@@ -1,0 +1,161 @@
+diff -ruN a/Makefile b/Makefile
+--- a/Makefile	2026-10-28 23:40:10
++++ b/Makefile	2026-10-28 23:40:10
+@@ -1,19 +1,19 @@
+ PREFIX=/usr/local
+ 
+ # comment out these two lines if you don't want to include [incr tsdb()] support
+-DELPHIN_CFLAGS=-isystem ${LOGONROOT}/lingo/lkb/include -DTSDB
+-DELPHIN_LIBS=-L ${LOGONROOT}/lingo/lkb/lib/linux.x86.64 -Wl,-Bstatic -litsdb -lpvm3 -Wl,-Bdynamic
++DELPHIN_CFLAGS=
++DELPHIN_LIBS=
+ 
+ POST_CFLAGS=-I post/ -DPOST
+-POST_LIBS=-Wl,-Bstatic -lutil -Wl,-Bdynamic	# for openpty for calling out to tnt (which uses fully buffered stdio)
++POST_LIBS=-lutil
+ 
+-REPP_LIBS=-Wl,-Bstatic -lrepp -Wl,-Bdynamic
++REPP_LIBS=$(REPP_DIR)/librepp.a
+ #REPP_CFLAGS=-I ${REPP_DIR}/include/
+ 
+-BOOST_REGEX_LIBS=-Wl,-Bstatic -lboost_regex -lstdc++ -Wl,-Bdynamic
++BOOST_REGEX_LIBS=/opt/homebrew/lib/libboost_regex.a -lc++
+ 
+ #CPU=-m32
+-CC=gcc
++CC=gcc-16
+ #CFLAGS=-g -O6 -fomit-frame-pointer -funsigned-char -falign-loops=32 -funroll-loops ${CPU} -fprofile-generate=./profile-data/
+ #REPP_LIBS+=-lgcov
+ #CFLAGS=-g -O6 -fomit-frame-pointer -funsigned-char -falign-loops=32 -funroll-loops ${CPU} -fprofile-use=./profile-data/
+@@ -26,10 +26,11 @@
+ #CFLAGS=-g -funsigned-char
+ #CFLAGS+=-fPIC
+ 
+-EXPORT_DYNAMIC_CFLAG=-Wl,--export-dynamic
++EXPORT_DYNAMIC_CFLAG=
+ 
+ #include MacOSX.config
+ 
++CFLAGS+=-include macfix.h -fcommon -std=gnu17 -fpermissive -w -DMACOSX_GCC -I$(REPP_DIR)/include -I/opt/homebrew/include
+ CFLAGS+=${DELPHIN_CFLAGS} ${POST_CFLAGS} ${REPP_CFLAGS}
+ 
+ OBJ=lexicon.o chart.o dag.o type.o tdl.o rule.o morpho.o roots.o freeze.o unify.o qc.o agenda.o net.o glb.o semindex.o hash.o mrs.o mrsvpm.o mrsdg.o itsdb.o pack.o unpack.o maxent.o generate.o parse.o lui.o conf.o preprocessor.o treebank-control.o token.o lattice-mapping.o lexical-parse.o generalize.o transfer.o transfer-result.o edge-vectors.o forest-out.o exunpack.o semilattice.o rebuild-th.o compile-qc.o idiom.o yy.o lisp.o tnt.o tree.o reconstruct.o arbiter.o profiler.o qcparse.o rule-use-model.o ubertag.o dublin.o licenses.o dag-provenance.o semi.o timeout.o csaw/csaw.o csaw/naive.o csaw/normalize.o
+diff -ruN a/freeze.h b/freeze.h
+--- a/freeze.h	2026-10-28 23:40:10
++++ b/freeze.h	2026-10-28 23:40:10
+@@ -12,6 +12,6 @@
+ extern long	loaded_freeze_size;
+ 
+ //#define	FREEZER_MMAP_BASE	0x60000000
+-#define	FREEZER_MMAP_BASE	0x6000000000L
++#define	FREEZER_MMAP_BASE	0x200000000000L
+ 
+ #define	FROZEN(x)		((long)x>=FREEZER_MMAP_BASE && (long)x<(FREEZER_MMAP_BASE+loaded_freeze_size))
+diff -ruN a/macfix.h b/macfix.h
+--- a/macfix.h	1969-12-31 19:00:00
++++ b/macfix.h	2026-10-28 23:40:10
+@@ -0,0 +1,7 @@
++/* prototypes for functions ACE calls without a declaration; without them a
++ * 64-bit build truncates the returned pointers and doubles to int */
++struct type; struct lattice; struct lattice_vertex; struct profiler;
++struct type *find_type(char *name, int constrain);
++struct lattice_vertex *new_lattice_vertex(struct lattice *tc);
++double stop_timer(int i, int count);
++double stop_profiler(struct profiler *prof, int nevents);
+diff -ruN a/post/Makefile b/post/Makefile
+--- a/post/Makefile	2026-10-28 23:40:10
++++ b/post/Makefile	2026-10-28 23:40:10
+@@ -1,5 +1,5 @@
+-CC=gcc
+-CFLAGS=-O3 -g -fPIC
++CC=gcc-16
++CFLAGS=-O3 -g -fPIC -std=gnu17 -fpermissive -w
+ #CFLAGS=-g
+ OBJS = train.o words.o tags.o hmm.o
+ 
+diff -ruN a/tdl.c b/tdl.c
+--- a/tdl.c	2026-10-28 23:40:10
++++ b/tdl.c	2026-10-28 23:40:10
+@@ -1534,6 +1534,8 @@
+ 	return process_tdl_status(status, mtrify_tdl_line, process);
+ }
+ 
++static int strcmp_ptr_for_glb_dump(const void *a, const void *b) { return strcmp(*(char**)a, *(char**)b); }
++
+ void	load_triggers(char	*path)
+ {
+ 	if(!path)return;
+@@ -1628,6 +1630,41 @@
+ 	}
+ 
+ 	number_strings();
++
++	if(getenv("ACE_GLB_DUMP"))
++	{
++		/* one line per glb: its declared (non-glb) supertypes, sorted */
++		struct type_hierarchy *th = default_type_hierarchy();
++		FILE *df = fopen(getenv("ACE_GLB_DUMP"), "w");
++		int *seen = calloc(th->ntypes, sizeof(int)), gen = 0;
++		struct type **stack = malloc(sizeof(struct type*) * th->ntypes);
++		char **names = malloc(sizeof(char*) * th->ntypes);
++		int i;
++		for(i=0;i<th->ntypes;i++)
++		{
++			struct type *t = th->types[i];
++			if(strncmp(t->name, "g(", 2))continue;
++			int sp = 0, nn = 0, j;
++			gen++;
++			stack[sp++] = t;
++			while(sp)
++			{
++				struct type *u = stack[--sp];
++				for(j=0;j<u->nparents;j++)
++				{
++					struct type *p = u->parents[j];
++					if(seen[p->tnum] == gen)continue;
++					seen[p->tnum] = gen;
++					stack[sp++] = p;
++					if(strncmp(p->name, "g(", 2))names[nn++] = p->name;
++				}
++			}
++			qsort(names, nn, sizeof(char*), strcmp_ptr_for_glb_dump);
++			for(j=0;j<nn;j++)fprintf(df, "%s%s", j?" ":"", names[j]);
++			fprintf(df, "\n");
++		}
++		fclose(df);
++	}
+ 
+ 	if(g_transfer == 0)
+ 		fprintf(stderr, "%d types (%d glb), %d lexemes, %d rules, %d orules, %d instances, %d strings, %d features\n",
+diff -ruN a/transfer.c b/transfer.c
+--- a/transfer.c	2026-10-28 23:40:10
++++ b/transfer.c	2026-10-28 23:40:10
+@@ -245,7 +245,7 @@
+ void warn_about_equals(struct transfer_rule	*tr)
+ {
+ 	static int	eqpath[5]={-1};
+-	struct dg	*eql = walk_dg(tr->dg, eqpath, "FLAGS", "EQUAL", 0);
++	struct dg	*eql = walk_dg(tr->dg, eqpath, "FLAGS", "EQUAL", NULL);
+ 	while(eql && dg_hop(eql, 1))
+ 	{
+ 		struct dg	*eq = dg_hop(eql, 1);
+@@ -263,7 +263,7 @@
+ 	struct transfer_rule	*tr = calloc(sizeof(struct transfer_rule), 1);
+ 	tr->name = strdup(name);
+ 	static int flagspath[5] = {-1,-1};
+-	struct dg	*optdg = walk_dg(dg, flagspath, "FLAGS", "OPTIONAL", 0);
++	struct dg	*optdg = walk_dg(dg, flagspath, "FLAGS", "OPTIONAL", NULL);
+ 	tr->optional = optdg?(!strcmp(optdg->xtype->name, "+")):0;
+ 	tr->dg = dg;
+ 	tr->output_override = output_override;
+@@ -458,8 +458,8 @@
+ 	bzero(tr->ss, sizeof(struct dg*)*10);
+ 	tr->neq = tr->nss = 0;
+ 	static int	eqpath[5]={-1}, sspath[5]={-1};
+-	struct dg	*eql = walk_dg(tr->dg, eqpath, "FLAGS", "EQUAL", 0);
+-	struct dg	*ssl = walk_dg(tr->dg, sspath, "FLAGS", "SUBSUME", 0);
++	struct dg	*eql = walk_dg(tr->dg, eqpath, "FLAGS", "EQUAL", NULL);
++	struct dg	*ssl = walk_dg(tr->dg, sspath, "FLAGS", "SUBSUME", NULL);
+ 	//printf("eql = \n");
+ 	//print_dg(eql); printf("\n");
+ 	while(eql && dg_hop(eql, 1))
