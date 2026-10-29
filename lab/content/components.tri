@@ -1,0 +1,53 @@
+// The component kinds of the laboratory. Each @component type is one
+// component kind; the features it introduces are its fields, with their
+// field registry flags. The structs and the registry the lab uses are
+// generated from this file (make gen).
+
+#Material: "iron" | "oak" | "brass" | "flesh" | "paper"
+
+// A physical thing: what it weighs, what it is made of, and the traces it
+// carries. Units of a stack share one Body, so marks on one unit split it off.
+#Body: {
+    @component(Body)
+    mass:      mass                    @field(content, saved, proposable, inspect, perceive(touch))
+    material:  #Material               @field(content, saved, inspect, perceive(sight))
+    bent:      *false | true           @field(saved, proposable, inspect, perceive(sight))
+    toolMarks: *0 | int & >=0 & <=100  @field(saved, proposable, inspect, perceive(sight))
+}
+
+// Identical units counted as one entity. The stack's mass is its units'.
+#Stack: #Body & {
+    @component(Stack)
+    count:    $n & int & >=1 & <=100000 @field(content, saved, proposable, inspect)
+    unitMass: $u & mass                 @field(content, saved, inspect)
+    unit:     text                      @field(content, saved, inspect)
+    mass:     $u * $n
+}
+
+// Something that acts, with hands to hold things in.
+#Agent: #Body & {
+    @component(Agent)
+    hands: int & >=0 & <=4 @field(content, saved, inspect)
+}
+
+// Something entities can be put in.
+#Container: #Body & {
+    @component(Container)
+    capacity: int & >=1 & <=1000 @field(content, saved, inspect)
+}
+
+// Something with parts installed in it.
+#Assembly: #Body & {
+    @component(Assembly)
+    slots: int & >=1 & <=64 @field(content, saved, inspect)
+}
+
+#ClaimKind: "ownership" | "custody"
+
+// A reified claim: an informational entity, with no body and no location.
+// Its claimant and subjects are edges.
+#Claim: {
+    @component(Claim)
+    kind:     #ClaimKind       @field(content, saved, inspect)
+    quantity: int & >=0 & <=100000 @field(content, saved, proposable, inspect)
+}

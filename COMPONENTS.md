@@ -303,8 +303,12 @@ There are three levels of identity:
 - Units merge into a stack only if they are **physically indistinguishable**:
   - the same unit spec
   - no traces or damage
-  - no relations other than location
-  - no reified claims on the individual
+  - no relations other than location (provenance edges such as `splitFrom`
+    are history and don't count)
+  - no reified claim on the individual alone. A quantity claim over several
+    entities follows the units: splitting a claimed stack extends the claim
+    to the split-off entity, so an unmarked nail carries the claim, and it
+    still merges back. (Found by the laboratory's variant A.)
 - **Knowledge does not prevent merging.** If an agent "knows which nail it
   was" but nothing physical distinguishes it, the identity is lost once it's
   mixed back in. That is realistic. The agent's belief now resolves to a

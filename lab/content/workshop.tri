@@ -1,0 +1,19 @@
+// The workshop of COMPONENTS.md's first scenario, "The marked nail".
+
+// One iron nail: the unit of the nail stacks.
+iron_nail: #Body & { material: "iron", mass: 3g }
+
+// Nails in a stack. Their unit is iron_nail, and so is their unit mass.
+nails_30: #Stack & { material: "iron", unit: "iron_nail", unitMass: 3g, count: 30 }
+nails_10: #Stack & { material: "iron", unit: "iron_nail", unitMass: 3g, count: 10 }
+
+// The workshop bin.
+bin: #Container & { material: "oak", mass: 4kg, capacity: 50 }
+
+// The lock that gets wedged shut.
+lock: #Assembly & { material: "brass", mass: 600g, slots: 4 }
+
+worker: #Agent & { material: "flesh", mass: 70kg, hands: 2 }
+smith:  #Agent & { material: "flesh", mass: 85kg, hands: 2 }
+
+ownership: #Claim & { kind: "ownership" }

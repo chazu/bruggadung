@@ -7,8 +7,11 @@ sets out the six systems and the development sequence. This document shows
 how the specified systems fit together, which rules apply across all of them,
 and what remains.
 
-None of this is implemented. The contracts are proposals, to be tested by
-the scenarios in each document before we build the simulation laboratory.
+The contracts are proposals, tested by the scenarios in each document. Two
+parts are built: the content language's engine ([triangle/](triangle/README.md))
+and the first slice of the simulation laboratory ([lab/](lab/README.md)):
+entities, component stores, relations, change commitment, and the scheduler,
+proven on COMPONENTS.md's first scenario.
 
 ## Documents
 
@@ -17,7 +20,7 @@ the scenarios in each document before we build the simulation laboratory.
 | [DESIGN.md](DESIGN.md) | The six systems, ambitions, and development sequence | Proposal |
 | [STACK.md](STACK.md) | Language: mulle Objective-C | Decided |
 | [DOMAIN_SIMULATION.md](DOMAIN_SIMULATION.md) | §3: domains, stocks, horizons, the scheduler | Contract proposed, 3 scenarios |
-| [COMPONENTS.md](COMPONENTS.md) | §2: entities, components, relations, identity on demand | Contract proposed, 3 scenarios |
+| [COMPONENTS.md](COMPONENTS.md) | §2: entities, components, relations, identity on demand | Contract proposed, 3 scenarios; Scenario 1 runs in [lab/](lab/README.md) |
 | [ACTIONS.md](ACTIONS.md) | §1: capabilities, actions, activities; change commitment | Contract proposed, 3 scenarios |
 | [KNOWLEDGE.md](KNOWLEDGE.md) | §4: history, traces, perception, referents, claims, beliefs, memory | Contract proposed, 3 scenarios |
 | [AGENCY.md](AGENCY.md) | §5: goals, methods, needs, commitments, habits, dispositions, salience | Contract proposed, 3 scenarios |
@@ -275,10 +278,14 @@ A rebuilt world produces the same next step as one that never saved.
    the same meet types, the same result on every one of 597,000
    unifications, and about 1.5 times the speed. See
    [CONTENT_LANGUAGE.md](CONTENT_LANGUAGE.md) §18.
-4. **The simulation laboratory:** set up the mulle Objective-C toolchain
-   (not yet installed on this machine), then build the clock, scheduler, run
-   policy, commitment, one tile-grid domain, one device network, and the
-   scenario harness.
+4. **The simulation laboratory:** in [lab/](lab/README.md), in mulle
+   Objective-C, with content from Triangle. The first slice is built:
+   entities, component stores generated from content, relations, tombstones,
+   change commitment with automatic individuation and reactions, the clock
+   and scheduler, and a scenario harness that runs *The marked nail* and its
+   variants with all seven acceptance checks. Next, per
+   [lab/PLAN.md](lab/PLAN.md): saves, operations and the action menu from
+   content, activities, a tile-grid domain, and the command interface.
 
 ## Cross-cutting open questions
 
