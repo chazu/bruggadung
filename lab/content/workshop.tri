@@ -22,3 +22,8 @@ ownership: #Claim & { kind: "ownership" }
 // with a tap and a bucket.
 agent_a: #Agent & { material: "flesh", mass: 60kg, hands: 2 }
 agent_b: #Agent & { material: "flesh", mass: 65kg, hands: 2 }
+
+// For AGENCY.md's first scenario, as "the missing nails": a crate across the
+// workshop, and the spare nails that may be in it.
+crate:   #Container & { material: "oak", mass: 2kg, capacity: 20 }
+nails_4: #Stack & { material: "iron", unit: "iron_nail", unitMass: 3g, count: 4 }

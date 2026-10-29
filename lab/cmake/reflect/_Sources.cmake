@@ -14,6 +14,7 @@ set( SOURCES
 src/act/BGActions.m
 src/act/BGActivities.m
 src/act/BGView.m
+src/agency/BGAgency.m
 src/commit/BGCommitter.m
 src/commit/BGProposalGroup.m
 src/core/BGStore.m

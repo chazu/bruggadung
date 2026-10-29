@@ -499,4 +499,35 @@ attention budgets, and the notebook.
 
 27 tests, 237 checks, under both compilers, ASan and UBSan, and leak-free.
 
-Next: agency (AGENCY.md): agents that choose from their own menus.
+### After the slice: agency
+
+The first agency slice (`src/agency/`): a decision phase after perception;
+per agent, a private motivation store (intentions as a stack with the
+commitment at the bottom, the places searched, the decision count), saved;
+and a decision log. AGENCY.md's Scenario 1 runs as "the missing nails": the
+worker, committed to wedging the lock, walks to the bin it believes holds
+nails and reaches in; the failed precondition yields *seek nails*; the
+search follows its beliefs to the crate; with spares there it takes two and
+wedges the lock, without them it drops the goal as impossible for now, with
+the reason. On the omniscient stub (perception without limits) it never
+visits the bin. The run is bit-identical on replay, decisions included.
+
+What it settled:
+
+- **A decision that only changes the intention is followed by another**, in
+  the same phase (up to four), until the agent acts or waits; otherwise the
+  next boundary might be the end of the run.
+- **In mulle-objc, variadic methods can't use `va_start`**; see README.md.
+- **Two nails, not one**: taking a single unit makes an individual, whose
+  kind is `#Body`, not a stack of nails; the method takes two.
+
+Not yet: goals and methods as content (AGENCY.md §5), scored goal
+generation and consideration curves, needs, routines and habits,
+dispositions and norms, salience, social behaviour (asking a coworker),
+walking with a duration (agents walk a tile per millisecond), and the
+decision committing at its own boundary.
+
+28 tests, 255 checks, under both compilers, ASan and UBSan, and leak-free.
+
+Next: goals and methods in content; event perception and communication, so
+the scenario's "ask a coworker" can run; walking as an activity.

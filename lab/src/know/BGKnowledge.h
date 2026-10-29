@@ -79,9 +79,15 @@ typedef struct
    BGWorld          *_world;
    NSMutableArray   *_stores;          /* sorted by agent */
    NSUInteger       _eventsSeen;
+   BOOL             _omniscient;
 }
 
 - (id) initWithWorld:(BGWorld *) world;
+
+/* The omniscient stub (AGENCY.md §3): perception without limits, everything
+ * everywhere, inside containers too. Agency run on it must behave visibly
+ * differently from agency run on what agents can know. */
+- (void) setOmniscient:(BOOL) flag;
 
 /* the agent's store, made when first asked for */
 - (BGKnowledgeStore *) storeOf:(BGEntityID) agent;

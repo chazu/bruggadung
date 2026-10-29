@@ -39,6 +39,7 @@ CFLAGS`.
 | `src/domains/` | `BGFluidDomain`: water through open taps, with checkout, exact allocation, and exhaustion as the horizon |
 | `src/sched/` | `BGScheduler`, with the domain and input-source protocols |
 | `src/act/` | `BGView` (reach and descriptions: the knowledge view's stub), `BGActions` (the menu, matching, effects, performing), `BGActivities` (activities under way: completion, watches, ending) |
+| `src/agency/` | `BGAgency`: agents that decide from their own knowledge, with intentions, a subgoal, and a decision log |
 | `src/know/` | `BGKnowledge`: agents' knowledge stores, the perception phase, recognition |
 | `src/save/` | `BGSave`: saves as text, and restoring them |
 | `src/scenario/` | `BGWorlds` (the worlds' setups), `BGMarkedNail` and `BGCistern`: the scenarios, their input logs, and their checks |
@@ -71,6 +72,19 @@ truth link. A referent believed where the agent can see, and not seen there,
 is marked absent. The menu `lab play` shows comes from this store, so it can
 offer what is no longer so: performing it, the world's side finds the thing
 gone, the attempt commits, and perception corrects the belief.
+
+## Agents that decide
+
+In the decision phase after perception, each agent agency controls decides
+one step from its intention, reading only its own knowledge store, and acts
+through the same believed actions a player uses. The first slice has one
+commitment (wedge the lock) and one instrumental goal (seek nails), written
+in code against the knowledge view: a failed precondition yields the
+subgoal, the search follows the agent's beliefs, the commitment stays the
+intention throughout, and when nowhere is left the goal is dropped with the
+reason. Every decision is logged. Run on an omniscient knowledge view, the
+same agent walks straight to the spare nails: the behaviour depends on what
+the agent knows.
 
 ## Playing
 
@@ -143,6 +157,10 @@ Every step is in the trace: `lab run marked-nail` prints it.
   `-content` returning `TriContent *`; the runtime warns, and the world's is
   `-contentBuild`. Describing an entity is `-describeEntity:` for the same
   reason. `make check` fails on any such warning.
+- **Variadic methods don't receive their arguments through `va_start`**: the
+  meta-ABI passes them differently, and reading them that way returns
+  garbage. The lab's own methods are not variadic; callers format with
+  `stringWithFormat:`, which MulleFoundation handles.
 - The code uses manual retain/release, no properties, and no blocks, so the
   same sources build with Apple clang (`make test-apple`).
 - The full MulleFoundation needs mulle-clang 23.1.3, which isn't released;

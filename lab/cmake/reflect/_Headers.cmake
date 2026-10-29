@@ -14,6 +14,7 @@ set( INCLUDE_DIRS
 src/reflect
 src/generic
 src/act
+src/agency
 src/commit
 src/core
 src/domains
@@ -72,6 +73,7 @@ set( PUBLIC_HEADERS
 src/act/BGActions.h
 src/act/BGActivities.h
 src/act/BGView.h
+src/agency/BGAgency.h
 src/commit/BGCommitter.h
 src/commit/BGProposalGroup.h
 src/core/BGStore.h

@@ -23,7 +23,7 @@ proven on COMPONENTS.md's first scenario.
 | [COMPONENTS.md](COMPONENTS.md) | §2: entities, components, relations, identity on demand | Contract proposed, 3 scenarios; Scenario 1 runs in [lab/](lab/README.md) |
 | [ACTIONS.md](ACTIONS.md) | §1: capabilities, actions, activities; change commitment | Contract proposed, 3 scenarios |
 | [KNOWLEDGE.md](KNOWLEDGE.md) | §4: history, traces, perception, referents, claims, beliefs, memory | Contract proposed, 3 scenarios; Scenario 3's stale map and menu run in [lab/](lab/README.md) |
-| [AGENCY.md](AGENCY.md) | §5: goals, methods, needs, commitments, habits, dispositions, salience | Contract proposed, 3 scenarios |
+| [AGENCY.md](AGENCY.md) | §5: goals, methods, needs, commitments, habits, dispositions, salience | Contract proposed, 3 scenarios; Scenario 1 runs, adapted, in [lab/](lab/README.md) |
 | — | §6: institutions | Next |
 | — | Latent physical assembly | Not started; hooks exist in COMPONENTS.md §7 |
 | [CONTENT_LANGUAGE.md](CONTENT_LANGUAGE.md) | Triangle, the content language: typed feature structures, TDL semantics, CUE-style syntax, the engine | Contract proposed, 3 scenarios |
@@ -289,8 +289,10 @@ A rebuilt world produces the same next step as one that never saved.
    suspension, and watches, and `lab play`: an interactive session with a
    text map, the menu, and the developer inspector, water spreading across
    the floor, and agents' knowledge stores filled by perception, with the
-   menu and map built from them. Next, per [lab/PLAN.md](lab/PLAN.md):
-   agency.
+   menu and map built from them, and a first slice of agency: agents that
+   decide from what they know, with a subgoal when a belief fails them.
+   Next, per [lab/PLAN.md](lab/PLAN.md): goals and methods as content,
+   event perception and communication.
 
 ## Cross-cutting open questions
 

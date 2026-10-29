@@ -1,4 +1,4 @@
-/* Generated from Triangle content 88b92d2fc18fd5b9: do not edit. Type IDs are valid
+/* Generated from Triangle content 3301c411ef410aec: do not edit. Type IDs are valid
  * only for this content; regenerate when it changes. */
 #ifndef BG_COMPONENTS_H
 #define BG_COMPONENTS_H
@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BG_CONTENT_HASH 0x88b92d2fc18fd5b9ULL
+#define BG_CONTENT_HASH 0x3301c411ef410aecULL
 
 /* Activity, from #Activity */
 typedef struct {

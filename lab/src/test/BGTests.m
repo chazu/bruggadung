@@ -10,6 +10,7 @@
 #import "BGPlay.h"
 #import "BGKnowledge.h"
 #import "BGWorlds.h"
+#import "BGAgency.h"
 
 #include <stdio.h>
 
@@ -979,6 +980,177 @@ static void   test_stale_belief( void)
 }
 
 
+/* --- agency ---------------------------------------------------------------- */
+
+typedef struct
+{
+   BGWorld       *world;
+   BGAgency      *agency;
+   NSString      *text;          /* a save at the end, agency and knowledge included */
+} BGNailsRun;
+
+
+/* AGENCY.md Scenario 1, as "the missing nails". The worker looks into the bin
+ * and walks off past the crate; the smith takes the nails away; then agency
+ * takes the worker over, committed to wedging the lock. */
+static BGNailsRun   missing_nails( BOOL spares, BOOL omniscient)
+{
+   BGWorld           *w;
+   BGCommitter       *c;
+   BGScheduler       *s;
+   BGActivities      *activities;
+   BGKnowledge       *knowledge;
+   BGAgency          *agency;
+   BGProposalGroup   *g;
+   BGEntityID        h[ 8];
+   BGEntityID        crate;
+   BGEntityID        ch;
+   NSString          *error;
+   BGNailsRun        run;
+   int               i;
+
+   w          = BGTestWorld( 13);
+   c          = BGTestCommitter( w);
+   activities = [BGActivities activitiesWithWorld:w committer:c];
+   knowledge  = [[[BGKnowledge alloc] initWithWorld:w] autorelease];
+   agency     = [[[BGAgency alloc] initWithWorld:w committer:c knowledge:knowledge] autorelease];
+   s          = [[[BGScheduler alloc] initWithWorld:w committer:c] autorelease];
+   [knowledge setOmniscient:omniscient];
+   [s setActivities:activities];
+   [s setPerception:knowledge];
+   [s setDecision:agency];
+   [c submit:BGWorkshopSetup( NO, h)];
+   g  = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the crate"];
+   ch = [g create:"crate" key:"crate" at:BGOnTile( 8, 7, 0)];
+   if( spares)
+      [g create:"nails_4" key:"spare nails" at:BGIn( ch)];
+   [c submit:g];
+   [s runUntil:BGTimeMake( 1)];
+   crate = [g idFor:ch];
+   (void) crate;
+
+   /* the worker looks into the bin, then walks off east */
+   BGPerform( w, c, BGActionMake( "look_in", 4, 1, BGNoEntity), 0, &error);
+   [s runUntil:BGTimeMake( 2)];
+   for( i = 0; i < 6; i++)
+   {
+      BGPerform( w, c, BGActionMake( "walk_east", 4, BGNoEntity, BGNoEntity), 0, &error);
+      [s runUntil:BGTimeMake( [w time].ms + 1000)];
+   }
+   /* the smith takes the nails and walks off south */
+   BGPerform( w, c, BGActionMake( "take", 5, 2, BGNoEntity), 0, &error);
+   [s runUntil:BGTimeMake( [w time].ms + 1000)];
+   for( i = 0; i < 5; i++)
+   {
+      BGPerform( w, c, BGActionMake( "walk_south", 5, BGNoEntity, BGNoEntity), 0, &error);
+      [s runUntil:BGTimeMake( [w time].ms + 1000)];
+   }
+
+   /* the shift: agency has the worker now */
+   [agency commitToWedging:4];
+   [s runUntil:BGTimeMake( [w time].ms + 1)];
+   [s runUntil:BGTimeMake( 120000)];
+   run.world  = w;
+   run.agency = agency;
+   run.text   = BGSave( w, c, [NSArray arrayWithObjects:knowledge, agency, nil]);
+   return( run);
+}
+
+
+static BOOL   happened( BGWorld *w, const char *kind, BGEntityID actor, BGEntityID other)
+{
+   const BGEvent   *ev;
+   NSUInteger      i;
+
+   for( i = 0; i < [w eventCount]; i++)
+   {
+      ev = [w eventAt:i];
+      if( ! strcmp( ev->kind, kind) && ev->actor == actor && ev->other == other)
+         return( YES);
+   }
+   return( NO);
+}
+
+
+static uint64_t   first_at( BGWorld *w, const char *kind, BGEntityID actor, BGEntityID other)
+{
+   const BGEvent   *ev;
+   NSUInteger      i;
+
+   for( i = 0; i < [w eventCount]; i++)
+   {
+      ev = [w eventAt:i];
+      if( ! strcmp( ev->kind, kind) && ev->actor == actor && ev->other == other)
+         return( ev->index);
+   }
+   return( 0);
+}
+
+
+static BOOL   wedged( BGWorld *w)
+{
+   BGEntityID   parts[ 4];
+
+   return( [w entitiesAt:3 form:BGLocationPartOf into:parts max:4] > 0);
+}
+
+
+static BOOL   logged( BGAgency *agency, NSString *text)
+{
+   NSArray      *log;
+   NSUInteger   i;
+
+   log = [agency logOf:4];
+   for( i = 0; i < [log count]; i++)
+      if( [[log objectAtIndex:i] rangeOfString:text].location != NSNotFound)
+         return( YES);
+   return( NO);
+}
+
+
+static void   test_missing_nails( void)
+{
+   BGNailsRun   base;
+   BGNailsRun   again;
+   BGNailsRun   spares;
+   BGNailsRun   seer;
+   BGEntityID   crate;
+
+   crate = 7;           /* after the workshop's six */
+
+   /* base: the bin first (believed), then the crate; nowhere left: dropped, with why */
+   base = missing_nails( NO, NO);
+
+   BG_CHECK( happened( base.world, "attempted", 4, 1));
+   BG_CHECK( happened( base.world, "looked", 4, crate));
+   BG_CHECK( first_at( base.world, "attempted", 4, 1) < first_at( base.world, "looked", 4, crate));
+   BG_CHECK( logged( base.agency, @"[wedge the lock] no nails where I believed them: seek nails"));
+   BG_CHECK( logged( base.agency, @"[seek nails] look_in"));
+   BG_CHECK( logged( base.agency, @"nowhere left to look: wedging the lock is impossible for now"));
+   BG_CHECK( ! wedged( base.world) && [base.agency mindOf:4]->ngoals == 0);
+
+   /* the same run is the same, decisions and all */
+   again = missing_nails( NO, NO);
+   BG_CHECK( [again.world stateHash] == [base.world stateHash]);
+   BG_CHECK( [[again.agency logOf:4] isEqualToArray:[base.agency logOf:4]]);
+   BG_CHECK( [again.text isEqualToString:base.text]);
+
+   /* A: spare nails in the crate: found, taken, and the lock wedged; wedging was the intention throughout */
+   spares = missing_nails( YES, NO);
+   BG_CHECK( happened( spares.world, "attempted", 4, 1));
+   BG_CHECK( logged( spares.agency, @"[seek nails] found nails: back to wedging the lock"));
+   BG_CHECK( logged( spares.agency, @"[wedge the lock] the lock is wedged: done"));
+   BG_CHECK( wedged( spares.world));
+
+   /* B: the omniscient stub knows better, and the behaviour shows it: straight to the crate */
+   seer = missing_nails( YES, YES);
+   BG_CHECK( ! happened( seer.world, "attempted", 4, 1));
+   BG_CHECK( ! logged( seer.agency, @"seek nails"));
+   BG_CHECK( wedged( seer.world));
+   BG_CHECK( [[seer.agency logOf:4] count] < [[spares.agency logOf:4] count]);
+}
+
+
 /* --- the cistern ----------------------------------------------------------- */
 
 static BGCistern   *run_cistern( BGCisternVariant variant)
@@ -1287,6 +1459,7 @@ const BGTestCase   BGAllTests[] =
    { "stages_and_suspension",         test_stages_and_suspension },
    { "play",                          test_play },
    { "stale_belief",                  test_stale_belief },
+   { "missing_nails",                 test_missing_nails },
    { "cistern",                       test_cistern },
    { "cistern_b",                     test_cistern_b },
    { "cistern_d",                     test_cistern_d },

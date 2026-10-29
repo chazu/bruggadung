@@ -78,6 +78,15 @@ typedef struct
 
 @end
 
+/* The decision phase (ARCHITECTURE.md step 6, AGENCY.md §12): after
+ * perception, agents decide. What they submit commits at the next boundary
+ * (the architecture would commit it at this one). */
+@protocol BGDecisionPhase
+
+- (void) decideBoundary:(uint64_t) boundary;
+
+@end
+
 @class BGScheduler;
 
 @protocol BGSchedulerObserver
@@ -97,6 +106,7 @@ typedef struct
    id <BGInputSource>           _inputs;
    id <BGActivityClock>         _activities;
    id <BGPerceptionPhase>       _perception;
+   id <BGDecisionPhase>         _decision;
    id <BGSchedulerObserver>     _observer;
 }
 
@@ -107,6 +117,7 @@ typedef struct
 - (void) setInputs:(id <BGInputSource>) inputs;          /* not retained */
 - (void) setActivities:(id <BGActivityClock>) activities; /* not retained */
 - (void) setPerception:(id <BGPerceptionPhase>) perception; /* not retained */
+- (void) setDecision:(id <BGDecisionPhase>) decision;       /* not retained */
 - (void) setObserver:(id <BGSchedulerObserver>) observer; /* not retained */
 
 /* The time the next boundary would be at, if nothing stops it first. */

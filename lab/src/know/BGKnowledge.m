@@ -267,6 +267,12 @@ static void   append_quoted( NSMutableString *s, const char *text)
 }
 
 
+- (void) setOmniscient:(BOOL) flag
+{
+   _omniscient = flag;
+}
+
+
 - (BGKnowledgeStore *) storeOf:(BGEntityID) agent
 {
    BGKnowledgeStore   *store;
@@ -386,11 +392,12 @@ static int   cmp_seen( const void *a, const void *b)
       BGEntityID   e;
 
       e = [bodies entityAtIndex:i];
-      if( ! ground_tile( _world, e, &tile) || tile.level != here.level ||
-          abs( tile.x - here.x) > BG_SIGHT || abs( tile.y - here.y) > BG_SIGHT)
+      if( ! ground_tile( _world, e, &tile) ||
+          (! _omniscient && (tile.level != here.level ||
+                             abs( tile.x - here.x) > BG_SIGHT || abs( tile.y - here.y) > BG_SIGHT)))
          continue;
       at = [_world locationOf:e];
-      if( at.form == BGLocationIn && ! contains( lookedIn, nlooked, at.place))
+      if( at.form == BGLocationIn && ! _omniscient && ! contains( lookedIn, nlooked, at.place))
          continue;          /* inside, unseen */
       seen[ nseen].entity = e;
       seen[ nseen].depth  = depth_of( _world, e);
@@ -487,10 +494,11 @@ static int   cmp_seen( const void *a, const void *b)
       const BGReferent   *holder;
 
       r = (BGReferent *) [store referentAt:j];
-      if( taken[ j] || ! r->present || r->level != here.level ||
-          abs( r->x - here.x) > BG_SIGHT || abs( r->y - here.y) > BG_SIGHT)
+      if( taken[ j] || ! r->present)
          continue;
-      if( r->form == BGLocationIn)
+      if( ! _omniscient && (r->level != here.level || abs( r->x - here.x) > BG_SIGHT || abs( r->y - here.y) > BG_SIGHT))
+         continue;
+      if( r->form == BGLocationIn && ! _omniscient)
       {
          holder = [store referent:r->container];
          if( ! holder || ! contains( lookedIn, nlooked, holder->truth))
