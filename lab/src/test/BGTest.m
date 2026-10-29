@@ -9,8 +9,9 @@
 
 const char   *BGContentDir = "content";
 
-static int   checks;
-static int   failures;
+static int         checks;
+static int         failures;
+static BGContent   *sharedContent;      /* loaded once per run, released at the end */
 
 
 void   BGTestCheck( int ok, const char *what, const char *file, int line)
@@ -80,21 +81,27 @@ BGContent   *BGLoadContent( void)
 
 BGWorld   *BGTestWorld( uint64_t seed)
 {
-   static BGContent   *content;
-   BGWorld            *world;
-   NSString           *error;
+   BGWorld    *world;
+   NSString   *error;
 
-   if( ! content)
-      content = [BGLoadContent() retain];
-   if( ! content)
+   if( ! sharedContent)
+      sharedContent = [BGLoadContent() retain];
+   if( ! sharedContent)
       return( nil);
    error = nil;
-   world = [BGWorld worldWithContent:content
+   world = [BGWorld worldWithContent:sharedContent
                                 seed:seed
                                error:&error];
    if( ! world)
       fprintf( stderr, "lab: %s\n", [error UTF8String]);
    return( world);
+}
+
+
+void   BGReleaseSharedContentAfterUse( void)
+{
+   [sharedContent release];
+   sharedContent = nil;
 }
 
 
@@ -129,5 +136,7 @@ int   BGRunTests( const BGTestCase *tests, size_t n, const char *only)
       run++;
    }
    printf( "%zu tests, %d checks, %d failed\n", run, checks, failures);
+   [sharedContent release];
+   sharedContent = nil;
    return( failures);
 }

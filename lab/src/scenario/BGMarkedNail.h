@@ -63,6 +63,12 @@ typedef enum
 
 /* Runs the input log to its end, then the final checks. */
 - (void) run;
+/* The same in parts: run boundaries up to a time; carry on in another world
+ * (restored from a save of this one); finish and check. */
+- (void) runUntil:(BGTime) t;
+- (void) resumeWithWorld:(BGWorld *) world
+               committer:(BGCommitter *) committer;
+- (void) finish;
 
 - (BGWorld *) world;
 - (BGCommitter *) committer;

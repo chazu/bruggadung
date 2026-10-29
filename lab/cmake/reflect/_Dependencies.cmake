@@ -302,3 +302,101 @@ ${MULLE_FALLBACK_LIBRARY_PREFIX}MulleFoundationBase${MULLE_FALLBACK_LIBRARY_SUFF
 MulleFoundationBase")
    endif()
 endif()
+
+
+#
+# Generated from sourcetree: 1959AA93-BF54-4B96-9F28-8B1D64C484CD;mulle-testallocator;no-cmake-loader,no-cmake-searchpath,no-import,no-singlephase;
+# Disable with : `mulle-sourcetree mark mulle-testallocator no-link`
+# Disable for this platform: `mulle-sourcetree mark mulle-testallocator no-cmake-platform-${MULLE_UNAME}`
+# Disable for a sdk: `mulle-sourcetree mark mulle-testallocator no-cmake-sdk-<name>`
+#
+if( COLLECT_ALL_LOAD_DEPENDENCY_LIBRARIES_AS_NAMES)
+   list( APPEND ALL_LOAD_DEPENDENCY_LIBRARIES "mulle-testallocator")
+else()
+   if( NOT MULLE__TESTALLOCATOR_LIBRARY)
+      foreach( _TMP_MULLE__TESTALLOCATOR_LIBRARY_TARGET mulle-testallocator)
+         if( TARGET ${_TMP_MULLE__TESTALLOCATOR_LIBRARY_TARGET})
+            set( MULLE__TESTALLOCATOR_LIBRARY ${_TMP_MULLE__TESTALLOCATOR_LIBRARY_TARGET})
+            break()
+         endif()
+      endforeach()
+      if( NOT MULLE__TESTALLOCATOR_LIBRARY)
+         find_library( MULLE__TESTALLOCATOR_LIBRARY NAMES
+            ${MULLE_PREFERRED_LIBRARY_PREFIX}mulle-testallocator${CMAKE_DEBUG_POSTFIX}${MULLE_PREFERRED_LIBRARY_SUFFIX}
+            ${MULLE_PREFERRED_LIBRARY_PREFIX}mulle-testallocator${MULLE_PREFERRED_LIBRARY_SUFFIX}
+            ${MULLE_FALLBACK_LIBRARY_PREFIX}mulle-testallocator${CMAKE_DEBUG_POSTFIX}${MULLE_FALLBACK_LIBRARY_SUFFIX}
+            ${MULLE_FALLBACK_LIBRARY_PREFIX}mulle-testallocator${MULLE_FALLBACK_LIBRARY_SUFFIX}
+            mulle-testallocator
+            NO_CMAKE_SYSTEM_PATH NO_SYSTEM_ENVIRONMENT_PATH NO_CMAKE_FIND_ROOT_PATH
+         )
+         if( NOT MULLE__TESTALLOCATOR_LIBRARY AND NOT DEPENDENCY_IGNORE_SYSTEM_LIBRARIES)
+            find_library( MULLE__TESTALLOCATOR_LIBRARY NAMES
+               ${MULLE_PREFERRED_LIBRARY_PREFIX}mulle-testallocator${CMAKE_DEBUG_POSTFIX}${MULLE_PREFERRED_LIBRARY_SUFFIX}
+               ${MULLE_PREFERRED_LIBRARY_PREFIX}mulle-testallocator${MULLE_PREFERRED_LIBRARY_SUFFIX}
+               ${MULLE_FALLBACK_LIBRARY_PREFIX}mulle-testallocator${CMAKE_DEBUG_POSTFIX}${MULLE_FALLBACK_LIBRARY_SUFFIX}
+               ${MULLE_FALLBACK_LIBRARY_PREFIX}mulle-testallocator${MULLE_FALLBACK_LIBRARY_SUFFIX}
+               mulle-testallocator
+            )
+         endif()
+      endif()
+      message( STATUS "MULLE__TESTALLOCATOR_LIBRARY is ${MULLE__TESTALLOCATOR_LIBRARY}")
+   endif()
+   if( MULLE__TESTALLOCATOR_LIBRARY)
+         #
+         # Add MULLE__TESTALLOCATOR_LIBRARY to ALL_LOAD_DEPENDENCY_LIBRARIES list.
+         # Disable with: `mulle-sourcetree mark mulle-testallocator no-cmake-add`
+         #
+         if( NOT ${MULLE__TESTALLOCATOR_LIBRARY} IN_LIST ALL_LOAD_DEPENDENCY_LIBRARIES)
+            list( APPEND ALL_LOAD_DEPENDENCY_LIBRARIES ${MULLE__TESTALLOCATOR_LIBRARY})
+         endif()
+         #
+         # Inherit information from dependency.
+         # Encompasses: no-cmake-searchpath,no-cmake-dependency,no-cmake-loader
+         # Disable with: `mulle-sourcetree mark mulle-testallocator no-cmake-inherit`
+         #
+         # temporarily expand CMAKE_MODULE_PATH
+         get_filename_component( _TMP_MULLE__TESTALLOCATOR_ROOT "${MULLE__TESTALLOCATOR_LIBRARY}" DIRECTORY)
+         get_filename_component( _TMP_MULLE__TESTALLOCATOR_ROOT "${_TMP_MULLE__TESTALLOCATOR_ROOT}" DIRECTORY)
+         #
+         #
+         # Search for "Definitions.cmake" and "DependenciesAndLibraries.cmake" to include.
+         # Disable with: `mulle-sourcetree mark mulle-testallocator no-cmake-dependency`
+         #
+         foreach( _TMP_MULLE__TESTALLOCATOR_NAME "mulle-testallocator")
+            set( _TMP_MULLE__TESTALLOCATOR_DIR "${_TMP_MULLE__TESTALLOCATOR_ROOT}/include/${_TMP_MULLE__TESTALLOCATOR_NAME}/cmake")
+            # use explicit path to avoid "surprises"
+            if( IS_DIRECTORY "${_TMP_MULLE__TESTALLOCATOR_DIR}")
+               list( INSERT CMAKE_MODULE_PATH 0 "${_TMP_MULLE__TESTALLOCATOR_DIR}")
+               # we only want top level INHERIT_OBJC_DEPS, so disable them
+               if( NOT NO_INHERIT_OBJC_DEPS)
+                  set( NO_INHERIT_OBJC_DEPS OFF)
+               endif()
+               list( APPEND _TMP_INHERIT_OBJC_DEPS ${NO_INHERIT_OBJC_DEPS})
+               set( NO_INHERIT_OBJC_DEPS ON)
+               #
+               include( "${_TMP_MULLE__TESTALLOCATOR_DIR}/DependenciesAndLibraries.cmake" OPTIONAL)
+               #
+               list( GET _TMP_INHERIT_OBJC_DEPS -1 NO_INHERIT_OBJC_DEPS)
+               list( REMOVE_AT _TMP_INHERIT_OBJC_DEPS -1)
+               list( REMOVE_ITEM CMAKE_MODULE_PATH "${_TMP_MULLE__TESTALLOCATOR_DIR}")
+               #
+               unset( MULLE__TESTALLOCATOR_DEFINITIONS)
+               unset( MULLE__TESTALLOCATOR_RENDEZVOUS_GLOBALS)
+               include( "${_TMP_MULLE__TESTALLOCATOR_DIR}/Definitions.cmake" OPTIONAL)
+               list( APPEND INHERITED_DEFINITIONS ${MULLE__TESTALLOCATOR_DEFINITIONS})
+               include( "${_TMP_MULLE__TESTALLOCATOR_DIR}/Definitions.cmake" OPTIONAL)
+               list( APPEND RENDEZVOUS_GLOBALS ${MULLE__TESTALLOCATOR_RENDEZVOUS_GLOBALS})
+               break()
+            else()
+               message( STATUS "${_TMP_MULLE__TESTALLOCATOR_DIR} not found")
+            endif()
+         endforeach()
+   else()
+      # Disable with: `mulle-sourcetree mark mulle-testallocator no-require-link`
+      message( SEND_ERROR "MULLE__TESTALLOCATOR_LIBRARY was not found in ${MULLE_PREFERRED_LIBRARY_PREFIX}mulle-testallocator${CMAKE_DEBUG_POSTFIX}${MULLE_PREFERRED_LIBRARY_SUFFIX}
+${MULLE_PREFERRED_LIBRARY_PREFIX}mulle-testallocator${MULLE_PREFERRED_LIBRARY_SUFFIX}
+${MULLE_FALLBACK_LIBRARY_PREFIX}mulle-testallocator${CMAKE_DEBUG_POSTFIX}${MULLE_FALLBACK_LIBRARY_SUFFIX}
+${MULLE_FALLBACK_LIBRARY_PREFIX}mulle-testallocator${MULLE_FALLBACK_LIBRARY_SUFFIX}
+mulle-testallocator")
+   endif()
+endif()

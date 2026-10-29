@@ -13,11 +13,13 @@ endif()
 set( INCLUDE_DIRS
 src/reflect
 src/generic
+src/act
 src/commit
 src/core
 src/generated
 src/kinds
 src
+src/save
 src/scenario
 src/sched
 src/test
@@ -64,6 +66,8 @@ src/generic/include.h
 # contents selected with patternfile ??-header--public-headers
 #
 set( PUBLIC_HEADERS
+src/act/BGActions.h
+src/act/BGView.h
 src/commit/BGCommitter.h
 src/commit/BGProposalGroup.h
 src/core/BGStore.h
@@ -72,6 +76,7 @@ src/core/BGWorld.h
 src/generated/BGComponents.h
 src/kinds/BGBodyKind.h
 src/lab-version.h
+src/save/BGSave.h
 src/scenario/BGMarkedNail.h
 src/sched/BGScheduler.h
 src/test/BGTest.h

@@ -104,6 +104,9 @@ extern const char   *BGPhaseNames[ BGPhaseCount];
 - (NSUInteger) count;
 - (const BGProposal *) proposals;
 - (BGEntityID) newHandle;
+/* how many handles it has given out; saves record it */
+- (uint64_t) handleCount;
+- (void) setHandleCount:(uint64_t) count;
 - (void) addProposal:(BGProposal) proposal;
 
 /* Creates an entity from a blueprint; its seed derives from the world seed

@@ -14,6 +14,19 @@
 #ifndef _lab_include_h__
 #define _lab_include_h__
 
-/* no headers */
+// To remove the following dependency (headers and library) completely:
+//   `mulle-sde dependency remove mulle-testallocator`
+// (Use 1959AA93-BF54-4B96-9F28-8B1D64C484CD instead of mulle-testallocator, if there are duplicate entries)
+//
+// You can tweak the following #include with these commands:
+//    remove #include: `mulle-sde dependency mark mulle-testallocator no-header`
+//    rename              : `mulle-sde dependency|library set mulle-testallocator include whatever.h`
+//    reorder             : `mulle-sde dependency move mulle-testallocator <up|down>`
+//    toggle objc         : `mulle-sde dependency mark mulle-testallocator [no-]import`
+//    toggle public       : `mulle-sde dependency mark mulle-testallocator [no-]public`
+//    toggle optional     : `mulle-sde dependency mark mulle-testallocator [no-]require`
+//    remove for platform : `mulle-sde dependency mark mulle-testallocator no-platform-<uname>`
+//        (use `mulle-sourcetree-to-c --unames` to list known values)
+#include <mulle-testallocator/mulle-testallocator.h>   // mulle-testallocator
 
 #endif

@@ -2,6 +2,9 @@
 
 #import "BGScheduler.h"
 #import "BGMarkedNail.h"
+#import "BGSave.h"
+#import "BGActions.h"
+#import "BGView.h"
 
 #include <stdio.h>
 
@@ -507,6 +510,210 @@ static void   test_marked_nail_replay( void)
 }
 
 
+/* --- the action menu ------------------------------------------------------- */
+
+static NSString   *menu_text( BGWorld *w, BGEntityID actor)
+{
+   BGMenu           *menu;
+   NSMutableArray   *lines;
+   NSUInteger       i;
+
+   menu  = [BGMenu menuFor:actor world:w];
+   lines = [NSMutableArray array];
+   for( i = 0; i < [menu count]; i++)
+      [lines addObject:[menu describeAt:i]];
+   return( [lines componentsJoinedByString:@"; "]);
+}
+
+
+static void   test_menu( void)
+{
+   BGWorld           *w;
+   BGCommitter       *c;
+   BGMarkedNail      *scenario;
+   BGProposalGroup   *g;
+   TriArena          *arena;
+   TriMatchResult    r;
+   NSString          *error;
+   NSString          *text;
+   const TriNode     *seen;
+   const TriNode     *wants;
+
+   /* the workshop: bin 1 holding nails 2, lock 3, worker 4, smith 5 (out of reach) */
+   w        = BGTestWorld( 42);
+   c        = BGTestCommitter( w);
+   scenario = [[[BGMarkedNail alloc] initWithWorld:w committer:c variant:BGMarkedNailBase] autorelease];
+   [scenario runUntil:BGTimeMake( 0)];
+   text = menu_text( w, 4);
+   BG_CHECK( [text isEqualToString:@"take item 1: entailed; take item 2: entailed; take item 3: entailed; "
+                                   @"take_some item 2: entailed"]);
+   if( ! [text isEqualToString:@"take item 1: entailed; take item 2: entailed; take item 3: entailed; take_some item 2: entailed"])
+      fprintf( stderr, "    menu: %s\n", [text UTF8String]);
+
+   /* a description carries perceivable fields only: the stack's count is hidden */
+   text = [[BGView viewOf:4 inWorld:w] describeEntity:2];
+   BG_CHECK( [text hasPrefix:@"#Stack & { id: ref(2), place: #Inside & { container: ref(1) }"]);
+   BG_CHECK( [text rangeOfString:@"unit: \"iron_nail\""].location != NSNotFound);
+   BG_CHECK( [text rangeOfString:@"count"].location == NSNotFound);
+   /* so a pattern on the count is unknown, never incompatible, and says what to find out */
+   arena = tri_arena_new();
+   seen  = tri_value( [w tri], [text UTF8String], arena, NULL, 0);
+   wants = tri_value( [w tri], "#Stack & { count: >=5 }", arena, NULL, 0);
+   BG_CHECK( seen && wants && tri_match( [w tri], wants, seen, &r) == TRI_UNKNOWN);
+   BG_CHECK( r.nresidual == 1 && ! strcmp( r.residual[ 0], "count"));
+   tri_arena_free( arena);
+
+   /* what isn't on the menu can't be performed */
+   error = nil;
+   BG_CHECK( ! BGPerform( w, c, BGActionMake( "put_in", 4, 2, 1), 0, &error));
+   BG_CHECK( [error rangeOfString:@"ruled out at roles.item.place"].location != NSNotFound);
+   BG_CHECK( ! BGPerform( w, c, BGActionMake( "take", 4, 5, BGNoEntity), 0, &error));
+   BG_CHECK( [error rangeOfString:@"not in the actor's reach"].location != NSNotFound);
+   BG_CHECK( ! BGPerform( w, c, BGActionMake( "fly", 4, BGNoEntity, BGNoEntity), 0, &error));
+   BG_CHECK( ! BGPerform( w, c, BGActionMake( "take_some", 4, 2, BGNoEntity), 0, &error));
+   BG_CHECK( [error rangeOfString:@"how many"].location != NSNotFound);
+
+   /* take five: then they can be put back, driven, or split between hands */
+   g = BGPerform( w, c, BGActionMake( "take_some", 4, 2, BGNoEntity), 5, &error);
+   BG_CHECK( g != nil);
+   [w setBoundary:[w boundary] + 1];
+   [c commitBoundary];
+   BG_CHECK( [g applied] && [g idFor:[g proposals][ 0].handle] == 7);      /* the claim is 6 */
+   text = menu_text( w, 4);
+   BG_CHECK( [text rangeOfString:@"put_in item 7 destination 1: entailed"].location != NSNotFound);
+   BG_CHECK( [text rangeOfString:@"drive item 7 destination 3: entailed"].location != NSNotFound);
+   BG_CHECK( [text rangeOfString:@"take_some item 7: entailed"].location != NSNotFound);
+   /* the bin is no assembly, and the lock no container */
+   BG_CHECK( [text rangeOfString:@"drive item 7 destination 1"].location == NSNotFound);
+   BG_CHECK( [text rangeOfString:@"put_in item 7 destination 3"].location == NSNotFound);
+}
+
+
+/* --- saves ----------------------------------------------------------------- */
+
+static BGWorld   *restore( NSString *text, BGContent *content, BGCommitter **committer, NSString **error)
+{
+   BGWorld    *world;
+   NSArray    *deferred;
+   uint64_t   position;
+
+   world = BGRestore( text, content, &deferred, &position, error);
+   if( ! world)
+      return( nil);
+   *committer = BGTestCommitter( world);
+   [*committer setPosition:position];
+   [*committer restoreDeferred:deferred];
+   return( world);
+}
+
+
+/* Save halfway through the marked nail, restore into a fresh world, and carry
+ * on: the restored world takes exactly the steps the original would have. */
+static void   test_save_and_resume( void)
+{
+   BGMarkedNail   *reference;
+   BGMarkedNail   *scenario;
+   BGWorld        *w1;
+   BGWorld        *w2;
+   BGCommitter    *c1;
+   BGCommitter    *c2;
+   NSString       *text;
+   NSString       *error;
+   NSArray        *full;
+   NSArray        *rest;
+   NSUInteger     before;
+
+   reference = run_marked_nail( BGMarkedNailBase, 42);
+   w1        = BGTestWorld( 42);
+   c1        = BGTestCommitter( w1);
+   scenario  = [[[BGMarkedNail alloc] initWithWorld:w1 committer:c1 variant:BGMarkedNailBase] autorelease];
+   [scenario runUntil:BGTimeMake( 5500)];          /* after the hammering, before the nail comes out */
+   text   = BGSave( w1, c1);
+   before = [[c1 trace] count];
+
+   error = nil;
+   w2    = restore( text, [w1 contentBuild], &c2, &error);
+   BG_CHECK( w2 != nil);
+   if( ! w2)
+   {
+      fprintf( stderr, "    %s\n", [error UTF8String]);
+      return;
+   }
+   BG_CHECK( [w2 stateHash] == [w1 stateHash]);
+   BG_CHECK( [BGSave( w2, c2) isEqualToString:text]);
+   BG_CHECK( [w2 time].ms == 5500 && [w2 boundary] == [w1 boundary] && [w2 nextID] == [w1 nextID]);
+
+   [scenario resumeWithWorld:w2 committer:c2];
+   [scenario finish];
+   check_scenario( scenario);
+   BG_CHECK( [w2 stateHash] == [[reference world] stateHash]);
+   /* the trace after the save is the reference's, line for line */
+   full = [[reference committer] trace];
+   rest = [c2 trace];
+   BG_CHECK( before + [rest count] == [full count]);
+   BG_CHECK( [full count] >= before && [rest isEqualToArray:[full subarrayWithRange:NSMakeRange( before, [full count] - before)]]);
+}
+
+
+/* Deferred groups are saved too: they commit at the restored world's next boundary. */
+static void   test_save_deferred_groups( void)
+{
+   BGWorld           *w1;
+   BGWorld           *w2;
+   BGCommitter       *c1;
+   BGCommitter       *c2;
+   BGProposalGroup   *g;
+   BGEntityID        claim;
+   NSString          *error;
+
+   w1    = BGTestWorld( 3);
+   c1    = BGTestCommitter( w1);
+   claim = commit_create( c1, "ownership", BGLocationMakeNone());
+   g     = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"later"];
+   [g set:"Claim.quantity" of:BGWhole( claim) to:12];
+   [c1 restoreDeferred:[NSArray arrayWithObject:g]];
+   w2 = restore( BGSave( w1, c1), [w1 contentBuild], &c2, &error);
+   BG_CHECK( w2 && [[c2 deferredGroups] count] == 1);
+   [w2 setBoundary:[w2 boundary] + 1];
+   [c2 commitBoundary];
+   BG_CHECK( [[c2 deferredGroups] count] == 0);
+   {
+      int64_t   q;
+
+      BG_CHECK( [w2 getField:"Claim.quantity" of:claim value:&q] && q == 12);
+   }
+}
+
+
+static void   test_restore_errors( void)
+{
+   BGWorld       *w;
+   BGCommitter   *c;
+   BGContent     *content;
+   NSString      *error;
+   NSString      *text;
+
+   w       = BGTestWorld( 1);
+   c       = BGTestCommitter( w);
+   content = [w contentBuild];
+   commit_create( c, "bin", BGOnTile( 0, 0, 0));
+   text    = BGSave( w, c);
+
+   error = nil;
+   BG_CHECK( ! BGRestore( @"not a save\n", content, NULL, NULL, &error));
+   BG_CHECK( [error rangeOfString:@"not a bruggadung save"].location != NSNotFound);
+   BG_CHECK( ! BGRestore( [text stringByReplacingOccurrencesOfString:@"capacity" withString:@"volume"],
+                          content, NULL, NULL, &error));
+   BG_CHECK( [error rangeOfString:@"no field Container.volume"].location != NSNotFound);
+   BG_CHECK( ! BGRestore( [text stringByReplacingOccurrencesOfString:@"\\\"oak\\\"" withString:@"\\\"teak\\\""],
+                          content, NULL, NULL, &error));
+   BG_CHECK( [error rangeOfString:@"no type \"teak\""].location != NSNotFound);
+   BG_CHECK( ! BGRestore( [text stringByReplacingOccurrencesOfString:@"end\n" withString:@""],
+                          content, NULL, NULL, &error));
+   BG_CHECK( [error rangeOfString:@"ends early"].location != NSNotFound);
+}
+
+
 const BGTestCase   BGAllTests[] =
 {
    { "store",                         test_store },
@@ -521,6 +728,10 @@ const BGTestCase   BGAllTests[] =
    { "marked_nail_a",                 test_marked_nail_a },
    { "marked_nail_b",                 test_marked_nail_b },
    { "marked_nail_replay",            test_marked_nail_replay },
+   { "menu",                          test_menu },
+   { "save_and_resume",               test_save_and_resume },
+   { "save_deferred_groups",          test_save_deferred_groups },
+   { "restore_errors",                test_restore_errors },
 };
 
 const size_t   BGAllTestsCount = sizeof( BGAllTests) / sizeof( BGAllTests[ 0]);

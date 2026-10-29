@@ -8,7 +8,7 @@ CSOURCES = $(wildcard $(TRIANGLE)/src/*.c)
 INCLUDES = $(addprefix -I,$(shell find src -type d -not -path 'src/triangle*' -not -path 'src/reflect*' -not -path 'src/generic*')) \
            -I$(TRIANGLE)/include -I$(TRIANGLE)/objc
 
-.PHONY: gen apple test-apple asan
+.PHONY: gen apple test-apple asan leaks check
 
 SANITIZE ?=
 
@@ -31,3 +31,19 @@ asan:
 	rm -f build/apple/lab
 	$(MAKE) SANITIZE="-fsanitize=address,undefined" test-apple
 	rm -f build/apple/lab
+
+# Leaks of objects, through mulle-testallocator, on the mulle build (mulle-sde craft first).
+# It tracks mulle-allocated memory: objects, not the C malloc inside them.
+leaks:
+	MULLE_OBJC_PEDANTIC_EXIT=YES MULLE_TESTALLOCATOR=YES ./kitchen/Debug/lab test 2>&1 | \
+	    grep -E '### leak|tests,' ; ! MULLE_OBJC_PEDANTIC_EXIT=YES MULLE_TESTALLOCATOR=YES ./kitchen/Debug/lab test 2>&1 | grep -q '### leak'
+
+# The mulle build's tests, failing on any runtime warning (in mulle-objc a
+# selector must have one signature in every class) and on object leaks.
+check:
+	mulle-sde craft
+	mkdir -p build
+	./kitchen/Debug/lab test > build/check.log 2>&1 ; status=$$? ; tail -1 build/check.log ; \
+	    if grep -q 'varying signatures' build/check.log ; then grep -A1 'varying signatures' build/check.log ; exit 1 ; fi ; \
+	    exit $$status
+	$(MAKE) leaks

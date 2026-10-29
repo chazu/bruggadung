@@ -82,6 +82,18 @@ const char   *BGPhaseNames[ BGPhaseCount] =
 }
 
 
+- (uint64_t) handleCount
+{
+   return( _handles);
+}
+
+
+- (void) setHandleCount:(uint64_t) count
+{
+   _handles = count;
+}
+
+
 /* The group keeps its own copies of the strings its proposals name. */
 static const char   *keep( BGProposalGroup *self, const char *s)
 {

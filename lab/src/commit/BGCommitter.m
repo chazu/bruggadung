@@ -113,6 +113,31 @@ static void   declare( BGTally *t, const char *unit, int64_t units, int64_t mass
 }
 
 
+- (uint64_t) position
+{
+   return( _position);
+}
+
+
+- (void) setPosition:(uint64_t) position
+{
+   _position = position;
+}
+
+
+- (NSArray *) deferredGroups
+{
+   return( _deferred);
+}
+
+
+- (void) restoreDeferred:(NSArray *) groups
+{
+   [_deferred removeAllObjects];
+   [_deferred addObjectsFromArray:groups];
+}
+
+
 - (NSArray *) trace
 {
    return( _trace);

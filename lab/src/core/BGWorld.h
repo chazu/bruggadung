@@ -113,6 +113,14 @@ extern const char   *BGEdgeKindNames[ BGEdgeKindCount];
 - (uint64_t) boundary;
 - (void) setBoundary:(uint64_t) boundary;
 - (BGEntityID) nextID;
+/* for restoring a save: the counter, and tombstones as they were */
+- (void) setNextID:(BGEntityID) nextID;
+- (void) restoreTombstone:(BGTombstone) stone
+                      for:(BGEntityID) entity;
+- (BGStore *) entities;
+- (BGStore *) tombstones;
+- (NSUInteger) edgeCount;
+- (const BGEdge *) edgeAt:(NSUInteger) i;
 
 /* --- component kinds and fields ------------------------------------------- */
 

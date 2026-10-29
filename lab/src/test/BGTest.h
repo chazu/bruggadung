@@ -21,6 +21,9 @@ BGContent    *BGLoadContent( void);
  * reactors. */
 BGWorld      *BGTestWorld( uint64_t seed);
 BGCommitter  *BGTestCommitter( BGWorld *world);
+/* The shared content stays alive while the worlds holding it do; this drops
+ * the runner's own reference, so leak checks come out clean. */
+void         BGReleaseSharedContentAfterUse( void);
 
 typedef void   (*BGTestFunction)( void);
 

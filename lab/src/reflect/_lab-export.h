@@ -13,6 +13,8 @@
 #define _lab__export_h__
 
 
+#import "BGActions.h"
+#import "BGView.h"
 #import "BGCommitter.h"
 #import "BGProposalGroup.h"
 #import "BGStore.h"
@@ -20,6 +22,7 @@
 #import "BGWorld.h"
 #import "BGComponents.h"
 #import "BGBodyKind.h"
+#import "BGSave.h"
 #import "BGMarkedNail.h"
 #import "BGScheduler.h"
 #import "BGTest.h"

@@ -10,9 +10,13 @@ and its status are in [PLAN.md](PLAN.md).
 mulle-sde craft                         # the real build: mulle-clang, MulleObjC, MulleFoundationBase
 ./kitchen/Debug/lab test                # unit tests and scenarios; non-zero exit on any failure
 ./kitchen/Debug/lab run marked-nail     # one scenario: trace, entities, checks (also -a, -b)
+./kitchen/Debug/lab save marked-nail    # the save of its end state
+./kitchen/Debug/lab menu marked-nail 1000   # what the worker sees, and its menu, at 1000 ms
 make gen                                # regenerate src/generated/BGComponents.h from content/
 make test-apple                         # the same sources with Apple clang and Foundation
 make asan                               # the Apple build under AddressSanitizer and UBSan
+make leaks                              # object leaks, through mulle-testallocator
+make check                              # craft, test, and fail on runtime warnings or leaks
 ```
 
 The first craft fetches and builds the mulle-objc dependencies. The build
@@ -23,15 +27,29 @@ CFLAGS`.
 
 | Path | Contents |
 | --- | --- |
-| `content/` | `components.tri`: the component kinds and their field registry; `workshop.tri`: the scenario's blueprints |
+| `content/` | `components.tri`: the component kinds and their field registry, plus what descriptions say besides fields (ids, places, free hands); `operations.tri`: the operations; `workshop.tri`: the scenario's blueprints |
 | `src/generated/BGComponents.h` | Generated from `content/` by `make gen`: one struct per component, enums, and the field registry. Committed; the lab refuses to run on content with another hash. |
 | `src/core/` | `BGTypes.h` (IDs, time, seeds, locations), `BGStore` (records of one kind, sorted by ID), `BGWorld` (all authoritative state, journaled for rollback) |
 | `src/commit/` | `BGProposalGroup` (proposals, handles, unit references), `BGCommitter` (ordering, individuation, apply, validation, events, reactions) |
 | `src/kinds/` | Component behaviour: `BGBodyKind`, the merge reaction |
 | `src/sched/` | `BGScheduler`, with the domain and input-source protocols |
+| `src/act/` | `BGView` (reach and descriptions: the knowledge view's stub), `BGActions` (the menu, matching, effects, performing) |
+| `src/save/` | `BGSave`: saves as text, and restoring them |
 | `src/scenario/` | `BGMarkedNail`: the scenario, its input log, and its checks |
 | `src/test/` | The test runner and the tests |
 | `src/triangle/` | Symlinks to the Triangle engine and its Objective-C wrapper, compiled into the lab |
+
+## How an action happens
+
+Operations are content (`content/operations.tri`): patterns over the
+descriptions of the entities filling their roles, with tags carrying
+bindings between roles. An actor's view (`BGView`) can bind only what is in
+reach, and describes each entity by its type, id, place, and the component
+fields whose `@field` flags say they can be perceived. A hidden field stays
+open, so a match on it is unknown, and unknown never excludes. The menu
+lists every operation and binding whose match isn't incompatible.
+Performing a command checks it is on the menu, then runs the operation's
+effect function, which builds a proposal group for commitment.
 
 ## How a change happens
 
@@ -58,7 +76,8 @@ Every step is in the trace: `lab run marked-nail` prints it.
 - A selector has one signature across every class in mulle-objc. The world
   can't have `-content` returning `BGContent *` while `BGContent` has
   `-content` returning `TriContent *`; the runtime warns, and the world's is
-  `-contentBuild`.
+  `-contentBuild`. Describing an entity is `-describeEntity:` for the same
+  reason. `make check` fails on any such warning.
 - The code uses manual retain/release, no properties, and no blocks, so the
   same sources build with Apple clang (`make test-apple`).
 - The full MulleFoundation needs mulle-clang 23.1.3, which isn't released;

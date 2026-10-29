@@ -53,6 +53,13 @@
  * groups processed, in order, each marked applied or rejected. */
 - (NSArray *) commitBoundary;
 
+/* Saved state: the last commit position, and the groups deferred to the
+ * next boundary. */
+- (uint64_t) position;
+- (void) setPosition:(uint64_t) position;
+- (NSArray *) deferredGroups;
+- (void) restoreDeferred:(NSArray *) groups;
+
 /* One line per group, rejection, event, and deferral, for the developer. */
 - (NSArray *) trace;
 - (void) note:(NSString *) line;

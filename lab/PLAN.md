@@ -263,9 +263,65 @@ What building it settled or found:
 - **In mulle-objc a selector has one signature across all classes**; see
   README.md.
 
-- **Leaks are not checked yet.** LeakSanitizer isn't supported on macOS
-  arm64 and `leaks` can't attach here; mulle's way is the
-  `mulle-testallocator` dependency, the next thing to add.
+- **Leaks are checked with mulle-testallocator** (`make leaks`), which sees
+  mulle-allocated memory: objects, not the C `malloc` inside them.
+  LeakSanitizer isn't supported on macOS arm64, and `leaks` can't attach here.
 
-Next: leak checking with mulle-testallocator, then saves and loading (item 1
-of "After this slice").
+### After the slice: saves
+
+Item 1 of "After this slice" is built (`src/save/`). A save is text: the
+entity table and ID counter, every component record (fields and types by
+name), locations, edges, tombstones, history, the clock and boundary, and
+the committer's position and deferred groups. `lab save marked-nail` prints
+one. The tests save *The marked nail* halfway, restore it into a fresh world
+with the same state hash, save again byte for byte, and carry on: the
+restored world's run matches the one that never saved, state and trace. A
+save names fields and types, so it reads into changed content; a field the
+content lost, or a type it lost, is refused with the reason.
+
+What it settled:
+
+- **The text trace is not saved; history is.** The committer's trace is a
+  developer log. Checks that must survive a save read the event history:
+  the marked nail's individuation is checked as a split inside the group
+  that marked it.
+- **The commit position is saved state.** Events record their group's
+  position, so a restored committer must continue the count.
+
+15 tests, 131 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: operations and the action menu
+
+Item 2 is built (`src/act/`, `content/operations.tri`). Operations are
+Triangle patterns in the `operations` family: `take`, `take_some`,
+`put_in`, and `drive`, each with an `effect` naming the code that builds its
+group. The menu matches every binding of an operation's roles to entities in
+the actor's reach against their descriptions; the stub of the knowledge view
+describes an entity by its type, id, place, and perceivable fields only. The
+marked nail now runs on commands: the worker takes five nails, drives one
+into the lock, takes it out, and puts both back, each action performed
+through the menu. `lab menu marked-nail 1000` shows what the worker sees and
+can do.
+
+What it settled:
+
+- **Ids, places, and free hands are description types, not component
+  fields.** `#Thing` (id), `#Placed` (place), and `#Handed` (freeHands) are
+  inherited by the component types but are not components, so the generated
+  structs don't carry them; the view fills them from relations and derived
+  values.
+- **An operation's roles type says which roles it has.** `#Roles`,
+  `#ItemRoles`, and `#PlacingRoles`: a structure's type is the most general
+  one with its features, so `take` has no destination to enumerate.
+- **Perceivable means `perceive` in the field's flags.** The stack's count
+  has none, so a pattern on it is unknown with `count` as the residual: the
+  scenario's "the stack count, if counted".
+- **The family index has an entry per variant**, so the menu takes each
+  operation once.
+- **`make check`** fails on mulle-objc's signature warnings, which caught a
+  second clash (`describe:`).
+
+16 tests, 151 checks, under both compilers, ASan and UBSan, and leak-free.
+
+Next: activities with stages, effort, interruption, and watches (item 3),
+which need a domain to watch: the tile-grid domain (item 4) may come first.

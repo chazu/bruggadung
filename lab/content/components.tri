@@ -5,9 +5,32 @@
 
 #Material: "iron" | "oak" | "brass" | "flesh" | "paper"
 
+// --- what descriptions say besides component fields ----------------------
+//
+// An agent's view of an entity (for now, the truth projection) is a
+// description: the entity's type, its id, its place, and the component
+// fields it can perceive. Places and ids are relations and handles, not
+// component fields, so they are introduced here, by types that are not
+// components: the generated structs don't carry them.
+
+// Anything with identity. In the truth projection, id is the entity's handle.
+#Thing: { id: ref }
+
+// Where a physical thing is: the location relation, as a description.
+#Place: {}
+#OnTile:    #Place & { x: int, y: int, level: int }
+#Inside:    #Place & { container: ref }
+#Held:      #Place & { by: ref, hand: int }
+#Installed: #Place & { assembly: ref, role: text, index: int }
+
+#Placed: #Thing & { place: #Place }
+
+// What an agent's hands are doing: a derived value, not a stored field.
+#Handed: { freeHands: int & >=0 & <=4 }
+
 // A physical thing: what it weighs, what it is made of, and the traces it
 // carries. Units of a stack share one Body, so marks on one unit split it off.
-#Body: {
+#Body: #Placed & {
     @component(Body)
     mass:      mass                    @field(content, saved, proposable, inspect, perceive(touch))
     material:  #Material               @field(content, saved, inspect, perceive(sight))
@@ -20,33 +43,33 @@
     @component(Stack)
     count:    $n & int & >=1 & <=100000 @field(content, saved, proposable, inspect)
     unitMass: $u & mass                 @field(content, saved, inspect)
-    unit:     text                      @field(content, saved, inspect)
+    unit:     text                      @field(content, saved, inspect, perceive(sight))
     mass:     $u * $n
 }
 
 // Something that acts, with hands to hold things in.
-#Agent: #Body & {
+#Agent: #Body & #Handed & {
     @component(Agent)
-    hands: int & >=0 & <=4 @field(content, saved, inspect)
+    hands: int & >=0 & <=4 @field(content, saved, inspect, perceive(sight))
 }
 
 // Something entities can be put in.
 #Container: #Body & {
     @component(Container)
-    capacity: int & >=1 & <=1000 @field(content, saved, inspect)
+    capacity: int & >=1 & <=1000 @field(content, saved, inspect, perceive(sight))
 }
 
 // Something with parts installed in it.
 #Assembly: #Body & {
     @component(Assembly)
-    slots: int & >=1 & <=64 @field(content, saved, inspect)
+    slots: int & >=1 & <=64 @field(content, saved, inspect, perceive(sight))
 }
 
 #ClaimKind: "ownership" | "custody"
 
 // A reified claim: an informational entity, with no body and no location.
 // Its claimant and subjects are edges.
-#Claim: {
+#Claim: #Thing & {
     @component(Claim)
     kind:     #ClaimKind       @field(content, saved, inspect)
     quantity: int & >=0 & <=100000 @field(content, saved, proposable, inspect)

@@ -1,5 +1,7 @@
 #import "BGMarkedNail.h"
 
+#import "BGActions.h"
+
 
 /* The input log: what happens, and when (simulation milliseconds). */
 typedef enum
@@ -35,8 +37,7 @@ static const BGScriptLine   unmarkedScript[] =
 {
    {     0, BGStepSetup },
    {  1000, BGStepTake },
-   {  5000, BGStepHammer },
-   { 60000, BGStepPullOut },
+   {  5000, BGStepHammer },       /* A: one nail goes into the other hand, unmarked */
    { 61000, BGStepDropBack },
    {    -1, BGStepEnd }
 };
@@ -167,13 +168,26 @@ static const BGScriptLine   mixedScript[] =
 }
 
 
-- (BGProposalGroup *) group:(NSString *) source
+/* A command: the worker performs an operation from content, through the
+ * menu. A command that isn't on the menu is a failed check. */
+- (BGProposalGroup *) perform:(const char *) operation
+                         item:(BGEntityID) item
+                  destination:(BGEntityID) destination
+                       amount:(int64_t) amount
 {
    BGProposalGroup   *group;
+   NSString          *error;
 
-   group = [BGProposalGroup groupWithPhase:BGPhaseAction
-                                    source:source];
-   [_committer submit:group];
+   error = nil;
+   group = BGPerform( _world, _committer, BGActionMake( [_world intern:operation], _worker, item, destination),
+                      amount, &error);
+   if( ! group)
+   {
+      [self check:NO
+             name:[NSString stringWithFormat:@"the worker can %s", operation]
+              why:error];
+      return( nil);
+   }
    [_groups addObject:group];
    return( group);
 }
@@ -241,41 +255,42 @@ static const BGScriptLine   mixedScript[] =
       break;
 
    case BGStepPour:
-      g = [self group:@"the worker pours their nails into the bin"];
-      [g move:BGWhole( _workerStack) to:BGIn( _bin)];
+      [self perform:"put_in" item:_workerStack destination:_bin amount:0];
       break;
 
    case BGStepTake:
-      g = [self group:@"the worker takes 5 nails"];
-      _handful = [g split:BGWhole( _stack) count:5 to:BGHeldBy( _worker, 0)];
-      [self name:&_handful group:g];
+      g = [self perform:"take_some" item:_stack destination:BGNoEntity amount:5];
+      if( g)
+      {
+         _handful = [g proposals][ 0].handle;
+         [self name:&_handful group:g];
+      }
       break;
 
    case BGStepHammer:
-      /* one of the five: the proposer doesn't split it off; commitment must */
-      g = [self group:@"the worker hammers a nail into the lock"];
+      /* drive names one nail of the five; commitment splits it off */
       if( _variant == BGMarkedNailBase)
-      {
-         [g set:"Body.bent" of:BGUnit( _handful, 1) to:1];
-         [g set:"Body.toolMarks" of:BGUnit( _handful, 1) to:3];
-      }
-      [g move:BGUnit( _handful, 1) to:BGPartOf( _lock, "wedge", 0)];
+         [self perform:"drive" item:_handful destination:_lock amount:0];
+      else
+         [self perform:"take_some" item:_handful destination:BGNoEntity amount:1];
       break;
 
    case BGStepPullOut:
-      g = [self group:@"the worker pulls the nail out"];
-      [g move:BGWhole( _nail) to:BGHeldBy( _worker, 1)];
+      [self perform:"take" item:_nail destination:BGNoEntity amount:0];
       break;
 
    case BGStepDropBack:
-      g = [self group:@"the worker drops the nails back into the bin"];
-      [g move:BGWhole( _handful) to:BGIn( _bin)];
-      [g move:BGWhole( _nail) to:BGIn( _bin)];
+      [self perform:"put_in" item:_handful destination:_bin amount:0];
+      [self perform:"put_in" item:_nail destination:_bin amount:0];
       break;
 
    case BGStepMergeBent:
-      g = [self group:@"someone proposes merging the bent nail"];
+      /* not an operation: a merge proposed outright, to see commitment refuse it */
+      g = [BGProposalGroup groupWithPhase:BGPhaseSystem
+                                   source:@"someone proposes merging the bent nail"];
       [g merge:BGWhole( _nail) into:BGWhole( _stack)];
+      [_committer submit:g];
+      [_groups addObject:g];
       _explicitMerge = [g retain];
       break;
 
@@ -302,17 +317,26 @@ static const BGScriptLine   mixedScript[] =
 {
    BGEntityID   parts[ 4];
    NSUInteger   i;
+   NSUInteger   n;
 
    for( i = 0; i < _npending; i++)
       if( [_pendingGroups[ i] applied])
          *_pendingNames[ i] = [_pendingGroups[ i] idFor:*_pendingNames[ i]];
    _npending = 0;
-   /* the hammered nail is whatever is now wedged in the lock */
+   /* the hammered nail is whatever is now wedged in the lock; in A, the single nail in the other hand */
    if( ! _nail && _lock && [_world entitiesAt:_lock
                                          form:BGLocationPartOf
                                          into:parts
                                           max:4])
       _nail = parts[ 0];
+   if( ! _nail && _variant == BGMarkedNailUnmarked && _worker &&
+       (n = [_world entitiesAt:_worker
+                          form:BGLocationHeldBy
+                          into:parts
+                           max:4]))
+      for( i = 0; i < n && i < 4; i++)
+         if( ! [_world isStack:parts[ i]])
+            _nail = parts[ i];
 }
 
 
@@ -419,7 +443,57 @@ static const BGScriptLine   mixedScript[] =
 }
 
 
+/* From history, which saves keep: the unit was split off in the same group
+ * that marked it, though the group proposed no split. */
+- (BOOL) splitInGroupThatMarked:(BGEntityID) unit
+{
+   const BGEvent   *ev;
+   const BGEvent   *split;
+   NSUInteger      i;
+
+   split = NULL;
+   for( i = 0; i < [_world eventCount]; i++)
+   {
+      ev = [_world eventAt:i];
+      if( ! strcmp( ev->kind, "split") && ev->subject == unit && ev->other == _handful && ev->amount == 1)
+         split = ev;
+      if( split && ! strcmp( ev->kind, "changed") && ev->subject == unit && ev->group == split->group &&
+          ev->detail && ! strcmp( ev->detail, "Body.bent"))
+         return( YES);
+   }
+   return( NO);
+}
+
+
+- (void) runUntil:(BGTime) t
+{
+   [_scheduler runUntil:t];
+}
+
+
+- (void) resumeWithWorld:(BGWorld *) world
+               committer:(BGCommitter *) committer
+{
+   [_world autorelease];
+   _world = [world retain];
+   [_committer autorelease];
+   _committer = [committer retain];
+   [_scheduler autorelease];
+   _scheduler = [[BGScheduler alloc] initWithWorld:world
+                                         committer:committer];
+   [_scheduler setInputs:self];
+   [_scheduler setObserver:self];
+}
+
+
 - (void) run
+{
+   [self runUntil:BGTimeMake( 120000)];
+   [self finish];
+}
+
+
+- (void) finish
 {
    const BGTombstone   *stone;
    const BGBody        *body;
@@ -440,7 +514,7 @@ static const BGScriptLine   mixedScript[] =
    case BGMarkedNailBase:
       body = _nail ? [_world record:kbody for:_nail] : NULL;
       [self check:_nail && ! [_world isStack:_nail] && body && body->bent && body->toolMarks == 3 &&
-                  [self traceContains:@"individuate: unit 1 of"]
+                  [self splitInGroupThatMarked:_nail]
              name:@"3. marking one nail in a stack split it off first, unasked"
               why:[NSString stringWithFormat:@"nail %llu", (unsigned long long) _nail]];
       [self check:[_world isLive:_nail] && [_world locationOf:_nail].form == BGLocationIn &&

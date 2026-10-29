@@ -192,6 +192,45 @@ void   BGLocationFormat( BGLocation loc, char *buf, size_t len)
 }
 
 
+- (void) setNextID:(BGEntityID) nextID
+{
+   _nextID = nextID;
+}
+
+
+- (void) restoreTombstone:(BGTombstone) stone
+                      for:(BGEntityID) entity
+{
+   stone.blueprint = [self intern:stone.blueprint];
+   [_tombstones setRecord:&stone
+                      for:entity];
+}
+
+
+- (BGStore *) entities
+{
+   return( _entities);
+}
+
+
+- (BGStore *) tombstones
+{
+   return( _tombstones);
+}
+
+
+- (NSUInteger) edgeCount
+{
+   return( _nedges);
+}
+
+
+- (const BGEdge *) edgeAt:(NSUInteger) i
+{
+   return( i < _nedges ? &_edges[ i] : NULL);
+}
+
+
 /* --- journal --------------------------------------------------------------- */
 
 static BGJournalEntry   *journal_push( BGWorld *self)
