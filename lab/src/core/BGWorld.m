@@ -1410,6 +1410,7 @@ static uint64_t   hash_record( uint64_t h, const BGComponentInfo *info, const vo
       h  = BGMixString( h, ev->detail ? ev->detail : "");
       h  = BGMix( h ^ ev->subject ^ (ev->other << 24) ^ ((uint64_t) ev->amount << 48));
       h  = BGMix( h ^ ev->cause ^ (ev->group << 32) ^ ev->boundary);
+      h  = BGMix( h ^ ev->actor);
    }
    return( h);
 }

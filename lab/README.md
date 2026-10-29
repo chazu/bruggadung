@@ -39,6 +39,7 @@ CFLAGS`.
 | `src/domains/` | `BGFluidDomain`: water through open taps, with checkout, exact allocation, and exhaustion as the horizon |
 | `src/sched/` | `BGScheduler`, with the domain and input-source protocols |
 | `src/act/` | `BGView` (reach and descriptions: the knowledge view's stub), `BGActions` (the menu, matching, effects, performing), `BGActivities` (activities under way: completion, watches, ending) |
+| `src/know/` | `BGKnowledge`: agents' knowledge stores, the perception phase, recognition |
 | `src/save/` | `BGSave`: saves as text, and restoring them |
 | `src/scenario/` | `BGWorlds` (the worlds' setups), `BGMarkedNail` and `BGCistern`: the scenarios, their input logs, and their checks |
 | `src/play/` | `BGPlay`: the interactive session behind `lab play` |
@@ -57,16 +58,31 @@ lists every operation and binding whose match isn't incompatible.
 Performing a command checks it is on the menu, then runs the operation's
 effect function, which builds a proposal group for commitment.
 
+## What agents know
+
+Agents learn only through perception (KNOWLEDGE.md). After each boundary's
+commit rounds, every agent perceives what is in sight through the fields
+declared perceivable; what is inside a container only when it looks in, takes
+from it, puts into it, or reaches into it. Its private knowledge store holds
+referents (R1, R2, ...): agent-local handles with a kind, the features last
+perceived, a believed place naming other referents, and when they were seen.
+Recognition binds percepts by kind and place, never by the developer-only
+truth link. A referent believed where the agent can see, and not seen there,
+is marked absent. The menu `lab play` shows comes from this store, so it can
+offer what is no longer so: performing it, the world's side finds the thing
+gone, the attempt commits, and perception corrects the belief.
+
 ## Playing
 
 `lab play workshop` (or `cistern`) is an interactive session: `look` draws
-the map around the actor and lists what it can see, `menu` numbers its
-actions, `do <n> [amount]` performs one, `walk n|s|e|w` moves, and `wait`,
+the map as the actor knows it (what it sees, and what it remembers, with the
+memory's age), `menu` numbers the actions it believes it can take, `do <n> [amount]` performs one, `walk n|s|e|w` moves, and `wait`,
 `step`, and `idle` run time. `activities`, `suspend`, and `resume` manage
 what the actor has under way. The developer's side: `inspect <id>` shows an
 entity's truth, relations, activities, and history; `why <id>` follows the
 chain of causes behind its last change back to the command that began it;
-`trace`, `save`, `load`, `hash`. The commands typed are the replay log
+`knows [id]` shows an agent's store with its truth links; `trace`, `save`,
+`load`, `hash`. The commands typed are the replay log
 (`--log file`): feeding them back reproduces the session exactly.
 
 ## How an activity runs

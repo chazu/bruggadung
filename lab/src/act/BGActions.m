@@ -2,6 +2,7 @@
 
 #import "BGView.h"
 #import "BGProposalGroup.h"
+#import "BGKnowledge.h"
 
 #include <stdlib.h>
 
@@ -51,35 +52,22 @@ static BOOL   kind_fits( BGWorld *world, const TriNode *pattern, BGRole role, BG
 }
 
 
-TriMatch   BGMatchAction( BGWorld *world, BGAction action, TriMatchResult *result, NSString **reason)
+/* Matches an operation against its roles' descriptions. */
+static TriMatch   match_described( BGWorld *world, const TriNode *pattern, BGAction action, NSString **descriptions,
+                                   TriMatchResult *result, NSString **reason)
 {
-   const TriNode     *pattern;
    const TriNode     *description;
    NSMutableString   *expr;
    TriContent        *tri;
    TriArena          *arena;
    TriMatch          match;
-   BGView            *view;
-   NSString          *d;
    char              duration[ 128];
    char              stages[ 1024];
    char              effect[ 64];
    char              err[ 256];
    int               r;
 
-   tri     = [world tri];
-   pattern = action.operation ? tri_pattern( tri, action.operation) : NULL;
-   memset( result, 0, sizeof( *result));
-   result->result = TRI_INCOMPATIBLE;
-   if( ! pattern || ! tri_at( tri, pattern, "effect"))
-   {
-      if( reason)
-         *reason = [NSString stringWithFormat:@"there is no operation %s", action.operation ? action.operation : "?"];
-      return( TRI_INCOMPATIBLE);
-   }
-   view = [BGView viewOf:action.roles[ BGRoleActor]
-                 inWorld:world];
-   /* the operation's own features, as the pattern has them; the roles, as the actor sees them */
+   tri = [world tri];
    tri_print( tri, tri_at( tri, pattern, "effect"), effect, sizeof( effect));
    expr = [NSMutableString stringWithFormat:@"#Operation & { effect: %s, ", effect];
    if( tri_at( tri, pattern, "duration"))
@@ -94,7 +82,125 @@ TriMatch   BGMatchAction( BGWorld *world, BGAction action, TriMatchResult *resul
    }
    [expr appendString:@"roles: {"];
    for( r = 0; r < BGRoleCount; r++)
+      if( descriptions[ r])
+         [expr appendFormat:@" %s: %@,", BGRoleNames[ r], descriptions[ r]];
+   [expr appendString:@" } }"];
+   arena       = tri_arena_new();
+   description = tri_value( tri, [expr UTF8String], arena, err, sizeof( err));
+   if( ! description)
    {
+      if( reason)
+         *reason = [NSString stringWithFormat:@"the description does not build: %s, in %@", err, expr];
+      tri_arena_free( arena);
+      return( TRI_INCOMPATIBLE);
+   }
+   match = tri_match_instance( tri, action.operation, description, result);
+   if( match == TRI_INCOMPATIBLE && reason)
+      *reason = [NSString stringWithFormat:@"%s is ruled out at %s", action.operation, result->failure.path];
+   tri_arena_free( arena);
+   return( match);
+}
+
+
+/* A believed kind more general than a role's isn't one (the same rule as kind_fits). */
+static BOOL   believed_kind_fits( BGWorld *world, const TriNode *pattern, BGRole role, const char *kind)
+{
+   const TriNode   *filler;
+   const TriNode   *k;
+   TriContent      *tri;
+   TriArena        *arena;
+   TriType         wanted;
+   TriType         have;
+   char            path[ 32];
+   BOOL            fits;
+
+   tri = [world tri];
+   snprintf( path, sizeof( path), "roles.%s", BGRoleNames[ role]);
+   filler = tri_at( tri, pattern, path);
+   if( ! filler || ! kind)
+      return( YES);
+   arena = tri_arena_new();
+   k     = tri_value( tri, kind, arena, NULL, 0);
+   fits  = YES;
+   if( k)
+   {
+      wanted = tri_node_type( filler);
+      have   = tri_node_type( k);
+      fits   = ! (have != wanted && tri_subtype( tri, wanted, have));
+   }
+   tri_arena_free( arena);
+   return( fits);
+}
+
+
+TriMatch   BGMatchBelieved( BGWorld *world, BGKnowledgeStore *store, BGAction action, TriMatchResult *result,
+                            NSString **reason)
+{
+   const TriNode      *pattern;
+   const BGReferent   *me;
+   const BGReferent   *ref;
+   NSString           *descriptions[ BGRoleCount];
+   int                r;
+
+   memset( result, 0, sizeof( *result));
+   result->result = TRI_INCOMPATIBLE;
+   pattern = action.operation ? tri_pattern( [world tri], action.operation) : NULL;
+   if( ! pattern || ! tri_at( [world tri], pattern, "effect"))
+   {
+      if( reason)
+         *reason = [NSString stringWithFormat:@"there is no operation %s", action.operation ? action.operation : "?"];
+      return( TRI_INCOMPATIBLE);
+   }
+   me = [store referent:[store selfReferent]];
+   for( r = 0; r < BGRoleCount; r++)
+   {
+      descriptions[ r] = nil;
+      if( ! has_role( [world tri], pattern, (BGRole) r))
+         continue;
+      ref = [store referent:(uint32_t) action.roles[ r]];
+      /* formulate, from the store: the actor is itself; the rest are believed there, in reach */
+      if( ! ref || ! me || (r == BGRoleActor) != (ref->id == me->id) || ! ref->present ||
+          ref->level != me->level || abs( ref->x - me->x) > 1 || abs( ref->y - me->y) > 1)
+      {
+         if( reason)
+            *reason = [NSString stringWithFormat:@"you don't know of a %s in reach", BGRoleNames[ r]];
+         return( TRI_INCOMPATIBLE);
+      }
+      if( ! believed_kind_fits( world, pattern, (BGRole) r, ref->kind))
+      {
+         if( reason)
+            *reason = [NSString stringWithFormat:@"R%u is not that kind of thing", ref->id];
+         return( TRI_INCOMPATIBLE);
+      }
+      descriptions[ r] = [store describeReferent:ref->id];
+   }
+   return( match_described( world, pattern, action, descriptions, result, reason));
+}
+
+
+TriMatch   BGMatchAction( BGWorld *world, BGAction action, TriMatchResult *result, NSString **reason)
+{
+   const TriNode     *pattern;
+   TriContent        *tri;
+   BGView            *view;
+   NSString          *descriptions[ BGRoleCount];
+   int               r;
+
+   tri     = [world tri];
+   pattern = action.operation ? tri_pattern( tri, action.operation) : NULL;
+   memset( result, 0, sizeof( *result));
+   result->result = TRI_INCOMPATIBLE;
+   if( ! pattern || ! tri_at( tri, pattern, "effect"))
+   {
+      if( reason)
+         *reason = [NSString stringWithFormat:@"there is no operation %s", action.operation ? action.operation : "?"];
+      return( TRI_INCOMPATIBLE);
+   }
+   view = [BGView viewOf:action.roles[ BGRoleActor]
+                 inWorld:world];
+   for( r = 0; r < BGRoleCount; r++)
+   {
+      descriptions[ r] = nil;
       if( ! has_role( tri, pattern, (BGRole) r))
          continue;
       /* formulate: the actor can bind only what it can reach, and not itself to another role */
@@ -113,24 +219,9 @@ TriMatch   BGMatchAction( BGWorld *world, BGAction action, TriMatchResult *resul
                                                  (unsigned long long) action.roles[ r]];
          return( TRI_INCOMPATIBLE);
       }
-      d = [view describeEntity:action.roles[ r]];
-      [expr appendFormat:@" %s: %@,", BGRoleNames[ r], d];
+      descriptions[ r] = [view describeEntity:action.roles[ r]];
    }
-   [expr appendString:@" } }"];
-   arena       = tri_arena_new();
-   description = tri_value( tri, [expr UTF8String], arena, err, sizeof( err));
-   if( ! description)
-   {
-      if( reason)
-         *reason = [NSString stringWithFormat:@"the description does not build: %s, in %@", err, expr];
-      tri_arena_free( arena);
-      return( TRI_INCOMPATIBLE);
-   }
-   match = tri_match_instance( tri, action.operation, description, result);
-   if( match == TRI_INCOMPATIBLE && reason)
-      *reason = [NSString stringWithFormat:@"%s is ruled out at %s", action.operation, result->failure.path];
-   tri_arena_free( arena);
-   return( match);
+   return( match_described( world, pattern, action, descriptions, result, reason));
 }
 
 
@@ -247,6 +338,87 @@ static int   cmp_string( const void *a, const void *b)
 }
 
 
++ (instancetype) menuFor:(BGKnowledgeStore *) store
+                   world:(BGWorld *) world
+                 believed:(BOOL) believed
+{
+   BGMenu             *menu;
+   TriContent         *tri;
+   TriIndex           *family;
+   TriMatchResult     result;
+   TriMatch           match;
+   const TriNode      *pattern;
+   const BGReferent   *me;
+   const BGReferent   *ref;
+   const char         **ops;
+   BGEntityID         reach[ 256];
+   BGEntityID         actor;
+   BGAction           action;
+   NSUInteger         nreach;
+   NSUInteger         i;
+   NSUInteger         j;
+   size_t             nops;
+   size_t             o;
+   BOOL               item;
+   BOOL               destination;
+
+   menu             = [[self new] autorelease];
+   menu->_residuals = [NSMutableArray new];
+   tri              = [world tri];
+   family           = tri_family_index( tri, "operations");
+   me               = [store referent:[store selfReferent]];
+   if( ! family || ! me)
+      return( menu);
+   actor = me->id;
+   nops  = tri_index_count( family);
+   ops   = malloc( sizeof( char *) * (nops ? nops : 1));
+   for( o = 0; o < nops; o++)
+      ops[ o] = tri_index_tag( family, o);
+   qsort( ops, nops, sizeof( char *), cmp_string);
+   for( o = j = 0; o < nops; o++)
+      if( ! j || strcmp( ops[ o], ops[ j - 1]))
+         ops[ j++] = ops[ o];
+   nops = j;
+   /* what the actor believes is here, in reach, by referent */
+   nreach = 0;
+   for( i = 0; i < [store count] && nreach < 256; i++)
+   {
+      ref = [store referentAt:i];
+      if( ref->present && ref->id != me->id && ref->level == me->level &&
+          abs( ref->x - me->x) <= 1 && abs( ref->y - me->y) <= 1)
+         reach[ nreach++] = ref->id;
+   }
+   for( o = 0; o < nops; o++)
+   {
+      pattern     = tri_pattern( tri, ops[ o]);
+      item        = has_role( tri, pattern, BGRoleItem);
+      destination = has_role( tri, pattern, BGRoleDestination);
+      for( i = 0; i < (item ? nreach : 1); i++)
+         for( j = 0; j < (destination ? nreach : 1); j++)
+         {
+            if( item && destination && reach[ i] == reach[ j])
+               continue;
+            action = BGActionMake( [world intern:ops[ o]], actor, item ? reach[ i] : BGNoEntity,
+                                   destination ? reach[ j] : BGNoEntity);
+            match  = BGMatchBelieved( world, store, action, &result, NULL);
+            if( match != TRI_INCOMPATIBLE)
+               [menu add:action
+                   match:match
+                  result:&result];
+         }
+   }
+   free( ops);
+   menu->_believed = believed;
+   return( menu);
+}
+
+
+- (BOOL) believed
+{
+   return( _believed);
+}
+
+
 - (NSUInteger) count
 {
    return( _count);
@@ -279,7 +451,7 @@ static int   cmp_string( const void *a, const void *b)
    s = [NSMutableString stringWithFormat:@"%s", _items[ i].operation];
    for( r = BGRoleItem; r < BGRoleCount; r++)
       if( _items[ i].roles[ r])
-         [s appendFormat:@" %s %llu", BGRoleNames[ r], (unsigned long long) _items[ i].roles[ r]];
+         [s appendFormat:_believed ? @" %s R%llu" : @" %s %llu", BGRoleNames[ r], (unsigned long long) _items[ i].roles[ r]];
    [s appendString:_matches[ i] == TRI_ENTAILED ? @": entailed" : @": unknown"];
    if( [[self residualsAt:i] count])
       [s appendFormat:@" (find out %@)", [[self residualsAt:i] componentsJoinedByString:@", "]];
@@ -396,6 +568,14 @@ static NSString   *effect_loosen( BGWorld *world, BGAction a, int64_t amount, BG
 }
 
 
+/* Looking changes nothing in the world; it is an event the looker perceives. */
+static NSString   *effect_look( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
+{
+   [g emit:"looked" subject:BGWhole( a.roles[ BGRoleActor]) other:BGWhole( a.roles[ BGRoleItem])];
+   return( nil);
+}
+
+
 static const struct
 {
    const char   *name;
@@ -409,6 +589,7 @@ static const struct
    { "open_tap",  effect_open_tap },
    { "walk",      effect_walk },
    { "loosen",    effect_loosen },
+   { "look",      effect_look },
 };
 
 
@@ -477,6 +658,52 @@ BOOL   BGOperationStage( BGWorld *world, const char *operation, int64_t index, i
    text[ n - 1] = 0;
    *effect = [NSString stringWithUTF8String:text + 1];
    return( YES);
+}
+
+
+BGProposalGroup   *BGPerformBelieved( BGWorld *world, BGCommitter *committer, BGKnowledgeStore *store,
+                                      BGAction action, int64_t amount, NSString **error)
+{
+   const BGReferent   *ref;
+   const BGReferent   *holder;
+   BGProposalGroup    *group;
+   TriMatchResult     result;
+   NSString           *reason;
+   BGAction           truth;
+   BGEntityID         where;
+   int                r;
+
+   reason = nil;
+   if( BGMatchBelieved( world, store, action, &result, &reason) == TRI_INCOMPATIBLE)
+   {
+      if( error)
+         *error = reason;
+      return( nil);
+   }
+   /* the world's side: what the referents actually track */
+   truth = action;
+   truth.roles[ BGRoleActor] = [store agent];
+   for( r = BGRoleItem; r < BGRoleCount; r++)
+   {
+      ref            = action.roles[ r] ? [store referent:(uint32_t) action.roles[ r]] : NULL;
+      truth.roles[ r] = ref ? ref->truth : BGNoEntity;
+   }
+   if( BGMatchAction( world, truth, &result, NULL) != TRI_INCOMPATIBLE)
+      return( BGPerform( world, committer, truth, amount, error));
+
+   /* it isn't as believed: the attempt is what happens, where the actor reached */
+   ref    = [store referent:(uint32_t) action.roles[ BGRoleItem]];
+   holder = ref && ref->form == BGLocationIn ? [store referent:ref->container] : NULL;
+   where  = holder ? holder->truth : (ref ? ref->truth : BGNoEntity);
+   group  = [BGProposalGroup groupWithPhase:BGPhaseAction
+                                     source:[NSString stringWithFormat:@"%llu: %s (an attempt)",
+                                                                       (unsigned long long) [store agent], action.operation]];
+   [group setActor:[store agent]];
+   [group emit:"attempted"
+       subject:BGWhole( [store agent])
+         other:BGWhole( where)];
+   [committer submit:group];
+   return( group);
 }
 
 
@@ -554,6 +781,7 @@ BGProposalGroup   *BGPerform( BGWorld *world, BGCommitter *committer, BGAction a
       source = [source stringByAppendingFormat:@" (%lld)", (long long) amount];
    group = [BGProposalGroup groupWithPhase:BGPhaseAction
                                     source:source];
+   [group setActor:action.roles[ BGRoleActor]];
    if( [effect isEqualToString:@"fill"])
    {
       /* an activity that ends by its watch on the bucket, or by the tap running dry */

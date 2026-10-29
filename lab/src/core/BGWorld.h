@@ -54,6 +54,7 @@ typedef struct
    const char   *kind;          /* a static string: "created", "moved", "split", ... */
    BGEntityID   subject;
    BGEntityID   other;
+   BGEntityID   actor;          /* who did it: the agent whose action the group is, or none */
    BGLocation   location;       /* for "moved" and "created": where to */
    int64_t      amount;
    const char   *detail;        /* interned: a field path, an edge kind, a reason; or NULL */

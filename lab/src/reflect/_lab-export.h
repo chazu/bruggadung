@@ -24,6 +24,7 @@
 #import "BGFluidDomain.h"
 #import "BGComponents.h"
 #import "BGBodyKind.h"
+#import "BGKnowledge.h"
 #import "BGPlay.h"
 #import "BGSave.h"
 #import "BGCistern.h"

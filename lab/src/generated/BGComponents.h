@@ -1,4 +1,4 @@
-/* Generated from Triangle content 3d8845cb3d117f9c: do not edit. Type IDs are valid
+/* Generated from Triangle content 88b92d2fc18fd5b9: do not edit. Type IDs are valid
  * only for this content; regenerate when it changes. */
 #ifndef BG_COMPONENTS_H
 #define BG_COMPONENTS_H
@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BG_CONTENT_HASH 0x3d8845cb3d117f9cULL
+#define BG_CONTENT_HASH 0x88b92d2fc18fd5b9ULL
 
 /* Activity, from #Activity */
 typedef struct {
@@ -89,11 +89,11 @@ enum {
 
 /* #Material */
 enum {
-    BG_MATERIAL_BRASS = 51,
-    BG_MATERIAL_FLESH = 52,
-    BG_MATERIAL_IRON = 53,
-    BG_MATERIAL_OAK = 54,
-    BG_MATERIAL_PAPER = 55,
+    BG_MATERIAL_BRASS = 52,
+    BG_MATERIAL_FLESH = 53,
+    BG_MATERIAL_IRON = 54,
+    BG_MATERIAL_OAK = 55,
+    BG_MATERIAL_PAPER = 56,
 };
 
 /* The field registry: what code needs to read and write any component

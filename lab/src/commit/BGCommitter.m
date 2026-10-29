@@ -339,6 +339,7 @@ static BGLocation   resolve_location( BGProposalGroup *g, BGLocation loc)
    ev.detail   = detail ? [_world intern:detail] : NULL;
    ev.location = location;
    ev.cause    = [group cause];
+   ev.actor    = [group actor];
    ev.group    = _position;
    return( [_world emit:ev]);
 }

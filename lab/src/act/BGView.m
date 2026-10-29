@@ -169,18 +169,13 @@ static void   append_place( NSMutableString *s, BGLocation loc)
 }
 
 
-- (NSString *) describeEntity:(BGEntityID) entity
+- (NSString *) kindOf:(BGEntityID) entity
 {
-   const BGEntityInfo        *info;
-   const BGComponentInfo     *kind;
-   const BGFieldInfo         *f;
-   const TriNode             *pattern;
-   const uint8_t             *record;
-   const char                *name;
-   NSMutableString           *s;
-   char                      buf[ 64];
-   size_t                    i;
-   NSUInteger                k;
+   const BGEntityInfo   *info;
+   const TriNode        *pattern;
+   const char           *name;
+   NSMutableString      *s;
+   NSUInteger           k;
 
    info = [_world info:entity];
    if( ! info)
@@ -190,23 +185,29 @@ static void   append_place( NSMutableString *s, BGLocation loc)
       types stands for it */
    pattern = tri_pattern( [_world tri], info->blueprint);
    name    = pattern ? tri_type_name( [_world tri], tri_node_type( pattern)) : "#Thing";
-   if( strpbrk( name, "[ &"))
-   {
-      s = [NSMutableString stringWithString:@"#Thing"];
-      for( k = 0; k < [_world kindCount]; k++)
-         if( [_world record:k for:entity])
-            [s appendFormat:@" & %s", [_world kindInfo:k]->type];
-      [s appendFormat:@" & { id: ref(%llu)", (unsigned long long) entity];
-   }
-   else
-      s = [NSMutableString stringWithFormat:@"%s & { id: ref(%llu)", name, (unsigned long long) entity];
-   if( [_world isPhysical:entity])
-   {
-      [s appendString:@", place: "];
-      append_place( s, [_world locationOf:entity]);
-   }
+   if( ! strpbrk( name, "[ &"))
+      return( [NSString stringWithUTF8String:(char *) name]);
+   s = [NSMutableString stringWithString:@"#Thing"];
+   for( k = 0; k < [_world kindCount]; k++)
+      if( [_world record:k for:entity])
+         [s appendFormat:@" & %s", [_world kindInfo:k]->type];
+   return( s);
+}
+
+
+- (NSString *) featuresOf:(BGEntityID) entity
+{
+   const BGComponentInfo     *kind;
+   const BGFieldInfo         *f;
+   const uint8_t             *record;
+   NSMutableString           *s;
+   char                      buf[ 64];
+   size_t                    i;
+   NSUInteger                k;
+
+   s = [NSMutableString string];
    if( [_world record:[_world kindNamed:"Agent"] for:entity])
-      [s appendFormat:@", freeHands: %d", BGFreeHands( _world, entity)];
+      [s appendFormat:@"freeHands: %d", BGFreeHands( _world, entity)];
    /* the perceivable fields of each component; the rest stay open */
    for( k = 0; k < [_world kindCount]; k++)
    {
@@ -219,7 +220,7 @@ static void   append_place( NSMutableString *s, BGLocation loc)
          f = &kind->fields[ i];
          if( ! strstr( f->flags, "perceive"))
             continue;
-         [s appendFormat:@", %s: ", f->name];
+         [s appendFormat:@"%s%s: ", [s length] ? ", " : "", f->name];
          switch( f->value)
          {
          case BG_VALUE_QUANTITY:
@@ -244,6 +245,26 @@ static void   append_place( NSMutableString *s, BGLocation loc)
          }
       }
    }
+   return( s);
+}
+
+
+- (NSString *) describeEntity:(BGEntityID) entity
+{
+   NSMutableString   *s;
+   NSString          *features;
+
+   if( ! [_world info:entity])
+      return( nil);
+   s = [NSMutableString stringWithFormat:@"%@ & { id: ref(%llu)", [self kindOf:entity], (unsigned long long) entity];
+   if( [_world isPhysical:entity])
+   {
+      [s appendString:@", place: "];
+      append_place( s, [_world locationOf:entity]);
+   }
+   features = [self featuresOf:entity];
+   if( [features length])
+      [s appendFormat:@", %@", features];
    [s appendString:@" }"];
    return( s);
 }

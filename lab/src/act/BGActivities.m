@@ -92,6 +92,7 @@ static BGAction   action_of( BGWorld *world, BGEntityID a, const BGActivity *rec
                                                                                                                (long long) record->stage]
                                                                                   : @"completes"]];
       [group setCause:[self startOf:a]];
+      [group setActor:(BGEntityID) record->actorRef];
       if( ! BGOperationStage( _world, operation, record->stage, &duration, &effect))
          effect = nil;
       reason = BGApplyNamedEffect( _world, effect, action_of( _world, a, record), record->amount, group);

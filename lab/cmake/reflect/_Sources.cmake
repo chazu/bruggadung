@@ -20,6 +20,7 @@ src/core/BGStore.m
 src/core/BGWorld.m
 src/domains/BGFluidDomain.m
 src/kinds/BGBodyKind.m
+src/know/BGKnowledge.m
 src/main.m
 src/play/BGPlay.m
 src/save/BGSave.m

@@ -16,8 +16,8 @@
 #import "BGCommitter.h"
 
 
-/* The save as text. Each domain checks its stocks in first, and adds what
- * it keeps itself (carries, transit) as "domain <name> ..." lines. */
+/* The save as text. Each saved system (domains, knowledge) checks in first,
+ * and adds what it keeps itself as "domain <name> ..." lines. */
 NSString   *BGSave( BGWorld *world, BGCommitter *committer, NSArray *domains);
 
 /* A world restored from a save, on `content`, or nil with the reason. The

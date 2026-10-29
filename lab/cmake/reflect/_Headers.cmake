@@ -19,6 +19,7 @@ src/core
 src/domains
 src/generated
 src/kinds
+src/know
 src
 src/play
 src/save
@@ -79,6 +80,7 @@ src/core/BGWorld.h
 src/domains/BGFluidDomain.h
 src/generated/BGComponents.h
 src/kinds/BGBodyKind.h
+src/know/BGKnowledge.h
 src/lab-version.h
 src/play/BGPlay.h
 src/save/BGSave.h

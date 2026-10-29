@@ -42,6 +42,12 @@ static BGTime   earlier( BGTime a, BGTime b)
 }
 
 
+- (void) setPerception:(id <BGPerceptionPhase>) perception
+{
+   _perception = perception;
+}
+
+
 - (void) setActivities:(id <BGActivityClock>) activities
 {
    _activities = activities;
@@ -122,6 +128,7 @@ static BGTime   earlier( BGTime a, BGTime b)
                          world:_world
                      committer:_committer];
    groups = [_committer commitBoundary];
+   [_perception perceiveBoundary:[_world boundary]];
    [_observer scheduler:self
       didCommitBoundary:[_world boundary]
                  groups:groups];

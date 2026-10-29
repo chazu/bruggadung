@@ -19,9 +19,9 @@
  *   location <id> <location>
  *   edge <kind> <from> <to>
  *   tombstone <id> "<blueprint>" <successor> <cause> "<reason>"
- *   event <index> <boundary> <round> "<kind>" <subject> <other> <amount> <detail> <cause> <group> <location>
+ *   event <index> <boundary> <round> "<kind>" <subject> <other> <amount> <detail> <cause> <group> <location> <actor>
  *   tile <x> <y> <level> water <mL>
- *   group <phase> <cause> <handles> "<source>"
+ *   group <phase> <cause> <handles> "<source>" <actor>
  *   proposal <kind> <target> <unit> <other> <unit> <value> <edge> <name> <key> <handle> <location>
  *   domain <name> <what the domain keeps>
  *   end
@@ -107,7 +107,7 @@ static void   put_record( NSMutableString *out, BGWorld *world, NSUInteger kind,
 NSString   *BGSave( BGWorld *world, BGCommitter *committer, NSArray *domains)
 {
    NSArray              *state;
-   id <BGDomain>        domain;
+   id <BGSavedSystem>   domain;
    const BGEntityInfo   *info;
    const BGTombstone    *stone;
    const BGEvent        *ev;
@@ -185,7 +185,7 @@ NSString   *BGSave( BGWorld *world, BGCommitter *committer, NSArray *domains)
       put_string( out, ev->detail);
       [out appendFormat:@" %llu %llu", (unsigned long long) ev->cause, (unsigned long long) ev->group];
       put_location( out, ev->location);
-      [out appendString:@"\n"];
+      [out appendFormat:@" %llu\n", (unsigned long long) ev->actor];
    }
    for( j = 0; j < 32; j++)
       for( i = 0; i < 32; i++)
@@ -199,7 +199,7 @@ NSString   *BGSave( BGWorld *world, BGCommitter *committer, NSArray *domains)
       [out appendFormat:@"group %d %llu %llu", (int) [group phase], (unsigned long long) [group cause],
                         (unsigned long long) [group handleCount]];
       put_string( out, [[group source] UTF8String]);
-      [out appendString:@"\n"];
+      [out appendFormat:@" %llu\n", (unsigned long long) [group actor]];
       for( j = 0; j < [group count]; j++)
       {
          p = &[group proposals][ j];
@@ -520,6 +520,7 @@ BGWorld   *BGRestore( NSString *text,
          ev.cause    = token_u64( &line, 9);
          ev.group    = token_u64( &line, 10);
          ev.location = token_location( &line, 11);
+         ev.actor    = token_u64( &line, 18);
          if( [world emit:ev] != token_u64( &line, 1))
             problem = @"events out of order";
       }
@@ -539,6 +540,7 @@ BGWorld   *BGRestore( NSString *text,
                                           source:[NSString stringWithUTF8String:(char *) (token_string( &line, 4) ? token_string( &line, 4) : "")]];
          [group setCause:token_u64( &line, 2)];
          [group setHandleCount:token_u64( &line, 3)];
+         [group setActor:token_u64( &line, 5)];
          [groups addObject:group];
       }
       else if( ! strcmp( s, "proposal"))

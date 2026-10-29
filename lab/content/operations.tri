@@ -4,7 +4,7 @@
 // bindings between roles. `effect` names the code that builds the proposal
 // group when the action is performed.
 
-#Effect: "take" | "take_some" | "put_in" | "drive" | "open_tap" | "fill" | "walk" | "loosen"
+#Effect: "take" | "take_some" | "put_in" | "drive" | "open_tap" | "fill" | "walk" | "loosen" | "look"
 
 // Which roles an operation has is its roles' type: a structure's type is the
 // most general one with all its features.
@@ -110,5 +110,14 @@ pry_out: #Operation & {
     roles: {
         actor: #Agent & { freeHands: >=1 }
         item:  #Body & { place: #Installed }
+    }
+} @family(operations)
+
+// Look into a container: what is inside is perceived only by looking.
+look_in: #Operation & {
+    effect: "look"
+    roles: {
+        actor: #Agent
+        item:  #Container
     }
 } @family(operations)

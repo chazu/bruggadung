@@ -31,6 +31,10 @@
                      max:(NSUInteger) max;
 /* the entity's description, as a Triangle expression */
 - (NSString *) describeEntity:(BGEntityID) entity;
+/* its parts: the kind (a type expression), and the perceivable fields
+ * ("mass: 90g, material: \"iron\", ..."), without id or place */
+- (NSString *) kindOf:(BGEntityID) entity;
+- (NSString *) featuresOf:(BGEntityID) entity;
 
 @end
 

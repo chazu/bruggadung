@@ -19,11 +19,23 @@ typedef struct
    BGTime   nextEvent;
 } BGHorizon;
 
-/* A domain, at the scheduler's boundary (DOMAIN_SIMULATION.md §13). Inner
- * loops are its own C; the protocol is only the boundary. */
-@protocol BGDomain
+/* A system that keeps state of its own in saves, outside the world: a
+ * domain's carries, the agents' knowledge stores. A save asks each to check
+ * in, then writes its lines as "domain <name> ..."; restoring hands them
+ * back. */
+@protocol BGSavedSystem
 
 - (NSString *) name;
+- (void) checkInAll;
+- (NSArray *) savedState;
+- (void) restoreSavedState:(NSArray *) lines;
+
+@end
+
+/* A domain, at the scheduler's boundary (DOMAIN_SIMULATION.md §13). Inner
+ * loops are its own C; the protocol is only the boundary. */
+@protocol BGDomain <BGSavedSystem>
+
 - (BOOL) isActive;
 - (BGHorizon) horizonAt:(BGTime) t;
 /* Advances from t0 to t1 and submits its discrete proposals for t1. */
@@ -32,13 +44,9 @@ typedef struct
                world:(BGWorld *) world
            committer:(BGCommitter *) committer;
 
-/* Saves: write every checked-out stock back to its holder; what the domain
- * itself must keep across a save (carries, transit), as lines; and taking
- * them back. A domain restored with its lines on a restored world takes the
- * same next step as one that never saved. */
-- (void) checkInAll;
-- (NSArray *) savedState;
-- (void) restoreSavedState:(NSArray *) lines;
+/* As a saved system: checkInAll writes every checked-out stock back to its
+ * holder, and savedState keeps carries and transit, so a domain restored on
+ * a restored world takes the same next step as one that never saved. */
 
 @end
 
@@ -62,6 +70,14 @@ typedef struct
 
 @end
 
+/* The perception phase (ARCHITECTURE.md step 5, KNOWLEDGE.md §14): after a
+ * boundary's commit rounds, before anyone decides. */
+@protocol BGPerceptionPhase
+
+- (void) perceiveBoundary:(uint64_t) boundary;
+
+@end
+
 @class BGScheduler;
 
 @protocol BGSchedulerObserver
@@ -80,6 +96,7 @@ typedef struct
    NSMutableArray               *_domains;
    id <BGInputSource>           _inputs;
    id <BGActivityClock>         _activities;
+   id <BGPerceptionPhase>       _perception;
    id <BGSchedulerObserver>     _observer;
 }
 
@@ -89,6 +106,7 @@ typedef struct
 - (void) addDomain:(id <BGDomain>) domain;
 - (void) setInputs:(id <BGInputSource>) inputs;          /* not retained */
 - (void) setActivities:(id <BGActivityClock>) activities; /* not retained */
+- (void) setPerception:(id <BGPerceptionPhase>) perception; /* not retained */
 - (void) setObserver:(id <BGSchedulerObserver>) observer; /* not retained */
 
 /* The time the next boundary would be at, if nothing stops it first. */

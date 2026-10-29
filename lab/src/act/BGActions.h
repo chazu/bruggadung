@@ -40,11 +40,14 @@ static inline BGAction   BGActionMake( const char *operation, BGEntityID actor, 
 }
 
 
+@class BGKnowledgeStore;
+
 @interface BGMenu : NSObject
 {
    BGAction         *_items;
    TriMatch         *_matches;
    NSMutableArray   *_residuals;
+   BOOL             _believed;
    NSUInteger       _count;
    NSUInteger       _capacity;
 }
@@ -52,8 +55,17 @@ static inline BGAction   BGActionMake( const char *operation, BGEntityID actor, 
 /* sorted by operation name, then by the bound entities */
 + (instancetype) menuFor:(BGEntityID) actor
                    world:(BGWorld *) world;
+/* The knowledge view's menu (KNOWLEDGE.md §13): built from the actor's
+ * store, its roles bound to referents (R1, R2, ...) believed present and in
+ * reach, described as the actor last perceived them. It can offer what is
+ * no longer so. */
++ (instancetype) menuFor:(BGKnowledgeStore *) store
+                   world:(BGWorld *) world
+                 believed:(BOOL) believed;
 
 - (NSUInteger) count;
+/* YES for a knowledge view's menu: its roles are referents */
+- (BOOL) believed;
 - (const BGAction *) actionAt:(NSUInteger) i;
 - (TriMatch) matchAt:(NSUInteger) i;
 /* what the actor would have to find out, for an unknown match */
@@ -78,6 +90,21 @@ TriMatch           BGMatchAction( BGWorld *world, BGAction action, TriMatchResul
  * can't be attempted. */
 BGProposalGroup    *BGPerform( BGWorld *world, BGCommitter *committer, BGAction action, int64_t amount,
                                NSString **error);
+
+/* The match of an action whose roles are the actor's referents, from what
+ * its store says; incompatible when a referent is not believed present and
+ * in reach. */
+TriMatch           BGMatchBelieved( BGWorld *world, BGKnowledgeStore *store, BGAction action,
+                                    TriMatchResult *result, NSString **reason);
+
+/* Performs an action chosen from the knowledge view: it must be on the
+ * actor's believed menu. The world's side then resolves the referents to the
+ * entities they track; if the world rules the action out (the thing isn't
+ * there any more), what commits is the attempt (an "attempted" event, the
+ * actor reaching where it believed the thing was), and perception corrects
+ * the belief. */
+BGProposalGroup    *BGPerformBelieved( BGWorld *world, BGCommitter *committer, BGKnowledgeStore *store,
+                                       BGAction action, int64_t amount, NSString **error);
 
 /* An operation's effect, as proposals added to `group`: what an instant
  * action commits, and what a timed activity commits when it is due. The

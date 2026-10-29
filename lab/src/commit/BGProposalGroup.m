@@ -64,6 +64,18 @@ const char   *BGPhaseNames[ BGPhaseCount] =
 }
 
 
+- (BGEntityID) actor
+{
+   return( _actor);
+}
+
+
+- (void) setActor:(BGEntityID) actor
+{
+   _actor = actor;
+}
+
+
 - (NSUInteger) count
 {
    return( _count);

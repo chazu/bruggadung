@@ -3,8 +3,9 @@
  * command interface, the text map, and the developer inspector of DESIGN.md's
  * laboratory. A person (or a script) controls one agent:
  *
- *   look                  the map around the actor, and what it can see
- *   menu                  the actor's menu, numbered
+ *   look                  the map as the actor knows it: what it sees now,
+ *                         and what it remembers, with the memory's age
+ *   menu                  the actor's menu, from what it knows, numbered
  *   do <n> [amount]       perform menu entry n, now
  *   walk n|s|e|w          walk one tile
  *   wait <ms>             let time pass
@@ -14,6 +15,7 @@
  *   activities            the actor's activities, with their stages
  *   suspend <id>, resume <id>
  *                         the actor's choice: suspend keeps the progress
+ *   knows [id]            the developer's view of an agent's knowledge store
  *   inspect <id>          the developer's view of an entity: truth,
  *                         relations, activities, history
  *   why <id>              what last changed it, and the chain of causes
@@ -32,6 +34,7 @@
 #import "BGFluidDomain.h"
 #import "BGActivities.h"
 #import "BGActions.h"
+#import "BGKnowledge.h"
 
 
 @interface BGPlay : NSObject <BGInputSource>
@@ -42,6 +45,7 @@
    BGScheduler      *_scheduler;
    BGFluidDomain    *_fluid;
    BGActivities     *_activities;
+   BGKnowledge      *_knowledge;
    BGMenu           *_menu;
    BGEntityID       _actor;
    NSMutableString  *_out;

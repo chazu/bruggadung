@@ -18,13 +18,16 @@
    [_scheduler autorelease];
    [_fluid autorelease];
    [_activities autorelease];
+   [_knowledge autorelease];
    _world      = [world retain];
    _committer  = [BGTestCommitter( world) retain];
    _fluid      = [[BGFluidDomain alloc] initWithWorld:world];
    _activities = [[BGActivities activitiesWithWorld:world committer:_committer] retain];
+   _knowledge  = [[BGKnowledge alloc] initWithWorld:world];
    _scheduler  = [[BGScheduler alloc] initWithWorld:world committer:_committer];
    [_scheduler addDomain:_fluid];
    [_scheduler setActivities:_activities];
+   [_scheduler setPerception:_knowledge];
    [_scheduler setInputs:self];
    _traceShown = 0;
 }
@@ -76,6 +79,7 @@
    [_scheduler release];
    [_fluid release];
    [_activities release];
+   [_knowledge release];
    [_menu release];
    [_out release];
    [super dealloc];
@@ -132,6 +136,18 @@
 }
 
 
+- (void) showNews
+{
+   NSArray      *news;
+   NSUInteger   i;
+
+   news = [[_knowledge storeOf:_actor] news];
+   for( i = 0; i < [news count]; i++)
+      [_out appendFormat:@"  you notice: %@\n", [news objectAtIndex:i]];
+}
+
+
+/* An action chosen from what the actor knows; walking is the actor's own. */
 - (void) perform:(BGAction) action
           amount:(int64_t) amount
 {
@@ -139,7 +155,13 @@
    NSString          *error;
 
    error = nil;
-   g     = BGPerform( _world, _committer, action, amount, &error);
+   if( action.roles[ BGRoleItem] || action.roles[ BGRoleDestination])
+      g = BGPerformBelieved( _world, _committer, [_knowledge storeOf:_actor], action, amount, &error);
+   else
+   {
+      action.roles[ BGRoleActor] = _actor;
+      g = BGPerform( _world, _committer, action, amount, &error);
+   }
    if( ! g)
    {
       [_out appendFormat:@"You can't: %@.\n", error];
@@ -148,30 +170,12 @@
    _inputDue = YES;
    [_scheduler stepUntil:[_world time]];
    [self showTrace];
+   [self showNews];
 }
 
 
 /* --- looking -------------------------------------------------------------------- */
 
-static BOOL   ground_tile( BGWorld *world, BGEntityID e, BGLocation *tile)
-{
-   BGLocation   loc;
-   NSUInteger   guard;
-
-   for( guard = 0; guard < 64; guard++)
-   {
-      loc = [world locationOf:e];
-      if( loc.form == BGLocationOnTile)
-      {
-         *tile = loc;
-         return( YES);
-      }
-      if( loc.form == BGLocationNone || ! loc.place)
-         return( NO);
-      e = loc.place;
-   }
-   return( NO);
-}
 
 
 - (char) glyphOf:(BGEntityID) e
@@ -192,73 +196,108 @@ static BOOL   ground_tile( BGWorld *world, BGEntityID e, BGLocation *tile)
 }
 
 
+static char   glyph_of_kind( const char *kind)
+{
+   if( strstr( kind, "WaterStore") && ! strstr( kind, "Assembly"))
+      return( 'w');
+   if( ! strcmp( kind, "#Agent"))
+      return( 'A');
+   if( strstr( kind, "Assembly"))
+      return( 'm');
+   if( ! strcmp( kind, "#Container") || ! strcmp( kind, "#Tap"))
+      return( 'u');
+   if( ! strcmp( kind, "#Stack"))
+      return( '*');
+   return( 'o');
+}
+
+
+/* The map as the actor knows it: tiles it has seen, what it remembers on
+ * them, and its age. Nothing here reads the world, except what is in sight
+ * now (its tiles' water). */
 - (void) look
 {
-   BGStore      *bodies;
-   BGView       *view;
-   BGLocation   here;
-   BGLocation   loc;
-   BGEntityID   e;
-   NSUInteger   i;
-   int32_t      x;
-   int32_t      y;
-   char         row[ 32];
-   char         g;
+   BGKnowledgeStore   *store;
+   const BGReferent   *me;
+   const BGReferent   *r;
+   const BGReferent   *holder;
+   NSUInteger         i;
+   int64_t            now;
+   int32_t            x;
+   int32_t            y;
+   char               row[ 32];
+   char               g;
 
-   if( ! ground_tile( _world, _actor, &here))
+   store = [_knowledge storeOf:_actor];
+   me    = [store referent:[store selfReferent]];
+   now   = [_world time].ms;
+   if( ! me)
    {
-      [_out appendString:@"You are nowhere.\n"];
+      [_out appendString:@"You know nothing yet.\n"];
       return;
    }
-   bodies = [_world storeForKind:[_world kindNamed:"Body"]];
-   /* the map: what stands on each tile, or water, or floor */
-   for( y = here.y - 3; y <= here.y + 3; y++)
+   for( y = me->y - 3; y <= me->y + 3; y++)
    {
-      for( x = here.x - 7; x <= here.x + 7; x++)
+      for( x = me->x - 7; x <= me->x + 7; x++)
       {
-         g = [_world isTileX:x y:y level:here.level] ? ([_world waterAtX:x y:y level:here.level] ? '~' : '.') : ' ';
-         for( i = 0; i < [bodies count]; i++)
+         g = ' ';
+         if( [store tileSeenAtX:x y:y] >= 0)
+            g = ([store tileSeenAtX:x y:y] == now && [_world waterAtX:x y:y level:me->level]) ? '~' : '.';
+         for( i = 0; i < [store count]; i++)
          {
-            e   = [bodies entityAtIndex:i];
-            loc = [_world locationOf:e];
-            if( loc.form == BGLocationOnTile && loc.x == x && loc.y == y && loc.level == here.level &&
-                (g == '.' || g == '~' || e == _actor))
-               g = [self glyphOf:e];
+            r = [store referentAt:i];
+            if( r->present && r->form == BGLocationOnTile && r->x == x && r->y == y && (g == '.' || g == '~' || g == ' '))
+               g = r->id == me->id ? '@' : glyph_of_kind( r->kind);
          }
-         row[ x - here.x + 7] = g;
+         if( me->x == x && me->y == y)
+            g = '@';
+         row[ x - me->x + 7] = g;
       }
       row[ 15] = 0;
       [_out appendFormat:@"   %s\n", row];
    }
-   /* what the actor can see of what is near: perceivable fields only */
-   view = [BGView viewOf:_actor inWorld:_world];
-   for( i = 0; i < [bodies count]; i++)
+   for( i = 0; i < [store count]; i++)
    {
-      e = [bodies entityAtIndex:i];
-      if( ! ground_tile( _world, e, &loc) || abs( loc.x - here.x) > 7 || abs( loc.y - here.y) > 3)
+      r = [store referentAt:i];
+      if( r->id == me->id)
          continue;
-      [_out appendFormat:@"%c %llu %s: %@\n", [self glyphOf:e], (unsigned long long) e, [_world info:e]->blueprint,
-                         [view describeEntity:e]];
+      holder = r->container ? [store referent:r->container] : NULL;
+      [_out appendFormat:@"R%u %s", r->id, r->kind];
+      if( ! r->present)
+         [_out appendFormat:@": not where you last saw it, %llds ago", (long long) (now - r->seen) / 1000];
+      else
+      {
+         if( holder)
+            [_out appendFormat:@" %s R%u", r->form == BGLocationIn ? "in" : r->form == BGLocationHeldBy ? "held by" : "part of",
+                               holder->id];
+         else
+            [_out appendFormat:@" at (%d, %d)", r->x, r->y];
+         if( r->seen < now)
+            [_out appendFormat:@", as you saw it %llds ago", (long long) (now - r->seen) / 1000];
+      }
+      [_out appendFormat:@": %s\n", r->features ? r->features : ""];
    }
 }
 
 
 - (void) showMenu
 {
+   BGKnowledgeStore   *store;
    const BGAction   *a;
    NSUInteger       i;
    int              r;
 
    [_menu release];
-   _menu = [[BGMenu menuFor:_actor world:_world] retain];
+   store = [_knowledge storeOf:_actor];
+   _menu = [[BGMenu menuFor:store world:_world believed:YES] retain];
    for( i = 0; i < [_menu count]; i++)
    {
       a = [_menu actionAt:i];
       [_out appendFormat:@"%2lu. %s", (unsigned long) i + 1, a->operation];
       for( r = BGRoleItem; r < BGRoleCount; r++)
          if( a->roles[ r])
-            [_out appendFormat:@" %s %llu (%s)", BGRoleNames[ r], (unsigned long long) a->roles[ r],
-                               [_world info:a->roles[ r]]->blueprint];
+            [_out appendFormat:@" %s R%llu (%s)", BGRoleNames[ r], (unsigned long long) a->roles[ r],
+                               [store referent:(uint32_t) a->roles[ r]]->kind];
       if( [_menu matchAt:i] == TRI_UNKNOWN)
          [_out appendFormat:@"  [unknown: %@]", [[_menu residualsAt:i] componentsJoinedByString:@", "]];
       [_out appendString:@"\n"];
@@ -361,7 +400,7 @@ static BOOL   ground_tile( BGWorld *world, BGEntityID e, BGLocation *tile)
    NSString   *text;
    FILE       *f;
 
-   text = BGSave( _world, _committer, [NSArray arrayWithObject:_fluid]);
+   text = BGSave( _world, _committer, [NSArray arrayWithObjects:_fluid, _knowledge, nil]);
    f    = fopen( [path UTF8String], "w");
    if( ! f)
    {
@@ -410,6 +449,7 @@ static BOOL   ground_tile( BGWorld *world, BGEntityID e, BGLocation *tile)
    [_committer setPosition:position];
    [_committer restoreDeferred:deferred];
    [_fluid restoreSavedState:BGSavedDomainState( text, @"fluid")];
+   [_knowledge restoreSavedState:BGSavedDomainState( text, @"knowledge")];
    [_out appendFormat:@"Loaded %@: t=%lldms.\n", path, (long long) [_world time].ms];
 }
 
@@ -493,7 +533,7 @@ static BOOL   ground_tile( BGWorld *world, BGEntityID e, BGLocation *tile)
       return( NO);
    if( [verb isEqualToString:@"help"])
       [_out appendString:@"look, menu, do <n> [amount], walk n|s|e|w, wait <ms>, step, idle, as <id>,\n"
-                         @"activities, suspend <id>, resume <id>, inspect <id>, why <id>, trace [n],\n"
+                         @"activities, suspend <id>, resume <id>, knows [id], inspect <id>, why <id>, trace [n],\n"
                          @"save <file>, load <file>, time, hash, quit\n"];
    else if( [verb isEqualToString:@"look"])
       [self look];
@@ -523,6 +563,7 @@ static BOOL   ground_tile( BGWorld *world, BGEntityID e, BGLocation *tile)
    {
       [_scheduler runUntil:BGTimeMake( [_world time].ms + (int64_t) n)];
       [self showTrace];
+      [self showNews];
       [_out appendFormat:@"t=%lldms\n", (long long) [_world time].ms];
    }
    else if( [verb isEqualToString:@"step"])
@@ -566,6 +607,8 @@ static BOOL   ground_tile( BGWorld *world, BGEntityID e, BGLocation *tile)
          [self showTrace];
       }
    }
+   else if( [verb isEqualToString:@"knows"])
+      [_out appendString:[_knowledge dump:e ? e : _actor]];
    else if( [verb isEqualToString:@"inspect"])
       [self inspect:e];
    else if( [verb isEqualToString:@"why"])

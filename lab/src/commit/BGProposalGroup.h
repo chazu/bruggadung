@@ -78,6 +78,7 @@ extern const char   *BGPhaseNames[ BGPhaseCount];
 {
    BGPhase      _phase;
    NSString     *_source;
+   BGEntityID   _actor;
    uint64_t     _cause;
    BGProposal   *_proposals;
    NSUInteger   _count;
@@ -101,6 +102,9 @@ extern const char   *BGPhaseNames[ BGPhaseCount];
 - (NSString *) source;
 - (uint64_t) cause;
 - (void) setCause:(uint64_t) cause;
+/* the agent whose action this is; its events record it */
+- (BGEntityID) actor;
+- (void) setActor:(BGEntityID) actor;
 - (NSUInteger) count;
 - (const BGProposal *) proposals;
 - (BGEntityID) newHandle;

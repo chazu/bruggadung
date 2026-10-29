@@ -8,6 +8,8 @@
 #import "BGCistern.h"
 #import "BGActivities.h"
 #import "BGPlay.h"
+#import "BGKnowledge.h"
+#import "BGWorlds.h"
 
 #include <stdio.h>
 
@@ -565,9 +567,9 @@ static void   test_menu( void)
    scenario = [[[BGMarkedNail alloc] initWithWorld:w committer:c variant:BGMarkedNailBase] autorelease];
    [scenario runUntil:BGTimeMake( 0)];
    text = menu_text( w, 4);
-   BG_CHECK( [text isEqualToString:@"take item 1: entailed; take item 2: entailed; take item 3: entailed; "
-                                   @"take_some item 2: entailed; walk_east: entailed; walk_north: entailed; "
-                                   @"walk_south: entailed; walk_west: entailed"]);
+   BG_CHECK( [text isEqualToString:@"look_in item 1: entailed; take item 1: entailed; take item 2: entailed; "
+                                   @"take item 3: entailed; take_some item 2: entailed; walk_east: entailed; "
+                                   @"walk_north: entailed; walk_south: entailed; walk_west: entailed"]);
    if( [text rangeOfString:@"take_some item 2: entailed; walk_east"].location == NSNotFound)
       fprintf( stderr, "    menu: %s\n", [text UTF8String]);
 
@@ -818,30 +820,162 @@ static void   test_play( void)
    uint64_t   h1;
    uint64_t   h2;
 
-   commands = [NSArray arrayWithObjects:@"look", @"menu", @"do 4 5", @"walk w", @"walk e", @"menu", @"do 1",
-                                        @"idle", @"inspect 9", @"why 9", @"walk n", @"walk n", @"walk n", @"walk n",
-                                        @"walk n", @"hash", nil];
+   commands = [NSArray arrayWithObjects:@"look", @"menu", @"do 1", @"menu", @"do 5 5", @"walk w", @"walk e", @"menu",
+                                        @"do 1", @"idle", @"inspect 9", @"why 9", @"knows", @"walk n", @"walk n",
+                                        @"walk n", @"walk n", @"walk n", @"hash", nil];
    out   = session( @"workshop", commands, &h1);
    again = session( @"workshop", commands, &h2);
    BG_CHECK( h1 == h2);
    BG_CHECK( [out isEqualToString:again]);
-   /* the map: the worker (@) between the bin (u) and the lock (m) */
-   BG_CHECK( [out rangeOfString:@"u@m"].location != NSNotFound);
-   BG_CHECK( [out rangeOfString:@" 4. take_some item 2 (nails_30)"].location != NSNotFound);
-   BG_CHECK( [out rangeOfString:@"event 10 split: 7, other 2, 5"].location != NSNotFound);
-   BG_CHECK( [out rangeOfString:@" 1. drive item 7 (nails_30) destination 3 (lock)"].location != NSNotFound);
+   /* the map, from what the worker knows: the smith (A), the bin (u), itself (@), the lock (m) */
+   BG_CHECK( [out rangeOfString:@"Au@m"].location != NSNotFound);
+   /* the menu comes from the knowledge view: the nails only once it has looked into the bin */
+   BG_CHECK( [out rangeOfString:@" 1. look_in item R2 (#Container)"].location != NSNotFound);
+   BG_CHECK( [out rangeOfString:@"you notice: R5: #Stack, at (3, 4)"].location != NSNotFound);
+   BG_CHECK( [out rangeOfString:@" 5. take_some item R5 (#Stack)"].location != NSNotFound);
+   BG_CHECK( [out rangeOfString:@"you notice: R6: #Stack, at (4, 4)"].location != NSNotFound);
+   BG_CHECK( [out rangeOfString:@" 1. drive item R6 (#Stack) destination R3 (#Assembly)"].location != NSNotFound);
    /* the drive completes as an activity, and the nail it split off is in the lock, bent */
    BG_CHECK( [out rangeOfString:@"activity 8: drive completes"].location != NSNotFound);
    BG_CHECK( [out rangeOfString:@"Body.bent=true"].location != NSNotFound);
    BG_CHECK( [out rangeOfString:@"at partOf(3, wedge, 0)"].location != NSNotFound);
+   BG_CHECK( [out rangeOfString:@"R7 #Body, seen at 4000ms, truth 9"].location != NSNotFound);
    /* why: the move into the lock, in the drive's completion, because the worker started the drive */
-   BG_CHECK( [out rangeOfString:@"moved 9 to partOf(3, wedge, 0) at boundary 6, in \"activity 8: drive completes\"\n"
-                                @"because:\n  created 8 activity at boundary 5, in \"4: drive item 7 destination 3\""].location
+   BG_CHECK( [out rangeOfString:@"moved 9 to partOf(3, wedge, 0) at boundary 7, in \"activity 8: drive completes\"\n"
+                                @"because:\n  created 8 activity at boundary 6, in \"4: drive item 7 destination 3\""].location
              != NSNotFound);
    /* the map's edge: walking off it is refused */
    BG_CHECK( [out rangeOfString:@"is off the map"].location != NSNotFound);
    if( [out rangeOfString:@"is off the map"].location == NSNotFound)
       fprintf( stderr, "%s\n", [out UTF8String]);
+}
+
+
+/* --- knowledge ------------------------------------------------------------- */
+
+static uint32_t   referent_of( BGKnowledgeStore *store, BGEntityID truth)
+{
+   NSUInteger   i;
+
+   for( i = 0; i < [store count]; i++)
+      if( [store referentAt:i]->truth == truth)
+         return( [store referentAt:i]->id);
+   return( 0);
+}
+
+
+static BOOL   believed_menu_has( BGWorld *w, BGKnowledgeStore *store, NSString *entry)
+{
+   BGMenu       *menu;
+   NSUInteger   i;
+
+   menu = [BGMenu menuFor:store world:w believed:YES];
+   for( i = 0; i < [menu count]; i++)
+      if( [[menu describeAt:i] hasPrefix:entry])
+         return( YES);
+   return( NO);
+}
+
+
+/* KNOWLEDGE.md Scenario 3, in the workshop: the worker looks into the bin,
+ * walks away; the smith takes the nails out of sight; back by the bin, the
+ * worker still believes them there, the menu offers them, and the attempt
+ * corrects the belief. */
+static void   test_stale_belief( void)
+{
+   BGWorld            *w;
+   BGWorld            *w2;
+   BGCommitter        *c;
+   BGScheduler        *s;
+   BGActivities       *activities;
+   BGKnowledge        *knowledge;
+   BGKnowledge        *restored;
+   BGKnowledgeStore   *store;
+   BGProposalGroup    *g;
+   const BGReferent   *nails;
+   BGEntityID         h[ 8];
+   NSString           *error;
+   NSString           *text;
+   NSArray            *deferred;
+   uint32_t           rbin;
+   uint32_t           rnails;
+   uint64_t           position;
+   int64_t            taken;
+   int                i;
+
+   w          = BGTestWorld( 11);
+   c          = BGTestCommitter( w);
+   activities = [BGActivities activitiesWithWorld:w committer:c];
+   knowledge  = [[[BGKnowledge alloc] initWithWorld:w] autorelease];
+   s          = [[[BGScheduler alloc] initWithWorld:w committer:c] autorelease];
+   [s setActivities:activities];
+   [s setPerception:knowledge];
+   [c submit:BGWorkshopSetup( NO, h)];
+   [s runUntil:BGTimeMake( 1)];
+   store = [knowledge storeOf:4];
+
+   /* the worker sees the bin, the lock, and the smith; not what is in the bin */
+   rbin = referent_of( store, 1);
+   BG_CHECK( rbin && referent_of( store, 3) && referent_of( store, 5) && ! referent_of( store, 2));
+   BG_CHECK( [store referent:[store selfReferent]]->truth == 4);
+   BG_CHECK( (believed_menu_has( w, store, [NSString stringWithFormat:@"look_in item R%u", rbin])));
+
+   /* it looks in, and knows the nails are there */
+   g = BGPerformBelieved( w, c, store, BGActionMake( "look_in", [store selfReferent], rbin, BGNoEntity), 0, &error);
+   BG_CHECK( g != nil);
+   [s runUntil:BGTimeMake( 2)];
+   rnails = referent_of( store, 2);
+   BG_CHECK( rnails && [store referent:rnails]->form == BGLocationIn && [store referent:rnails]->container == rbin);
+
+   /* it walks away, out of sight */
+   for( i = 0; i < 6; i++)
+   {
+      BGPerform( w, c, BGActionMake( "walk_east", 4, BGNoEntity, BGNoEntity), 0, &error);
+      [s runUntil:BGTimeMake( [w time].ms + 1000)];
+   }
+   /* the smith takes the nails and walks off */
+   taken = [w time].ms;
+   BG_CHECK( BGPerform( w, c, BGActionMake( "take", 5, 2, BGNoEntity), 0, &error) != nil);
+   [s runUntil:BGTimeMake( [w time].ms + 1000)];
+   for( i = 0; i < 5; i++)
+   {
+      BGPerform( w, c, BGActionMake( "walk_south", 5, BGNoEntity, BGNoEntity), 0, &error);
+      [s runUntil:BGTimeMake( [w time].ms + 1000)];
+   }
+   nails = [store referent:rnails];
+   BG_CHECK( nails->present && nails->form == BGLocationIn);           /* it saw none of that */
+   BG_CHECK( [store tileSeenAtX:3 y:4] < taken);                        /* nor the bin's tile, since */
+
+   /* back by the bin: it sees the bin, not into it */
+   for( i = 0; i < 6; i++)
+   {
+      BGPerform( w, c, BGActionMake( "walk_west", 4, BGNoEntity, BGNoEntity), 0, &error);
+      [s runUntil:BGTimeMake( [w time].ms + 1000)];
+   }
+   BG_CHECK( [store referent:rnails]->present);
+   /* the menu comes from the knowledge view: it offers the nails it remembers */
+   BG_CHECK( (believed_menu_has( w, store, [NSString stringWithFormat:@"take_some item R%u", rnails])));
+   BG_CHECK( ! [[BGMenu menuFor:4 world:w] count] ||
+             [[[BGMenu menuFor:4 world:w] describeAt:0] rangeOfString:@"item 2"].location == NSNotFound);
+
+   /* the attempt: it reaches into the bin, and now knows they are gone */
+   g = BGPerformBelieved( w, c, store, BGActionMake( "take_some", [store selfReferent], rnails, BGNoEntity), 5, &error);
+   BG_CHECK( g != nil && [[g source] rangeOfString:@"an attempt"].location != NSNotFound);
+   [s runUntil:BGTimeMake( [w time].ms + 1)];
+   BG_CHECK( ! [store referent:rnails]->present);
+   BG_CHECK( ([[store news] containsObject:[NSString stringWithFormat:@"R%u is not where it was", rnails]]));
+   BG_CHECK( (! believed_menu_has( w, store, [NSString stringWithFormat:@"take_some item R%u", rnails])));
+   /* the world is as it was: the smith has the nails */
+   BG_CHECK( [w locationOf:2].form == BGLocationHeldBy && [w locationOf:2].place == 5);
+
+   /* knowledge is saved, and restored the same */
+   text = BGSave( w, c, [NSArray arrayWithObject:knowledge]);
+   w2   = BGRestore( text, [w contentBuild], &deferred, &position, &error);
+   BG_CHECK( w2 != nil);
+   restored = [[[BGKnowledge alloc] initWithWorld:w2] autorelease];
+   [restored restoreSavedState:BGSavedDomainState( text, @"knowledge")];
+   BG_CHECK( [[restored dump:4] isEqualToString:[knowledge dump:4]]);
+   BG_CHECK( [[restored dump:5] isEqualToString:[knowledge dump:5]]);
 }
 
 
@@ -1152,6 +1286,7 @@ const BGTestCase   BGAllTests[] =
    { "activity_fails",                test_activity_fails },
    { "stages_and_suspension",         test_stages_and_suspension },
    { "play",                          test_play },
+   { "stale_belief",                  test_stale_belief },
    { "cistern",                       test_cistern },
    { "cistern_b",                     test_cistern_b },
    { "cistern_d",                     test_cistern_d },

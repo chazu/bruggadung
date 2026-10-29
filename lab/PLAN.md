@@ -464,4 +464,39 @@ Not yet: regions smaller than the whole structure (a puddle across the room
 keeps the cistern's structure awake), walls and levels, and contributions
 from other domains.
 
-Next: perception and knowledge stores (KNOWLEDGE.md), then agency.
+### After the slice: knowledge
+
+Item 6's first part: perception and knowledge stores (`src/know/`). The
+scheduler runs a perception phase after each boundary's commit rounds. Each
+agent's private store holds referents with Triangle descriptions built from
+percepts, believed places that name other referents, sight times, and a
+developer-only truth link; recognition binds by kind and place. Contents of
+a container are seen only by looking in (look_in, putting, taking,
+reaching). The menu `lab play` shows comes from the knowledge view, and
+performing a believed action resolves its referents on the world's side: if
+the world rules it out, an "attempted" event commits and perception
+corrects the belief. KNOWLEDGE.md's Scenario 3 runs in the workshop: the
+worker looks into the bin and walks away, the smith takes the nails out of
+sight, and back at the bin the worker's menu offers the nails it remembers;
+the attempt finds them gone. Stores are saved.
+
+What it settled:
+
+- **Events record their actor**, so perception can tell what an agent did:
+  an agent that put something into a container, or took from it, has looked
+  into it.
+- **An agent knows itself**: its own percept binds to its self referent,
+  whatever recognition would say.
+- **A third selector clash** (`describe:` on the store), caught by
+  `make check`; the store's is `describeReferent:`.
+- **Saved systems are one protocol** (`BGSavedSystem`): domains and the
+  knowledge system both keep "domain <name> ..." lines.
+
+Not yet: event perception (seeing things happen, not only how they are),
+observations, propositions and interpretation rules, claims and
+communication, credence, memory decay (`tri_generalize` is ready for it),
+attention budgets, and the notebook.
+
+27 tests, 237 checks, under both compilers, ASan and UBSan, and leak-free.
+
+Next: agency (AGENCY.md): agents that choose from their own menus.
