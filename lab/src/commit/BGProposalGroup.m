@@ -169,6 +169,19 @@ static BGProposal   proposal( BGProposalKind kind, BGRef target)
 }
 
 
+- (void) set:(const char *) field
+          of:(BGRef) target
+      toText:(const char *) text
+{
+   BGProposal   p;
+
+   p      = proposal( BGProposeSetField, target);
+   p.name = field;
+   p.key  = text ? text : "";
+   [self addProposal:p];
+}
+
+
 - (void) move:(BGRef) target
            to:(BGLocation) location
 {

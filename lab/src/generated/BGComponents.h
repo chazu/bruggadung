@@ -1,4 +1,4 @@
-/* Generated from Triangle content acdf4dcaf6fe52f8: do not edit. Type IDs are valid
+/* Generated from Triangle content 837795a2fafb1ee6: do not edit. Type IDs are valid
  * only for this content; regenerate when it changes. */
 #ifndef BG_COMPONENTS_H
 #define BG_COMPONENTS_H
@@ -6,7 +6,20 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BG_CONTENT_HASH 0xacdf4dcaf6fe52f8ULL
+#define BG_CONTENT_HASH 0x837795a2fafb1ee6ULL
+
+/* Activity, from #Activity */
+typedef struct {
+    uint64_t        actorRef;    /* a referent; saved, proposable, inspect */
+    int64_t         amount;    /* int, in quanta of 1; content, saved, proposable, inspect */
+    uint64_t        destinationRef;    /* a referent; saved, proposable, inspect */
+    int64_t         due;    /* time, in quanta of 1ms; content, saved, proposable, inspect */
+    uint64_t        itemRef;    /* a referent; saved, proposable, inspect */
+    const char *    operation;    /* text; saved, proposable, inspect */
+    uint32_t        status;    /* #ActivityStatus: a type ID; content, saved, proposable, inspect */
+    int64_t         watchAtLeast;    /* volume, in quanta of 1mL; content, saved, proposable, inspect */
+    uint64_t        watchHolder;    /* a referent; saved, proposable, inspect */
+} BGActivity;
 
 /* Claim, from #Claim */
 typedef struct {
@@ -56,19 +69,27 @@ typedef struct {
     int64_t         waterCapacity;    /* volume, in quanta of 1mL; content, saved, inspect, perceive(sight) */
 } BGWaterStore;
 
+/* #ActivityStatus */
+enum {
+    BG_ACTIVITYSTATUS_COMPLETED = 29,
+    BG_ACTIVITYSTATUS_EXHAUSTED = 30,
+    BG_ACTIVITYSTATUS_FAILED = 31,
+    BG_ACTIVITYSTATUS_RUNNING = 32,
+};
+
 /* #ClaimKind */
 enum {
-    BG_CLAIMKIND_CUSTODY = 28,
-    BG_CLAIMKIND_OWNERSHIP = 29,
+    BG_CLAIMKIND_CUSTODY = 34,
+    BG_CLAIMKIND_OWNERSHIP = 35,
 };
 
 /* #Material */
 enum {
-    BG_MATERIAL_BRASS = 37,
-    BG_MATERIAL_FLESH = 38,
-    BG_MATERIAL_IRON = 39,
-    BG_MATERIAL_OAK = 40,
-    BG_MATERIAL_PAPER = 41,
+    BG_MATERIAL_BRASS = 44,
+    BG_MATERIAL_FLESH = 45,
+    BG_MATERIAL_IRON = 46,
+    BG_MATERIAL_OAK = 47,
+    BG_MATERIAL_PAPER = 48,
 };
 
 /* The field registry: what code needs to read and write any component
@@ -94,9 +115,21 @@ typedef struct {
     const BGFieldInfo *fields;
 } BGComponentInfo;
 
-#define BG_COMPONENT_COUNT 8
+#define BG_COMPONENT_COUNT 9
 
 #ifdef BG_COMPONENT_REGISTRY
+
+static const BGFieldInfo BGActivity_fields[] = {
+    { "actorRef", offsetof(BGActivity, actorRef), BG_VALUE_REF, "ref", "saved, proposable, inspect" },
+    { "amount", offsetof(BGActivity, amount), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
+    { "destinationRef", offsetof(BGActivity, destinationRef), BG_VALUE_REF, "ref", "saved, proposable, inspect" },
+    { "due", offsetof(BGActivity, due), BG_VALUE_QUANTITY, "time", "content, saved, proposable, inspect" },
+    { "itemRef", offsetof(BGActivity, itemRef), BG_VALUE_REF, "ref", "saved, proposable, inspect" },
+    { "operation", offsetof(BGActivity, operation), BG_VALUE_TEXT, "text", "saved, proposable, inspect" },
+    { "status", offsetof(BGActivity, status), BG_VALUE_TYPE, "#ActivityStatus", "content, saved, proposable, inspect" },
+    { "watchAtLeast", offsetof(BGActivity, watchAtLeast), BG_VALUE_QUANTITY, "volume", "content, saved, proposable, inspect" },
+    { "watchHolder", offsetof(BGActivity, watchHolder), BG_VALUE_REF, "ref", "saved, proposable, inspect" },
+};
 
 static const BGFieldInfo BGClaim_fields[] = {
     { "kind", offsetof(BGClaim, kind), BG_VALUE_TYPE, "#ClaimKind", "content, saved, inspect" },
@@ -139,6 +172,7 @@ static const BGFieldInfo BGWaterStore_fields[] = {
 };
 
 static const BGComponentInfo BGComponents[BG_COMPONENT_COUNT + 1] = {
+    { "Activity", "#Activity", sizeof(BGActivity), 9, BGActivity_fields },
     { "Claim", "#Claim", sizeof(BGClaim), 2, BGClaim_fields },
     { "Body", "#Body", sizeof(BGBody), 4, BGBody_fields },
     { "Agent", "#Agent", sizeof(BGAgent), 1, BGAgent_fields },

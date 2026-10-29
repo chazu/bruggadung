@@ -82,6 +82,8 @@ static const BGScriptLine   mixedScript[] =
    _results        = [NSMutableArray new];
    _groups         = [NSMutableArray new];
    _invariantsHeld = YES;
+   _activities     = [[BGActivities activitiesWithWorld:world committer:committer] retain];
+   [_scheduler setActivities:_activities];
    [_scheduler setInputs:self];
    [_scheduler setObserver:self];
    return( self);
@@ -93,6 +95,7 @@ static const BGScriptLine   mixedScript[] =
    [_world release];
    [_committer release];
    [_scheduler release];
+   [_activities release];
    [_results release];
    [_groups release];
    [_explicitMerge release];
@@ -478,9 +481,12 @@ static const BGScriptLine   mixedScript[] =
    _world = [world retain];
    [_committer autorelease];
    _committer = [committer retain];
+   [_activities autorelease];
+   _activities = [[BGActivities activitiesWithWorld:world committer:committer] retain];
    [_scheduler autorelease];
    _scheduler = [[BGScheduler alloc] initWithWorld:world
                                          committer:committer];
+   [_scheduler setActivities:_activities];
    [_scheduler setInputs:self];
    [_scheduler setObserver:self];
 }

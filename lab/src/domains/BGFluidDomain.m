@@ -384,8 +384,127 @@ static int64_t   delivered( const BGFluidOutlet *o, int64_t dt)
 }
 
 
+/* --- watches ----------------------------------------------------------------- */
+
+typedef struct
+{
+   BGEntityID   activity;
+   int          holder;
+   int64_t      atLeast;
+} BGFluidWatch;
+
+
+/* The watches of running activities on holders in the structure. */
+- (int) watches:(BGFluidWatch *) out
+{
+   const BGActivity   *record;
+   BGStore            *store;
+   TriType            running;
+   NSUInteger         i;
+   int                h;
+   int                n;
+
+   store   = [_world storeForKind:[_world kindNamed:"Activity"]];
+   running = tri_type_named( [_world tri], "\"running\"");
+   n       = 0;
+   for( i = 0; i < [store count] && n < BG_FLUID_MAX; i++)
+   {
+      record = [store recordAtIndex:i];
+      if( ! record->watchHolder || record->status != (uint32_t) running)
+         continue;
+      for( h = 0; h < _nholders; h++)
+         if( _holders[ h].entity == (BGEntityID) record->watchHolder)
+         {
+            out[ n].activity = [store entityAtIndex:i];
+            out[ n].holder   = h;
+            out[ n].atLeast  = record->watchAtLeast;
+            n++;
+            break;
+         }
+   }
+   return( n);
+}
+
+
+- (BOOL) hasFired:(BGEntityID) activity
+{
+   int   i;
+
+   for( i = 0; i < _nfired; i++)
+      if( _fired[ i] == activity)
+         return( YES);
+   return( NO);
+}
+
+
+/* Forget fired watches whose activities no longer watch. */
+- (void) pruneFired:(BGFluidWatch *) watches
+              count:(int) n
+{
+   int    i;
+   int    j;
+   int    k;
+   BOOL   live;
+
+   for( i = k = 0; i < _nfired; i++)
+   {
+      for( live = NO, j = 0; j < n && ! live; j++)
+         live = watches[ j].activity == _fired[ i];
+      if( live)
+         _fired[ k++] = _fired[ i];
+   }
+   _nfired = k;
+}
+
+
+/* The first step at which the inflow brings a holder to the threshold. Never
+ * later than the true time: a source running dry first only delays it. */
+- (BGTime) crossingOf:(BGFluidWatch *) w
+                   at:(BGTime) t
+{
+   int64_t   hi;
+   int64_t   lo;
+   int64_t   mid;
+   int64_t   need;
+   int64_t   rate;
+   int64_t   sum;
+   int       i;
+   int       n;
+
+   need = w->atLeast - _holders[ w->holder].water;
+   if( need <= 0)
+      return( t);
+   rate = 0;
+   n    = 0;
+   for( i = 0; i < _noutlets; i++)
+      if( _outlets[ i].destination == w->holder && ! _outlets[ i].exhausted)
+      {
+         rate += _outlets[ i].rate;
+         n++;
+      }
+   if( ! rate)
+      return( BGTimeNever);
+   lo = 1;
+   hi = ((need + n) * BG_MS_PER_MINUTE + rate - 1) / rate;
+   while( lo < hi)
+   {
+      mid = (lo + hi) / 2;
+      sum = 0;
+      for( i = 0; i < _noutlets; i++)
+         if( _outlets[ i].destination == w->holder && ! _outlets[ i].exhausted)
+            sum += delivered( &_outlets[ i], mid);
+      if( sum >= need)
+         hi = mid;
+      else
+         lo = mid + 1;
+   }
+   return( BGTimeMake( t.ms + lo));
+}
+
+
 - (BGHorizon) horizonAt:(BGTime) t
 {
+   BGFluidWatch   watches[ BG_FLUID_MAX];
    BGTapView   views[ BG_FLUID_MAX];
    BGHorizon   h;
    BGTime      next;
@@ -419,6 +538,19 @@ static int64_t   delivered( const BGFluidOutlet *o, int64_t dt)
          h.nextEvent = next;
    }
    _predicted = h.nextEvent;
+   /* the activities' watches */
+   n = [self watches:watches];
+   [self pruneFired:watches
+              count:n];
+   for( i = 0; i < n; i++)
+   {
+      if( [self hasFired:watches[ i].activity])
+         continue;
+      next = [self crossingOf:&watches[ i]
+                           at:t];
+      if( next.ms < h.nextEvent.ms)
+         h.nextEvent = next;
+   }
    return( h);
 }
 
@@ -558,8 +690,37 @@ static void   sort_by_tap( int *order, int n, const BGFluidOutlet *outlets)
          [committer submit:group];
       }
    }
+   /* watches the step brought to their threshold */
+   [self reportWatchesTo:committer];
    if( ! [self flowing])
       [self checkInAll];
+}
+
+
+- (void) reportWatchesTo:(BGCommitter *) committer
+{
+   BGFluidWatch      watches[ BG_FLUID_MAX];
+   BGProposalGroup   *group;
+   int               i;
+   int               n;
+
+   n     = [self watches:watches];
+   group = nil;
+   for( i = 0; i < n; i++)
+   {
+      if( [self hasFired:watches[ i].activity] || _holders[ watches[ i].holder].water < watches[ i].atLeast)
+         continue;
+      if( ! group)
+         group = [BGProposalGroup groupWithPhase:BGPhaseProcess
+                                          source:@"fluid: watches reached"];
+      [group emit:"watched"
+          subject:BGWhole( watches[ i].activity)
+            other:BGWhole( _holders[ watches[ i].holder].entity)];
+      if( _nfired < BG_FLUID_MAX)
+         _fired[ _nfired++] = watches[ i].activity;
+   }
+   if( group)
+      [committer submit:group];
 }
 
 @end

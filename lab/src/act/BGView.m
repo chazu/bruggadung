@@ -176,6 +176,7 @@ static void   append_place( NSMutableString *s, BGLocation loc)
    const BGFieldInfo         *f;
    const TriNode             *pattern;
    const uint8_t             *record;
+   const char                *name;
    NSMutableString           *s;
    char                      buf[ 64];
    size_t                    i;
@@ -184,11 +185,21 @@ static void   append_place( NSMutableString *s, BGLocation loc)
    info = [_world info:entity];
    if( ! info)
       return( nil);
-   /* the type of the blueprint it was built from */
+   /* the type of the blueprint it was built from; a generated type (a meet,
+      glb[...]) has no name to write, so the conjunction of its components'
+      types stands for it */
    pattern = tri_pattern( [_world tri], info->blueprint);
-   s       = [NSMutableString stringWithFormat:@"%s & { id: ref(%llu)",
-                                               pattern ? tri_type_name( [_world tri], tri_node_type( pattern)) : "#Thing",
-                                               (unsigned long long) entity];
+   name    = pattern ? tri_type_name( [_world tri], tri_node_type( pattern)) : "#Thing";
+   if( strpbrk( name, "[ &"))
+   {
+      s = [NSMutableString stringWithString:@"#Thing"];
+      for( k = 0; k < [_world kindCount]; k++)
+         if( [_world record:k for:entity])
+            [s appendFormat:@" & %s", [_world kindInfo:k]->type];
+      [s appendFormat:@" & { id: ref(%llu)", (unsigned long long) entity];
+   }
+   else
+      s = [NSMutableString stringWithFormat:@"%s & { id: ref(%llu)", name, (unsigned long long) entity];
    if( [_world isPhysical:entity])
    {
       [s appendString:@", place: "];

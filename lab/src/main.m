@@ -4,7 +4,7 @@
  *   lab test [name]          run the tests (those whose names contain `name`)
  *   lab run <scenario>       run a scenario and print its trace and checks:
  *                            marked-nail, marked-nail-a, marked-nail-b,
- *                            cistern, cistern-b, cistern-d
+ *                            cistern, cistern-b, cistern-d, cistern-e
  *   lab save <scenario>      run a scenario and print the save of its end state
  *   lab menu <scenario> <ms> run a scenario to a time and print the worker's menu
  *   lab -C <dir> ...         read content from <dir> (default: content)
@@ -46,6 +46,8 @@ static int   run_cistern( const char *name)
       variant = BGCisternBase;
    else if( ! strcmp( name, "cistern-b"))
       variant = BGCisternEarlier;
+   else if( ! strcmp( name, "cistern-e"))
+      variant = BGCisternStopsEarly;
    else
       variant = BGCisternReversed;
    world = BGTestWorld( 7);

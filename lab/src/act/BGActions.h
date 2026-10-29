@@ -69,9 +69,21 @@ static inline BGAction   BGActionMake( const char *operation, BGEntityID actor, 
  * or the descriptions rule it out. */
 TriMatch           BGMatchAction( BGWorld *world, BGAction action, TriMatchResult *result, NSString **reason);
 
-/* Performs an action: if it is on the actor's menu, builds its effect's
- * group (phase action) and submits it for the next boundary. `amount` is the
- * command's parameter (how many, for take_some). nil, with the reason, if it
+/* Performs an action: if it is on the actor's menu, submits a group (phase
+ * action) for the next boundary. An instant operation's group carries its
+ * effect. One with a duration starts a timed activity, whose effect commits
+ * when it is due; fill starts an activity that ends by a watch or an event
+ * (BGActivities). `amount` is the command's parameter: how many, for
+ * take_some; how many millilitres, for fill. nil, with the reason, if it
  * can't be attempted. */
 BGProposalGroup    *BGPerform( BGWorld *world, BGCommitter *committer, BGAction action, int64_t amount,
                                NSString **error);
+
+/* An operation's effect, as proposals added to `group`: what an instant
+ * action commits, and what a timed activity commits when it is due. The
+ * reason if it can't be built. */
+NSString           *BGApplyEffect( BGWorld *world, BGAction action, int64_t amount, BGProposalGroup *group);
+
+/* The operation's effect name, and its duration in ms (0 if it has none). */
+NSString           *BGOperationEffect( BGWorld *world, const char *operation);
+int64_t            BGOperationDuration( BGWorld *world, const char *operation);

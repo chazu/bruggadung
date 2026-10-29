@@ -119,6 +119,10 @@ extern const char   *BGPhaseNames[ BGPhaseCount];
 - (void) set:(const char *) field
           of:(BGRef) target
           to:(int64_t) value;
+/* a text field: the text travels as the proposal's key */
+- (void) set:(const char *) field
+          of:(BGRef) target
+      toText:(const char *) text;
 - (void) move:(BGRef) target
            to:(BGLocation) location;
 /* Splits `count` units off a stack; returns the new entity's handle. */

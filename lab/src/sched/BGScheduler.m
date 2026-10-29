@@ -42,6 +42,12 @@ static BGTime   earlier( BGTime a, BGTime b)
 }
 
 
+- (void) setActivities:(id <BGActivityClock>) activities
+{
+   _activities = activities;
+}
+
+
 - (void) setObserver:(id <BGSchedulerObserver>) observer
 {
    _observer = observer;
@@ -60,6 +66,8 @@ static BGTime   earlier( BGTime a, BGTime b)
    bound = BGTimeNever;
    if( _inputs)
       bound = earlier( bound, [_inputs nextInputTime]);
+   if( _activities)
+      bound = earlier( bound, [_activities nextCompletion]);
    for( i = 0; i < [_domains count]; i++)
    {
       d = [_domains objectAtIndex:i];
@@ -111,6 +119,7 @@ static BGTime   earlier( BGTime a, BGTime b)
    /* commit at the bound, with the inputs due then */
    [_world setTime:bound];
    [_world setBoundary:[_world boundary] + 1];
+   [_activities completeDueAt:bound];
    if( _inputs && [_inputs nextInputTime].ms <= bound.ms)
       [_inputs deliverInputsAt:bound
                          world:_world

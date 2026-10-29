@@ -4,7 +4,7 @@
 // bindings between roles. `effect` names the code that builds the proposal
 // group when the action is performed.
 
-#Effect: "take" | "take_some" | "put_in" | "drive" | "open_tap"
+#Effect: "take" | "take_some" | "put_in" | "drive" | "open_tap" | "fill"
 
 // Which roles an operation has is its roles' type: a structure's type is the
 // most general one with all its features.
@@ -12,9 +12,13 @@
 #ItemRoles:    #Roles & { item: #Body }
 #PlacingRoles: #ItemRoles & { destination: #Body }
 
+// An operation with a duration is a timed activity: its effect commits when
+// the duration is up. One without is instant, unless its effect's code makes
+// it an activity that ends by a watch or an event (fill).
 #Operation: {
-    roles:  #Roles
-    effect: #Effect
+    roles:    #Roles
+    effect:   #Effect
+    duration: time & >=0ms & <=1d
 }
 
 // Pick something up into a free hand: from a container, the ground, or an
@@ -50,7 +54,8 @@ put_in: #Operation & {
 // Drive a held nail into an assembly, as a wedge: it bends and takes tool
 // marks. From a stack, one nail is driven.
 drive: #Operation & {
-    effect: "drive"
+    effect:   "drive"
+    duration: 4s
     roles: {
         actor:       #Agent & { id: $a }
         item:        #Body & { material: "iron", place: #Held & { by: $a } }
@@ -64,5 +69,17 @@ open_tap: #Operation & {
     roles: {
         actor: #Agent
         item:  #Tap & { open: false }
+    }
+} @family(operations)
+
+// Fill a bucket from a tap: open it, and keep filling until the bucket holds
+// the command's amount (a watch on the bucket) or the source runs dry (the
+// tap's "exhausted"). The bucket must sit in the tap.
+fill_bucket: #Operation & {
+    effect: "fill"
+    roles: {
+        actor:       #Agent
+        item:        #Tap & { id: $t, open: false }
+        destination: #WaterStore & #Body & { place: #Inside & { container: $t } }
     }
 } @family(operations)

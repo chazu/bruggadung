@@ -12,6 +12,7 @@ endif()
 #
 set( SOURCES
 src/act/BGActions.m
+src/act/BGActivities.m
 src/act/BGView.m
 src/commit/BGCommitter.m
 src/commit/BGProposalGroup.m

@@ -14,7 +14,7 @@ mulle-sde craft                         # the real build: mulle-clang, MulleObjC
 ./kitchen/Debug/lab run marked-nail     # one scenario: trace, entities, checks (also -a, -b)
 ./kitchen/Debug/lab save marked-nail    # the save of its end state
 ./kitchen/Debug/lab menu marked-nail 1000   # what the worker sees, and its menu, at 1000 ms
-./kitchen/Debug/lab run cistern         # the fluid domain: two taps and a leak on a dwindling cistern (also -b, -d)
+./kitchen/Debug/lab run cistern         # the fluid domain: two taps and a leak on a dwindling cistern (also -b, -d, -e)
 make gen                                # regenerate src/generated/BGComponents.h from content/
 make test-apple                         # the same sources with Apple clang and Foundation
 make asan                               # the Apple build under AddressSanitizer and UBSan
@@ -30,14 +30,14 @@ CFLAGS`.
 
 | Path | Contents |
 | --- | --- |
-| `content/` | `components.tri`: the component kinds and their field registry, plus what descriptions say besides fields (ids, places, free hands); `water.tri`: water stores and taps; `operations.tri`: the operations; `workshop.tri`: the scenarios' blueprints |
+| `content/` | `components.tri`: the component kinds and their field registry, plus what descriptions say besides fields (ids, places, free hands); `water.tri`: water stores and taps; `activities.tri`: the Activity component; `operations.tri`: the operations; `workshop.tri`: the scenarios' blueprints |
 | `src/generated/BGComponents.h` | Generated from `content/` by `make gen`: one struct per component, enums, and the field registry. Committed; the lab refuses to run on content with another hash. |
 | `src/core/` | `BGTypes.h` (IDs, time, seeds, locations), `BGStore` (records of one kind, sorted by ID), `BGWorld` (all authoritative state, journaled for rollback) |
 | `src/commit/` | `BGProposalGroup` (proposals, handles, unit references), `BGCommitter` (ordering, individuation, apply, validation, events, reactions) |
 | `src/kinds/` | Component behaviour: `BGBodyKind`, the merge reaction |
 | `src/domains/` | `BGFluidDomain`: water through open taps, with checkout, exact allocation, and exhaustion as the horizon |
 | `src/sched/` | `BGScheduler`, with the domain and input-source protocols |
-| `src/act/` | `BGView` (reach and descriptions: the knowledge view's stub), `BGActions` (the menu, matching, effects, performing) |
+| `src/act/` | `BGView` (reach and descriptions: the knowledge view's stub), `BGActions` (the menu, matching, effects, performing), `BGActivities` (activities under way: completion, watches, ending) |
 | `src/save/` | `BGSave`: saves as text, and restoring them |
 | `src/scenario/` | `BGMarkedNail` and `BGCistern`: the scenarios, their input logs, and their checks |
 | `src/test/` | The test runner and the tests |
@@ -54,6 +54,19 @@ open, so a match on it is unknown, and unknown never excludes. The menu
 lists every operation and binding whose match isn't incompatible.
 Performing a command checks it is on the menu, then runs the operation's
 effect function, which builds a proposal group for commitment.
+
+## How an activity runs
+
+An operation with a `duration` (drive takes 4 s) is a timed activity:
+performing it commits an Activity entity, the scheduler puts a boundary at
+its due time, and its effect commits then; if commitment rejects the effect
+(the nails merged away meanwhile), the activity fails. `fill_bucket` is an
+activity with a watch: it opens the tap, and the fluid domain, which reads
+the watches of running activities, includes the moment the bucket reaches
+the amount in its horizon and reports "watched" exactly then. The activity
+system follows each commit round and ends what the round's events end: a
+watch fired, or the tap's source ran dry. Activities and their watches are
+components, so saves keep them.
 
 ## How a domain runs
 

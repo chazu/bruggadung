@@ -59,6 +59,7 @@ static void   declare( BGTally *t, const char *unit, int64_t units, int64_t mass
    _submitted = [NSMutableArray new];
    _deferred  = [NSMutableArray new];
    _reactors  = [NSMutableArray new];
+   _listeners = [NSMutableArray new];
    _trace     = [NSMutableArray new];
    _rounds    = 4;
    return( self);
@@ -71,6 +72,7 @@ static void   declare( BGTally *t, const char *unit, int64_t units, int64_t mass
    [_submitted release];
    [_deferred release];
    [_reactors release];
+   [_listeners release];
    [_trace release];
    [super dealloc];
 }
@@ -98,6 +100,12 @@ static void   declare( BGTally *t, const char *unit, int64_t units, int64_t mass
       return;
    [_reactors addObject:[NSNumber numberWithUnsignedLongLong:k]];
    [_reactors addObject:reactor];
+}
+
+
+- (void) addListener:(id <BGRoundListener>) listener
+{
+   [_listeners addObject:listener];
 }
 
 
@@ -476,9 +484,8 @@ static NSString   *live_check( BGWorld *w, BGEntityID e, const char *role)
                        for:e])
          return( [NSString stringWithFormat:@"%llu has no %s component",
                                             (unsigned long long) e, [_world kindInfo:k]->name]);
-      if( ! [_world setField:p->name
-                          of:e
-                       value:p->value])
+      if( f->value == BG_VALUE_TEXT ? ! [_world setField:p->name of:e text:p->key]
+                                    : ! [_world setField:p->name of:e value:p->value])
          return( [NSString stringWithFormat:@"%s cannot be set", p->name]);
       [self emit:"changed" subject:e other:BGNoEntity amount:p->value detail:p->name location:BGLocationMakeNone() group:g];
       return( nil);
@@ -895,6 +902,12 @@ static NSString   *live_check( BGWorld *w, BGEntityID e, const char *role)
    NSUInteger      last;
 
    last = [_world eventCount];
+   /* engine machinery that follows each round, such as activities */
+   for( k = 0; k < [_listeners count]; k++)
+      [[_listeners objectAtIndex:k] committer:self
+                              didCommitRound:_round
+                                  eventsFrom:first
+                                          to:last];
    for( i = first; i < last; i++)
    {
       ev = [_world eventAt:i];

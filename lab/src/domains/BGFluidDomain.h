@@ -11,6 +11,10 @@
  * in tap-ID order, rotated by the boundary index. The horizon's next event is
  * the first step at which a store runs dry, so the scheduler puts a boundary
  * exactly there, and every tap on that store reports "exhausted" in it.
+ *
+ * Watches are activities' (DOMAIN_SIMULATION.md §5, ACTIONS.md §5): a running
+ * activity with a watchHolder is told, by a "watched" event, in the step its
+ * holder's water reaches watchAtLeast; that step is part of the horizon too.
  */
 #import "BGScheduler.h"
 
@@ -49,6 +53,10 @@ typedef struct
    int              _noutlets;
    NSMutableArray   *_log;
    BGTime           _predicted;
+
+   /* watches that have fired, until their activities stop watching */
+   BGEntityID       _fired[ BG_FLUID_MAX];
+   int              _nfired;
 
    /* carries of open taps, kept across check-in and forming again */
    BGEntityID       _carryTaps[ BG_FLUID_MAX];

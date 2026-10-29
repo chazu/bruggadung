@@ -9,6 +9,11 @@
  *   3b:   A opens a minute earlier, and gets more
  *   3d:   the domain holds its participants in the reverse order inside;
  *         the run must be bit-identical to the base
+ *   3e:   A fills only 3 L: a watch on the bucket ends A's activity, which
+ *         closes the tap, and B gets the rest
+ *
+ * The agents fill their buckets as activities (fill_bucket), which end when
+ * their watch fires or their tap reports the cistern dry.
  */
 #import "BGTypes.h"
 
@@ -16,13 +21,15 @@
 #import "BGCommitter.h"
 #import "BGScheduler.h"
 #import "BGFluidDomain.h"
+#import "BGActivities.h"
 
 
 typedef enum
 {
    BGCisternBase,
    BGCisternEarlier,         /* 3b */
-   BGCisternReversed         /* 3d */
+   BGCisternReversed,        /* 3d */
+   BGCisternStopsEarly       /* 3e */
 } BGCisternVariant;
 
 
@@ -33,6 +40,7 @@ typedef enum
    BGCommitter        *_committer;
    BGScheduler        *_scheduler;
    BGFluidDomain      *_fluid;
+   BGActivities       *_activities;
    NSMutableArray     *_results;
    NSMutableArray     *_groups;
    int64_t            _times[ 256];      /* boundary → time */

@@ -61,6 +61,7 @@ TriMatch   BGMatchAction( BGWorld *world, BGAction action, TriMatchResult *resul
    TriMatch          match;
    BGView            *view;
    NSString          *d;
+   char              duration[ 128];
    char              effect[ 64];
    char              err[ 256];
    int               r;
@@ -77,8 +78,15 @@ TriMatch   BGMatchAction( BGWorld *world, BGAction action, TriMatchResult *resul
    }
    view = [BGView viewOf:action.roles[ BGRoleActor]
                  inWorld:world];
+   /* the operation's own features, as the pattern has them; the roles, as the actor sees them */
    tri_print( tri, tri_at( tri, pattern, "effect"), effect, sizeof( effect));
-   expr = [NSMutableString stringWithFormat:@"#Operation & { effect: %s, roles: {", effect];
+   expr = [NSMutableString stringWithFormat:@"#Operation & { effect: %s, ", effect];
+   if( tri_at( tri, pattern, "duration"))
+   {
+      tri_print( tri, tri_at( tri, pattern, "duration"), duration, sizeof( duration));
+      [expr appendFormat:@"duration: %s, ", duration];
+   }
+   [expr appendString:@"roles: {"];
    for( r = 0; r < BGRoleCount; r++)
    {
       if( ! has_role( tri, pattern, (BGRole) r))
@@ -108,7 +116,7 @@ TriMatch   BGMatchAction( BGWorld *world, BGAction action, TriMatchResult *resul
    if( ! description)
    {
       if( reason)
-         *reason = [NSString stringWithFormat:@"the description does not build: %s", err];
+         *reason = [NSString stringWithFormat:@"the description does not build: %s, in %@", err, expr];
       tri_arena_free( arena);
       return( TRI_INCOMPATIBLE);
    }
@@ -362,16 +370,77 @@ static const struct
 };
 
 
+NSString   *BGOperationEffect( BGWorld *world, const char *operation)
+{
+   const TriNode   *pattern;
+   char            effect[ 64];
+   size_t          n;
+
+   pattern = operation ? tri_pattern( [world tri], operation) : NULL;
+   if( ! pattern || ! tri_at( [world tri], pattern, "effect"))
+      return( nil);
+   n = tri_print( [world tri], tri_at( [world tri], pattern, "effect"), effect, sizeof( effect));
+   if( n < 2 || n >= sizeof( effect))
+      return( nil);
+   effect[ n - 1] = 0;          /* without its quotes */
+   return( [NSString stringWithUTF8String:effect + 1]);
+}
+
+
+int64_t   BGOperationDuration( BGWorld *world, const char *operation)
+{
+   const TriNode   *pattern;
+   int64_t         hi;
+   int64_t         lo;
+
+   pattern = operation ? tri_pattern( [world tri], operation) : NULL;
+   if( ! pattern || ! tri_node_interval( tri_at( [world tri], pattern, "duration"), &lo, &hi) || lo != hi)
+      return( 0);
+   return( lo);
+}
+
+
+NSString   *BGApplyEffect( BGWorld *world, BGAction action, int64_t amount, BGProposalGroup *group)
+{
+   NSString     *effect;
+   size_t       i;
+
+   effect = BGOperationEffect( world, action.operation);
+   for( i = 0; i < sizeof( effects) / sizeof( effects[ 0]); i++)
+      if( effect && ! strcmp( effects[ i].name, [effect UTF8String]))
+         return( effects[ i].function( world, action, amount, group));
+   return( [NSString stringWithFormat:@"no code for the effect %@", effect]);
+}
+
+
+/* The activity entity an action starts, with its bindings. */
+static BGEntityID   start_activity( BGWorld *world, BGAction action, int64_t amount, BGProposalGroup *g)
+{
+   BGEntityID   a;
+   char         key[ 96];
+
+   snprintf( key, sizeof( key), "activity of %llu at %llu: %s", (unsigned long long) action.roles[ BGRoleActor],
+             (unsigned long long) [world boundary], action.operation);
+   a = [g create:"activity" key:key at:BGLocationMakeNone()];
+   [g set:"Activity.operation" of:BGWhole( a) toText:action.operation];
+   [g set:"Activity.actorRef" of:BGWhole( a) to:(int64_t) action.roles[ BGRoleActor]];
+   [g set:"Activity.itemRef" of:BGWhole( a) to:(int64_t) action.roles[ BGRoleItem]];
+   [g set:"Activity.destinationRef" of:BGWhole( a) to:(int64_t) action.roles[ BGRoleDestination]];
+   [g set:"Activity.amount" of:BGWhole( a) to:amount];
+   return( a);
+}
+
+
 BGProposalGroup   *BGPerform( BGWorld *world, BGCommitter *committer, BGAction action, int64_t amount,
                               NSString **error)
 {
    BGProposalGroup   *group;
    TriMatchResult    result;
+   NSString          *effect;
    NSString          *reason;
    NSString          *source;
-   char              effect[ 64];
-   size_t            i;
-   size_t            n;
+   BGEntityID        activity;
+   int64_t           duration;
    int               r;
 
    reason = nil;
@@ -381,16 +450,9 @@ BGProposalGroup   *BGPerform( BGWorld *world, BGCommitter *committer, BGAction a
          *error = reason;
       return( nil);
    }
-   n = tri_print( [world tri], tri_at( [world tri], tri_pattern( [world tri], action.operation), "effect"),
-                  effect, sizeof( effect));
-   /* the effect's name, without its quotes */
-   if( n >= 2 && n < sizeof( effect))
-   {
-      memmove( effect, effect + 1, n - 2);
-      effect[ n - 2] = 0;
-   }
-   source = [NSMutableString stringWithFormat:@"%llu: %s", (unsigned long long) action.roles[ BGRoleActor],
-                                              action.operation];
+   effect   = BGOperationEffect( world, action.operation);
+   duration = BGOperationDuration( world, action.operation);
+   source   = [NSString stringWithFormat:@"%llu: %s", (unsigned long long) action.roles[ BGRoleActor], action.operation];
    for( r = BGRoleItem; r < BGRoleCount; r++)
       if( action.roles[ r])
          source = [source stringByAppendingFormat:@" %s %llu", BGRoleNames[ r], (unsigned long long) action.roles[ r]];
@@ -398,17 +460,27 @@ BGProposalGroup   *BGPerform( BGWorld *world, BGCommitter *committer, BGAction a
       source = [source stringByAppendingFormat:@" (%lld)", (long long) amount];
    group = [BGProposalGroup groupWithPhase:BGPhaseAction
                                     source:source];
-   for( i = 0; i < sizeof( effects) / sizeof( effects[ 0]); i++)
-      if( ! strcmp( effects[ i].name, effect))
-         break;
-   if( i == sizeof( effects) / sizeof( effects[ 0]))
+   if( [effect isEqualToString:@"fill"])
    {
-      if( error)
-         *error = [NSString stringWithFormat:@"no code for the effect %s", effect];
-      return( nil);
+      /* an activity that ends by its watch on the bucket, or by the tap running dry */
+      if( amount < 1)
+      {
+         if( error)
+            *error = @"fill to how many millilitres?";
+         return( nil);
+      }
+      activity = start_activity( world, action, amount, group);
+      [group set:"Activity.watchHolder" of:BGWhole( activity) to:(int64_t) action.roles[ BGRoleDestination]];
+      [group set:"Activity.watchAtLeast" of:BGWhole( activity) to:amount];
+      [group set:"Tap.open" of:BGWhole( action.roles[ BGRoleItem]) to:1];
    }
-   reason = effects[ i].function( world, action, amount, group);
-   if( reason)
+   else if( duration > 0)
+   {
+      /* a timed activity: the effect commits when it is due */
+      activity = start_activity( world, action, amount, group);
+      [group set:"Activity.due" of:BGWhole( activity) to:[world time].ms + duration];
+   }
+   else if( (reason = BGApplyEffect( world, action, amount, group)))
    {
       if( error)
          *error = reason;

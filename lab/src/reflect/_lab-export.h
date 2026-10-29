@@ -14,6 +14,7 @@
 
 
 #import "BGActions.h"
+#import "BGActivities.h"
 #import "BGView.h"
 #import "BGCommitter.h"
 #import "BGProposalGroup.h"

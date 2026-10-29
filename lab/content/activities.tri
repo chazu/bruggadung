@@ -1,0 +1,23 @@
+// Activities (ACTIONS.md §5): an action under way is an informational
+// entity, with no body and no location. Being a component, it is saved like
+// any other, and so are its watches.
+
+#ActivityStatus: "running" | "completed" | "exhausted" | "failed"
+
+#Activity: #Thing & {
+    @component(Activity)
+    operation:      text                       @field(saved, proposable, inspect)
+    actorRef:       ref                        @field(saved, proposable, inspect)
+    itemRef:        ref                        @field(saved, proposable, inspect)
+    destinationRef: ref                        @field(saved, proposable, inspect)
+    amount:         int & >=0 & <=1000000      @field(content, saved, proposable, inspect)
+    // when a timed activity completes; 0ms for one that ends by a watch or an event
+    due:            time & >=0ms & <=100d      @field(content, saved, proposable, inspect)
+    status:         #ActivityStatus            @field(content, saved, proposable, inspect)
+    // a watch (DOMAIN_SIMULATION.md §5): tell this activity when the holder's
+    // water reaches watchAtLeast; no holder, no watch
+    watchHolder:    ref                        @field(saved, proposable, inspect)
+    watchAtLeast:   volume & >=0mL & <=10m3    @field(content, saved, proposable, inspect)
+}
+
+activity: #Activity & { amount: 0, due: 0ms, status: "running", watchAtLeast: 0mL }

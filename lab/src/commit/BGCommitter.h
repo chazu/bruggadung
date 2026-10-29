@@ -27,12 +27,26 @@
 @end
 
 
+/* Engine machinery told after each round, before the reactions run: the
+ * activity system rechecks the activities bound to what changed (ACTIONS.md
+ * §5). It may submit groups, which join the next round. */
+@protocol BGRoundListener
+
+- (void) committer:(BGCommitter *) committer
+    didCommitRound:(uint32_t) round
+        eventsFrom:(NSUInteger) first
+                to:(NSUInteger) last;
+
+@end
+
+
 @interface BGCommitter : NSObject
 {
    BGWorld          *_world;
    NSMutableArray   *_submitted;
    NSMutableArray   *_deferred;
    NSMutableArray   *_reactors;        /* pairs: kind index, reactor */
+   NSMutableArray   *_listeners;
    NSMutableArray   *_trace;
    NSUInteger       _rounds;
    uint64_t         _position;
@@ -46,6 +60,8 @@
 - (void) addReactor:(id <BGReactor>) reactor
             forKind:(const char *) kind;
 
+/* retained: a listener must not retain the committer */
+- (void) addListener:(id <BGRoundListener>) listener;
 - (void) submit:(BGProposalGroup *) group;
 - (BOOL) hasPending;
 

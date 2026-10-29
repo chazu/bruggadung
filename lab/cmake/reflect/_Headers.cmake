@@ -68,6 +68,7 @@ src/generic/include.h
 #
 set( PUBLIC_HEADERS
 src/act/BGActions.h
+src/act/BGActivities.h
 src/act/BGView.h
 src/commit/BGCommitter.h
 src/commit/BGProposalGroup.h

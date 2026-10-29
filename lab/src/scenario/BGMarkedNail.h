@@ -14,6 +14,7 @@
 #import "BGWorld.h"
 #import "BGCommitter.h"
 #import "BGScheduler.h"
+#import "BGActivities.h"
 
 
 typedef enum
@@ -30,6 +31,7 @@ typedef enum
    BGWorld               *_world;
    BGCommitter           *_committer;
    BGScheduler           *_scheduler;
+   BGActivities          *_activities;
    NSUInteger            _next;
    NSMutableArray        *_results;
    NSMutableArray        *_groups;        /* every group processed, in order */

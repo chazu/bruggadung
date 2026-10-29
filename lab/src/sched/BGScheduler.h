@@ -53,6 +53,15 @@ typedef struct
 
 @end
 
+/* Activities with a due time (ACTIONS.md §5): they bound steps, and their
+ * completions are submitted at the boundary they fall on. */
+@protocol BGActivityClock
+
+- (BGTime) nextCompletion;           /* BGTimeNever when none is due */
+- (void) completeDueAt:(BGTime) t;
+
+@end
+
 @class BGScheduler;
 
 @protocol BGSchedulerObserver
@@ -70,6 +79,7 @@ typedef struct
    BGCommitter                  *_committer;
    NSMutableArray               *_domains;
    id <BGInputSource>           _inputs;
+   id <BGActivityClock>         _activities;
    id <BGSchedulerObserver>     _observer;
 }
 
@@ -78,6 +88,7 @@ typedef struct
 
 - (void) addDomain:(id <BGDomain>) domain;
 - (void) setInputs:(id <BGInputSource>) inputs;          /* not retained */
+- (void) setActivities:(id <BGActivityClock>) activities; /* not retained */
 - (void) setObserver:(id <BGSchedulerObserver>) observer; /* not retained */
 
 /* The time the next boundary would be at, if nothing stops it first. */

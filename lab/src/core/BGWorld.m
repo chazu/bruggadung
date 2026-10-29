@@ -597,6 +597,47 @@ static BOOL   field_set( const BGFieldInfo *f, void *record, int64_t value)
 }
 
 
+- (BOOL) setField:(const char *) path
+               of:(BGEntityID) entity
+             text:(const char *) text
+{
+   const BGFieldInfo   *f;
+   const void          *record;
+   NSUInteger          k;
+   uint8_t             copy[ 512];
+
+   if( ! [self lookupField:path
+                      kind:&k
+                     field:&f] || f->value != BG_VALUE_TEXT)
+      return( NO);
+   record = [_kinds[ k] recordFor:entity];
+   if( ! record || BGComponents[ k].size > sizeof( copy))
+      return( NO);
+   memcpy( copy, record, BGComponents[ k].size);
+   *(const char **) (copy + f->offset) = text ? [self intern:text] : NULL;
+   [self setRecord:copy
+              kind:k
+               for:entity];
+   return( YES);
+}
+
+
+- (const char *) textField:(const char *) path
+                        of:(BGEntityID) entity
+{
+   const BGFieldInfo   *f;
+   const uint8_t       *record;
+   NSUInteger          k;
+
+   if( ! [self lookupField:path
+                      kind:&k
+                     field:&f] || f->value != BG_VALUE_TEXT)
+      return( NULL);
+   record = [_kinds[ k] recordFor:entity];
+   return( record ? *(const char *const *) (record + f->offset) : NULL);
+}
+
+
 /* --- entities -------------------------------------------------------------- */
 
 - (BGEntityID) allocateID
@@ -686,8 +727,13 @@ static BOOL   field_set( const BGFieldInfo *f, void *record, int64_t value)
             continue;
          switch( f->value)
          {
-         case BG_VALUE_QUANTITY:
          case BG_VALUE_REF:
+            /* a referent is bound at runtime: left open in a blueprint, it is none */
+            if( tri_node_interval( v, &lo, &hi) && lo == hi)
+               field_set( f, record, lo);
+            break;
+
+         case BG_VALUE_QUANTITY:
             if( ! tri_node_interval( v, &lo, &hi) || lo != hi)
             {
                if( error)

@@ -361,6 +361,49 @@ by region, contributions between domains, and bucket capacity (overflow).
 
 21 tests, 171 checks, under both compilers, ASan and UBSan, and leak-free.
 
-Next: activities with stages, effort, interruption, and watches (item 3),
-now that there is a domain to watch: the scenario's agents should *fill a
-bucket*, an activity that stops when the source is exhausted.
+### After the slice: activities and watches
+
+Item 3's first part is built (`src/act/BGActivities`, `content/activities.tri`).
+An activity is an informational entity with an Activity component: its
+operation, its bound entities, an amount, a due time, a status, and an
+optional watch. Operations with a `duration` are timed activities (drive
+takes 4 s); fill_bucket is an activity that ends by its watch on the bucket,
+or by the tap's "exhausted". The scheduler bounds steps by due times; the
+fluid domain reads running activities' watches and reports "watched" in the
+exact step a bucket reaches its amount; a round listener on the committer
+ends the activities a round's events end (ACTIONS.md §5: "engine machinery,
+not a component channel"). Watches are owned by activities and saved with
+them, as ACTIONS.md answered DOMAIN_SIMULATION.md's open question 4.
+
+The cistern's agents now fill their buckets as activities: in the base run
+both end "exhausted" in the step the cistern runs dry; in the new variant
+3e, A asks for 3 L and B for 10 L, and each watch ends its activity at
+exactly that amount (3000 and 10000 mL), the crack draining the remaining
+2000 mL. The marked nail's drive is timed; the save test saves in the
+middle of it, and the restored world completes it.
+
+What it settled:
+
+- **A referent left open in a blueprint is none**, not an error: an
+  activity's bindings are set when it starts.
+- **Text fields travel through proposals** (an activity records its
+  operation's name).
+- **An operation's description carries its own features** (effect and
+  duration) as well as its roles; without the duration, drive matched
+  unknown.
+- **A generated type has no writable name.** The bucket's type is the meet
+  `glb[#Assembly & #WaterStore,#Body & #WaterStore]`, which completion made
+  because two conjunction types share `#Body` and `#WaterStore`; the view
+  describes such an entity by the conjunction of its components' types.
+- **A duration counts from the command**, at the world's time when it is
+  given.
+
+Not yet: stages and effort rates from capabilities, interruption by the
+actor's choice, suspension and resuming, provider allocation (hands), and
+partial effects.
+
+23 tests, 182 checks, under both compilers, ASan and UBSan, and leak-free.
+
+Next: the command interface, a text map, and the developer inspector
+(item 5), so a person can drive the lab; or stages and suspension, if the
+scenarios of ACTIONS.md come first.

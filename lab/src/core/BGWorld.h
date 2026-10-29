@@ -156,6 +156,12 @@ extern const char   *BGEdgeKindNames[ BGEdgeKindCount];
 - (BOOL) setField:(const char *) path
                of:(BGEntityID) entity
             value:(int64_t) value;
+/* a text field; the text is interned */
+- (BOOL) setField:(const char *) path
+               of:(BGEntityID) entity
+             text:(const char *) text;
+- (const char *) textField:(const char *) path
+                        of:(BGEntityID) entity;
 
 /* --- entities ------------------------------------------------------------- */
 

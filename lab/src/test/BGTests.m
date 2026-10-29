@@ -6,6 +6,7 @@
 #import "BGActions.h"
 #import "BGView.h"
 #import "BGCistern.h"
+#import "BGActivities.h"
 
 #include <stdio.h>
 
@@ -59,7 +60,7 @@ static void   test_registry_and_construction( void)
 
    w = BGTestWorld( 1);
    c = BGTestCommitter( w);
-   BG_CHECK( [w kindCount] == 8);
+   BG_CHECK( [w kindCount] == 9);
    BG_CHECK( [w kindNamed:"Body"] != NSNotFound && [w kindNamed:"Nonesuch"] == NSNotFound);
    bin   = commit_create( c, "bin", BGOnTile( 0, 0, 0));
    nails = commit_create( c, "nails_30", BGIn( bin));
@@ -606,6 +607,68 @@ static void   test_menu( void)
 }
 
 
+/* --- activities ------------------------------------------------------------ */
+
+static const char   *status_of( BGWorld *w, BGEntityID a)
+{
+   const BGActivity   *record;
+
+   record = [w record:[w kindNamed:"Activity"] for:a];
+   return( record ? tri_type_name( [w tri], record->status) : "none");
+}
+
+
+/* A timed activity whose item is gone when it is due: commitment rejects its
+ * effect, and the activity fails. */
+static void   test_activity_fails( void)
+{
+   BGWorld           *w;
+   BGCommitter       *c;
+   BGScheduler       *s;
+   BGActivities      *activities;
+   BGProposalGroup   *g;
+   BGEntityID        bin;
+   BGEntityID        nails;
+   BGEntityID        lock;
+   BGEntityID        worker;
+   BGEntityID        handful;
+   BGEntityID        a;
+   NSString          *error;
+
+   w          = BGTestWorld( 5);
+   c          = BGTestCommitter( w);
+   activities = [BGActivities activitiesWithWorld:w committer:c];
+   s          = [[[BGScheduler alloc] initWithWorld:w committer:c] autorelease];
+   [s setActivities:activities];
+   bin    = commit_create( c, "bin", BGOnTile( 0, 0, 0));
+   nails  = commit_create( c, "nails_30", BGIn( bin));
+   lock   = commit_create( c, "lock", BGOnTile( 2, 0, 0));
+   worker = commit_create( c, "worker", BGOnTile( 1, 0, 0));
+
+   g = BGPerform( w, c, BGActionMake( "take_some", worker, nails, BGNoEntity), 5, &error);
+   [s runUntil:BGTimeMake( 10)];
+   handful = [g idFor:[g proposals][ 0].handle];
+   BG_CHECK( [w unitsOf:handful] == 5);
+
+   g = BGPerform( w, c, BGActionMake( "drive", worker, handful, lock), 0, &error);
+   BG_CHECK( g != nil);
+   [s runUntil:BGTimeMake( 20)];
+   a = [g idFor:[g proposals][ 0].handle];
+   BG_CHECK( ! strcmp( status_of( w, a), "\"running\""));
+   BG_CHECK( [activities nextCompletion].ms == 10 + 4000);      /* from the command, at 10ms */
+   BG_CHECK( [w unitsOf:handful] == 5);                       /* nothing happens until it is due */
+
+   /* the nails go back in the bin and merge away before the drive is due */
+   BGPerform( w, c, BGActionMake( "put_in", worker, handful, bin), 0, &error);
+   [s runUntil:BGTimeMake( 30)];
+   BG_CHECK( [w resolve:handful] == nails);
+   [s runUntil:BGTimeMake( 6000)];
+   BG_CHECK( ! strcmp( status_of( w, a), "\"failed\""));
+   BG_CHECK( [activities nextCompletion].ms == BGTimeNever.ms);
+   BG_CHECK( [w unitsOf:nails] == 30);
+}
+
+
 /* --- the cistern ----------------------------------------------------------- */
 
 static BGCistern   *run_cistern( BGCisternVariant variant)
@@ -653,6 +716,13 @@ static void   test_cistern( void)
 static void   test_cistern_b( void)
 {
    check_cistern( run_cistern( BGCisternEarlier));
+}
+
+
+/* A watch: A stops at 3 L, closing the tap; B fills on */
+static void   test_cistern_e( void)
+{
+   check_cistern( run_cistern( BGCisternStopsEarly));
 }
 
 
@@ -879,9 +949,11 @@ const BGTestCase   BGAllTests[] =
    { "marked_nail_b",                 test_marked_nail_b },
    { "marked_nail_replay",            test_marked_nail_replay },
    { "menu",                          test_menu },
+   { "activity_fails",                test_activity_fails },
    { "cistern",                       test_cistern },
    { "cistern_b",                     test_cistern_b },
    { "cistern_d",                     test_cistern_d },
+   { "cistern_e",                     test_cistern_e },
    { "checked_out",                   test_checked_out },
    { "cistern_save",                  test_cistern_save },
    { "save_and_resume",               test_save_and_resume },
