@@ -26,13 +26,21 @@ void op_end(Content *c, uint32_t saved)
 
 TriNode *node_new(Content *c, TriArena *a, uint32_t type)
 {
-    TriNode *n = arena_alloc(a, sizeof(TriNode));
+    TriNode *n = arena_alloc_raw(a, sizeof(TriNode));
     n->type = type;
-    if (a == c->scratch) n->flags |= NF_SCRATCH;
+    n->narcs = 0;
+    n->flags = a == c->scratch ? NF_SCRATCH : 0;
+    n->sx = NULL;
+    n->sxgen = 0;
+    n->cpygen = 0;
+    n->cpy = NULL;
     if (is_dim(c, type)) {
         n->flags |= NF_DIM;
         n->lo = TRI_NINF;
         n->hi = TRI_INF;
+    } else {
+        n->arcs = NULL;
+        n->hi = 0;
     }
     return n;
 }
@@ -53,7 +61,13 @@ Scratch *sx_get(Content *c, TriNode *n)
 Scratch *sx_make(Content *c, TriNode *n)
 {
     if (n->sxgen != c->gen) {
-        n->sx = arena_alloc(c->scratch, sizeof(Scratch));
+        Scratch *s = arena_alloc_raw(c->scratch, sizeof(Scratch));
+        s->fwd = s->bwd = NULL;
+        s->carcs = NULL;
+        s->ncarcs = s->ccap = 0;
+        s->hasiv = false;
+        s->forced = false;
+        n->sx = s;
         n->sxgen = c->gen;
     }
     return n->sx;
@@ -103,7 +117,7 @@ void carc_add(Content *c, TriNode *n, uint32_t f, TriNode *v)
     Scratch *s = sx_make(c, n);
     if (s->ncarcs == s->ccap) {
         uint32_t ncap = s->ccap ? s->ccap * 2 : 4;
-        Arc *na = arena_alloc(c->scratch, ncap * sizeof(Arc));
+        Arc *na = arena_alloc_raw(c->scratch, ncap * sizeof(Arc));
         if (s->ncarcs) memcpy(na, s->carcs, s->ncarcs * sizeof(Arc));
         s->carcs = na;
         s->ccap = ncap;
@@ -121,22 +135,27 @@ static uint32_t arc_count(Content *c, TriNode *n)
 
 /* --- failure recording ---------------------------------------------------------------- */
 
-static void describe(Content *c, Buf *b, TriNode *n)
+static void describe_value(Content *c, Buf *b, uint32_t type, int64_t lo, int64_t hi)
 {
-    if (is_dim(c, n->type)) {
-        int64_t lo, hi;
-        node_iv(c, n, &lo, &hi);
-        int dim = c->types.v[n->type].dim;
+    if (is_dim(c, type)) {
+        int dim = c->types.v[type].dim;
         if (lo == hi) units_format(b, dim, lo);
-        else if (lo == TRI_NINF && hi == TRI_INF) buf_puts(b, dim_names[dim]);
+        else if ((lo == TRI_NINF && hi == TRI_INF) || dim == DIM_TEXT) buf_puts(b, dim_names[dim]);
         else {
             if (lo != TRI_NINF) { buf_puts(b, ">="); units_format(b, dim, lo); }
             if (lo != TRI_NINF && hi != TRI_INF) buf_puts(b, " & ");
             if (hi != TRI_INF) { buf_puts(b, "<="); units_format(b, dim, hi); }
         }
     } else {
-        buf_puts(b, c->types.v[n->type].name);
+        buf_puts(b, c->types.v[type].name);
     }
+}
+
+static void describe(Content *c, Buf *b, TriNode *n)
+{
+    int64_t lo, hi;
+    node_iv(c, n, &lo, &hi);
+    describe_value(c, b, n->type, lo, hi);
 }
 
 void path_format(Content *c, Buf *b, const uint32_t *path, size_t n)
@@ -148,38 +167,98 @@ void path_format(Content *c, Buf *b, const uint32_t *path, size_t n)
     if (!n) buf_puts(b, "(root)");
 }
 
+/* Records a failure cheaply; most failures are never looked at, so the text
+ * is made only when failure() is asked for it. */
 static void fail_at(Content *c, TriNode *a, TriNode *b, const char *why)
 {
     if (c->failed) return;
     c->failed = true;
+    c->failfmt = false;
+    c->faildepth = c->depth;
+    memcpy(c->failpath, c->pathstack, sizeof(uint32_t) * (size_t) c->depth);
+    c->failraw.why = why;
+    c->failraw.ltype = a->type;
+    node_iv(c, a, &c->failraw.llo, &c->failraw.lhi);
+    c->failraw.hasr = b != NULL;
+    if (b) {
+        c->failraw.rtype = b->type;
+        node_iv(c, b, &c->failraw.rlo, &c->failraw.rhi);
+    }
+}
+
+TriFailure *fail_info(Content *c)
+{
+    if (c->failfmt) return &c->fail_;
+    c->failfmt = true;
+    memset(&c->fail_, 0, sizeof c->fail_);
+    if (!c->failed) return &c->fail_;
     Buf p = { 0 }, l = { 0 }, r = { 0 };
-    path_format(c, &p, c->pathstack, (size_t) c->depth);
-    if (why) buf_puts(&l, why);
-    else describe(c, &l, a);
-    if (b) describe(c, &r, b);
-    snprintf(c->fail.path, sizeof c->fail.path, "%s", p.s ? p.s : "");
-    snprintf(c->fail.left, sizeof c->fail.left, "%s", l.s ? l.s : "");
-    snprintf(c->fail.right, sizeof c->fail.right, "%s", r.s ? r.s : "");
+    path_format(c, &p, c->failpath, (size_t) c->faildepth);
+    if (c->failraw.why) buf_puts(&l, c->failraw.why);
+    else describe_value(c, &l, c->failraw.ltype, c->failraw.llo, c->failraw.lhi);
+    if (c->failraw.hasr) describe_value(c, &r, c->failraw.rtype, c->failraw.rlo, c->failraw.rhi);
+    snprintf(c->fail_.path, sizeof c->fail_.path, "%s", p.s ? p.s : "");
+    snprintf(c->fail_.left, sizeof c->fail_.left, "%s", l.s ? l.s : "");
+    snprintf(c->fail_.right, sizeof c->fail_.right, "%s", r.s ? r.s : "");
     buf_free(&p);
     buf_free(&l);
     buf_free(&r);
+    return &c->fail_;
 }
 
 /* --- unification ------------------------------------------------------------------------ */
+
+/* An enum atom meeting free text becomes text: its name, as a string. */
+static TriNode *atom_as_text(Content *c, TriNode *atom)
+{
+    int64_t q = (int64_t) (intptr_t) c->types.v[atom->type].name;
+    TriNode *t = leaf_new(c, c->scratch, c->dimtype[DIM_TEXT], q, q);
+    sx_make(c, atom)->fwd = t;
+    return t;
+}
+
+static bool is_text(Content *c, TriNode *n)
+{
+    return (n->flags & NF_DIM) && c->types.v[n->type].dim == DIM_TEXT;
+}
+
+static int dim_of(Content *c, TriNode *n)
+{
+    return (n->flags & NF_DIM) ? c->types.v[n->type].dim : -1;
+}
+
+/* A whole number meeting a fixed-point value is taken as fixed (×1000). */
+static TriNode *int_as_fixed(Content *c, TriNode *n)
+{
+    int64_t lo, hi;
+    node_iv(c, n, &lo, &hi);
+    int64_t s = 1000;
+    lo = lo == TRI_NINF ? lo : lo < TRI_NINF / s ? TRI_NINF + 1 : lo * s;
+    hi = hi == TRI_INF ? hi : hi > TRI_INF / s ? TRI_INF - 1 : hi * s;
+    TriNode *f = leaf_new(c, c->scratch, c->dimtype[DIM_FIXED], lo, hi);
+    sx_make(c, n)->fwd = f;
+    return f;
+}
 
 bool unify1(Content *c, TriNode *a, TriNode *b)
 {
     a = deref(c, a);
     b = deref(c, b);
     if (a == b) return true;
+    if ((a->flags ^ b->flags) & NF_DIM) {
+        if (is_text(c, a) && c->types.v[b->type].kind == TK_ATOM) b = atom_as_text(c, b);
+        else if (is_text(c, b) && c->types.v[a->type].kind == TK_ATOM) a = atom_as_text(c, a);
+    } else if ((a->flags & NF_DIM) && a->type != b->type) {
+        if (dim_of(c, a) == DIM_INT && dim_of(c, b) == DIM_FIXED) a = int_as_fixed(c, a);
+        else if (dim_of(c, b) == DIM_INT && dim_of(c, a) == DIM_FIXED) b = int_as_fixed(c, b);
+    }
     uint32_t t = meet(c, a->type, b->type);
     if (t == TRI_BOTTOM) { fail_at(c, a, b, NULL); return false; }
 
     if (t != a->type && t != b->type) {
         /* A new, more specific type: its constraint must hold too. */
-        TriNode *e = type_expansion(c, t);
-        if (!e) { fail_at(c, a, b, "recursive type constraint"); return false; }
-        TriNode *n = copy_raw(c, c->scratch, e);
+        TriNode *n = type_instance(c, t, c->scratch);
+        if (!n) { fail_at(c, a, b, "the type's constraint cannot be expanded"); return false; }
         return unify1(c, n, a) && unify1(c, n, b);
     }
 
@@ -192,6 +271,17 @@ bool unify1(Content *c, TriNode *a, TriNode *b)
         target = a; src = b;
     } else {
         target = b; src = a;
+    }
+
+    if ((target->flags & NF_LAZY) && is_lazy(c, target) && arc_count(c, src) && c->types.v[target->type].xstate == 2) {
+        /* structure is being added to a lazy node: apply its constraint first */
+        TriNode *e = type_expansion(c, target->type);
+        sx_make(c, target)->forced = true;
+        if (e) {
+            TriNode *m = copy_raw(c, c->scratch, e);
+            if (!unify1(c, m, target)) return false;
+            target = deref(c, target);
+        }
     }
 
     if (target->flags & NF_DIM) {
@@ -210,24 +300,43 @@ bool unify1(Content *c, TriNode *a, TriNode *b)
 
     sx_make(c, src)->fwd = target;
 
-    /* Take src's arc list first: adding comp-arcs to target can't affect it. */
-    uint32_t nsrc = arc_count(c, src);
-    if (!nsrc) return true;
+    /* src's own arcs never change during unification; its comp-arcs might (if
+     * it is reached again as a target), so those are taken as a snapshot. */
     Scratch *ss = sx_get(c, src);
-    Arc *arcs = arena_alloc(c->scratch, nsrc * sizeof(Arc));
-    if (src->narcs) memcpy(arcs, src->arcs, src->narcs * sizeof(Arc));
-    if (ss && ss->ncarcs) memcpy(arcs + src->narcs, ss->carcs, ss->ncarcs * sizeof(Arc));
-    for (uint32_t i = 0; i < nsrc; i++) {
-        uint32_t f = arcs[i].feat;
-        TriNode *tv = carc_find(c, target, f);
+    uint32_t nown = (src->flags & NF_DIM) ? 0 : src->narcs, ncomp = ss ? ss->ncarcs : 0;
+    if (!nown && !ncomp) return true;
+    Arc *comp = NULL;
+    if (ncomp) {
+        comp = arena_alloc_raw(c->scratch, ncomp * sizeof(Arc));
+        memcpy(comp, ss->carcs, ncomp * sizeof(Arc));
+    }
+    /* Both own arc lists are sorted by feature: walk them in step, and look in
+     * the target's comp-arcs only for features its own arcs lack. */
+    uint32_t tn = (target->flags & NF_DIM) ? 0 : target->narcs, j = 0;
+    for (uint32_t i = 0; i < nown + ncomp; i++) {
+        const Arc *arc = i < nown ? &src->arcs[i] : &comp[i - nown];
+        uint32_t f = arc->feat;
+        TriNode *tv = NULL;
+        if (i < nown) {
+            while (j < tn && target->arcs[j].feat < f) j++;
+            if (j < tn && target->arcs[j].feat == f) tv = target->arcs[j].val;
+        } else {
+            tv = tn ? node_arc(target, f) : NULL;
+        }
+        if (!tv) {
+            Scratch *ts = sx_get(c, target);
+            if (ts)
+                for (uint32_t k = 0; k < ts->ncarcs; k++)
+                    if (ts->carcs[k].feat == f) { tv = ts->carcs[k].val; break; }
+        }
         c->pathstack[c->depth++] = f;
         if (tv) {
-            if (!unify1(c, tv, arcs[i].val)) return false;
+            if (!unify1(c, tv, arc->val)) return false;
         } else if (!approp(c, t, f)) {
             fail_at(c, target, NULL, "feature not appropriate for this type");
             return false;
         } else {
-            carc_add(c, target, f, arcs[i].val);
+            carc_add(c, target, f, arc->val);
         }
         c->depth--;
     }
@@ -242,10 +351,37 @@ static int cmp_arc(const void *a, const void *b)
     return x < y ? -1 : x > y;
 }
 
+bool is_lazy(Content *c, TriNode *n)
+{
+    if (!(n->flags & NF_LAZY)) return false;
+    Scratch *s = sx_get(c, n);
+    return !(s && s->forced);
+}
+
+/* A lazy node as a full structure, in scratch: its type's expansion unified
+ * with what it carries. Used by read-only passes that need its arcs. */
+TriNode *materialize(Content *c, TriNode *n)
+{
+    if (!is_lazy(c, n) || c->types.v[n->type].xstate != 2) return n;
+    TriNode *e = type_expansion(c, n->type);
+    if (!e) return n;
+    uint32_t saved = op_begin(c);
+    bool savedfailed = c->failed;
+    int saveddepth = c->depth;
+    TriNode *m = copy_raw(c, c->scratch, e);
+    TriNode *r = n;
+    if (unify1(c, m, n)) r = copy_out(c, c->scratch, m, NULL);
+    c->failed = savedfailed;
+    c->depth = saveddepth;
+    op_end(c, saved);
+    return r;
+}
+
 static TriNode *copy_raw_rec(Content *c, TriArena *a, TriNode *n, uint32_t cg)
 {
     if (n->cpygen == cg) return n->cpy;
     TriNode *m = node_new(c, a, n->type);
+    m->flags |= n->flags & NF_LAZY;
     if (n->flags & NF_DIM) { m->lo = n->lo; m->hi = n->hi; }
     n->cpy = m;
     n->cpygen = cg;
@@ -284,9 +420,10 @@ static TriNode *copy_out_rec(Content *c, TriArena *a, TriNode *n, uint32_t cg, b
     bool same = share && !(n->flags & NF_SCRATCH) && !(s && (s->ncarcs || s->hasiv));
     uint32_t na = n->narcs + (s ? s->ncarcs : 0);
     Arc *arcs = NULL;
+    Arc local[32];
     if (na) {
         n->cpy = INPROGRESS;
-        arcs = arena_alloc(c->scratch, na * sizeof(Arc));
+        arcs = na <= 32 ? local : arena_alloc_raw(c->scratch, na * sizeof(Arc));
         if (n->narcs) memcpy(arcs, n->arcs, n->narcs * sizeof(Arc));
         if (s && s->ncarcs) {
             memcpy(arcs + n->narcs, s->carcs, s->ncarcs * sizeof(Arc));
@@ -303,9 +440,10 @@ static TriNode *copy_out_rec(Content *c, TriArena *a, TriNode *n, uint32_t cg, b
         return n;
     }
     TriNode *m = node_new(c, a, n->type);
+    if (is_lazy(c, n)) m->flags |= NF_LAZY;
     if (n->flags & NF_DIM) node_iv(c, n, &m->lo, &m->hi);
     if (na) {
-        m->arcs = arena_alloc(a, na * sizeof(Arc));
+        m->arcs = arena_alloc_raw(a, na * sizeof(Arc));
         memcpy(m->arcs, arcs, na * sizeof(Arc));
         m->narcs = (uint16_t) na;
         for (uint32_t i = 0; i < na; i++)
@@ -313,6 +451,26 @@ static TriNode *copy_out_rec(Content *c, TriArena *a, TriNode *n, uint32_t cg, b
     }
     n->cpy = m;
     return m;
+}
+
+/* Copies several roots out of one operation together, so nodes they share
+ * stay shared. */
+void copy_out_many(Content *c, TriArena *a, TriNode **roots, size_t n)
+{
+    static int noshare = -1;
+    if (noshare < 0) noshare = getenv("TRI_NOSHARE") != NULL;
+    bool ok = true;
+    c->cyclic = false;
+    uint32_t cg = ++c->cgenctr;
+    TriNode **in = malloc(sizeof(TriNode *) * (n ? n : 1));
+    memcpy(in, roots, sizeof(TriNode *) * n);
+    for (size_t i = 0; i < n; i++) roots[i] = copy_out_rec(c, a, in[i], cg, &ok, !noshare);
+    if (c->cyclic) {
+        c->cyclic = false;
+        cg = ++c->cgenctr;
+        for (size_t i = 0; i < n; i++) roots[i] = copy_out_rec(c, a, in[i], cg, &ok, false);
+    }
+    free(in);
 }
 
 TriNode *copy_out(Content *c, TriArena *a, TriNode *n, bool *closed_ok)
@@ -348,6 +506,12 @@ typedef struct { bool fwd, bwd; } SubState;
 
 static void subsume_rec(Content *c, TriNode *a, TriNode *b, SubState *s)
 {
+    /* A lazy node stands for its type's expansion with what it carries. Compare
+     * against that, unless both are lazy (then their carried arcs decide). */
+    if (is_lazy(c, a) != is_lazy(c, b)) {
+        if (is_lazy(c, b) && a->narcs) b = materialize(c, b);
+        else if (is_lazy(c, a) && b->narcs) a = materialize(c, a);
+    }
     Scratch *sa = sx_make(c, a), *sb = sx_make(c, b);
     bool amapped = sa->fwd != NULL, bmapped = sb->bwd != NULL;
     if (amapped && bmapped && sa->fwd == b && sb->bwd == a) return;
@@ -411,11 +575,26 @@ TriNode *node_at(TriNode *n, const uint32_t *path, size_t len)
     return n;
 }
 
+/* Like node_at, but a lazy node with no arc for the next feature stands for
+ * its type's expansion (which lives as long as the content): continue there. */
+static TriNode *node_at_lazy(Content *c, TriNode *n, const uint32_t *path, size_t len)
+{
+    for (size_t i = 0; i < len && n; i++) {
+        TriNode *next = node_arc(n, path[i]);
+        if (!next && (n->flags & NF_LAZY)) {
+            TriNode *e = type_expansion(c, n->type);
+            next = e ? node_arc(e, path[i]) : NULL;
+        }
+        n = next;
+    }
+    return n;
+}
+
 const TriNode *tri_at(const TriContent *cc, const TriNode *node, const char *path)
 {
     Content *c = (Content *) cc;
     U32Vec p = { 0 };
-    TriNode *r = path_parse(c, path, &p) ? node_at((TriNode *) node, p.v, p.n) : NULL;
+    TriNode *r = path_parse(c, path, &p) ? node_at_lazy(c, (TriNode *) node, p.v, p.n) : NULL;
     VEC_FREE(p);
     return r;
 }
@@ -503,9 +682,176 @@ const TriNode *tri_unify(TriContent *c, const TriNode *a, const TriNode *b, TriA
         bool ok;
         r = copy_out(c, out, (TriNode *) a, &ok);
     } else if (failure) {
-        *failure = c->fail;
+        *failure = *fail_info(c);
     }
     op_end(c, saved);
     tri_arena_release(c->scratch, m);
+    if (r && (c->disjs.n || c->narith)) r = settle(c, r, NULL, out, failure);   /* alternatives, arithmetic */
     return r;
+}
+
+/* --- generalisation of two structures ----------------------------------------------------------- */
+
+/* A least upper bound of two types: a minimal common ancestor, preferring one
+ * within `bound` (the type the context allows), then the highest ID, so the
+ * choice is deterministic. */
+static uint32_t join_type(Content *c, uint32_t a, uint32_t b, uint32_t bound)
+{
+    if (is_subtype(c, a, b)) return b;
+    if (is_subtype(c, b, a)) return a;
+    U32Vec queue = { 0 }, common = { 0 };
+    U64Map seen = { 0 };
+    VEC_PUSH(queue, a);
+    u64map_put(&seen, a, 1);
+    for (size_t i = 0; i < queue.n; i++) {
+        uint32_t t = queue.v[i];
+        if (is_subtype(c, b, t)) { VEC_PUSH(common, t); continue; }   /* its ancestors are not minimal */
+        for (size_t k = 0; k < c->types.v[t].parents.n; k++) {
+            uint32_t p = c->types.v[t].parents.v[k];
+            if (!u64map_get(&seen, p, NULL)) { u64map_put(&seen, p, 1); VEC_PUSH(queue, p); }
+        }
+    }
+    uint32_t best = c->top;
+    bool best_in = false;
+    for (size_t i = 0; i < common.n; i++) {
+        uint32_t t = common.v[i];
+        bool minimal = true;
+        for (size_t j = 0; j < common.n && minimal; j++)
+            if (common.v[j] != t && is_subtype(c, common.v[j], t)) minimal = false;
+        if (!minimal) continue;
+        bool in = bound == TRI_BOTTOM || is_subtype(c, t, bound);
+        if ((in && !best_in) || (in == best_in && (best == c->top || t > best))) { best = t; best_in = in; }
+    }
+    VEC_FREE(queue);
+    VEC_FREE(common);
+    u64map_free(&seen);
+    return best;
+}
+
+typedef struct { TriNode *a, *b, *r; } GenPair;
+typedef struct { VEC(GenPair) pairs; U64Map idx; } GenState;
+
+static TriNode *gen_rec(Content *c, TriArena *out, TriNode *a, TriNode *b, uint32_t bound, GenState *st)
+{
+    uint64_t key = hash64((uint64_t) (uintptr_t) a * 31 + (uint64_t) (uintptr_t) b), v;
+    for (uint64_t k = key; u64map_get(&st->idx, k, &v); k = hash64(k)) {
+        GenPair *gp = &st->pairs.v[v - 1];
+        if (gp->a == a && gp->b == b) return gp->r;
+    }
+    if (a == b && !(a->flags & NF_SCRATCH)) return a;
+    uint32_t t = join_type(c, a->type, b->type, bound);
+    if (is_lazy(c, a) && is_lazy(c, b)) {
+        /* both stand for their type's expansion: so does the result (what they
+         * carry beyond it is dropped, which only generalises further) */
+        TriNode *r = node_new(c, out, t);
+        r->flags |= c->types.v[t].feats.n ? NF_LAZY : 0;
+        return r;
+    }
+    if (is_lazy(c, a)) a = materialize(c, a);
+    if (is_lazy(c, b)) b = materialize(c, b);
+    TriNode *r = node_new(c, out, t);
+    GenPair gp = { a, b, r };
+    VEC_PUSH(st->pairs, gp);
+    uint64_t k = key;
+    while (u64map_get(&st->idx, k, NULL)) k = hash64(k);
+    u64map_put(&st->idx, k, st->pairs.n);
+    if (r->flags & NF_DIM) {
+        bool both = (a->flags & NF_DIM) && (b->flags & NF_DIM);
+        r->lo = both ? (a->lo < b->lo ? a->lo : b->lo) : TRI_NINF;
+        r->hi = both ? (a->hi > b->hi ? a->hi : b->hi) : TRI_INF;
+        int dim = c->types.v[t].dim;
+        if ((dim == DIM_TEXT || dim == DIM_REF) && r->lo != r->hi) { r->lo = TRI_NINF; r->hi = TRI_INF; }
+        return r;
+    }
+    TypeInfo *ti = &c->types.v[t];
+    if (!ti->feats.n) return r;
+    TriNode *e = type_expansion(c, t);
+    r->arcs = arena_alloc(out, ti->feats.n * sizeof(Arc));
+    for (size_t i = 0; i < ti->feats.n; i++) {
+        uint32_t f = ti->feats.v[i];
+        TriNode *ev = e ? node_arc(e, f) : NULL;
+        TriNode *va = node_arc(a, f), *vb = node_arc(b, f);
+        TriNode *val = va && vb ? gen_rec(c, out, va, vb, ev ? ev->type : TRI_BOTTOM, st)
+                     : ev ? copy_raw(c, out, ev) : NULL;
+        if (!val) continue;
+        r->arcs[r->narcs].feat = f;
+        r->arcs[r->narcs].val = val;
+        r->narcs++;
+    }
+    return r;
+}
+
+/* The most specific structure that subsumes both (anti-unification). */
+TriNode *fs_generalise(Content *c, TriArena *out, TriNode *a, TriNode *b)
+{
+    GenState st = { 0 };
+    TriMark m = tri_arena_mark(c->scratch);
+    TriNode *r = gen_rec(c, out, a, b, TRI_BOTTOM, &st);
+    if (out != c->scratch) tri_arena_release(c->scratch, m);
+    VEC_FREE(st.pairs);
+    u64map_free(&st.idx);
+    return r;
+}
+
+const TriNode *tri_lgg(TriContent *c, const TriNode *a, const TriNode *b, TriArena *out)
+{
+    return fs_generalise(c, out, (TriNode *) a, (TriNode *) b);
+}
+
+/* --- every conflict ------------------------------------------------------------------------------ */
+
+/* The paths where two structures conflict, all of them, not just the first
+ * unification meets: recognition weighs each against the paths that agree.
+ * Each conflict is reported at its smallest path: a type clash or disjoint
+ * interval where it occurs, or, if the parts below agree one by one, where
+ * the combination fails (for example through a tag). */
+static void conflicts_rec(Content *c, TriNode *a, TriNode *b, U32Vec *path, char (*out)[256], size_t *n, size_t max,
+                          int depth)
+{
+    if (*n >= max || depth > 64) return;
+    TriFailure f;
+    TriArena *tmp = c->scratch;
+    TriMark m = tri_arena_mark(tmp);
+    bool ok = tri_unify(c, a, b, tmp, &f) != NULL;
+    tri_arena_release(tmp, m);
+    if (ok) return;
+    size_t before = *n;
+    uint32_t t = meet(c, a->type, b->type);
+    bool local = t == TRI_BOTTOM;
+    if (!local && (a->flags & NF_DIM) && (b->flags & NF_DIM)) local = a->lo > b->hi || b->lo > a->hi;
+    if (!local && !(a->flags & NF_DIM) && !(b->flags & NF_DIM)) {
+        uint32_t i = 0, j = 0;
+        while (i < a->narcs && j < b->narcs && *n < max) {
+            if (a->arcs[i].feat == b->arcs[j].feat) {
+                VEC_PUSH(*path, a->arcs[i].feat);
+                conflicts_rec(c, a->arcs[i].val, b->arcs[j].val, path, out, n, max, depth + 1);
+                path->n--;
+                i++; j++;
+            } else if (a->arcs[i].feat < b->arcs[j].feat) i++;
+            else j++;
+        }
+    }
+    if (*n == before && *n < max) {
+        Buf p = { 0 };
+        path_format(c, &p, path->v, path->n);
+        snprintf(out[(*n)++], 256, "%s", p.s);
+        buf_free(&p);
+    }
+}
+
+size_t tri_conflicts(TriContent *c, const TriNode *a, const TriNode *b, char (*paths)[256], size_t max)
+{
+    size_t n = 0;
+    U32Vec path = { 0 };
+    conflicts_rec(c, (TriNode *) a, (TriNode *) b, &path, paths, &n, max, 0);
+    VEC_FREE(path);
+    return n;
+}
+
+/* A copy that shares nothing with its source (apart from type expansions a
+ * lazy node stands for), keeping its own shared nodes shared: what a store
+ * compacts by, copying its live descriptions into a fresh arena. */
+const TriNode *tri_copy(TriContent *c, const TriNode *node, TriArena *out)
+{
+    return copy_raw(c, out, (TriNode *) node);
 }

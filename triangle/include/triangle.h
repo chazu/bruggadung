@@ -56,9 +56,17 @@ const char *tri_instance_status(const TriContent *content, size_t i);  /* TDL :s
 
 int         tri_content_ok(const TriContent *content);
 uint64_t    tri_content_hash(const TriContent *content);
+/* The build log, for the developer: every type the loader generated (meet,
+ * conjunction, disjunction, alternative, anonymous enum, typed list), and
+ * every pair of conflicting defaults it dropped. */
+size_t      tri_log_count(const TriContent *content);
+const char *tri_log_message(const TriContent *content, size_t i);
 size_t      tri_diag_count(const TriContent *content);
 const char *tri_diag_message(const TriContent *content, size_t i);
 int         tri_diag_is_error(const TriContent *content, size_t i);
+
+/* The comment directly above a type's or instance's declaration. */
+const char *tri_doc(TriContent *content, const char *name);
 
 /* --- types ------------------------------------------------------------------- */
 
@@ -73,6 +81,9 @@ TriType     tri_primary_parent(const TriContent *content, TriType t);
 size_t      tri_component_count(const TriContent *content);
 const char *tri_component_name(const TriContent *content, size_t i);
 TriType     tri_component_type(const TriContent *content, size_t i);
+/* An entity type's components: the component types among its supertypes, as
+ * component indices. Writes up to max and returns how many there are. */
+size_t      tri_type_components(const TriContent *content, TriType type, size_t *out, size_t max);
 size_t      tri_component_field_count(const TriContent *content, size_t i);
 const char *tri_component_field(const TriContent *content, size_t i, size_t j,
                                 const char **flags);
@@ -103,6 +114,20 @@ const TriNode *tri_unify(TriContent *content, const TriNode *a, const TriNode *b
 void           tri_subsumes(TriContent *content, const TriNode *a, const TriNode *b,
                             int *forward, int *backward);
 
+/* A deep copy into `out` that shares nothing with the source: a knowledge
+ * store compacts by copying its live descriptions into a fresh arena and
+ * freeing the old one. */
+const TriNode *tri_copy(TriContent *content, const TriNode *node, TriArena *out);
+
+/* Every path where a and b conflict (unification reports only the first);
+ * writes up to max paths and returns how many. Recognition weighs these
+ * against the paths that agree. */
+size_t         tri_conflicts(TriContent *content, const TriNode *a, const TriNode *b,
+                             char (*paths)[256], size_t max);
+
+/* The most specific structure subsuming both (least general generalisation). */
+const TriNode *tri_lgg(TriContent *content, const TriNode *a, const TriNode *b, TriArena *out);
+
 /* Memory decay: generalise the node at path by up to `steps` primary parents. */
 const TriNode *tri_generalize(TriContent *content, const TriNode *node,
                               const char *path, int steps, TriArena *out);
@@ -111,13 +136,29 @@ const TriNode *tri_generalize(TriContent *content, const TriNode *node,
 
 /* The indefeasible structure of an instance: what patterns use. */
 const TriNode *tri_pattern(TriContent *content, const char *instance);
-/* A blueprint spec: defaults resolved, variation points recorded. */
+/* An instance with disjunctions of structures has one variant per combination
+ * of alternatives; tri_pattern is then their generalisation. */
+size_t         tri_pattern_variant_count(TriContent *content, const char *instance);
+const TriNode *tri_pattern_variant(TriContent *content, const char *instance, size_t i);
+/* A blueprint spec: defaults resolved, variation points recorded. With
+ * several variants, the generalisation of those that defaults leave. */
 const TriNode *tri_spec(TriContent *content, const char *instance);
 size_t         tri_spec_variation_count(TriContent *content, const char *instance);
 const char    *tri_spec_variation_path(TriContent *content, const char *instance, size_t i);
 size_t         tri_spec_note_count(TriContent *content, const char *instance);
 const char    *tri_spec_note(TriContent *content, const char *instance, size_t i);
-/* Makes every variation point concrete from the seed. */
+/* The spec as an indented structure, each value annotated with its origin:
+ * the instance, a type, a default, a forced alternative, or the seed. */
+size_t         tri_inspect(TriContent *content, const char *instance, char *buf, size_t len);
+/* Code that computes a derived field, named in content by @fn(name). It reads
+ * the structure holding the field and returns 1 with an interval (an exact
+ * value when lo == hi), or 0 to leave the field as it is. */
+typedef int (*TriFn)(void *ctx, TriContent *content, const TriNode *owner, int64_t *lo, int64_t *hi);
+void           tri_register_fn(TriContent *content, const char *name, TriFn fn, void *ctx);
+/* Applies registered functions to every @fn field of a structure. NULL if a
+ * computed value conflicts with the structure. */
+const TriNode *tri_derive(TriContent *content, const TriNode *node, TriArena *out, TriFailure *failure);
+/* Makes every variation point concrete from the seed, then derives @fn fields. */
 const TriNode *tri_construct(TriContent *content, const char *instance, uint64_t seed,
                              TriArena *out);
 
@@ -137,16 +178,34 @@ typedef struct {
 TriMatch tri_match(TriContent *content, const TriNode *pattern, const TriNode *description,
                    TriMatchResult *result);
 
+/* Matches against every variant of an instance: entailed if any variant is,
+ * incompatible if all are, otherwise unknown. */
+TriMatch tri_match_instance(TriContent *content, const char *instance, const TriNode *description,
+                            TriMatchResult *result);
+
 /* The node in `description` bound to `tag` of the named pattern instance. */
 const TriNode *tri_binding(TriContent *content, const char *instance, const char *tag,
                            const TriNode *description);
 
-/* Credence masses over competing hypotheses. Credences are Q16 probabilities. */
-typedef struct { uint32_t entailed, unknown, incompatible; } TriMasses;
+/* Credence masses over competing hypotheses. Credences are Q16 probabilities.
+ * The residuals are those of the unknown hypotheses, without repeats. */
+typedef struct {
+    uint32_t entailed, unknown, incompatible;
+    size_t   nresidual;
+    char     residual[TRI_MAX_RESIDUAL][128];
+} TriMasses;
 
 TriMasses tri_match_hypotheses(TriContent *content, const TriNode *pattern,
                                const TriNode *const *descriptions,
                                const uint32_t *credences, size_t n);
+
+/* A readable account of a match: the result, the tag bindings, the residuals,
+ * and the first failing path. Returns the length of the full text. */
+size_t tri_explain(TriContent *content, const TriNode *pattern, const TriNode *description,
+                   char *buf, size_t len);
+/* The same for a named pattern instance, with its tag names (and variants). */
+size_t tri_explain_instance(TriContent *content, const char *instance, const TriNode *description,
+                            char *buf, size_t len);
 
 /* --- quick check and pattern indexes ----------------------------------------------- */
 
@@ -174,6 +233,36 @@ size_t         tri_index_candidates(TriIndex *index, const TriNode *description,
 const TriNode *tri_index_pattern(const TriIndex *index, size_t i);
 void          *tri_index_tag(const TriIndex *index, size_t i);
 void           tri_index_free(TriIndex *index);
+
+/* --- definite clauses -------------------------------------------------------------------- */
+
+/* Relations over feature structures, for recursion such as reachability.
+ * Content writes clauses as instances of the built-in #Clause (head, body: a
+ * list of goals) and #Fact (no body). tri_solve proves `query` by resolution,
+ * depth-first, clauses in name order, each proof at most depth_limit steps
+ * deep. Writes up to max solutions (the query made specific by each proof) to
+ * `out` and returns how many; *truncated says whether the depth limit cut any
+ * proof short, so more solutions may exist. */
+size_t tri_solve(TriContent *content, const TriNode *query, size_t depth_limit,
+                 const TriNode **solutions, size_t max, TriArena *out, int *truncated);
+
+/* --- families ------------------------------------------------------------------------- */
+
+/* Instances marked @family(name) are a family; their @quickcheck(paths) are
+ * pooled and the family's pattern index is compiled at load. Index tags are
+ * instance names (const char *). */
+size_t      tri_family_count(const TriContent *content);
+const char *tri_family_name(const TriContent *content, size_t i);
+TriIndex   *tri_family_index(TriContent *content, const char *family);
+
+/* --- saves ---------------------------------------------------------------------------- */
+
+/* Writes a description as text (malloc'd). By ID is compact but restores only
+ * into the same content; by name restores into changed content too. */
+char          *tri_save(TriContent *content, const TriNode *node, int by_id);
+/* NULL on failure, with the reason in err: a type or feature that no longer
+ * exists, or a structure that no longer fits its types. */
+const TriNode *tri_restore(TriContent *content, const char *text, TriArena *out, char *err, size_t errlen);
 
 #ifdef __cplusplus
 }

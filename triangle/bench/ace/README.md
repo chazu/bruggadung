@@ -58,6 +58,9 @@ cmp <(norm ace-glbs.txt) <(norm tri-glbs.txt)
 
 ## Unification
 
+Both drivers report process CPU time, so the comparison holds up on a busy
+machine. Run them alternately.
+
 ```sh
 cc -std=c11 -O2 -Iinclude bench/ace/workload.c build/libtriangle.a -o build/workload
 build/workload erg/english.tdl 1000 names.txt tri-pairs.txt

@@ -4,35 +4,38 @@
  * and force are candidates (CONTENT_LANGUAGE.md open question 7). */
 
 const char *const dim_names[NDIMS] = {
-    "int", "fixed", "mass", "length", "time", "torque", "force", "heat", "temperature",
+    "int", "fixed", "mass", "length", "time", "torque", "force", "heat", "temperature", "ref", "text",
 };
 
-typedef struct { const char *suffix; int dim; int64_t num, den; } Unit;
+typedef struct { const char *suffix; int dim; int64_t num, den, offset; } Unit;
 
-/* One unit is num/den quanta. */
+/* One unit is num/den quanta; a scale with an offset zero (Celsius) adds
+ * `offset` quanta. */
 static const Unit units[] = {
-    { "g",   DIM_MASS, 1, 1 },          { "kg",  DIM_MASS, 1000, 1 },
-    { "t",   DIM_MASS, 1000000, 1 },
-    { "mm",  DIM_LENGTH, 10, 1 },        { "cm",  DIM_LENGTH, 100, 1 },
-    { "m",   DIM_LENGTH, 10000, 1 },     { "km",  DIM_LENGTH, 10000000, 1 },
-    { "ms",  DIM_TIME, 1, 1 },           { "s",   DIM_TIME, 1000, 1 },
-    { "min", DIM_TIME, 60000, 1 },       { "h",   DIM_TIME, 3600000, 1 },
-    { "d",   DIM_TIME, 86400000, 1 },
-    { "mNm", DIM_TORQUE, 1, 1 },         { "Nm",  DIM_TORQUE, 1000, 1 },
-    { "mN",  DIM_FORCE, 1, 1 },          { "N",   DIM_FORCE, 1000, 1 },
-    { "kN",  DIM_FORCE, 1000000, 1 },
-    { "J",   DIM_HEAT, 1, 100 },         { "kJ",  DIM_HEAT, 10, 1 },
-    { "MJ",  DIM_HEAT, 10000, 1 },
-    { "K",   DIM_TEMPERATURE, 100, 1 },
+    { "g",   DIM_MASS, 1, 1, 0 },          { "kg",  DIM_MASS, 1000, 1, 0 },
+    { "t",   DIM_MASS, 1000000, 1, 0 },
+    { "mm",  DIM_LENGTH, 10, 1, 0 },        { "cm",  DIM_LENGTH, 100, 1, 0 },
+    { "m",   DIM_LENGTH, 10000, 1, 0 },     { "km",  DIM_LENGTH, 10000000, 1, 0 },
+    { "ms",  DIM_TIME, 1, 1, 0 },           { "s",   DIM_TIME, 1000, 1, 0 },
+    { "min", DIM_TIME, 60000, 1, 0 },       { "h",   DIM_TIME, 3600000, 1, 0 },
+    { "d",   DIM_TIME, 86400000, 1, 0 },
+    { "mNm", DIM_TORQUE, 1, 1, 0 },         { "Nm",  DIM_TORQUE, 1000, 1, 0 },
+    { "mN",  DIM_FORCE, 1, 1, 0 },          { "N",   DIM_FORCE, 1000, 1, 0 },
+    { "kN",  DIM_FORCE, 1000000, 1, 0 },
+    { "J",   DIM_HEAT, 1, 100, 0 },         { "kJ",  DIM_HEAT, 10, 1, 0 },
+    { "MJ",  DIM_HEAT, 10000, 1, 0 },
+    { "K",   DIM_TEMPERATURE, 100, 1, 0 },  { "C",   DIM_TEMPERATURE, 100, 1, 27315 },
+    { "degC", DIM_TEMPERATURE, 100, 1, 27315 },
 };
 
 /* Display unit per dimension: suffix and quanta per display unit. */
 static const struct { const char *suffix; int64_t per; } display[NDIMS] = {
     { "", 1 }, { "", 1000 }, { "g", 1 }, { "mm", 10 }, { "ms", 1 },
     { "Nm", 1000 }, { "N", 1000 }, { "J", 1 /* special: 1 quantum = 100 J */ }, { "K", 100 },
+    { "", 1 }, { "", 1 },
 };
 
-const char *units_parse(const char *text, size_t len, int *dim, int64_t *q)
+const char *units_parse(const char *text, size_t len, bool neg, int *dim, int64_t *q)
 {
     size_t i = 0;
     __int128 mant = 0;
@@ -51,7 +54,7 @@ const char *units_parse(const char *text, size_t len, int *dim, int64_t *q)
     }
     const char *suffix = text + i;
     size_t slen = len - i;
-    __int128 num = 1, den = 1;
+    __int128 num = 1, den = 1, offset = 0;
     if (slen == 0) {
         if (point) { *dim = DIM_FIXED; num = 1000; }
         else *dim = DIM_INT;
@@ -64,19 +67,28 @@ const char *units_parse(const char *text, size_t len, int *dim, int64_t *q)
         *dim = u->dim;
         num = u->num;
         den = u->den;
+        offset = u->offset;
     }
     __int128 p10 = 1;
     for (int k = 0; k < scale; k++) p10 *= 10;
     __int128 top = mant * num, bottom = den * p10;
     if (top % bottom != 0) return "literal is not a whole number of quanta";
-    __int128 v = top / bottom;
-    if (v > (__int128) INT64_MAX) return "quantity out of range";
+    __int128 v = (neg ? -(top / bottom) : top / bottom) + offset;
+    if (v > (__int128) INT64_MAX || v <= (__int128) INT64_MIN) return "quantity out of range";
     *q = (int64_t) v;
     return NULL;
 }
 
 void units_format(Buf *b, int dim, int64_t q)
 {
+    if (dim == DIM_TEXT) {
+        buf_puts(b, (const char *) (intptr_t) q);
+        return;
+    }
+    if (dim == DIM_REF) {
+        buf_printf(b, "ref(%lld)", (long long) q);
+        return;
+    }
     if (dim == DIM_HEAT) {
         buf_printf(b, "%lldJ", (long long) q * 100);
         return;

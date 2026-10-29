@@ -34,7 +34,18 @@ int has_diag(const TriContent *c, const char *needle, int errors_only)
     X(test_scenario1_order_independence) X(test_scenario1_defaults) X(test_scenario1_variation) \
     X(test_scenario1_conflict) X(test_scenario1_inexact) X(test_scenario1_feature_clash) \
     X(test_scenario2_unknown) X(test_scenario2_wrong_size) X(test_scenario2_hypotheses) \
-    X(test_scenario3_recognition) X(test_tdl_front_end) X(test_quick_check)
+    X(test_scenario3_recognition) X(test_tdl_front_end) X(test_quick_check) \
+    X(test_builtin_types) X(test_default_override_survives_tie) \
+    X(test_blueprints_resolve_at_load) X(test_registry_content_fields) X(test_defaults_with_type_alternatives) \
+    X(test_type_disjunctions) X(test_instance_variants) X(test_vary_weights) X(test_typed_lists) \
+    X(test_recursive_types) X(test_text_values) X(test_generalize_numbers) X(test_conflict_locations) \
+    X(test_explain_and_inspect) X(test_docstrings) X(test_families) X(test_derived_fields) X(test_saves) \
+    X(test_lgg) X(test_hypothesis_residuals) X(test_example_file) \
+    X(test_tag_residuals_and_bindings) X(test_alternative_chosen_by_value) X(test_all_conflicts) X(test_compaction) \
+    X(test_fixed_and_int) X(test_runtime_is_strict) X(test_build_log_and_clash_hint) X(test_previously_untested) \
+    X(test_arithmetic) X(test_clauses) \
+    X(test_properties) X(test_properties_order) X(test_properties_construct) X(test_fuzz_sources) X(test_properties_arithmetic) \
+    X(test_properties_clauses)
 
 #define DECLARE(name) void name(void);
 TESTS(DECLARE)

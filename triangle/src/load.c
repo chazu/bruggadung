@@ -13,6 +13,12 @@ static const char *prelude =
     "#Cons: #List & { first: _, rest: #List }\n"
     "#Null: #List\n";
 
+/* Definite clauses (§10), built in when content uses them: they introduce
+ * `head` and `body`, which content may otherwise want for itself. */
+static const char *clause_prelude =
+    "#Clause: { head: _, body: #List }\n"
+    "#Fact: #Clause & { body: #Null }\n";
+
 /* --- building ------------------------------------------------------------------------- */
 
 typedef struct { Sym name; TriNode *node; } TagEnt;
@@ -22,18 +28,35 @@ typedef struct {
     VEC(TagEnt) tags;
     U32Vec path;
     DefVec defs;
+    DefVec varies;
     uint32_t contributor;
     bool record;
     bool ok;
     bool direct;     /* the next type name may use its expansion without copying */
     Loc errloc;
+    uint32_t owner;  /* type whose body is being built, or TRI_BOTTOM */
+    size_t decl;     /* which of its declarations */
+    bool runtime;    /* a runtime value: no defaults */
+    ArithVec ariths; /* arithmetic met while building; tags resolved afterwards */
 } Build;
+
+static void free_ariths(ArithVec *v)
+{
+    for (size_t i = 0; i < v->n; i++) {
+        VEC_FREE(v->v[i].path);
+        for (size_t k = 0; k < v->v[i].tags.n; k++) VEC_FREE(v->v[i].tags.v[k].path);
+        VEC_FREE(v->v[i].tags);
+    }
+    VEC_FREE(*v);
+}
 
 static void build_free(Build *b)
 {
     VEC_FREE(b->tags);
     VEC_FREE(b->path);
     VEC_FREE(b->defs);
+    VEC_FREE(b->varies);
+    free_ariths(&b->ariths);
 }
 
 static void reset_failure(Content *c)
@@ -52,26 +75,121 @@ static void build_error(Build *b, Loc loc, const char *fmt, const char *arg)
     b->ok = false;
 }
 
-static bool unify_at(Build *b, TriNode *x, TriNode *y, Loc loc, const char *what)
+/* The location of the field at `path` in an expression, through
+ * conjunctions and nested structures. */
+static bool find_field_loc(Content *c, X *x, const uint32_t *path, size_t n, Loc *out)
+{
+    if (!n) return false;
+    if (x->k == X_AND) return find_field_loc(c, x->u.bin.a, path, n, out) || find_field_loc(c, x->u.bin.b, path, n, out);
+    if (x->k == X_DEFAULT) return find_field_loc(c, x->u.sub, path, n, out);
+    if (x->k != X_STRUCT) return false;
+    for (int i = 0; i < x->u.st.n; i++) {
+        XField *f = &x->u.st.fields[i];
+        if (f->label != c->feats.v[path[0]].name) continue;
+        if (n == 1 || find_field_loc(c, f->value, path + 1, n - 1, out)) {
+            if (n == 1) *out = f->loc;
+            return true;
+        }
+    }
+    return false;
+}
+
+/* Where a type, or its nearest ancestor that does, declares `path`. */
+static bool type_field_loc(Content *c, uint32_t t, const uint32_t *path, size_t n, Loc *out, Sym *who)
+{
+    U32Vec queue = { 0 };
+    U64Map seen = { 0 };
+    VEC_PUSH(queue, t);
+    bool found = false;
+    for (size_t i = 0; i < queue.n && !found; i++) {
+        TypeInfo *ti = &c->types.v[queue.v[i]];
+        for (size_t k = 0; k < ti->decls.n && !found; k++) found = find_field_loc(c, ti->decls.v[k]->value, path, n, out);
+        if (found) { *who = ti->name; break; }
+        for (size_t k = 0; k < ti->parents.n; k++)
+            if (!u64map_get(&seen, ti->parents.v[k], NULL)) {
+                u64map_put(&seen, ti->parents.v[k], 1);
+                VEC_PUSH(queue, ti->parents.v[k]);
+            }
+    }
+    VEC_FREE(queue);
+    u64map_free(&seen);
+    return found;
+}
+
+/* Reports a conflict at `loc`, naming where the other side was declared:
+ * an earlier declaration of the type being built, or `other` (a type whose
+ * constraint is being added) and its ancestors. */
+static bool unify_at_other(Build *b, TriNode *x, TriNode *y, Loc loc, const char *what, uint32_t other)
 {
     Content *c = b->c;
     memcpy(c->pathstack, b->path.v, b->path.n * sizeof(uint32_t));
     c->depth = (int) b->path.n;
     c->failed = false;
     if (unify1(c, x, y)) return true;
-    if (b->ok)
-        diag(c, true, loc, "%s: conflict at %s: %s vs %s", what, c->fail.path, c->fail.left,
-             c->fail.right[0] ? c->fail.right : "(missing)");
+    if (b->ok) {
+        Buf where = { 0 };
+        Loc ol;
+        Sym who = NULL;
+        if (other != TRI_BOTTOM && type_field_loc(c, other, c->failpath, (size_t) c->faildepth, &ol, &who))
+            buf_printf(&where, ", with %s at %s:%d", who, ol.file, ol.line);
+        else if (b->owner != TRI_BOTTOM)
+            for (size_t k = 0; k < b->decl && !where.len; k++)
+                if (find_field_loc(c, c->types.v[b->owner].decls.v[k]->value, c->failpath, (size_t) c->faildepth, &ol))
+                    buf_printf(&where, ", with the declaration at %s:%d", ol.file, ol.line);
+        TriFailure *fl = fail_info(c);
+        diag(c, true, loc, "%s: conflict at %s: %s vs %s%s", what, fl->path, fl->left,
+             fl->right[0] ? fl->right : "(missing)", where.s ? where.s : "");
+        buf_free(&where);
+    }
     b->ok = false;
     return false;
+}
+
+static bool unify_at(Build *b, TriNode *x, TriNode *y, Loc loc, const char *what)
+{
+    return unify_at_other(b, x, y, loc, what, TRI_BOTTOM);
 }
 
 static void record_default(Build *b, X *value)
 {
     if (!b->record) return;
-    DefaultRec d = { { 0 }, value, b->contributor };
+    DefaultRec d = { { 0 }, value, b->contributor, NULL };
     for (size_t i = 0; i < b->path.n; i++) VEC_PUSH(d.path, b->path.v[i]);
     VEC_PUSH(b->defs, d);
+}
+
+static bool parse_weights(const char *args, uint64_t *w, size_t n);
+
+/* A field's @vary weights, kept for construction. The path includes the field. */
+static void record_vary(Build *b, X *value, const char *weights, Loc loc)
+{
+    if (!b->record) return;
+    if (value->k == X_NAME) {
+        /* a named enum: the weights follow its declared members */
+        uint32_t t = type_lookup(b->c, value->u.name);
+        if (t != TRI_BOTTOM && b->c->types.v[t].decls.n && b->c->types.v[t].decls.v[0]->value->k == X_OR)
+            value = b->c->types.v[t].decls.v[0]->value;
+    }
+    XPtrVec ds = { 0 };
+    x_flatten(value, X_OR, &ds);
+    size_t n = ds.n;
+    VEC_FREE(ds);
+    uint64_t *w = malloc(sizeof(uint64_t) * (n ? n : 1));
+    bool good = parse_weights(weights, w, n);
+    free(w);
+    if (n < 2) {
+        build_error(b, loc, "@vary(%s) needs a field with alternatives", weights);
+        return;
+    }
+    if (!good) {
+        char msg[160];
+        snprintf(msg, sizeof msg, "@vary(%s) needs one whole-number weight per alternative (%zu)", weights, n);
+        build_error(b, loc, "%s", msg);
+        return;
+    }
+    DefaultRec d = { { 0 }, value, b->contributor, weights };
+    for (size_t i = 0; i < b->path.n; i++) VEC_PUSH(d.path, b->path.v[i]);
+    VEC_PUSH(b->varies, d);
 }
 
 static TriNode *build_raw(Build *b, X *x);
@@ -84,6 +202,8 @@ static TriNode *build_struct_into(Build *b, TriNode *r, X *x)
         uint32_t fid = feat_lookup(c, f->label);
         if (fid == TRI_BOTTOM) { build_error(b, f->loc, "unknown feature '%s'", f->label); break; }
         VEC_PUSH(b->path, fid);
+        const char *vary = attr_args(f->attrs, f->nattrs, "vary");
+        if (vary) record_vary(b, f->value, vary, f->loc);
         TriNode *child = build_raw(b, f->value);
         b->path.n--;
         if (!child) break;
@@ -109,30 +229,7 @@ static void flatten_or(X *x, XPtrVec *out)
 
 static bool numeric_interval(Build *b, X *x, int *dim, int64_t *lo, int64_t *hi)
 {
-    if (x->k == X_NUM) { *dim = x->u.num.dim; *lo = *hi = x->u.num.q; return true; }
-    if (x->k == X_BOUND) {
-        *dim = x->u.bound.dim;
-        int64_t q = x->u.bound.q;
-        *lo = TRI_NINF; *hi = TRI_INF;
-        switch (x->u.bound.op) {
-        case B_GE: *lo = q; break;
-        case B_GT: *lo = q + 1; break;
-        case B_LE: *hi = q; break;
-        case B_LT: *hi = q - 1; break;
-        }
-        return true;
-    }
-    if (x->k == X_AND) {
-        int d1, d2;
-        int64_t l1, h1, l2, h2;
-        if (!numeric_interval(b, x->u.bin.a, &d1, &l1, &h1) ||
-            !numeric_interval(b, x->u.bin.b, &d2, &l2, &h2) || d1 != d2) return false;
-        *dim = d1;
-        *lo = l1 > l2 ? l1 : l2;
-        *hi = h1 < h2 ? h1 : h2;
-        return true;
-    }
-    return false;
+    return x_interval(x, dim, lo, hi);
 }
 
 static TriNode *build_raw(Build *b, X *x)
@@ -145,6 +242,7 @@ static TriNode *build_raw(Build *b, X *x)
     case X_NAME: {
         uint32_t t = type_lookup(c, x->u.name);
         if (t != TRI_BOTTOM && c->types.v[t].kind != TK_ATOM) {
+            if (c->types.v[t].xstate == 1) return type_instance(c, t, c->scratch);
             TriNode *e = type_expansion(c, t);
             if (!e) { build_error(b, x->loc, "cannot expand %s", x->u.name); return NULL; }
             /* The first type name of a top-level definition may be used as is:
@@ -169,6 +267,12 @@ static TriNode *build_raw(Build *b, X *x)
     }
     case X_ATOM: {
         uint32_t t = type_lookup(c, x->u.name);
+        if (!c->tdl && (t == TRI_BOTTOM || (c->types.v[t].kind == TK_ATOM && c->types.v[t].parents.n == 1 &&
+                                            c->types.v[t].parents.v[0] == c->atomroot))) {
+            /* a string no enum lists is free text */
+            int64_t q = (int64_t) (intptr_t) x->u.name;
+            return leaf_new(c, c->scratch, c->dimtype[DIM_TEXT], q, q);
+        }
         if (t == TRI_BOTTOM) { build_error(b, x->loc, "unknown atom %s", x->u.name); return NULL; }
         return node_new(c, c->scratch, t);
     }
@@ -202,7 +306,9 @@ static TriNode *build_raw(Build *b, X *x)
         TriNode *r = node_new(c, c->scratch, t);
         build_struct_into(b, r, x);
         if (!b->ok) return NULL;
-        if (t != c->top) {
+        if (t != c->top && c->types.v[t].xstate == 1) {
+            r->flags |= NF_LAZY;             /* inside t's own constraint */
+        } else if (t != c->top) {
             TriNode *e = type_expansion(c, t);
             if (!e) { build_error(b, x->loc, "cannot expand %s", c->types.v[t].name); return NULL; }
             unify_at(b, r, copy_raw(c, c->scratch, e), x->loc, "struct");
@@ -216,10 +322,32 @@ static TriNode *build_raw(Build *b, X *x)
         unify_at(b, l, r, x->loc, "conjunction");
         return b->ok ? l : NULL;
     }
+    case X_ARITH: {
+        int dim;
+        int64_t lo, hi;
+        if (x_interval(x, &dim, &lo, &hi)) return leaf_new(c, c->scratch, c->dimtype[dim], lo, hi);
+        /* a constraint on this field, resolved once the tags have their places */
+        ArithRec r = { { 0 }, x, { 0 } };
+        for (size_t i = 0; i < b->path.n; i++) VEC_PUSH(r.path, b->path.v[i]);
+        VEC_PUSH(b->ariths, r);
+        return node_new(c, c->scratch, c->top);
+    }
     case X_DEFAULT:
+        if (b->runtime) { build_error(b, x->loc, "%s", "a default (*) has no meaning in a runtime value"); return NULL; }
         record_default(b, x->u.sub);
         return node_new(c, c->scratch, c->top);
     case X_OR: {
+        uint64_t di;
+        if (u64map_get(&c->disjidx, (uint64_t) (uintptr_t) x, &di)) {
+            /* a disjunction of structures in a type body: its type, whose
+             * alternatives are subtypes */
+            DisjInfo *d = &c->disjs.v[di - 1];
+            if (d->def >= 0)
+                record_default(b, d->collapse ? d->altx.v[d->def] : x_name(c, d->alts.v[d->def], x->loc));
+            X *named = x_name(c, d->collapse ? d->collapse : d->dname, x->loc);
+            if (d->collapse && c->types.v[type_lookup(c, d->collapse)].kind == TK_ATOM) named->k = X_ATOM;
+            return build_raw(b, named);
+        }
         XPtrVec ds = { 0 };
         flatten_or(x, &ds);
         X *def = NULL;
@@ -229,6 +357,11 @@ static TriNode *build_raw(Build *b, X *x)
         for (size_t i = 0; i < ds.n; i++) {
             X *d = ds.v[i];
             if (d->k == X_DEFAULT) {
+                if (b->runtime) {
+                    build_error(b, d->loc, "%s", "a default (*) has no meaning in a runtime value");
+                    VEC_FREE(ds);
+                    return NULL;
+                }
                 if (def) { build_error(b, d->loc, "%s", "more than one default in a disjunction"); VEC_FREE(ds); return NULL; }
                 def = d->u.sub;
                 d = d->u.sub;
@@ -258,8 +391,17 @@ static TriNode *build_raw(Build *b, X *x)
             if (t == TRI_BOTTOM) { build_error(b, x->loc, "unknown enum %s", an); return NULL; }
             return node_new(c, c->scratch, t);
         }
-        if (all_num) return leaf_new(c, c->scratch, c->dimtype[dim], lo, hi);
-        build_error(b, x->loc, "%s", "disjunction of structures is not supported yet");
+        if (all_num) {
+            int d2;
+            int64_t l2, h2;
+            bool contiguous;
+            if (x_numeric_or(x, &d2, &l2, &h2, &contiguous) && !contiguous) {
+                build_error(b, x->loc, "%s", "a disjunction of separate numbers is resolved only in an instance");
+                return NULL;
+            }
+            return leaf_new(c, c->scratch, c->dimtype[dim], lo, hi);
+        }
+        build_error(b, x->loc, "%s", "a disjunction of structures is resolved only in a type or an instance");
         return NULL;
     }
     case X_LIST: {
@@ -271,6 +413,11 @@ static TriNode *build_raw(Build *b, X *x)
             tail = build_raw(b, x->u.list.tail);
             b->path.n = base;
             if (!tail) return NULL;
+        } else if (x->u.list.elem) {
+            uint32_t lt = type_lookup(c, list_type_name(c, x->u.list.elem, false));
+            TriNode *e = lt == TRI_BOTTOM ? NULL : type_expansion(c, lt);
+            if (!e) { build_error(b, x->loc, "%s", "this typed list does not occur in the content"); return NULL; }
+            tail = copy_raw(c, c->scratch, e);
         } else {
             tail = copy_raw(c, c->scratch, type_expansion(c, x->u.list.open ? c->tlist : c->tnull));
         }
@@ -304,6 +451,10 @@ static TriNode *build_raw(Build *b, X *x)
 
 /* --- type expansions ------------------------------------------------------------------------ */
 
+static bool resolve_ariths(Content *c, Build *b, TriNode *out, ArithVec *dst, Loc loc, const char *who);
+static void copy_arith(ArithVec *dst, const ArithRec *src);
+static TriNode *settle_arith(Content *c, TriNode *root, const ArithVec *extra, TriArena *arena, TriFailure *fail);
+
 static void conjuncts(X *x, XPtrVec *out)
 {
     if (x->k == X_AND) { conjuncts(x->u.bin.a, out); conjuncts(x->u.bin.b, out); }
@@ -317,7 +468,7 @@ static bool path_eq(const U32Vec *a, const U32Vec *b)
 
 static void add_default(DefVec *defs, const DefaultRec *d, const uint32_t *prefix, size_t plen)
 {
-    DefaultRec n = { { 0 }, d->value, d->contributor };
+    DefaultRec n = { { 0 }, d->value, d->contributor, d->vary };
     for (size_t i = 0; i < plen; i++) VEC_PUSH(n.path, prefix[i]);
     for (size_t i = 0; i < d->path.n; i++) VEC_PUSH(n.path, d->path.v[i]);
     for (size_t i = 0; i < defs->n; i++)
@@ -328,15 +479,23 @@ static void add_default(DefVec *defs, const DefaultRec *d, const uint32_t *prefi
     VEC_PUSH(*defs, n);
 }
 
+TriNode *type_instance(Content *c, uint32_t t, TriArena *a)
+{
+    if (c->types.v[t].xstate == 1) {
+        /* t's constraint mentions t: a lazy node, completed when used */
+        TriNode *n = node_new(c, a, t);
+        n->flags |= NF_LAZY;
+        return n;
+    }
+    TriNode *e = type_expansion(c, t);
+    return e ? copy_raw(c, a, e) : NULL;
+}
+
 TriNode *type_expansion(Content *c, uint32_t t)
 {
     TypeInfo *ti = &c->types.v[t];
     if (ti->xstate == 2) return ti->expansion;
-    if (ti->xstate == 1) {
-        diag(c, true, ti->decls.n ? ti->decls.v[0]->loc : noloc,
-             "recursive type constraint involving %s", ti->name);
-        return NULL;
-    }
+    if (ti->xstate == 1) return NULL;
     if (ti->kind == TK_TOP || ti->kind == TK_DIM || ti->kind == TK_ATOMROOT ||
         ti->kind == TK_ATOM || ti->kind == TK_ANON) {
         ti->expansion = node_new(c, c->spec, t);
@@ -349,7 +508,10 @@ TriNode *type_expansion(Content *c, uint32_t t)
     uint32_t savedpath[128];
     int saveddepth = c->depth;
     bool savedfailed = c->failed;
-    TriFailure savedfail = c->fail;
+    TriFailure savedfail = *fail_info(c);
+    uint32_t savedfailpath[128];
+    int savedfaildepth = c->faildepth;
+    memcpy(savedfailpath, c->failpath, sizeof savedfailpath);
     memcpy(savedpath, c->pathstack, sizeof savedpath);
     TriMark m = tri_arena_mark(c->scratch);
     uint32_t saved = op_begin(c);
@@ -359,8 +521,10 @@ TriNode *type_expansion(Content *c, uint32_t t)
     b.contributor = t;
     b.record = true;
     b.ok = true;
+    b.owner = t;
     TriNode *r = node_new(c, c->scratch, t);
     for (size_t k = 0; k < ti->decls.n && b.ok; k++) {
+        b.decl = k;
         XPtrVec cj = { 0 };
         conjuncts(ti->decls.v[k]->value, &cj);
         for (size_t j = 0; j < cj.n && b.ok; j++)
@@ -371,11 +535,34 @@ TriNode *type_expansion(Content *c, uint32_t t)
     for (size_t k = 0; k < ti->parents.n && b.ok; k++) {
         uint32_t p = ti->parents.v[k];
         TriNode *e = type_expansion(c, p);
-        if (!e) { b.ok = false; break; }
+        if (!e) {
+            if (c->types.v[p].xstate == 1)
+                diag(c, true, loc, "%s inherits from %s, whose constraint depends on %s", ti->name,
+                     c->types.v[p].name, ti->name);
+            b.ok = false;
+            break;
+        }
         Buf what = { 0 };
         buf_printf(&what, "%s inheriting from %s", ti->name, c->types.v[p].name);
+        /* the conflict is reported at this type's own declaration of the path */
+        Loc here = loc;
+        b.owner = TRI_BOTTOM;
         /* the first parent's expansion is used as is, so the result shares it */
-        unify_at(&b, r, k == 0 && c->opdepth == 1 ? e : copy_raw(c, c->scratch, e), loc, what.s);
+        if (!unify_at_other(&b, r, k == 0 && c->opdepth == 1 ? e : copy_raw(c, c->scratch, e), here, what.s, p)) {
+            /* re-point the diagnostic at this type's declaration of the path, if any */
+            for (size_t q = 0; q < ti->decls.n; q++)
+                if (find_field_loc(c, ti->decls.v[q]->value, c->failpath, (size_t) c->faildepth, &here)) {
+                    Diag *dg = &c->diags.v[c->diags.n - 1];
+                    char *old = dg->msg;
+                    const char *rest = strstr(old, ": error: ");
+                    Buf nb = { 0 };
+                    if (rest) buf_printf(&nb, "%s:%d:%d%s", here.file, here.line, here.col, rest);
+                    else buf_printf(&nb, "%s:%d:%d: %s", here.file, here.line, here.col, old);
+                    dg->msg = nb.s;
+                    free(old);
+                    break;
+                }
+        }
         buf_free(&what);
     }
     TriNode *out = NULL;
@@ -388,13 +575,25 @@ TriNode *type_expansion(Content *c, uint32_t t)
         }
     }
     if (out) {
+        /* arithmetic: the type's own, with tags placed in its expansion, and its parents' */
+        if (!resolve_ariths(c, &b, out, &ti->ariths, loc, ti->name)) out = NULL;
+        ti = &c->types.v[t];
+        for (size_t k = 0; k < ti->parents.n; k++) {
+            const ArithVec *pa = &c->types.v[ti->parents.v[k]].ariths;
+            for (size_t i = 0; i < pa->n; i++) copy_arith(&ti->ariths, &pa->v[i]);
+        }
+    }
+    if (out) {
         for (size_t i = 0; i < b.defs.n; i++) add_default(&ti->defaults, &b.defs.v[i], NULL, 0);
+        for (size_t i = 0; i < b.varies.n; i++) add_default(&ti->varies, &b.varies.v[i], NULL, 0);
         for (size_t k = 0; k < ti->parents.n; k++) {
             TypeInfo *pi = &c->types.v[ti->parents.v[k]];
             for (size_t i = 0; i < pi->defaults.n; i++) add_default(&ti->defaults, &pi->defaults.v[i], NULL, 0);
+            for (size_t i = 0; i < pi->varies.n; i++) add_default(&ti->varies, &pi->varies.v[i], NULL, 0);
         }
     }
     for (size_t i = 0; i < b.defs.n; i++) VEC_FREE(b.defs.v[i].path);
+    for (size_t i = 0; i < b.varies.n; i++) VEC_FREE(b.varies.v[i].path);
     build_free(&b);
 
     op_end(c, saved);
@@ -402,13 +601,276 @@ TriNode *type_expansion(Content *c, uint32_t t)
     memcpy(c->pathstack, savedpath, sizeof savedpath);
     c->depth = saveddepth;
     c->failed = savedfailed;
-    c->fail = savedfail;
+    c->fail_ = savedfail;
+    c->failfmt = true;
+    memcpy(c->failpath, savedfailpath, sizeof savedfailpath);
+    c->faildepth = savedfaildepth;
 
     ti = &c->types.v[t];
+    if (out && c->types.v[t].ariths.n) {
+        /* what the constraints give with the type's own values; open stays open */
+        ti->expansion = out;
+        ti->xstate = 2;
+        TriFailure f;
+        TriNode *settled = settle_arith(c, out, NULL, c->spec, &f);
+        if (!settled) diag(c, true, loc, "%s: arithmetic at %s: %s gives %s", c->types.v[t].name, f.path, f.left, f.right);
+        out = settled;
+        ti = &c->types.v[t];
+    }
     ti->expansion = out;
     ti->xstate = out ? 2 : 0;
     if (!out) ti->xstate = 2;    /* do not retry; errors are already reported */
     return out;
+}
+
+/* --- variants ---------------------------------------------------------------------------------- */
+
+/* An instance's disjunctions of structures are expanded at load: the instance
+ * becomes one variant per combination of alternatives. Enums of atoms and
+ * ranges stay as they are; they are resolved by types and intervals. */
+
+typedef struct { X *x; uint64_t weight, hasdef, tookdef; } XVar;
+typedef VEC(XVar) XVarVec;
+
+typedef struct {
+    Content *c;
+    size_t cap;
+    int ndisj;               /* disjunctions with a default, numbered for the masks */
+    bool overflow, bad;
+    bool vary_used;          /* some disjunction took the weights it was given */
+} Expand;
+
+static bool structural_or(Content *c, X *x)
+{
+    if (x->k != X_OR || anon_name(c, x)) return false;
+    XPtrVec ds = { 0 };
+    x_flatten(x, X_OR, &ds);
+    bool atoms = true;
+    for (size_t i = 0; i < ds.n; i++) {
+        X *d = ds.v[i]->k == X_DEFAULT ? ds.v[i]->u.sub : ds.v[i];
+        if (d->k != X_ATOM) atoms = false;
+    }
+    VEC_FREE(ds);
+    if (atoms) return false;                 /* the same atom, repeated */
+    int dim;
+    int64_t lo, hi;
+    bool contiguous;
+    if (x_numeric_or(x, &dim, &lo, &hi, &contiguous)) return !contiguous;
+    return true;
+}
+
+static bool has_structural(Content *c, X *x)
+{
+    switch (x->k) {
+    case X_OR: return structural_or(c, x) || has_structural(c, x->u.bin.a) || has_structural(c, x->u.bin.b);
+    case X_AND: return has_structural(c, x->u.bin.a) || has_structural(c, x->u.bin.b);
+    case X_DEFAULT: return has_structural(c, x->u.sub);
+    case X_STRUCT:
+        for (int i = 0; i < x->u.st.n; i++) if (has_structural(c, x->u.st.fields[i].value)) return true;
+        return false;
+    case X_LIST:
+        for (int i = 0; i < x->u.list.n; i++) if (has_structural(c, x->u.list.items[i])) return true;
+        return (x->u.list.tail && has_structural(c, x->u.list.tail)) ||
+               (x->u.list.elem && has_structural(c, x->u.list.elem));
+    default: return false;
+    }
+}
+
+/* Parses @vary weights; false unless there is exactly one per alternative. */
+static bool parse_weights(const char *args, uint64_t *w, size_t n)
+{
+    const char *s = args;
+    size_t k = 0;
+    while (*s) {
+        while (*s == ' ' || *s == ',' || *s == '\t') s++;
+        if (!*s) break;
+        if (*s < '0' || *s > '9' || k == n) return false;
+        uint64_t v = 0;
+        while (*s >= '0' && *s <= '9') { v = v * 10 + (uint64_t) (*s - '0'); if (v > 1000000) return false; s++; }
+        w[k++] = v;
+        while (*s == ' ' || *s == '\t') s++;
+        if (*s && *s != ',') return false;
+    }
+    return k == n;
+}
+
+const char *attr_args(const Attr *attrs, int n, const char *name)
+{
+    for (int i = 0; i < n; i++) if (strcmp(attrs[i].name, name) == 0) return attrs[i].args;
+    return NULL;
+}
+
+static uint64_t mul_sat(uint64_t a, uint64_t b)
+{
+    return a && b > UINT64_MAX / a ? UINT64_MAX : a * b;
+}
+
+static void expand_x(Expand *e, X *x, const char *vary, Loc vloc, XVarVec *out);
+
+/* The cartesian product of the children's variants; `make` builds the parent. */
+static void product(Expand *e, XVarVec *parts, size_t n, X *orig,
+                    X *(*make)(Content *, X *, X **), XVarVec *out)
+{
+    size_t *ix = calloc(n ? n : 1, sizeof(size_t));
+    X **chosen = malloc(sizeof(X *) * (n ? n : 1));
+    for (;;) {
+        XVar v = { NULL, 1, 0, 0 };
+        for (size_t i = 0; i < n; i++) {
+            XVar *p = &parts[i].v[ix[i]];
+            chosen[i] = p->x;
+            v.weight = mul_sat(v.weight, p->weight);
+            v.hasdef |= p->hasdef;
+            v.tookdef |= p->tookdef;
+        }
+        v.x = make(e->c, orig, chosen);
+        VEC_PUSH(*out, v);
+        if (out->n > e->cap) { e->overflow = true; break; }
+        size_t i = 0;
+        while (i < n && ++ix[i] == parts[i].n) ix[i++] = 0;
+        if (i == n) break;
+    }
+    free(ix);
+    free(chosen);
+}
+
+static X *make_and(Content *c, X *orig, X **ch)
+{
+    X *x = x_new(c, X_AND, orig->loc);
+    x->u.bin.a = ch[0];
+    x->u.bin.b = ch[1];
+    return x;
+}
+
+static X *make_default(Content *c, X *orig, X **ch)
+{
+    X *x = x_new(c, X_DEFAULT, orig->loc);
+    x->u.sub = ch[0];
+    return x;
+}
+
+static X *make_struct(Content *c, X *orig, X **ch)
+{
+    X *x = x_new(c, X_STRUCT, orig->loc);
+    x->u.st = orig->u.st;
+    x->u.st.fields = arena_alloc(c->load, sizeof(XField) * (size_t) (orig->u.st.n ? orig->u.st.n : 1));
+    for (int i = 0; i < orig->u.st.n; i++) {
+        x->u.st.fields[i] = orig->u.st.fields[i];
+        x->u.st.fields[i].value = ch[i];
+    }
+    return x;
+}
+
+static X *make_list(Content *c, X *orig, X **ch)
+{
+    X *x = x_new(c, X_LIST, orig->loc);
+    x->u.list = orig->u.list;
+    x->u.list.items = arena_alloc(c->load, sizeof(X *) * (size_t) (orig->u.list.n ? orig->u.list.n : 1));
+    int k = 0;
+    for (int i = 0; i < orig->u.list.n; i++) x->u.list.items[i] = ch[k++];
+    if (orig->u.list.tail) x->u.list.tail = ch[k++];
+    if (orig->u.list.elem) x->u.list.elem = ch[k++];
+    return x;
+}
+
+static void free_parts(XVarVec *parts, size_t n)
+{
+    for (size_t i = 0; i < n; i++) VEC_FREE(parts[i]);
+    free(parts);
+}
+
+static void expand_x(Expand *e, X *x, const char *vary, Loc vloc, XVarVec *out)
+{
+    Content *c = e->c;
+    if (e->overflow || e->bad) return;
+    if (!has_structural(c, x)) {
+        XVar v = { x, 1, 0, 0 };
+        VEC_PUSH(*out, v);
+        return;
+    }
+    switch (x->k) {
+    case X_OR: {
+        if (!structural_or(c, x)) {           /* an enum or range whose parts nest structure */
+            XVar v = { x, 1, 0, 0 };
+            VEC_PUSH(*out, v);
+            return;
+        }
+        XPtrVec ds = { 0 };
+        x_flatten(x, X_OR, &ds);
+        uint64_t *w = malloc(sizeof(uint64_t) * ds.n);
+        for (size_t i = 0; i < ds.n; i++) w[i] = 1;
+        if (vary) e->vary_used = true;
+        if (vary && !parse_weights(vary, w, ds.n)) {
+            diag(c, true, vloc, "@vary(%s) needs one whole-number weight per alternative (%zu)", vary, ds.n);
+            e->bad = true;
+        }
+        int def = -1;
+        for (size_t i = 0; i < ds.n; i++) if (ds.v[i]->k == X_DEFAULT) def = (int) i;
+        uint64_t bit = 0;
+        if (def >= 0) {
+            if (e->ndisj == 64) { diag(c, true, x->loc, "too many defaults among alternatives"); e->bad = true; }
+            else bit = 1ull << e->ndisj++;
+        }
+        for (size_t i = 0; i < ds.n && !e->overflow && !e->bad; i++) {
+            X *a = ds.v[i]->k == X_DEFAULT ? ds.v[i]->u.sub : ds.v[i];
+            size_t from = out->n;
+            expand_x(e, a, NULL, a->loc, out);
+            for (size_t k = from; k < out->n; k++) {
+                out->v[k].weight = mul_sat(out->v[k].weight, w[i]);
+                out->v[k].hasdef |= bit;
+                if ((int) i == def) out->v[k].tookdef |= bit;
+            }
+            if (out->n > e->cap) e->overflow = true;
+        }
+        free(w);
+        VEC_FREE(ds);
+        return;
+    }
+    case X_AND: {
+        /* weights written after a conjunction belong to its disjunction */
+        bool sa = structural_or(c, x->u.bin.a) || x->u.bin.a->k == X_AND;
+        bool sb = structural_or(c, x->u.bin.b) || x->u.bin.b->k == X_AND;
+        XVarVec *parts = calloc(2, sizeof(XVarVec));
+        expand_x(e, x->u.bin.a, sa && !sb ? vary : NULL, vloc, &parts[0]);
+        expand_x(e, x->u.bin.b, sb ? vary : NULL, vloc, &parts[1]);
+        if (!e->overflow && !e->bad) product(e, parts, 2, x, make_and, out);
+        free_parts(parts, 2);
+        return;
+    }
+    case X_DEFAULT: {
+        XVarVec *parts = calloc(1, sizeof(XVarVec));
+        expand_x(e, x->u.sub, vary, vloc, &parts[0]);
+        if (!e->overflow && !e->bad) product(e, parts, 1, x, make_default, out);
+        free_parts(parts, 1);
+        return;
+    }
+    case X_STRUCT: {
+        size_t n = (size_t) x->u.st.n;
+        XVarVec *parts = calloc(n ? n : 1, sizeof(XVarVec));
+        for (size_t i = 0; i < n; i++) {
+            XField *f = &x->u.st.fields[i];
+            expand_x(e, f->value, attr_args(f->attrs, f->nattrs, "vary"), f->loc, &parts[i]);
+        }
+        if (!e->overflow && !e->bad) product(e, parts, n, x, make_struct, out);
+        free_parts(parts, n);
+        return;
+    }
+    case X_LIST: {
+        size_t n = (size_t) x->u.list.n + (x->u.list.tail != NULL) + (x->u.list.elem != NULL);
+        XVarVec *parts = calloc(n ? n : 1, sizeof(XVarVec));
+        size_t k = 0;
+        for (int i = 0; i < x->u.list.n; i++) expand_x(e, x->u.list.items[i], NULL, vloc, &parts[k++]);
+        if (x->u.list.tail) expand_x(e, x->u.list.tail, NULL, vloc, &parts[k++]);
+        if (x->u.list.elem) expand_x(e, x->u.list.elem, NULL, vloc, &parts[k++]);
+        if (!e->overflow && !e->bad) product(e, parts, n, x, make_list, out);
+        free_parts(parts, n);
+        return;
+    }
+    default: {
+        XVar v = { x, 1, 0, 0 };
+        VEC_PUSH(*out, v);
+        return;
+    }
+    }
 }
 
 /* --- instances ------------------------------------------------------------------------------- */
@@ -431,17 +893,230 @@ static void find_tag_paths(Content *c, TriNode *root, TriNode *target, U32Vec *c
     }
 }
 
-/* Builds one declaration of an instance by itself, for locating conflicts. */
-static bool decl_pair_conflicts(Content *c, Decl *d1, Decl *d2)
+/* --- arithmetic ------------------------------------------------------------------------------- */
+
+static TriNode *wrap_path(Content *c, const U32Vec *path, TriNode *value);
+
+/* Turns a build's arithmetic into constraints on `out`, the structure it
+ * built: each tag the expression uses gets its path there. False (with a
+ * diagnostic) if a tag is bound nowhere else. */
+static bool resolve_ariths(Content *c, Build *b, TriNode *out, ArithVec *dst, Loc loc, const char *who)
+{
+    bool ok = true;
+    for (size_t i = 0; i < b->ariths.n; i++) {
+        ArithRec r = { { 0 }, b->ariths.v[i].expr, { 0 } };
+        for (size_t k = 0; k < b->ariths.v[i].path.n; k++) VEC_PUSH(r.path, b->ariths.v[i].path.v[k]);
+        SymVec names = { 0 };
+        arith_tags(r.expr, &names);
+        for (size_t t = 0; t < names.n; t++) {
+            TagPath tp = { names.v[t], { 0 } };
+            bool found = false;
+            for (size_t q = 0; q < b->tags.n && !found; q++) {
+                if (b->tags.v[q].name != names.v[t]) continue;
+                TriNode *mapped = deref(c, b->tags.v[q].node)->cpy;      /* valid: copy_out just ran */
+                U32Vec cur = { 0 };
+                U64Map seen = { 0 };
+                find_tag_paths(c, out, mapped, &cur, &tp.path, &seen);
+                VEC_FREE(cur);
+                u64map_free(&seen);
+                found = tp.path.n > 0 && !(tp.path.n == 1 && tp.path.v[0] == TRI_BOTTOM);
+            }
+            if (!found) {
+                diag(c, true, loc, "%s: the tag %s in arithmetic is not bound to a field", who, names.v[t]);
+                ok = false;
+            }
+            VEC_PUSH(r.tags, tp);
+        }
+        VEC_FREE(names);
+        VEC_PUSH(*dst, r);
+        c->narith++;
+    }
+    return ok;
+}
+
+static void copy_arith(ArithVec *dst, const ArithRec *src)
+{
+    ArithRec r = { { 0 }, src->expr, { 0 } };
+    for (size_t k = 0; k < src->path.n; k++) VEC_PUSH(r.path, src->path.v[k]);
+    for (size_t t = 0; t < src->tags.n; t++) {
+        TagPath tp = { src->tags.v[t].name, { 0 } };
+        for (size_t k = 0; k < src->tags.v[t].path.n; k++) VEC_PUSH(tp.path, src->tags.v[t].path.v[k]);
+        VEC_PUSH(r.tags, tp);
+    }
+    VEC_PUSH(*dst, r);
+}
+
+/* A constraint as found in a structure: the record and where it applies. */
+typedef struct { const ArithRec *rec; U32Vec prefix; } ArithUse;
+typedef VEC(ArithUse) ArithUses;
+
+static void collect_ariths(Content *c, TriNode *n, U32Vec *path, ArithUses *out, uint32_t cg)
+{
+    if (n->cpygen == cg) return;
+    n->cpygen = cg;
+    TypeInfo *ti = &c->types.v[n->type];
+    for (size_t i = 0; i < ti->ariths.n; i++) {
+        ArithUse u = { &ti->ariths.v[i], { 0 } };
+        for (size_t k = 0; k < path->n; k++) VEC_PUSH(u.prefix, path->v[k]);
+        VEC_PUSH(*out, u);
+    }
+    if (n->flags & NF_DIM) return;
+    for (uint32_t i = 0; i < n->narcs; i++) {
+        VEC_PUSH(*path, n->arcs[i].feat);
+        collect_ariths(c, n->arcs[i].val, path, out, cg);
+        path->n--;
+    }
+}
+
+static TriNode *node_at_prefixed(TriNode *root, const U32Vec *prefix, const U32Vec *path)
+{
+    TriNode *n = node_at(root, prefix->v, prefix->n);
+    return n ? node_at(n, path->v, path->n) : NULL;
+}
+
+typedef struct { TriNode *root; const ArithUse *use; Content *c; } ALookup;
+
+static bool arith_lookup(void *ctx, Sym tag, Quantity *q)
+{
+    ALookup *l = ctx;
+    for (size_t i = 0; i < l->use->rec->tags.n; i++) {
+        if (l->use->rec->tags.v[i].name != tag) continue;
+        TriNode *n = node_at_prefixed(l->root, &l->use->prefix, &l->use->rec->tags.v[i].path);
+        if (!n || !(n->flags & NF_DIM)) return false;
+        q->dim = l->c->types.v[n->type].dim;
+        q->lo = n->lo;
+        q->hi = n->hi;
+        return true;
+    }
+    return false;
+}
+
+static void set_arith_failure(Content *c, TriFailure *fail, const U32Vec *prefix, const U32Vec *path, const ArithRec *rec,
+                              const char *why)
+{
+    if (!fail) return;
+    memset(fail, 0, sizeof *fail);
+    U32Vec full = { 0 };
+    for (size_t k = 0; k < prefix->n; k++) VEC_PUSH(full, prefix->v[k]);
+    for (size_t k = 0; k < path->n; k++) VEC_PUSH(full, path->v[k]);
+    Buf p = { 0 }, e = { 0 };
+    path_format(c, &p, full.v, full.n);
+    x_print(&e, rec->expr);
+    snprintf(fail->path, sizeof fail->path, "%s", p.s);
+    snprintf(fail->left, sizeof fail->left, "%s", e.s);
+    snprintf(fail->right, sizeof fail->right, "%s", why);
+    buf_free(&p);
+    buf_free(&e);
+    VEC_FREE(full);
+}
+
+/* Propagates arithmetic: every constraint in `root` (those of its nodes'
+ * types, and `extra`, given at the root) narrows its field to the value its
+ * expression gives, until nothing changes. Returns the new root in `arena`,
+ * root itself if nothing changed, or NULL with *fail if a constraint can't
+ * hold. */
+static TriNode *settle_arith(Content *c, TriNode *root, const ArithVec *extra, TriArena *arena, TriFailure *fail)
+{
+    if (!c->narith || !root) return root;
+    for (int round = 0; round < 16; round++) {
+        ArithUses uses = { 0 };
+        U32Vec path = { 0 };
+        collect_ariths(c, root, &path, &uses, ++c->cgenctr);
+        VEC_FREE(path);
+        for (size_t i = 0; extra && i < extra->n; i++) {
+            ArithUse u = { &extra->v[i], { 0 } };
+            VEC_PUSH(uses, u);
+        }
+        TriMark m = tri_arena_mark(c->scratch);
+        VEC(TriNode *) vals = { 0 };
+        PathVec where = { 0 };
+        bool ok = true;
+        for (size_t i = 0; i < uses.n && ok; i++) {
+            ArithUse *u = &uses.v[i];
+            ALookup l = { root, u, c };
+            Quantity q;
+            const char *err = arith_eval(u->rec->expr, arith_lookup, &l, &q);
+            if (err == ARITH_UNKNOWN) continue;
+            if (err) { set_arith_failure(c, fail, &u->prefix, &u->rec->path, u->rec, err); ok = false; break; }
+            TriNode *t = node_at_prefixed(root, &u->prefix, &u->rec->path);
+            if (!t) continue;
+            if (t->flags & NF_DIM) {
+                int tdim = c->types.v[t->type].dim;
+                if (tdim != q.dim && !(tdim == DIM_FIXED && q.dim == DIM_INT)) {
+                    set_arith_failure(c, fail, &u->prefix, &u->rec->path, u->rec, "a value of another dimension");
+                    ok = false;
+                    break;
+                }
+                if (tdim == DIM_FIXED && q.dim == DIM_INT) {      /* read the result as fixed */
+                    q.dim = DIM_FIXED;
+                    if (q.lo != TRI_NINF) q.lo *= 1000;
+                    if (q.hi != TRI_INF) q.hi *= 1000;
+                }
+                int64_t lo = q.lo > t->lo ? q.lo : t->lo, hi = q.hi < t->hi ? q.hi : t->hi;
+                if (lo > hi) {
+                    Buf d = { 0 };
+                    units_format(&d, q.dim, q.lo);
+                    if (q.lo != q.hi) { buf_puts(&d, ".."); units_format(&d, q.dim, q.hi); }
+                    set_arith_failure(c, fail, &u->prefix, &u->rec->path, u->rec, d.s);
+                    buf_free(&d);
+                    ok = false;
+                    break;
+                }
+                if (lo == t->lo && hi == t->hi) continue;
+                q.lo = lo;
+                q.hi = hi;
+            } else if (t->type != c->top) {
+                set_arith_failure(c, fail, &u->prefix, &u->rec->path, u->rec, "a number where a structure is");
+                ok = false;
+                break;
+            }
+            U32Vec full = { 0 };
+            for (size_t k = 0; k < u->prefix.n; k++) VEC_PUSH(full, u->prefix.v[k]);
+            for (size_t k = 0; k < u->rec->path.n; k++) VEC_PUSH(full, u->rec->path.v[k]);
+            VEC_PUSH(where, full);
+            VEC_PUSH(vals, leaf_new(c, c->scratch, c->dimtype[q.dim], q.lo, q.hi));
+        }
+        bool changed = false;
+        if (ok && where.n) {
+            uint32_t saved = op_begin(c);
+            reset_failure(c);
+            for (size_t k = 0; k < where.n && ok; k++) ok = unify1(c, root, wrap_path(c, &where.v[k], vals.v[k]));
+            if (ok) { root = copy_out(c, arena, root, NULL); changed = true; }
+            else if (fail) *fail = *fail_info(c);
+            op_end(c, saved);
+        }
+        for (size_t k = 0; k < where.n; k++) VEC_FREE(where.v[k]);
+        VEC_FREE(where);
+        VEC_FREE(vals);
+        for (size_t k = 0; k < uses.n; k++) VEC_FREE(uses.v[k].prefix);
+        VEC_FREE(uses);
+        if (arena != c->scratch) tri_arena_release(c->scratch, m);
+        if (!ok) return NULL;
+        if (!changed) break;
+    }
+    return root;
+}
+
+/* Whether field f of a node of type t is computed by arithmetic. */
+static bool arith_target(Content *c, uint32_t t, uint32_t f)
+{
+    const ArithVec *av = &c->types.v[t].ariths;
+    for (size_t i = 0; i < av->n; i++)
+        if (av->v[i].path.n == 1 && av->v[i].path.v[0] == f) return true;
+    return false;
+}
+
+/* Builds two parts of an instance by themselves, for locating conflicts. */
+static bool pair_conflicts(Content *c, X *x1, X *x2)
 {
     TriMark m = tri_arena_mark(c->scratch);
     uint32_t saved = op_begin(c);
     Build b = { 0 };
-    b.c = c; b.ok = true; b.contributor = CONTRIB_INSTANCE;
+    b.c = c; b.ok = true; b.contributor = CONTRIB_INSTANCE; b.owner = TRI_BOTTOM;
     int nerr = c->nerrors;
     size_t ndiag = c->diags.n;
-    TriNode *x = build_raw(&b, d1->value);
-    TriNode *y = x ? build_raw(&b, d2->value) : NULL;
+    TriNode *x = build_raw(&b, x1);
+    TriNode *y = x ? build_raw(&b, x2) : NULL;
     bool conflict = false;
     if (x && y) {
         reset_failure(c);
@@ -455,6 +1130,112 @@ static bool decl_pair_conflicts(Content *c, Decl *d1, Decl *d2)
     return conflict;
 }
 
+static void free_recs(DefVec *v)
+{
+    for (size_t k = 0; k < v->n; k++) VEC_FREE(v->v[k].path);
+    VEC_FREE(*v);
+}
+
+/* Builds one variant of an instance from one expression per declaration.
+ * With `report`, a failure is diagnosed; otherwise it leaves no trace. */
+static bool build_variant(Content *c, uint32_t i, X **xs, InstVariant *out, bool report)
+{
+    InstInfo *in = &c->insts.v[i];
+    int nerr = c->nerrors;
+    size_t ndiag = c->diags.n;
+    TriMark m = tri_arena_mark(c->scratch);
+    uint32_t saved = op_begin(c);
+    Build b = { 0 };
+    b.c = c; b.ok = true; b.contributor = CONTRIB_INSTANCE; b.owner = TRI_BOTTOM; b.record = true;
+    b.direct = true;
+    TriNode *r = NULL;
+    for (size_t k = 0; k < in->decls.n && b.ok; k++) {
+        Decl *d = in->decls.v[k];
+        TriNode *x = build_raw(&b, xs[k]);
+        if (!x) break;
+        if (!r) { r = x; continue; }
+        reset_failure(c);
+        if (!unify1(c, r, x)) {
+            Decl *partner = NULL;
+            if (report)
+                for (size_t j = 0; j < k && !partner; j++)
+                    if (pair_conflicts(c, xs[j], xs[k])) partner = in->decls.v[j];
+            if (partner)
+                diag(c, true, d->loc, "%s: conflict at %s: %s vs %s, with the declaration at %s:%d",
+                     in->name, fail_info(c)->path, fail_info(c)->left, fail_info(c)->right,
+                     partner->loc.file, partner->loc.line);
+            else
+                diag(c, true, d->loc, "%s: conflict at %s: %s vs %s, with earlier declarations",
+                     in->name, fail_info(c)->path, fail_info(c)->left, fail_info(c)->right);
+            b.ok = false;
+        }
+        in = &c->insts.v[i];
+    }
+    in = &c->insts.v[i];
+    if (b.ok && r) {
+        bool closed;
+        TriNode *pat = copy_out(c, c->spec, r, &closed);
+        if (!closed) {
+            diag(c, true, in->decls.v[0]->loc, "%s: a field is not appropriate for its type", in->name);
+            b.ok = false;
+        } else {
+            out->pattern = pat;
+            for (size_t t = 0; t < b.tags.n; t++) {
+                TriNode *tn = deref(c, b.tags.v[t].node);
+                TriNode *mapped = tn->cpy;   /* valid: copy_out just ran */
+                TagPath tp = { b.tags.v[t].name, { 0 } };
+                U32Vec cur = { 0 };
+                U64Map seen = { 0 };
+                find_tag_paths(c, pat, mapped, &cur, &tp.path, &seen);
+                if (tp.path.n == 1 && tp.path.v[0] == TRI_BOTTOM) tp.path.n = 0;
+                VEC_FREE(cur);
+                u64map_free(&seen);
+                VEC_PUSH(out->tags, tp);
+            }
+            for (size_t d = 0; d < b.defs.n; d++) add_default(&out->defaults, &b.defs.v[d], NULL, 0);
+            for (size_t d = 0; d < b.varies.n; d++) add_default(&out->varies, &b.varies.v[d], NULL, 0);
+            if (!resolve_ariths(c, &b, pat, &out->ariths, in->decls.v[0]->loc, in->name)) b.ok = false;
+        }
+    } else if (b.ok) {
+        b.ok = false;
+    }
+    free_recs(&b.defs);
+    free_recs(&b.varies);
+    build_free(&b);
+    op_end(c, saved);
+    tri_arena_release(c->scratch, m);
+    if (b.ok && c->narith) {
+        TriFailure f;
+        TriNode *settled = settle_arith(c, out->pattern, &out->ariths, c->spec, &f);
+        if (!settled) {
+            diag(c, true, c->insts.v[i].decls.v[0]->loc, "%s: arithmetic at %s: %s gives %s", c->insts.v[i].name,
+                 f.path, f.left, f.right);
+            b.ok = false;
+        } else {
+            out->pattern = settled;
+        }
+    }
+    if (!report) {
+        while (c->diags.n > ndiag) free(c->diags.v[--c->diags.n].msg);
+        c->nerrors = nerr;
+    }
+    return b.ok;
+}
+
+static void variant_free(InstVariant *v)
+{
+    free_recs(&v->specvaries);
+    free_ariths(&v->ariths);
+    for (size_t k = 0; k < v->tags.n; k++) VEC_FREE(v->tags.v[k].path);
+    VEC_FREE(v->tags);
+    free_recs(&v->defaults);
+    free_recs(&v->varies);
+    for (size_t k = 0; k < v->varpaths.n; k++) VEC_FREE(v->varpaths.v[k]);
+    VEC_FREE(v->varpaths);
+}
+
+#define DEFAULT_MAX_VARIANTS 64
+
 bool inst_pattern(Content *c, uint32_t i)
 {
     InstInfo *in = &c->insts.v[i];
@@ -465,62 +1246,88 @@ bool inst_pattern(Content *c, uint32_t i)
         return false;
     }
     in->pstate = 1;
-    TriMark m = tri_arena_mark(c->scratch);
-    uint32_t saved = op_begin(c);
-    Build b = { 0 };
-    b.c = c; b.ok = true; b.contributor = CONTRIB_INSTANCE; b.record = true;
-    b.direct = true;
-    TriNode *r = NULL;
-    for (size_t k = 0; k < in->decls.n && b.ok; k++) {
-        Decl *d = c->insts.v[i].decls.v[k];
-        TriNode *x = build_raw(&b, d->value);
-        if (!x) break;
-        if (!r) { r = x; continue; }
-        reset_failure(c);
-        if (!unify1(c, r, x)) {
-            Decl *partner = NULL;
-            for (size_t j = 0; j < k && !partner; j++)
-                if (decl_pair_conflicts(c, c->insts.v[i].decls.v[j], d)) partner = c->insts.v[i].decls.v[j];
-            if (partner)
-                diag(c, true, d->loc, "%s: conflict at %s: %s vs %s, with the declaration at %s:%d",
-                     c->insts.v[i].name, c->fail.path, c->fail.left, c->fail.right,
-                     partner->loc.file, partner->loc.line);
-            else
-                diag(c, true, d->loc, "%s: conflict at %s: %s vs %s, with earlier declarations",
-                     c->insts.v[i].name, c->fail.path, c->fail.left, c->fail.right);
-            b.ok = false;
+    size_t nd = in->decls.n;
+    Expand e = { c, DEFAULT_MAX_VARIANTS, 0, false, false, false };
+    for (size_t k = 0; k < nd; k++) {
+        const char *lim = attr_args(in->decls.v[k]->attrs, in->decls.v[k]->nattrs, "variants");
+        if (lim) {
+            long n = strtol(lim, NULL, 10);
+            if (n < 1) diag(c, true, in->decls.v[k]->loc, "%s: @variants needs a positive count", in->name);
+            else e.cap = (size_t) n;
         }
+    }
+    /* each declaration's variants, then their product */
+    XVarVec *parts = calloc(nd ? nd : 1, sizeof(XVarVec));
+    for (size_t k = 0; k < nd && !e.overflow && !e.bad; k++) {
+        Decl *d = c->insts.v[i].decls.v[k];
+        const char *vary = attr_args(d->attrs, d->nattrs, "vary");
+        e.vary_used = false;
+        expand_x(&e, d->value, vary, d->loc, &parts[k]);
+        if (vary && !e.vary_used && !e.bad) {
+            diag(c, true, d->loc, "%s: @vary(%s) after a declaration weights its top-level alternatives, "
+                 "and this declaration has none (put it after the field)", c->insts.v[i].name, vary);
+            e.bad = true;
+        }
+    }
+    XVarVec all = { 0 };
+    if (!e.overflow && !e.bad) {
+        X **xs = malloc(sizeof(X *) * (nd ? nd : 1));
+        size_t *ix = calloc(nd ? nd : 1, sizeof(size_t));
+        for (;;) {
+            /* one combination: a pseudo-variant whose x is unused; xs are kept per combination */
+            XVar v = { NULL, 1, 0, 0 };
+            for (size_t k = 0; k < nd; k++) {
+                XVar *p = &parts[k].v[ix[k]];
+                v.weight = mul_sat(v.weight, p->weight);
+                v.hasdef |= p->hasdef;
+                v.tookdef |= p->tookdef;
+            }
+            /* the combination's expressions, as a list X holding one item per declaration */
+            X *combo = x_new(c, X_LIST, noloc);
+            combo->u.list.n = (int) nd;
+            combo->u.list.items = arena_alloc(c->load, sizeof(X *) * (nd ? nd : 1));
+            for (size_t k = 0; k < nd; k++) combo->u.list.items[k] = parts[k].v[ix[k]].x;
+            v.x = combo;
+            VEC_PUSH(all, v);
+            if (all.n > e.cap) { e.overflow = true; break; }
+            size_t k = 0;
+            while (k < nd && ++ix[k] == parts[k].n) ix[k++] = 0;
+            if (k == nd) break;
+        }
+        free(xs);
+        free(ix);
+    }
+    free_parts(parts, nd);
+    in = &c->insts.v[i];
+    if (e.overflow)
+        diag(c, true, in->decls.v[0]->loc, "%s expands to more than %zu variants; raise the limit with @variants(n)",
+             in->name, e.cap);
+    if (e.overflow || e.bad) {
+        VEC_FREE(all);
+        in->pstate = 3;
+        return false;
+    }
+    for (size_t k = 0; k < all.n; k++) {
+        InstVariant v = { 0 };
+        v.weight = all.v[k].weight;
+        v.hasdef = all.v[k].hasdef;
+        v.tookdef = all.v[k].tookdef;
+        if (build_variant(c, i, all.v[k].x->u.list.items, &v, false)) VEC_PUSH(c->insts.v[i].vars, v);
+        else variant_free(&v);
     }
     in = &c->insts.v[i];
-    if (b.ok && r) {
-        bool closed;
-        TriNode *out = copy_out(c, c->spec, r, &closed);
-        if (!closed) {
-            diag(c, true, in->decls.v[0]->loc, "%s: a field is not appropriate for its type", in->name);
-            b.ok = false;
-        } else {
-            in->pattern = out;
-            for (size_t t = 0; t < b.tags.n; t++) {
-                TriNode *tn = deref(c, b.tags.v[t].node);
-                TriNode *mapped = tn->cpy;   /* valid: copy_out just ran */
-                TagPath tp = { b.tags.v[t].name, { 0 } };
-                U32Vec cur = { 0 };
-                U64Map seen = { 0 };
-                find_tag_paths(c, out, mapped, &cur, &tp.path, &seen);
-                if (tp.path.n == 1 && tp.path.v[0] == TRI_BOTTOM) tp.path.n = 0;
-                VEC_FREE(cur);
-                u64map_free(&seen);
-                VEC_PUSH(in->tags, tp);
-            }
-            for (size_t d = 0; d < b.defs.n; d++) add_default(&in->defaults, &b.defs.v[d], NULL, 0);
-        }
+    if (!in->vars.n && all.n) {
+        InstVariant v = { 0 };
+        build_variant(c, i, all.v[0].x->u.list.items, &v, true);    /* diagnoses the first variant */
+        variant_free(&v);
     }
-    for (size_t d = 0; d < b.defs.n; d++) VEC_FREE(b.defs.v[d].path);
-    build_free(&b);
-    op_end(c, saved);
-    tri_arena_release(c->scratch, m);
-    in->pstate = b.ok && in->pattern ? 2 : 3;
-    return in->pstate == 2;
+    VEC_FREE(all);
+    in = &c->insts.v[i];
+    if (!in->vars.n) { in->pstate = 3; return false; }
+    in->pattern = in->vars.v[0].pattern;
+    for (size_t k = 1; k < in->vars.n; k++) in->pattern = fs_generalise(c, c->spec, in->pattern, in->vars.v[k].pattern);
+    in->pstate = 2;
+    return true;
 }
 
 /* --- specs: defaults and variation ---------------------------------------------------------- */
@@ -533,16 +1340,19 @@ static int cmp_path(const U32Vec *a, const U32Vec *b)
     return a->n < b->n ? -1 : a->n > b->n;
 }
 
-static void collect_defaults(Content *c, TriNode *n, U32Vec *path, DefVec *out, U64Map *seen)
+/* Gathers the default (or @vary) records of the types of every node, with
+ * their paths made absolute. */
+static void collect_recs(Content *c, TriNode *n, U32Vec *path, DefVec *out, uint32_t cg, bool vary)
 {
-    uint64_t k = (uint64_t) (uintptr_t) n;
-    if (u64map_get(seen, k, NULL)) return;
-    u64map_put(seen, k, 1);
+    if (n->cpygen == cg) return;          /* visited (a shared node) */
+    n->cpygen = cg;
     TypeInfo *ti = &c->types.v[n->type];
-    for (size_t i = 0; i < ti->defaults.n; i++) add_default(out, &ti->defaults.v[i], path->v, path->n);
+    DefVec *own = vary ? &ti->varies : &ti->defaults;
+    for (size_t i = 0; i < own->n; i++) add_default(out, &own->v[i], path->v, path->n);
+    if (n->flags & NF_DIM) return;
     for (uint32_t i = 0; i < n->narcs; i++) {
         VEC_PUSH(*path, n->arcs[i].feat);
-        collect_defaults(c, n->arcs[i].val, path, out, seen);
+        collect_recs(c, n->arcs[i].val, path, out, cg, vary);
         path->n--;
     }
 }
@@ -563,8 +1373,9 @@ static TriNode *wrap_path(Content *c, const U32Vec *path, TriNode *value)
 }
 
 /* Unifies `root` with each default value at its path; returns the new root in
- * the load arena, or NULL if they do not all fit. */
-static TriNode *try_defaults(Content *c, TriNode *root, DefaultRec **ds, size_t n)
+ * `arena`, or NULL if they do not all fit. In the scratch arena, the result
+ * lives until the caller releases its own mark. */
+static TriNode *try_defaults(Content *c, TriNode *root, DefaultRec **ds, size_t n, TriArena *arena)
 {
     TriMark m = tri_arena_mark(c->scratch);
     uint32_t saved = op_begin(c);
@@ -582,14 +1393,16 @@ static TriNode *try_defaults(Content *c, TriNode *root, DefaultRec **ds, size_t 
     }
     if (ok) {
         bool closed;
-        r = copy_out(c, c->load, root, &closed);
+        r = copy_out(c, arena, root, &closed);
         if (!closed) r = NULL;
     }
     while (c->diags.n > ndiag) free(c->diags.v[--c->diags.n].msg);
     c->nerrors = nerr;
+    free_recs(&b.defs);
+    free_recs(&b.varies);
     build_free(&b);
     op_end(c, saved);
-    tri_arena_release(c->scratch, m);
+    if (arena != c->scratch) tri_arena_release(c->scratch, m);
     return r;
 }
 
@@ -607,49 +1420,23 @@ static bool more_specific(Content *c, uint32_t a, uint32_t b)
     return is_subtype(c, a, b);
 }
 
-static void note(InstInfo *in, Buf *b)
-{
-    VEC_PUSH(in->notes, b->s);
-    b->s = NULL;
-    b->len = b->cap = 0;
-}
+typedef struct {
+    InstInfo *in;            /* notes and warnings go here; NULL to stay quiet */
+    const char *prefix;      /* for notes, e.g. "variant 2: " */
+    TriFailure *fail;        /* if set, where no alternative fits */
+} Notes;
 
-static void collect_variation(Content *c, TriNode *n, U32Vec *path, InstInfo *in, U64Map *seen, bool *ok)
+static void note(Notes *ns, Buf *b)
 {
-    uint64_t k = (uint64_t) (uintptr_t) n;
-    if (u64map_get(seen, k, NULL)) return;
-    u64map_put(seen, k, 1);
-    TypeInfo *ti = &c->types.v[n->type];
-    bool vary = false;
-    if (ti->kind == TK_DIM) {
-        if (n->lo != n->hi) {
-            if (n->lo == TRI_NINF || n->hi == TRI_INF) {
-                Buf p = { 0 };
-                path_format(c, &p, path->v, path->n);
-                diag(c, true, in->decls.v[0]->loc, "%s: %s is not concrete and has no bounds to vary within",
-                     in->name, p.s);
-                buf_free(&p);
-                *ok = false;
-            } else {
-                vary = true;
-            }
-        }
-    } else if (is_subtype(c, n->type, c->atomroot) && ti->children.n > 0) {
-        vary = true;
+    if (ns->in) {
+        Buf full = { 0 };
+        buf_printf(&full, "%s%s", ns->prefix ? ns->prefix : "", b->s);
+        bool dup = false;
+        for (size_t k = 0; k < ns->in->notes.n && !dup; k++) dup = strcmp(ns->in->notes.v[k], full.s) == 0;
+        if (dup) buf_free(&full);
+        else VEC_PUSH(ns->in->notes, full.s);
     }
-    if (vary) {
-        U32Vec copy = { 0 };
-        for (size_t i = 0; i < path->n; i++) VEC_PUSH(copy, path->v[i]);
-        VEC_PUSH(in->varpaths, copy);
-        Buf p = { 0 };
-        path_format(c, &p, path->v, path->n);
-        VEC_PUSH(in->variation, p.s);
-    }
-    for (uint32_t i = 0; i < n->narcs; i++) {
-        VEC_PUSH(*path, n->arcs[i].feat);
-        collect_variation(c, n->arcs[i].val, path, in, seen, ok);
-        path->n--;
-    }
+    b->len = 0;
 }
 
 static int cmp_defptr(const void *a, const void *b)
@@ -658,21 +1445,16 @@ static int cmp_defptr(const void *a, const void *b)
     return cmp_path(&x->path, &y->path);
 }
 
-static bool inst_spec(Content *c, uint32_t i)
+/* YADU-style default resolution: per path, the most specific defaults first;
+ * one overridden by a more specific default stays overridden; conflicting
+ * defaults from incomparable types are both dropped. */
+static TriNode *resolve_defaults(Content *c, TriNode *root, const DefVec *instdefs, Notes *ns, TriArena *arena)
 {
-    InstInfo *in = &c->insts.v[i];
-    if (in->sstate) return in->sstate == 2;
-    in->sstate = 3;
-    if (!inst_pattern(c, i)) return false;
-    in = &c->insts.v[i];
-    TriNode *root = in->pattern;
-
     DefVec all = { 0 };
     U32Vec path = { 0 };
-    U64Map seen = { 0 };
-    collect_defaults(c, root, &path, &all, &seen);
-    u64map_free(&seen);
-    for (size_t k = 0; k < in->defaults.n; k++) add_default(&all, &in->defaults.v[k], NULL, 0);
+    collect_recs(c, root, &path, &all, ++c->cgenctr, false);
+    VEC_FREE(path);
+    for (size_t k = 0; k < instdefs->n; k++) add_default(&all, &instdefs->v[k], NULL, 0);
 
     DefaultRec **order = malloc(sizeof(DefaultRec *) * (all.n ? all.n : 1));
     for (size_t k = 0; k < all.n; k++) order[k] = &all.v[k];
@@ -682,9 +1464,10 @@ static bool inst_spec(Content *c, uint32_t i)
     size_t g0 = 0;
     while (g0 < all.n) {
         size_t g1 = g0;
-        while (g1 < all.n && path_eq(&order[g1]->path, &order[g0]->path)) g1++;
+        while (g1 < all.n && cmp_path(&order[g1]->path, &order[g0]->path) == 0) g1++;
         size_t gn = g1 - g0;
         bool *done = calloc(gn, 1);
+        VEC(DefaultRec *) dropped = { 0 };
         DefaultRec **ready = malloc(sizeof(DefaultRec *) * gn);
         size_t left = gn;
         Buf pth = { 0 };
@@ -702,71 +1485,331 @@ static bool inst_spec(Content *c, uint32_t i)
             for (size_t a = 0; a < gn; a++)
                 for (size_t q = 0; q < nr; q++)
                     if (order[g0 + a] == ready[q]) { done[a] = true; left--; }
-            TriNode *res = try_defaults(c, root, ready, nr);
+            /* A default overridden by a more specific one stays overridden even
+             * when that one was dropped in a tie. */
+            size_t kept = 0;
+            for (size_t q = 0; q < nr; q++) {
+                bool overridden = false;
+                for (size_t k = 0; k < dropped.n && !overridden; k++) {
+                    DefaultRec *pair[2] = { ready[q], dropped.v[k] };
+                    overridden = more_specific(c, dropped.v[k]->contributor, ready[q]->contributor) &&
+                                 !try_defaults(c, root, pair, 2, arena);
+                }
+                if (overridden) {
+                    buf_printf(&nb, "%s: default from %s is overridden by a more specific default",
+                               pth.s, contributor_name(c, ready[q]->contributor));
+                    note(ns, &nb);
+                } else {
+                    ready[kept++] = ready[q];
+                }
+            }
+            nr = kept;
+            if (!nr) continue;
+            TriNode *res = try_defaults(c, root, ready, nr, arena);
             if (res) {
                 root = res;
                 for (size_t q = 0; q < nr; q++) {
                     buf_printf(&nb, "%s <- %s (default)", pth.s, contributor_name(c, ready[q]->contributor));
-                    note(in, &nb);
+                    note(ns, &nb);
                 }
                 continue;
             }
             DefaultRec **compat = malloc(sizeof(DefaultRec *) * nr);
             size_t nc = 0;
             for (size_t q = 0; q < nr; q++) {
-                if (try_defaults(c, root, &ready[q], 1)) compat[nc++] = ready[q];
+                if (try_defaults(c, root, &ready[q], 1, arena)) compat[nc++] = ready[q];
                 else {
                     buf_printf(&nb, "%s: default from %s loses to a more specific value",
                                pth.s, contributor_name(c, ready[q]->contributor));
-                    note(in, &nb);
+                    note(ns, &nb);
                 }
             }
             if (nc == 1) {
-                root = try_defaults(c, root, compat, 1);
+                root = try_defaults(c, root, compat, 1, arena);
                 buf_printf(&nb, "%s <- %s (default)", pth.s, contributor_name(c, compat[0]->contributor));
-                note(in, &nb);
+                note(ns, &nb);
             } else if (nc > 1) {
                 Buf names = { 0 };
                 for (size_t q = 0; q < nc; q++) {
                     if (q) buf_puts(&names, ", ");
                     buf_puts(&names, contributor_name(c, compat[q]->contributor));
                 }
-                diag(c, false, in->decls.v[0]->loc, "%s: conflicting defaults for %s from %s; both dropped",
-                     in->name, pth.s, names.s);
+                if (ns->in) {
+                    diag(c, false, ns->in->decls.v[0]->loc, "%s: %sconflicting defaults for %s from %s; both dropped",
+                         ns->in->name, ns->prefix ? ns->prefix : "", pth.s, names.s);
+                    Buf lb = { 0 };
+                    buf_printf(&lb, "dropped defaults: %s: %s%s from %s", ns->in->name, ns->prefix ? ns->prefix : "",
+                               pth.s, names.s);
+                    VEC_PUSH(c->buildlog, lb.s);
+                }
+                for (size_t q = 0; q < nc; q++) VEC_PUSH(dropped, compat[q]);
                 buf_printf(&nb, "%s: conflicting defaults from %s dropped", pth.s, names.s);
-                note(in, &nb);
+                note(ns, &nb);
                 buf_free(&names);
             }
             free(compat);
         }
         buf_free(&pth);
+        VEC_FREE(dropped);
         free(done);
         free(ready);
         g0 = g1;
     }
+    buf_free(&nb);
     free(order);
-    for (size_t k = 0; k < all.n; k++) VEC_FREE(all.v[k].path);
-    VEC_FREE(all);
+    free_recs(&all);
+    return root;
+}
 
+/* Whether a node is a variation point: an enum or a disjunction left open, or
+ * a bounded range. Free text and referents stay open: they are bound at runtime. */
+static int variation_kind(Content *c, TriNode *n)
+{
+    TypeInfo *ti = &c->types.v[n->type];
+    if (ti->kind == TK_DIM) {
+        if (n->lo == n->hi || ti->dim == DIM_REF || ti->dim == DIM_TEXT) return 0;
+        return n->lo == TRI_NINF || n->hi == TRI_INF ? -1 : 1;
+    }
+    if (ti->isdisj) return 1;
+    if (!is_subtype(c, n->type, c->atomroot)) return 0;
+    for (size_t k = 0; k < ti->children.n; k++)
+        if (c->types.v[ti->children.v[k]].kind != TK_ALT) return 1;
+    return 0;
+}
+
+/* Records variation points in path order. Returns false (with a diagnostic
+ * when `in` is given) if a number is open without bounds. */
+static bool collect_variation(Content *c, TriNode *n, U32Vec *path, PathVec *out, InstInfo *in,
+                              const char *prefix, uint32_t cg)
+{
+    if (n->cpygen == cg) return true;     /* visited (a shared node) */
+    n->cpygen = cg;
     bool ok = true;
-    path.n = 0;
-    U64Map vseen = { 0 };
-    collect_variation(c, root, &path, in, &vseen, &ok);
-    u64map_free(&vseen);
+    int v = variation_kind(c, n);
+    if (v < 0) {
+        if (in) {
+            Buf p = { 0 };
+            path_format(c, &p, path->v, path->n);
+            diag(c, true, in->decls.v[0]->loc, "%s: %s%s is not concrete and has no bounds to vary within",
+                 in->name, prefix ? prefix : "", p.s);
+            buf_free(&p);
+        }
+        ok = false;
+    } else if (v > 0) {
+        U32Vec copy = { 0 };
+        for (size_t i = 0; i < path->n; i++) VEC_PUSH(copy, path->v[i]);
+        VEC_PUSH(*out, copy);
+    }
+    if (n->flags & NF_DIM) return ok;
+    for (uint32_t i = 0; i < n->narcs; i++) {
+        TriNode *v = n->arcs[i].val;
+        /* a derived number (@fn, or arithmetic) is computed, not drawn */
+        if ((v->flags & NF_DIM) && v->lo != v->hi &&
+            (field_attr(c, n->type, n->arcs[i].feat, "fn") || arith_target(c, n->type, n->arcs[i].feat)))
+            continue;
+        if ((v->flags & NF_DIM) && v->lo != v->hi && c->varskip) {
+            bool skip = false;
+            for (size_t q = 0; q < c->varskip->n && !skip; q++) {
+                const U32Vec *tp = &c->varskip->v[q].path;
+                skip = tp->n == path->n + 1 && tp->v[path->n] == n->arcs[i].feat &&
+                       (path->n == 0 || memcmp(tp->v, path->v, path->n * sizeof(uint32_t)) == 0);
+            }
+            if (skip) continue;
+        }
+        VEC_PUSH(*path, n->arcs[i].feat);
+        ok &= collect_variation(c, v, path, out, in, prefix, cg);
+        path->n--;
+    }
+    return ok;
+}
+
+static void alternatives_fitting(Content *c, TriNode *root, const U32Vec *path, uint32_t d, void *outv);
+
+/* Resolves open disjunctions that only one alternative fits. Returns the new
+ * root (in the load arena), or NULL if some disjunction has no fitting
+ * alternative. Sets *changed when it resolved any. */
+static TriNode *force_alternatives(Content *c, TriNode *root, Notes *ns, bool *changed, TriArena *arena)
+{
+    *changed = false;
+    TriMark m = tri_arena_mark(c->scratch);
+    PathVec points = { 0 };
+    U32Vec path = { 0 };
+    collect_variation(c, root, &path, &points, NULL, NULL, ++c->cgenctr);
     VEC_FREE(path);
+    VEC(TriNode *) vals = { 0 };
+    PathVec forced = { 0 };
+    bool ok = true;
+    Buf nb = { 0 };
+    for (size_t k = 0; k < points.n && ok; k++) {
+        TriNode *n = node_at(root, points.v[k].v, points.v[k].n);
+        if (!c->types.v[n->type].isdisj) continue;
+        VEC(TriNode *) fit = { 0 };
+        alternatives_fitting(c, root, &points.v[k], n->type, &fit);
+        path_format(c, &nb, points.v[k].v, points.v[k].n);
+        if (fit.n == 1) {
+            VEC_PUSH(vals, fit.v[0]);
+            VEC_PUSH(forced, points.v[k]);
+            buf_printf(&nb, " <- %s (the only alternative that fits)", c->types.v[fit.v[0]->type].name);
+            note(ns, &nb);
+        } else if (!fit.n) {
+            if (ns->in)
+                diag(c, true, ns->in->decls.v[0]->loc, "%s: %sno alternative of %s fits at %s", ns->in->name,
+                     ns->prefix ? ns->prefix : "", c->types.v[n->type].name, nb.s);
+            if (ns->fail) {
+                memset(ns->fail, 0, sizeof *ns->fail);
+                snprintf(ns->fail->path, sizeof ns->fail->path, "%s", nb.s);
+                snprintf(ns->fail->left, sizeof ns->fail->left, "no alternative of %s fits", c->types.v[n->type].name);
+            }
+            ok = false;
+        }
+        nb.len = 0;
+        VEC_FREE(fit);
+    }
+    buf_free(&nb);
+    if (ok && forced.n) {
+        uint32_t saved = op_begin(c);
+        reset_failure(c);
+        for (size_t k = 0; k < forced.n && ok; k++) ok = unify1(c, root, wrap_path(c, &forced.v[k], vals.v[k]));
+        if (ok) root = copy_out(c, arena, root, NULL);
+        op_end(c, saved);
+        *changed = ok;
+    }
+    for (size_t k = 0; k < points.n; k++) VEC_FREE(points.v[k]);
+    VEC_FREE(points);
+    VEC_FREE(forced);
+    VEC_FREE(vals);
+    tri_arena_release(c->scratch, m);
+    return ok ? root : NULL;
+}
+
+/* Resolves, in a runtime structure, every open disjunction that only one
+ * alternative fits; NULL (with the failure) if one has none. Content without
+ * disjunctions of structures costs nothing. */
+TriNode *settle_alternatives(Content *c, TriNode *root, TriArena *arena, TriFailure *fail)
+{
+    if (!c->disjs.n || !root) return root;
+    TriFailure local;
+    Notes ns = { NULL, NULL, fail ? fail : &local };
+    for (int round = 0; round < 64 && root; round++) {
+        bool changed;
+        root = force_alternatives(c, root, &ns, &changed, arena);
+        if (!changed) break;
+    }
+    return root;
+}
+
+TriNode *settle(Content *c, TriNode *root, const ArithVec *extra, TriArena *arena, TriFailure *fail)
+{
+    if (!root || (!c->disjs.n && !c->narith)) return root;
+    for (int round = 0; round < 8 && root; round++) {
+        TriNode *before = root;
+        root = settle_alternatives(c, root, arena, fail);
+        if (root) root = settle_arith(c, root, extra, arena, fail);
+        if (root == before) break;
+    }
+    return root;
+}
+
+bool inst_spec(Content *c, uint32_t i)
+{
+    InstInfo *in = &c->insts.v[i];
+    if (in->sstate) return in->sstate == 2;
+    in->sstate = 3;
+    if (!inst_pattern(c, i)) return false;
+    in = &c->insts.v[i];
+    size_t nv = in->vars.n;
+    bool multi = nv > 1;
+    TriNode **roots = calloc(nv, sizeof(TriNode *));
+    for (size_t k = 0; k < nv; k++) {
+        char prefix[32];
+        snprintf(prefix, sizeof prefix, "variant %zu: ", k + 1);
+        Notes ns = { &c->insts.v[i], multi ? prefix : NULL, NULL };
+        InstVariant *v = &c->insts.v[i].vars.v[k];
+        TriNode *r = resolve_defaults(c, v->pattern, &v->defaults, &ns, c->load);
+        for (int round = 0; r && round < 64; round++) {
+            TriFailure af;
+            TriNode *before = r;
+            r = settle_arith(c, r, &c->insts.v[i].vars.v[k].ariths, c->load, &af);
+            if (!r) {
+                diag(c, true, c->insts.v[i].decls.v[0]->loc, "%s: %sarithmetic at %s: %s gives %s", c->insts.v[i].name,
+                     multi ? prefix : "", af.path, af.left, af.right);
+                break;
+            }
+            bool changed;
+            r = force_alternatives(c, r, &ns, &changed, c->load);
+            if (!r || (!changed && r == before)) break;
+            r = resolve_defaults(c, r, &c->insts.v[i].vars.v[k].defaults, &ns, c->load);
+        }
+        roots[k] = r;
+    }
+    in = &c->insts.v[i];
+    /* defaults among structural alternatives choose variants */
+    bool *alive = malloc(nv);
+    for (size_t k = 0; k < nv; k++) alive[k] = true;
+    for (int d = 0; d < 64; d++) {
+        uint64_t bit = 1ull << d;
+        bool took = false;
+        for (size_t k = 0; k < nv; k++)
+            if (alive[k] && (in->vars.v[k].hasdef & bit) && (in->vars.v[k].tookdef & bit)) took = true;
+        if (!took) continue;
+        for (size_t k = 0; k < nv; k++)
+            if ((in->vars.v[k].hasdef & bit) && !(in->vars.v[k].tookdef & bit)) alive[k] = false;
+    }
+    bool ok = true;
+    for (size_t k = 0; k < nv; k++) if (!roots[k]) ok = false;
+    size_t nalive = 0;
+    for (size_t k = 0; k < nv; k++) nalive += alive[k];
+    if (nalive < nv) {
+        Buf nb = { 0 };
+        buf_puts(&nb, "(variant): defaults among alternatives keep variant");
+        for (size_t k = 0, first = 1; k < nv; k++)
+            if (alive[k]) { buf_printf(&nb, "%s %zu", first ? "" : ",", k + 1); first = 0; }
+        VEC_PUSH(c->insts.v[i].notes, nb.s);
+    }
+    TriNode *gen = NULL;
+    for (size_t k = 0; k < nv && ok; k++) {
+        if (!alive[k]) continue;
+        InstVariant *v = &c->insts.v[i].vars.v[k];
+        char prefix[32];
+        snprintf(prefix, sizeof prefix, "variant %zu: ", k + 1);
+        U32Vec path = { 0 };
+        c->varskip = &v->ariths;
+        ok &= collect_variation(c, roots[k], &path, &v->varpaths, &c->insts.v[i], multi ? prefix : NULL, ++c->cgenctr);
+        c->varskip = NULL;
+        VEC_FREE(path);
+        /* freeze into the spec arena */
+        TriMark fm = tri_arena_mark(c->scratch);
+        uint32_t saved = op_begin(c);
+        v->spec = copy_out(c, c->spec, roots[k], NULL);
+        op_end(c, saved);
+        tri_arena_release(c->scratch, fm);
+        VEC_PUSH(c->insts.v[i].specvars, (uint32_t) k);
+        gen = gen ? fs_generalise(c, c->spec, gen, v->spec) : v->spec;
+    }
+    free(alive);
+    free(roots);
+    in = &c->insts.v[i];
+    /* variation: which variant, then each point, in order of first appearance */
+    Buf nb = { 0 };
+    if (in->specvars.n > 1) VEC_PUSH(in->variation, strdup("(variant)"));
+    for (size_t s = 0; s < in->specvars.n; s++) {
+        InstVariant *v = &in->vars.v[in->specvars.v[s]];
+        for (size_t k = 0; k < v->varpaths.n; k++) {
+            path_format(c, &nb, v->varpaths.v[k].v, v->varpaths.v[k].n);
+            bool dup = false;
+            for (size_t q = 0; q < in->variation.n && !dup; q++) dup = strcmp(in->variation.v[q], nb.s) == 0;
+            if (!dup) VEC_PUSH(in->variation, strdup(nb.s));
+            nb.len = 0;
+        }
+    }
     for (size_t k = 0; k < in->variation.n; k++) {
         buf_printf(&nb, "%s <- seed", in->variation.v[k]);
-        note(in, &nb);
+        VEC_PUSH(in->notes, strdup(nb.s));
+        nb.len = 0;
     }
     buf_free(&nb);
     if (!ok) return false;
-
-    /* freeze into the spec arena */
-    TriMark fm = tri_arena_mark(c->scratch);
-    uint32_t saved = op_begin(c);
-    in->spec = copy_out(c, c->spec, root, NULL);
-    op_end(c, saved);
-    tri_arena_release(c->scratch, fm);
+    in->spec = gen;
     in->sstate = 2;
     return true;
 }
@@ -790,11 +1833,228 @@ static uint64_t draw(uint64_t *s, uint64_t n)
     return r % n;
 }
 
+/* An index drawn with probability proportional to its weight; uniform if all
+ * weights are zero. */
+static size_t draw_weighted(uint64_t *s, const uint64_t *w, size_t n)
+{
+    uint64_t total = 0;
+    for (size_t i = 0; i < n; i++) total = total + w[i] < total ? UINT64_MAX : total + w[i];
+    if (!total) return (size_t) draw(s, n);
+    uint64_t r = draw(s, total);
+    for (size_t i = 0; i < n; i++) {
+        if (r < w[i]) return i;
+        r -= w[i];
+    }
+    return n - 1;
+}
+
 static uint32_t inst_index(Content *c, const char *name)
 {
     uint64_t v;
     if (u64map_get(&c->instidx, (uint64_t) (uintptr_t) intern(c, name), &v)) return (uint32_t) v - 1;
     return TRI_BOTTOM;
+}
+
+/* The maximal subtypes of t that are not alternatives: an enum's leaves. */
+static const U32Vec *enum_leaves(Content *c, uint32_t t)
+{
+    if (!c->leafcache) c->leafcache = calloc(c->types.n, sizeof(U32Vec *));
+    if (c->leafcache[t]) return c->leafcache[t];
+    U32Vec *v = calloc(1, sizeof *v);
+    U32Vec stack = { 0 };
+    U64Map seen = { 0 };
+    VEC_PUSH(stack, t);
+    while (stack.n) {
+        uint32_t u = stack.v[--stack.n];
+        TypeInfo *ui = &c->types.v[u];
+        size_t kids = 0;
+        for (size_t k = 0; k < ui->children.n; k++) {
+            uint32_t ch = ui->children.v[k];
+            if (c->types.v[ch].kind == TK_ALT) continue;
+            kids++;
+            if (!u64map_get(&seen, ch, NULL)) { u64map_put(&seen, ch, 1); VEC_PUSH(stack, ch); }
+        }
+        if (!kids) VEC_PUSH(*v, u);
+    }
+    /* ascending IDs, so the draw does not depend on traversal order */
+    for (size_t a = 1; a < v->n; a++)
+        for (size_t b = a; b > 0 && v->v[b - 1] > v->v[b]; b--) { uint32_t x = v->v[b]; v->v[b] = v->v[b - 1]; v->v[b - 1] = x; }
+    VEC_FREE(stack);
+    u64map_free(&seen);
+    c->leafcache[t] = v;
+    return v;
+}
+
+/* Whether unifying `value` into `root` at `path` would succeed. */
+static bool fits(Content *c, TriNode *root, const U32Vec *path, TriNode *value)
+{
+    uint32_t saved = op_begin(c);
+    reset_failure(c);
+    bool ok = unify1(c, root, wrap_path(c, path, value));
+    op_end(c, saved);
+    return ok;
+}
+
+/* The alternatives of disjunction type d that fit at `path`, each as a fresh
+ * copy of its expansion in scratch. */
+static void alternatives_fitting(Content *c, TriNode *root, const U32Vec *path, uint32_t d, void *outv)
+{
+    VEC(TriNode *) *out = outv;
+    TypeInfo *ti = &c->types.v[d];
+    for (size_t k = 0; k < ti->children.n; k++) {
+        uint32_t ch = ti->children.v[k];
+        if (c->types.v[ch].kind != TK_ALT || c->types.v[ch].parents.v[0] != d) continue;
+        TriNode *e = type_expansion(c, ch);
+        if (!e) continue;
+        TriNode *alt = copy_raw(c, c->scratch, e);
+        if (fits(c, root, path, alt)) VEC_PUSH(*out, alt);
+    }
+}
+
+/* A value for one variation point: from the most specific @vary record at
+ * the path if there is one, otherwise uniform. Allocated in scratch. */
+static TriNode *draw_point(Content *c, TriNode *root, const U32Vec *path, const DefVec *varies, uint64_t *state,
+                           bool *structural)
+{
+    TriNode *n = node_at(root, path->v, path->n);
+    const DefaultRec *rec = NULL;
+    for (size_t k = 0; k < varies->n; k++)
+        if (cmp_path(&varies->v[k].path, path) == 0 &&
+            (!rec || more_specific(c, varies->v[k].contributor, rec->contributor)))
+            rec = &varies->v[k];
+    if (rec) {
+        XPtrVec ds = { 0 };
+        x_flatten(rec->value, X_OR, &ds);
+        uint64_t *w = malloc(sizeof(uint64_t) * ds.n);
+        TriNode **cand = calloc(ds.n, sizeof(TriNode *));
+        uint64_t di = 0;
+        DisjInfo *d = u64map_get(&c->disjidx, (uint64_t) (uintptr_t) rec->value, &di) ? &c->disjs.v[di - 1] : NULL;
+        if (!parse_weights(rec->vary, w, ds.n)) for (size_t k = 0; k < ds.n; k++) w[k] = 1;
+        Build b = { 0 };
+        b.c = c; b.ok = true;
+        for (size_t k = 0; k < ds.n; k++) {
+            if (!w[k]) continue;
+            X *a = ds.v[k]->k == X_DEFAULT ? ds.v[k]->u.sub : ds.v[k];
+            if (d && !d->collapse) a = x_name(c, d->alts.v[k], a->loc);
+            b.ok = true;
+            cand[k] = build_raw(&b, a);
+            if (!cand[k] || !fits(c, root, path, cand[k])) { cand[k] = NULL; w[k] = 0; }
+        }
+        build_free(&b);
+        bool any = false;
+        for (size_t k = 0; k < ds.n; k++) any |= cand[k] != NULL;
+        TriNode *r = NULL;
+        if (any) {
+            size_t k = draw_weighted(state, w, ds.n);
+            while (!cand[k]) k = (k + 1) % ds.n;      /* all weights zero: uniform over the fitting */
+            r = cand[k];
+            *structural |= d != NULL && !d->collapse;
+        }
+        free(w);
+        free(cand);
+        VEC_FREE(ds);
+        if (r) return r;
+    }
+    TypeInfo *ti = &c->types.v[n->type];
+    if (ti->kind == TK_DIM) {
+        uint64_t span = (uint64_t) (n->hi - n->lo) + 1;
+        int64_t q = n->lo + (int64_t) (span ? draw(state, span) : splitmix(state));
+        return leaf_new(c, c->scratch, n->type, q, q);
+    }
+    if (ti->isdisj) {
+        VEC(TriNode *) fit = { 0 };
+        alternatives_fitting(c, root, path, n->type, &fit);
+        TriNode *r = fit.n ? fit.v[draw(state, fit.n)] : NULL;
+        VEC_FREE(fit);
+        *structural = true;
+        return r;
+    }
+    const U32Vec *leaves = enum_leaves(c, n->type);
+    return node_new(c, c->scratch, leaves->v[draw(state, leaves->n)]);
+}
+
+/* --- derived fields --------------------------------------------------------------------------- */
+
+void tri_register_fn(TriContent *c, const char *name, TriFn fn, void *ctx)
+{
+    Sym s = intern(c, name);
+    for (size_t i = 0; i < c->fns.n; i++)
+        if (c->fns.v[i].name == s) { c->fns.v[i].fn = fn; c->fns.v[i].ctx = ctx; return; }
+    FnReg r = { s, fn, ctx };
+    VEC_PUSH(c->fns, r);
+}
+
+typedef struct { U32Vec path; int64_t lo, hi; uint32_t dimtype; } Derived;
+
+static void derive_walk(Content *c, TriNode *n, U32Vec *path, U64Map *seen, void *outv)
+{
+    VEC(Derived) *out = outv;
+    uint64_t k = (uint64_t) (uintptr_t) n;
+    if (u64map_get(seen, k, NULL) || (n->flags & NF_DIM)) return;
+    u64map_put(seen, k, 1);
+    for (uint32_t i = 0; i < n->narcs; i++) {
+        uint32_t f = n->arcs[i].feat;
+        TriNode *v = n->arcs[i].val;
+        const char *fn = (v->flags & NF_DIM) ? field_attr(c, n->type, f, "fn") : NULL;
+        if (fn) {
+            char *name = strdup(fn);
+            char *s = name;
+            while (*s == ' ') s++;
+            size_t len = strlen(s);
+            while (len && s[len - 1] == ' ') s[--len] = 0;
+            Sym sym = intern(c, s);
+            free(name);
+            for (size_t q = 0; q < c->fns.n; q++) {
+                if (c->fns.v[q].name != sym) continue;
+                Derived d = { { 0 }, TRI_NINF, TRI_INF, v->type };
+                if (c->fns.v[q].fn(c->fns.v[q].ctx, c, n, &d.lo, &d.hi)) {
+                    for (size_t z = 0; z < path->n; z++) VEC_PUSH(d.path, path->v[z]);
+                    VEC_PUSH(d.path, f);
+                    VEC_PUSH(*out, d);
+                }
+                break;
+            }
+        }
+        VEC_PUSH(*path, f);
+        derive_walk(c, v, path, seen, out);
+        path->n--;
+    }
+}
+
+/* Unifies the values of registered @fn fields into `root`; the result goes to
+ * `out` (or is root itself when there is nothing to derive). */
+static TriNode *derive(Content *c, TriNode *root, TriArena *out, bool *ok)
+{
+    *ok = true;
+    if (!c->fns.n) return root;
+    VEC(Derived) ds = { 0 };
+    U32Vec path = { 0 };
+    U64Map seen = { 0 };
+    derive_walk(c, root, &path, &seen, &ds);
+    u64map_free(&seen);
+    VEC_FREE(path);
+    if (!ds.n) { VEC_FREE(ds); return root; }
+    TriMark m = tri_arena_mark(c->scratch);
+    uint32_t saved = op_begin(c);
+    reset_failure(c);
+    for (size_t k = 0; k < ds.n && *ok; k++) {
+        TriNode *v = leaf_new(c, c->scratch, ds.v[k].dimtype, ds.v[k].lo, ds.v[k].hi);
+        *ok = unify1(c, root, wrap_path(c, &ds.v[k].path, v));
+    }
+    TriNode *r = *ok ? copy_out(c, out, root, NULL) : NULL;
+    op_end(c, saved);
+    if (out != c->scratch) tri_arena_release(c->scratch, m);
+    for (size_t k = 0; k < ds.n; k++) VEC_FREE(ds.v[k].path);
+    VEC_FREE(ds);
+    return r;
+}
+
+const TriNode *tri_derive(TriContent *c, const TriNode *node, TriArena *out, TriFailure *failure)
+{
+    bool ok;
+    TriNode *r = derive(c, (TriNode *) node, out, &ok);
+    if (!ok && failure) *failure = *fail_info(c);
+    return r;
 }
 
 const TriNode *tri_construct(TriContent *c, const char *instance, uint64_t seed, TriArena *out)
@@ -803,29 +2063,82 @@ const TriNode *tri_construct(TriContent *c, const char *instance, uint64_t seed,
     if (i == TRI_BOTTOM || !inst_spec(c, i)) return NULL;
     InstInfo *in = &c->insts.v[i];
     uint64_t state = seed;
-    TriMark m = tri_arena_mark(c->scratch);
-    uint32_t saved = op_begin(c);
-    reset_failure(c);
-    bool ok = true;
-    for (size_t k = 0; k < in->varpaths.n && ok; k++) {
-        U32Vec *p = &in->varpaths.v[k];
-        TriNode *n = node_at(in->spec, p->v, p->n);
-        TriNode *v;
-        if (is_dim(c, n->type)) {
-            uint64_t span = (uint64_t) (n->hi - n->lo) + 1;
-            int64_t q = n->lo + (int64_t) draw(&state, span);
-            v = leaf_new(c, c->scratch, n->type, q, q);
-        } else {
-            U32Vec leaves = { 0 };
-            for (uint32_t t = 0; t < c->types.n; t++)
-                if (is_subtype(c, t, n->type) && c->types.v[t].children.n == 0) VEC_PUSH(leaves, t);
-            v = node_new(c, c->scratch, leaves.v[draw(&state, leaves.n)]);
-            VEC_FREE(leaves);
-        }
-        ok = unify1(c, in->spec, wrap_path(c, p, v));
+    InstVariant *v = &in->vars.v[in->specvars.v[0]];
+    if (in->specvars.n > 1) {
+        uint64_t *w = malloc(sizeof(uint64_t) * in->specvars.n);
+        for (size_t k = 0; k < in->specvars.n; k++) w[k] = in->vars.v[in->specvars.v[k]].weight;
+        v = &in->vars.v[in->specvars.v[draw_weighted(&state, w, in->specvars.n)]];
+        free(w);
     }
-    TriNode *r = ok ? copy_out(c, out, in->spec, NULL) : NULL;
-    op_end(c, saved);
+    TriMark m = tri_arena_mark(c->scratch);
+    TriNode *root = v->spec;
+    bool ok = true;
+    /* Each round makes the open points concrete. Choosing an alternative can
+     * expose new points and new defaults, so rounds repeat until none are left. */
+    /* The first round works on the spec itself: its points and @vary records
+     * are the same every time, so they are kept with the variant. */
+    if (!v->vcached) {
+        U32Vec path = { 0 };
+        collect_recs(c, v->spec, &path, &v->specvaries, ++c->cgenctr, true);
+        VEC_FREE(path);
+        for (size_t k = 0; k < v->varies.n; k++) add_default(&v->specvaries, &v->varies.v[k], NULL, 0);
+        v->vcached = true;
+    }
+    for (int round = 0; round < 64 && ok; round++) {
+        PathVec fresh = { 0 };
+        const PathVec *pts = &v->varpaths;
+        if (round) {
+            U32Vec path = { 0 };
+            c->varskip = &v->ariths;
+            collect_variation(c, root, &path, &fresh, NULL, NULL, ++c->cgenctr);
+            c->varskip = NULL;
+            VEC_FREE(path);
+            pts = &fresh;
+        }
+        if (!pts->n) { VEC_FREE(fresh); break; }
+        PathVec points = *pts;
+        DefVec varies = { 0 };
+        const DefVec *vp = &v->specvaries;
+        if (round) {
+            U32Vec path = { 0 };
+            collect_recs(c, root, &path, &varies, ++c->cgenctr, true);
+            VEC_FREE(path);
+            for (size_t k = 0; k < v->varies.n; k++) add_default(&varies, &v->varies.v[k], NULL, 0);
+            vp = &varies;
+        }
+        bool structural = false;
+        TriNode *small[16];
+        TriNode **vals = points.n <= 16 ? small : malloc(sizeof(TriNode *) * points.n);
+        for (size_t k = 0; k < points.n && ok; k++) {
+            vals[k] = draw_point(c, root, &points.v[k], vp, &state, &structural);
+            ok = vals[k] != NULL;
+        }
+        uint32_t saved = op_begin(c);
+        reset_failure(c);
+        for (size_t k = 0; k < points.n && ok; k++) ok = unify1(c, root, wrap_path(c, &points.v[k], vals[k]));
+        if (ok) root = copy_out(c, c->scratch, root, NULL);
+        op_end(c, saved);
+        if (ok && c->narith) {
+            TriFailure af;
+            root = settle_arith(c, root, &v->ariths, c->scratch, &af);
+            ok = root != NULL;
+        }
+        if (vals != small) free(vals);
+        free_recs(&varies);
+        for (size_t k = 0; k < fresh.n; k++) VEC_FREE(fresh.v[k]);
+        VEC_FREE(fresh);
+        if (ok && structural) {
+            Notes quiet = { NULL, NULL, NULL };
+            root = resolve_defaults(c, root, &v->defaults, &quiet, c->scratch);
+        }
+    }
+    if (ok) root = derive(c, root, c->scratch, &ok);
+    TriNode *r = NULL;
+    if (ok) {
+        uint32_t saved = op_begin(c);
+        r = copy_out(c, out, root, NULL);
+        op_end(c, saved);
+    }
     tri_arena_release(c->scratch, m);
     return r;
 }
@@ -836,6 +2149,19 @@ const TriNode *tri_pattern(TriContent *c, const char *instance)
 {
     uint32_t i = inst_index(c, instance);
     return i != TRI_BOTTOM && inst_pattern(c, i) ? c->insts.v[i].pattern : NULL;
+}
+
+size_t tri_pattern_variant_count(TriContent *c, const char *instance)
+{
+    uint32_t i = inst_index(c, instance);
+    return i != TRI_BOTTOM && inst_pattern(c, i) ? c->insts.v[i].vars.n : 0;
+}
+
+const TriNode *tri_pattern_variant(TriContent *c, const char *instance, size_t k)
+{
+    uint32_t i = inst_index(c, instance);
+    if (i == TRI_BOTTOM || !inst_pattern(c, i) || k >= c->insts.v[i].vars.n) return NULL;
+    return c->insts.v[i].vars.v[k].pattern;
 }
 
 const TriNode *tri_spec(TriContent *c, const char *instance)
@@ -872,20 +2198,255 @@ const char *tri_spec_note(TriContent *c, const char *instance, size_t k)
     return c->insts.v[i].notes.v[k];
 }
 
+static void count_nodes(TriNode *n, U64Map *count);
+static size_t buf_out(Buf *b, char *buf, size_t len);
+
+/* --- the inspector ------------------------------------------------------------------------------ */
+
+static bool same_value(Content *c, TriNode *a, TriNode *b)
+{
+    if (a->type != b->type) return false;
+    if (a->flags & NF_DIM) return a->lo == b->lo && a->hi == b->hi;
+    return true;
+}
+
+static bool x_sets_path(Content *c, X *x, const uint32_t *path, size_t n)
+{
+    Loc loc;
+    if (x->k == X_OR) return x_sets_path(c, x->u.bin.a, path, n) || x_sets_path(c, x->u.bin.b, path, n);
+    if (x->k == X_AND) return x_sets_path(c, x->u.bin.a, path, n) || x_sets_path(c, x->u.bin.b, path, n);
+    if (x->k == X_STRUCT && n) {
+        for (int i = 0; i < x->u.st.n; i++) {
+            XField *f = &x->u.st.fields[i];
+            if (f->label != c->feats.v[path[0]].name) continue;
+            if (n == 1 || x_sets_path(c, f->value, path + 1, n - 1)) return true;
+        }
+        return false;
+    }
+    return find_field_loc(c, x, path, n, &loc);
+}
+
+/* Where a value in a spec came from. */
+static void origin(Content *c, InstInfo *in, TriNode *root, const U32Vec *path, TriNode *v, Buf *b)
+{
+    Buf p = { 0 };
+    path_format(c, &p, path->v, path->n);
+    size_t plen = p.len;
+    for (size_t k = 0; k < in->variation.n; k++)
+        if (strcmp(in->variation.v[k], p.s) == 0) { buf_puts(b, "seed"); buf_free(&p); return; }
+    for (size_t k = 0; k < in->notes.n; k++) {
+        const char *n = in->notes.v[k];
+        if (!strncmp(n, "variant ", 8)) { const char *q = strstr(n, ": "); if (q) n = q + 2; }
+        if (strncmp(n, p.s, plen) || strncmp(n + plen, " <- ", 4)) continue;
+        const char *what = n + plen + 4;
+        const char *dflt = strstr(what, " (default)");
+        if (dflt) buf_printf(b, "default from %.*s", (int) (dflt - what), what);
+        else if (strstr(what, "(the only alternative that fits)")) buf_puts(b, "the only alternative that fits");
+        else continue;
+        buf_free(&p);
+        return;
+    }
+    buf_free(&p);
+    for (size_t k = 0; k < in->decls.n; k++)
+        if (x_sets_path(c, in->decls.v[k]->value, path->v, path->n)) { buf_puts(b, "the instance"); return; }
+    /* the most general type in the root's ancestry whose constraint gives this value */
+    U32Vec queue = { 0 }, found = { 0 };
+    U64Map seen = { 0 };
+    VEC_PUSH(queue, root->type);
+    u64map_put(&seen, root->type, 1);
+    for (size_t i = 0; i < queue.n; i++) {
+        uint32_t t = queue.v[i];
+        TriNode *e = type_expansion(c, t);
+        TriNode *ev = e ? node_at(e, path->v, path->n) : NULL;
+        if (ev && same_value(c, ev, v)) VEC_PUSH(found, t);
+        for (size_t k = 0; k < c->types.v[t].parents.n; k++) {
+            uint32_t pt = c->types.v[t].parents.v[k];
+            if (!u64map_get(&seen, pt, NULL)) { u64map_put(&seen, pt, 1); VEC_PUSH(queue, pt); }
+        }
+    }
+    uint32_t best = TRI_BOTTOM;
+    for (size_t i = 0; i < found.n && best == TRI_BOTTOM; i++) {
+        bool general = true;
+        for (size_t j = 0; j < found.n && general; j++)
+            if (found.v[j] != found.v[i] && is_subtype(c, found.v[i], found.v[j])) general = false;
+        if (general) best = found.v[i];
+    }
+    if (best != TRI_BOTTOM) buf_printf(b, "%s", c->types.v[best].name);
+    else buf_puts(b, "combined");
+    VEC_FREE(queue);
+    VEC_FREE(found);
+    u64map_free(&seen);
+}
+
+static void inspect_rec(Content *c, InstInfo *in, TriNode *root, TriNode *n, U32Vec *path, int depth,
+                        U64Map *count, U64Map *tags, int *ntags, Buf *b)
+{
+    uint64_t k = (uint64_t) (uintptr_t) n, v = 0, tag;
+    u64map_get(count, k, &v);
+    if (v > 1 && u64map_get(tags, k, &tag)) { buf_printf(b, "$%llu\n", (unsigned long long) tag); return; }
+    if (v > 1) {
+        u64map_put(tags, k, (uint64_t) ++*ntags);
+        buf_printf(b, "$%d & ", *ntags);
+    }
+    if ((n->flags & NF_DIM) || !n->narcs) {
+        Buf val = { 0 };
+        fs_print(c, &val, n);
+        buf_puts(b, val.s);
+        buf_free(&val);
+        if (depth) {
+            buf_puts(b, "  <- ");
+            origin(c, in, root, path, n, b);
+        }
+        buf_putc(b, '\n');
+        return;
+    }
+    buf_printf(b, "%s\n", c->types.v[n->type].name);
+    for (uint32_t i = 0; i < n->narcs; i++) {
+        for (int d = 0; d <= depth; d++) buf_puts(b, "  ");
+        buf_printf(b, "%s: ", c->feats.v[n->arcs[i].feat].name);
+        VEC_PUSH(*path, n->arcs[i].feat);
+        inspect_rec(c, in, root, n->arcs[i].val, path, depth + 1, count, tags, ntags, b);
+        path->n--;
+    }
+}
+
+size_t tri_inspect(TriContent *c, const char *instance, char *buf, size_t len)
+{
+    Buf b = { 0 };
+    uint32_t i = inst_index(c, instance);
+    if (i == TRI_BOTTOM || !inst_spec(c, i)) {
+        buf_printf(&b, "%s has no spec\n", instance);
+    } else {
+        InstInfo *in = &c->insts.v[i];
+        U64Map count = { 0 }, tags = { 0 };
+        int ntags = 0;
+        U32Vec path = { 0 };
+        count_nodes(in->spec, &count);
+        buf_printf(&b, "%s: ", in->name);
+        if (in->specvars.n > 1) buf_printf(&b, "(%zu variants, generalised) ", in->specvars.n);
+        inspect_rec(c, in, in->spec, in->spec, &path, 0, &count, &tags, &ntags, &b);
+        VEC_FREE(path);
+        u64map_free(&count);
+        u64map_free(&tags);
+    }
+    return buf_out(&b, buf, len);
+}
+
+/* Matching against an instance with variants: entailed if some variant is,
+ * incompatible if every variant is, otherwise unknown. Returns the variant
+ * that decided (or the first unknown one) in *which. */
+static TriMatch match_variants(Content *c, InstInfo *in, const TriNode *d, TriMatchResult *r, size_t *which)
+{
+    TriMatchResult tmp, first_incompatible;
+    bool have_unknown = false;
+    *which = 0;
+    memset(r, 0, sizeof *r);
+    for (size_t k = 0; k < in->vars.n; k++) {
+        TriMatch m = tri_match(c, in->vars.v[k].pattern, d, &tmp);
+        if (m == TRI_ENTAILED) { *r = tmp; *which = k; return m; }
+        if (m == TRI_UNKNOWN) {
+            if (!have_unknown) { *r = tmp; *which = k; have_unknown = true; }
+            else
+                for (size_t q = 0; q < tmp.nresidual && r->nresidual < TRI_MAX_RESIDUAL; q++) {
+                    bool dup = false;
+                    for (size_t s = 0; s < r->nresidual && !dup; s++) dup = strcmp(r->residual[s], tmp.residual[q]) == 0;
+                    if (!dup) memcpy(r->residual[r->nresidual++], tmp.residual[q], sizeof tmp.residual[q]);
+                }
+        } else if (k == 0 || !have_unknown) {
+            if (k == 0) first_incompatible = tmp;
+        }
+    }
+    if (have_unknown) return TRI_UNKNOWN;
+    *r = first_incompatible;
+    return TRI_INCOMPATIBLE;
+}
+
+TriMatch tri_match_instance(TriContent *c, const char *instance, const TriNode *description,
+                            TriMatchResult *result)
+{
+    TriMatchResult local;
+    TriMatchResult *r = result ? result : &local;
+    uint32_t i = inst_index(c, instance);
+    if (i == TRI_BOTTOM || !inst_pattern(c, i)) {
+        memset(r, 0, sizeof *r);
+        r->result = TRI_INCOMPATIBLE;
+        snprintf(r->failure.left, sizeof r->failure.left, "no instance %s", instance);
+        return r->result;
+    }
+    size_t which;
+    r->result = match_variants(c, &c->insts.v[i], description, r, &which);
+    return r->result;
+}
+
+static TriNode *arc_lazy(Content *c, TriNode *n, uint32_t f);
+static bool below(Content *c, TriNode *x, TriNode *y);
+
+static void tag_positions(TriNode *n, TriNode *target, U32Vec *path, PathVec *out, int depth)
+{
+    if (depth > 64) return;
+    if (n == target) {
+        U32Vec copy = { 0 };
+        for (size_t i = 0; i < path->n; i++) VEC_PUSH(copy, path->v[i]);
+        VEC_PUSH(*out, copy);
+        return;
+    }
+    if (n->flags & NF_DIM) return;
+    for (uint32_t i = 0; i < n->narcs; i++) {
+        VEC_PUSH(*path, n->arcs[i].feat);
+        tag_positions(n->arcs[i].val, target, path, out, depth + 1);
+        path->n--;
+    }
+}
+
+static TriNode *desc_at(Content *c, TriNode *d, const U32Vec *p)
+{
+    for (size_t i = 0; i < p->n && d; i++) d = arc_lazy(c, d, p->v[i]);
+    return d;
+}
+
+/* The value a tag of `pattern` (first found at `first`) takes in a description:
+ * the most specific of the description's values at all the tag's positions. */
+static TriNode *tag_value(Content *c, TriNode *pattern, const U32Vec *first, TriNode *d, U32Vec *where)
+{
+    TriNode *pn = node_at(pattern, first->v, first->n);
+    PathVec pos = { 0 };
+    U32Vec path = { 0 };
+    if (pn) tag_positions(pattern, pn, &path, &pos, 0);
+    VEC_FREE(path);
+    TriNode *best = desc_at(c, d, first);
+    size_t bi = SIZE_MAX;
+    for (size_t k = 0; k < pos.n; k++) {
+        TriNode *v = desc_at(c, d, &pos.v[k]);
+        if (!v) continue;
+        if (!best || (bi != k && below(c, v, best) && !below(c, best, v))) { best = v; bi = k; }
+    }
+    if (where) {
+        where->n = 0;
+        const U32Vec *src = bi != SIZE_MAX ? &pos.v[bi] : first;
+        for (size_t i = 0; i < src->n; i++) VEC_PUSH(*where, src->v[i]);
+    }
+    for (size_t k = 0; k < pos.n; k++) VEC_FREE(pos.v[k]);
+    VEC_FREE(pos);
+    return best;
+}
+
 const TriNode *tri_binding(TriContent *c, const char *instance, const char *tag, const TriNode *d)
 {
     uint32_t i = inst_index(c, instance);
     if (i == TRI_BOTTOM || !inst_pattern(c, i)) return NULL;
-    Sym t = intern(c, tag[0] == '$' ? tag : "");
-    if (tag[0] != '$') {
-        Buf b = { 0 };
-        buf_printf(&b, "$%s", tag);
-        t = intern(c, b.s);
-        buf_free(&b);
-    }
+    Buf b = { 0 };
+    buf_printf(&b, "%s%s", tag[0] == '$' ? "" : "$", tag);
+    Sym t = intern(c, b.s);
+    buf_free(&b);
     InstInfo *in = &c->insts.v[i];
-    for (size_t k = 0; k < in->tags.n; k++)
-        if (in->tags.v[k].name == t) return node_at((TriNode *) d, in->tags.v[k].path.v, in->tags.v[k].path.n);
+    size_t which = 0;
+    if (in->vars.n > 1) {
+        TriMatchResult r;
+        match_variants(c, in, d, &r, &which);
+    }
+    InstVariant *v = &in->vars.v[which];
+    for (size_t k = 0; k < v->tags.n; k++)
+        if (v->tags.v[k].name == t) return tag_value(c, v->pattern, &v->tags.v[k].path, (TriNode *) d, NULL);
     return NULL;
 }
 
@@ -901,19 +2462,29 @@ const TriNode *tri_value(TriContent *c, const char *expr, TriArena *out, char *e
         TriMark m = tri_arena_mark(c->scratch);
         uint32_t saved = op_begin(c);
         Build b = { 0 };
-        b.c = c; b.ok = true;
+        b.c = c; b.ok = true; b.runtime = true;
         TriNode *n = build_raw(&b, x);
+        ArithVec ariths = { 0 };
         if (n && b.ok) {
             bool closed;
             r = copy_out(c, out, n, &closed);
             if (!closed) {
                 diag(c, true, noloc, "a field is not appropriate for its type");
                 r = NULL;
+            } else if (!resolve_ariths(c, &b, (TriNode *) r, &ariths, noloc, "value")) {
+                r = NULL;
             }
         }
         build_free(&b);
         op_end(c, saved);
         tri_arena_release(c->scratch, m);
+        if (r) {
+            TriFailure f;
+            r = settle(c, (TriNode *) r, &ariths, out, &f);
+            if (!r && f.right[0]) diag(c, true, noloc, "arithmetic at %s: %s gives %s", f.path, f.left, f.right);
+            else if (!r) diag(c, true, noloc, "%s at %s", f.left, f.path);
+        }
+        free_ariths(&ariths);
     }
     if (err && errlen) err[0] = 0;
     if (c->diags.n > ndiag && err && errlen) snprintf(err, errlen, "%s", c->diags.v[ndiag].msg);
@@ -925,35 +2496,91 @@ const TriNode *tri_value(TriContent *c, const char *expr, TriArena *out, char *e
 
 /* --- matching ------------------------------------------------------------------------------------ */
 
-static void residuals(Content *c, TriNode *p, TriNode *d, U32Vec *path, TriMatchResult *r)
+/* Residuals. The description is walked under the pattern, recording each
+ * position of each pattern node with the description node there. A position
+ * is residual if the description is too general there: a type not below the
+ * pattern's, or an interval not inside it. A pattern node at several positions
+ * (a tag) is residual where its description is less specific than at another
+ * of its positions: that is where the value is still to be learned. If its
+ * descriptions are all equivalent but separate structures, every position is
+ * residual: whether they are one thing is what remains unknown. The walk goes
+ * on below a too-general type, so the fields that are open there show too. */
+
+typedef struct { TriNode *p, *d; U32Vec path; } Occ;
+typedef VEC(Occ) OccVec;
+
+static TriNode *arc_lazy(Content *c, TriNode *n, uint32_t f)
 {
-    if (r->nresidual >= TRI_MAX_RESIDUAL) return;
-    Scratch *sp = sx_make(c, p);
-    if (sp->fwd) {
-        if (sp->fwd != d && !ext_equal(c, sp->fwd, d)) goto record;
-        if (sp->fwd == d) return;
-    } else {
-        sp->fwd = d;
+    TriNode *v = (n->flags & NF_DIM) ? NULL : node_arc(n, f);
+    if (!v && (n->flags & NF_LAZY)) {
+        TriNode *e = type_expansion(c, n->type);
+        v = e ? node_arc(e, f) : NULL;
     }
-    if (p->flags & NF_DIM) {
-        if ((d->flags & NF_DIM) && d->lo >= p->lo && d->hi <= p->hi) return;
-        goto record;
-    }
-    if (!is_subtype(c, d->type, p->type)) goto record;
+    return v;
+}
+
+static void occ_walk(Content *c, TriNode *p, TriNode *d, U32Vec *path, OccVec *out, int depth)
+{
+    if (depth > 64) return;
+    Occ o = { p, d, { 0 } };
+    for (size_t i = 0; i < path->n; i++) VEC_PUSH(o.path, path->v[i]);
+    VEC_PUSH(*out, o);
+    if (p->flags & NF_DIM) return;
     for (uint32_t i = 0; i < p->narcs; i++) {
-        TriNode *dv = node_arc(d, p->arcs[i].feat);
+        TriNode *dv = arc_lazy(c, d, p->arcs[i].feat);
         if (!dv) continue;
         VEC_PUSH(*path, p->arcs[i].feat);
-        residuals(c, p->arcs[i].val, dv, path, r);
+        occ_walk(c, p->arcs[i].val, dv, path, out, depth + 1);
         path->n--;
     }
-    return;
-record: {
-        Buf b = { 0 };
-        path_format(c, &b, path->v, path->n);
-        snprintf(r->residual[r->nresidual++], sizeof r->residual[0], "%s", b.s);
-        buf_free(&b);
+}
+
+static bool below(Content *c, TriNode *x, TriNode *y)         /* x ⊑ y */
+{
+    if (x == y || ext_equal(c, x, y)) return true;
+    int f, b;
+    tri_subsumes(c, y, x, &f, &b);
+    return f;
+}
+
+static void add_residual(Content *c, TriMatchResult *r, const U32Vec *path)
+{
+    if (r->nresidual >= TRI_MAX_RESIDUAL) return;
+    Buf b = { 0 };
+    path_format(c, &b, path->v, path->n);
+    for (size_t k = 0; k < r->nresidual; k++)
+        if (strcmp(r->residual[k], b.s) == 0) { buf_free(&b); return; }
+    snprintf(r->residual[r->nresidual++], sizeof r->residual[0], "%s", b.s);
+    buf_free(&b);
+}
+
+static void residuals(Content *c, TriNode *pattern, TriNode *desc, TriMatchResult *r)
+{
+    OccVec occ = { 0 };
+    U32Vec path = { 0 };
+    occ_walk(c, pattern, desc, &path, &occ, 0);
+    VEC_FREE(path);
+    for (size_t i = 0; i < occ.n; i++) {
+        Occ *o = &occ.v[i];
+        bool open;
+        if (o->p->flags & NF_DIM)
+            open = !((o->d->flags & NF_DIM) && o->d->lo >= o->p->lo && o->d->hi <= o->p->hi);
+        else
+            open = !is_subtype(c, o->d->type, o->p->type);
+        /* the other positions of the same pattern node */
+        bool shared = false, unresolved_identity = false;
+        for (size_t j = 0; j < occ.n && !open; j++) {
+            if (j == i || occ.v[j].p != o->p) continue;
+            shared = true;
+            TriNode *e = occ.v[j].d;
+            if (e == o->d) continue;
+            if (!below(c, o->d, e)) open = true;
+            else if (!ext_equal(c, o->d, e) && below(c, e, o->d)) unresolved_identity = true;
+        }
+        if (open || (shared && unresolved_identity)) add_residual(c, r, &o->path);
     }
+    for (size_t i = 0; i < occ.n; i++) VEC_FREE(occ.v[i].path);
+    VEC_FREE(occ);
 }
 
 TriMatch tri_match(TriContent *c, const TriNode *pattern, const TriNode *description,
@@ -970,17 +2597,13 @@ TriMatch tri_match(TriContent *c, const TriNode *pattern, const TriNode *descrip
     uint32_t saved = op_begin(c);
     reset_failure(c);
     bool compatible = unify1(c, (TriNode *) pattern, (TriNode *) description);
-    if (!compatible) r->failure = c->fail;
+    if (!compatible) r->failure = *fail_info(c);
     op_end(c, saved);
     tri_arena_release(c->scratch, m);
     if (!compatible) { r->result = TRI_INCOMPATIBLE; return r->result; }
 
     m = tri_arena_mark(c->scratch);
-    saved = op_begin(c);
-    U32Vec path = { 0 };
-    residuals(c, (TriNode *) pattern, (TriNode *) description, &path, r);
-    VEC_FREE(path);
-    op_end(c, saved);
+    residuals(c, (TriNode *) pattern, (TriNode *) description, r);
     tri_arena_release(c->scratch, m);
     r->result = TRI_UNKNOWN;
     return r->result;
@@ -989,25 +2612,161 @@ TriMatch tri_match(TriContent *c, const TriNode *pattern, const TriNode *descrip
 TriMasses tri_match_hypotheses(TriContent *c, const TriNode *pattern,
                                const TriNode *const *ds, const uint32_t *cred, size_t n)
 {
-    TriMasses m = { 0, 0, 0 };
+    TriMasses m;
+    memset(&m, 0, sizeof m);
+    TriMatchResult r;
     for (size_t i = 0; i < n; i++) {
-        switch (tri_match(c, pattern, ds[i], NULL)) {
+        switch (tri_match(c, pattern, ds[i], &r)) {
         case TRI_ENTAILED: m.entailed += cred[i]; break;
-        case TRI_UNKNOWN: m.unknown += cred[i]; break;
         case TRI_INCOMPATIBLE: m.incompatible += cred[i]; break;
+        case TRI_UNKNOWN:
+            m.unknown += cred[i];
+            for (size_t k = 0; k < r.nresidual && m.nresidual < TRI_MAX_RESIDUAL; k++) {
+                bool dup = false;
+                for (size_t q = 0; q < m.nresidual && !dup; q++) dup = strcmp(m.residual[q], r.residual[k]) == 0;
+                if (!dup) memcpy(m.residual[m.nresidual++], r.residual[k], sizeof r.residual[k]);
+            }
+            break;
         }
     }
     return m;
 }
 
+/* --- explaining matches ------------------------------------------------------------------------- */
+
+static const char *match_name(TriMatch m)
+{
+    return m == TRI_ENTAILED ? "entailed" : m == TRI_UNKNOWN ? "unknown" : "incompatible";
+}
+
+static void explain_tail(Content *c, Buf *b, const TriMatchResult *r)
+{
+    if (r->nresidual) {
+        buf_puts(b, "residuals:");
+        for (size_t k = 0; k < r->nresidual; k++) buf_printf(b, " %s", r->residual[k]);
+        buf_putc(b, '\n');
+    }
+    if (r->result == TRI_INCOMPATIBLE)
+        buf_printf(b, "first failing path: %s: %s vs %s\n", r->failure.path[0] ? r->failure.path : "(root)",
+                   r->failure.left, r->failure.right[0] ? r->failure.right : "(missing)");
+}
+
+static void binding_line(Content *c, Buf *b, const char *name, const U32Vec *path, const TriNode *d)
+{
+    Buf p = { 0 };
+    path_format(c, &p, path->v, path->n);
+    buf_printf(b, "  %s at %s = ", name, p.s);
+    TriNode *v = node_at((TriNode *) d, path->v, path->n);
+    if (v) fs_print(c, b, v);
+    else buf_puts(b, "(not in the description)");
+    buf_putc(b, '\n');
+    buf_free(&p);
+}
+
+/* Shared nodes of a pattern, by first path: its tags. */
+static void shared_paths(Content *c, TriNode *n, U32Vec *path, U64Map *count, U64Map *done, PathVec *out)
+{
+    uint64_t k = (uint64_t) (uintptr_t) n, v = 0;
+    u64map_get(count, k, &v);
+    if (v > 1 && !u64map_get(done, k, NULL)) {
+        u64map_put(done, k, 1);
+        U32Vec copy = { 0 };
+        for (size_t i = 0; i < path->n; i++) VEC_PUSH(copy, path->v[i]);
+        VEC_PUSH(*out, copy);
+        return;
+    }
+    if (u64map_get(done, k, NULL) || (n->flags & NF_DIM)) return;
+    u64map_put(done, k, 1);
+    for (uint32_t i = 0; i < n->narcs; i++) {
+        VEC_PUSH(*path, n->arcs[i].feat);
+        shared_paths(c, n->arcs[i].val, path, count, done, out);
+        path->n--;
+    }
+}
+
+static void count_nodes(TriNode *n, U64Map *count)
+{
+    uint64_t k = (uint64_t) (uintptr_t) n, v = 0;
+    if (u64map_get(count, k, &v)) { u64map_put(count, k, v + 1); return; }
+    u64map_put(count, k, 1);
+    if (n->flags & NF_DIM) return;
+    for (uint32_t i = 0; i < n->narcs; i++) count_nodes(n->arcs[i].val, count);
+}
+
+static size_t buf_out(Buf *b, char *buf, size_t len)
+{
+    size_t n = b->len;
+    if (len) snprintf(buf, len, "%s", b->s ? b->s : "");
+    buf_free(b);
+    return n;
+}
+
+size_t tri_explain(TriContent *c, const TriNode *pattern, const TriNode *d, char *buf, size_t len)
+{
+    TriMatchResult r;
+    tri_match(c, pattern, d, &r);
+    Buf b = { 0 };
+    buf_printf(&b, "result: %s\n", match_name(r.result));
+    U64Map count = { 0 }, done = { 0 };
+    PathVec shared = { 0 };
+    U32Vec path = { 0 };
+    count_nodes((TriNode *) pattern, &count);
+    shared_paths(c, (TriNode *) pattern, &path, &count, &done, &shared);
+    if (shared.n) buf_puts(&b, "bindings:\n");
+    for (size_t k = 0; k < shared.n; k++) {
+        char name[16];
+        snprintf(name, sizeof name, "$%zu", k + 1);
+        binding_line(c, &b, name, &shared.v[k], d);
+        VEC_FREE(shared.v[k]);
+    }
+    VEC_FREE(shared);
+    VEC_FREE(path);
+    u64map_free(&count);
+    u64map_free(&done);
+    explain_tail(c, &b, &r);
+    return buf_out(&b, buf, len);
+}
+
+size_t tri_explain_instance(TriContent *c, const char *instance, const TriNode *d, char *buf, size_t len)
+{
+    Buf b = { 0 };
+    uint32_t i = inst_index(c, instance);
+    if (i == TRI_BOTTOM || !inst_pattern(c, i)) {
+        buf_printf(&b, "no pattern instance %s\n", instance);
+        return buf_out(&b, buf, len);
+    }
+    InstInfo *in = &c->insts.v[i];
+    TriMatchResult r;
+    size_t which;
+    r.result = match_variants(c, in, d, &r, &which);
+    buf_printf(&b, "result: %s\n", match_name(r.result));
+    if (in->vars.n > 1) buf_printf(&b, "variant: %zu of %zu\n", which + 1, in->vars.n);
+    InstVariant *v = &in->vars.v[which];
+    if (v->tags.n) buf_puts(&b, "bindings:\n");
+    for (size_t k = 0; k < v->tags.n; k++) {
+        U32Vec where = { 0 };
+        tag_value(c, v->pattern, &v->tags.v[k].path, (TriNode *) d, &where);
+        binding_line(c, &b, v->tags.v[k].name, &where, d);
+        VEC_FREE(where);
+    }
+    explain_tail(c, &b, &r);
+    return buf_out(&b, buf, len);
+}
+
 /* --- generalisation ----------------------------------------------------------------------------- */
 
-static TriNode *gen_copy(Content *c, TriArena *a, TriNode *n, TriNode *target, uint32_t newtype, uint32_t cg)
+typedef struct { TriNode *target; uint32_t type; int64_t lo, hi; } GenTarget;
+
+static TriNode *gen_copy(Content *c, TriArena *a, TriNode *n, const GenTarget *g, uint32_t cg)
 {
     if (n->cpygen == cg) return n->cpy;
-    uint32_t t = n == target ? newtype : n->type;
+    uint32_t t = n == g->target ? g->type : n->type;
     TriNode *m = node_new(c, a, t);
-    if (n->flags & NF_DIM) { m->lo = n->lo; m->hi = n->hi; }
+    m->flags |= n->flags & NF_LAZY;
+    if (n->flags & NF_DIM) {
+        m->lo = n == g->target ? g->lo : n->lo;
+        m->hi = n == g->target ? g->hi : n->hi;
+    }
     n->cpy = m;
     n->cpygen = cg;
     uint32_t k = 0;
@@ -1015,65 +2774,197 @@ static TriNode *gen_copy(Content *c, TriArena *a, TriNode *n, TriNode *target, u
     for (uint32_t i = 0; i < n->narcs; i++) {
         if (!approp(c, t, n->arcs[i].feat)) continue;
         m->arcs[k].feat = n->arcs[i].feat;
-        m->arcs[k].val = gen_copy(c, a, n->arcs[i].val, target, newtype, cg);
+        m->arcs[k].val = gen_copy(c, a, n->arcs[i].val, g, cg);
         k++;
     }
     m->narcs = k;
     return m;
 }
 
+/* An attribute on the declaration of feature f, looked up from type t along
+ * primary parents: the nearest declaration that has it. */
+const char *field_attr(Content *c, uint32_t t, uint32_t f, const char *name)
+{
+    Sym label = c->feats.v[f].name;
+    for (uint32_t u = t; u != TRI_BOTTOM; u = c->types.v[u].parents.n ? c->types.v[u].parents.v[0] : TRI_BOTTOM) {
+        TypeInfo *ui = &c->types.v[u];
+        for (size_t k = 0; k < ui->decls.n; k++) {
+            XPtrVec cj = { 0 };
+            conjuncts(ui->decls.v[k]->value, &cj);
+            const char *r = NULL;
+            for (size_t j = 0; j < cj.n && !r; j++) {
+                if (cj.v[j]->k != X_STRUCT) continue;
+                for (int q = 0; q < cj.v[j]->u.st.n && !r; q++)
+                    if (cj.v[j]->u.st.fields[q].label == label)
+                        r = attr_args(cj.v[j]->u.st.fields[q].attrs, cj.v[j]->u.st.fields[q].nattrs, name);
+            }
+            VEC_FREE(cj);
+            if (r) return r;
+        }
+        if (u == c->top) break;
+    }
+    return NULL;
+}
+
+static int64_t sat_add(int64_t a, int64_t b)
+{
+    if (a == TRI_NINF || a == TRI_INF) return a;
+    if (b > 0 && a > TRI_INF - b) return TRI_INF;
+    if (b < 0 && a < TRI_NINF - b) return TRI_NINF;
+    return a + b;
+}
+
 const TriNode *tri_generalize(TriContent *c, const TriNode *node, const char *path, int steps,
                               TriArena *out)
 {
     U32Vec p = { 0 };
-    if (!path_parse(c, path, &p) || !p.n) { VEC_FREE(p); return NULL; }
-    TriNode *parent = node_at((TriNode *) node, p.v, p.n - 1);
-    TriNode *target = parent ? node_arc(parent, p.v[p.n - 1]) : NULL;
-    if (!target) { VEC_FREE(p); return NULL; }
-    /* The bound: the value type the parent's type allows at this feature. */
-    TriNode *pe = type_expansion(c, parent->type);
-    TriNode *bound = pe ? node_arc(pe, p.v[p.n - 1]) : NULL;
-    uint32_t limit = bound ? bound->type : c->top;
-    uint32_t t = target->type;
-    for (int s = 0; s < steps && t != limit && t != c->top; s++) {
-        uint32_t pt = c->types.v[t].parents.v[0];
-        if (!is_subtype(c, pt, limit)) { t = limit; break; }
-        t = pt;
+    if (!path_parse(c, path, &p)) { VEC_FREE(p); return NULL; }
+    if (!p.n) {
+        /* the root: its type along primary parents, as far as the top */
+        VEC_FREE(p);
+        GenTarget g = { (TriNode *) node, node->type, node->lo, node->hi };
+        for (int s = 0; s < steps && g.type != c->top && c->types.v[g.type].parents.n; s++)
+            g.type = c->types.v[g.type].parents.v[0];
+        if (node->flags & NF_DIM) return node;
+        return gen_copy(c, out, (TriNode *) node, &g, ++c->cgenctr);
     }
+    TriNode *parent = node_at((TriNode *) node, p.v, p.n - 1);
+    uint32_t f = p.v[p.n - 1];
+    TriNode *target = parent ? node_arc(parent, f) : NULL;
     VEC_FREE(p);
-    return gen_copy(c, out, (TriNode *) node, target, t, ++c->cgenctr);
+    if (!target) return NULL;
+    /* The bound: the value the parent's type allows at this feature. */
+    TriNode *pe = type_expansion(c, parent->type);
+    TriNode *bound = pe ? node_arc(pe, f) : NULL;
+    GenTarget g = { target, target->type, target->lo, target->hi };
+    if (target->flags & NF_DIM) {
+        /* numbers widen by the declared @widen step on each side, within the bound */
+        int64_t blo = bound && (bound->flags & NF_DIM) ? bound->lo : TRI_NINF;
+        int64_t bhi = bound && (bound->flags & NF_DIM) ? bound->hi : TRI_INF;
+        const char *w = field_attr(c, parent->type, f, "widen");
+        int dim = c->types.v[target->type].dim;
+        int wdim;
+        int64_t step = 0;
+        if (w && dim != DIM_TEXT && dim != DIM_REF) {
+            char *t = strdup(w);
+            char *s = t;
+            while (*s == ' ') s++;
+            size_t len = strlen(s);
+            while (len && s[len - 1] == ' ') s[--len] = 0;
+            if (units_parse(s, len, false, &wdim, &step) || wdim != dim) step = 0;
+            free(t);
+        }
+        if (steps > 0 && step > 0) {
+            for (int k = 0; k < steps; k++) { g.lo = sat_add(g.lo, -step); g.hi = sat_add(g.hi, step); }
+        } else if (steps > 0) {
+            g.lo = blo;
+            g.hi = bhi;
+        }
+        if (g.lo < blo) g.lo = blo;
+        if (g.hi > bhi) g.hi = bhi;
+    } else {
+        uint32_t limit = bound ? bound->type : c->top;
+        uint32_t t = target->type;
+        for (int s = 0; s < steps && t != limit && t != c->top; s++) {
+            uint32_t pt = c->types.v[t].parents.v[0];
+            if (!is_subtype(c, pt, limit)) { t = limit; break; }
+            t = pt;
+        }
+        g.type = t;
+    }
+    return gen_copy(c, out, (TriNode *) node, &g, ++c->cgenctr);
 }
 
 /* --- loading API ----------------------------------------------------------------------------------- */
 
+/* --- the content hash ---------------------------------------------------------------------------- */
+
+/* The hash covers the hierarchy, every type's expansion, and every instance's
+ * patterns and spec. Structures are hashed by walking them: a node seen before
+ * in the same structure is hashed as a reference to its first position (the
+ * copy-generation fields mark the visit), so sharing counts but addresses don't.
+ * TRI_DUMP=file also writes the same content as text, for diffing. */
+
+static void hmix(uint64_t *h, uint64_t x)
+{
+    *h = hash64(*h ^ x) * 0x100000001b3ULL + 0x9e3779b97f4a7c15ULL;
+}
+
+static void hstr(uint64_t *h, const char *s)
+{
+    *h = fnv1a(*h, s, strlen(s) + 1);
+}
+
+static void hash_node(Content *c, uint64_t *h, TriNode *n, uint32_t cg, uint64_t *next)
+{
+    if (n->cpygen == cg) { hmix(h, 0xA11CE ^ ((uint64_t) (uintptr_t) n->cpy << 8)); return; }
+    n->cpygen = cg;
+    n->cpy = (TriNode *) (uintptr_t) (*next)++;
+    hmix(h, ((uint64_t) n->type << 8) | (n->flags & NF_LAZY));
+    if (n->flags & NF_DIM) {
+        if (c->types.v[n->type].dim == DIM_TEXT && n->lo == n->hi) hstr(h, (const char *) (intptr_t) n->lo);
+        else { hmix(h, (uint64_t) n->lo); hmix(h, (uint64_t) n->hi); }
+        return;
+    }
+    hmix(h, n->narcs);
+    for (uint32_t i = 0; i < n->narcs; i++) {
+        hmix(h, n->arcs[i].feat);
+        hash_node(c, h, n->arcs[i].val, cg, next);
+    }
+}
+
+static void hash_root(Content *c, uint64_t *h, TriNode *n)
+{
+    uint64_t next = 1;
+    hash_node(c, h, n, ++c->cgenctr, &next);
+}
+
+static int cmp_symp(const void *a, const void *b)
+{
+    return strcmp(*(Sym const *) a, *(Sym const *) b);
+}
+
 static void compute_hash(Content *c)
 {
     uint64_t h = 0xcbf29ce484222325ULL;
+    const char *dump = getenv("TRI_DUMP");
     Buf b = { 0 };
     for (uint32_t t = 0; t < c->types.n; t++) {
         TypeInfo *ti = &c->types.v[t];
-        buf_printf(&b, "%s<", ti->name);
-        for (size_t k = 0; k < ti->parents.n; k++) buf_printf(&b, "%s,", c->types.v[ti->parents.v[k]].name);
-        buf_puts(&b, ">");
-        if (ti->expansion) fs_print(c, &b, ti->expansion);
-        buf_putc(&b, '\n');
+        hstr(&h, ti->name);
+        for (size_t k = 0; k < ti->parents.n; k++) hmix(&h, ti->parents.v[k]);
+        if (ti->expansion) hash_root(c, &h, ti->expansion);
+        if (dump) {
+            buf_printf(&b, "%s<", ti->name);
+            for (size_t k = 0; k < ti->parents.n; k++) buf_printf(&b, "%s,", c->types.v[ti->parents.v[k]].name);
+            buf_puts(&b, ">");
+            if (ti->expansion) fs_print(c, &b, ti->expansion);
+            buf_putc(&b, '\n');
+        }
     }
     /* instances in name order */
     Sym *names = malloc(sizeof(Sym) * (c->insts.n ? c->insts.n : 1));
     for (size_t i = 0; i < c->insts.n; i++) names[i] = c->insts.v[i].name;
-    for (size_t i = 1; i < c->insts.n; i++)
-        for (size_t j = i; j > 0 && strcmp(names[j - 1], names[j]) > 0; j--) {
-            Sym tmp = names[j]; names[j] = names[j - 1]; names[j - 1] = tmp;
-        }
+    qsort(names, c->insts.n, sizeof(Sym), cmp_symp);
     for (size_t i = 0; i < c->insts.n; i++) {
-        uint32_t k = inst_index(c, names[i]);
-        buf_printf(&b, "%s=", names[i]);
-        if (c->insts.v[k].pattern) fs_print(c, &b, c->insts.v[k].pattern);
-        buf_putc(&b, '\n');
+        InstInfo *in = &c->insts.v[inst_index(c, names[i])];
+        hstr(&h, names[i]);
+        for (size_t v = 0; v < in->vars.n; v++) hash_root(c, &h, in->vars.v[v].pattern);
+        if (in->sstate == 2) hash_root(c, &h, in->spec);
+        if (dump) {
+            buf_printf(&b, "%s=", names[i]);
+            for (size_t v = 0; v < in->vars.n; v++) {
+                if (v) buf_puts(&b, " || ");
+                fs_print(c, &b, in->vars.v[v].pattern);
+            }
+            if (in->sstate == 2) {
+                buf_puts(&b, " spec ");
+                fs_print(c, &b, in->spec);
+            }
+            buf_putc(&b, '\n');
+        }
     }
     free(names);
-    h = fnv1a(h, b.s ? b.s : "", b.len);
-    const char *dump = getenv("TRI_DUMP");     /* write the hashed text, for diffing */
     if (dump) {
         FILE *f = fopen(dump, "w");
         if (f) { fwrite(b.s ? b.s : "", 1, b.len, f); fclose(f); }
@@ -1089,6 +2980,86 @@ static double now_ms(void)
     return ts.tv_sec * 1e3 + ts.tv_nsec / 1e6;
 }
 
+/* --- the field registry ---------------------------------------------------------------------- */
+
+/* The @field flags of a feature, from the type that introduces it, or NULL. */
+const char *field_flags(const Content *c, uint32_t f)
+{
+    const TypeInfo *ti = &c->types.v[c->feats.v[f].intro];
+    for (size_t a = 0; a < ti->field_feats.n; a++)
+        if (ti->field_feats.v[a] == f) return ti->field_attrs.v[a]->args;
+    return NULL;
+}
+
+/* Whether a comma-separated flag list has `flag` at the top level. */
+bool has_flag(const char *flags, const char *flag)
+{
+    size_t n = strlen(flag);
+    int depth = 0;
+    const char *s = flags;
+    while (*s) {
+        while (*s == ' ' || *s == '\t' || (*s == ',' && !depth)) s++;
+        const char *start = s;
+        while (*s && !(*s == ',' && !depth)) {
+            if (*s == '(') depth++;
+            if (*s == ')') depth--;
+            s++;
+        }
+        const char *end = s;
+        while (end > start && (end[-1] == ' ' || end[-1] == '\t')) end--;
+        if ((size_t) (end - start) == n && memcmp(start, flag, n) == 0) return true;
+    }
+    return false;
+}
+
+/* A blueprint is an instance whose type includes a component. */
+static bool is_blueprint(Content *c, uint32_t i, const U32Vec *components)
+{
+    InstInfo *in = &c->insts.v[i];
+    if (!in->pattern) return false;
+    for (size_t k = 0; k < components->n; k++)
+        if (is_subtype(c, in->pattern->type, components->v[k])) return true;
+    return false;
+}
+
+/* Content may set only fields the registry marks `content`. */
+static void check_fields_set(Content *c, InstInfo *in, X *x)
+{
+    if (!x) return;
+    switch (x->k) {
+    case X_STRUCT:
+        for (int k = 0; k < x->u.st.n; k++) {
+            XField *fl = &x->u.st.fields[k];
+            uint32_t f = feat_lookup(c, fl->label);
+            const char *flags = f == TRI_BOTTOM ? NULL : field_flags(c, f);
+            if (flags && !has_flag(flags, "content"))
+                diag(c, true, fl->loc, "%s: %s is not a content field (@field(%s)), so content may not set it",
+                     in->name, fl->label, flags);
+            check_fields_set(c, in, fl->value);
+        }
+        break;
+    case X_AND: case X_OR:
+        check_fields_set(c, in, x->u.bin.a);
+        check_fields_set(c, in, x->u.bin.b);
+        break;
+    case X_DEFAULT:
+        check_fields_set(c, in, x->u.sub);
+        break;
+    case X_LIST:
+        for (int k = 0; k < x->u.list.n; k++) check_fields_set(c, in, x->u.list.items[k]);
+        break;
+    default:
+        break;
+    }
+}
+
+static void check_blueprint(Content *c, uint32_t i)
+{
+    InstInfo *in = &c->insts.v[i];
+    for (size_t k = 0; k < in->decls.n; k++) check_fields_set(c, in, in->decls.v[k]->value);
+    inst_spec(c, i);
+}
+
 static void finish_load(Content *c, bool ok, double t0)
 {
     double t1 = now_ms();
@@ -1099,8 +3070,16 @@ static void finish_load(Content *c, bool ok, double t0)
         for (uint32_t t = 0; t < c->types.n; t++) type_expansion(c, t);
         double t3 = now_ms();
         c->stats.expansion_ms = t3 - t2;
-        if (!c->tdl)                             /* TDL instances (lexicons) resolve on demand */
+        if (!c->tdl) {                           /* TDL instances (lexicons) resolve on demand */
             for (uint32_t i = 0; i < c->insts.n; i++) inst_pattern(c, i);
+            /* blueprints become specs at load; other instances only on request */
+            U32Vec components = { 0 };
+            for (uint32_t t = 0; t < c->types.n; t++) if (c->types.v[t].component) VEC_PUSH(components, t);
+            for (uint32_t i = 0; i < c->insts.n; i++)
+                if (is_blueprint(c, i, &components)) check_blueprint(c, i);
+            VEC_FREE(components);
+            families_build(c);
+        }
         c->stats.instances_ms = now_ms() - t3;
         compute_hash(c);
     }
@@ -1134,6 +3113,7 @@ static TriContent *load_common(const char *const *names, const char *const *sour
     c->genctr = 1;
     c->gen = 1;
     bool ok = parse_source(c, intern(c, "<prelude>"), prelude, &c->decls);
+    bool uses_clauses = false;
     for (size_t i = 0; i < n; i++) {
         const char *src = sources ? sources[i] : NULL;
         char *owned = NULL;
@@ -1150,8 +3130,10 @@ static TriContent *load_common(const char *const *names, const char *const *sour
             src = owned;
         }
         ok &= parse_source(c, intern(c, names[i]), src, &c->decls);
+        if (src && (strstr(src, "#Clause") || strstr(src, "#Fact"))) uses_clauses = true;
         free(owned);
     }
+    if (uses_clauses) ok &= parse_source(c, intern(c, "<clauses>"), clause_prelude, &c->decls);
     finish_load(c, ok, t0);
     return c;
 }
@@ -1179,8 +3161,10 @@ void tri_content_free(TriContent *c)
         VEC_FREE(t->feats);
         VEC_FREE(t->decls);
         VEC_FREE(t->members);
-        for (size_t k = 0; k < t->defaults.n; k++) VEC_FREE(t->defaults.v[k].path);
-        VEC_FREE(t->defaults);
+        free_recs(&t->defaults);
+        free_recs(&t->varies);
+        free_ariths(&t->ariths);
+        if (c->leafcache && c->leafcache[i]) { VEC_FREE(*c->leafcache[i]); free(c->leafcache[i]); }
         VEC_FREE(t->field_attrs);
         VEC_FREE(t->field_feats);
     }
@@ -1188,18 +3172,24 @@ void tri_content_free(TriContent *c)
     for (size_t i = 0; i < c->insts.n; i++) {
         InstInfo *in = &c->insts.v[i];
         VEC_FREE(in->decls);
-        for (size_t k = 0; k < in->defaults.n; k++) VEC_FREE(in->defaults.v[k].path);
-        VEC_FREE(in->defaults);
-        for (size_t k = 0; k < in->tags.n; k++) VEC_FREE(in->tags.v[k].path);
-        VEC_FREE(in->tags);
+        for (size_t k = 0; k < in->vars.n; k++) variant_free(&in->vars.v[k]);
+        VEC_FREE(in->vars);
+        VEC_FREE(in->specvars);
         for (size_t k = 0; k < in->variation.n; k++) free(in->variation.v[k]);
         VEC_FREE(in->variation);
-        for (size_t k = 0; k < in->varpaths.n; k++) VEC_FREE(in->varpaths.v[k]);
-        VEC_FREE(in->varpaths);
         for (size_t k = 0; k < in->notes.n; k++) free(in->notes.v[k]);
         VEC_FREE(in->notes);
     }
     VEC_FREE(c->insts);
+    free(c->leafcache);
+    VEC_FREE(c->listelems);
+    for (size_t i = 0; i < c->buildlog.n; i++) free(c->buildlog.v[i]);
+    VEC_FREE(c->buildlog);
+    families_free(c);
+    VEC_FREE(c->fns);
+    for (size_t i = 0; i < c->disjs.n; i++) { VEC_FREE(c->disjs.v[i].altx); VEC_FREE(c->disjs.v[i].alts); }
+    VEC_FREE(c->disjs);
+    u64map_free(&c->disjidx);
     VEC_FREE(c->feats);
     VEC_FREE(c->decls);
     u64map_free(&c->typeidx);
@@ -1216,6 +3206,8 @@ void tri_content_free(TriContent *c)
 }
 
 int tri_content_ok(const TriContent *c) { return c->nerrors == 0; }
+size_t tri_log_count(const TriContent *c) { return c->buildlog.n; }
+const char *tri_log_message(const TriContent *c, size_t i) { return i < c->buildlog.n ? c->buildlog.v[i] : NULL; }
 uint64_t tri_content_hash(const TriContent *c) { return c->hash; }
 size_t tri_diag_count(const TriContent *c) { return c->diags.n; }
 const char *tri_diag_message(const TriContent *c, size_t i) { return i < c->diags.n ? c->diags.v[i].msg : NULL; }
@@ -1266,6 +3258,17 @@ const char *tri_component_name(const TriContent *c, size_t i)
 }
 
 TriType tri_component_type(const TriContent *c, size_t i) { return component_type_at(c, i); }
+
+size_t tri_type_components(const TriContent *c, TriType t, size_t *out, size_t max)
+{
+    size_t n = 0, k = 0;
+    for (uint32_t u = 0; u < c->types.n; u++) {
+        if (!c->types.v[u].component) continue;
+        if (is_subtype(c, t, u)) { if (n < max) out[n] = k; n++; }
+        k++;
+    }
+    return n;
+}
 
 /* A component's fields are the features its type introduces. */
 size_t tri_component_field_count(const TriContent *c, size_t i)

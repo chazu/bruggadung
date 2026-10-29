@@ -177,5 +177,11 @@ void test_components(void)
         CHECK_STR(flags, "content, saved, perceive(touch)");
     }
     CHECK(found);
+    /* a wrench's components: the component types among its supertypes */
+    size_t comps[8];
+    size_t n = tri_type_components(c, tri_type_named(c, "#Wrench"), comps, 8);
+    CHECK(n == 3);
+    for (size_t i = 0; i < n && i < 8; i++) CHECK(comps[i] < tri_component_count(c));
+    CHECK(tri_type_components(c, tri_type_named(c, "#Pair"), comps, 8) == 0);
     tri_content_free(c);
 }

@@ -70,12 +70,14 @@ Out of scope here:
 8. **Numbers are integers in quanta with units.** Decimal literals with unit
    suffixes convert exactly at load; a literal that is not a whole number of
    quanta is a load error. Numeric constraints are intervals, and unification
-   intersects them. There is no arithmetic in content in the first version.
+   intersects them. Arithmetic over quantities (`+ - * /` on numbers and
+   tags) is a constraint on intervals, propagated forward (§5).
 9. **Rules are feature structures applied by fixed engines.** Operations,
    recipes, interpretation rules, and methods are tagged structures. The
    action, knowledge, and agency systems apply them, as DELPH-IN parsers
-   apply grammar rules. A definite-clause layer is deferred until some
-   content needs recursion.
+   apply grammar rules. For recursion, such as reachability, there is a
+   definite-clause layer: relations over feature structures, solved by
+   resolution with a depth limit (§10).
 10. **Runtime matching is three-valued.** Matching a pattern against a
    description returns **entailed**, **incompatible**, or **unknown**, with
    the tag bindings and the **residual paths** that would have to be learned.
@@ -130,10 +132,15 @@ the parts listed in §2.
 | Bounds | `>=0 & <=1000`, `>=40Nm` | Interval constraints |
 | Quantity literal | `0.85kg`, `19mm`, `2.5s` | Exact conversion to quanta |
 | Default | `wear: *0 \| >=0 & <=1000` | Default 0 within the range |
-| List | `[a, b]`, `[a, ...]`, `[...#Item]` | Closed list, open list, list of any length |
+| List | `[a, b]`, `[a, ...]`, `[...#Item]`, `[a, ...#Item]` | Closed list, open list, list of any length of `#Item` (items before the `...` are not constrained by it) |
+| Booleans | `true`, `false` | The two atoms of `bool` |
+| Referent | `ref(12)` | A runtime referent handle, in descriptions and tests |
 | Field attribute | `mass: mass @field(content, saved)` | Field registry flags |
 | Declaration attribute | `@component(Physical)` inside a type | Marks a component kind |
-| Variation attribute | `material: "steel" \| "brass" @vary(3, 1)` | Weights for seed variation |
+| Variation attribute | `material: "steel" \| "brass" @vary(3, 1)` | Weights for seed variation, one per alternative (or per member of a named enum) |
+| Decay attribute | `height: length @widen(5cm)` | How far a number widens per step of memory decay |
+| Derived field | `torque: torque @fn(lever_torque)` | A value computed by registered code |
+| Instance attributes | `@family(operations)`, `@quickcheck(target.size)`, `@variants(128)` | Pattern family, its quick-check paths, and the variant cap |
 | Addition | the same name declared again, anywhere | Unified with the other declarations; order never matters |
 | Comment | `// ...` | A comment directly above a declaration is its docstring |
 
@@ -143,6 +150,9 @@ the parts listed in §2.
 
 - `int`, `fixed` (a fixed-point coefficient), `bool`, `text` (free text,
   compared by equality), `ref` (a runtime referent or entity handle)
+- `text` and `ref` are values, not types: a string or referent first seen at
+  runtime is as good as one in content. Left open in a spec, they stay open
+  (they are bound at runtime), rather than becoming variation
 - one type per quantity dimension, named after it: `mass`, `length`,
   `time`, `heat`, `temperature`, `torque`, and so on. Their quanta come from
   the unit descriptors (DOMAIN_SIMULATION.md §12).
@@ -163,9 +173,9 @@ Three constructs look like CUE but mean something else:
    specific type wins. Only defaults from incomparable types that conflict
    are dropped, with a warning.
 
-**Not adopted from CUE:** comprehensions, string interpolation, arithmetic
-between fields, field references, `let`, and packages (files are simply
-included). Each could be revisited, but none is needed by the scenarios.
+**Not adopted from CUE:** comprehensions, string interpolation, field
+references, `let`, and packages (files are simply included). Arithmetic is
+adopted, but between tags rather than field references (§5).
 
 ### 3. The type hierarchy
 
@@ -198,10 +208,14 @@ included). Each could be revisited, but none is needed by the scenarios.
   instance of the type satisfies. This is how universal constraints, like
   Troll's "every bird can fly", are written: there is no separate implication
   syntax.
-- **Enums** are atom types. String literals are atoms when the field's type
-  is an enum, and free text only when the field's type is `text`. An atom can
-  itself be an enum, by a declaration with the atom as its label:
-  `"dark": "grey" | "black" | "navy"`.
+- **Enums** are atom types. A string some enum lists (named or anonymous) is
+  that enum's atom; any other string is free text. An atom meeting `text` is
+  taken as its string. An atom can itself be an enum, by a declaration with
+  the atom as its label: `"dark": "grey" | "black" | "navy"`.
+- **Recursive constraints** are allowed: `#Person: { mother: #Person }`. A
+  node made while its type is still being expanded is lazy: its type's
+  constraint is applied when unification first adds structure to it, so a
+  structure is only as deep as what is known about it.
 - **Components.** A type with `@component(Name)` defines component kind
   `Name`. The features it introduces are that component's fields, with the
   flags from their `@field` attributes. An entity type conjoins component
@@ -227,12 +241,28 @@ included). Each could be revisited, but none is needed by the scenarios.
   is a load error, not a rounding.
 - **Unification intersects intervals.** An empty intersection fails, and so
   do mismatched dimensions.
-- `int` and `fixed` values work the same way, without a dimension.
+- `int` and `fixed` values work the same way, without a dimension. A whole
+  number where a fixed-point value is expected is that number in fixed point.
 - **Precision is an interval.** A perceived temperature of 30 °C ± 2 is the
   interval [28, 32] °C in quanta, so imprecise perception produces "unknown"
   matches naturally (§9).
-- There is no arithmetic. Derived values, such as a transformer's output
-  torque, come from code named by attribute (`@fn(lever_torque)`), as in
+- **Arithmetic** relates fields through tags: `torque: $f * $a` with
+  `force: $f, arm: $a`. There are still no field references, only tags.
+  - Operators are `+ - * /` over numbers, tags, and parenthesised
+    expressions, binding tighter than `&`.
+  - Sums need one dimension. Products and quotients scale by a dimensionless
+    `int` or `fixed`, divide like by like into a `fixed` ratio, or combine
+    dimensions through a table (force × length = torque).
+  - It is a constraint on intervals, computed forward and rounded outward:
+    while an argument is open, so is the result, and it narrows as the
+    arguments do (LIFE's suspension, for free). A result that is not a whole
+    number of quanta is the one-quantum interval holding it.
+  - It applies wherever structures are made: type expansions, patterns,
+    specs, construction (a computed field is not a variation point), runtime
+    values, and unification. A result that contradicts its field fails.
+  - Constants fold at load: `size: 2 * 9.5mm` is `19mm`.
+- Values code computes, such as a transformer's output torque from a table,
+  come from functions named by attribute (`@fn(lever_torque)`), as in
   ACTIONS.md §2.
 
 ### 6. Defaults
@@ -259,13 +289,33 @@ included). Each could be revisited, but none is needed by the scenarios.
 ### 7. Disjunction and variation
 
 - **In type definitions**, a disjunction of atoms is an enum (§3). A
-  disjunction of structures is moved into the hierarchy: the loader creates
-  one anonymous subtype per alternative.
+  disjunction of structures is moved into the hierarchy:
+  - the disjunction becomes a type (anonymous, or the named type it defines),
+    below the common named ancestors of its alternatives
+  - each alternative becomes a subtype of it, named after its text
+  - a field that several alternatives declare, and no named type does, is
+    introduced by the disjunction
+  - unification picks an alternative when the types decide it (a feature only
+    one alternative has, or a value only one allows)
+  - if one alternative is a supertype of all the others (`*"oak" | #Material`),
+    the disjunction is just that type
+- A disjunction of separate numbers (`1 | 3`) is not a type, and is an error
+  in a type. Overlapping or adjacent ranges are their hull.
 - **In instances**, what remains open after defaults is variation:
   - an atom alternative: one is chosen
   - a range: a value is drawn
   - a structural alternative: the blueprint was already expanded at load into
     one variant per alternative, and one variant is chosen
+  - an open disjunction type: one of its alternatives that fits is chosen,
+    and its own defaults and variation follow
+- **Variants.** An instance's disjunctions of structures (and of separate
+  numbers) are expanded into one variant per combination:
+  - variants that cannot hold are dropped; none holding is an error
+  - a pattern instance matches if some variant matches (`tri_match_instance`);
+    its single pattern is the generalisation of the variants
+  - a `*` alternative is a default: the spec keeps the variants that took it
+  - a spec resolves an open disjunction that only one alternative fits
+  - `@vary` weights after a field or declaration weight its alternatives
 - **Construction makes every authoritative field concrete** from the
   entity's seed (COMPONENTS.md §1, §10), using `@vary` weights where given
   and a uniform choice otherwise. The draw order is the spec's field order,
@@ -273,7 +323,8 @@ included). Each could be revisited, but none is needed by the scenarios.
 - A spec records its variation points, so the developer inspector can show
   which properties came from the seed.
 - **Expansion is capped.** A blueprint that expands to more than a declared
-  number of variants is a load error, to catch accidental blowup.
+  number of variants (`@variants(n)`, 64 by default) is a load error, to
+  catch accidental blowup.
 
 ### 8. Loading
 
@@ -285,11 +336,14 @@ The loader runs these steps, in this order, once per content build:
    check introductions.
 3. Expand type constraints and enums. Encode meets (§12).
 4. Resolve each instance: unify its parts and additions, resolve defaults,
-   expand structural alternatives, record variation points.
+   expand structural alternatives, record variation points. Blueprints
+   (instances whose type includes a component) become specs here; other
+   instances, such as operations, become patterns, and specs only on request.
 5. Check against the field registry: only `content` fields set by content,
    units valid, every authoritative field either concrete or variation.
 6. Freeze the specs into an immutable arena, laid out by position (§12).
-7. Compile the pattern indexes and quick-check vectors (§12).
+7. Compile the pattern indexes and quick-check vectors (§12), one per
+   family of instances marked `@family(name)`, from their `@quickcheck` paths.
 8. Record the content hash. Saves store it (§15).
 
 Every error carries the source locations of both conflicting sides.
@@ -310,7 +364,12 @@ description without changing the description.
   instrument and target, two known sizes entail if equal and are
   incompatible if not, and one unknown size makes the match unknown.
 - **Residual paths.** An unknown result lists the paths that are too general,
-  for example `target.size`. Agency uses this to create information goals
+  for example `target.size`. For a tag, it is the positions whose value is
+  less specific than at another of the tag's positions, whatever the order of
+  features; below a too-general type, the open fields show too. Equal values
+  in separate structures under one tag are residual at every position: tags
+  share nodes, and whether two described things are one is open until a
+  `ref` says so. Agency uses this to create information goals
   (AGENCY.md §5): a residual says exactly what to find out.
 - **Intervals.** An interval inside the pattern's interval entails, one
   disjoint from it is incompatible, and one overlapping it is unknown.
@@ -350,9 +409,30 @@ result is built by unification once its premises match. **No rule engine
 searches.** Each system applies its rules in its own fixed way, within the
 depth limits its doc sets.
 
-**Deferred:** definite clauses over feature structures (LiLFeS-style), for
-recursion such as reachability. They will be added only when a method or
-rule needs them, with a depth limit, and with syntax chosen then.
+**Definite clauses** over feature structures (LiLFeS-style) give recursion,
+such as reachability, which rules applied once can't express:
+
+```cue
+e1: #Fact   & { head: #Edge & { from: "kitchen", to: "hall", d: 4m } }
+r1: #Clause & { head: #Dist & { from: $x, to: $y, d: $d },
+                body: [#Edge & { from: $x, to: $y, d: $d }] }
+r2: #Clause & { head: #Dist & { from: $x, to: $z, d: $a + $b },
+                body: [#Edge & { from: $x, to: $y, d: $a },
+                       #Dist & { from: $y, to: $z, d: $b }] }
+```
+
+- Clauses are ordinary instances of the built-in `#Clause` (a `head` and a
+  `body` list of goals) and `#Fact` (no body), so they need no new syntax.
+  The two types exist when content uses them, leaving `head` and `body`
+  free otherwise.
+- A query is a structure; each solution is the query made specific by one
+  proof (`tri_solve`). Resolution is depth-first, goals left to right,
+  clauses in name order, each clause copied fresh so its tags are its
+  variables.
+- A depth limit bounds each proof, and the caller learns whether it cut any
+  short. A bound on the whole search guards against explosion.
+- Arithmetic in a clause waits through the search: `$a + $b` narrows as the
+  recursive goal fixes `$b`, and a query's bound (`d: <=8m`) filters.
 
 ### 11. Descriptions in knowledge
 
@@ -363,7 +443,8 @@ rule needs them, with a depth limit, and with syntax chosen then.
   referent's hypotheses:
   - success on all distinguishing paths: a strong match, and the result is
     the merged, more specific description
-  - failure: the failing paths are reported. Recognition weighs them against
+  - failure: the failing paths are reported, every one of them
+    (`tri_conflicts`), not only the first that unification meets. Recognition weighs them against
     the agreeing paths, using each feature's persistence (a coat changes
     daily, height doesn't). It then binds, splits into a new referent, or
     creates competing identity hypotheses with credences.
@@ -371,7 +452,9 @@ rule needs them, with a depth limit, and with syntax chosen then.
   competing hypotheses (KNOWLEDGE.md §11).
 - **Memory decay is generalisation.** Losing detail (KNOWLEDGE.md §12)
   replaces a node's type with its primary parent: "grey" becomes "dark",
-  `#WoolCoat` becomes `#Coat`. Intervals widen by declared steps. A decayed
+  `#WoolCoat` becomes `#Coat`. Intervals widen by declared steps
+  (`@widen(5cm)` per step on each side); a number without a declared step,
+  and any text or referent, is forgotten in one step. A decayed
   description can then unify with percepts it used to conflict with. That is
   a source of honest misidentification.
 - Propositions are FSs whose arguments are `ref` atoms and values (§5).
@@ -395,10 +478,11 @@ systems.
 
 - A node is a C struct: type ID, arcs, and the scratch fields unification
   needs (a forwarding pointer, a copy pointer, a generation number).
-- **Arcs are positional.** A type's appropriate features have fixed slots, as
-  in ProFIT and Wintner and Francez, so feature lookup is a static offset.
-  When unification refines a node to a subtype with more features, the copy
-  phase lays it out afresh.
+- **Arcs are sorted by feature** (the prototype's choice; the plan was
+  positional slots, as in ProFIT and Wintner and Francez). Since structures
+  are totally well-typed, a type's nodes carry the same features in the same
+  order, and unification walks two arc lists in step. Lookup by feature is a
+  binary search.
 - Quantities and atoms are leaf nodes with an inline payload.
 
 **Unification and subsumption**
@@ -418,7 +502,7 @@ systems.
 | Load | One content build; dropped after specs are frozen |
 | Specs | The session; immutable |
 | Scratch | One match or unification, released by mark and release |
-| Knowledge | One per agent; compacted by copying live descriptions during housekeeping (boundary step 4) when waste passes a threshold |
+| Knowledge | One per agent; compacted by copying live descriptions (`tri_copy`) into a fresh arena during housekeeping (boundary step 4) when waste passes a threshold |
 
 **Filtering and indexing**
 
@@ -427,8 +511,8 @@ systems.
 - **The quick check.** Each pattern family stores the types at a small set of
   paths that most often cause failure. Comparing those by meet lookup
   rejects most failing matches before full matching. The paths are chosen
-  offline from recorded scenario runs, and stored in the content build, so
-  they are fixed at load. In DELPH-IN, 13–30 paths with a rule filter
+  offline from recorded scenario runs and written in content
+  (`@quickcheck(...)` on a family's instances), so they are fixed at load. In DELPH-IN, 13–30 paths with a rule filter
   rejected 95–98% of failing unifications.
 
 **Determinism**
@@ -458,9 +542,12 @@ systems.
   values.
 - **The developer inspector** shows any FS as an indented structure with
   tags. For a spec, it also shows each value's origin: which parent, mixin,
-  default, or seed draw.
+  default, or seed draw (`tri_inspect`).
 - **A match explainer** shows, for any pattern and description, the result,
-  the bindings, the residuals, and the first failing path.
+  the bindings, the residuals, and the first failing path (`tri_explain`,
+  and `tri_explain_instance` with tag names).
+- **Docstrings.** A comment directly above a declaration is its docstring
+  (`tri_doc`).
 - **The TDL front end** reads a subset of TDL into the same tree. Its first
   use is benchmarking against the English Resource Grammar, with ACE (MIT,
   C) as the reference for results.
@@ -471,10 +558,16 @@ systems.
 - Knowledge descriptions are saved as FSs. With the same content hash, they
   use type IDs. Otherwise they are written by type name, so a save can be
   migrated to new content, failing loudly on types that no longer exist.
+- The format is text: a header with the content hash and encoding, then the
+  structure, with shared nodes written once and referred to as `@n`.
+  Restoring into changed content makes every node satisfy its type again,
+  so new features appear at their most general value, and a structure that
+  no longer fits is refused with the reason (`tri_save`, `tri_restore`).
 
 ### 16. Interface sketch
 
-Illustrative only; this has not been compiled.
+Illustrative only. The built interfaces are `triangle/include/triangle.h`
+and the Objective-C wrapper `triangle/objc/BGContent.h`.
 
 ```c
 typedef uint32_t TriType;            // dense, assigned at load
@@ -589,98 +682,76 @@ fetch_tool: #Method & {
 
 ### 18. Prototype status
 
-A first prototype of the core is in [triangle/](triangle/README.md): plain C11, about
-4,300 lines with tests. It implements:
+The prototype of the engine is in [triangle/](triangle/README.md): plain C11,
+about 7,800 lines, with 2,000 lines of tests. Every feature in this document
+is built, including the definite-clause layer (§10) and arithmetic (§5),
+which the first version had deferred; the open questions below remain
+open:
 
-- the parser
-- the hierarchy, with completion, conjunction types, and bit-vector meets
-- quasi-destructive unification
-- type expansion
-- instance patterns and specs, with defaults and variation
-- construction from seeds
-- subsumption
-- three-valued matching with residuals and hypothesis masses
-- generalisation
+- the parser, the hierarchy with completion, conjunction types, and
+  bit-vector meets
+- disjunction of structures, in types (as subtypes) and in instances (as
+  variants, with a cap)
+- typed open lists and recursive type constraints
+- quasi-destructive unification with structure sharing, subsumption, and
+  generalisation of two structures
+- instance patterns and specs, YADU defaults, variation with `@vary` weights,
+  construction from seeds, and derived fields (`@fn`)
+- the field registry check, with blueprints resolved at load
+- three-valued matching with residuals, matching against variants, and
+  hypothesis masses with residuals
+- memory decay, including numbers (`@widen`)
+- the quick check, pattern indexes, and families compiled at load
+- the inspector, the match explainer, docstrings, and both locations of every
+  conflict
+- saves by ID or by name, with migration to changed content
+- arithmetic over quantities, propagated as interval constraints
+- definite clauses, solved by resolution with a depth limit (`tri_solve`)
+- the content hash, and the Objective-C wrapper (`BGContent`), run under
+  Apple's runtime and mulle-objc
 
-Tests reproduce the acceptance checks of all three scenarios below, and pass
+Tests cover each feature, the three scenarios below, and the example file of
+§17, read from this document. Randomised property tests check the algebra of
+unification, subsumption, matching, and generalisation, the quick check,
+saves, construction, and order independence; mutated sources are fuzzed. A
+leak check runs the library against a counting allocator. All of it passes
 under AddressSanitizer and UndefinedBehaviorSanitizer.
 
 **The TDL front end** reads the whole English Resource Grammar from
-`english.tdl` and loads it in about 2.5 s with no diagnostics. It handles
-`:begin`/`:end`/`:include`, `:+` addenda, lists with tails, difference lists,
-strings, regular expressions as opaque atoms, and `%suffix` and letter sets,
-which it skips. The ERG trunk loads to:
+`english.tdl` with no diagnostics. It handles `:begin`/`:end`/`:include`,
+`:+` addenda, lists with tails, difference lists, strings, regular
+expressions as opaque atoms, and `%suffix` and letter sets, which it skips.
 
-- 9,241 coded types
-- 4,732 generated meet types
-- 57,389 leaf types, mostly strings
-
-In a parsing-shaped workload (rule daughters against lexical entries) it does
-about half a million unifications per second on an Apple M3, and 93% of them
-fail. Twelve failure paths account for 96.8% of failures, which matches the
-DELPH-IN quick-check literature and argues for building the quick check.
-Details and caveats are in [triangle/README.md](triangle/README.md).
-
-Building the front end added three engine features:
-
-- **Leaf types get no bit in the codes**, as in PET: their subsumption
-  follows the parent chain. Otherwise every string in the lexicon would be a
-  coded type.
-- **Completion links meet types made in the same round by set containment**,
-  and later rounds only examine pairs involving new types. Before this,
-  completion of the ERG did not converge in reasonable time.
-- **In TDL mode, `:+` addenda may add supertypes** after the declared ones.
-  The ERG uses this.
-
-**Memory.** Two changes cut the ERG's type expansions from 324 MB to 62 MB,
-and a resolved lexical entry from about 74 KB to about 5 KB. Unification also
-got faster, from 0.46–0.69 M to about 0.73 M per second.
-
-- **Nodes shrank from 128 to 48 bytes.** Unification scratch moved into a
-  record allocated on first touch, and a node's arcs pointer now overlays its
-  interval.
-- **Copy-out shares structure** (Malouf, Carroll & Copestake). An unchanged
-  node from a long-lived arena is reused, not copied. Type expansions and
-  instance patterns use their first type's expansion directly so that there
-  is something to share.
-
-Structure is byte-identical with and without sharing. The rules this
-requires are in [triangle/README.md](triangle/README.md): result lifetimes,
-inputs that must not overlap, and direct use only in top-level operations.
-
-**The quick check and pattern indexes** are built: `tri_qc_*` and
-`tri_index_*`. Paths are learned from recorded failure paths.
-
-- On the ERG, 13 paths filter 97.6% of failing unifications and never reject
-  a success, for a 2.1× speedup. That is within the published 95–98%.
-- The learned paths agree closely with ACE's own quick-check file for the
-  ERG.
-- An index of the 597 rule daughters narrows each lexical entry to about 52
-  candidates in 11 µs.
-
-**Checked against ACE 0.9.34** on the ERG, built natively on the same
-machine (details in [triangle/README.md](triangle/README.md)):
+**Checked against ACE 0.9.34** on the ERG, built natively on the same machine
+(details in [triangle/README.md](triangle/README.md)):
 
 - The generated meet types are the same 4,730, compared by each one's set of
   declared supertypes. The check found that conjunction types were also
-  being made for TDL. They added a type and two glbs, and are now made only
-  for Triangle sources.
+  being made for TDL; they are now made only for Triangle sources.
 - On 597,000 rule-daughter × lexical-entry unifications, the same 38,191
-  succeed in both engines.
-- Unification with copying runs at about the same rate in both, roughly
-  0.8 M per second.
+  succeed in both engines, pair by pair.
+- Unification with copying runs at about 1.6 M per second here and 1.07 M in
+  ACE (1.3 M without copying).
 - Type expansions take 62 MB here and 131 MB in ACE.
-- ACE completes the hierarchy faster: 0.3 s against 1.4 s.
+- The ERG loads in 0.57 s, with hierarchy completion in 0.2 s (ACE: 0.3 s).
 
-Not yet built:
+**Engine features the ERG called for:**
 
-- `@vary` weights (parsed but ignored)
-- disjunction of structures
-- typed open lists (`[...X]`)
-- recursive type constraints (currently an error)
-- generalisation of numbers
-- source locations for both sides of every conflict (instances name the
-  conflicting declaration; type bodies don't yet)
+- Leaf types get no bit in the codes, as in PET: their subsumption follows
+  the parent chain.
+- Completion examines each pair of types once: after the first round, only
+  new meet types against the ancestors of their descendants. Codes carry
+  their range of non-zero words.
+- In TDL mode, `:+` addenda may add supertypes after the declared ones.
+- Nodes are 48 bytes, with unification scratch allocated on first touch, and
+  copy-out shares unchanged structure (Malouf, Carroll & Copestake). Type
+  expansions went from 324 MB to 62 MB, and a lexical entry from 74 KB to
+  5 KB.
+
+**A content build of the game's shape** (`bench/content.c`: 20,000
+blueprints over 40 component kinds) loads in 0.18 s, constructs about
+790,000 entities per second, and matches about 200,000 operation patterns per
+second after the family index.
 
 ## Scenarios
 
@@ -938,8 +1009,9 @@ own workloads (open question 9).
 
 ## Open questions
 
-1. **The clause layer.** Does any content need recursion? If so, what syntax
-   fits the CUE style, and what depth limit?
+1. **The clause layer.** Built (§10). Which systems use it, and with what
+   depth limits, is for the systems' docs; negation and cuts are not
+   provided.
 2. **Code generation.** Should the loader generate Objective-C classes from
    `@component` types, or should Objective-C declare components and the
    loader check them against content (COMPONENTS.md open question 6)?
@@ -951,9 +1023,9 @@ own workloads (open question 9).
 5. **Variation distributions.** Are weights enough, or do ranges need
    distributions (triangular, normal by table)? How do variation points
    interact with latent assembly's deferred seeding?
-6. **Arithmetic.** Derived values come from code via `@fn`. Will content
-   need arithmetic, and if so, LIFE-style suspension until arguments are
-   known?
+6. **Arithmetic.** Built (§5), forward only. Should constraints also narrow
+   their arguments from the result (backward propagation), and which
+   dimension products beyond force × length does content need?
 7. **Quanta.** Length and torque need quanta (0.1 mm and 1 mN·m are
    candidates) in the DOMAIN_SIMULATION.md §12 table.
 8. **Referent identity inside descriptions.** A `ref` atom unifies only with

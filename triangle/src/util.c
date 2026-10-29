@@ -20,24 +20,37 @@ void tri_arena_free(TriArena *a)
         free(ch);
         ch = prev;
     }
+    free(a->spare);
     free(a);
 }
 
-void *arena_alloc(TriArena *a, size_t n)
+void *arena_alloc_raw(TriArena *a, size_t n)
 {
     n = (n + 15) & ~(size_t) 15;
     Chunk *ch = a->top;
     if (!ch || ch->used + n > ch->cap) {
-        size_t cap = n > CHUNK_SIZE ? n : CHUNK_SIZE;
-        Chunk *nc = malloc(sizeof(Chunk) + cap);
+        Chunk *nc;
+        if (a->spare && a->spare->cap >= n) {
+            nc = a->spare;
+            a->spare = NULL;
+        } else {
+            size_t cap = n > CHUNK_SIZE ? n : CHUNK_SIZE;
+            nc = malloc(sizeof(Chunk) + cap);
+            nc->cap = cap;
+        }
         nc->prev = ch;
         nc->used = 0;
-        nc->cap = cap;
         a->top = nc;
         ch = nc;
     }
     void *p = ch->data + ch->used;
     ch->used += n;
+    return p;
+}
+
+void *arena_alloc(TriArena *a, size_t n)
+{
+    void *p = arena_alloc_raw(a, n);
     memset(p, 0, n);
     return p;
 }
@@ -52,7 +65,10 @@ void tri_arena_release(TriArena *a, TriMark m)
 {
     while (a->top && a->top != (Chunk *) m.chunk) {
         Chunk *prev = a->top->prev;
-        free(a->top);
+        /* keep one standard chunk, so an operation that crosses a chunk
+         * boundary doesn't allocate and free one every time */
+        if (!a->spare && a->top->cap == CHUNK_SIZE) a->spare = a->top;
+        else free(a->top);
         a->top = prev;
     }
     if (a->top) a->top->used = m.used;

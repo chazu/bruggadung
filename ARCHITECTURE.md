@@ -268,11 +268,12 @@ A rebuilt world produces the same next step as one that never saved.
    parts).
 2. **Latent assembly:** materialization, consistency with history, and
    culprit attribution, carried over from Dewdrop and simplified.
-3. **Content language (Triangle) prototype:** in [triangle/](triangle/README.md). The core works,
-   the three scenarios pass, and the TDL front end loads the whole English
-   Resource Grammar. Structure sharing and the quick check are built. Checked
-   against ACE: the same meet types, the same result on every one of 597,000
-   unifications, and about the same speed. See
+3. **Content language (Triangle) prototype:** in [triangle/](triangle/README.md). Every
+   feature the spec plans is built and tested, including randomised property
+   tests and a leak check, with an Objective-C wrapper. The TDL front end
+   loads the whole English Resource Grammar in 0.57 s. Checked against ACE:
+   the same meet types, the same result on every one of 597,000
+   unifications, and about 1.5 times the speed. See
    [CONTENT_LANGUAGE.md](CONTENT_LANGUAGE.md) §18.
 4. **The simulation laboratory:** set up the mulle Objective-C toolchain
    (not yet installed on this machine), then build the clock, scheduler, run
