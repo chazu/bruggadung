@@ -126,11 +126,15 @@ bool x_interval(const X *x, int *dim, int64_t *lo, int64_t *hi)
             if (strcmp(x->u.name, dim_names[d]) == 0) { *dim = d; *lo = TRI_NINF; *hi = TRI_INF; return true; }
         return false;
     }
-    if (x->k == X_ARITH) {                       /* constant arithmetic folds */
-        Quantity a, b, r;
-        if (!x_interval(x->u.ar.a, &a.dim, &a.lo, &a.hi) || !x_interval(x->u.ar.b, &b.dim, &b.lo, &b.hi)) return false;
-        if (quantity_op(x->u.ar.op, a, b, &r)) return false;
-        *dim = r.dim; *lo = r.lo; *hi = r.hi;
+    if (x->k == X_ARITH) {                       /* constant arithmetic folds, into the kind it has */
+        int da, db;
+        int64_t la, ha, lb, hb;
+        if (!x_interval(x->u.ar.a, &da, &la, &ha) || !x_interval(x->u.ar.b, &db, &lb, &hb)) return false;
+        Quantity r, k;
+        if (quantity_op(x->u.ar.op, quantity_of(da, la, ha), quantity_of(db, lb, hb), &r)) return false;
+        int kd = quantity_kind_for(&r);
+        if (kd < 0 || quantity_to(&r, kd, &k)) return false;
+        *dim = kd; *lo = k.lo; *hi = k.hi;
         return true;
     }
     if (x->k == X_AND) {

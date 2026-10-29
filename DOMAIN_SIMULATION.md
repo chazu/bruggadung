@@ -335,6 +335,13 @@ commitments:
 | Water volume | stock | 1 mL | ≈ 2,100 m³ | |
 | Temperature | derived | 0.01 K | | Computed from heat and capacity. Never a stock. |
 | Time | clock | 1 ms | `int64_t` | |
+| Length | content | 0.1 mm | | Wrench sizes come in half millimetres (CONTENT_LANGUAGE.md) |
+| Force | content | 1 mN | | |
+| Torque | content | 1 mN·m | | |
+
+The descriptors, with each quantity's exponents over the base units, live in
+one table (`triangle/src/units.c`); content arithmetic derives its products
+from them, and the engine's unit structs will be generated from it.
 
 ### 13. Interface sketch
 

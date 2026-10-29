@@ -960,3 +960,149 @@ void test_clauses(void)
     tri_arena_free(a);
     tri_content_free(c);
 }
+
+/* --- the decided open questions ------------------------------------------------------------ */
+
+void test_path_keyed_variation(void)
+{
+    /* adding a field to a blueprint leaves the other fields' draws alone */
+    const char *v1 = "#Thing: { @component(Thing)\n colour: \"red\" | \"green\" | \"blue\" @field(content)\n"
+                     " size: length & >=1mm & <=99mm @field(content)\n}\nt: #Thing\n";
+    const char *v2 = "#Thing: { @component(Thing)\n colour: \"red\" | \"green\" | \"blue\" @field(content)\n"
+                     " grip: \"bare\" | \"wrapped\" @field(content)\n"
+                     " size: length & >=1mm & <=99mm @field(content)\n}\nt: #Thing\n";
+    TriContent *a1 = load1_ok(v1), *a2 = load1_ok(v2);
+    TriArena *a = tri_arena_new();
+    int same = 0;
+    for (uint64_t seed = 1; seed <= 30; seed++) {
+        const TriNode *x = tri_construct(a1, "t", seed, a), *y = tri_construct(a2, "t", seed, a);
+        char cx[64], sx[64];
+        snprintf(cx, sizeof cx, "%s", printed(a1, tri_at(a1, x, "colour")));
+        snprintf(sx, sizeof sx, "%s", printed(a1, tri_at(a1, x, "size")));
+        if (!strcmp(cx, printed(a2, tri_at(a2, y, "colour"))) && !strcmp(sx, printed(a2, tri_at(a2, y, "size")))) same++;
+    }
+    CHECK(same == 30);
+    tri_content_free(a1);
+    tri_content_free(a2);
+    /* a range peaked by @vary(mode: v) */
+    TriContent *c = load1_ok("#R: { @component(R)\n size: length & >=10mm & <=20mm @field(content) @vary(mode: 11mm)\n}\nr: #R\n");
+    int low = 0;
+    int64_t sum = 0;
+    for (uint64_t seed = 1; seed <= 400; seed++) {
+        int64_t lo, hi;
+        tri_node_interval(tri_at(c, tri_construct(c, "r", seed, a), "size"), &lo, &hi);
+        CHECK(lo == hi && lo >= 100 && lo <= 200);
+        sum += lo;
+        if (lo < 150) low++;
+    }
+    CHECK(low > 240);                          /* the peak is near the bottom */
+    CHECK(sum / 400 > 125 && sum / 400 < 148);  /* the mean (10 + 11 + 20) / 3 = 13.7 mm */
+    tri_arena_free(a);
+    tri_content_free(c);
+}
+
+void test_arithmetic_exponents_and_backwards(void)
+{
+    TriContent *c = load1_ok(
+        "#Box: { w: $w & length, h: $h & length, total: $w + $h, half: $w / 2, triple: $h * 3 }\n"
+        "#Cube: { l: $l & length, vol: $l * $l * $l, f: $f & force, work: $f * $l & torque }\n");
+    TriArena *a = tri_arena_new();
+    /* backwards: a known total and width give the height; scaling inverts */
+    const TriNode *b = tri_value(c, "#Box & { total: 3m, w: 1m }", a, NULL, 0);
+    CHECK_STR(printed(c, tri_at(c, b, "h")), "2000mm");
+    CHECK_STR(printed(c, tri_at(c, tri_value(c, "#Box & { triple: 3m }", a, NULL, 0), "h")), "1000mm");
+    const TriNode *hb = tri_value(c, "#Box & { half: 500mm }", a, NULL, 0);
+    int64_t lo, hi;
+    tri_node_interval(tri_at(c, hb, "w"), &lo, &hi);
+    CHECK(lo <= 10000 && hi >= 10000 && hi - lo <= 4);
+    CHECK_STR(printed(c, tri_at(c, tri_value(c, "#Box & { total: >=1m & <=2m, w: >=0.5m }", a, NULL, 0), "h")), "<=1500mm");
+    /* exponents: an area on the way to a volume, force times length as torque */
+    const TriNode *cu = tri_value(c, "#Cube & { l: 2m, f: 3N }", a, NULL, 0);
+    CHECK_STR(printed(c, tri_at(c, cu, "vol")), "8000000mL");
+    CHECK_STR(printed(c, tri_at(c, cu, "work")), "6Nm");
+    tri_arena_free(a);
+    tri_content_free(c);
+    c = load1("#D: { m: $m & mass, v: $v & volume, d: $m / $v }\n");
+    CHECK(has_diag(c, "no quantity has this dimension", 1));
+    tri_content_free(c);
+}
+
+void test_clause_solutions_distinct(void)
+{
+    char src[4096];
+    snprintf(src, sizeof src, "%se4: #Fact & { head: #Edge & { from: \"yard\", to: \"kitchen\", d: 20m } }\n", graph_src);
+    TriContent *c = load1_ok(src);
+    TriArena *a = tri_arena_new();
+    const TriNode *sol[16];
+    int trunc;
+    size_t n = tri_solve(c, tri_value(c, "#Reach & { from: \"kitchen\" }", a, NULL, 0), 14, sol, 16, a, &trunc);
+    CHECK(n == 4 && trunc);                  /* each place once, though the cycle repeats them */
+    tri_arena_free(a);
+    tri_content_free(c);
+}
+
+void test_component_header(void)
+{
+    TriContent *c = load1_ok(
+        "#Material: \"steel\" | \"brass\"\n"
+        "#Tool: { @component(Tool)\n mass: mass @field(content, saved)\n material: #Material @field(content)\n"
+        " lit: bool @field(saved)\n label: text\n owner: ref\n finish: \"black\" | \"dull\"\n}\n");
+    char buf[4096];
+    size_t n = tri_component_header(c, "BG", buf, sizeof buf);
+    CHECK(n > 0 && n < sizeof buf);
+    CHECK_CONTAINS(buf, "#define BG_CONTENT_HASH 0x");
+    CHECK_CONTAINS(buf, "int64_t         mass;    /* mass, in quanta of 1g; content, saved */");
+    CHECK_CONTAINS(buf, "uint32_t        material;    /* #Material: a type ID; content */");
+    CHECK_CONTAINS(buf, "bool            lit;");
+    CHECK_CONTAINS(buf, "const char *    label;");
+    CHECK_CONTAINS(buf, "uint64_t        owner;");
+    CHECK_CONTAINS(buf, "} BGTool;");
+    CHECK_CONTAINS(buf, "BG_MATERIAL_STEEL = ");
+    CHECK_CONTAINS(buf, "BG_TOOL_FINISH_BLACK = ");
+    tri_content_free(c);
+}
+
+void test_failure_recording_and_sizes(void)
+{
+    TriContent *c = load1_ok(
+        "#Nut: { size: length, state: \"loose\" | \"tight\" }\n#Roles: { target: #Nut }\n"
+        "tighten: #Roles & { target: { state: \"loose\" } } @family(ops)\n"
+        "big: #Roles & { target: { size: >=30mm } } @family(ops)\n");
+    TriArena *a = tri_arena_new();
+    tri_record_failures(c, 1);
+    const char *ds[] = { "#Roles & { target: { state: \"tight\", size: 10mm } }",
+                         "#Roles & { target: { state: \"tight\", size: 40mm } }",
+                         "#Roles & { target: { state: \"loose\", size: 10mm } }" };
+    TriMatchResult r;
+    for (int i = 0; i < 3; i++) {
+        const TriNode *d = tri_value(c, ds[i], a, NULL, 0);
+        tri_match_instance(c, "tighten", d, &r);
+        tri_match_instance(c, "big", d, &r);
+    }
+    char buf[256];
+    tri_family_suggest_quickcheck(c, "ops", 4, buf, sizeof buf);
+    CHECK_STR(buf, "@quickcheck(target.size, target.state)");
+    tri_family_suggest_quickcheck(c, "ops", 1, buf, sizeof buf);
+    CHECK_STR(buf, "@quickcheck(target.size)");
+    /* sizes a knowledge store measures */
+    const TriNode *d = tri_value(c, ds[0], a, NULL, 0);
+    CHECK(tri_node_count(d) == 4);
+    CHECK(tri_arena_bytes(a) > 0);
+    tri_arena_free(a);
+    tri_content_free(c);
+}
+
+void test_migration(void)
+{
+    TriContent *old = load1_ok("#Coat: { colour: \"grey\" | \"brown\" }\n#Person: { coat: #Coat, name: text }\n");
+    TriContent *new = load1_ok("#Coat: { colour: \"grey\" | \"brown\" | \"navy\", buttons: int }\n#Person: { coat: #Coat, name: text, age: int }\n");
+    TriArena *a = tri_arena_new();
+    char err[256];
+    const TriNode *p = tri_value(old, "#Person & { coat: { colour: \"grey\" }, name: \"Ines\" }", a, NULL, 0);
+    const TriNode *q = tri_migrate(old, new, p, a, err, sizeof err);
+    CHECK(q != NULL);
+    CHECK_STR(printed(new, q), "#Person & { age: int, coat: #Coat & { buttons: int, colour: \"grey\" }, name: \"Ines\" }");
+    tri_arena_free(a);
+    tri_content_free(old);
+    tri_content_free(new);
+}

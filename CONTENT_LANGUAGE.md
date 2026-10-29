@@ -141,6 +141,8 @@ the parts listed in §2.
 | Decay attribute | `height: length @widen(5cm)` | How far a number widens per step of memory decay |
 | Derived field | `torque: torque @fn(lever_torque)` | A value computed by registered code |
 | Instance attributes | `@family(operations)`, `@quickcheck(target.size)`, `@variants(128)` | Pattern family, its quick-check paths, and the variant cap |
+| Range distribution | `size: >=10mm & <=20mm @vary(mode: 11mm)` | A triangular draw peaked at the mode |
+| Arithmetic | `torque: $f * $a`, `girth: ($w + $h) * 2` | A constraint between tagged fields (§5) |
 | Addition | the same name declared again, anywhere | Unified with the other declarations; order never matters |
 | Comment | `// ...` | A comment directly above a declaration is its docstring |
 
@@ -153,9 +155,13 @@ the parts listed in §2.
 - `text` and `ref` are values, not types: a string or referent first seen at
   runtime is as good as one in content. Left open in a spec, they stay open
   (they are bound at runtime), rather than becoming variation
-- one type per quantity dimension, named after it: `mass`, `length`,
-  `time`, `heat`, `temperature`, `torque`, and so on. Their quanta come from
-  the unit descriptors (DOMAIN_SIMULATION.md §12).
+- one type per quantity kind, named after it: `mass` (1 g), `length`
+  (0.1 mm), `time` (1 ms), `force` (1 mN), `torque` (1 mN·m), `heat`
+  (100 J), `temperature` (0.01 K), `volume` (1 mL), `amount` (1 mmol). Each
+  kind's descriptor gives its exponents over the base units, its quantum,
+  and its display unit, following DOMAIN_SIMULATION.md §12. The descriptor
+  table (`triangle/src/units.c`) is the one source; the engine's unit
+  structs will be generated from it.
 
 ### 2. False friends with CUE
 
@@ -201,9 +207,10 @@ adopted, but between tags rather than field references (§5).
 - **Appropriateness is inferred**:
   - A feature belongs to the type that introduces it.
   - Subtypes inherit it and may narrow its value type.
-  - A feature introduced by two unrelated types is a load error. The message
-    names both and suggests a common supertype (for example `#Sized` for a
-    `size` shared by tools and nuts).
+  - A feature introduced by two unrelated types is a load error, by
+    decision: generating a hidden common supertype would change what the
+    types mean without anyone seeing it. The message gives both locations,
+    and names a common supertype to declare it on, or suggests a new one.
 - **Type constraints.** A type's definition body is a constraint every
   instance of the type satisfies. This is how universal constraints, like
   Troll's "every bird can fly", are written: there is no separate implication
@@ -221,6 +228,11 @@ adopted, but between tags rather than field references (§5).
   flags from their `@field` attributes. An entity type conjoins component
   types, so an entity's components are the component types among its
   supertypes. This is Qud's parts written as multiple inheritance.
+- **Content is the source of truth for components.** A build step
+  (`tri-components`) generates one C struct per component from the
+  `@component` types, with numbers as quanta, enums as type IDs, and units
+  and flags in comments. The component stores use those structs; the field
+  registry is never written twice.
 
 ### 4. Unification and tags
 
@@ -250,9 +262,17 @@ adopted, but between tags rather than field references (§5).
   `force: $f, arm: $a`. There are still no field references, only tags.
   - Operators are `+ - * /` over numbers, tags, and parenthesised
     expressions, binding tighter than `&`.
-  - Sums need one dimension. Products and quotients scale by a dimensionless
-    `int` or `fixed`, divide like by like into a `fixed` ratio, or combine
-    dimensions through a table (force × length = torque).
+  - Values carry their exponents over the base units (m, kg, s, K, mol)
+    and their quantum, so products and quotients follow from the units:
+    force × length is torque (torque and heat share exponents; a product is
+    torque), length × length × length is volume, and an intermediate needs
+    no kind of its own (the area on the way). Only the final result must be
+    a kind, converted to its field's quanta. Sums need equal exponents.
+  - A dimensionless result is `int` or `fixed` as its field says; an
+    untyped field gets `fixed`.
+  - Constraints also narrow backwards, through sums, differences, and
+    scaling by a constant: a known total and one part give the other.
+    Products and quotients of two variables are not inverted.
   - It is a constraint on intervals, computed forward and rounded outward:
     while an argument is open, so is the result, and it narrows as the
     arguments do (LIFE's suspension, for free). A result that is not a whole
@@ -274,7 +294,9 @@ adopted, but between tags rather than field references (§5).
   that contributed it.
   - A default from a more specific type overrides a conflicting one from a
     more general type.
-  - Conflicting defaults from incomparable types are both dropped, with a
+  - Conflicting defaults from incomparable types are both dropped, by
+    decision (YADU proper would keep their generalisation, a value nobody
+    wrote), with a
     warning. The field stays open, which makes it variation (§7).
   - A default never overrides an indefeasible value. If they conflict, the
     default silently loses.
@@ -318,8 +340,15 @@ adopted, but between tags rather than field references (§5).
   - `@vary` weights after a field or declaration weight its alternatives
 - **Construction makes every authoritative field concrete** from the
   entity's seed (COMPONENTS.md §1, §10), using `@vary` weights where given
-  and a uniform choice otherwise. The draw order is the spec's field order,
-  fixed at load.
+  and a uniform choice otherwise.
+- **Each point draws from its own seed:** a hash of the entity's seed and
+  the point's path, by feature name. A draw doesn't depend on the order of
+  points or on which others are drawn. Adding a field to a blueprint leaves
+  existing entities' other values alone, and a latent part can be drawn
+  when it is revealed, from its parent's seed and its own path.
+- **Distributions.** Enums and alternatives take `@vary` weights. A range
+  takes `@vary(mode: 19mm)`: a triangular distribution peaked at the mode,
+  drawn in integers so that it is deterministic everywhere.
 - A spec records its variation points, so the developer inspector can show
   which properties came from the seed.
 - **Expansion is capped.** A blueprint that expands to more than a declared
@@ -430,7 +459,11 @@ r2: #Clause & { head: #Dist & { from: $x, to: $z, d: $a + $b },
   clauses in name order, each clause copied fresh so its tags are its
   variables.
 - A depth limit bounds each proof, and the caller learns whether it cut any
-  short. A bound on the whole search guards against explosion.
+  short. A bound on the whole search guards against explosion. A solution
+  equal to one already found (the same answer by another route around a
+  cycle) is reported once.
+- Clauses are for short relational inferences ("reachable through doors this
+  agent can open"). Search over the map, such as pathfinding, is engine code.
 - Arithmetic in a clause waits through the search: `$a + $b` narrows as the
   recursive goal fixes `$b`, and a query's bound (`d: <=8m`) filters.
 
@@ -459,6 +492,10 @@ r2: #Clause & { head: #Dist & { from: $x, to: $z, d: $a + $b },
   a source of honest misidentification.
 - Propositions are FSs whose arguments are `ref` atoms and values (§5).
   Their time index and persistence are features of `#Proposition`.
+- **Uncertain identity lives in hypotheses only.** A `ref` unifies only with
+  itself, and "R12 may be R7" is a pair of competing hypotheses with
+  credences, never a disjunction inside a description: descriptions stay
+  conjunctive.
 
 ### 12. The engine
 
@@ -502,7 +539,7 @@ systems.
 | Load | One content build; dropped after specs are frozen |
 | Specs | The session; immutable |
 | Scratch | One match or unification, released by mark and release |
-| Knowledge | One per agent; compacted by copying live descriptions (`tri_copy`) into a fresh arena during housekeeping (boundary step 4) when waste passes a threshold |
+| Knowledge | One per agent; compacted by copying live descriptions (`tri_copy`) into a fresh arena during housekeeping (boundary step 4) when live data is under about half the arena (`tri_arena_bytes`). A store's memory bound counts bytes, estimated from node counts (`tri_node_count`). |
 
 **Filtering and indexing**
 
@@ -512,8 +549,14 @@ systems.
   paths that most often cause failure. Comparing those by meet lookup
   rejects most failing matches before full matching. The paths are chosen
   offline from recorded scenario runs and written in content
-  (`@quickcheck(...)` on a family's instances), so they are fixed at load. In DELPH-IN, 13–30 paths with a rule filter
-  rejected 95–98% of failing unifications.
+  (`@quickcheck(...)` on a family's instances), so they are fixed at load.
+  In DELPH-IN, 13–30 paths with a rule filter rejected 95–98% of failing
+  unifications.
+- **Choosing the paths is measured, not guessed.** Scenario runs record the
+  failure paths of each family's matches (`tri_record_failures`), and
+  `tri_family_suggest_quickcheck` writes the `@quickcheck` attribute to
+  paste in. It should pay off for method and operation matching, with many
+  patterns per description; blueprint loading needs none.
 
 **Determinism**
 
@@ -548,13 +591,19 @@ systems.
   and `tri_explain_instance` with tag names).
 - **Docstrings.** A comment directly above a declaration is its docstring
   (`tri_doc`).
-- **The TDL front end** reads a subset of TDL into the same tree. Its first
+- **The TDL front end** stays, as a test oracle: checking against ACE found
+  a real bug and drove the performance work. The game links a build without
+  it (`make game`). It reads a subset of TDL into the same tree. Its first
   use is benchmarking against the English Resource Grammar, with ACE (MIT,
   C) as the reference for results.
 
 ### 15. Saves
 
 - Specs are never saved. Saves record the content hash.
+- **Reloading and mods are a full rebuild.** A rebuild is fast (the ERG, far
+  larger than the game's content, takes 0.6 s), and declaration order never
+  matters, so a mod is more files in the same load. What crosses a rebuild
+  is live descriptions, moved by name (`tri_migrate`), as saves are.
 - Knowledge descriptions are saved as FSs. With the same content hash, they
   use type IDs. Otherwise they are written by type name, so a save can be
   migrated to new content, failing loudly on types that no longer exist.
@@ -705,8 +754,12 @@ open:
 - the inspector, the match explainer, docstrings, and both locations of every
   conflict
 - saves by ID or by name, with migration to changed content
-- arithmetic over quantities, propagated as interval constraints
+- arithmetic over quantities, with units from exponents, propagated as
+  interval constraints forwards and (through sums and scaling) backwards
 - definite clauses, solved by resolution with a depth limit (`tri_solve`)
+- path-keyed variation seeds and triangular ranges (`@vary(mode:)`)
+- generated component structs (`tri-components`), failure recording for
+  choosing quick-check paths, store sizes, and migration between builds
 - the content hash, and the Objective-C wrapper (`BGContent`), run under
   Apple's runtime and mulle-objc
 
@@ -1007,36 +1060,34 @@ own workloads (open question 9).
 | LiLFeS, CUF | Definite clauses over TFS; delayed goals | Deferred clause layer |
 | Qud | Parts as composition | Component types conjoined by multiple inheritance |
 
-## Open questions
+## Decisions on the former open questions
 
-1. **The clause layer.** Built (§10). Which systems use it, and with what
-   depth limits, is for the systems' docs; negation and cuts are not
-   provided.
-2. **Code generation.** Should the loader generate Objective-C classes from
-   `@component` types, or should Objective-C declare components and the
-   loader check them against content (COMPONENTS.md open question 6)?
-3. **Feature introduction friction.** Should the loader factor a shared
-   feature into a generated common supertype automatically, instead of
-   erroring?
-4. **Default ties.** YADU proper keeps the generalisation of conflicting
-   defaults rather than dropping both. Is that worth the complexity?
-5. **Variation distributions.** Are weights enough, or do ranges need
-   distributions (triangular, normal by table)? How do variation points
-   interact with latent assembly's deferred seeding?
-6. **Arithmetic.** Built (§5), forward only. Should constraints also narrow
-   their arguments from the result (backward propagation), and which
-   dimension products beyond force × length does content need?
-7. **Quanta.** Length and torque need quanta (0.1 mm and 1 mN·m are
-   candidates) in the DOMAIN_SIMULATION.md §12 table.
-8. **Referent identity inside descriptions.** A `ref` atom unifies only with
-   itself. When identity is uncertain ("R12 is R7"), is that handled only by
-   hypotheses, or can a description carry an identity disjunction?
-9. **Our workloads.** What failure ratios, structure sizes, and sharing do
-   blueprint loading, recognition, and method matching actually have? Does
-   the quick check pay off for us?
-10. **Knowledge arenas.** When to compact, and whether a store's memory bound
-    (KNOWLEDGE.md §12) should count nodes.
-11. **Reloading and mods.** A changed hierarchy needs new meet codes. Is a
-    full reload acceptable, including for mods?
-12. **The TDL front end.** How much of TDL to read, and whether to keep it
-    after benchmarking.
+Each question this section used to hold is decided; what stays open is
+listed under it.
+
+1. **The clause layer.** Built (§10): no negation, no cut; identical
+   solutions are merged; pathfinding stays engine code. *Open:* tabling, if
+   content comes to lean on recursion over cyclic data.
+2. **Code generation.** Content is the source of truth; `tri-components`
+   generates C structs for the component stores (§3), not Objective-C
+   classes. This also answers COMPONENTS.md open question 6.
+3. **Feature introduction friction.** Kept as an error, with both locations
+   and a suggested supertype (§3).
+4. **Default ties.** Both are dropped, with a warning; the field becomes
+   variation (§6).
+5. **Variation distributions.** Path-keyed seeds, weights for alternatives,
+   and `@vary(mode: v)` for ranges (§7). Latent parts draw from their
+   parent's seed and their own path.
+6. **Arithmetic.** Units from exponents; backward narrowing through sums,
+   differences, and constant scaling (§5). *Open:* narrowing through
+   products of two variables, if content needs it.
+7. **Quanta.** As in §1's built-in types, from one descriptor table, which
+   DOMAIN_SIMULATION.md §12's quanta also come from.
+8. **Referent identity.** Hypotheses only (§11).
+9. **Our workloads.** Measured by recording failure paths in scenario runs
+   (§12). *Open:* the numbers, once the systems exist.
+10. **Knowledge arenas.** Compact under half live; bound by bytes (§12).
+11. **Reloading and mods.** A full rebuild, with live descriptions migrated
+    by name (§15).
+12. **The TDL front end.** Kept as a test oracle, left out of the game build
+    (§14).

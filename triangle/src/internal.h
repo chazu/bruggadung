@@ -62,11 +62,24 @@ uint64_t fnv1a(uint64_t h, const void *data, size_t n);
 
 typedef VEC(uint32_t) U32Vec;
 typedef VEC(U32Vec) PathVec;
+typedef VEC(TriNode *) NodeVec;
 
 /* --- units ---------------------------------------------------------------------- */
 
 enum { DIM_INT, DIM_FIXED, DIM_MASS, DIM_LENGTH, DIM_TIME, DIM_TORQUE, DIM_FORCE,
-       DIM_HEAT, DIM_TEMPERATURE, DIM_REF, DIM_TEXT, NDIMS };
+       DIM_HEAT, DIM_TEMPERATURE, DIM_VOLUME, DIM_AMOUNT, DIM_REF, DIM_TEXT, NDIMS };
+
+/* A quantity kind: its exponents over the base units (m, kg, s, K, mol), its
+ * quantum in those units (num / den), and how it prints. Products and
+ * quotients of quantities follow from the exponents. */
+typedef struct {
+    int8_t exp[5];
+    int64_t qnum, qden;
+    const char *display;        /* suffix */
+    int64_t per;                /* quanta per display unit */
+    bool quantity;              /* false for ref and text */
+} QuantityKind;
+extern const QuantityKind quantity_kinds[NDIMS];
 /* DIM_REF holds a referent number; DIM_TEXT an interned string, as a pointer.
  * Both are concrete when lo == hi and unify by equality. */
 
@@ -78,7 +91,10 @@ void        units_format(Buf *b, int dim, int64_t q);
 
 /* --- arithmetic ------------------------------------------------------------------ */
 
-typedef struct { int dim; int64_t lo, hi; } Quantity;
+/* A value in arithmetic: an interval in quanta, with its exponents over the
+ * base units and its quantum (qnum / qden in base units). dim is the kind it
+ * is in, or -1 for an intermediate no kind has (an area, say). */
+typedef struct { int dim; int64_t lo, hi; int8_t exp[5]; int64_t qnum, qden; } Quantity;
 
 /* --- syntax tree -------------------------------------------------------------------- */
 
@@ -148,6 +164,11 @@ bool  x_numeric_or(X *x, int *dim, int64_t *lo, int64_t *hi, bool *contiguous);
 /* arith.c */
 extern const char *const ARITH_UNKNOWN;
 const char *quantity_op(int op, Quantity a, Quantity b, Quantity *out);
+Quantity    quantity_of(int dim, int64_t lo, int64_t hi);
+int         quantity_kind_for(const Quantity *q);
+const char *quantity_to(const Quantity *q, int dim, Quantity *out);       /* convert to a kind */
+void        arith_narrow(const X *x, Quantity want, bool (*lookup)(void *ctx, Sym tag, Quantity *q), void *ctx,
+                         void (*narrow)(void *ctx, Sym tag, const Quantity *q));
 const char *arith_eval(const X *x, bool (*lookup)(void *ctx, Sym tag, Quantity *q), void *ctx, Quantity *out);
 void        arith_tags(const X *x, SymVec *out);
 
@@ -302,6 +323,8 @@ typedef struct {
     U32Vec insts;                /* member instances, in name order */
     TriQuickCheck *qc;
     TriIndex *index;
+    U64Map failcount;            /* failure path Sym → count, when recording */
+    SymVec failpaths;            /* the paths, in the order first seen */
 } Family;
 
 typedef struct { Sym name; TriFn fn; void *ctx; } FnReg;
@@ -336,6 +359,7 @@ struct TriContent {
 
     XPtrVec listelems;           /* element expressions of typed lists [...X] */
     VEC(Family) families;
+    bool recording;              /* count failure paths of family matches */
     VEC(char *) buildlog;        /* generated types and dropped defaults, for the developer */
     size_t narith;               /* arithmetic constraints anywhere: none means nothing to propagate */
     const ArithVec *varskip;     /* instance-level arithmetic targets, not variation points */
@@ -409,6 +433,7 @@ TriNode *fs_generalise(Content *c, TriArena *out, TriNode *a, TriNode *b);
 /* runtime.c */
 void     families_build(Content *c);
 void     families_free(Content *c);
+void     family_record_failure(Content *c, uint32_t inst, const char *path);
 
 /* load.c */
 TriNode *type_expansion(Content *c, uint32_t t);      /* NULL while t is being expanded */

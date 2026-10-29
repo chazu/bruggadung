@@ -1,22 +1,26 @@
 #include "internal.h"
-#include <math.h>
 
 /* Arithmetic over quantities: interval arithmetic in exact quanta, with units.
  *
- * A value is a dimension and a closed interval. Sums need one dimension;
- * products and quotients scale by a dimensionless int or fixed value, or
- * combine two dimensions through the product table. Bounds round outward, so
- * the result always contains every exact answer. An infinite bound stays
- * infinite, which is how a constraint waits for its arguments (LIFE-style
- * suspension): the result narrows as they do. */
+ * A value carries its exponents over the base units (m, kg, s, K, mol) and its
+ * quantum in those units, so intermediate results need not be a named kind:
+ * length × length is an area on the way to a volume. Only a final result is
+ * converted to its field's kind. Sums need equal exponents and work in the
+ * largest quantum dividing both; products and quotients add or subtract
+ * exponents. Bounds round outward, so a result always contains every exact
+ * answer. An infinite bound stays infinite, which is how a constraint waits
+ * for its arguments (LIFE-style suspension): the result narrows as they do.
+ *
+ * Constraints also narrow backwards where that is exact enough to be useful:
+ * through sums and differences, and through scaling by a constant. */
 
-/* d1 × d2 = r, with r_quanta = d1_quanta × d2_quanta × num / den */
-static const struct { int d1, d2, r; int64_t num, den; } products[] = {
-    /* force (mN) × length (0.1 mm) = torque (mN·m) */
-    { DIM_FORCE, DIM_LENGTH, DIM_TORQUE, 1, 10000 },
-};
-
-static bool scalar(int dim) { return dim == DIM_INT || dim == DIM_FIXED; }
+static __int128 gcd128(__int128 a, __int128 b)
+{
+    if (a < 0) a = -a;
+    if (b < 0) b = -b;
+    while (b) { __int128 t = a % b; a = b; b = t; }
+    return a ? a : 1;
+}
 
 static int64_t clamp128(__int128 v)
 {
@@ -26,6 +30,73 @@ static int64_t clamp128(__int128 v)
 }
 
 static bool infinite(int64_t v) { return v == TRI_INF || v == TRI_NINF; }
+
+/* floor (or ceiling) of n / d, exactly */
+static __int128 div_round(__int128 n, __int128 d, bool up)
+{
+    __int128 q = n / d, r = n % d;
+    if (r != 0 && ((r < 0) != (d < 0))) q -= 1;
+    if (up && r != 0) q += 1;
+    return q;
+}
+
+/* a bound times num / den, rounded down (or up); infinities stay */
+static int64_t rescale(int64_t v, __int128 num, __int128 den, bool up)
+{
+    if (infinite(v)) return v;
+    return clamp128(div_round((__int128) v * num, den, up));
+}
+
+Quantity quantity_of(int dim, int64_t lo, int64_t hi)
+{
+    Quantity q;
+    q.dim = dim;
+    q.lo = lo;
+    q.hi = hi;
+    memcpy(q.exp, quantity_kinds[dim].exp, sizeof q.exp);
+    q.qnum = quantity_kinds[dim].qnum;
+    q.qden = quantity_kinds[dim].qden;
+    return q;
+}
+
+static void set_quantum(Quantity *q, __int128 num, __int128 den)
+{
+    __int128 g = gcd128(num, den);
+    num /= g;
+    den /= g;
+    q->qnum = clamp128(num);
+    q->qden = clamp128(den);
+}
+
+/* The kind with q's exponents, preferring one with q's quantum. Dimensionless
+ * values are int in quantum 1, fixed otherwise. -1 if no kind has them. */
+int quantity_kind_for(const Quantity *q)
+{
+    bool zero = true;
+    for (int i = 0; i < 5; i++) zero &= q->exp[i] == 0;
+    if (zero) return q->qden == 1 && q->qnum == 1 ? DIM_INT : DIM_FIXED;
+    int best = -1;
+    for (int d = 0; d < NDIMS; d++) {
+        if (!quantity_kinds[d].quantity || d == DIM_INT || d == DIM_FIXED) continue;
+        if (memcmp(quantity_kinds[d].exp, q->exp, sizeof q->exp)) continue;
+        if (quantity_kinds[d].qnum == q->qnum && quantity_kinds[d].qden == q->qden) return d;
+        if (best < 0) best = d;
+    }
+    return best;
+}
+
+const char *quantity_to(const Quantity *q, int dim, Quantity *out)
+{
+    const QuantityKind *k = &quantity_kinds[dim];
+    if (!k->quantity || memcmp(k->exp, q->exp, sizeof q->exp)) return "a value of another dimension";
+    /* value × (q's quantum / the kind's quantum) */
+    __int128 num = (__int128) q->qnum * k->qden, den = (__int128) q->qden * k->qnum;
+    __int128 g = gcd128(num, den);
+    num /= g;
+    den /= g;
+    *out = quantity_of(dim, rescale(q->lo, num, den, false), rescale(q->hi, num, den, true));
+    return NULL;
+}
 
 /* a × b for bounds, with infinities */
 static __int128 mul_bound(int64_t a, int64_t b, bool *inf, int *sign)
@@ -40,65 +111,44 @@ static __int128 mul_bound(int64_t a, int64_t b, bool *inf, int *sign)
     return (__int128) a * b;
 }
 
-/* floor or ceiling of v × num / den */
-static int64_t scale(__int128 v, int64_t num, int64_t den, bool up)
+static void interval_mul(const Quantity *a, const Quantity *b, Quantity *out)
 {
-    __int128 t = v * num;
-    __int128 q = t / den, r = t % den;
-    if (r != 0 && ((t < 0) != (den < 0))) q -= 1;       /* towards -inf */
-    if (up && r != 0) q += 1;
-    return clamp128(q);
-}
-
-static void interval_mul(Quantity a, Quantity b, int64_t num, int64_t den, Quantity *out)
-{
-    int64_t xs[2] = { a.lo, a.hi }, ys[2] = { b.lo, b.hi };
-    bool any_lo_inf = false, any_hi_inf = false;
+    int64_t xs[2] = { a->lo, a->hi }, ys[2] = { b->lo, b->hi };
+    bool lo_inf = false, hi_inf = false, first = true;
     __int128 lo = 0, hi = 0;
-    bool first = true;
     for (int i = 0; i < 2; i++)
         for (int j = 0; j < 2; j++) {
             bool inf;
             int sign;
             __int128 p = mul_bound(xs[i], ys[j], &inf, &sign);
-            if (inf) { if (sign < 0) any_lo_inf = true; else any_hi_inf = true; continue; }
+            if (inf) { if (sign < 0) lo_inf = true; else hi_inf = true; continue; }
             if (first || p < lo) lo = p;
             if (first || p > hi) hi = p;
             first = false;
         }
-    out->lo = any_lo_inf || first ? TRI_NINF : scale(lo, num, den, false);
-    out->hi = any_hi_inf || first ? TRI_INF : scale(hi, num, den, true);
+    out->lo = lo_inf || first ? TRI_NINF : clamp128(lo);
+    out->hi = hi_inf || first ? TRI_INF : clamp128(hi);
 }
 
-/* floor (or ceiling) of n / d, exactly */
-static __int128 div_round(__int128 n, __int128 d, bool up)
+/* (a × scale) / b, rounding outward; b containing zero gives no bound */
+static void interval_div(const Quantity *a, const Quantity *b, int64_t scale, Quantity *out)
 {
-    __int128 q = n / d, r = n % d;
-    if (r != 0 && ((r < 0) != (d < 0))) q -= 1;
-    if (up && r != 0) q += 1;
-    return q;
-}
-
-/* a / b: (a × num) / (b × den), rounding outward. An interval b containing
- * zero gives no bound. */
-static void interval_div(Quantity a, Quantity b, int64_t num, int64_t den, Quantity *out)
-{
-    if (b.lo <= 0 && b.hi >= 0) { out->lo = TRI_NINF; out->hi = TRI_INF; return; }
-    int64_t xs[2] = { a.lo, a.hi }, ys[2] = { b.lo, b.hi };
+    if (b->lo <= 0 && b->hi >= 0) { out->lo = TRI_NINF; out->hi = TRI_INF; return; }
+    int64_t xs[2] = { a->lo, a->hi }, ys[2] = { b->lo, b->hi };
     __int128 lo = 0, hi = 0;
     bool lo_inf = false, hi_inf = false, first = true;
     for (int i = 0; i < 2; i++)
         for (int j = 0; j < 2; j++) {
             __int128 vlo, vhi;
             if (infinite(ys[j])) {
-                vlo = vhi = 0;                    /* x / ±inf → 0 */
+                vlo = vhi = 0;
             } else if (infinite(xs[i])) {
                 if ((xs[i] < 0) != (ys[j] < 0)) lo_inf = true; else hi_inf = true;
                 continue;
             } else {
-                __int128 n = (__int128) xs[i] * num, d = (__int128) ys[j] * den;
-                vlo = div_round(n, d, false);
-                vhi = div_round(n, d, true);
+                __int128 n = (__int128) xs[i] * scale;
+                vlo = div_round(n, ys[j], false);
+                vhi = div_round(n, ys[j], true);
             }
             if (first || vlo < lo) lo = vlo;
             if (first || vhi > hi) hi = vhi;
@@ -108,9 +158,9 @@ static void interval_div(Quantity a, Quantity b, int64_t num, int64_t den, Quant
     out->hi = hi_inf || first ? TRI_INF : clamp128(hi);
 }
 
-static int64_t add_bound(int64_t a, int64_t b, bool up)
+static int64_t add_bound(int64_t a, int64_t b)
 {
-    if (a == TRI_NINF || b == TRI_NINF) return up && (a == TRI_INF || b == TRI_INF) ? TRI_INF : TRI_NINF;
+    if (a == TRI_NINF || b == TRI_NINF) return (a == TRI_INF || b == TRI_INF) ? TRI_INF : TRI_NINF;
     if (a == TRI_INF || b == TRI_INF) return TRI_INF;
     return clamp128((__int128) a + b);
 }
@@ -120,68 +170,57 @@ static int64_t neg_bound(int64_t v)
     return v == TRI_INF ? TRI_NINF : v == TRI_NINF ? TRI_INF : -v;
 }
 
-/* an int value read as fixed */
-static Quantity as_fixed(Quantity q)
+/* Brings two values of equal exponents to a common quantum: the largest that
+ * divides both quanta exactly. */
+static void common_quantum(Quantity *a, Quantity *b)
 {
-    if (q.dim != DIM_INT) return q;
-    q.dim = DIM_FIXED;
-    q.lo = infinite(q.lo) ? q.lo : clamp128((__int128) q.lo * 1000);
-    q.hi = infinite(q.hi) ? q.hi : clamp128((__int128) q.hi * 1000);
-    return q;
+    if (a->qnum == b->qnum && a->qden == b->qden) return;
+    __int128 x = (__int128) a->qnum * b->qden, y = (__int128) b->qnum * a->qden, d = (__int128) a->qden * b->qden;
+    __int128 g = gcd128(x, y);               /* the common quantum is g / d */
+    __int128 fa = x / g, fb = y / g;          /* each value in common quanta: value × f */
+    a->lo = infinite(a->lo) ? a->lo : clamp128(a->lo * fa);
+    a->hi = infinite(a->hi) ? a->hi : clamp128(a->hi * fa);
+    b->lo = infinite(b->lo) ? b->lo : clamp128(b->lo * fb);
+    b->hi = infinite(b->hi) ? b->hi : clamp128(b->hi * fb);
+    set_quantum(a, g, d);
+    set_quantum(b, g, d);
 }
+
+/* Quotients are computed this many times finer than their operands' quanta,
+ * so that little is lost before the final conversion. */
+#define DIV_SCALE 1000000
 
 const char *quantity_op(int op, Quantity a, Quantity b, Quantity *out)
 {
-    if ((a.dim == DIM_INT && b.dim == DIM_FIXED) || (a.dim == DIM_FIXED && b.dim == DIM_INT)) {
-        if (op == '+' || op == '-') { a = as_fixed(a); b = as_fixed(b); }
-    }
+    if (a.dim >= 0 && !quantity_kinds[a.dim].quantity) return "not a quantity";
+    if (b.dim >= 0 && !quantity_kinds[b.dim].quantity) return "not a quantity";
     switch (op) {
     case '+': case '-':
-        if (a.dim != b.dim) return "adding or subtracting needs the same dimension";
-        out->dim = a.dim;
-        if (op == '+') { out->lo = add_bound(a.lo, b.lo, false); out->hi = add_bound(a.hi, b.hi, true); }
-        else { out->lo = add_bound(a.lo, neg_bound(b.hi), false); out->hi = add_bound(a.hi, neg_bound(b.lo), true); }
-        return NULL;
-    case '*': {
-        if (scalar(b.dim) && !scalar(a.dim)) { Quantity t = a; a = b; b = t; }
-        if (scalar(a.dim)) {                    /* a scales b */
-            int64_t den = a.dim == DIM_FIXED ? 1000 : 1;
-            out->dim = b.dim == DIM_INT && a.dim == DIM_FIXED ? DIM_FIXED : b.dim;
-            if (b.dim == DIM_INT && a.dim == DIM_FIXED) den = 1;     /* int × fixed is fixed */
-            interval_mul(a, b, 1, den, out);
-            return NULL;
-        }
-        for (size_t i = 0; i < sizeof products / sizeof products[0]; i++)
-            if ((products[i].d1 == a.dim && products[i].d2 == b.dim) ||
-                (products[i].d2 == a.dim && products[i].d1 == b.dim)) {
-                out->dim = products[i].r;
-                interval_mul(a, b, products[i].num, products[i].den, out);
-                return NULL;
-            }
-        return "no product of these dimensions is defined";
-    }
+        if (memcmp(a.exp, b.exp, sizeof a.exp)) return "adding or subtracting needs the same dimension";
+        common_quantum(&a, &b);
+        memcpy(out->exp, a.exp, sizeof a.exp);
+        out->qnum = a.qnum;
+        out->qden = a.qden;
+        if (op == '+') { out->lo = add_bound(a.lo, b.lo); out->hi = add_bound(a.hi, b.hi); }
+        else { out->lo = add_bound(a.lo, neg_bound(b.hi)); out->hi = add_bound(a.hi, neg_bound(b.lo)); }
+        break;
+    case '*':
+        for (int i = 0; i < 5; i++) out->exp[i] = (int8_t) (a.exp[i] + b.exp[i]);
+        set_quantum(out, (__int128) a.qnum * b.qnum, (__int128) a.qden * b.qden);
+        interval_mul(&a, &b, out);
+        break;
     case '/':
-        if (scalar(b.dim)) {
-            out->dim = a.dim == DIM_INT && b.dim == DIM_FIXED ? DIM_FIXED : a.dim;
-            int64_t num = b.dim == DIM_FIXED ? 1000 : 1;
-            if (a.dim == DIM_INT && b.dim == DIM_FIXED) num = 1000000;  /* int / fixed is fixed */
-            interval_div(a, b, num, 1, out);
-            return NULL;
-        }
-        if (a.dim == b.dim) {                   /* a ratio: fixed */
-            out->dim = DIM_FIXED;
-            interval_div(a, b, 1000, 1, out);
-            return NULL;
-        }
-        for (size_t i = 0; i < sizeof products / sizeof products[0]; i++)
-            if (products[i].r == a.dim && (products[i].d1 == b.dim || products[i].d2 == b.dim)) {
-                out->dim = products[i].d1 == b.dim ? products[i].d2 : products[i].d1;
-                interval_div(a, b, products[i].den, products[i].num, out);
-                return NULL;
-            }
-        return "no quotient of these dimensions is defined";
+        for (int i = 0; i < 5; i++) out->exp[i] = (int8_t) (a.exp[i] - b.exp[i]);
+        set_quantum(out, (__int128) a.qnum * b.qden, (__int128) a.qden * b.qnum * DIV_SCALE);
+        interval_div(&a, &b, DIV_SCALE, out);
+        break;
+    default:
+        return "unknown operator";
     }
-    return "unknown operator";
+    /* named only if it is already in that kind's quanta */
+    int d = quantity_kind_for(out);
+    out->dim = d >= 0 && quantity_kinds[d].qnum == out->qnum && quantity_kinds[d].qden == out->qden ? d : -1;
+    return NULL;
 }
 
 /* Evaluates an arithmetic expression. Returns NULL with the result, an error
@@ -192,8 +231,7 @@ const char *arith_eval(const X *x, bool (*lookup)(void *ctx, Sym tag, Quantity *
 {
     switch (x->k) {
     case X_NUM:
-        out->dim = x->u.num.dim;
-        out->lo = out->hi = x->u.num.q;
+        *out = quantity_of(x->u.num.dim, x->u.num.q, x->u.num.q);
         return NULL;
     case X_TAG:
         return lookup(ctx, x->u.name, out) ? NULL : ARITH_UNKNOWN;
@@ -207,6 +245,51 @@ const char *arith_eval(const X *x, bool (*lookup)(void *ctx, Sym tag, Quantity *
     }
     default:
         return "only numbers, tags, and + - * / may appear in arithmetic";
+    }
+}
+
+/* Backward narrowing: given that expression x lies within `want`, narrow the
+ * tags it reads, through sums, differences, and scaling by a constant. Each
+ * narrowing goes to `narrow` with the tag and the interval it must lie in, in
+ * the tag's own kind. Products and quotients of two variables are not
+ * inverted. */
+void arith_narrow(const X *x, Quantity want, bool (*lookup)(void *ctx, Sym tag, Quantity *q), void *ctx,
+                  void (*narrow)(void *ctx, Sym tag, const Quantity *q))
+{
+    if (x->k == X_TAG) {
+        Quantity cur, conv;
+        if (!lookup(ctx, x->u.name, &cur) || cur.dim < 0) return;
+        if (quantity_to(&want, cur.dim, &conv)) return;
+        narrow(ctx, x->u.name, &conv);
+        return;
+    }
+    if (x->k != X_ARITH) return;
+    const X *xa = x->u.ar.a, *xb = x->u.ar.b;
+    Quantity a, b, r;
+    bool ka = !arith_eval(xa, lookup, ctx, &a), kb = !arith_eval(xb, lookup, ctx, &b);
+    switch (x->u.ar.op) {
+    case '+':                                   /* a ∈ want − b, b ∈ want − a */
+        if (kb && !quantity_op('-', want, b, &r)) arith_narrow(xa, r, lookup, ctx, narrow);
+        if (ka && !quantity_op('-', want, a, &r)) arith_narrow(xb, r, lookup, ctx, narrow);
+        break;
+    case '-':                                   /* a ∈ want + b, b ∈ a − want */
+        if (kb && !quantity_op('+', want, b, &r)) arith_narrow(xa, r, lookup, ctx, narrow);
+        if (ka && !quantity_op('-', a, want, &r)) arith_narrow(xb, r, lookup, ctx, narrow);
+        break;
+    case '*':                                   /* by a nonzero constant: divide it out */
+        if (xb->k == X_NUM && b.lo != 0 && !quantity_op('/', want, b, &r)) arith_narrow(xa, r, lookup, ctx, narrow);
+        else if (xa->k == X_NUM && a.lo != 0 && !quantity_op('/', want, a, &r)) arith_narrow(xb, r, lookup, ctx, narrow);
+        break;
+    case '/':                                   /* by a nonzero constant: multiply it back */
+        if (xb->k == X_NUM && b.lo != 0) {
+            /* a / b lies in want, and a / b was rounded outward from a, so a
+             * lies in want × b widened by one of want's quanta on each side */
+            Quantity wider = want;
+            wider.lo = wider.lo == TRI_NINF ? wider.lo : wider.lo - 1;
+            wider.hi = wider.hi == TRI_INF ? wider.hi : wider.hi + 1;
+            if (!quantity_op('*', wider, b, &r)) arith_narrow(xa, r, lookup, ctx, narrow);
+        }
+        break;
     }
 }
 

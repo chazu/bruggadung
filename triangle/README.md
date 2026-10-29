@@ -11,6 +11,8 @@ make            # library and tests
 make test       # the leak check, then the tests
 make asan       # rebuild and test with AddressSanitizer and UBSan
 make objc       # the Objective-C wrapper and its test (macOS: Foundation)
+make game       # build/libtriangle-game.a, without the TDL front end
+./build/tri-components BG content/*.tri > components.h   # C structs for the components
 TRI_PROPS_SCALE=10 ./build/test properties     # ten times the randomised cases
 ```
 
@@ -29,6 +31,7 @@ TRI_PROPS_SCALE=10 ./build/test properties     # ten times the randomised cases
 | `src/runtime.c` | Docstrings, pattern families and their compiled indexes, saves |
 | `src/arith.c` | Interval arithmetic over quantities, with units |
 | `src/clause.c` | Definite clauses: resolution with a depth limit |
+| `tools/tri-components.c` | Generates the C structs for a content build's components |
 | `src/xtree.c` | Syntax tree printing and construction |
 | `src/util.c` | Arenas, symbols, maps, diagnostics |
 | `objc/` | `BGContent`, the Objective-C wrapper, with its test; runs under Apple's runtime and mulle-objc |
@@ -94,7 +97,7 @@ wall-clock times on a quiet machine are within a few per cent of it.
 | With the quick check (13 paths) | 97.6% of failures filtered, 2.2× faster, none wrongly rejected |
 | Pattern index of 597 rule daughters | about 52 candidates per entry, 7 µs per query |
 | Subsumption | about 17 million tests per second |
-| Content hash | `35aa07efc7556717`, identical across runs, and with sharing on or off |
+| Content hash | `3ea4a70b06b06265`, identical across runs, and with sharing on or off |
 | Sanitizers | Clean under ASan and UBSan |
 
 **Speed**, before and after profiling. Instruction counts are from
@@ -225,6 +228,7 @@ below.
 | Families and compiled indexes, derived fields (`@fn`), saves and migration, generalisation, hypothesis residuals | `test_features.c` |
 | Findings of an independent audit of the spec against the code: residuals and bindings for tags, alternatives chosen by a value, every conflicting path, compaction, `int` and `fixed`, strict runtime values, the build log, and items that had no test | `test_features.c` |
 | Arithmetic over quantities: folding, propagation, suspension, units, errors; definite clauses: reachability, accumulated distances, depth limits | `test_features.c` (`test_arithmetic`, `test_clauses`) |
+| The decided open questions: path-keyed variation seeds and `@vary(mode:)`, units from exponents and backward narrowing, distinct clause solutions, generated component structs, failure recording for `@quickcheck`, store sizes, migration | `test_features.c` |
 | Randomised properties: unification is commutative, associative, and idempotent; subsumption, matching, and generalisation agree with it; the quick check never rejects a success; saves round-trip; declaration order never changes the content; construction is concrete and a function of the seed | `test_props.c` |
 | Interval arithmetic is sound and exact; every clause solution is an instance of its query | `test_properties_arithmetic`, `test_properties_clauses` |
 | Fuzzed sources never crash the loader | `test_fuzz_sources` |
@@ -257,7 +261,9 @@ Foundation it builds and passes the same test (`make objc`).
 The full MulleFoundation does not build on this Mac (macOS 14, arm64): in
 `NSTask+System.m`, mulle-clang emits an empty inline-assembly barrier for
 `@try` with every local variable as a memory operand, 30 in that method, and
-arm64 runs out of registers. The wrapper doesn't need that part.
+arm64 runs out of registers. The wrapper doesn't need that part. The tap's
+`--HEAD` build is no way out: it is an older line (mulle-clang 17.0.6) that
+can't parse current MulleObjC headers. The bug is the mulle project's to fix.
 
 An independent audit (a separate agent reading only the spec and the code)
 then found eleven gaps, now closed or recorded. Residuals and bindings for a

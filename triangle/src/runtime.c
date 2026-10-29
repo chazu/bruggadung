@@ -125,8 +125,211 @@ void families_free(Content *c)
         tri_index_free(c->families.v[i].index);
         tri_qc_free(c->families.v[i].qc);
         VEC_FREE(c->families.v[i].insts);
+        u64map_free(&c->families.v[i].failcount);
+        VEC_FREE(c->families.v[i].failpaths);
     }
     VEC_FREE(c->families);
+}
+
+/* --- measuring workloads ----------------------------------------------------------- */
+
+/* While recording, every failed match of a family's instance counts its
+ * failure path, so scenario runs show which paths a quick check should test. */
+
+void tri_record_failures(TriContent *c, int on) { c->recording = on != 0; }
+
+void family_record_failure(Content *c, uint32_t inst, const char *path)
+{
+    Sym p = intern(c, path[0] ? path : "(root)");
+    for (size_t f = 0; f < c->families.n; f++) {
+        Family *fam = &c->families.v[f];
+        bool member = false;
+        for (size_t k = 0; k < fam->insts.n && !member; k++) member = fam->insts.v[k] == inst;
+        if (!member) continue;
+        uint64_t n = 0;
+        if (!u64map_get(&fam->failcount, (uint64_t) (uintptr_t) p, &n)) VEC_PUSH(fam->failpaths, p);
+        u64map_put(&fam->failcount, (uint64_t) (uintptr_t) p, n + 1);
+    }
+}
+
+size_t tri_family_suggest_quickcheck(TriContent *c, const char *family, size_t k, char *buf, size_t len)
+{
+    Sym s = intern(c, family);
+    Family *fam = NULL;
+    for (size_t i = 0; i < c->families.n && !fam; i++) if (c->families.v[i].name == s) fam = &c->families.v[i];
+    Buf b = { 0 };
+    if (fam) {
+        /* the most frequent failure paths, ties by name; the root is always checked anyway */
+        size_t n = fam->failpaths.n;
+        Sym *order = malloc(sizeof(Sym) * (n ? n : 1));
+        memcpy(order, fam->failpaths.v, sizeof(Sym) * n);
+        for (size_t i = 1; i < n; i++)
+            for (size_t j = i; j > 0; j--) {
+                uint64_t ca = 0, cb = 0;
+                u64map_get(&fam->failcount, (uint64_t) (uintptr_t) order[j - 1], &ca);
+                u64map_get(&fam->failcount, (uint64_t) (uintptr_t) order[j], &cb);
+                if (ca > cb || (ca == cb && strcmp(order[j - 1], order[j]) <= 0)) break;
+                Sym t = order[j]; order[j] = order[j - 1]; order[j - 1] = t;
+            }
+        size_t taken = 0;
+        buf_puts(&b, "@quickcheck(");
+        for (size_t i = 0; i < n && taken < k; i++) {
+            if (strcmp(order[i], "(root)") == 0) continue;
+            buf_printf(&b, "%s%s", taken ? ", " : "", order[i]);
+            taken++;
+        }
+        buf_putc(&b, ')');
+        free(order);
+        if (!taken) b.len = 0;
+    }
+    size_t n = b.len;
+    if (len) snprintf(buf, len, "%s", b.s ? b.s : "");
+    buf_free(&b);
+    return n;
+}
+
+/* --- sizes, for knowledge stores ------------------------------------------------------ */
+
+size_t tri_arena_bytes(const TriArena *a)
+{
+    size_t n = 0;
+    for (const Chunk *ch = a->top; ch; ch = ch->prev) n += ch->used;
+    return n;
+}
+
+static size_t count_rec(TriNode *n, U64Map *seen)
+{
+    uint64_t k = (uint64_t) (uintptr_t) n;
+    if (u64map_get(seen, k, NULL)) return 0;
+    u64map_put(seen, k, 1);
+    size_t total = 1;
+    if (!(n->flags & NF_DIM))
+        for (uint32_t i = 0; i < n->narcs; i++) total += count_rec(n->arcs[i].val, seen);
+    return total;
+}
+
+size_t tri_node_count(const TriNode *node)
+{
+    U64Map seen = { 0 };
+    size_t n = count_rec((TriNode *) node, &seen);
+    u64map_free(&seen);
+    return n;
+}
+
+/* --- migration ---------------------------------------------------------------------- */
+
+const TriNode *tri_migrate(TriContent *from, TriContent *to, const TriNode *node, TriArena *out, char *err, size_t errlen)
+{
+    char *text = tri_save(from, node, 0);           /* by name: IDs mean nothing in other content */
+    const TriNode *r = tri_restore(to, text, out, err, errlen);
+    free(text);
+    return r;
+}
+
+/* --- generated component structs ------------------------------------------------------ */
+
+static void c_ident(Buf *b, const char *s, bool upper)
+{
+    if (*s == '#' || *s == '"') s++;
+    for (; *s; s++) {
+        char ch = *s;
+        if (ch == '"') continue;
+        if (!((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9'))) ch = '_';
+        if (upper && ch >= 'a' && ch <= 'z') ch = (char) (ch - 32);
+        buf_putc(b, ch);
+    }
+}
+
+/* The enum members of an atom type: its leaf atoms, in ID order. */
+static void enum_members(Content *c, uint32_t t, U32Vec *out)
+{
+    for (uint32_t u = 0; u < c->types.n; u++)
+        if (c->types.v[u].kind == TK_ATOM && !c->types.v[u].children.n && is_subtype(c, u, t)) VEC_PUSH(*out, u);
+}
+
+size_t tri_component_header(TriContent *c, const char *prefix, char *buf, size_t len)
+{
+    Buf b = { 0 }, up = { 0 };
+    c_ident(&up, prefix, true);
+    buf_printf(&b, "/* Generated from Triangle content %016llx: do not edit. Type IDs are valid\n"
+                   " * only for this content; regenerate when it changes. */\n"
+                   "#ifndef %s_COMPONENTS_H\n#define %s_COMPONENTS_H\n\n"
+                   "#include <stdbool.h>\n#include <stdint.h>\n\n"
+                   "#define %s_CONTENT_HASH 0x%016llxULL\n\n",
+               (unsigned long long) c->hash, up.s, up.s, up.s, (unsigned long long) c->hash);
+    Buf enums = { 0 };
+    U64Map emitted = { 0 };
+    for (uint32_t t = 0; t < c->types.n; t++) {
+        TypeInfo *ti = &c->types.v[t];
+        if (!ti->component) continue;
+        TriNode *e = type_expansion(c, t);
+        buf_printf(&b, "/* %s, from %s */\ntypedef struct {\n", ti->component, ti->name);
+        for (uint32_t f = 0; f < c->feats.n; f++) {
+            if (c->feats.v[f].intro != t) continue;
+            TriNode *v = e ? node_arc(e, f) : NULL;
+            const char *flags = field_flags(c, f);
+            Buf fld = { 0 }, note = { 0 };
+            c_ident(&fld, c->feats.v[f].name, false);
+            const TypeInfo *vt = v ? &c->types.v[v->type] : NULL;
+            const char *ctype;
+            if (v && (v->flags & NF_DIM)) {
+                int dim = vt->dim;
+                if (dim == DIM_TEXT) { ctype = "const char *"; buf_puts(&note, "text"); }
+                else if (dim == DIM_REF) { ctype = "uint64_t"; buf_puts(&note, "a referent"); }
+                else {
+                    ctype = "int64_t";
+                    buf_printf(&note, "%s, in quanta of ", dim_names[dim]);
+                    units_format(&note, dim, 1);
+                }
+            } else if (v && v->type == c->tbool) {
+                ctype = "bool";
+                buf_puts(&note, "bool");
+            } else if (v && is_subtype(c, v->type, c->atomroot)) {
+                ctype = "uint32_t";
+                buf_printf(&note, "%s: a type ID", vt->name);
+                if (!u64map_get(&emitted, v->type, NULL)) {
+                    u64map_put(&emitted, v->type, 1);
+                    U32Vec members = { 0 };
+                    enum_members(c, v->type, &members);
+                    buf_printf(&enums, "/* %s */\nenum {\n", vt->name);
+                    for (size_t m = 0; m < members.n; m++) {
+                        buf_printf(&enums, "    %s_", up.s);
+                        if (vt->kind == TK_ANON) {
+                            c_ident(&enums, ti->component, true);
+                            buf_putc(&enums, '_');
+                            c_ident(&enums, c->feats.v[f].name, true);
+                        } else {
+                            c_ident(&enums, vt->name, true);
+                        }
+                        buf_putc(&enums, '_');
+                        c_ident(&enums, c->types.v[members.v[m]].name, true);
+                        buf_printf(&enums, " = %u,\n", members.v[m]);
+                    }
+                    buf_puts(&enums, "};\n\n");
+                    VEC_FREE(members);
+                }
+            } else {
+                ctype = "const TriNode *";
+                buf_printf(&note, "%s: a structure", vt ? vt->name : "_");
+            }
+            buf_printf(&b, "    %-15s %s;", ctype, fld.s);
+            buf_printf(&b, "    /* %s%s%s */\n", note.s ? note.s : "", flags ? "; " : "", flags ? flags : "");
+            buf_free(&fld);
+            buf_free(&note);
+        }
+        buf_printf(&b, "} %s", prefix);
+        c_ident(&b, ti->component, false);
+        buf_puts(&b, ";\n\n");
+    }
+    if (enums.s) buf_puts(&b, enums.s);
+    buf_printf(&b, "#endif\n");
+    buf_free(&enums);
+    buf_free(&up);
+    u64map_free(&emitted);
+    size_t n = b.len;
+    if (len) snprintf(buf, len, "%s", b.s ? b.s : "");
+    buf_free(&b);
+    return n;
 }
 
 size_t tri_family_count(const TriContent *c) { return c->families.n; }

@@ -5,7 +5,7 @@ SRC      = $(wildcard src/*.c)
 OBJ      = $(SRC:src/%.c=build/%.o)
 TESTS    = $(wildcard tests/*.c)
 
-all: build/libtriangle.a build/test
+all: build/libtriangle.a build/test build/tri-components
 
 build/%.o: src/%.c src/internal.h include/triangle.h | build
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
@@ -15,6 +15,21 @@ build/libtriangle.a: $(OBJ)
 
 build/test: $(TESTS) build/libtriangle.a tests/test.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TESTS) build/libtriangle.a -o $@
+
+build/tri-components: tools/tri-components.c build/libtriangle.a
+	$(CC) $(CPPFLAGS) $(CFLAGS) $< build/libtriangle.a -o $@
+
+# The library for the game: without the TDL front end, which stays a test oracle.
+GAMEOBJ = $(filter-out build/game/tdl.o,$(SRC:src/%.c=build/game/%.o))
+
+build/game/%.o: src/%.c src/internal.h include/triangle.h
+	@mkdir -p build/game
+	$(CC) $(CPPFLAGS) $(CFLAGS) -DTRI_NO_TDL -c $< -o $@
+
+build/libtriangle-game.a: $(GAMEOBJ)
+	ar rcs $@ $^
+
+game: build/libtriangle-game.a
 
 build:
 	mkdir -p build
@@ -49,4 +64,4 @@ objc: build/libtriangle.a
 clean:
 	rm -rf build
 
-.PHONY: all test asan objc leakcheck clean
+.PHONY: all test asan objc leakcheck game clean

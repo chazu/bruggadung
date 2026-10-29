@@ -240,8 +240,8 @@ void           tri_index_free(TriIndex *index);
  * Content writes clauses as instances of the built-in #Clause (head, body: a
  * list of goals) and #Fact (no body). tri_solve proves `query` by resolution,
  * depth-first, clauses in name order, each proof at most depth_limit steps
- * deep. Writes up to max solutions (the query made specific by each proof) to
- * `out` and returns how many; *truncated says whether the depth limit cut any
+ * deep. Writes up to max distinct solutions (the query made specific by each
+ * proof) to `out` and returns how many; *truncated says whether the depth limit cut any
  * proof short, so more solutions may exist. */
 size_t tri_solve(TriContent *content, const TriNode *query, size_t depth_limit,
                  const TriNode **solutions, size_t max, TriArena *out, int *truncated);
@@ -254,6 +254,32 @@ size_t tri_solve(TriContent *content, const TriNode *query, size_t depth_limit,
 size_t      tri_family_count(const TriContent *content);
 const char *tri_family_name(const TriContent *content, size_t i);
 TriIndex   *tri_family_index(TriContent *content, const char *family);
+
+/* While recording, a failed tri_match_instance of a family's instance counts
+ * its failure path. The suggestion is the k most frequent, as a @quickcheck
+ * attribute to paste into content. */
+void        tri_record_failures(TriContent *content, int on);
+size_t      tri_family_suggest_quickcheck(TriContent *content, const char *family, size_t k, char *buf, size_t len);
+
+/* --- code generation ------------------------------------------------------------------ */
+
+/* A C header with one struct per @component type, named prefix + component:
+ * numbers as int64_t quanta, text as strings, referents as uint64_t, bool,
+ * enums as type IDs with an enum of their members, other structures as
+ * TriNode pointers. Field comments give units and @field flags. */
+size_t tri_component_header(TriContent *content, const char *prefix, char *buf, size_t len);
+
+/* --- knowledge stores ------------------------------------------------------------------ */
+
+/* Bytes an arena holds, and distinct nodes a structure has: what a store
+ * measures to decide when to compact (tri_copy) and to keep its bound. */
+size_t tri_arena_bytes(const TriArena *arena);
+size_t tri_node_count(const TriNode *node);
+
+/* Moves a description from one content build to another (a reload, a mod),
+ * by name; NULL with the reason if a type is gone or it no longer fits. */
+const TriNode *tri_migrate(TriContent *from, TriContent *to, const TriNode *node, TriArena *out,
+                           char *err, size_t errlen);
 
 /* --- saves ---------------------------------------------------------------------------- */
 

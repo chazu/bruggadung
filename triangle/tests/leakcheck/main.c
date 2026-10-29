@@ -81,6 +81,20 @@ int main(void)
                 tri_solve(c, q, 6, sol, 8, a, &trunc);
             }
             tri_value(c, "#L & { f: 1N, a: 2m, t: 9Nm }", a, buf, sizeof buf);
+            tri_record_failures(c, 1);
+            for (size_t i = 0; i < tri_instance_count(c); i++) {
+                TriMatchResult mr;
+                const TriNode *p = tri_pattern(c, tri_instance_name(c, i));
+                if (p) tri_match_instance(c, tri_instance_name(c, 0), p, &mr);
+            }
+            tri_family_suggest_quickcheck(c, "ops", 3, buf, sizeof buf);
+            size_t hn = tri_component_header(c, "BG", NULL, 0);
+            (void) hn;
+            if (tri_instance_count(c)) {
+                const TriNode *p0 = tri_pattern(c, tri_instance_name(c, 0));
+                if (p0) { tri_migrate(c, c, p0, a, buf, sizeof buf); tri_node_count(p0); }
+            }
+            tri_arena_bytes(a);
             tri_value(c, "{ broken", a, buf, sizeof buf);
             tri_arena_free(a);
             tri_content_free(c);

@@ -14,7 +14,8 @@
  * made specific by one proof. Resolution is depth-first over the goals left to
  * right and the clauses in name order, so solutions come in a fixed order; a
  * depth limit bounds each proof, and the caller learns if it cut any short.
- * Each clause is copied fresh for each use, so its tags are its variables. */
+ * Each clause is copied fresh for each use, so its tags are its variables.
+ * Solutions equal to one already found are dropped. */
 
 typedef struct {
     Content *c;
@@ -45,8 +46,6 @@ static void sort_clauses(Content *c, U32Vec *v)
             uint32_t t = v->v[j]; v->v[j] = v->v[j - 1]; v->v[j - 1] = t;
         }
 }
-
-typedef VEC(TriNode *) NodeVec;
 
 /* The goals of a clause body, a list, in order. */
 static void list_items(Content *c, TriNode *list, NodeVec *out)
@@ -88,9 +87,7 @@ static bool pend_lookup(void *ctx, Sym tag, Quantity *q)
         if (l->p->names[i] != tag) continue;
         TriNode *n = l->st->roots[l->p->tags[i]];
         if (!(n->flags & NF_DIM)) return false;
-        q->dim = l->c->types.v[n->type].dim;
-        q->lo = n->lo;
-        q->hi = n->hi;
+        *q = quantity_of(l->c->types.v[n->type].dim, n->lo, n->hi);
         return true;
     }
     return false;
@@ -115,13 +112,17 @@ static bool propagate_pending(Solver *s, State *st)
             if (err == ARITH_UNKNOWN) continue;
             if (err) { ok = false; break; }
             TriNode *t = st->roots[p->target];
+            int tdim = (t->flags & NF_DIM) ? c->types.v[t->type].dim : quantity_kind_for(&q);
+            Quantity conv;
+            if (tdim < 0 || quantity_to(&q, tdim, &conv) || (!(t->flags & NF_DIM) && t->type != c->top)) {
+                ok = false;
+                break;
+            }
+            q = conv;
             if (t->flags & NF_DIM) {
                 int64_t lo, hi;
                 node_iv(c, t, &lo, &hi);
                 if (q.lo <= lo && q.hi >= hi) continue;
-            } else if (t->type != c->top) {
-                ok = false;
-                break;
             }
             ok = unify1(c, t, leaf_new(c, c->scratch, c->dimtype[q.dim], q.lo, q.hi));
             changed = true;
@@ -145,7 +146,14 @@ static void solve(Solver *s, State *st, size_t depth)
         TriFailure f;
         TriNode *q = copy_raw(c, s->out, st->roots[0]);
         q = settle(c, q, NULL, s->out, &f);
-        if (q) s->solutions[s->n++] = q;
+        if (!q) return;
+        /* the same answer by another proof (around a cycle, say) is reported once */
+        for (size_t i = 0; i < s->n; i++) {
+            int fw, bw;
+            tri_subsumes(c, s->solutions[i], q, &fw, &bw);
+            if (fw && bw) return;
+        }
+        s->solutions[s->n++] = q;
         return;
     }
     if (depth >= s->limit || ++s->steps > s->step_limit) { s->truncated = true; return; }

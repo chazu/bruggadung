@@ -620,8 +620,9 @@ of the domain simulation doc.
    references be collected? What happens to tombstones over long runs?
 5. **Reaction rounds.** What is the bound on reaction rounds per boundary, and
    what does the player see when proposals are deferred?
-6. **Field registry.** Can it be derived from mulle-objc's runtime property
-   metadata, or must it be generated from declarations?
+6. **Field registry.** Decided (CONTENT_LANGUAGE.md §3): it is generated
+   from the content's `@component` declarations, which also generate the C
+   structs the stores use.
 7. **Stores at scale.** Should stores be sorted arrays or B-trees, and do we
    want stores partitioned by region for large worlds?
 8. **Larger-scale aggregates.** How does identity on demand extend to crowds

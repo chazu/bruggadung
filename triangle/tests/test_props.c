@@ -455,7 +455,7 @@ static int64_t floor_div(int64_t a, int64_t b) { int64_t q = a / b; if ((a % b) 
 void test_properties_arithmetic(void)
 {
     static const char *src =
-        "#Q: { a: $a & int, b: $b & int, s: $a + $b, d: $a - $b, p: $a * $b, q: $a / $b }\n";
+        "#Q: { a: $a & int, b: $b & int, s: $a + $b, d: $a - $b, p: $a * $b, q: $a / $b & int }\n";
     const char *names[] = { "q.tri" };
     const char *srcs[] = { src };
     TriContent *c = load(names, srcs, 1);

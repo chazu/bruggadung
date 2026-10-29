@@ -164,6 +164,15 @@ static bool parse_weights(const char *args, uint64_t *w, size_t n);
 static void record_vary(Build *b, X *value, const char *weights, Loc loc)
 {
     if (!b->record) return;
+    if (!strncmp(weights, "mode", 4)) {
+        /* @vary(mode: v): a peak for a range, checked when drawn */
+        const char *v = strchr(weights, ':');
+        if (!v) { build_error(b, loc, "@vary(%s) needs a value: @vary(mode: 19mm)", weights); return; }
+        DefaultRec d = { { 0 }, value, b->contributor, weights };
+        for (size_t i = 0; i < b->path.n; i++) VEC_PUSH(d.path, b->path.v[i]);
+        VEC_PUSH(b->varies, d);
+        return;
+    }
     if (value->k == X_NAME) {
         /* a named enum: the weights follow its declared members */
         uint32_t t = type_lookup(b->c, value->u.name);
@@ -983,12 +992,33 @@ static bool arith_lookup(void *ctx, Sym tag, Quantity *q)
         if (l->use->rec->tags.v[i].name != tag) continue;
         TriNode *n = node_at_prefixed(l->root, &l->use->prefix, &l->use->rec->tags.v[i].path);
         if (!n || !(n->flags & NF_DIM)) return false;
-        q->dim = l->c->types.v[n->type].dim;
-        q->lo = n->lo;
-        q->hi = n->hi;
+        *q = quantity_of(l->c->types.v[n->type].dim, n->lo, n->hi);
         return true;
     }
     return false;
+}
+
+/* Backward narrowings found while settling: each tag's new interval. The
+ * lookup comes first, so one context serves both callbacks. */
+typedef struct { ALookup l; NodeVec *vals; PathVec *where; } ANarrow;
+
+static void arith_narrowed(void *ctx, Sym tag, const Quantity *q)
+{
+    ANarrow *an = ctx;
+    const ArithUse *u = an->l.use;
+    for (size_t i = 0; i < u->rec->tags.n; i++) {
+        if (u->rec->tags.v[i].name != tag) continue;
+        TriNode *n = node_at_prefixed(an->l.root, &u->prefix, &u->rec->tags.v[i].path);
+        if (!n || !(n->flags & NF_DIM)) return;
+        int64_t lo = q->lo > n->lo ? q->lo : n->lo, hi = q->hi < n->hi ? q->hi : n->hi;
+        if (lo == n->lo && hi == n->hi) return;       /* nothing new (an empty result is left to unification) */
+        U32Vec full = { 0 };
+        for (size_t k = 0; k < u->prefix.n; k++) VEC_PUSH(full, u->prefix.v[k]);
+        for (size_t k = 0; k < u->rec->tags.v[i].path.n; k++) VEC_PUSH(full, u->rec->tags.v[i].path.v[k]);
+        VEC_PUSH(*an->where, full);
+        VEC_PUSH(*an->vals, leaf_new(an->l.c, an->l.c->scratch, n->type, q->lo, q->hi));
+        return;
+    }
 }
 
 static void set_arith_failure(Content *c, TriFailure *fail, const U32Vec *prefix, const U32Vec *path, const ArithRec *rec,
@@ -1028,7 +1058,7 @@ static TriNode *settle_arith(Content *c, TriNode *root, const ArithVec *extra, T
             VEC_PUSH(uses, u);
         }
         TriMark m = tri_arena_mark(c->scratch);
-        VEC(TriNode *) vals = { 0 };
+        NodeVec vals = { 0 };
         PathVec where = { 0 };
         bool ok = true;
         for (size_t i = 0; i < uses.n && ok; i++) {
@@ -1040,18 +1070,20 @@ static TriNode *settle_arith(Content *c, TriNode *root, const ArithVec *extra, T
             if (err) { set_arith_failure(c, fail, &u->prefix, &u->rec->path, u->rec, err); ok = false; break; }
             TriNode *t = node_at_prefixed(root, &u->prefix, &u->rec->path);
             if (!t) continue;
+            /* the result, in the field's kind (or the kind its dimension has) */
+            int tdim = (t->flags & NF_DIM) ? c->types.v[t->type].dim : quantity_kind_for(&q);
+            Quantity conv;
+            if (tdim < 0 || quantity_to(&q, tdim, &conv)) {
+                set_arith_failure(c, fail, &u->prefix, &u->rec->path, u->rec,
+                                  tdim < 0 ? "no quantity has this dimension" : "a value of another dimension");
+                ok = false;
+                break;
+            }
+            q = conv;
             if (t->flags & NF_DIM) {
-                int tdim = c->types.v[t->type].dim;
-                if (tdim != q.dim && !(tdim == DIM_FIXED && q.dim == DIM_INT)) {
-                    set_arith_failure(c, fail, &u->prefix, &u->rec->path, u->rec, "a value of another dimension");
-                    ok = false;
-                    break;
-                }
-                if (tdim == DIM_FIXED && q.dim == DIM_INT) {      /* read the result as fixed */
-                    q.dim = DIM_FIXED;
-                    if (q.lo != TRI_NINF) q.lo *= 1000;
-                    if (q.hi != TRI_INF) q.hi *= 1000;
-                }
+                /* backwards: the field's interval narrows the arguments */
+                ANarrow an = { l, &vals, &where };
+                arith_narrow(u->rec->expr, quantity_of(tdim, t->lo, t->hi), arith_lookup, &an, arith_narrowed);
                 int64_t lo = q.lo > t->lo ? q.lo : t->lo, hi = q.hi < t->hi ? q.hi : t->hi;
                 if (lo > hi) {
                     Buf d = { 0 };
@@ -1913,16 +1945,62 @@ static void alternatives_fitting(Content *c, TriNode *root, const U32Vec *path, 
 
 /* A value for one variation point: from the most specific @vary record at
  * the path if there is one, otherwise uniform. Allocated in scratch. */
-static TriNode *draw_point(Content *c, TriNode *root, const U32Vec *path, const DefVec *varies, uint64_t *state,
+/* The seed for one variation point: the entity's seed mixed with the point's
+ * path, by feature name (not ID, which content changes may renumber). Each
+ * point's draw is then independent of every other point's, of the order they
+ * are drawn in, and of whether they are drawn at all: adding a field to a
+ * blueprint leaves existing entities' other values alone, and a latent part
+ * can be drawn when it is revealed. */
+static uint64_t point_seed(Content *c, uint64_t seed, const U32Vec *path)
+{
+    uint64_t h = hash64(seed ^ 0x7072696e74ULL);
+    for (size_t i = 0; i < path->n; i++) h = fnv1a(hash64(h), c->feats.v[path->v[i]].name, strlen(c->feats.v[path->v[i]].name));
+    return hash64(h);
+}
+
+/* A draw from the triangular distribution on [lo, hi] with its peak at mode,
+ * in integers: each side's density is linear, from the larger of two
+ * uniform draws. */
+static int64_t draw_triangular(uint64_t *state, int64_t lo, int64_t hi, int64_t mode)
+{
+    if (mode < lo) mode = lo;
+    if (mode > hi) mode = hi;
+    uint64_t span = (uint64_t) (hi - lo);
+    if (!span) return lo;
+    uint64_t u1 = splitmix(state) >> 32, u2 = splitmix(state) >> 32, u = u1 > u2 ? u1 : u2;   /* in [0, 2^32) */
+    bool left = draw(state, span) < (uint64_t) (mode - lo);
+    if (left) return lo + (int64_t) (((__int128) (mode - lo) * u) >> 32);
+    return hi - (int64_t) (((__int128) (hi - mode) * u) >> 32);
+}
+
+static TriNode *draw_point(Content *c, TriNode *root, const U32Vec *path, const DefVec *varies, uint64_t seed,
                            bool *structural)
 {
+    uint64_t pstate = point_seed(c, seed, path), *state = &pstate;
     TriNode *n = node_at(root, path->v, path->n);
     const DefaultRec *rec = NULL;
     for (size_t k = 0; k < varies->n; k++)
         if (cmp_path(&varies->v[k].path, path) == 0 &&
             (!rec || more_specific(c, varies->v[k].contributor, rec->contributor)))
             rec = &varies->v[k];
-    if (rec) {
+    if (rec && !strncmp(rec->vary, "mode", 4) && (n->flags & NF_DIM)) {
+        /* @vary(mode: v): a range peaked at v */
+        const char *v = strchr(rec->vary, ':');
+        int dim;
+        int64_t m;
+        if (v) {
+            while (*++v == ' ') {}
+            size_t len = strlen(v);
+            while (len && v[len - 1] == ' ') len--;
+            bool neg = *v == '-';
+            if (!units_parse(v + neg, len - neg, neg, &dim, &m) && dim == c->types.v[n->type].dim &&
+                n->lo != TRI_NINF && n->hi != TRI_INF) {
+                int64_t q = draw_triangular(state, n->lo, n->hi, m);
+                return leaf_new(c, c->scratch, n->type, q, q);
+            }
+        }
+    }
+    if (rec && strncmp(rec->vary, "mode", 4)) {
         XPtrVec ds = { 0 };
         x_flatten(rec->value, X_OR, &ds);
         uint64_t *w = malloc(sizeof(uint64_t) * ds.n);
@@ -2062,7 +2140,7 @@ const TriNode *tri_construct(TriContent *c, const char *instance, uint64_t seed,
     uint32_t i = inst_index(c, instance);
     if (i == TRI_BOTTOM || !inst_spec(c, i)) return NULL;
     InstInfo *in = &c->insts.v[i];
-    uint64_t state = seed;
+    uint64_t state = hash64(seed ^ 0x76617269616e74ULL);        /* the variant's own stream */
     InstVariant *v = &in->vars.v[in->specvars.v[0]];
     if (in->specvars.n > 1) {
         uint64_t *w = malloc(sizeof(uint64_t) * in->specvars.n);
@@ -2110,7 +2188,7 @@ const TriNode *tri_construct(TriContent *c, const char *instance, uint64_t seed,
         TriNode *small[16];
         TriNode **vals = points.n <= 16 ? small : malloc(sizeof(TriNode *) * points.n);
         for (size_t k = 0; k < points.n && ok; k++) {
-            vals[k] = draw_point(c, root, &points.v[k], vp, &state, &structural);
+            vals[k] = draw_point(c, root, &points.v[k], vp, seed, &structural);
             ok = vals[k] != NULL;
         }
         uint32_t saved = op_begin(c);
@@ -2375,6 +2453,7 @@ TriMatch tri_match_instance(TriContent *c, const char *instance, const TriNode *
     }
     size_t which;
     r->result = match_variants(c, &c->insts.v[i], description, r, &which);
+    if (c->recording && r->result == TRI_INCOMPATIBLE) family_record_failure(c, i, r->failure.path);
     return r->result;
 }
 
@@ -3087,6 +3166,14 @@ static void finish_load(Content *c, bool ok, double t0)
 
 TriContent *tri_content_load_tdl(const char *topfile)
 {
+#ifdef TRI_NO_TDL
+    Content *nc = calloc(1, sizeof(Content));
+    nc->load = tri_arena_new();
+    nc->spec = tri_arena_new();
+    nc->scratch = tri_arena_new();
+    diag(nc, true, noloc, "this library was built without the TDL front end (TRI_NO_TDL); cannot read %s", topfile);
+    return nc;
+#endif
     Content *c = calloc(1, sizeof(Content));
     c->load = tri_arena_new();
     c->spec = tri_arena_new();

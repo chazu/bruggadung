@@ -1,5 +1,7 @@
 #include "internal.h"
 
+#ifndef TRI_NO_TDL      /* a game build can leave the TDL front end out */
+
 #include <ctype.h>
 
 /* TDL front end: reads DELPH-IN type description language into the same
@@ -479,3 +481,5 @@ bool tdl_parse_top(Content *c, const char *path, int kind)
 {
     return parse_file(c, path, kind, NULL, 0);
 }
+
+#endif

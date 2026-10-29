@@ -1,10 +1,32 @@
 #include "internal.h"
 
-/* Quanta follow DOMAIN_SIMULATION.md §12 where it sets them. Length, torque,
- * and force are candidates (CONTENT_LANGUAGE.md open question 7). */
+/* The unit descriptors: one per quantity kind, with its quantum, following
+ * DOMAIN_SIMULATION.md §12 (heat 100 J, mass 1 g, gas amount 1 mmol, water
+ * volume 1 mL, temperature 0.01 K, time 1 ms), and CONTENT_LANGUAGE.md's
+ * decisions for length (0.1 mm), force (1 mN), and torque (1 mN·m). Torque and
+ * heat share exponents; a product that could be either is torque, the first
+ * listed. */
 
 const char *const dim_names[NDIMS] = {
-    "int", "fixed", "mass", "length", "time", "torque", "force", "heat", "temperature", "ref", "text",
+    "int", "fixed", "mass", "length", "time", "torque", "force", "heat", "temperature", "volume", "amount",
+    "ref", "text",
+};
+
+/*                                       m  kg   s   K mol   quantum (SI)    display  per */
+const QuantityKind quantity_kinds[NDIMS] = {
+    [DIM_INT]         = { { 0, 0, 0, 0, 0 }, 1, 1,         "",    1, true },
+    [DIM_FIXED]       = { { 0, 0, 0, 0, 0 }, 1, 1000,      "",    1000, true },
+    [DIM_MASS]        = { { 0, 1, 0, 0, 0 }, 1, 1000,      "g",   1, true },
+    [DIM_LENGTH]      = { { 1, 0, 0, 0, 0 }, 1, 10000,     "mm",  10, true },
+    [DIM_TIME]        = { { 0, 0, 1, 0, 0 }, 1, 1000,      "ms",  1, true },
+    [DIM_TORQUE]      = { { 2, 1, -2, 0, 0 }, 1, 1000,     "Nm",  1000, true },
+    [DIM_FORCE]       = { { 1, 1, -2, 0, 0 }, 1, 1000,     "N",   1000, true },
+    [DIM_HEAT]        = { { 2, 1, -2, 0, 0 }, 100, 1,      "J",   1, true },    /* printed in joules */
+    [DIM_TEMPERATURE] = { { 0, 0, 0, 1, 0 }, 1, 100,       "K",   100, true },
+    [DIM_VOLUME]      = { { 3, 0, 0, 0, 0 }, 1, 1000000,   "mL",  1, true },
+    [DIM_AMOUNT]      = { { 0, 0, 0, 0, 1 }, 1, 1000,      "mmol", 1, true },
+    [DIM_REF]         = { { 0, 0, 0, 0, 0 }, 1, 1,         "",    1, false },
+    [DIM_TEXT]        = { { 0, 0, 0, 0, 0 }, 1, 1,         "",    1, false },
 };
 
 typedef struct { const char *suffix; int dim; int64_t num, den, offset; } Unit;
@@ -26,13 +48,9 @@ static const Unit units[] = {
     { "MJ",  DIM_HEAT, 10000, 1, 0 },
     { "K",   DIM_TEMPERATURE, 100, 1, 0 },  { "C",   DIM_TEMPERATURE, 100, 1, 27315 },
     { "degC", DIM_TEMPERATURE, 100, 1, 27315 },
-};
-
-/* Display unit per dimension: suffix and quanta per display unit. */
-static const struct { const char *suffix; int64_t per; } display[NDIMS] = {
-    { "", 1 }, { "", 1000 }, { "g", 1 }, { "mm", 10 }, { "ms", 1 },
-    { "Nm", 1000 }, { "N", 1000 }, { "J", 1 /* special: 1 quantum = 100 J */ }, { "K", 100 },
-    { "", 1 }, { "", 1 },
+    { "mL",  DIM_VOLUME, 1, 1, 0 },         { "L",   DIM_VOLUME, 1000, 1, 0 },
+    { "m3",  DIM_VOLUME, 1000000, 1, 0 },
+    { "mmol", DIM_AMOUNT, 1, 1, 0 },        { "mol", DIM_AMOUNT, 1000, 1, 0 },
 };
 
 const char *units_parse(const char *text, size_t len, bool neg, int *dim, int64_t *q)
@@ -93,10 +111,10 @@ void units_format(Buf *b, int dim, int64_t q)
         buf_printf(b, "%lldJ", (long long) q * 100);
         return;
     }
-    int64_t per = display[dim].per;
+    int64_t per = quantity_kinds[dim].per;
     int64_t whole = q / per, frac = q % per;
     if (frac == 0) {
-        buf_printf(b, "%lld%s", (long long) whole, display[dim].suffix);
+        buf_printf(b, "%lld%s", (long long) whole, quantity_kinds[dim].display);
         return;
     }
     if (q < 0 && whole == 0) buf_putc(b, '-');
@@ -108,5 +126,5 @@ void units_format(Buf *b, int dim, int64_t q)
     snprintf(tmp, sizeof tmp, "%0*lld", digits, (long long) frac);
     size_t n = strlen(tmp);
     while (n > 1 && tmp[n - 1] == '0') tmp[--n] = 0;
-    buf_printf(b, "%s%s", tmp, display[dim].suffix);
+    buf_printf(b, "%s%s", tmp, quantity_kinds[dim].display);
 }
