@@ -2,7 +2,7 @@
 // entity, with no body and no location. Being a component, it is saved like
 // any other, and so are its watches.
 
-#ActivityStatus: "running" | "completed" | "exhausted" | "failed"
+#ActivityStatus: "running" | "suspended" | "completed" | "exhausted" | "failed"
 
 #Activity: #Thing & {
     @component(Activity)
@@ -11,7 +11,12 @@
     itemRef:        ref                        @field(saved, proposable, inspect)
     destinationRef: ref                        @field(saved, proposable, inspect)
     amount:         int & >=0 & <=1000000      @field(content, saved, proposable, inspect)
-    // when a timed activity completes; 0ms for one that ends by a watch or an event
+    // the stage under way, the work done in it, and when it last started
+    // running; due is when the stage completes (0ms while suspended, or for an
+    // activity that ends by a watch or an event)
+    stage:          int & >=0 & <=64           @field(content, saved, proposable, inspect)
+    progress:       time & >=0ms & <=100d      @field(content, saved, proposable, inspect)
+    started:        time & >=0ms & <=100d      @field(content, saved, proposable, inspect)
     due:            time & >=0ms & <=100d      @field(content, saved, proposable, inspect)
     status:         #ActivityStatus            @field(content, saved, proposable, inspect)
     // a watch (DOMAIN_SIMULATION.md §5): tell this activity when the holder's
@@ -20,4 +25,4 @@
     watchAtLeast:   volume & >=0mL & <=10m3    @field(content, saved, proposable, inspect)
 }
 
-activity: #Activity & { amount: 0, due: 0ms, status: "running", watchAtLeast: 0mL }
+activity: #Activity & { amount: 0, stage: 0, progress: 0ms, started: 0ms, due: 0ms, status: "running", watchAtLeast: 0mL }

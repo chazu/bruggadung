@@ -284,10 +284,12 @@ A rebuilt world produces the same next step as one that never saved.
    change commitment with automatic individuation and reactions, the clock
    and scheduler, and a scenario harness that runs *The marked nail* and its
    variants with all seven acceptance checks. Since then: saves, the action
-   menu with operations from content, and a fluid domain with tile stocks,
-   running DOMAIN_SIMULATION.md's Scenario 3. Next, per
-   [lab/PLAN.md](lab/PLAN.md): activities and watches, the tile grid's
-   stencils, and the command interface.
+   menu with operations from content, a fluid domain with tile stocks
+   running DOMAIN_SIMULATION.md's Scenario 3, activities with stages,
+   suspension, and watches, and `lab play`: an interactive session with a
+   text map, the menu, and the developer inspector. Next, per
+   [lab/PLAN.md](lab/PLAN.md): the tile grid's stencils, then perception
+   and knowledge stores, then agency.
 
 ## Cross-cutting open questions
 

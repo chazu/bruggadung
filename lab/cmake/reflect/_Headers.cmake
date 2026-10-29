@@ -20,6 +20,7 @@ src/domains
 src/generated
 src/kinds
 src
+src/play
 src/save
 src/scenario
 src/sched
@@ -79,9 +80,11 @@ src/domains/BGFluidDomain.h
 src/generated/BGComponents.h
 src/kinds/BGBodyKind.h
 src/lab-version.h
+src/play/BGPlay.h
 src/save/BGSave.h
 src/scenario/BGCistern.h
 src/scenario/BGMarkedNail.h
+src/scenario/BGWorlds.h
 src/sched/BGScheduler.h
 src/test/BGTest.h
 src/triangle/BGContent.h

@@ -2,6 +2,7 @@
 
 #import "BGActions.h"
 #import "BGProposalGroup.h"
+#import "BGView.h"
 
 
 @implementation BGActivities
@@ -69,7 +70,11 @@ static BGAction   action_of( BGWorld *world, BGEntityID a, const BGActivity *rec
    BGStore            *store;
    BGEntityID         a;
    NSString           *reason;
+   NSString           *effect;
+   const char         *operation;
    NSUInteger         i;
+   int64_t            duration;
+   BOOL               more;
 
    store = [_world storeForKind:[_world kindNamed:"Activity"]];
    for( i = 0; i < [store count]; i++)
@@ -78,21 +83,53 @@ static BGAction   action_of( BGWorld *world, BGEntityID a, const BGActivity *rec
       a      = [store entityAtIndex:i];
       if( ! record->due || record->due > t.ms || ! running( _world, a, record))
          continue;
-      group  = [BGProposalGroup groupWithPhase:BGPhaseAction
-                                        source:[NSString stringWithFormat:@"activity %llu: %s completes",
-                                                                          (unsigned long long) a,
-                                                                          [_world textField:"Activity.operation" of:a]]];
-      reason = BGApplyEffect( _world, action_of( _world, a, record), record->amount, group);
+      operation = [_world textField:"Activity.operation" of:a];
+      more      = BGOperationStage( _world, operation, record->stage + 1, &duration, &effect);
+      group     = [BGProposalGroup groupWithPhase:BGPhaseAction
+                                           source:[NSString stringWithFormat:@"activity %llu: %s %@",
+                                                                             (unsigned long long) a, operation,
+                                                                             more ? [NSString stringWithFormat:@"stage %lld done",
+                                                                                                               (long long) record->stage]
+                                                                                  : @"completes"]];
+      [group setCause:[self startOf:a]];
+      if( ! BGOperationStage( _world, operation, record->stage, &duration, &effect))
+         effect = nil;
+      reason = BGApplyNamedEffect( _world, effect, action_of( _world, a, record), record->amount, group);
       if( reason)
       {
-         [self end:a status:"failed" because:reason];
+         [self end:a status:"failed" because:reason cause:[self startOf:a]];
          continue;
       }
-      [group set:"Activity.status" of:BGWhole( a) to:tri_type_named( [_world tri], "\"completed\"")];
+      if( BGOperationStage( _world, operation, record->stage + 1, &duration, &effect))
+      {
+         /* the next stage starts now */
+         [group set:"Activity.stage" of:BGWhole( a) to:record->stage + 1];
+         [group set:"Activity.progress" of:BGWhole( a) to:0];
+         [group set:"Activity.started" of:BGWhole( a) to:t.ms];
+         [group set:"Activity.due" of:BGWhole( a) to:t.ms + duration];
+      }
+      else
+         [group set:"Activity.status" of:BGWhole( a) to:tri_type_named( [_world tri], "\"completed\"")];
       [_committer submit:group];
       [_completions addObject:group];
       [_completions addObject:[NSNumber numberWithUnsignedLongLong:a]];
    }
+}
+
+
+/* The event that created the activity: what its completion follows from. */
+- (uint64_t) startOf:(BGEntityID) a
+{
+   const BGEvent   *ev;
+   NSUInteger      i;
+
+   for( i = [_world eventCount]; i-- > 0;)
+   {
+      ev = [_world eventAt:i];
+      if( ev->subject == a && ! strcmp( ev->kind, "created"))
+         return( ev->index);
+   }
+   return( 0);
 }
 
 
@@ -103,6 +140,7 @@ static BGAction   action_of( BGWorld *world, BGEntityID a, const BGActivity *rec
 - (void) end:(BGEntityID) a
       status:(const char *) status
      because:(NSString *) why
+       cause:(uint64_t) cause
 {
    const BGActivity   *record;
    BGProposalGroup    *group;
@@ -114,6 +152,7 @@ static BGAction   action_of( BGWorld *world, BGEntityID a, const BGActivity *rec
    group = [BGProposalGroup groupWithPhase:BGPhaseSystem
                                     source:[NSString stringWithFormat:@"activity %llu: %s (%@)",
                                                                       (unsigned long long) a, status, why]];
+   [group setCause:cause];
    if( [BGOperationEffect( _world, [_world textField:"Activity.operation" of:a]) isEqualToString:@"fill"])
       [group set:"Tap.open" of:BGWhole( (BGEntityID) record->itemRef) to:0];
    snprintf( atom, sizeof( atom), "\"%s\"", status);
@@ -121,6 +160,97 @@ static BGAction   action_of( BGWorld *world, BGEntityID a, const BGActivity *rec
    if( record->watchHolder)
       [group set:"Activity.watchHolder" of:BGWhole( a) to:0];
    [_committer submit:group];
+}
+
+
+/* --- suspending and resuming ---------------------------------------------------- */
+
+/* Why the activity can't go on: a bound entity gone, or out of the actor's reach. */
+- (NSString *) obstacleTo:(BGEntityID) a
+                   record:(const BGActivity *) record
+{
+   BGEntityID   bound[ 3];
+   BGView       *view;
+   int          i;
+
+   bound[ 0] = (BGEntityID) record->actorRef;
+   bound[ 1] = (BGEntityID) record->itemRef;
+   bound[ 2] = (BGEntityID) record->destinationRef;
+   if( ! [_world isLive:bound[ 0]])
+      return( @"its actor is gone");
+   view = [BGView viewOf:bound[ 0] inWorld:_world];
+   for( i = 1; i < 3; i++)
+   {
+      if( ! bound[ i])
+         continue;
+      if( ! [_world isLive:bound[ i]])
+         return( [NSString stringWithFormat:@"%llu is gone", (unsigned long long) bound[ i]]);
+      if( ! [view canReach:bound[ i]])
+         return( [NSString stringWithFormat:@"%llu is out of reach", (unsigned long long) bound[ i]]);
+   }
+   return( nil);
+}
+
+
+- (BGProposalGroup *) suspend:(BGEntityID) a
+                      because:(NSString *) why
+                        error:(NSString **) error
+{
+   const BGActivity   *record;
+   BGProposalGroup    *group;
+   int64_t            now;
+
+   record = [_world record:[_world kindNamed:"Activity"] for:a];
+   if( ! running( _world, a, record) || ! record->due)
+   {
+      if( error)
+         *error = [NSString stringWithFormat:@"%llu is not a timed activity under way", (unsigned long long) a];
+      return( nil);
+   }
+   now   = [_world time].ms;
+   group = [BGProposalGroup groupWithPhase:BGPhaseAction
+                                    source:[NSString stringWithFormat:@"activity %llu: suspended (%@)",
+                                                                      (unsigned long long) a, why]];
+   [group set:"Activity.progress" of:BGWhole( a) to:record->progress + (now - record->started)];
+   [group set:"Activity.due" of:BGWhole( a) to:0];
+   [group set:"Activity.status" of:BGWhole( a) to:tri_type_named( [_world tri], "\"suspended\"")];
+   [_committer submit:group];
+   return( group);
+}
+
+
+- (BGProposalGroup *) resume:(BGEntityID) a
+                       error:(NSString **) error
+{
+   const BGActivity   *record;
+   BGProposalGroup    *group;
+   NSString           *reason;
+   NSString           *effect;
+   int64_t            duration;
+   int64_t            now;
+
+   record = [_world record:[_world kindNamed:"Activity"] for:a];
+   if( ! record || record->status != (uint32_t) tri_type_named( [_world tri], "\"suspended\""))
+   {
+      if( error)
+         *error = [NSString stringWithFormat:@"%llu is not suspended", (unsigned long long) a];
+      return( nil);
+   }
+   if( (reason = [self obstacleTo:a record:record]) ||
+       ! BGOperationStage( _world, [_world textField:"Activity.operation" of:a], record->stage, &duration, &effect))
+   {
+      if( error)
+         *error = reason ? reason : @"it has no stage to resume";
+      return( nil);
+   }
+   now   = [_world time].ms;
+   group = [BGProposalGroup groupWithPhase:BGPhaseAction
+                                    source:[NSString stringWithFormat:@"activity %llu: resumed", (unsigned long long) a]];
+   [group set:"Activity.started" of:BGWhole( a) to:now];
+   [group set:"Activity.due" of:BGWhole( a) to:now + (duration - record->progress)];
+   [group set:"Activity.status" of:BGWhole( a) to:tri_type_named( [_world tri], "\"running\"")];
+   [_committer submit:group];
+   return( group);
 }
 
 
@@ -136,6 +266,7 @@ static BGAction   action_of( BGWorld *world, BGEntityID a, const BGActivity *rec
    BGEntityID         ended[ 64];
    BGEntityID         a;
    NSString           *effect;
+   NSString           *why;
    NSUInteger         nended;
    NSUInteger         i;
    NSUInteger         j;
@@ -153,7 +284,7 @@ static BGAction   action_of( BGWorld *world, BGEntityID a, const BGActivity *rec
          continue;
       }
       if( ! [group applied])
-         [self end:a status:"failed" because:[group rejection]];
+         [self end:a status:"failed" because:[group rejection] cause:[group cause]];
       [_completions removeObjectsInRange:NSMakeRange( i, 2)];
    }
 
@@ -176,13 +307,22 @@ static BGAction   action_of( BGWorld *world, BGEntityID a, const BGActivity *rec
          effect = BGOperationEffect( _world, [_world textField:"Activity.operation" of:a]);
          if( ! strcmp( ev->kind, "watched") && ev->subject == a)
          {
-            [self end:a status:"completed" because:@"its watch fired"];
+            [self end:a status:"completed" because:@"its watch fired" cause:ev->index];
             ended[ nended++ % 64] = a;
          }
          else if( ! strcmp( ev->kind, "exhausted") && ev->subject == (BGEntityID) record->itemRef &&
                   [effect isEqualToString:@"fill"])
          {
-            [self end:a status:"exhausted" because:@"the source ran dry"];
+            [self end:a status:"exhausted" because:@"the source ran dry" cause:ev->index];
+            ended[ nended++ % 64] = a;
+         }
+         else if( record->due && (ev->subject == (BGEntityID) record->actorRef || ev->subject == (BGEntityID) record->itemRef ||
+                                  ev->subject == (BGEntityID) record->destinationRef) &&
+                  (why = [self obstacleTo:a record:record]))
+         {
+            /* a hard interruption: what it binds is gone or out of reach */
+            group = [self suspend:a because:why error:NULL];
+            [group setCause:ev->index];
             ended[ nended++ % 64] = a;
          }
       }

@@ -3,8 +3,11 @@
  * entity with an Activity component, started by BGPerform. This is the
  * engine machinery that ends them:
  *
- *   - a timed activity completes at its due time: its operation's effect
- *     commits then, and if commitment rejects it, the activity fails
+ *   - a timed activity completes a stage at its due time: the stage's effect
+ *     commits then, and the next stage starts; if commitment rejects it, the
+ *     activity fails
+ *   - a running timed activity whose bound entities are gone or out of the
+ *     actor's reach is suspended (a hard interruption, ACTIONS.md §5)
  *   - an activity with a watch completes when its domain reports the watch
  *     ("watched", from the fluid domain)
  *   - a fill ends, "exhausted", when its tap reports its source ran dry
@@ -29,5 +32,15 @@
 /* Creates the activity system and registers it with the committer. */
 + (instancetype) activitiesWithWorld:(BGWorld *) world
                            committer:(BGCommitter *) committer;
+
+/* The actor's choice, through commitment: suspending keeps the stage's
+ * progress; resuming rechecks that everything bound is still there and in
+ * reach, and runs what is left of the stage. nil, with the reason, if it
+ * can't. */
+- (BGProposalGroup *) suspend:(BGEntityID) activity
+                      because:(NSString *) why
+                        error:(NSString **) error;
+- (BGProposalGroup *) resume:(BGEntityID) activity
+                       error:(NSString **) error;
 
 @end

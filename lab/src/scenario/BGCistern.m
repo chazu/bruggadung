@@ -1,6 +1,7 @@
 #import "BGCistern.h"
 
 #import "BGActions.h"
+#import "BGWorlds.h"
 
 
 @implementation BGCistern
@@ -167,15 +168,7 @@
       switch( _next)
       {
       case 0:
-         g     = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the cistern room"];
-         h[ 0] = [g create:"cistern" key:"cistern" at:BGOnTile( 5, 5, 0)];
-         h[ 1] = [g create:"tap" key:"tap A" at:BGPartOf( h[ 0], "tap", 0)];
-         h[ 2] = [g create:"tap" key:"tap B" at:BGPartOf( h[ 0], "tap", 1)];
-         h[ 3] = [g create:"crack" key:"crack" at:BGPartOf( h[ 0], "crack", 0)];
-         h[ 4] = [g create:"bucket" key:"bucket A" at:BGIn( h[ 1])];
-         h[ 5] = [g create:"bucket" key:"bucket B" at:BGIn( h[ 2])];
-         h[ 6] = [g create:"agent_a" key:"agent A" at:BGOnTile( 4, 5, 0)];
-         h[ 7] = [g create:"agent_b" key:"agent B" at:BGOnTile( 6, 5, 0)];
+         g = BGCisternSetup( h);
          [committer submit:g];
          _setup   = [g retain];
          _cistern = h[ 0];

@@ -15,6 +15,7 @@ mulle-sde craft                         # the real build: mulle-clang, MulleObjC
 ./kitchen/Debug/lab save marked-nail    # the save of its end state
 ./kitchen/Debug/lab menu marked-nail 1000   # what the worker sees, and its menu, at 1000 ms
 ./kitchen/Debug/lab run cistern         # the fluid domain: two taps and a leak on a dwindling cistern (also -b, -d, -e)
+./kitchen/Debug/lab play workshop       # play: the map, the menu, commands, the inspector (also cistern)
 make gen                                # regenerate src/generated/BGComponents.h from content/
 make test-apple                         # the same sources with Apple clang and Foundation
 make asan                               # the Apple build under AddressSanitizer and UBSan
@@ -39,7 +40,8 @@ CFLAGS`.
 | `src/sched/` | `BGScheduler`, with the domain and input-source protocols |
 | `src/act/` | `BGView` (reach and descriptions: the knowledge view's stub), `BGActions` (the menu, matching, effects, performing), `BGActivities` (activities under way: completion, watches, ending) |
 | `src/save/` | `BGSave`: saves as text, and restoring them |
-| `src/scenario/` | `BGMarkedNail` and `BGCistern`: the scenarios, their input logs, and their checks |
+| `src/scenario/` | `BGWorlds` (the worlds' setups), `BGMarkedNail` and `BGCistern`: the scenarios, their input logs, and their checks |
+| `src/play/` | `BGPlay`: the interactive session behind `lab play` |
 | `src/test/` | The test runner and the tests |
 | `src/triangle/` | Symlinks to the Triangle engine and its Objective-C wrapper, compiled into the lab |
 
@@ -55,12 +57,29 @@ lists every operation and binding whose match isn't incompatible.
 Performing a command checks it is on the menu, then runs the operation's
 effect function, which builds a proposal group for commitment.
 
+## Playing
+
+`lab play workshop` (or `cistern`) is an interactive session: `look` draws
+the map around the actor and lists what it can see, `menu` numbers its
+actions, `do <n> [amount]` performs one, `walk n|s|e|w` moves, and `wait`,
+`step`, and `idle` run time. `activities`, `suspend`, and `resume` manage
+what the actor has under way. The developer's side: `inspect <id>` shows an
+entity's truth, relations, activities, and history; `why <id>` follows the
+chain of causes behind its last change back to the command that began it;
+`trace`, `save`, `load`, `hash`. The commands typed are the replay log
+(`--log file`): feeding them back reproduces the session exactly.
+
 ## How an activity runs
 
-An operation with a `duration` (drive takes 4 s) is a timed activity:
+An operation with stages, or a `duration` (one stage), is a timed activity:
 performing it commits an Activity entity, the scheduler puts a boundary at
-its due time, and its effect commits then; if commitment rejects the effect
-(the nails merged away meanwhile), the activity fails. `fill_bucket` is an
+the stage's due time, the stage's effect commits then, and the next stage
+starts (`pry_out` loosens for 3 s, then pulls for 2 s). If commitment
+rejects a stage's effect, the activity fails. Suspending keeps the stage's
+progress and resuming runs what is left, after rechecking that everything
+bound is there and in reach; after each round, a running activity whose
+bound entities are gone or out of reach is suspended (walking away from a
+job does it). `fill_bucket` is an
 activity with a watch: it opens the tap, and the fluid domain, which reads
 the watches of running activities, includes the moment the bucket reaches
 the amount in its horizon and reports "watched" exactly then. The activity

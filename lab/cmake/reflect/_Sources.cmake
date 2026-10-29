@@ -21,9 +21,11 @@ src/core/BGWorld.m
 src/domains/BGFluidDomain.m
 src/kinds/BGBodyKind.m
 src/main.m
+src/play/BGPlay.m
 src/save/BGSave.m
 src/scenario/BGCistern.m
 src/scenario/BGMarkedNail.m
+src/scenario/BGWorlds.m
 src/sched/BGScheduler.m
 src/test/BGTest.m
 src/test/BGTests.m

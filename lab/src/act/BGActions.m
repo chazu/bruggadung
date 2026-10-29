@@ -62,6 +62,7 @@ TriMatch   BGMatchAction( BGWorld *world, BGAction action, TriMatchResult *resul
    BGView            *view;
    NSString          *d;
    char              duration[ 128];
+   char              stages[ 1024];
    char              effect[ 64];
    char              err[ 256];
    int               r;
@@ -85,6 +86,11 @@ TriMatch   BGMatchAction( BGWorld *world, BGAction action, TriMatchResult *resul
    {
       tri_print( tri, tri_at( tri, pattern, "duration"), duration, sizeof( duration));
       [expr appendFormat:@"duration: %s, ", duration];
+   }
+   if( tri_at( tri, pattern, "stages"))
+   {
+      tri_print( tri, tri_at( tri, pattern, "stages"), stages, sizeof( stages));
+      [expr appendFormat:@"stages: %s, ", stages];
    }
    [expr appendString:@"roles: {"];
    for( r = 0; r < BGRoleCount; r++)
@@ -356,6 +362,40 @@ static NSString   *effect_open_tap( BGWorld *world, BGAction a, int64_t amount, 
 }
 
 
+static NSString   *effect_walk( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
+{
+   BGLocation   at;
+   const char   *direction;
+
+   at        = [world locationOf:a.roles[ BGRoleActor]];
+   direction = strchr( a.operation, '_');
+   if( at.form != BGLocationOnTile || ! direction)
+      return( @"one can walk only on the ground");
+   switch( direction[ 1])
+   {
+   case 'n': at.y--; break;
+   case 's': at.y++; break;
+   case 'e': at.x++; break;
+   case 'w': at.x--; break;
+   default:  return( @"walk where?");
+   }
+   [g move:BGWhole( a.roles[ BGRoleActor]) to:at];
+   return( nil);
+}
+
+
+/* A stage of prying: the item works loose, and takes a mark. */
+static NSString   *effect_loosen( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
+{
+   int64_t   marks;
+
+   marks = 0;
+   [world getField:"Body.toolMarks" of:a.roles[ BGRoleItem] value:&marks];
+   [g set:"Body.toolMarks" of:BGWhole( a.roles[ BGRoleItem]) to:marks + 1];
+   return( nil);
+}
+
+
 static const struct
 {
    const char   *name;
@@ -367,6 +407,8 @@ static const struct
    { "put_in",    effect_put_in },
    { "drive",     effect_drive },
    { "open_tap",  effect_open_tap },
+   { "walk",      effect_walk },
+   { "loosen",    effect_loosen },
 };
 
 
@@ -397,6 +439,56 @@ int64_t   BGOperationDuration( BGWorld *world, const char *operation)
    if( ! pattern || ! tri_node_interval( tri_at( [world tri], pattern, "duration"), &lo, &hi) || lo != hi)
       return( 0);
    return( lo);
+}
+
+
+BOOL   BGOperationStage( BGWorld *world, const char *operation, int64_t index, int64_t *duration, NSString **effect)
+{
+   const TriNode     *pattern;
+   const TriNode     *stage;
+   NSMutableString   *path;
+   TriContent        *tri;
+   int64_t           hi;
+   int64_t           k;
+   char              text[ 64];
+   size_t            n;
+
+   tri     = [world tri];
+   pattern = operation ? tri_pattern( tri, operation) : NULL;
+   if( ! pattern)
+      return( NO);
+   if( ! tri_at( tri, pattern, "stages.first"))
+   {
+      /* one stage: the operation's own duration and effect */
+      *duration = BGOperationDuration( world, operation);
+      *effect   = BGOperationEffect( world, operation);
+      return( index == 0 && *duration > 0);
+   }
+   path = [NSMutableString stringWithString:@"stages"];
+   for( k = 0; k < index; k++)
+      [path appendString:@".rest"];
+   [path appendString:@".first"];
+   stage = tri_at( tri, pattern, [path UTF8String]);
+   if( ! stage || ! tri_node_interval( tri_at( tri, stage, "duration"), duration, &hi) || *duration != hi)
+      return( NO);
+   n = tri_print( tri, tri_at( tri, stage, "effect"), text, sizeof( text));
+   if( n < 2 || n >= sizeof( text))
+      return( NO);
+   text[ n - 1] = 0;
+   *effect = [NSString stringWithUTF8String:text + 1];
+   return( YES);
+}
+
+
+NSString   *BGApplyNamedEffect( BGWorld *world, NSString *effect, BGAction action, int64_t amount,
+                                BGProposalGroup *group)
+{
+   size_t   i;
+
+   for( i = 0; i < sizeof( effects) / sizeof( effects[ 0]); i++)
+      if( effect && ! strcmp( effects[ i].name, [effect UTF8String]))
+         return( effects[ i].function( world, action, amount, group));
+   return( [NSString stringWithFormat:@"no code for the effect %@", effect]);
 }
 
 
@@ -440,6 +532,7 @@ BGProposalGroup   *BGPerform( BGWorld *world, BGCommitter *committer, BGAction a
    NSString          *reason;
    NSString          *source;
    BGEntityID        activity;
+   NSString          *stageEffect;
    int64_t           duration;
    int               r;
 
@@ -450,8 +543,9 @@ BGProposalGroup   *BGPerform( BGWorld *world, BGCommitter *committer, BGAction a
          *error = reason;
       return( nil);
    }
-   effect   = BGOperationEffect( world, action.operation);
-   duration = BGOperationDuration( world, action.operation);
+   effect = BGOperationEffect( world, action.operation);
+   if( ! BGOperationStage( world, action.operation, 0, &duration, &stageEffect))
+      duration = 0;
    source   = [NSString stringWithFormat:@"%llu: %s", (unsigned long long) action.roles[ BGRoleActor], action.operation];
    for( r = BGRoleItem; r < BGRoleCount; r++)
       if( action.roles[ r])
@@ -476,8 +570,9 @@ BGProposalGroup   *BGPerform( BGWorld *world, BGCommitter *committer, BGAction a
    }
    else if( duration > 0)
    {
-      /* a timed activity: the effect commits when it is due */
+      /* a timed activity: its first stage's effect commits when the stage is due */
       activity = start_activity( world, action, amount, group);
+      [group set:"Activity.started" of:BGWhole( activity) to:[world time].ms];
       [group set:"Activity.due" of:BGWhole( activity) to:[world time].ms + duration];
    }
    else if( (reason = BGApplyEffect( world, action, amount, group)))

@@ -87,3 +87,12 @@ NSString           *BGApplyEffect( BGWorld *world, BGAction action, int64_t amou
 /* The operation's effect name, and its duration in ms (0 if it has none). */
 NSString           *BGOperationEffect( BGWorld *world, const char *operation);
 int64_t            BGOperationDuration( BGWorld *world, const char *operation);
+
+/* Stage `index` of an operation: its duration and effect. An operation with
+ * a duration and no stages has one stage. NO past the last stage. */
+BOOL               BGOperationStage( BGWorld *world, const char *operation, int64_t index,
+                                     int64_t *duration, NSString **effect);
+
+/* A named effect, as proposals added to `group`. */
+NSString           *BGApplyNamedEffect( BGWorld *world, NSString *effect, BGAction action, int64_t amount,
+                                        BGProposalGroup *group);

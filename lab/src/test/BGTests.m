@@ -7,6 +7,7 @@
 #import "BGView.h"
 #import "BGCistern.h"
 #import "BGActivities.h"
+#import "BGPlay.h"
 
 #include <stdio.h>
 
@@ -453,11 +454,12 @@ static void   test_scheduler_horizons( void)
    d = [[BGTestDomain new] autorelease];
    [s addDomain:d];
    n = [s runUntil:BGTimeMake( 2000)];
-   /* events bound the first steps; the safe step bounds the rest; the stop bounds the run */
-   BG_CHECK( n == 3);
-   BG_CHECK( d->nsteps == 3);
+   /* events bound the first steps; the safe step bounds the next; the stop is a boundary too */
+   BG_CHECK( n == 4);
+   BG_CHECK( d->nsteps == 4);
    BG_CHECK( d->steps[ 0][ 1] == 300 && d->steps[ 1][ 1] == 700 && d->steps[ 2][ 1] == 1700);
-   BG_CHECK( [w time].ms == 2000 && [w boundary] == 3);
+   BG_CHECK( d->steps[ 3][ 0] == 1700 && d->steps[ 3][ 1] == 2000);
+   BG_CHECK( [w time].ms == 2000 && [w boundary] == 4);
 }
 
 
@@ -564,8 +566,9 @@ static void   test_menu( void)
    [scenario runUntil:BGTimeMake( 0)];
    text = menu_text( w, 4);
    BG_CHECK( [text isEqualToString:@"take item 1: entailed; take item 2: entailed; take item 3: entailed; "
-                                   @"take_some item 2: entailed"]);
-   if( ! [text isEqualToString:@"take item 1: entailed; take item 2: entailed; take item 3: entailed; take_some item 2: entailed"])
+                                   @"take_some item 2: entailed; walk_east: entailed; walk_north: entailed; "
+                                   @"walk_south: entailed; walk_west: entailed"]);
+   if( [text rangeOfString:@"take_some item 2: entailed; walk_east"].location == NSNotFound)
       fprintf( stderr, "    menu: %s\n", [text UTF8String]);
 
    /* a description carries perceivable fields only: the stack's count is hidden */
@@ -618,9 +621,9 @@ static const char   *status_of( BGWorld *w, BGEntityID a)
 }
 
 
-/* A timed activity whose item is gone when it is due: commitment rejects its
- * effect, and the activity fails. */
-static void   test_activity_fails( void)
+/* A timed activity whose item merges away before it is due: the recheck
+ * suspends it (a hard interruption), and it can't be resumed. */
+static void   test_activity_interrupted( void)
 {
    BGWorld           *w;
    BGCommitter       *c;
@@ -662,10 +665,183 @@ static void   test_activity_fails( void)
    BGPerform( w, c, BGActionMake( "put_in", worker, handful, bin), 0, &error);
    [s runUntil:BGTimeMake( 30)];
    BG_CHECK( [w resolve:handful] == nails);
+   BG_CHECK( ! strcmp( status_of( w, a), "\"suspended\""));
+   BG_CHECK( ! [activities resume:a error:&error] && [error rangeOfString:@"is gone"].location != NSNotFound);
    [s runUntil:BGTimeMake( 6000)];
-   BG_CHECK( ! strcmp( status_of( w, a), "\"failed\""));
    BG_CHECK( [activities nextCompletion].ms == BGTimeNever.ms);
    BG_CHECK( [w unitsOf:nails] == 30);
+}
+
+
+/* A completion commitment rejects fails its activity: the lock has four
+ * slots, and the fifth nail has nowhere to go. */
+static void   test_activity_fails( void)
+{
+   BGWorld           *w;
+   BGCommitter       *c;
+   BGScheduler       *s;
+   BGActivities      *activities;
+   BGProposalGroup   *g;
+   BGEntityID        bin;
+   BGEntityID        nails;
+   BGEntityID        lock;
+   BGEntityID        worker;
+   BGEntityID        handful;
+   BGEntityID        a;
+   BGEntityID        parts[ 8];
+   NSString          *error;
+   int               i;
+
+   w          = BGTestWorld( 5);
+   c          = BGTestCommitter( w);
+   activities = [BGActivities activitiesWithWorld:w committer:c];
+   s          = [[[BGScheduler alloc] initWithWorld:w committer:c] autorelease];
+   [s setActivities:activities];
+   bin    = commit_create( c, "bin", BGOnTile( 0, 0, 0));
+   nails  = commit_create( c, "nails_30", BGIn( bin));
+   lock   = commit_create( c, "lock", BGOnTile( 2, 0, 0));
+   worker = commit_create( c, "worker", BGOnTile( 1, 0, 0));
+   g = BGPerform( w, c, BGActionMake( "take_some", worker, nails, BGNoEntity), 10, &error);
+   [s runUntil:BGTimeMake( 10)];
+   handful = [g idFor:[g proposals][ 0].handle];
+   a       = BGNoEntity;
+   for( i = 0; i < 5; i++)
+   {
+      g = BGPerform( w, c, BGActionMake( "drive", worker, handful, lock), 0, &error);
+      [s runUntil:BGTimeMake( [w time].ms + 5000)];
+      a = [g idFor:[g proposals][ 0].handle];
+   }
+   BG_CHECK( [w entitiesAt:lock form:BGLocationPartOf into:parts max:8] == 4);
+   BG_CHECK( ! strcmp( status_of( w, a), "\"failed\""));
+   BG_CHECK( [w unitsOf:handful] == 6);
+}
+
+
+/* Two stages, walked away from and come back to: progress is kept across a
+ * suspension, and resuming runs only what is left. */
+static void   test_stages_and_suspension( void)
+{
+   BGWorld           *w;
+   BGCommitter       *c;
+   BGScheduler       *s;
+   BGActivities      *activities;
+   BGProposalGroup   *g;
+   BGEntityID        lock;
+   BGEntityID        worker;
+   BGEntityID        nail;
+   BGEntityID        a;
+   NSString          *error;
+   int64_t           v;
+   const BGActivity  *record;
+
+   w          = BGTestWorld( 5);
+   c          = BGTestCommitter( w);
+   activities = [BGActivities activitiesWithWorld:w committer:c];
+   s          = [[[BGScheduler alloc] initWithWorld:w committer:c] autorelease];
+   [s setActivities:activities];
+   lock   = commit_create( c, "lock", BGOnTile( 2, 0, 0));
+   worker = commit_create( c, "worker", BGOnTile( 1, 0, 0));
+   nail   = commit_create( c, "iron_nail", BGPartOf( lock, "wedge", 0));
+
+   /* pry it out: 3 s loosening, 2 s pulling */
+   g = BGPerform( w, c, BGActionMake( "pry_out", worker, nail, BGNoEntity), 0, &error);
+   BG_CHECK( g != nil);
+   [s runUntil:BGTimeMake( 1000)];
+   a = [g idFor:[g proposals][ 0].handle];
+   BG_CHECK( ! strcmp( status_of( w, a), "\"running\""));
+
+   /* a second in, the worker walks away: suspended, with the second kept */
+   BGPerform( w, c, BGActionMake( "walk_west", worker, BGNoEntity, BGNoEntity), 0, &error);
+   [s runUntil:BGTimeMake( 1001)];
+   record = [w record:[w kindNamed:"Activity"] for:a];
+   /* the walk, given at 1000 ms, commits at the next boundary, 1001 ms */
+   BG_CHECK( ! strcmp( status_of( w, a), "\"suspended\"") && record->progress == 1001 && record->stage == 0);
+   BG_CHECK( ! [activities resume:a error:&error] && [error rangeOfString:@"out of reach"].location != NSNotFound);
+   [s runUntil:BGTimeMake( 10000)];
+   BG_CHECK( [w getField:"Body.toolMarks" of:nail value:&v] && v == 0);      /* nothing happened meanwhile */
+
+   /* back, and resumed at 10 s: what is left of the loosening, then 2 s of pulling */
+   BGPerform( w, c, BGActionMake( "walk_east", worker, BGNoEntity, BGNoEntity), 0, &error);
+   [s runUntil:BGTimeMake( 10001)];
+   BG_CHECK( [activities resume:a error:&error] != nil);
+   [s runUntil:BGTimeMake( 10002)];
+   record = [w record:[w kindNamed:"Activity"] for:a];
+   BG_CHECK( record->due == 10001 + 1999);
+   [s runUntil:BGTimeMake( 12000)];
+   BG_CHECK( [w getField:"Body.toolMarks" of:nail value:&v] && v == 1);      /* loosened */
+   record = [w record:[w kindNamed:"Activity"] for:a];
+   BG_CHECK( record->stage == 1 && record->due == 12000 + 2000);
+   [s runUntil:BGTimeMake( 14001)];
+   BG_CHECK( ! strcmp( status_of( w, a), "\"completed\""));
+   BG_CHECK( [w locationOf:nail].form == BGLocationHeldBy && [w locationOf:nail].place == worker);
+
+   /* and suspended by choice, then resumed: the same accounting */
+   g = BGPerform( w, c, BGActionMake( "drive", worker, nail, lock), 0, &error);
+   [s runUntil:BGTimeMake( 15001)];
+   a = [g idFor:[g proposals][ 0].handle];
+   BG_CHECK( [activities suspend:a because:@"a break" error:&error] != nil);
+   [s runUntil:BGTimeMake( 20000)];
+   BG_CHECK( [activities resume:a error:&error] != nil);
+   [s runUntil:BGTimeMake( 20001)];
+   record = [w record:[w kindNamed:"Activity"] for:a];
+   BG_CHECK( record->progress == 1000 && record->due == 20000 + 3000);
+}
+
+
+/* --- the command interface ------------------------------------------------- */
+
+static NSString   *session( NSString *world, NSArray *commands, uint64_t *hash)
+{
+   BGPlay            *play;
+   NSMutableString   *out;
+   NSUInteger        i;
+
+   play = [BGPlay playWorld:world seed:42 error:NULL];
+   out  = [NSMutableString stringWithString:[play takeOutput]];
+   for( i = 0; i < [commands count]; i++)
+   {
+      [play command:[commands objectAtIndex:i]];
+      [out appendString:[play takeOutput]];
+   }
+   *hash = [[play world] stateHash];
+   return( out);
+}
+
+
+/* A session in the workshop: look, take five nails, walk, drive one into the
+ * lock, inspect it, and ask why. The same commands give the same world. */
+static void   test_play( void)
+{
+   NSArray    *commands;
+   NSString   *out;
+   NSString   *again;
+   uint64_t   h1;
+   uint64_t   h2;
+
+   commands = [NSArray arrayWithObjects:@"look", @"menu", @"do 4 5", @"walk w", @"walk e", @"menu", @"do 1",
+                                        @"idle", @"inspect 9", @"why 9", @"walk n", @"walk n", @"walk n", @"walk n",
+                                        @"walk n", @"hash", nil];
+   out   = session( @"workshop", commands, &h1);
+   again = session( @"workshop", commands, &h2);
+   BG_CHECK( h1 == h2);
+   BG_CHECK( [out isEqualToString:again]);
+   /* the map: the worker (@) between the bin (u) and the lock (m) */
+   BG_CHECK( [out rangeOfString:@"u@m"].location != NSNotFound);
+   BG_CHECK( [out rangeOfString:@" 4. take_some item 2 (nails_30)"].location != NSNotFound);
+   BG_CHECK( [out rangeOfString:@"event 10 split: 7, other 2, 5"].location != NSNotFound);
+   BG_CHECK( [out rangeOfString:@" 1. drive item 7 (nails_30) destination 3 (lock)"].location != NSNotFound);
+   /* the drive completes as an activity, and the nail it split off is in the lock, bent */
+   BG_CHECK( [out rangeOfString:@"activity 8: drive completes"].location != NSNotFound);
+   BG_CHECK( [out rangeOfString:@"Body.bent=true"].location != NSNotFound);
+   BG_CHECK( [out rangeOfString:@"at partOf(3, wedge, 0)"].location != NSNotFound);
+   /* why: the move into the lock, in the drive's completion, because the worker started the drive */
+   BG_CHECK( [out rangeOfString:@"moved 9 to partOf(3, wedge, 0) at boundary 6, in \"activity 8: drive completes\"\n"
+                                @"because:\n  created 8 activity at boundary 5, in \"4: drive item 7 destination 3\""].location
+             != NSNotFound);
+   /* the map's edge: walking off it is refused */
+   BG_CHECK( [out rangeOfString:@"is off the map"].location != NSNotFound);
+   if( [out rangeOfString:@"is off the map"].location == NSNotFound)
+      fprintf( stderr, "%s\n", [out UTF8String]);
 }
 
 
@@ -779,7 +955,10 @@ static void   test_cistern_save( void)
    NSArray     *deferred;
    uint64_t    position;
 
-   reference = run_cistern( BGCisternBase);
+   w1        = BGTestWorld( 7);
+   reference = [[[BGCistern alloc] initWithWorld:w1 committer:BGTestCommitter( w1) variant:BGCisternBase] autorelease];
+   [reference runUntil:BGTimeMake( 30000)];
+   [reference finish];
    w1        = BGTestWorld( 7);
    c1        = BGTestCommitter( w1);
    scenario  = [[[BGCistern alloc] initWithWorld:w1 committer:c1 variant:BGCisternBase] autorelease];
@@ -843,7 +1022,12 @@ static void   test_save_and_resume( void)
    NSArray        *rest;
    NSUInteger     before;
 
-   reference = run_marked_nail( BGMarkedNailBase, 42);
+   /* the reference stops where the saving run does: a stop is a boundary */
+   w1        = BGTestWorld( 42);
+   reference = [[[BGMarkedNail alloc] initWithWorld:w1 committer:BGTestCommitter( w1) variant:BGMarkedNailBase]
+                autorelease];
+   [reference runUntil:BGTimeMake( 5500)];
+   [reference finish];
    w1        = BGTestWorld( 42);
    c1        = BGTestCommitter( w1);
    scenario  = [[[BGMarkedNail alloc] initWithWorld:w1 committer:c1 variant:BGMarkedNailBase] autorelease];
@@ -949,7 +1133,10 @@ const BGTestCase   BGAllTests[] =
    { "marked_nail_b",                 test_marked_nail_b },
    { "marked_nail_replay",            test_marked_nail_replay },
    { "menu",                          test_menu },
+   { "activity_interrupted",          test_activity_interrupted },
    { "activity_fails",                test_activity_fails },
+   { "stages_and_suspension",         test_stages_and_suspension },
+   { "play",                          test_play },
    { "cistern",                       test_cistern },
    { "cistern_b",                     test_cistern_b },
    { "cistern_d",                     test_cistern_d },

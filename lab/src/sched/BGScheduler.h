@@ -96,8 +96,9 @@ typedef struct
 /* Runs one boundary, at most at `stop`. NO when there is nothing to do
  * before `stop`. */
 - (BOOL) stepUntil:(BGTime) stop;
-/* The run policy for now: run boundaries until `stop`, then set the clock
- * to `stop`. Returns the number of boundaries run. */
+/* The run policy for now: run boundaries until `stop`, and one at `stop`
+ * itself, as a stop request inserts (the replay log records stops). Returns
+ * the number of boundaries run. */
 - (NSUInteger) runUntil:(BGTime) stop;
 
 @end

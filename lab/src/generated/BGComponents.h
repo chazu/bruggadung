@@ -1,4 +1,4 @@
-/* Generated from Triangle content 837795a2fafb1ee6: do not edit. Type IDs are valid
+/* Generated from Triangle content 3d8845cb3d117f9c: do not edit. Type IDs are valid
  * only for this content; regenerate when it changes. */
 #ifndef BG_COMPONENTS_H
 #define BG_COMPONENTS_H
@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BG_CONTENT_HASH 0x837795a2fafb1ee6ULL
+#define BG_CONTENT_HASH 0x3d8845cb3d117f9cULL
 
 /* Activity, from #Activity */
 typedef struct {
@@ -16,6 +16,9 @@ typedef struct {
     int64_t         due;    /* time, in quanta of 1ms; content, saved, proposable, inspect */
     uint64_t        itemRef;    /* a referent; saved, proposable, inspect */
     const char *    operation;    /* text; saved, proposable, inspect */
+    int64_t         progress;    /* time, in quanta of 1ms; content, saved, proposable, inspect */
+    int64_t         stage;    /* int, in quanta of 1; content, saved, proposable, inspect */
+    int64_t         started;    /* time, in quanta of 1ms; content, saved, proposable, inspect */
     uint32_t        status;    /* #ActivityStatus: a type ID; content, saved, proposable, inspect */
     int64_t         watchAtLeast;    /* volume, in quanta of 1mL; content, saved, proposable, inspect */
     uint64_t        watchHolder;    /* a referent; saved, proposable, inspect */
@@ -71,25 +74,26 @@ typedef struct {
 
 /* #ActivityStatus */
 enum {
-    BG_ACTIVITYSTATUS_COMPLETED = 29,
-    BG_ACTIVITYSTATUS_EXHAUSTED = 30,
-    BG_ACTIVITYSTATUS_FAILED = 31,
-    BG_ACTIVITYSTATUS_RUNNING = 32,
+    BG_ACTIVITYSTATUS_COMPLETED = 33,
+    BG_ACTIVITYSTATUS_EXHAUSTED = 34,
+    BG_ACTIVITYSTATUS_FAILED = 35,
+    BG_ACTIVITYSTATUS_RUNNING = 36,
+    BG_ACTIVITYSTATUS_SUSPENDED = 37,
 };
 
 /* #ClaimKind */
 enum {
-    BG_CLAIMKIND_CUSTODY = 34,
-    BG_CLAIMKIND_OWNERSHIP = 35,
+    BG_CLAIMKIND_CUSTODY = 39,
+    BG_CLAIMKIND_OWNERSHIP = 40,
 };
 
 /* #Material */
 enum {
-    BG_MATERIAL_BRASS = 44,
-    BG_MATERIAL_FLESH = 45,
-    BG_MATERIAL_IRON = 46,
-    BG_MATERIAL_OAK = 47,
-    BG_MATERIAL_PAPER = 48,
+    BG_MATERIAL_BRASS = 51,
+    BG_MATERIAL_FLESH = 52,
+    BG_MATERIAL_IRON = 53,
+    BG_MATERIAL_OAK = 54,
+    BG_MATERIAL_PAPER = 55,
 };
 
 /* The field registry: what code needs to read and write any component
@@ -126,6 +130,9 @@ static const BGFieldInfo BGActivity_fields[] = {
     { "due", offsetof(BGActivity, due), BG_VALUE_QUANTITY, "time", "content, saved, proposable, inspect" },
     { "itemRef", offsetof(BGActivity, itemRef), BG_VALUE_REF, "ref", "saved, proposable, inspect" },
     { "operation", offsetof(BGActivity, operation), BG_VALUE_TEXT, "text", "saved, proposable, inspect" },
+    { "progress", offsetof(BGActivity, progress), BG_VALUE_QUANTITY, "time", "content, saved, proposable, inspect" },
+    { "stage", offsetof(BGActivity, stage), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
+    { "started", offsetof(BGActivity, started), BG_VALUE_QUANTITY, "time", "content, saved, proposable, inspect" },
     { "status", offsetof(BGActivity, status), BG_VALUE_TYPE, "#ActivityStatus", "content, saved, proposable, inspect" },
     { "watchAtLeast", offsetof(BGActivity, watchAtLeast), BG_VALUE_QUANTITY, "volume", "content, saved, proposable, inspect" },
     { "watchHolder", offsetof(BGActivity, watchHolder), BG_VALUE_REF, "ref", "saved, proposable, inspect" },
@@ -172,7 +179,7 @@ static const BGFieldInfo BGWaterStore_fields[] = {
 };
 
 static const BGComponentInfo BGComponents[BG_COMPONENT_COUNT + 1] = {
-    { "Activity", "#Activity", sizeof(BGActivity), 9, BGActivity_fields },
+    { "Activity", "#Activity", sizeof(BGActivity), 12, BGActivity_fields },
     { "Claim", "#Claim", sizeof(BGClaim), 2, BGClaim_fields },
     { "Body", "#Body", sizeof(BGBody), 4, BGBody_fields },
     { "Agent", "#Agent", sizeof(BGAgent), 1, BGAgent_fields },

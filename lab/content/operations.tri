@@ -4,7 +4,7 @@
 // bindings between roles. `effect` names the code that builds the proposal
 // group when the action is performed.
 
-#Effect: "take" | "take_some" | "put_in" | "drive" | "open_tap" | "fill"
+#Effect: "take" | "take_some" | "put_in" | "drive" | "open_tap" | "fill" | "walk" | "loosen"
 
 // Which roles an operation has is its roles' type: a structure's type is the
 // most general one with all its features.
@@ -12,13 +12,24 @@
 #ItemRoles:    #Roles & { item: #Body }
 #PlacingRoles: #ItemRoles & { destination: #Body }
 
-// An operation with a duration is a timed activity: its effect commits when
-// the duration is up. One without is instant, unless its effect's code makes
-// it an activity that ends by a watch or an event (fill).
-#Operation: {
-    roles:    #Roles
-    effect:   #Effect
+// Something that takes time and has an effect: an operation's single stage,
+// or one of its stages.
+#Step: {
     duration: time & >=0ms & <=1d
+    effect:   #Effect
+}
+
+// A stage of an activity: it takes `duration`, and its effect commits when
+// it is done (ACTIONS.md §5).
+#Stage: #Step & { duration: >=1ms }
+
+// An operation with stages, or with a duration (one stage), is a timed
+// activity, which can be suspended and resumed, keeping its progress. One
+// without is instant, unless its effect's code makes it an activity that ends
+// by a watch or an event (fill).
+#Operation: #Step & {
+    roles:  #Roles
+    stages: [...#Stage]
 }
 
 // Pick something up into a free hand: from a container, the ground, or an
@@ -81,5 +92,23 @@ fill_bucket: #Operation & {
         actor:       #Agent
         item:        #Tap & { id: $t, open: false }
         destination: #WaterStore & #Body & { place: #Inside & { container: $t } }
+    }
+} @family(operations)
+
+// Walk one tile; the direction is in the operation's name. What the actor
+// holds goes along: it is held by the actor, wherever the actor is.
+walk_north: #Operation & { effect: "walk", roles: { actor: #Agent & { place: #OnTile } } } @family(operations)
+walk_south: #Operation & { effect: "walk", roles: { actor: #Agent & { place: #OnTile } } } @family(operations)
+walk_east:  #Operation & { effect: "walk", roles: { actor: #Agent & { place: #OnTile } } } @family(operations)
+walk_west:  #Operation & { effect: "walk", roles: { actor: #Agent & { place: #OnTile } } } @family(operations)
+
+// Pry a wedged nail out of an assembly: loosen it, then pull it free into a
+// free hand. Walking away suspends it; coming back, it can be resumed.
+pry_out: #Operation & {
+    effect: "take"
+    stages: [{ duration: 3s, effect: "loosen" }, { duration: 2s, effect: "take" }]
+    roles: {
+        actor: #Agent & { freeHands: >=1 }
+        item:  #Body & { place: #Installed }
     }
 } @family(operations)

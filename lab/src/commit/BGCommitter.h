@@ -47,6 +47,7 @@
    NSMutableArray   *_deferred;
    NSMutableArray   *_reactors;        /* pairs: kind index, reactor */
    NSMutableArray   *_listeners;
+   NSMutableDictionary   *_sources;     /* commit position → the group's source */
    NSMutableArray   *_trace;
    NSUInteger       _rounds;
    uint64_t         _position;
@@ -72,6 +73,8 @@
 /* Saved state: the last commit position, and the groups deferred to the
  * next boundary. */
 - (uint64_t) position;
+/* the source of the group committed at a position, if this committer did it */
+- (NSString *) sourceOfPosition:(uint64_t) position;
 - (void) setPosition:(uint64_t) position;
 - (NSArray *) deferredGroups;
 - (void) restoreDeferred:(NSArray *) groups;

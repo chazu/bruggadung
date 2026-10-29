@@ -404,6 +404,49 @@ partial effects.
 
 23 tests, 182 checks, under both compilers, ASan and UBSan, and leak-free.
 
-Next: the command interface, a text map, and the developer inspector
-(item 5), so a person can drive the lab; or stages and suspension, if the
-scenarios of ACTIONS.md come first.
+### After the slice: the command interface, and stages
+
+Item 5 is built (`src/play/`): `lab play workshop|cistern` is an interactive
+session with a text map, the numbered menu, commands, run controls, saves,
+and the developer inspector (`inspect`, and `why`, which follows causes from
+a change back to the command that began it). The commands typed are the
+replay log; a test plays a session twice and compares the state hashes.
+Walking (`walk_north` and the rest) is the first operation that moves the
+actor.
+
+Then item 3's second part: stages and suspension. An operation may list
+stages; an activity keeps its stage, the progress made in it, and when it
+last started; `suspend` keeps the progress and `resume` rechecks reach and
+runs what is left; after each round, a running activity whose bound
+entities are gone or out of reach is suspended. `pry_out` (loosen 3 s, pull
+2 s) is the example: walked away from after a second, it waits; resumed,
+it finishes the loosening and pulls.
+
+What it settled:
+
+- **A stop is a boundary.** The run policy used to set the clock to the
+  stop time without one, so the domains never advanced to it, and the next
+  step advanced from the stop: the water between the last boundary and a
+  `wait` was simply not delivered. ARCHITECTURE.md already said a stop
+  request inserts a boundary; now it does, and the save tests' reference
+  runs stop where the saving runs stop.
+- **Checked-out records mirror the domain.** The inspector and the view read
+  the holder's record; while checked out, the domain writes its values back
+  after each step, and the record stays closed to commitment.
+- **Activities have causes.** A completion follows from the event that
+  created the activity, and an ending from the event that ended it, so
+  `why` reaches the command.
+- **An item merging away now suspends the drive** rather than failing it
+  when due: the recheck notices first. A completion commitment rejects
+  still fails (the fifth nail in a four-slot lock).
+- **A duration counts from the command**, and the command commits at the
+  next boundary; tests count that millisecond.
+
+Not yet: effort rates from capabilities (graded requirements), partial
+effects at checkpoints, provider allocation (hands), and per-stage
+requirements (a resumed stage rechecks reach, not the operation's pattern).
+
+26 tests, 212 checks, under both compilers, ASan and UBSan, and leak-free.
+
+Next: the tile grid's stencils (water spreading between tiles), with wake
+and sleep by region; then perception and knowledge stores, then agency.

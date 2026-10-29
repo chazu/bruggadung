@@ -690,10 +690,30 @@ static void   sort_by_tap( int *order, int n, const BGFluidOutlet *outlets)
          [committer submit:group];
       }
    }
+   /* readers (the inspector, perception) see the domain's values; the
+      records stay checked out, so nothing else may change them */
+   [self mirror];
    /* watches the step brought to their threshold */
    [self reportWatchesTo:committer];
    if( ! [self flowing])
       [self checkInAll];
+}
+
+
+- (void) mirror
+{
+   int   i;
+
+   for( i = 0; i < _nholders; i++)
+      if( _holders[ i].entity)
+         [_world setField:"WaterStore.water"
+                       of:_holders[ i].entity
+                    value:_holders[ i].water];
+      else
+         [_world setWater:_holders[ i].water
+                      atX:_holders[ i].x
+                        y:_holders[ i].y
+                    level:_holders[ i].level];
 }
 
 

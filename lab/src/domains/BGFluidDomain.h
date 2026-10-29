@@ -12,6 +12,10 @@
  * the first step at which a store runs dry, so the scheduler puts a boundary
  * exactly there, and every tap on that store reports "exhausted" in it.
  *
+ * While a store is checked out, its record mirrors the domain's value after
+ * each step, for readers; commitment still refuses to change it, and the
+ * conservation sum counts it once, through the domain.
+ *
  * Watches are activities' (DOMAIN_SIMULATION.md §5, ACTIONS.md §5): a running
  * activity with a watchHolder is told, by a "watched" event, in the step its
  * holder's water reaches watchAtLeast; that step is part of the horizon too.

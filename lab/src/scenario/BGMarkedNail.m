@@ -1,6 +1,7 @@
 #import "BGMarkedNail.h"
 
 #import "BGActions.h"
+#import "BGWorlds.h"
 
 
 /* The input log: what happens, and when (simulation milliseconds). */
@@ -215,25 +216,7 @@ static const BGScriptLine   mixedScript[] =
    switch( step)
    {
    case BGStepSetup:
-      g = [BGProposalGroup groupWithPhase:BGPhaseSystem
-                                   source:@"setup: the workshop"];
-      h[ 0] = [g create:"bin" key:"bin" at:BGOnTile( 3, 4, 0)];
-      h[ 1] = [g create:"nails_30" key:"the smith's nails" at:BGIn( h[ 0])];
-      h[ 2] = [g create:"lock" key:"lock" at:BGOnTile( 5, 4, 0)];
-      h[ 3] = [g create:"worker" key:"worker" at:BGOnTile( 4, 4, 0)];
-      h[ 4] = [g create:"smith" key:"smith" at:BGOnTile( 2, 4, 0)];
-      h[ 5] = [g create:"ownership" key:"the smith's claim" at:BGLocationMakeNone()];
-      [g set:"Claim.quantity" of:BGWhole( h[ 5]) to:30];
-      [g relate:BGEdgeClaimant from:BGWhole( h[ 5]) to:BGWhole( h[ 4])];
-      [g relate:BGEdgeClaimSubject from:BGWhole( h[ 5]) to:BGWhole( h[ 1])];
-      if( _variant == BGMarkedNailMixedGoods)
-      {
-         h[ 6] = [g create:"nails_10" key:"the worker's nails" at:BGHeldBy( h[ 3], 0)];
-         h[ 7] = [g create:"ownership" key:"the worker's claim" at:BGLocationMakeNone()];
-         [g set:"Claim.quantity" of:BGWhole( h[ 7]) to:10];
-         [g relate:BGEdgeClaimant from:BGWhole( h[ 7]) to:BGWhole( h[ 3])];
-         [g relate:BGEdgeClaimSubject from:BGWhole( h[ 7]) to:BGWhole( h[ 6])];
-      }
+      g = BGWorkshopSetup( _variant == BGMarkedNailMixedGoods, h);
       [_committer submit:g];
       [_groups addObject:g];
       _bin    = h[ 0];

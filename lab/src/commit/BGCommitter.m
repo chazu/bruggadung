@@ -60,6 +60,7 @@ static void   declare( BGTally *t, const char *unit, int64_t units, int64_t mass
    _deferred  = [NSMutableArray new];
    _reactors  = [NSMutableArray new];
    _listeners = [NSMutableArray new];
+   _sources   = [NSMutableDictionary new];
    _trace     = [NSMutableArray new];
    _rounds    = 4;
    return( self);
@@ -73,6 +74,7 @@ static void   declare( BGTally *t, const char *unit, int64_t units, int64_t mass
    [_deferred release];
    [_reactors release];
    [_listeners release];
+   [_sources release];
    [_trace release];
    [super dealloc];
 }
@@ -118,6 +120,12 @@ static void   declare( BGTally *t, const char *unit, int64_t units, int64_t mass
 - (BOOL) hasPending
 {
    return( [_submitted count] || [_deferred count]);
+}
+
+
+- (NSString *) sourceOfPosition:(uint64_t) position
+{
+   return( [_sources objectForKey:[NSNumber numberWithUnsignedLongLong:position]]);
 }
 
 
@@ -678,7 +686,8 @@ static NSString   *live_check( BGWorld *w, BGEntityID e, const char *role)
    NSUInteger          n;
 
    if( loc.form == BGLocationOnTile)
-      return( nil);
+      return( [_world isTileX:loc.x y:loc.y level:loc.level]
+              ? nil : [NSString stringWithFormat:@"(%d, %d) is off the map", loc.x, loc.y]);
    if( ! [_world isLive:loc.place])
       return( [NSString stringWithFormat:@"%llu is in %llu, which does not exist",
                                          (unsigned long long) e, (unsigned long long) loc.place]);
@@ -857,6 +866,8 @@ static NSString   *live_check( BGWorld *w, BGEntityID e, const char *role)
    NSUInteger   n;
 
    _position++;
+   [_sources setObject:[group source]
+                forKey:[NSNumber numberWithUnsignedLongLong:_position]];
    [self note:[NSString stringWithFormat:@"b%llu r%u #%llu %s %@", (unsigned long long) [_world boundary], _round,
                                          (unsigned long long) _position, BGPhaseNames[ [group phase]], [group source]]];
    memset( &tally, 0, sizeof( tally));

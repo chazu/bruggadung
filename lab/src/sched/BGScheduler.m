@@ -92,18 +92,15 @@ static BGTime   earlier( BGTime a, BGTime b)
 }
 
 
-- (BOOL) stepUntil:(BGTime) stop
+/* One boundary at `bound`: domains advance to it, then commitment runs there. */
+- (void) boundaryAt:(BGTime) bound
 {
    id <BGDomain>   d;
    NSArray         *groups;
-   BGTime          bound;
    BGTime          t;
    NSUInteger      i;
 
-   t     = [_world time];
-   bound = [self nextBoundaryTime];
-   if( bound.ms > stop.ms || bound.ms == BGTimeNever.ms)
-      return( NO);
+   t = [_world time];
 
    /* advance every active domain to the bound */
    for( i = 0; i < [_domains count]; i++)
@@ -128,10 +125,23 @@ static BGTime   earlier( BGTime a, BGTime b)
    [_observer scheduler:self
       didCommitBoundary:[_world boundary]
                  groups:groups];
+}
+
+
+- (BOOL) stepUntil:(BGTime) stop
+{
+   BGTime   bound;
+
+   bound = [self nextBoundaryTime];
+   if( bound.ms > stop.ms || bound.ms == BGTimeNever.ms)
+      return( NO);
+   [self boundaryAt:bound];
    return( YES);
 }
 
 
+/* A stop is a boundary too (ARCHITECTURE.md): the domains advance to it, so
+ * no time passes without them. */
 - (NSUInteger) runUntil:(BGTime) stop
 {
    NSUInteger   n;
@@ -140,7 +150,10 @@ static BGTime   earlier( BGTime a, BGTime b)
    while( [self stepUntil:stop])
       n++;
    if( [_world time].ms < stop.ms)
-      [_world setTime:stop];
+   {
+      [self boundaryAt:stop];
+      n++;
+   }
    return( n);
 }
 
