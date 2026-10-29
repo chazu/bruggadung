@@ -261,9 +261,12 @@ Foundation it builds and passes the same test (`make objc`).
 The full MulleFoundation does not build on this Mac (macOS 14, arm64): in
 `NSTask+System.m`, mulle-clang emits an empty inline-assembly barrier for
 `@try` with every local variable as a memory operand, 30 in that method, and
-arm64 runs out of registers. The wrapper doesn't need that part. The tap's
-`--HEAD` build is no way out: it is an older line (mulle-clang 17.0.6) that
-can't parse current MulleObjC headers. The bug is the mulle project's to fix.
+arm64 runs out of registers. The wrapper doesn't need that part. mulle-clang
+has fixed this on its `mulle/23.1.3` branch (commit 2759313016, batching the
+operands), not yet in a release; the tap's `--HEAD` build is an older line
+(17.0.6) and no help. Built from that branch, mulle-clang 23.1.3 compiles the
+whole MulleFoundation, where 22.1.8 fails on exactly that file, and the
+wrapper's test passes against the full MulleFoundation.
 
 An independent audit (a separate agent reading only the spec and the code)
 then found eleven gaps, now closed or recorded. Residuals and bindings for a
