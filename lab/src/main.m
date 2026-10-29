@@ -133,7 +133,7 @@ static int   run_cistern( const char *name)
    printf( "\n== entities\n");
    for( i = 1; i < [world nextID]; i++)
       printf( "%s\n", [[world describeEntity:(BGEntityID) i] UTF8String]);
-   printf( "floor at (5, 5): %lld mL\n", (long long) [world waterAtX:5 y:5 level:0]);
+   printf( "on the floor: %lld mL\n", (long long) [world totalTileWater]);
    printf( "\n== checks\n");
    lines = [scenario results];
    for( i = 0; i < [lines count]; i++)

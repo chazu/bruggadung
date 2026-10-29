@@ -448,5 +448,20 @@ requirements (a resumed stage rechecks reach, not the operation's pattern).
 
 26 tests, 212 checks, under both compilers, ASan and UBSan, and leak-free.
 
-Next: the tile grid's stencils (water spreading between tiles), with wake
-and sleep by region; then perception and knowledge stores, then agency.
+### After the slice: the floor
+
+Item 4's second part: water spreads across the floor. The fluid domain's
+structure includes the floor around wet tiles and below every tap; across
+each adjacent pair it moves (difference × dt) / (8 τ) whole millilitres from
+step-start values, with τ = 10 s as the safe step, so the scheme is stable
+and order independent, and a puddle settles once neighbours differ by less
+than 8 mL. When nothing flows or spreads, the whole region checks in and
+sleeps. The cistern's 722 mL now spread from under the crack across the
+floor, and the domain is asleep at the end of the run; every earlier check
+still holds, the reversed order included.
+
+Not yet: regions smaller than the whole structure (a puddle across the room
+keeps the cistern's structure awake), walls and levels, and contributions
+from other domains.
+
+Next: perception and knowledge stores (KNOWLEDGE.md), then agency.

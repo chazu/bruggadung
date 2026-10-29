@@ -885,7 +885,22 @@ static void   test_cistern( void)
    [[base world] getField:"WaterStore.water" of:5 value:&a];
    [[base world] getField:"WaterStore.water" of:6 value:&b];
    BG_CHECK( a > 7000 && a < 7300 && b > 7000 && b < 7300);
-   BG_CHECK( [[base world] waterAtX:5 y:5 level:0] > 650 && [[base world] waterAtX:5 y:5 level:0] < 800);
+   BG_CHECK( [[base world] totalTileWater] > 650 && [[base world] totalTileWater] < 800);
+   /* the puddle spread from the tile below the crack, and then settled: the domain sleeps */
+   {
+      int32_t   x;
+      int32_t   y;
+      int       wet;
+
+      wet = 0;
+      for( y = 0; y < 32; y++)
+         for( x = 0; x < 32; x++)
+            if( [[base world] waterAtX:x y:y level:0])
+               wet++;
+      BG_CHECK( wet > 9 && [[base world] waterAtX:5 y:5 level:0] < 100);
+      BG_CHECK( [[base fluid] checkedOutWater] == 0 && ! [[base world] isTileCheckedOutX:5 y:5 level:0]);
+      BG_CHECK( [[base fluid] horizonAt:[[base world] time]].nextEvent.ms == BGTimeNever.ms);
+   }
 }
 
 

@@ -16,6 +16,11 @@
  * each step, for readers; commitment still refuses to change it, and the
  * conservation sum counts it once, through the domain.
  *
+ * The floor around wet tiles (and below every tap) is part of the structure:
+ * water spreads across it (BG_SPREAD_TAU), and when nothing flows or spreads
+ * the whole region sleeps: everything is checked in and the horizon is
+ * infinite.
+ *
  * Watches are activities' (DOMAIN_SIMULATION.md §5, ACTIONS.md §5): a running
  * activity with a watchHolder is told, by a "watched" event, in the step its
  * holder's water reaches watchAtLeast; that step is part of the horizon too.
@@ -23,7 +28,15 @@
 #import "BGScheduler.h"
 
 
-#define BG_FLUID_MAX   64
+#define BG_FLUID_MAX       64
+#define BG_FLUID_HOLDERS   512           /* stores and tiles */
+
+/* Water on the floor spreads between adjacent tiles: across each pair, in a
+ * step of dt, (difference × dt) / (8 τ) whole millilitres, from step-start
+ * values; the safe step is τ, so no pair moves more than an eighth of its
+ * difference and the scheme stays stable. A fraction of a millilitre doesn't
+ * move, so a puddle settles once neighbours differ by less than 8 mL. */
+#define BG_SPREAD_TAU      10000         /* ms */
 
 typedef struct
 {
@@ -51,7 +64,7 @@ typedef struct
    BOOL             _active;
    BOOL             _reversed;
    uint64_t         _signature;
-   BGFluidHolder    _holders[ BG_FLUID_MAX];
+   BGFluidHolder    _holders[ BG_FLUID_HOLDERS];
    int              _nholders;
    BGFluidOutlet    _outlets[ BG_FLUID_MAX];
    int              _noutlets;

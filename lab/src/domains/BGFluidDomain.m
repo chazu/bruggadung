@@ -152,12 +152,53 @@ static BOOL   ground_tile( BGWorld *world, BGEntityID e, BGLocation *tile)
 }
 
 
-static uint64_t   signature( BGTapView *views, int n)
+/* The floor the domain works on: wet tiles and their neighbours, and the
+ * tiles below the taps, in (level, y, x) order. */
+- (int) region:(int32_t (*)[ 3]) tiles
+         views:(BGTapView *) views
+         count:(int) nviews
+{
+   static const int   dx[ 5] = { 0, 1, -1, 0, 0 };
+   static const int   dy[ 5] = { 0, 0, 0, 1, -1 };
+   uint8_t            in[ 32][ 32];
+   int32_t            x;
+   int32_t            y;
+   int                d;
+   int                i;
+   int                n;
+
+   memset( in, 0, sizeof( in));
+   for( y = 0; y < 32; y++)
+      for( x = 0; x < 32; x++)
+         if( [_world waterAtX:x y:y level:0] > 0)
+            for( d = 0; d < 5; d++)
+               if( [_world isTileX:x + dx[ d] y:y + dy[ d] level:0])
+                  in[ y + dy[ d]][ x + dx[ d]] = 1;
+   for( i = 0; i < nviews; i++)
+      if( ! views[ i].destination && [_world isTileX:views[ i].x y:views[ i].y level:0])
+         in[ views[ i].y][ views[ i].x] = 1;
+   n = 0;
+   for( y = 0; y < 32; y++)
+      for( x = 0; x < 32; x++)
+         if( in[ y][ x] && n < BG_FLUID_HOLDERS - BG_FLUID_MAX)
+         {
+            tiles[ n][ 0] = x;
+            tiles[ n][ 1] = y;
+            tiles[ n][ 2] = 0;
+            n++;
+         }
+   return( n);
+}
+
+
+static uint64_t   signature( BGTapView *views, int n, int32_t (*tiles)[ 3], int ntiles)
 {
    uint64_t   h;
    int        i;
 
-   h = BGMix( (uint64_t) n);
+   h = BGMix( (uint64_t) n ^ ((uint64_t) ntiles << 32));
+   for( i = 0; i < ntiles; i++)
+      h = BGMix( h ^ (uint64_t) (uint32_t) tiles[ i][ 0] ^ ((uint64_t) (uint32_t) tiles[ i][ 1] << 16));
    for( i = 0; i < n; i++)
    {
       h = BGMix( h ^ views[ i].tap ^ (views[ i].source << 20) ^ (views[ i].destination << 40));
@@ -182,7 +223,7 @@ static uint64_t   signature( BGTapView *views, int n)
       if( entity ? _holders[ i].entity == entity
                  : (! _holders[ i].entity && _holders[ i].x == x && _holders[ i].y == y && _holders[ i].level == level))
          return( i);
-   if( _nholders == BG_FLUID_MAX)
+   if( _nholders == BG_FLUID_HOLDERS)
       return( -1);
    if( entity)
    {
@@ -207,6 +248,8 @@ static uint64_t   signature( BGTapView *views, int n)
 /* Checks out the stores the open taps join, and starts flowing. */
 - (void) formFrom:(BGTapView *) views
             count:(int) n
+            tiles:(int32_t (*)[ 3]) tiles
+           ntiles:(int) ntiles
 {
    BGFluidOutlet   *o;
    int             i;
@@ -232,7 +275,52 @@ static uint64_t   signature( BGTapView *views, int n)
       o->exhausted = _holders[ o->source].water == 0;
       _noutlets++;
    }
+   for( k = 0; k < ntiles; k++)
+   {
+      i = _reversed ? ntiles - 1 - k : k;
+      [self holderFor:BGNoEntity x:tiles[ i][ 0] y:tiles[ i][ 1] level:tiles[ i][ 2]];
+   }
    _active = YES;
+}
+
+
+/* Whether some pair of adjacent tiles differs by enough to move water. */
+- (void) tileIndex:(int (*)[ 32]) at
+{
+   int   i;
+   int   x;
+   int   y;
+
+   for( y = 0; y < 32; y++)
+      for( x = 0; x < 32; x++)
+         at[ y][ x] = -1;
+   for( i = 0; i < _nholders; i++)
+      if( ! _holders[ i].entity && _holders[ i].level == 0 && [_world isTileX:_holders[ i].x y:_holders[ i].y level:0])
+         at[ _holders[ i].y][ _holders[ i].x] = i;
+}
+
+
+- (BOOL) spreading
+{
+   int64_t   diff;
+   int       at[ 32][ 32];
+   int       i;
+   int       j;
+   int       x;
+   int       y;
+
+   [self tileIndex:at];
+   for( y = 0; y < 32; y++)
+      for( x = 0; x < 32; x++)
+      {
+         if( (i = at[ y][ x]) < 0)
+            continue;
+         if( x + 1 < 32 && (j = at[ y][ x + 1]) >= 0 && ((diff = _holders[ i].water - _holders[ j].water) >= 8 || diff <= -8))
+            return( YES);
+         if( y + 1 < 32 && (j = at[ y + 1][ x]) >= 0 && ((diff = _holders[ i].water - _holders[ j].water) >= 8 || diff <= -8))
+            return( YES);
+      }
+   return( NO);
 }
 
 
@@ -295,7 +383,7 @@ static uint64_t   signature( BGTapView *views, int n)
    for( i = 0; i < _noutlets; i++)
       if( ! _outlets[ i].exhausted && _outlets[ i].rate > 0)
          return( YES);
-   return( NO);
+   return( [self spreading]);
 }
 
 
@@ -505,7 +593,9 @@ typedef struct
 - (BGHorizon) horizonAt:(BGTime) t
 {
    BGFluidWatch   watches[ BG_FLUID_MAX];
-   BGTapView   views[ BG_FLUID_MAX];
+   BGTapView      views[ BG_FLUID_MAX];
+   int32_t        tiles[ BG_FLUID_HOLDERS][ 3];
+   int            ntiles;
    BGHorizon   h;
    BGTime      next;
    uint64_t    sig;
@@ -514,8 +604,9 @@ typedef struct
 
    h.safeStep  = BGTimeNever;      /* constant rates: any step is exact */
    h.nextEvent = BGTimeNever;
-   n   = [self scan:views];
-   sig = signature( views, n);
+   n      = [self scan:views];
+   ntiles = [self region:tiles views:views count:n];
+   sig    = signature( views, n, tiles, ntiles);
    /* a tap opened or closed, or a bucket moved: check in and form again */
    if( _active && sig != _signature)
       [self checkInAll];
@@ -523,7 +614,9 @@ typedef struct
    {
       _signature = sig;
       [self formFrom:views
-               count:n];
+               count:n
+               tiles:tiles
+              ntiles:ntiles];
       if( ! [self flowing])
       {
          [self checkInAll];
@@ -537,7 +630,10 @@ typedef struct
       if( next.ms < h.nextEvent.ms)
          h.nextEvent = next;
    }
-   _predicted = h.nextEvent;
+   if( h.nextEvent.ms != BGTimeNever.ms)
+      _predicted = h.nextEvent;
+   if( [self spreading])
+      h.safeStep = BGTimeMake( BG_SPREAD_TAU);
    /* the activities' watches */
    n = [self watches:watches];
    [self pruneFired:watches
@@ -690,6 +786,7 @@ static void   sort_by_tap( int *order, int n, const BGFluidOutlet *outlets)
          [committer submit:group];
       }
    }
+   [self spreadFor:dt];
    /* readers (the inspector, perception) see the domain's values; the
       records stay checked out, so nothing else may change them */
    [self mirror];
@@ -697,6 +794,56 @@ static void   sort_by_tap( int *order, int n, const BGFluidOutlet *outlets)
    [self reportWatchesTo:committer];
    if( ! [self flowing])
       [self checkInAll];
+}
+
+
+/* Water levelling out across the floor: every adjacent pair from step-start
+ * values, then all applied, so no order can matter. */
+- (void) spreadFor:(int64_t) dt
+{
+   int64_t   delta[ BG_FLUID_HOLDERS];
+   int64_t   diff;
+   int64_t   q;
+   int       at[ 32][ 32];
+   int       i;
+   int       j;
+   int       x;
+   int       y;
+   int       d;
+
+   if( dt > BG_SPREAD_TAU)
+      dt = BG_SPREAD_TAU;
+   [self tileIndex:at];
+   for( i = 0; i < _nholders; i++)
+      delta[ i] = 0;
+   for( y = 0; y < 32; y++)
+      for( x = 0; x < 32; x++)
+         for( d = 0; d < 2; d++)          /* each pair once: east, south */
+         {
+            i = at[ y][ x];
+            j = d ? (y + 1 < 32 ? at[ y + 1][ x] : -1) : (x + 1 < 32 ? at[ y][ x + 1] : -1);
+            if( i < 0 || j < 0)
+               continue;
+            diff = _holders[ i].water - _holders[ j].water;
+            q    = (diff < 0 ? -diff : diff) * dt / (8 * BG_SPREAD_TAU);
+            if( ! q)
+               continue;
+            if( diff > 0)
+            {
+               delta[ i] -= q;
+               delta[ j] += q;
+            }
+            else
+            {
+               delta[ i] += q;
+               delta[ j] -= q;
+            }
+         }
+   for( i = 0; i < _nholders; i++)
+   {
+      _holders[ i].water += delta[ i];
+      assert( _holders[ i].water >= 0);
+   }
 }
 
 

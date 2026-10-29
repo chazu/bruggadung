@@ -358,7 +358,7 @@
 
    a     = [self waterOf:_bucketA];
    b     = [self waterOf:_bucketB];
-   puddle = [_world waterAtX:5 y:5 level:0];
+   puddle = [_world totalTileWater];
    [self check:_conserved && [self totalWater] == 15000
           name:@"1. exact conservation: buckets + floor + cistern = 15 L at every boundary"
            why:_firstProblem];
