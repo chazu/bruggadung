@@ -6,6 +6,14 @@ semantics with CUE-style syntax, specified in
 of its engine. It is plain C11 with no dependencies, so it builds without the mulle
 toolchain.
 
+Documentation:
+
+- [docs/GUIDE.md](docs/GUIDE.md): learn the language by building one content
+  file, from types to blueprints, variation, patterns, arithmetic, and clauses
+- [docs/REFERENCE.md](docs/REFERENCE.md): the grammar, built-in types, units,
+  every attribute, the rules for defaults and variation, and every diagnostic
+- [docs/API.md](docs/API.md): embedding the engine from C and Objective-C
+
 ```sh
 make            # library and tests
 make test       # the leak check, then the tests
@@ -35,6 +43,7 @@ TRI_PROPS_SCALE=10 ./build/test properties     # ten times the randomised cases
 | `src/xtree.c` | Syntax tree printing and construction |
 | `src/util.c` | Arenas, symbols, maps, diagnostics |
 | `objc/` | `BGContent`, the Objective-C wrapper, with its test; runs under Apple's runtime and mulle-objc |
+| `docs/` | The guide, the language reference, and the embedding API |
 | `tests/` | Core tests; the three scenarios and the example file from CONTENT_LANGUAGE.md; every feature; randomised property tests and source fuzzing; a small TDL grammar; a leak check against a counting allocator |
 | `bench/erg.c` | Benchmark against a TDL grammar such as the English Resource Grammar |
 | `bench/content.c` | Benchmark of a synthetic content build shaped like bruggadung's |
@@ -212,15 +221,16 @@ paths. With 20,000 blueprints:
 ## Status
 
 Every feature in CONTENT_LANGUAGE.md is built, including the definite-clause
-layer and arithmetic, which the first version of the spec had deferred. The
-spec's open questions remain open. Each feature has tests, listed by area
-below.
+layer and arithmetic, which the first version of the spec had deferred, and
+the spec's decisions on its former open questions. Each feature has tests,
+listed by area below.
 
 | Area | Tests |
 | --- | --- |
 | Parser, hierarchy, meets, closed typing, tags, units, lists | `test_core.c` |
 | The three scenarios: defaults, variation, conflicts, matching, hypotheses, recognition, decay | `test_scenarios.c` |
 | The example file of §17, read from the spec | `test_example_file` |
+| The guide's examples and the results it quotes, read from `docs/GUIDE.md` | `test_docs_guide` |
 | `bool`, `text`, `ref`, Celsius; blueprints resolved at load; the field registry | `test_features.c` |
 | Disjunction of structures in types and instances, variants, default alternatives, the variant cap | `test_features.c` |
 | `@vary` weights, typed open lists, recursive types, numbers in memory decay (`@widen`) | `test_features.c` |

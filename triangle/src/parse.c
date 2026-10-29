@@ -85,7 +85,9 @@ static bool lex(Parser *p, const char *src)
                 if (*s == '.' && s[1] == '.') break;
                 ADV();
             }
-            while (isalpha((unsigned char) *s)) ADV();
+            /* a unit suffix starts with a letter and may end in digits (m3) */
+            if (isalpha((unsigned char) *s))
+                while (isalnum((unsigned char) *s)) ADV();
         } else if (ch == '"') {
             t.k = T_STRING;
             ADV();

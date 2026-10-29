@@ -41,6 +41,9 @@ void test_builtin_types(void)
     CHECK(lo == 26815);
     tri_node_interval(tri_value(c, "-2.5", a, NULL, 0), &lo, &hi);
     CHECK(lo == -2500);
+    /* a unit suffix may end in digits */
+    tri_node_interval(tri_value(c, "2m3", a, NULL, 0), &lo, &hi);
+    CHECK(lo == 2000000);
     /* referents unify only with themselves */
     const TriNode *r7 = tri_value(c, "#Lamp & { owner: ref(7) }", a, err, sizeof err);
     CHECK(r7 != NULL);
@@ -654,6 +657,95 @@ void test_example_file(void)
     const TriNode *seen = tri_value(c, "#Observed & { what: #Floor & { wetness: \"damp\" }, place: ref(4) }", a, NULL, 0);
     TriMatchResult r;
     CHECK(tri_match(c, tri_at(c, rule, "premises.first"), seen, &r) == TRI_ENTAILED);
+    tri_arena_free(a);
+    tri_content_free(c);
+}
+
+/* docs/GUIDE.md: every cue block in it is one content file, which loads and
+ * gives the results the guide quotes. */
+void test_docs_guide(void)
+{
+    FILE *f = fopen("docs/GUIDE.md", "rb");
+    if (!f) { fprintf(stderr, "    (skipped: docs/GUIDE.md not found)\n"); return; }
+    static char doc[100000], src[50000];
+    size_t n = fread(doc, 1, sizeof doc - 1, f), len = 0;
+    fclose(f);
+    doc[n] = 0;
+    for (const char *p = doc; (p = strstr(p, "```cue\n")); ) {
+        p += 7;
+        const char *e = strstr(p, "\n```");
+        if (!e) break;
+        len += (size_t) snprintf(src + len, sizeof src - len, "%.*s\n", (int) (e - p), p);
+        p = e + 4;
+    }
+    CHECK(len > 1000 && len < sizeof src);
+    const char *names[] = { "guide.tri" };
+    const char *srcs[] = { src };
+    TriContent *c = load(names, srcs, 1);
+    CHECK(tri_content_ok(c));
+    if (!tri_content_ok(c)) { dump_diags(c); tri_content_free(c); return; }
+    CHECK(has_diag(c, "warning: hammer: conflicting defaults for material from #Wooden, #Metal; both dropped", 0));
+    CHECK_STR(tri_doc(c, "#Physical"), "Anything with mass and a material.");
+    /* §4–5: specs, defaults, the inspector */
+    CHECK_STR(printed(c, tri_spec(c, "wrench_19")), "#Wrench & { mass: 850g, material: \"steel\", size: 19mm, wear: 0 }");
+    CHECK_STR(printed(c, tri_at(c, tri_spec(c, "hammer"), "material")), "#Material");
+    CHECK_STR(printed(c, tri_at(c, tri_spec(c, "mallet"), "material")), "\"ash\"");
+    char buf[2048];
+    tri_inspect(c, "mallet", buf, sizeof buf);
+    CHECK_CONTAINS(buf, "material: \"ash\"  <- default from the instance");
+    CHECK_CONTAINS(buf, "wear: 0  <- default from #Tool");
+    /* §6: four nuts */
+    TriArena *a = tri_arena_new();
+    static const char *nuts[] = {
+        "#Nut & { mass: 39g, material: \"brass\", size: 12.4mm, state: \"loose\" }",
+        "#Nut & { mass: 9g, material: \"brass\", size: 12mm, state: \"loose\" }",
+        "#Nut & { mass: 10g, material: \"brass\", size: 13.1mm, state: \"loose\" }",
+        "#Nut & { mass: 5g, material: \"steel\", size: 16mm, state: \"loose\" }",
+    };
+    for (uint64_t seed = 1; seed <= 4; seed++) CHECK_STR(printed(c, tri_construct(c, "nut", seed, a)), nuts[seed - 1]);
+    CHECK(tri_spec_variation_count(c, "wrench_19") == 1);
+    /* §7: variants, and a disjunction type */
+    CHECK(tri_pattern_variant_count(c, "spanner") == 3);
+    CHECK(tri_construct(c, "file_tool", 1, a) != NULL);
+    /* §8: the matching table, the explainer, and the family index */
+    static const struct { const char *nut; TriMatch m; const char *residuals; } rows[] = {
+        { "#Nut & { size: 19mm, state: \"tight\" }", TRI_ENTAILED, "" },
+        { "#Nut & { size: >=17mm & <=21mm, state: \"tight\" }", TRI_UNKNOWN, "target.size " },
+        { "#Nut & { size: 13mm }", TRI_INCOMPATIBLE, "" },
+        { "#Nut", TRI_UNKNOWN, "target.size target.state " },
+    };
+    char expr[256];
+    for (size_t i = 0; i < 4; i++) {
+        snprintf(expr, sizeof expr, "#Roles & { instrument: #Wrench & { size: 19mm }, target: %s }", rows[i].nut);
+        const TriNode *d = tri_value(c, expr, a, NULL, 0);
+        TriMatchResult r;
+        CHECK(tri_match_instance(c, "loosen", d, &r) == rows[i].m);
+        char res[256] = "";
+        for (size_t k = 0; k < r.nresidual; k++) { strcat(res, r.residual[k]); strcat(res, " "); }
+        CHECK_STR(res, rows[i].residuals);
+        if (rows[i].m == TRI_INCOMPATIBLE) {
+            CHECK_STR(r.failure.path, "target.size");
+            CHECK_STR(r.failure.right, "13mm");
+        }
+        if (i == 1) {
+            tri_explain_instance(c, "loosen", d, buf, sizeof buf);
+            CHECK_CONTAINS(buf, "result: unknown\nbindings:\n  $s at instrument.size = 19mm\nresiduals: target.size");
+        }
+    }
+    TriIndex *ix = tri_family_index(c, "operations");
+    CHECK(ix && tri_index_count(ix) == 2);
+    const TriNode *loose = tri_value(c, "#Roles & { instrument: #Wrench & { size: 19mm }, target: #Nut & { state: \"loose\" } }", a, NULL, 0);
+    size_t out[4];
+    CHECK(ix && tri_index_candidates(ix, loose, out, 4) == 1);
+    if (ix) CHECK_STR((const char *) tri_index_tag(ix, out[0]), "tighten");
+    /* §9–10: arithmetic and clauses */
+    CHECK_STR(printed(c, tri_at(c, tri_spec(c, "breaker"), "torque")), "40Nm");
+    const TriNode *sol[8];
+    int trunc;
+    CHECK(tri_solve(c, tri_value(c, "#Way & { from: \"kitchen\" }", a, NULL, 0), 10, sol, 8, a, &trunc) == 3 && !trunc);
+    CHECK_STR(printed(c, sol[0]), "#Way & { from: \"kitchen\", length: 3000mm, to: \"yard\" }");
+    CHECK_STR(printed(c, sol[2]), "#Way & { from: \"kitchen\", length: 1000mm, to: \"hall\" }");
+    CHECK(tri_solve(c, tri_value(c, "#Way & { from: \"kitchen\", length: <=2m }", a, NULL, 0), 10, sol, 8, a, &trunc) == 2);
     tri_arena_free(a);
     tri_content_free(c);
 }

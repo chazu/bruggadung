@@ -28,6 +28,13 @@ language), the syntax of CUE, the engine techniques of PET and ACE, and the
 matching discipline of LIFE**, extended with integer units, load-time
 defaults, and seed-driven variation.
 
+For writing content, start with the user documentation in
+[triangle/docs/](triangle/docs/): a [guide](triangle/docs/GUIDE.md) that
+builds one content file step by step, a [language
+reference](triangle/docs/REFERENCE.md) with the grammar, attributes, units,
+and diagnostics, and [the embedding API](triangle/docs/API.md). This document
+keeps the design and the reasons for it.
+
 Out of scope here:
 
 - what the systems do with the content once it is loaded (their own docs)
@@ -734,8 +741,8 @@ fetch_tool: #Method & {
 The prototype of the engine is in [triangle/](triangle/README.md): plain C11,
 about 7,800 lines, with 2,000 lines of tests. Every feature in this document
 is built, including the definite-clause layer (§10) and arithmetic (§5),
-which the first version had deferred; the open questions below remain
-open:
+which the first version had deferred, and the decisions on the former open
+questions (the last section):
 
 - the parser, the hierarchy with completion, conjunction types, and
   bit-vector meets
