@@ -1,4 +1,4 @@
-/* Generated from Triangle content 9a92831ffbe239e8: do not edit. Type IDs are valid
+/* Generated from Triangle content acdf4dcaf6fe52f8: do not edit. Type IDs are valid
  * only for this content; regenerate when it changes. */
 #ifndef BG_COMPONENTS_H
 #define BG_COMPONENTS_H
@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BG_CONTENT_HASH 0x9a92831ffbe239e8ULL
+#define BG_CONTENT_HASH 0xacdf4dcaf6fe52f8ULL
 
 /* Claim, from #Claim */
 typedef struct {
@@ -44,19 +44,31 @@ typedef struct {
     int64_t         unitMass;    /* mass, in quanta of 1g; content, saved, inspect */
 } BGStack;
 
+/* Tap, from #Tap */
+typedef struct {
+    bool            open;    /* bool; content, saved, proposable, inspect, perceive(sight) */
+    int64_t         rate;    /* int, in quanta of 1; content, saved, inspect */
+} BGTap;
+
+/* WaterStore, from #WaterStore */
+typedef struct {
+    int64_t         water;    /* volume, in quanta of 1mL; content, saved, proposable, inspect, perceive(sight) */
+    int64_t         waterCapacity;    /* volume, in quanta of 1mL; content, saved, inspect, perceive(sight) */
+} BGWaterStore;
+
 /* #ClaimKind */
 enum {
-    BG_CLAIMKIND_CUSTODY = 26,
-    BG_CLAIMKIND_OWNERSHIP = 27,
+    BG_CLAIMKIND_CUSTODY = 28,
+    BG_CLAIMKIND_OWNERSHIP = 29,
 };
 
 /* #Material */
 enum {
-    BG_MATERIAL_BRASS = 34,
-    BG_MATERIAL_FLESH = 35,
-    BG_MATERIAL_IRON = 36,
-    BG_MATERIAL_OAK = 37,
-    BG_MATERIAL_PAPER = 38,
+    BG_MATERIAL_BRASS = 37,
+    BG_MATERIAL_FLESH = 38,
+    BG_MATERIAL_IRON = 39,
+    BG_MATERIAL_OAK = 40,
+    BG_MATERIAL_PAPER = 41,
 };
 
 /* The field registry: what code needs to read and write any component
@@ -82,7 +94,7 @@ typedef struct {
     const BGFieldInfo *fields;
 } BGComponentInfo;
 
-#define BG_COMPONENT_COUNT 6
+#define BG_COMPONENT_COUNT 8
 
 #ifdef BG_COMPONENT_REGISTRY
 
@@ -116,6 +128,16 @@ static const BGFieldInfo BGStack_fields[] = {
     { "unitMass", offsetof(BGStack, unitMass), BG_VALUE_QUANTITY, "mass", "content, saved, inspect" },
 };
 
+static const BGFieldInfo BGTap_fields[] = {
+    { "open", offsetof(BGTap, open), BG_VALUE_BOOL, "bool", "content, saved, proposable, inspect, perceive(sight)" },
+    { "rate", offsetof(BGTap, rate), BG_VALUE_QUANTITY, "int", "content, saved, inspect" },
+};
+
+static const BGFieldInfo BGWaterStore_fields[] = {
+    { "water", offsetof(BGWaterStore, water), BG_VALUE_QUANTITY, "volume", "content, saved, proposable, inspect, perceive(sight)" },
+    { "waterCapacity", offsetof(BGWaterStore, waterCapacity), BG_VALUE_QUANTITY, "volume", "content, saved, inspect, perceive(sight)" },
+};
+
 static const BGComponentInfo BGComponents[BG_COMPONENT_COUNT + 1] = {
     { "Claim", "#Claim", sizeof(BGClaim), 2, BGClaim_fields },
     { "Body", "#Body", sizeof(BGBody), 4, BGBody_fields },
@@ -123,6 +145,8 @@ static const BGComponentInfo BGComponents[BG_COMPONENT_COUNT + 1] = {
     { "Assembly", "#Assembly", sizeof(BGAssembly), 1, BGAssembly_fields },
     { "Container", "#Container", sizeof(BGContainer), 1, BGContainer_fields },
     { "Stack", "#Stack", sizeof(BGStack), 3, BGStack_fields },
+    { "Tap", "#Tap", sizeof(BGTap), 2, BGTap_fields },
+    { "WaterStore", "#WaterStore", sizeof(BGWaterStore), 2, BGWaterStore_fields },
     { 0 }
 };
 

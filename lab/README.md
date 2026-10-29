@@ -1,9 +1,11 @@
 # The simulation laboratory
 
 The first code of the bruggadung framework, in mulle Objective-C: entities,
-component stores, relations, change commitment, and the clock and scheduler,
-with content loaded from Triangle. It runs COMPONENTS.md's first scenario,
-*The marked nail*, headless, and checks its acceptance criteria. The plan
+component stores, relations, change commitment, the clock and scheduler,
+saves, the action menu, and the first domain, with content loaded from
+Triangle. It runs COMPONENTS.md's first scenario, *The marked nail*, and
+DOMAIN_SIMULATION.md's third, *Two draws on a dwindling stock*, headless,
+and checks their acceptance criteria. The plan
 and its status are in [PLAN.md](PLAN.md).
 
 ```sh
@@ -12,6 +14,7 @@ mulle-sde craft                         # the real build: mulle-clang, MulleObjC
 ./kitchen/Debug/lab run marked-nail     # one scenario: trace, entities, checks (also -a, -b)
 ./kitchen/Debug/lab save marked-nail    # the save of its end state
 ./kitchen/Debug/lab menu marked-nail 1000   # what the worker sees, and its menu, at 1000 ms
+./kitchen/Debug/lab run cistern         # the fluid domain: two taps and a leak on a dwindling cistern (also -b, -d)
 make gen                                # regenerate src/generated/BGComponents.h from content/
 make test-apple                         # the same sources with Apple clang and Foundation
 make asan                               # the Apple build under AddressSanitizer and UBSan
@@ -27,15 +30,16 @@ CFLAGS`.
 
 | Path | Contents |
 | --- | --- |
-| `content/` | `components.tri`: the component kinds and their field registry, plus what descriptions say besides fields (ids, places, free hands); `operations.tri`: the operations; `workshop.tri`: the scenario's blueprints |
+| `content/` | `components.tri`: the component kinds and their field registry, plus what descriptions say besides fields (ids, places, free hands); `water.tri`: water stores and taps; `operations.tri`: the operations; `workshop.tri`: the scenarios' blueprints |
 | `src/generated/BGComponents.h` | Generated from `content/` by `make gen`: one struct per component, enums, and the field registry. Committed; the lab refuses to run on content with another hash. |
 | `src/core/` | `BGTypes.h` (IDs, time, seeds, locations), `BGStore` (records of one kind, sorted by ID), `BGWorld` (all authoritative state, journaled for rollback) |
 | `src/commit/` | `BGProposalGroup` (proposals, handles, unit references), `BGCommitter` (ordering, individuation, apply, validation, events, reactions) |
 | `src/kinds/` | Component behaviour: `BGBodyKind`, the merge reaction |
+| `src/domains/` | `BGFluidDomain`: water through open taps, with checkout, exact allocation, and exhaustion as the horizon |
 | `src/sched/` | `BGScheduler`, with the domain and input-source protocols |
 | `src/act/` | `BGView` (reach and descriptions: the knowledge view's stub), `BGActions` (the menu, matching, effects, performing) |
 | `src/save/` | `BGSave`: saves as text, and restoring them |
-| `src/scenario/` | `BGMarkedNail`: the scenario, its input log, and its checks |
+| `src/scenario/` | `BGMarkedNail` and `BGCistern`: the scenarios, their input logs, and their checks |
 | `src/test/` | The test runner and the tests |
 | `src/triangle/` | Symlinks to the Triangle engine and its Objective-C wrapper, compiled into the lab |
 
@@ -50,6 +54,19 @@ open, so a match on it is unknown, and unknown never excludes. The menu
 lists every operation and binding whose match isn't incompatible.
 Performing a command checks it is on the menu, then runs the operation's
 effect function, which builds a proposal group for commitment.
+
+## How a domain runs
+
+The fluid domain owns water while it flows. At each boundary the scheduler
+asks it for a horizon; if an open tap can draw, it forms a structure,
+checking out the water of the stores and tiles involved (commitment then
+refuses to change them), and answers with the exact time its source runs
+dry. The scheduler jumps there. Flows are whole millilitres with the
+fraction carried on the tap; a step that can't be met is shared pro rata,
+with the leftover millilitres given in tap-ID order rotated by the boundary.
+When nothing can flow it checks everything back in. A save checks in first
+and keeps the carries, so a run restored mid-flow ends exactly where the
+original does.
 
 ## How a change happens
 

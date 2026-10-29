@@ -1,6 +1,7 @@
 #import "BGSave.h"
 
 #import "BGProposalGroup.h"
+#import "BGScheduler.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,8 +20,10 @@
  *   edge <kind> <from> <to>
  *   tombstone <id> "<blueprint>" <successor> <cause> "<reason>"
  *   event <index> <boundary> <round> "<kind>" <subject> <other> <amount> <detail> <cause> <group> <location>
+ *   tile <x> <y> <level> water <mL>
  *   group <phase> <cause> <handles> "<source>"
  *   proposal <kind> <target> <unit> <other> <unit> <value> <edge> <name> <key> <handle> <location>
+ *   domain <name> <what the domain keeps>
  *   end
  *
  * where <location> is <form> <place> <x> <y> <level> <slot> "<role>".
@@ -101,8 +104,10 @@ static void   put_record( NSMutableString *out, BGWorld *world, NSUInteger kind,
 }
 
 
-NSString   *BGSave( BGWorld *world, BGCommitter *committer)
+NSString   *BGSave( BGWorld *world, BGCommitter *committer, NSArray *domains)
 {
+   NSArray              *state;
+   id <BGDomain>        domain;
    const BGEntityInfo   *info;
    const BGTombstone    *stone;
    const BGEvent        *ev;
@@ -116,7 +121,17 @@ NSString   *BGSave( BGWorld *world, BGCommitter *committer)
    NSUInteger           j;
    NSUInteger           k;
 
+   /* stocks at rest first: every domain checks in, and keeps its own state aside */
    out = [NSMutableString string];
+   for( i = 0; i < [domains count]; i++)
+   {
+      domain = [domains objectAtIndex:i];
+      state  = [domain savedState];
+      for( j = 0; j < [state count]; j++)
+         [out appendFormat:@"domain %@ %@\n", [domain name], [state objectAtIndex:j]];
+   }
+   state = [NSArray arrayWithObject:out];
+   out   = [NSMutableString string];
    [out appendFormat:@"bruggadung-save %d\n", BG_SAVE_VERSION];
    [out appendFormat:@"content %016llx\n", (unsigned long long) [[world contentBuild] contentHash]];
    [out appendFormat:@"world %llu %lld %llu %llu %llu\n", (unsigned long long) [world seed], (long long) [world time].ms,
@@ -172,6 +187,11 @@ NSString   *BGSave( BGWorld *world, BGCommitter *committer)
       put_location( out, ev->location);
       [out appendString:@"\n"];
    }
+   for( j = 0; j < 32; j++)
+      for( i = 0; i < 32; i++)
+         if( [world waterAtX:(int32_t) i y:(int32_t) j level:0])
+            [out appendFormat:@"tile %lu %lu 0 water %lld\n", (unsigned long) i, (unsigned long) j,
+                              (long long) [world waterAtX:(int32_t) i y:(int32_t) j level:0]];
    deferred = [committer deferredGroups];
    for( i = 0; i < [deferred count]; i++)
    {
@@ -194,8 +214,30 @@ NSString   *BGSave( BGWorld *world, BGCommitter *committer)
          [out appendString:@"\n"];
       }
    }
+   [out appendString:[state objectAtIndex:0]];
    [out appendString:@"end\n"];
    return( out);
+}
+
+
+NSArray   *BGSavedDomainState( NSString *text, NSString *domain)
+{
+   NSMutableArray   *lines;
+   NSArray          *all;
+   NSString         *prefix;
+   NSString         *line;
+   NSUInteger       i;
+
+   lines  = [NSMutableArray array];
+   prefix = [NSString stringWithFormat:@"domain %@ ", domain];
+   all    = [text componentsSeparatedByString:@"\n"];
+   for( i = 0; i < [all count]; i++)
+   {
+      line = [all objectAtIndex:i];
+      if( [line hasPrefix:prefix])
+         [lines addObject:[line substringFromIndex:[prefix length]]];
+   }
+   return( lines);
 }
 
 
@@ -481,6 +523,16 @@ BGWorld   *BGRestore( NSString *text,
          if( [world emit:ev] != token_u64( &line, 1))
             problem = @"events out of order";
       }
+      else if( ! strcmp( s, "tile"))
+      {
+         if( line.n < 6 || strcmp( line.tokens[ 4], "water"))
+            problem = @"an unknown tile stock";
+         else
+            [world setWater:token_i64( &line, 5)
+                        atX:(int32_t) token_i64( &line, 1)
+                          y:(int32_t) token_i64( &line, 2)
+                      level:(int32_t) token_i64( &line, 3)];
+      }
       else if( ! strcmp( s, "group"))
       {
          group = [BGProposalGroup groupWithPhase:(BGPhase) token_i64( &line, 1)
@@ -510,6 +562,8 @@ BGWorld   *BGRestore( NSString *text,
          p.location      = token_location( &line, 11);
          [group addProposal:p];
       }
+      else if( ! strcmp( s, "domain"))
+         ;         /* the domain's own: BGSavedDomainState */
       else if( ! strcmp( s, "end"))
          ended = YES;
       else

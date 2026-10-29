@@ -5,6 +5,7 @@
 #import "BGSave.h"
 #import "BGActions.h"
 #import "BGView.h"
+#import "BGCistern.h"
 
 #include <stdio.h>
 
@@ -58,7 +59,7 @@ static void   test_registry_and_construction( void)
 
    w = BGTestWorld( 1);
    c = BGTestCommitter( w);
-   BG_CHECK( [w kindCount] == 6);
+   BG_CHECK( [w kindCount] == 8);
    BG_CHECK( [w kindNamed:"Body"] != NSNotFound && [w kindNamed:"Nonesuch"] == NSNotFound);
    bin   = commit_create( c, "bin", BGOnTile( 0, 0, 0));
    nails = commit_create( c, "nails_30", BGIn( bin));
@@ -405,6 +406,22 @@ static void   test_reaction_rounds( void)
 }
 
 
+- (void) checkInAll
+{
+}
+
+
+- (NSArray *) savedState
+{
+   return( [NSArray array]);
+}
+
+
+- (void) restoreSavedState:(NSArray *) lines
+{
+}
+
+
 - (void) advanceFrom:(BGTime) t0
                   to:(BGTime) t1
                world:(BGWorld *) world
@@ -589,6 +606,139 @@ static void   test_menu( void)
 }
 
 
+/* --- the cistern ----------------------------------------------------------- */
+
+static BGCistern   *run_cistern( BGCisternVariant variant)
+{
+   BGWorld     *w;
+   BGCistern   *scenario;
+
+   w        = BGTestWorld( 7);
+   scenario = [[[BGCistern alloc] initWithWorld:w committer:BGTestCommitter( w) variant:variant] autorelease];
+   [scenario run];
+   return( scenario);
+}
+
+
+static void   check_cistern( BGCistern *scenario)
+{
+   NSArray      *results;
+   NSUInteger   i;
+
+   results = [scenario results];
+   for( i = 0; i < [results count]; i++)
+      if( [[results objectAtIndex:i] hasPrefix:@"FAIL"])
+         fprintf( stderr, "    %s\n", [[results objectAtIndex:i] UTF8String]);
+   BG_CHECK( [results count] >= 4);
+   BG_CHECK( [scenario failureCount] == 0);
+}
+
+
+static void   test_cistern( void)
+{
+   BGCistern   *base;
+   int64_t     a;
+   int64_t     b;
+
+   base = run_cistern( BGCisternBase);
+   check_cistern( base);
+   /* the doc's numbers: about 7 L in each bucket, about 0.7 L on the floor */
+   [[base world] getField:"WaterStore.water" of:5 value:&a];
+   [[base world] getField:"WaterStore.water" of:6 value:&b];
+   BG_CHECK( a > 7000 && a < 7300 && b > 7000 && b < 7300);
+   BG_CHECK( [[base world] waterAtX:5 y:5 level:0] > 650 && [[base world] waterAtX:5 y:5 level:0] < 800);
+}
+
+
+static void   test_cistern_b( void)
+{
+   check_cistern( run_cistern( BGCisternEarlier));
+}
+
+
+/* 2. order independence: the domain's inside order can't change anything */
+static void   test_cistern_d( void)
+{
+   BGCistern   *base;
+   BGCistern   *reversed;
+
+   base     = run_cistern( BGCisternBase);
+   reversed = run_cistern( BGCisternReversed);
+   check_cistern( reversed);
+   BG_CHECK( [[reversed world] stateHash] == [[base world] stateHash]);
+   BG_CHECK( [[[reversed fluid] log] isEqualToArray:[[base fluid] log]]);
+}
+
+
+/* While the water flows, the domain has it: commitment refuses to set it. */
+static void   test_checked_out( void)
+{
+   BGWorld           *w;
+   BGCommitter       *c;
+   BGCistern         *scenario;
+   BGProposalGroup   *g;
+
+   w        = BGTestWorld( 7);
+   c        = BGTestCommitter( w);
+   scenario = [[[BGCistern alloc] initWithWorld:w committer:c variant:BGCisternBase] autorelease];
+   [scenario runUntil:BGTimeMake( 30000)];
+   BG_CHECK( [w isCheckedOut:5] && [[scenario fluid] checkedOutWater] > 0);
+   g = [BGProposalGroup groupWithPhase:BGPhaseAction source:@"pour it out"];
+   [g set:"WaterStore.water" of:BGWhole( 5) to:0];
+   [c submit:g];
+   [w setBoundary:[w boundary] + 1];
+   [c commitBoundary];
+   BG_CHECK( ! [g applied] && [[g rejection] rangeOfString:@"checked out"].location != NSNotFound);
+   BG_CHECK( [scenario totalWater] == 15000);
+}
+
+
+/* Saving while the water flows: the domain checks in and keeps its carries,
+ * and a world restored from the save, with a fresh domain given them, ends
+ * exactly where the run that never saved does. */
+static void   test_cistern_save( void)
+{
+   BGCistern   *reference;
+   BGCistern   *scenario;
+   BGWorld     *w1;
+   BGWorld     *w2;
+   BGCommitter *c1;
+   BGCommitter *c2;
+   NSString    *text;
+   NSString    *error;
+   NSArray     *deferred;
+   uint64_t    position;
+
+   reference = run_cistern( BGCisternBase);
+   w1        = BGTestWorld( 7);
+   c1        = BGTestCommitter( w1);
+   scenario  = [[[BGCistern alloc] initWithWorld:w1 committer:c1 variant:BGCisternBase] autorelease];
+   [scenario runUntil:BGTimeMake( 30000)];
+   text = BGSave( w1, c1, [NSArray arrayWithObject:[scenario fluid]]);
+   BG_CHECK( [text rangeOfString:@"domain fluid carry"].location != NSNotFound);
+   BG_CHECK( ! [w1 isCheckedOut:5] && [scenario totalWater] == 15000);
+
+   error = nil;
+   w2    = BGRestore( text, [w1 contentBuild], &deferred, &position, &error);
+   BG_CHECK( w2 != nil);
+   if( ! w2)
+   {
+      fprintf( stderr, "    %s\n", [error UTF8String]);
+      return;
+   }
+   BG_CHECK( [w2 stateHash] == [w1 stateHash]);
+   c2 = BGTestCommitter( w2);
+   [c2 setPosition:position];
+   [c2 restoreDeferred:deferred];
+   [scenario resumeWithWorld:w2
+                   committer:c2
+                  fluidState:BGSavedDomainState( text, @"fluid")];
+   [scenario finish];
+   check_cistern( scenario);
+   BG_CHECK( [w2 stateHash] == [[reference world] stateHash]);
+}
+
+
 /* --- saves ----------------------------------------------------------------- */
 
 static BGWorld   *restore( NSString *text, BGContent *content, BGCommitter **committer, NSString **error)
@@ -628,7 +778,7 @@ static void   test_save_and_resume( void)
    c1        = BGTestCommitter( w1);
    scenario  = [[[BGMarkedNail alloc] initWithWorld:w1 committer:c1 variant:BGMarkedNailBase] autorelease];
    [scenario runUntil:BGTimeMake( 5500)];          /* after the hammering, before the nail comes out */
-   text   = BGSave( w1, c1);
+   text   = BGSave( w1, c1, nil);
    before = [[c1 trace] count];
 
    error = nil;
@@ -640,7 +790,7 @@ static void   test_save_and_resume( void)
       return;
    }
    BG_CHECK( [w2 stateHash] == [w1 stateHash]);
-   BG_CHECK( [BGSave( w2, c2) isEqualToString:text]);
+   BG_CHECK( [BGSave( w2, c2, nil) isEqualToString:text]);
    BG_CHECK( [w2 time].ms == 5500 && [w2 boundary] == [w1 boundary] && [w2 nextID] == [w1 nextID]);
 
    [scenario resumeWithWorld:w2 committer:c2];
@@ -672,7 +822,7 @@ static void   test_save_deferred_groups( void)
    g     = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"later"];
    [g set:"Claim.quantity" of:BGWhole( claim) to:12];
    [c1 restoreDeferred:[NSArray arrayWithObject:g]];
-   w2 = restore( BGSave( w1, c1), [w1 contentBuild], &c2, &error);
+   w2 = restore( BGSave( w1, c1, nil), [w1 contentBuild], &c2, &error);
    BG_CHECK( w2 && [[c2 deferredGroups] count] == 1);
    [w2 setBoundary:[w2 boundary] + 1];
    [c2 commitBoundary];
@@ -697,7 +847,7 @@ static void   test_restore_errors( void)
    c       = BGTestCommitter( w);
    content = [w contentBuild];
    commit_create( c, "bin", BGOnTile( 0, 0, 0));
-   text    = BGSave( w, c);
+   text    = BGSave( w, c, nil);
 
    error = nil;
    BG_CHECK( ! BGRestore( @"not a save\n", content, NULL, NULL, &error));
@@ -729,6 +879,11 @@ const BGTestCase   BGAllTests[] =
    { "marked_nail_b",                 test_marked_nail_b },
    { "marked_nail_replay",            test_marked_nail_replay },
    { "menu",                          test_menu },
+   { "cistern",                       test_cistern },
+   { "cistern_b",                     test_cistern_b },
+   { "cistern_d",                     test_cistern_d },
+   { "checked_out",                   test_checked_out },
+   { "cistern_save",                  test_cistern_save },
    { "save_and_resume",               test_save_and_resume },
    { "save_deferred_groups",          test_save_deferred_groups },
    { "restore_errors",                test_restore_errors },

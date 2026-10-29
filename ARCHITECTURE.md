@@ -19,7 +19,7 @@ proven on COMPONENTS.md's first scenario.
 | --- | --- | --- |
 | [DESIGN.md](DESIGN.md) | The six systems, ambitions, and development sequence | Proposal |
 | [STACK.md](STACK.md) | Language: mulle Objective-C | Decided |
-| [DOMAIN_SIMULATION.md](DOMAIN_SIMULATION.md) | §3: domains, stocks, horizons, the scheduler | Contract proposed, 3 scenarios |
+| [DOMAIN_SIMULATION.md](DOMAIN_SIMULATION.md) | §3: domains, stocks, horizons, the scheduler | Contract proposed, 3 scenarios; Scenario 3 runs in [lab/](lab/README.md) |
 | [COMPONENTS.md](COMPONENTS.md) | §2: entities, components, relations, identity on demand | Contract proposed, 3 scenarios; Scenario 1 runs in [lab/](lab/README.md) |
 | [ACTIONS.md](ACTIONS.md) | §1: capabilities, actions, activities; change commitment | Contract proposed, 3 scenarios |
 | [KNOWLEDGE.md](KNOWLEDGE.md) | §4: history, traces, perception, referents, claims, beliefs, memory | Contract proposed, 3 scenarios |
@@ -283,9 +283,11 @@ A rebuilt world produces the same next step as one that never saved.
    entities, component stores generated from content, relations, tombstones,
    change commitment with automatic individuation and reactions, the clock
    and scheduler, and a scenario harness that runs *The marked nail* and its
-   variants with all seven acceptance checks. Next, per
-   [lab/PLAN.md](lab/PLAN.md): saves, operations and the action menu from
-   content, activities, a tile-grid domain, and the command interface.
+   variants with all seven acceptance checks. Since then: saves, the action
+   menu with operations from content, and a fluid domain with tile stocks,
+   running DOMAIN_SIMULATION.md's Scenario 3. Next, per
+   [lab/PLAN.md](lab/PLAN.md): activities and watches, the tile grid's
+   stencils, and the command interface.
 
 ## Cross-cutting open questions
 

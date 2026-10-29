@@ -469,6 +469,9 @@ static NSString   *live_check( BGWorld *w, BGEntityID e, const char *role)
          return( [NSString stringWithFormat:@"no field %s", p->name]);
       if( ! strstr( f->flags, "proposable"))
          return( [NSString stringWithFormat:@"%s is not proposable", p->name]);
+      if( [_world isCheckedOut:e] && ! strcmp( [_world kindInfo:k]->name, "WaterStore"))
+         return( [NSString stringWithFormat:@"%llu's water is checked out by its domain; contribute to the domain instead",
+                                            (unsigned long long) e]);
       if( ! [_world record:k
                        for:e])
          return( [NSString stringWithFormat:@"%llu has no %s component",

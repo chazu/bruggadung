@@ -16,8 +16,9 @@
 #import "BGCommitter.h"
 
 
-/* The save as text. */
-NSString   *BGSave( BGWorld *world, BGCommitter *committer);
+/* The save as text. Each domain checks its stocks in first, and adds what
+ * it keeps itself (carries, transit) as "domain <name> ..." lines. */
+NSString   *BGSave( BGWorld *world, BGCommitter *committer, NSArray *domains);
 
 /* A world restored from a save, on `content`, or nil with the reason. The
  * groups that were deferred come back in `deferred`, for the committer made
@@ -28,3 +29,6 @@ BGWorld    *BGRestore( NSString *text,
                        NSArray **deferred,
                        uint64_t *position,
                        NSString **error);
+
+/* The lines a save keeps for the named domain, for -restoreSavedState:. */
+NSArray    *BGSavedDomainState( NSString *text, NSString *domain);

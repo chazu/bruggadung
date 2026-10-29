@@ -26,6 +26,31 @@ static BOOL   has_role( TriContent *tri, const TriNode *pattern, BGRole role)
 }
 
 
+/* NO when the entity's type is strictly more general than the role's: in a
+ * description its type would leave the role open, but its kind is perceived. */
+static BOOL   kind_fits( BGWorld *world, const TriNode *pattern, BGRole role, BGEntityID entity)
+{
+   const BGEntityInfo   *info;
+   const TriNode        *filler;
+   const TriNode        *blueprint;
+   TriContent           *tri;
+   TriType              wanted;
+   TriType              kind;
+   char                 path[ 32];
+
+   tri  = [world tri];
+   info = [world info:entity];
+   snprintf( path, sizeof( path), "roles.%s", BGRoleNames[ role]);
+   filler    = tri_at( tri, pattern, path);
+   blueprint = info ? tri_pattern( tri, info->blueprint) : NULL;
+   if( ! filler || ! blueprint)
+      return( YES);
+   wanted = tri_node_type( filler);
+   kind   = tri_node_type( blueprint);
+   return( ! (kind != wanted && tri_subtype( tri, wanted, kind)));
+}
+
+
 TriMatch   BGMatchAction( BGWorld *world, BGAction action, TriMatchResult *result, NSString **reason)
 {
    const TriNode     *pattern;
@@ -64,6 +89,14 @@ TriMatch   BGMatchAction( BGWorld *world, BGAction action, TriMatchResult *resul
       {
          if( reason)
             *reason = [NSString stringWithFormat:@"the %s is not in the actor's reach", BGRoleNames[ r]];
+         return( TRI_INCOMPATIBLE);
+      }
+      /* what kind of thing something is can be seen: a thing more general than the role isn't one */
+      if( ! kind_fits( world, pattern, (BGRole) r, action.roles[ r]))
+      {
+         if( reason)
+            *reason = [NSString stringWithFormat:@"the %s %llu is not that kind of thing", BGRoleNames[ r],
+                                                 (unsigned long long) action.roles[ r]];
          return( TRI_INCOMPATIBLE);
       }
       d = [view describeEntity:action.roles[ r]];
@@ -308,6 +341,13 @@ static NSString   *effect_drive( BGWorld *world, BGAction a, int64_t amount, BGP
 }
 
 
+static NSString   *effect_open_tap( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
+{
+   [g set:"Tap.open" of:BGWhole( a.roles[ BGRoleItem]) to:1];
+   return( nil);
+}
+
+
 static const struct
 {
    const char   *name;
@@ -318,6 +358,7 @@ static const struct
    { "take_some", effect_take_some },
    { "put_in",    effect_put_in },
    { "drive",     effect_drive },
+   { "open_tap",  effect_open_tap },
 };
 
 

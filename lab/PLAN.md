@@ -323,5 +323,44 @@ What it settled:
 
 16 tests, 151 checks, under both compilers, ASan and UBSan, and leak-free.
 
+### After the slice: the first domain
+
+Item 4's first part is built: a fluid domain (`src/domains/`) and the first
+tile stock, proven on DOMAIN_SIMULATION.md's Scenario 3, *Two draws on a
+dwindling stock*. Two agents open taps on a cistern of 15 L with a leaking
+crack; the domain checks out the cistern, the buckets, and the floor tile,
+predicts the exact step the cistern runs dry, and the scheduler jumps there:
+the whole run is three boundaries. The buckets get 7140 and 7139 mL and the
+floor 721 mL, 15 L exactly. All five of the scenario's checks that need a
+domain pass (conservation at every boundary, order independence as variant
+3d bit-identical to the base, fairness within a millilitre, no negative
+stock, every tap told "exhausted" in the step the horizon predicted), and
+variant 3b gives the earlier agent more. Variant 3c, the single seal, is
+change commitment's (the seeded-order test).
+
+What it settled:
+
+- **A holder nothing draws from has no exhaustion time.** The first version
+  asked every holder, and the empty floor said "now", stepping a
+  millisecond at a time.
+- **Tiles are checked out like entities.** While the domain has the floor,
+  the world's value is stale, and the conservation sum must skip it; the
+  first version counted the crack's first second twice.
+- **What kind of thing something is, is perceived.** A `#Container` might
+  be a `#Tap` as far as a description's type goes, so `open_tap` on the bin
+  was unknown; the menu now rules out an entity whose kind is more general
+  than the role's.
+- **Carries survive check-in for taps that stay open, and saves keep them**
+  (ARCHITECTURE.md's "carried remainders not yet dropped"), so a save in
+  mid-flow changes nothing, for the run that saved or the one restored.
+- **Domains have a save interface**: `checkInAll`, `savedState`,
+  `restoreSavedState:`, with "domain <name> ..." lines in the save.
+
+Not yet: water spreading between tiles (a real grid stencil), wake and sleep
+by region, contributions between domains, and bucket capacity (overflow).
+
+21 tests, 171 checks, under both compilers, ASan and UBSan, and leak-free.
+
 Next: activities with stages, effort, interruption, and watches (item 3),
-which need a domain to watch: the tile-grid domain (item 4) may come first.
+now that there is a domain to watch: the scenario's agents should *fill a
+bucket*, an activity that stops when the source is exhausted.

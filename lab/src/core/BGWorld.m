@@ -116,6 +116,11 @@ void   BGLocationFormat( BGLocation loc, char *buf, size_t len)
    _locations  = [[BGStore alloc] initWithRecordSize:sizeof( BGLocation)];
    _tombstones = [[BGStore alloc] initWithRecordSize:sizeof( BGTombstone)];
    _arena      = tri_arena_new();
+   _tilesWide  = 32;
+   _tilesHigh  = 32;
+   _levels     = 1;
+   _tileWater  = calloc( (size_t) (_tilesWide * _tilesHigh * _levels), sizeof( int64_t));
+   _tileOut    = calloc( (size_t) (_tilesWide * _tilesHigh * _levels), 1);
    return( self);
 }
 
@@ -138,6 +143,9 @@ void   BGLocationFormat( BGLocation loc, char *buf, size_t len)
       free( _strings[ i]);
    free( _strings);
    free( _journal);
+   free( _tileWater);
+   free( _tileOut);
+   free( _checkedOut);
    tri_arena_free( _arena);
    [_content release];
    [super dealloc];
@@ -1047,6 +1055,107 @@ static void   edge_remove_raw( BGWorld *self, BGEdge e)
 }
 
 
+/* --- tiles ----------------------------------------------------------------- */
+
+- (BOOL) isTileX:(int32_t) x
+               y:(int32_t) y
+           level:(int32_t) level
+{
+   return( x >= 0 && x < _tilesWide && y >= 0 && y < _tilesHigh && level >= 0 && level < _levels);
+}
+
+
+- (int64_t) waterAtX:(int32_t) x
+                   y:(int32_t) y
+               level:(int32_t) level
+{
+   if( ! [self isTileX:x y:y level:level])
+      return( 0);
+   return( _tileWater[ (level * _tilesHigh + y) * _tilesWide + x]);
+}
+
+
+- (void) setWater:(int64_t) water
+              atX:(int32_t) x
+                y:(int32_t) y
+            level:(int32_t) level
+{
+   if( [self isTileX:x y:y level:level])
+      _tileWater[ (level * _tilesHigh + y) * _tilesWide + x] = water;
+}
+
+
+- (int64_t) totalTileWater
+{
+   int64_t   sum;
+   int32_t   i;
+
+   sum = 0;
+   for( i = 0; i < _tilesWide * _tilesHigh * _levels; i++)
+      if( ! _tileOut[ i])
+         sum += _tileWater[ i];
+   return( sum);
+}
+
+
+- (BOOL) isTileCheckedOutX:(int32_t) x
+                         y:(int32_t) y
+                     level:(int32_t) level
+{
+   if( ! [self isTileX:x y:y level:level])
+      return( NO);
+   return( _tileOut[ (level * _tilesHigh + y) * _tilesWide + x] != 0);
+}
+
+
+- (void) setTileCheckedOut:(BOOL) flag
+                         x:(int32_t) x
+                         y:(int32_t) y
+                     level:(int32_t) level
+{
+   if( [self isTileX:x y:y level:level])
+      _tileOut[ (level * _tilesHigh + y) * _tilesWide + x] = flag ? 1 : 0;
+}
+
+
+/* --- checkout -------------------------------------------------------------- */
+
+- (BOOL) isCheckedOut:(BGEntityID) entity
+{
+   NSUInteger   i;
+
+   for( i = 0; i < _ncheckedOut; i++)
+      if( _checkedOut[ i] == entity)
+         return( YES);
+   return( NO);
+}
+
+
+- (void) setCheckedOut:(BOOL) flag
+                   for:(BGEntityID) entity
+{
+   NSUInteger   i;
+
+   for( i = 0; i < _ncheckedOut && _checkedOut[ i] < entity; i++)
+      ;
+   if( flag)
+   {
+      if( i < _ncheckedOut && _checkedOut[ i] == entity)
+         return;
+      _checkedOut = realloc( _checkedOut, sizeof( BGEntityID) * (_ncheckedOut + 1));
+      memmove( &_checkedOut[ i + 1], &_checkedOut[ i], sizeof( BGEntityID) * (_ncheckedOut - i));
+      _checkedOut[ i] = entity;
+      _ncheckedOut++;
+      return;
+   }
+   if( i < _ncheckedOut && _checkedOut[ i] == entity)
+   {
+      memmove( &_checkedOut[ i], &_checkedOut[ i + 1], sizeof( BGEntityID) * (_ncheckedOut - i - 1));
+      _ncheckedOut--;
+   }
+}
+
+
 /* --- claims ---------------------------------------------------------------- */
 
 - (int64_t) claimedUnitsOf:(BGEntityID) entity
@@ -1245,6 +1354,9 @@ static uint64_t   hash_record( uint64_t h, const BGComponentInfo *info, const vo
    }
    for( i = 0; i < _nedges; i++)
       h = BGMix( h ^ (uint64_t) _edges[ i].kind ^ (_edges[ i].from << 8) ^ (_edges[ i].to << 36));
+   for( i = 0; i < (NSUInteger) (_tilesWide * _tilesHigh * _levels); i++)
+      if( _tileWater[ i])
+         h = BGMix( h ^ (uint64_t) i ^ ((uint64_t) _tileWater[ i] << 20));
    for( i = 0; i < _nevents; i++)
    {
       ev = &_events[ i];

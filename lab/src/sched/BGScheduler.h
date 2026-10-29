@@ -32,6 +32,14 @@ typedef struct
                world:(BGWorld *) world
            committer:(BGCommitter *) committer;
 
+/* Saves: write every checked-out stock back to its holder; what the domain
+ * itself must keep across a save (carries, transit), as lines; and taking
+ * them back. A domain restored with its lines on a restored world takes the
+ * same next step as one that never saved. */
+- (void) checkInAll;
+- (NSArray *) savedState;
+- (void) restoreSavedState:(NSArray *) lines;
+
 @end
 
 /* Where inputs come from: scripted scenarios now, the player later. The

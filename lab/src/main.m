@@ -3,7 +3,8 @@
  *
  *   lab test [name]          run the tests (those whose names contain `name`)
  *   lab run <scenario>       run a scenario and print its trace and checks:
- *                            marked-nail, marked-nail-a, marked-nail-b
+ *                            marked-nail, marked-nail-a, marked-nail-b,
+ *                            cistern, cistern-b, cistern-d
  *   lab save <scenario>      run a scenario and print the save of its end state
  *   lab menu <scenario> <ms> run a scenario to a time and print the worker's menu
  *   lab -C <dir> ...         read content from <dir> (default: content)
@@ -14,6 +15,7 @@
 #import "BGSave.h"
 #import "BGActions.h"
 #import "BGView.h"
+#import "BGCistern.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -32,6 +34,48 @@ static int   usage( void)
 }
 
 
+static int   run_cistern( const char *name)
+{
+   BGCisternVariant   variant;
+   BGCistern          *scenario;
+   BGWorld            *world;
+   NSArray            *lines;
+   NSUInteger         i;
+
+   if( ! strcmp( name, "cistern"))
+      variant = BGCisternBase;
+   else if( ! strcmp( name, "cistern-b"))
+      variant = BGCisternEarlier;
+   else
+      variant = BGCisternReversed;
+   world = BGTestWorld( 7);
+   if( ! world)
+      return( 1);
+   BGReleaseSharedContentAfterUse();
+   scenario = [[[BGCistern alloc] initWithWorld:world
+                                      committer:BGTestCommitter( world)
+                                        variant:variant] autorelease];
+   [scenario run];
+   printf( "== trace\n");
+   lines = [[scenario committer] trace];
+   for( i = 0; i < [lines count]; i++)
+      printf( "%s\n", [[lines objectAtIndex:i] UTF8String]);
+   printf( "\n== the fluid domain, per step\n");
+   lines = [[scenario fluid] log];
+   for( i = 0; i < [lines count]; i++)
+      printf( "%s\n", [[lines objectAtIndex:i] UTF8String]);
+   printf( "\n== entities\n");
+   for( i = 1; i < [world nextID]; i++)
+      printf( "%s\n", [[world describeEntity:(BGEntityID) i] UTF8String]);
+   printf( "floor at (5, 5): %lld mL\n", (long long) [world waterAtX:5 y:5 level:0]);
+   printf( "\n== checks\n");
+   lines = [scenario results];
+   for( i = 0; i < [lines count]; i++)
+      printf( "%s\n", [[lines objectAtIndex:i] UTF8String]);
+   return( [scenario failureCount] ? 1 : 0);
+}
+
+
 static int   run_scenario( const char *name, BOOL save, int64_t menuAt)
 {
    BGMarkedNailVariant   variant;
@@ -41,6 +85,8 @@ static int   run_scenario( const char *name, BOOL save, int64_t menuAt)
    BGStore               *entities;
    NSUInteger            i;
 
+   if( ! strncmp( name, "cistern", 7))
+      return( run_cistern( name));
    if( ! strcmp( name, "marked-nail"))
       variant = BGMarkedNailBase;
    else if( ! strcmp( name, "marked-nail-a"))
@@ -79,7 +125,7 @@ static int   run_scenario( const char *name, BOOL save, int64_t menuAt)
    [scenario run];
    if( save)
    {
-      printf( "%s", [BGSave( world, [scenario committer]) UTF8String]);
+      printf( "%s", [BGSave( world, [scenario committer], nil) UTF8String]);
       return( [scenario failureCount] ? 1 : 0);
    }
 

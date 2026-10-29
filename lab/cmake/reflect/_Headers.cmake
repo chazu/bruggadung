@@ -16,6 +16,7 @@ src/generic
 src/act
 src/commit
 src/core
+src/domains
 src/generated
 src/kinds
 src
@@ -73,10 +74,12 @@ src/commit/BGProposalGroup.h
 src/core/BGStore.h
 src/core/BGTypes.h
 src/core/BGWorld.h
+src/domains/BGFluidDomain.h
 src/generated/BGComponents.h
 src/kinds/BGBodyKind.h
 src/lab-version.h
 src/save/BGSave.h
+src/scenario/BGCistern.h
 src/scenario/BGMarkedNail.h
 src/sched/BGScheduler.h
 src/test/BGTest.h

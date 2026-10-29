@@ -17,3 +17,8 @@ worker: #Agent & { material: "flesh", mass: 70kg, hands: 2 }
 smith:  #Agent & { material: "flesh", mass: 85kg, hands: 2 }
 
 ownership: #Claim & { kind: "ownership" }
+
+// The cistern room of "Two draws on a dwindling stock": two agents, each
+// with a tap and a bucket.
+agent_a: #Agent & { material: "flesh", mass: 60kg, hands: 2 }
+agent_b: #Agent & { material: "flesh", mass: 65kg, hands: 2 }

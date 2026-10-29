@@ -98,6 +98,15 @@ extern const char   *BGEdgeKindNames[ BGEdgeKindCount];
    BOOL           _open;
 
    TriArena       *_arena;
+
+   int32_t        _tilesWide;
+   int32_t        _tilesHigh;
+   int32_t        _levels;
+   int64_t        *_tileWater;       /* a stock per tile, in mL */
+   uint8_t        *_tileOut;         /* checked out by a domain; not saved */
+
+   BGEntityID     *_checkedOut;      /* sorted; not saved: saves check everything in */
+   NSUInteger     _ncheckedOut;
 }
 
 /* nil, with the reason, if the content's hash differs from the generated header's */
@@ -211,6 +220,40 @@ extern const char   *BGEdgeKindNames[ BGEdgeKindCount];
                   to:(BGEntityID) to
                 into:(BGEntityID *) out
                  max:(NSUInteger) max;
+
+/* --- tiles ---------------------------------------------------------------- */
+
+/* The map: 32 × 32 tiles on one level, for now. Tiles hold stocks; water is
+ * the first. A tile outside the map holds nothing and takes nothing. */
+- (BOOL) isTileX:(int32_t) x
+               y:(int32_t) y
+           level:(int32_t) level;
+- (int64_t) waterAtX:(int32_t) x
+                   y:(int32_t) y
+               level:(int32_t) level;
+/* Only a domain checking in, or a save being restored, writes a tile stock
+ * directly; at rest, stocks change through commitment. */
+- (void) setWater:(int64_t) water
+              atX:(int32_t) x
+                y:(int32_t) y
+            level:(int32_t) level;
+/* the water in tiles whose stock is at rest */
+- (int64_t) totalTileWater;
+- (BOOL) isTileCheckedOutX:(int32_t) x
+                         y:(int32_t) y
+                     level:(int32_t) level;
+- (void) setTileCheckedOut:(BOOL) flag
+                         x:(int32_t) x
+                         y:(int32_t) y
+                     level:(int32_t) level;
+
+/* --- checkout --------------------------------------------------------------- */
+
+/* A holder whose stock a domain has checked out: the domain's value is
+ * authoritative, and commitment refuses to change the holder's. */
+- (BOOL) isCheckedOut:(BGEntityID) entity;
+- (void) setCheckedOut:(BOOL) flag
+                   for:(BGEntityID) entity;
 
 /* --- claims --------------------------------------------------------------- */
 
