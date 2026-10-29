@@ -269,6 +269,11 @@ size_t      tri_family_suggest_quickcheck(TriContent *content, const char *famil
  * TriNode pointers. Field comments give units and @field flags. */
 size_t tri_component_header(TriContent *content, const char *prefix, char *buf, size_t len);
 
+/* A number of quanta of a quantity kind ("mass", "length", "int", ...) as
+ * content would write it: tri_format_quantity("mass", 850, ...) is "850g".
+ * An unknown kind prints the plain number. */
+size_t tri_format_quantity(const char *kind, int64_t quanta, char *buf, size_t len);
+
 /* --- knowledge stores ------------------------------------------------------------------ */
 
 /* Bytes an arena holds, and distinct nodes a structure has: what a store

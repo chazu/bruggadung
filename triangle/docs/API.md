@@ -328,11 +328,32 @@ typedef struct {
 
 - Numbers are `int64_t` quanta.
 - Enums are `uint32_t` type IDs, with an `enum` of their members.
-- Text is a string, referents are `uint64_t`, and `bool` is `bool`.
+- Text is a string, referents are `uint64_t`, and `bool` (or `true | false`
+  with a default) is `bool`.
 - Any other structure is a `const TriNode *`.
 
 The header records the content hash (`BG_CONTENT_HASH`). Type IDs are valid
 only for that content, so regenerate the header whenever the content changes.
+
+The header also carries a **field registry**, so code can read and write any
+component without knowing it: `BGComponentInfo` and `BGFieldInfo` describe
+each component's fields, with their offsets, value kinds (`BG_VALUE_QUANTITY`,
+`_TYPE`, `_TEXT`, `_REF`, `_BOOL`, `_NODE`), quantity kinds, and `@field`
+flags. The types are always declared; define `BG_COMPONENT_REGISTRY` in one
+source file to get the tables:
+
+```c
+#define BG_COMPONENT_REGISTRY
+#include "BGComponents.h"
+
+for (size_t i = 0; i < BG_COMPONENT_COUNT; i++)
+    for (size_t j = 0; j < BGComponents[i].nfields; j++)
+        printf("%s.%s at %zu\n", BGComponents[i].name, BGComponents[i].fields[j].name,
+               BGComponents[i].fields[j].offset);
+```
+
+`tri_format_quantity(kind, quanta, buf, len)` prints a stored value the way
+content writes it: `tri_format_quantity("mass", 850, …)` is `850g`.
 
 ## The Objective-C wrapper
 

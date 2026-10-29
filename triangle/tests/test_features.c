@@ -1151,6 +1151,31 @@ void test_component_header(void)
     CHECK_CONTAINS(buf, "} BGTool;");
     CHECK_CONTAINS(buf, "BG_MATERIAL_STEEL = ");
     CHECK_CONTAINS(buf, "BG_TOOL_FINISH_BLACK = ");
+    /* the field registry, for reading and writing any component generically */
+    CHECK_CONTAINS(buf, "#ifdef BG_COMPONENT_REGISTRY");
+    CHECK(strstr(buf, "} BGFieldInfo;") < strstr(buf, "#ifdef BG_COMPONENT_REGISTRY"));
+    CHECK_CONTAINS(buf, "{ \"mass\", offsetof(BGTool, mass), BG_VALUE_QUANTITY, \"mass\", \"content, saved\" },");
+    CHECK_CONTAINS(buf, "{ \"material\", offsetof(BGTool, material), BG_VALUE_TYPE, \"#Material\", \"content\" },");
+    CHECK_CONTAINS(buf, "{ \"label\", offsetof(BGTool, label), BG_VALUE_TEXT, \"text\", \"\" },");
+    CHECK_CONTAINS(buf, "#define BG_COMPONENT_COUNT 1");
+    CHECK_CONTAINS(buf, "{ \"Tool\", \"#Tool\", sizeof(BGTool), 6, BGTool_fields },");
+    tri_content_free(c);
+    /* a structure-valued field declares TriNode before using it; an empty component still has a member */
+    c = load1_ok("#Shape: { w: length }\n#Tool: { @component(Tool)\n shape: #Shape\n bent: *false | true\n}\n#Mark: { @component(Mark) }\n");
+    tri_component_header(c, "BG", buf, sizeof buf);
+    const char *td = strstr(buf, "typedef struct TriNode TriNode;"), *st = strstr(buf, "const TriNode * shape;");
+    CHECK(td && st && td < st);
+    CHECK_CONTAINS(buf, "char            unused_;");
+    CHECK_CONTAINS(buf, "bool            bent;");
+    /* raw quanta, formatted for traces and inspectors */
+    tri_format_quantity("mass", 850, buf, sizeof buf);
+    CHECK_STR(buf, "850g");
+    tri_format_quantity("length", 195, buf, sizeof buf);
+    CHECK_STR(buf, "19.5mm");
+    tri_format_quantity("int", 7, buf, sizeof buf);
+    CHECK_STR(buf, "7");
+    tri_format_quantity("nonesuch", 7, buf, sizeof buf);
+    CHECK_STR(buf, "7");
     tri_content_free(c);
 }
 

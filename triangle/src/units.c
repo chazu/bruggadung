@@ -128,3 +128,17 @@ void units_format(Buf *b, int dim, int64_t q)
     while (n > 1 && tmp[n - 1] == '0') tmp[--n] = 0;
     buf_printf(b, "%s%s", tmp, quantity_kinds[dim].display);
 }
+
+size_t tri_format_quantity(const char *kind, int64_t quanta, char *buf, size_t len)
+{
+    int dim = -1;
+    for (int d = 0; d < NDIMS && dim < 0; d++)
+        if (kind && !strcmp(kind, dim_names[d])) dim = d;
+    Buf b = { 0 };
+    if (dim < 0 || dim == DIM_TEXT) buf_printf(&b, "%lld", (long long) quanta);
+    else units_format(&b, dim, quanta);
+    size_t n = b.len;
+    if (len) snprintf(buf, len, "%s", b.s ? b.s : "");
+    buf_free(&b);
+    return n;
+}

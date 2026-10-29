@@ -240,6 +240,16 @@ static void c_ident(Buf *b, const char *s, bool upper)
     }
 }
 
+static void put_c_string(Buf *b, const char *s)
+{
+    buf_putc(b, '"');
+    for (; *s; s++) {
+        if (*s == '"' || *s == '\\') buf_putc(b, '\\');
+        buf_putc(b, *s);
+    }
+    buf_putc(b, '"');
+}
+
 /* The enum members of an atom type: its leaf atoms, in ID order. */
 static void enum_members(Content *c, uint32_t t, U32Vec *out)
 {
@@ -249,21 +259,28 @@ static void enum_members(Content *c, uint32_t t, U32Vec *out)
 
 size_t tri_component_header(TriContent *c, const char *prefix, char *buf, size_t len)
 {
-    Buf b = { 0 }, up = { 0 };
+    Buf head = { 0 }, b = { 0 }, up = { 0 };
     c_ident(&up, prefix, true);
-    buf_printf(&b, "/* Generated from Triangle content %016llx: do not edit. Type IDs are valid\n"
-                   " * only for this content; regenerate when it changes. */\n"
-                   "#ifndef %s_COMPONENTS_H\n#define %s_COMPONENTS_H\n\n"
-                   "#include <stdbool.h>\n#include <stdint.h>\n\n"
-                   "#define %s_CONTENT_HASH 0x%016llxULL\n\n",
+    buf_printf(&head, "/* Generated from Triangle content %016llx: do not edit. Type IDs are valid\n"
+                      " * only for this content; regenerate when it changes. */\n"
+                      "#ifndef %s_COMPONENTS_H\n#define %s_COMPONENTS_H\n\n"
+                      "#include <stdbool.h>\n#include <stdint.h>\n\n"
+                      "#define %s_CONTENT_HASH 0x%016llxULL\n\n",
                (unsigned long long) c->hash, up.s, up.s, up.s, (unsigned long long) c->hash);
-    Buf enums = { 0 };
+    Buf enums = { 0 }, reg = { 0 }, regtab = { 0 };
     U64Map emitted = { 0 };
+    bool nodes = false;
+    size_t ncomp = 0;
     for (uint32_t t = 0; t < c->types.n; t++) {
         TypeInfo *ti = &c->types.v[t];
         if (!ti->component) continue;
         TriNode *e = type_expansion(c, t);
         buf_printf(&b, "/* %s, from %s */\ntypedef struct {\n", ti->component, ti->name);
+        Buf sname = { 0 };
+        buf_puts(&sname, prefix);
+        c_ident(&sname, ti->component, false);
+        buf_printf(&reg, "static const %sFieldInfo %s_fields[] = {\n", prefix, sname.s);
+        size_t nfields = 0;
         for (uint32_t f = 0; f < c->feats.n; f++) {
             if (c->feats.v[f].intro != t) continue;
             TriNode *v = e ? node_arc(e, f) : NULL;
@@ -271,21 +288,27 @@ size_t tri_component_header(TriContent *c, const char *prefix, char *buf, size_t
             Buf fld = { 0 }, note = { 0 };
             c_ident(&fld, c->feats.v[f].name, false);
             const TypeInfo *vt = v ? &c->types.v[v->type] : NULL;
-            const char *ctype;
+            const char *ctype, *vkind, *kname;
             if (v && (v->flags & NF_DIM)) {
                 int dim = vt->dim;
-                if (dim == DIM_TEXT) { ctype = "const char *"; buf_puts(&note, "text"); }
-                else if (dim == DIM_REF) { ctype = "uint64_t"; buf_puts(&note, "a referent"); }
+                kname = dim_names[dim];
+                if (dim == DIM_TEXT) { ctype = "const char *"; vkind = "TEXT"; buf_puts(&note, "text"); }
+                else if (dim == DIM_REF) { ctype = "uint64_t"; vkind = "REF"; buf_puts(&note, "a referent"); }
                 else {
                     ctype = "int64_t";
+                    vkind = "QUANTITY";
                     buf_printf(&note, "%s, in quanta of ", dim_names[dim]);
                     units_format(&note, dim, 1);
                 }
-            } else if (v && v->type == c->tbool) {
+            } else if (v && c->tbool != TRI_BOTTOM && is_subtype(c, v->type, c->tbool)) {     /* bool, or true | false with a default */
                 ctype = "bool";
+                vkind = "BOOL";
+                kname = "bool";
                 buf_puts(&note, "bool");
             } else if (v && is_subtype(c, v->type, c->atomroot)) {
                 ctype = "uint32_t";
+                vkind = "TYPE";
+                kname = vt->name;
                 buf_printf(&note, "%s: a type ID", vt->name);
                 if (!u64map_get(&emitted, v->type, NULL)) {
                     u64map_put(&emitted, v->type, 1);
@@ -310,20 +333,59 @@ size_t tri_component_header(TriContent *c, const char *prefix, char *buf, size_t
                 }
             } else {
                 ctype = "const TriNode *";
-                buf_printf(&note, "%s: a structure", vt ? vt->name : "_");
+                vkind = "NODE";
+                kname = vt ? vt->name : "_";
+                nodes = true;
+                buf_printf(&note, "%s: a structure", kname);
             }
             buf_printf(&b, "    %-15s %s;", ctype, fld.s);
             buf_printf(&b, "    /* %s%s%s */\n", note.s ? note.s : "", flags ? "; " : "", flags ? flags : "");
+            buf_printf(&reg, "    { \"%s\", offsetof(%s, %s), %s_VALUE_%s, ", c->feats.v[f].name, sname.s, fld.s, up.s, vkind);
+            put_c_string(&reg, kname);
+            buf_puts(&reg, ", ");
+            put_c_string(&reg, flags ? flags : "");
+            buf_puts(&reg, " },\n");
+            nfields++;
             buf_free(&fld);
             buf_free(&note);
         }
-        buf_printf(&b, "} %s", prefix);
-        c_ident(&b, ti->component, false);
-        buf_puts(&b, ";\n\n");
+        if (!nfields) buf_puts(&b, "    char            unused_;    /* no fields */\n");
+        buf_printf(&b, "} %s;\n\n", sname.s);
+        if (!nfields) buf_printf(&reg, "    { 0 },\n");
+        buf_puts(&reg, "};\n\n");
+        buf_printf(&regtab, "    { \"%s\", ", ti->component);
+        put_c_string(&regtab, ti->name);
+        buf_printf(&regtab, ", sizeof(%s), %zu, %s_fields },\n", sname.s, nfields, sname.s);
+        buf_free(&sname);
+        ncomp++;
     }
     if (enums.s) buf_puts(&b, enums.s);
-    buf_printf(&b, "#endif\n");
+    /* the field registry: what code needs to read and write any component generically */
+    buf_printf(&b, "/* The field registry: what code needs to read and write any component\n"
+                   " * generically. Define %s_COMPONENT_REGISTRY in one file to get the tables. */\n\n"
+                   "#include <stddef.h>\n\n", up.s);
+    buf_printf(&b, "enum { %s_VALUE_QUANTITY, %s_VALUE_TYPE, %s_VALUE_TEXT, %s_VALUE_REF, %s_VALUE_BOOL, %s_VALUE_NODE };\n\n",
+               up.s, up.s, up.s, up.s, up.s, up.s);
+    buf_printf(&b, "typedef struct {\n    const char *name;       /* the feature */\n    size_t      offset;\n"
+                   "    int         value;      /* %s_VALUE_... */\n"
+                   "    const char *kind;       /* a quantity kind, an enum's type name, or a structure's type */\n"
+                   "    const char *flags;      /* from @field */\n} %sFieldInfo;\n\n", up.s, prefix);
+    buf_printf(&b, "typedef struct {\n    const char *name;       /* the component */\n    const char *type;       /* its Triangle type */\n"
+                   "    size_t      size;\n    size_t      nfields;\n    const %sFieldInfo *fields;\n} %sComponentInfo;\n\n",
+               prefix, prefix);
+    buf_printf(&b, "#define %s_COMPONENT_COUNT %zu\n\n#ifdef %s_COMPONENT_REGISTRY\n\n", up.s, ncomp, up.s);
+    if (reg.s) buf_puts(&b, reg.s);
+    buf_printf(&b, "static const %sComponentInfo %sComponents[%s_COMPONENT_COUNT + 1] = {\n%s    { 0 }\n};\n\n",
+               prefix, prefix, up.s, regtab.s ? regtab.s : "");
+    buf_printf(&b, "#endif\n\n#endif\n");
+    /* structure-valued fields need TriNode declared, whether or not triangle.h is included */
+    if (nodes) buf_puts(&head, "typedef struct TriNode TriNode;\n\n");
+    buf_puts(&head, b.s);
+    buf_free(&b);
+    b = head;
     buf_free(&enums);
+    buf_free(&reg);
+    buf_free(&regtab);
     buf_free(&up);
     u64map_free(&emitted);
     size_t n = b.len;
