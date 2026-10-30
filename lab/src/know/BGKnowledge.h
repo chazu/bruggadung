@@ -71,6 +71,11 @@
  * author, recognized by the looks the writing gives, and whose medium is
  * the record.
  *
+ * Interoception (AGENCY.md §6) is a sense like any other: each perception
+ * phase the agent feels its hunger, from its body's stock, to the nearest
+ * band of ten below, and dulled by what its running activity demands of
+ * its attention. It acts on what it feels, not on what its body is.
+ *
  * Salience (KNOWLEDGE.md §7, AGENCY.md §10): what an agent perceives happen
  * is kept as an observation only if it is salient enough: being addressed
  * most, its own deeds next, then what its goals concern (agency says what
@@ -241,6 +246,8 @@ typedef struct
    BGFinding        *_findings;
    NSUInteger       _nfindings;
    NSUInteger       _fcapacity;
+   int32_t          _hunger;         /* as felt */
+   int64_t          _feltAt;         /* ms, or -1 */
 }
 
 - (BGEntityID) agent;
@@ -292,6 +299,10 @@ typedef struct
 /* the traces it has perceived, first perceived first */
 - (NSUInteger) traceCount;
 - (const BGTraceSeen *) traceAt:(NSUInteger) i;
+
+/* how much it feels the need, 0 to 100, as of its last perception phase:
+ * "hunger" */
+- (int32_t) feels:(const char *) need;
 
 /* what it has concluded, first concluded first */
 - (NSUInteger) findingCount;

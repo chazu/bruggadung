@@ -1192,7 +1192,41 @@ re-weighing as urgency rises between boundaries.
 
 42 tests, 702 checks, under both compilers, ASan and UBSan, and leak-free.
 
-Next: needs and interoception (AGENCY.md §6): body stocks as world state,
-interoception as a sense with its own precision, and need pressure as a
-consideration over what the agent feels, not what its body is, so the
-needs generator, the last of AGENCY.md §4's table, can raise *eat*.
+### After the slice: needs and interoception
+
+AGENCY.md §6. A hungry worker (70), idle, with its supper in hand: the
+needs generator raises *eat something*, worth 35, the pressure of what it
+feels, and it eats; the supper is gone and the worker is fed (80). A
+worker driving a nail when it is 50 hungry feels only 30, its hunger dulled
+by the attention the drive demands, and eats only once the drive is done.
+A worker fed at 80 grows hungry a point every three minutes; the body
+domain wakes it at each band of ten, and at 90 minutes it feels 50 and
+eats, with nothing computed between.
+
+- **A body stock** (`#Agent.fed`, as of `fedAt`) falls analytically,
+  computed when read (`BGSatiety`). The body domain (`BGBodies`) proposes
+  nothing; its horizon is the next time anyone's hunger crosses a band, so
+  perception refreshes there.
+- **Interoception** is a sense: each perception phase the agent feels its
+  hunger, to the band below, dulled by twice its activity's attention
+  demand; the knowledge store keeps what it feels, and saves it.
+- **The needs generator**: a goal `pressed` by a need (`#Pressing`) is a
+  candidate while the felt need is above its threshold, worth a `#Need`
+  pressure over what the agent feels. Done or given up, it presses again
+  only when the need is felt 20 more. A kept commitment now weighs its duty
+  and urgency against candidates too.
+- **Eating** is an effect: the food is gone, and the eater half again more
+  fed.
+- **An agent agency takes over decides at once**: `control:` asks for a
+  decision at the next millisecond, so an idle agent doesn't wait for
+  something else to happen.
+
+Not yet: other needs (rest, warmth, air) and their stocks in other domains,
+misperception from modifiers other than attention (adrenaline, numbness),
+the body domain in `lab play`, starvation's consequences, and finding food.
+
+43 tests, 719 checks, under both compilers, ASan and UBSan, and leak-free.
+
+Next: habits (AGENCY.md §8): a context, a choice, and a strength that rises
+with repetition and decays, supplying method defaults (where to put
+things), and others' beliefs about them, so a broken habit is salient.

@@ -1,5 +1,7 @@
 #import "BGActions.h"
 
+#import "BGBodies.h"
+
 #import "BGView.h"
 #import "BGProposalGroup.h"
 #import "BGKnowledge.h"
@@ -639,6 +641,23 @@ static NSString   *effect_read( BGWorld *world, BGAction a, int64_t amount, BGPr
 }
 
 
+/* Eating: the food is gone, and the eater is fed, half its stock more. */
+static NSString   *effect_eat( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
+{
+   const BGAgent   *agent;
+   int64_t         fed;
+
+   agent = [world record:[world kindNamed:"Agent"] for:a.roles[ BGRoleActor]];
+   if( ! agent)
+      return( @"only an agent eats");
+   fed = BGSatiety( agent, [world time].ms) + 50;
+   [g set:"Agent.fed" of:BGWhole( a.roles[ BGRoleActor]) to:fed > 100 ? 100 : fed];
+   [g set:"Agent.fedAt" of:BGWhole( a.roles[ BGRoleActor]) to:[world time].ms];
+   [g destroy:BGWhole( a.roles[ BGRoleItem]) reason:"eaten"];
+   return( nil);
+}
+
+
 /* Tending changes nothing but traces, which the operation declares. */
 static NSString   *effect_tend( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
 {
@@ -673,6 +692,7 @@ static const struct
    { "analyse",   effect_analyse },
    { "write",     effect_write },
    { "read",      effect_read },
+   { "eat",       effect_eat },
 };
 
 

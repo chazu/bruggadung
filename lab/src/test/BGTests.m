@@ -12,6 +12,7 @@
 #import "BGWorlds.h"
 #import "BGAgency.h"
 #import "BGTraces.h"
+#import "BGBodies.h"
 
 #include <stdio.h>
 
@@ -853,8 +854,8 @@ static void   test_play( void)
    BG_CHECK( [out rangeOfString:@"at partOf(3, wedge, 0)"].location != NSNotFound);
    BG_CHECK( [out rangeOfString:@"R7 #Body, seen at 6000ms, truth 11"].location != NSNotFound);
    /* why: the move into the lock, in the drive's completion, because the worker started the drive */
-   BG_CHECK( [out rangeOfString:@"moved 11 to partOf(3, wedge, 0) at boundary 9, in \"activity 10: drive completes\"\n"
-                                @"because:\n  created 10 activity at boundary 8, in \"4: drive item 7 destination 3\""].location
+   BG_CHECK( [out rangeOfString:@"moved 11 to partOf(3, wedge, 0) at boundary 10, in \"activity 10: drive completes\"\n"
+                                @"because:\n  created 10 activity at boundary 9, in \"4: drive item 7 destination 3\""].location
              != NSNotFound);
    /* walks are activities of a second each: two of them, so the drive is activity 10, and done at 6 s */
    BG_CHECK( [out rangeOfString:@"activity 9: walk_east completes"].location != NSNotFound);
@@ -1105,6 +1106,12 @@ static BGNailsRun   missing_nails( BOOL spares, BOOL omniscient, BGApprentice ap
    ch = [g create:"crate" key:"crate" at:BGOnTile( 8, 7, 0)];
    if( spares)
       [g create:"nails_4" key:"spare nails" at:BGIn( ch)];
+   if( shiftUntil > BG_EIGHT)
+   {
+      /* breakfast at 7:30, before the shift */
+      [g set:"Agent.fed" of:BGWhole( 4) to:100];
+      [g set:"Agent.fedAt" of:BGWhole( 4) to:BG_EIGHT - 1800000];
+   }
    chest  = BGNoEntity;
    helper = BGNoEntity;
    if( apprentice)
@@ -1492,6 +1499,128 @@ static void   test_routine( void)
    rest = [resumed.agency logOf:4];
    BG_CHECK( [rest count] > 0 && [rest count] < [full count] &&
              [rest isEqualToArray:[full subarrayWithRange:NSMakeRange( [full count] - [rest count], [rest count])]]);
+}
+
+
+/* AGENCY.md §6: the worker, holding nails of its own and its supper, by the
+ * lock. `fed` is how fed it is at 0; `drive`, whether it is driving a nail
+ * when agency takes it over; it runs to `until`. */
+typedef struct
+{
+   BGWorld       *world;
+   BGKnowledge   *knowledge;
+   BGAgency      *agency;
+   BGEntityID    supper;
+   int32_t       feltDriving;    /* what it felt while driving */
+   NSUInteger    boundaries;
+   NSString      *text;
+} BGHungerRun;
+
+
+static BGHungerRun   hunger_run( int64_t fed, BOOL drive, int64_t until)
+{
+   BGWorld           *w;
+   BGCommitter       *c;
+   BGScheduler       *s;
+   BGActivities      *activities;
+   BGKnowledge       *knowledge;
+   BGAgency          *agency;
+   BGProposalGroup   *g;
+   BGEntityID        h[ 8];
+   BGEntityID        supper;
+   NSString          *error;
+   BGHungerRun       run;
+
+   memset( &run, 0, sizeof( run));
+   w          = BGTestWorld( 47);
+   c          = BGTestCommitter( w);
+   activities = [BGActivities activitiesWithWorld:w committer:c];
+   knowledge  = [[[BGKnowledge alloc] initWithWorld:w] autorelease];
+   agency     = [[[BGAgency alloc] initWithWorld:w committer:c knowledge:knowledge] autorelease];
+   s          = [[[BGScheduler alloc] initWithWorld:w committer:c] autorelease];
+   [agency setActivities:activities];
+   [s setActivities:activities];
+   [s setPerception:knowledge];
+   [s setDecision:agency];
+   [s addDomain:[[[BGBodies alloc] initWithWorld:w] autorelease]];
+   [c submit:BGWorkshopSetup( YES, h)];
+   [s runUntil:BGTimeMake( 1)];
+   g      = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: supper, and how fed the worker is"];
+   supper = [g create:"supper" key:"supper" at:BGHeldBy( 4, 1)];
+   [g set:"Agent.fed" of:BGWhole( 4) to:fed];
+   [c submit:g];
+   [s runUntil:BGTimeMake( 2)];
+   run.supper = [g idFor:supper];
+
+   if( drive)
+   {
+      error = nil;
+      BG_CHECK( BGPerform( w, c, BGActionMake( "drive", 4, 7, 3), 0, &error) != nil);
+      [s runUntil:BGTimeMake( 1000)];
+   }
+   [agency control:4];
+   if( drive)
+   {
+      [s runUntil:BGTimeMake( 2000)];
+      run.feltDriving = [[knowledge storeOf:4] feels:"hunger"];
+   }
+   run.boundaries = [s runUntil:BGTimeMake( until)];
+   run.world      = w;
+   run.knowledge  = knowledge;
+   run.agency     = agency;
+   run.text       = BGSave( w, c, [NSArray arrayWithObjects:knowledge, agency, nil]);
+   return( run);
+}
+
+
+static void   test_needs( void)
+{
+   BGHungerRun        hungry;
+   BGHungerRun        busy;
+   BGHungerRun        later;
+   BGHungerRun        again;
+   const BGAgent      *agent;
+   BGWorld            *w2;
+   BGKnowledge        *restored;
+   NSArray            *deferred;
+   NSString           *error;
+   uint64_t           position;
+
+   /* hungry (70), idle: the needs generator raises eating, worth what it
+    * feels, and it eats its supper */
+   hungry = hunger_run( 30, NO, 120000);
+   BG_CHECK( logged_by( hungry.agency, 4, @"weighing eat something: +35 (hunger +35) against nothing: switching"));
+   BG_CHECK( logged_by( hungry.agency, 4, @"[eat something] eat what I have: eat R"));
+   BG_CHECK( logged_by( hungry.agency, 4, @"[eat something] done"));
+   BG_CHECK( ! [hungry.world isLive:hungry.supper]);
+   agent = [hungry.world record:[hungry.world kindNamed:"Agent"] for:4];
+   BG_CHECK( agent && agent->fed == 80);
+   BG_CHECK( [[hungry.knowledge storeOf:4] feels:"hunger"] == 20);
+
+   /* driving a nail, its hunger (50) dulled by the attention the drive
+    * demands: it feels 30, and eats only once the drive is done */
+   busy = hunger_run( 50, YES, 120000);
+   BG_CHECK( busy.feltDriving == 30);
+   BG_CHECK( logged_by( busy.agency, 4, @"t=4002ms [-] weighing eat something: +25 (hunger +25)"));
+   BG_CHECK( log_count( busy.agency, 4, @"weighing") == 1);
+   BG_CHECK( ! [busy.world isLive:busy.supper]);
+
+   /* fed (80), it grows hungry as time passes, a point every three minutes,
+    * computed when read: the body domain wakes it at each band, and at 90
+    * minutes it feels 50 and eats; nothing is computed between */
+   later = hunger_run( 80, NO, 2 * 3600000LL);
+   BG_CHECK( logged_by( later.agency, 4, @"t=5400000ms [-] weighing eat something: +25 (hunger +25)"));
+   BG_CHECK( later.boundaries < 12);
+   BG_CHECK( ! [later.world isLive:later.supper]);
+
+   /* the same on replay; what it feels is saved */
+   again = hunger_run( 80, NO, 2 * 3600000LL);
+   BG_CHECK( [again.text isEqualToString:later.text]);
+   w2 = BGRestore( later.text, [later.world contentBuild], &deferred, &position, &error);
+   BG_CHECK( w2 != nil);
+   restored = [[[BGKnowledge alloc] initWithWorld:w2] autorelease];
+   [restored restoreSavedState:BGSavedDomainState( later.text, @"knowledge")];
+   BG_CHECK( [[restored dump:4] isEqualToString:[later.knowledge dump:4]]);
 }
 
 
@@ -3388,6 +3517,7 @@ const BGTestCase   BGAllTests[] =
    { "missing_nails",                 test_missing_nails },
    { "asking",                        test_asking },
    { "routine",                       test_routine },
+   { "needs",                         test_needs },
    { "rumour",                        test_rumour },
    { "memory_decay",                  test_memory_decay },
    { "salience",                      test_salience },

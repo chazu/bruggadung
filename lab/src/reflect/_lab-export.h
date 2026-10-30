@@ -22,6 +22,7 @@
 #import "BGStore.h"
 #import "BGTypes.h"
 #import "BGWorld.h"
+#import "BGBodies.h"
 #import "BGFluidDomain.h"
 #import "BGTraces.h"
 #import "BGComponents.h"

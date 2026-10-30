@@ -39,12 +39,23 @@
 #Consideration: {}
 // a fixed worth: a duty, a meal
 #Flat:      #Consideration & { value: int }
+// one that scales something of the agent's: `per` tenths of a point for
+// each point of it
+#Scaled:    #Consideration & { per: int }
 // a cost, the believed risk
 #Cost:      #Consideration & { cost: int }
 // how strongly the agent believes something like `suspect` is in the slot's
 // referent: the credence of what it was told, with its findings of
 // `evidence` about the place as a group of their own (KNOWLEDGE.md §11)
 #Suspicion: #Consideration & { suspect: #Body, inside: text, evidence: text }
+
+// What a need presses for (AGENCY.md §6): pressure over what the agent
+// feels, `per` tenths of a point for each point of it.
+#Need:      #Scaled & { pressure: text }
+
+// When a need raises a goal (AGENCY.md §4's needs generator): while the
+// agent feels it above `above`.
+#Pressing: { need: text, above: int }
 
 // Where a goal arises (AGENCY.md §4's reactive generator): a candidate for
 // each finding of the kind about something of kind `of`, the slot bound to
@@ -55,7 +66,8 @@
 // that holds it (AGENCY.md §10): something like one of them seen moved, or
 // talked of, is worth remembering. A goal with `arises` is weighed against
 // what the agent is doing whenever it arises.
-#Goal: #Intent & { done: #Condition, concerns: [...#Body], worth: [...#Consideration], arises: #Arising }
+#Goal: #Intent & { done: #Condition, concerns: [...#Body], worth: [...#Consideration], arises: #Arising,
+                   pressed: #Pressing }
 
 // Conditions of what the agent did, not of how things are: it has looked
 // into the slot's referent since adopting the goal; an activity of the
@@ -98,7 +110,7 @@
 // unthinkable, and not tried at all.
 // what a disposition or a norm of the agent's adds: `per` tenths of a point
 // for each point of it
-#Trait:   #Consideration & { trait: text, per: int }
+#Trait:   #Scaled & { trait: text }
 // a penalty if the agent believes someone, not itself, could see the slot's
 // referent
 #Watched: #Consideration & { watched: text, penalty: int }
@@ -271,4 +283,29 @@ take_the_purse: #Method & {
         #Trait & { trait: "scruples", per: -10 },
         #Watched & { watched: "money", penalty: 40 },
     ]
+} @family(methods)
+
+
+// --- AGENCY.md §6, needs ------------------------------------------------------
+
+// Hunger raises eating, worth what the agent feels of it.
+eat_when_hungry: #Goal & {
+    title:   "eat something"
+    done:    #Did & { did: "eat" }
+    pressed: { need: "hunger", above: 40 }
+    worth:   [#Need & { pressure: "hunger", per: 5 }]
+} @family(goals)
+
+eat_what_i_have: #Method & {
+    title: "eat what I have"
+    goal:  "eat_when_hungry"
+    rank:  1
+    pre: {
+        find:  ["food"]
+        match: #Supper & {
+            me:   #Agent & { id: $me }
+            food: #Body & { material: "food", place: #Held & { by: $me } }
+        }
+    }
+    steps: [#Do & { op: "eat", object: "food" }]
 } @family(methods)

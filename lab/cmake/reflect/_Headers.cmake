@@ -79,6 +79,7 @@ src/commit/BGProposalGroup.h
 src/core/BGStore.h
 src/core/BGTypes.h
 src/core/BGWorld.h
+src/domains/BGBodies.h
 src/domains/BGFluidDomain.h
 src/domains/BGTraces.h
 src/generated/BGComponents.h

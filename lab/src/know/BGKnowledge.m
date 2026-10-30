@@ -2,6 +2,7 @@
 
 #import "BGView.h"
 #import "BGTraces.h"
+#import "BGBodies.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -117,8 +118,9 @@ static NSUInteger   feature_keys( const char *features, char (*keys)[ 32], NSUIn
 
    if( ! (self = [super init]))
       return( nil);
-   _world = world;
-   _agent = agent;
+   _world  = world;
+   _agent  = agent;
+   _feltAt = -1;
    _next  = 1;
    _news  = [NSMutableArray new];
    for( i = 0; i < 32 * 32; i++)
@@ -349,6 +351,31 @@ static NSUInteger   feature_keys( const char *features, char (*keys)[ 32], NSUIn
    }
    _traces[ _ntraces++] = t;
    return( YES);
+}
+
+
+- (int32_t) feels:(const char *) need
+{
+   return( ! strcmp( need, "hunger") ? _hunger : 0);
+}
+
+
+- (int64_t) feltAt
+{
+   return( _feltAt);
+}
+
+
+/* YES if it feels differently now */
+- (BOOL) feelHunger:(int32_t) hunger
+                 at:(int64_t) t
+{
+   BOOL   changed;
+
+   changed = _feltAt < 0 || hunger != _hunger;
+   _hunger = hunger;
+   _feltAt = t;
+   return( changed);
 }
 
 
@@ -1959,6 +1986,17 @@ static BOOL   near( BGKnowledgeStore *store, const BGReferent *r, const char *ki
     * said, if it noticed, believed */
    memory   = [_world record:[_world kindNamed:"Agent"] for:agent];
    notice   = BG_NOTICE + [self attentionOf:agent] - (memory ? (int) memory->curious / 10 : 0);
+
+   /* interoception: hunger, to the band, dulled by attention */
+   if( memory)
+   {
+      int64_t   hunger;
+
+      hunger = 100 - BGSatiety( memory, now) - 2 * [self attentionOf:agent];
+      hunger = hunger < 0 ? 0 : (hunger / BG_HUNGER_BAND) * BG_HUNGER_BAND;
+      if( [store feelHunger:(int32_t) hunger at:now])
+         [news addObject:[NSString stringWithFormat:@"you feel hunger (%d)", (int) hunger]];
+   }
    concerns = _concerns ? [_concerns concernsOf:agent] : nil;
    for( i = 0; i < nwitnessed; i++)
    {
@@ -2259,6 +2297,8 @@ static NSString   *attribution_text( const BGTestimony *t)
                                 : [NSString stringWithFormat:@"at (%d, %d)", t->x, t->y],
                       t->strength, (long long) t->seen, t->present ? "" : ", gone", (unsigned long long) t->truth];
    }
+   if( [store feltAt] >= 0)
+      [s appendFormat:@"  feels hunger %d, at %lldms\n", [store feels:"hunger"], (long long) [store feltAt]];
    for( i = 0; i < [store findingCount]; i++)
    {
       const BGFinding   *f;
@@ -2455,6 +2495,9 @@ char   *BGDecodeWord( const char *s)
                                                      tr->level, tr->strength, (long long) tr->seen, tr->present ? 1 : 0,
                                                      (unsigned long long) tr->truth, tr->kind]];
       }
+      if( [store feltAt] >= 0)
+         [lines addObject:[NSString stringWithFormat:@"feels %llu %d %lld", (unsigned long long) [store agent],
+                                                     [store feels:"hunger"], (long long) [store feltAt]]];
       for( j = 0; j < [store findingCount]; j++)
       {
          const BGFinding   *f;
@@ -2583,6 +2626,8 @@ char   *BGDecodeWord( const char *s)
          tr.kind     = [_world intern:role];
          [[self storeOf:(BGEntityID) agent] noteTrace:tr];
       }
+      else if( sscanf( text, "feels %llu %d %lld", &agent, &trust, &seen) == 3)
+         [[self storeOf:(BGEntityID) agent] feelHunger:trust at:seen];
       else if( sscanf( text, "finding %llu %u %d %lld %63s %511s", &agent, &id, &trust, &seen, role, kind) == 6)
       {
          BGFinding   f;

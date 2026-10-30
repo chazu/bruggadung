@@ -145,7 +145,9 @@ and comes back to it after. Methods are scored too, by dispositions and
 norms (`honesty`, `scruples`) and by whether the agent believes itself
 watched; one that scores below nothing is unthinkable. An agent's commitments (a shift from 8:00 to 16:00) are its routine:
 while a window is open its goal is a candidate, worth its duty and an
-urgency that rises toward the deadline. The player can hand their character to agency
+urgency that rises toward the deadline. Agents feel their hunger, a body stock that falls as time passes, through
+interoception, dulled while they concentrate; the needs generator raises
+eating, worth what they feel. The player can hand their character to agency
 on autopilot, and control comes back when something arises worth more
 than the player said, or the goal is done. Being asked is a choice for agents agency
 controls: answering is worth their trust in the

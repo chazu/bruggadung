@@ -80,6 +80,10 @@
     scruples: *20 | int & >=0 & <=100        @field(content, saved, proposable, inspect)
     // half hidden: seen only from close by, though it sees as well as anyone
     hiding:   *false | true                  @field(content, saved, proposable, inspect)
+    // a body stock (AGENCY.md §6): how fed it is, 0 to 100, as of `fedAt`;
+    // it falls a point every three minutes, computed when read
+    fed:      *80 | int & >=0 & <=100        @field(content, saved, proposable, inspect)
+    fedAt:    *0ms | time & >=0ms & <=10000d @field(content, saved, proposable, inspect)
 }
 
 // Something entities can be put in.

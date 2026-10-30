@@ -296,6 +296,7 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
          return;        /* already */
    m        = [self mindOf:agent];
    m->heard = [[_knowledge storeOf:agent] nextSerial];
+   m->wake  = [_world time].ms + 1;     /* it decides soon, whatever else happens */
 }
 
 
@@ -1309,6 +1310,12 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
          v = [self suspicion:c of:bound( b, n, slot) store:store];
          [parts addObject:[NSString stringWithFormat:@"credence %+d", v]];
       }
+      else if( text_at( tri, c, "pressure", slot, sizeof( slot)))
+      {
+         /* what it feels, not what its body is */
+         v = (int32_t) ([store feels:slot] * int_at( tri, c, "per", 0) / 10);
+         [parts addObject:[NSString stringWithFormat:@"%s %+d", slot, v]];
+      }
       else if( text_at( tri, c, "trait", slot, sizeof( slot)))
       {
          /* its own disposition or norm, which it knows */
@@ -1356,6 +1363,25 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
 {
    if( intention->commitment > 0 && intention->commitment <= m->ncommitments)
       m->commitments[ intention->commitment - 1].settled = YES;
+   if( intention->pressed)
+   {
+      char   need[ 32];
+      int    k;
+
+      if( ! text_at( [_world tri], tri_pattern( [_world tri], intention->goal), "pressed.need", need, sizeof( need)))
+         return;
+      for( k = 0; k < m->nsettled && ! (m->settled[ k].goal == intention->goal && ! m->settled[ k].about); k++)
+         ;
+      if( k == m->nsettled && m->nsettled < BG_MAX_SETTLED)
+         m->nsettled++;
+      if( k < m->nsettled)
+      {
+         m->settled[ k].goal    = intention->goal;
+         m->settled[ k].about   = 0;
+         m->settled[ k].verdict = [[_knowledge storeOf:m->agent] feels:need];
+      }
+      return;
+   }
    if( ! intention->arose || m->nsettled == BG_MAX_SETTLED ||
        [self has:m->settled count:m->nsettled goal:intention->goal about:intention->arose verdict:NULL])
       return;
@@ -1402,6 +1428,7 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    char               currentTitle[ 64];
    const char         *bestSlot;
    int                bestCommitment;
+   BOOL               bestPressed;
 
    tri       = [_world tri];
    family    = tri_family_index( tri, "goals");
@@ -1442,6 +1469,7 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
             bestWorth = worth;
             bestParts = parts;
             bestSlot  = b.slot;
+            bestPressed = NO;
          }
       }
    }
@@ -1469,21 +1497,65 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
                                                            [NSString stringWithFormat:@"urgency %+d", worth - BG_DUTY], nil];
          bestSlot       = NULL;
          bestCommitment = k;
+         bestPressed    = NO;
+      }
+   }
+   /* needs: goals pressed by what the agent feels */
+   bestPressed = NO;
+   for( i = 0; family && i < tri_index_count( family); i++)
+   {
+      int   felt;
+      int   was;
+
+      goal = [_world intern:tri_index_tag( family, i)];
+      if( ! text_at( tri, tri_pattern( tri, goal), "pressed.need", finding, sizeof( finding)))
+         continue;
+      felt = [store feels:finding];
+      if( felt <= int_at( tri, tri_pattern( tri, goal), "pressed.above", 100))
+         continue;
+      if( [self has:m->settled count:m->nsettled goal:goal about:0 verdict:&was] && felt < was + 20)
+         continue;      /* settled, until it is felt more */
+      for( k = 0; k < m->nintentions && m->intentions[ k].goal != goal; k++)
+         ;
+      if( k < m->nintentions)
+         continue;
+      parts = [NSMutableArray array];
+      worth = [self worthOf:goal bindings:NULL count:0 store:store parts:parts];
+      if( ! best || worth > bestWorth)
+      {
+         best           = goal;
+         bestAbout      = 0;
+         bestWorth      = worth;
+         bestParts      = parts;
+         bestSlot       = NULL;
+         bestCommitment = -1;
+         bestPressed    = YES;
       }
    }
    if( ! best)
       return( NO);
 
-   /* against what it is doing: the topmost intention that has a worth */
+   /* against what it is doing: the topmost intention that has a worth, or keeps a commitment */
    current      = NULL;
    against      = 0;
    currentParts = [NSMutableArray array];
    for( k = m->nintentions - 1; k >= 0 && ! current; k--)
-      if( tri_at( tri, tri_pattern( tri, m->intentions[ k].goal), "worth.first"))
+      if( tri_at( tri, tri_pattern( tri, m->intentions[ k].goal), "worth.first") || m->intentions[ k].commitment)
       {
          current = &m->intentions[ k];
          against = [self worthOf:current->goal bindings:current->params count:current->nparams store:store
                            parts:currentParts];
+         if( current->commitment > 0 && current->commitment <= m->ncommitments)
+         {
+            BGCommitment   *c;
+            int32_t        urgency;
+
+            c       = &m->commitments[ current->commitment - 1];
+            urgency = (int32_t) (BG_URGENCY * ([_world time].ms - c->from) / (c->until - c->from));
+            against += BG_DUTY + urgency;
+            [currentParts addObject:[NSString stringWithFormat:@"%s, duty %+d", c->source, BG_DUTY]];
+            [currentParts addObject:[NSString stringWithFormat:@"urgency %+d", urgency]];
+         }
       }
    if( m->nintentions)
       against += BG_MARGIN;
@@ -1551,6 +1623,7 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    [self adopt:best mind:m params:&b count:bestSlot ? 1 : 0];
    m->intentions[ m->nintentions - 1].arose      = bestAbout;
    m->intentions[ m->nintentions - 1].commitment = bestCommitment + 1;
+   m->intentions[ m->nintentions - 1].pressed    = bestPressed;
    return( YES);
 }
 
@@ -1582,6 +1655,8 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
 
    store = [_knowledge storeOf:m->agent];
    me    = [store referent:[store selfReferent]];
+   if( m->wake && m->wake <= [_world time].ms)
+      m->wake = 0;
    if( ! me || m->handedBack)
       return( YES);
    [self hearQuestions:m store:store];
@@ -1736,6 +1811,8 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
       m = [_minds objectAtIndex:i];
       if( m->awaiting && m->awaitUntil < t.ms)
          t = BGTimeMake( m->awaitUntil);
+      if( m->wake > [_world time].ms && m->wake < t.ms)
+         t = BGTimeMake( m->wake);
       /* a commitment's window opening, or closing */
       for( k = 0; k < m->ncommitments; k++)
       {
@@ -1779,14 +1856,16 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
       for( k = 0; k < m->nintentions; k++)
       {
          t = &m->intentions[ k];
-         [line appendFormat:@" %s %lld %u %d %d %u %d %d", t->goal, (long long) t->adopted, t->failed, t->pending,
-                                                       t->following, t->arose, t->commitment, t->nparams];
+         [line appendFormat:@" %s %lld %u %d %d %u %d %d %d", t->goal, (long long) t->adopted, t->failed, t->pending,
+                                                          t->following, t->arose, t->commitment, t->pressed, t->nparams];
          for( p = 0; p < t->nparams; p++)
             [line appendFormat:@" %s %u", t->params[ p].slot, t->params[ p].referent];
       }
       [lines addObject:line];
       if( m->autopilot)
          [lines addObject:[NSString stringWithFormat:@"autopilot %llu %d", (unsigned long long) m->agent, m->threshold]];
+      if( m->wake)
+         [lines addObject:[NSString stringWithFormat:@"wake %llu %lld", (unsigned long long) m->agent, (long long) m->wake]];
       for( k = 0; k < m->ncommitments; k++)
          [lines addObject:[NSString stringWithFormat:@"commitment %llu %s %lld %lld %s %d", (unsigned long long) m->agent,
                                                      m->commitments[ k].goal, (long long) m->commitments[ k].from,
@@ -1839,6 +1918,11 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
          c->settled = [[words objectAtIndex:6] intValue] != 0;
          continue;
       }
+      if( [words count] == 3 && [[words objectAtIndex:0] isEqualToString:@"wake"])
+      {
+         [self mindOf:(BGEntityID) [[words objectAtIndex:1] longLongValue]]->wake = [[words objectAtIndex:2] longLongValue];
+         continue;
+      }
       if( [words count] == 3 && [[words objectAtIndex:0] isEqualToString:@"autopilot"])
       {
          m            = [self mindOf:(BGEntityID) [[words objectAtIndex:1] longLongValue]];
@@ -1885,7 +1969,7 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
       m->awaitUntil = [[words objectAtIndex:7] longLongValue];
       n             = [[words objectAtIndex:8] intValue];
       w             = 9;
-      for( k = 0; k < n && k < BG_MAX_INTENTIONS && w + 8 <= [words count]; k++)
+      for( k = 0; k < n && k < BG_MAX_INTENTIONS && w + 9 <= [words count]; k++)
       {
          t          = &m->intentions[ m->nintentions++];
          memset( t, 0, sizeof( *t));
@@ -1896,6 +1980,7 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
          t->following = [[words objectAtIndex:w++] intValue];
          t->arose      = (uint32_t) [[words objectAtIndex:w++] longLongValue];
          t->commitment = [[words objectAtIndex:w++] intValue];
+         t->pressed    = [[words objectAtIndex:w++] intValue];
          t->nparams    = [[words objectAtIndex:w++] intValue];
          for( p = 0; p < t->nparams && p < BG_MAX_SLOTS && w + 2 <= [words count]; p++)
          {

@@ -49,6 +49,11 @@
  * it is dropped. The scheduler wakes the agent when a window opens or
  * closes.
  *
+ * Needs (AGENCY.md §6): a goal `pressed` by a need is a candidate while the
+ * agent feels the need above the goal's threshold (the needs generator),
+ * worth the pressure of what it feels. Done or given up, it doesn't press
+ * again until the need is felt 20 more.
+ *
  * Autopilot (AGENCY.md §14): the player hands their character to agency
  * with a goal and an interruption threshold. Agency decides for it from its
  * knowledge view, as for anyone, but takes up no goal of its own: when one
@@ -102,6 +107,7 @@ typedef struct
    int             nparams;
    uint32_t        arose;        /* the referent it arose about, or 0 */
    int             commitment;   /* the commitment it keeps, + 1, or 0 */
+   int             pressed;      /* a need raised it */
 } BGIntention;
 
 
@@ -155,6 +161,7 @@ typedef struct
    int              nweighed;
    BGCommitment     commitments[ BG_MAX_COMMITMENTS];
    int              ncommitments;
+   int64_t          wake;              /* a decision is due then (ms), or 0 */
    BOOL             autopilot;         /* the player's character, handed over */
    int32_t          threshold;         /* worth above which control returns */
    BOOL             handedBack;

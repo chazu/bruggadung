@@ -19,6 +19,7 @@ src/commit/BGCommitter.m
 src/commit/BGProposalGroup.m
 src/core/BGStore.m
 src/core/BGWorld.m
+src/domains/BGBodies.m
 src/domains/BGFluidDomain.m
 src/domains/BGTraces.m
 src/kinds/BGBodyKind.m
