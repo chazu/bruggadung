@@ -2023,10 +2023,19 @@ The remaining scenario checks that aren't run, after the passes above:
     naming the lamp.
   - told, featureless referents in recognition: AGENCY.md Scenario 2's
     variant C by asking (see its section).
-  - urgency curves other than a line: AGENCY.md names "a curve that
-    rises toward the deadline", no shape.
-  - belief from habit: AGENCY.md Scenario 1's setup states the belief,
-    not how a habit makes one.
+  - urgency curves other than a line, and consideration curves in
+    general: AGENCY.md's open question 1, "Consideration curves. How are
+    they represented in content, and how are considerations combined
+    (product, weighted sum, or a mix)?"
+  - belief from one's own habit: AGENCY.md §8 has habits supplying method
+    defaults (the lab's `habit` order) and others forming beliefs about
+    habits (`usually_puts`). Scenario 1's setup states Oskar's belief, not
+    how his habit makes it.
+  - perception or memory making feature hypotheses of their own: the docs
+    give "half-remembers" (CONTENT_LANGUAGE.md Scenario 2, C), not how
+    memory forms a doubt.
+  - the actor's exertion as a percept (ACTIONS.md Scenario 1, "their
+    exertion"): named only.
   - loyalty: AGENCY.md lists it among dispositions and says it favours
     reporting to the miller, with nothing more.
 
