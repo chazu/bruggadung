@@ -1957,3 +1957,16 @@ isn't true:
   behind it.
 
 57 tests, 2068 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: two more scenario checks asserted
+
+- **COMPONENTS.md Scenario 1, step 4**: after the marked nail, the smith
+  looks into the bin. Among the 29 clean nails it finds the bent one, an
+  individual of its own, `bent: true`, with the tool marks on it. That is
+  the evidence step 4 promises.
+- **KNOWLEDGE.md Scenario 3, check 6**: an out-of-character note ("the
+  nails are in the loft") doesn't change what the character says. The
+  same session with and without the note ends in the same world, to the
+  bit, and the claim made says nothing of the loft.
+
+58 tests, 2075 checks, under both compilers, ASan and UBSan, and leak-free.

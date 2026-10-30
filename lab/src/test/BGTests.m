@@ -2950,6 +2950,66 @@ static void   test_play_notebook( void)
    BG_CHECK( book.location != NSNotFound && book.location < knows.location &&
              [[out substringWithRange:NSMakeRange( book.location, knows.location - book.location)]
                rangeOfString:@"truth"].location == NSNotFound);
+
+   /* nor do they change what the character says: told the same, with and
+    * without a note, the world is the same to the bit */
+   {
+      NSString   *with;
+      NSString   *without;
+      uint64_t   h1;
+      uint64_t   h2;
+
+      with    = session( @"workshop", [NSArray arrayWithObjects:@"do 1", @"walk w", @"note the nails are in the loft",
+                                                                 @"tell R4 R5", @"hash", nil], &h1);
+      without = session( @"workshop", [NSArray arrayWithObjects:@"do 1", @"walk w", @"tell R4 R5", @"hash", nil], &h2);
+      BG_CHECK( h1 == h2);
+      BG_CHECK( [with rangeOfString:@"said: 4, other 5, #IsIn"].location != NSNotFound);
+      BG_CHECK( [[with substringFromIndex:[with rangeOfString:@"said: 4"].location] rangeOfString:@"loft"].location == NSNotFound);
+      (void) without;
+   }
+}
+
+
+/* COMPONENTS.md Scenario 1's step 4: afterwards, someone looking into the bin finds the bent nail, an
+ * individual among the clean ones, tool marks and all: evidence (§4). */
+static void   test_marked_nail_found( void)
+{
+   BGMarkedNail       *scenario;
+   BGWorld            *w;
+   BGCommitter        *c;
+   BGScheduler        *s;
+   BGKnowledge        *knowledge;
+   BGKnowledgeStore   *store;
+   const BGReferent   *r;
+   NSString           *error;
+   NSString           *seen;
+   NSUInteger         i;
+   uint32_t           bin;
+   BOOL               found;
+
+   scenario  = run_marked_nail( BGMarkedNailBase, 42);
+   w         = [scenario world];
+   c         = [scenario committer];
+   knowledge = [[[BGKnowledge alloc] initWithWorld:w] autorelease];
+   s         = [[[BGScheduler alloc] initWithWorld:w committer:c] autorelease];
+   [s setPerception:knowledge];
+   [s runUntil:BGTimeMake( [w time].ms + 1)];
+   store = [knowledge storeOf:5];
+   bin   = referent_of( store, 1);
+   BG_CHECK( bin != 0);
+   error = nil;
+   BG_CHECK( BGPerformBelieved( w, c, store, BGActionMake( "look_in", [store selfReferent], bin, BGNoEntity), 0, &error) != nil);
+   [s runUntil:BGTimeMake( [w time].ms + 1)];
+   found = NO;
+   for( i = 0; i < [store count]; i++)
+   {
+      r     = [store referentAt:i];
+      seen  = [store describeReferent:r->id];
+      found = found || (r->form == BGLocationIn && r->container == bin && ! strcmp( r->kind, "#Body") &&
+                        [seen rangeOfString:@"bent: true"].location != NSNotFound);
+   }
+   BG_CHECK( found);
+   BG_CHECK( [[knowledge dump:5] rangeOfString:@"trace tool_marks on"].location != NSNotFound);
 }
 
 
@@ -5466,6 +5526,7 @@ const BGTestCase   BGAllTests[] =
    { "scheduler_horizons",            test_scheduler_horizons },
    { "marked_nail",                   test_marked_nail },
    { "marked_nail_a",                 test_marked_nail_a },
+   { "marked_nail_found",             test_marked_nail_found },
    { "marked_nail_b",                 test_marked_nail_b },
    { "marked_nail_replay",            test_marked_nail_replay },
    { "menu",                          test_menu },
