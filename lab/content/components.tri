@@ -57,12 +57,14 @@
     mass:     $u * $n
 }
 
-// Something that acts, with hands to hold things in, and a coat to know it
-// by at a glance.
+// Something that acts, with hands to hold things in, a coat to know it by
+// at a glance, and room in its memory for so many observations
+// (KNOWLEDGE.md §12): past that, the least salient go first.
 #Agent: #Body & #Handed & {
     @component(Agent)
-    hands: int & >=0 & <=4 @field(content, saved, inspect, perceive(sight))
-    coat:  #Colour         @field(content, saved, inspect, perceive(sight))
+    hands:  int & >=0 & <=4                  @field(content, saved, inspect, perceive(sight))
+    coat:   #Colour                          @field(content, saved, inspect, perceive(sight))
+    memory: *64 | int & >=1 & <=100000       @field(content, saved, inspect)
 }
 
 // Something entities can be put in.

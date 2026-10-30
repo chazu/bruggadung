@@ -192,12 +192,15 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    _committer = committer;
    _knowledge = [knowledge retain];
    _minds     = [NSMutableArray new];
+   [_knowledge setConcerns:self];
    return( self);
 }
 
 
 - (void) dealloc
 {
+   if( [_knowledge concerns] == self)
+      [_knowledge setConcerns:nil];
    [_world release];
    [_knowledge release];
    [_minds release];
@@ -260,7 +263,38 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    BGMotivation   *m;
 
    m        = [self mindOf:agent];
-   m->heard = [[_knowledge storeOf:agent] observationCount];
+   m->heard = [[_knowledge storeOf:agent] nextSerial];
+}
+
+
+/* What the agent's goals concern, all the way down its intentions. */
+- (NSArray *) concernsOf:(BGEntityID) agent
+{
+   NSMutableArray   *patterns;
+   BGMotivation     *m;
+   const TriNode    *list;
+   TriContent       *tri;
+   NSUInteger       i;
+   int              k;
+   char             printed[ 1024];
+
+   tri      = [_world tri];
+   patterns = [NSMutableArray array];
+   for( i = 0; i < [_minds count]; i++)
+   {
+      m = [_minds objectAtIndex:i];
+      if( m->agent != agent)
+         continue;
+      for( k = 0; k < m->nintentions; k++)
+         for( list = tri_at( tri, tri_pattern( tri, m->intentions[ k].goal), "concerns");
+              list && tri_at( tri, list, "first");
+              list = tri_at( tri, list, "rest"))
+         {
+            tri_print( tri, tri_at( tri, list, "first"), printed, sizeof( printed));
+            [patterns addObject:[NSString stringWithUTF8String:printed]];
+         }
+   }
+   return( patterns);
 }
 
 
@@ -842,15 +876,17 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    TriContent            *tri;
    TriArena              *arena;
    NSString              *answer;
+   NSUInteger            i;
    uint32_t              me;
    uint32_t              asker;
 
    tri = [_world tri];
    me  = [store selfReferent];
-   for( ; m->heard < [store observationCount]; m->heard++)
+   for( i = 0; i < [store observationCount]; i++)
    {
-      o = [store observationAt:m->heard];
-      if( strcmp( o->kind, "said") || o->other != me || ! o->actor || o->actor == me || ! o->content)
+      o = [store observationAt:i];
+      if( o->serial < m->heard || strcmp( o->kind, "said") || o->other != me || ! o->actor || o->actor == me ||
+          ! o->content)
          continue;
       asker    = o->actor;
       arena    = tri_arena_new();
@@ -864,6 +900,7 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
          [self act:m why:"answering" store:store operation:"say" object:asker target:0 units:0
            content:[answer UTF8String]];
    }
+   m->heard = [store nextSerial];
 }
 
 
@@ -1067,7 +1104,7 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
       m             = [self mindOf:(BGEntityID) [[words objectAtIndex:1] longLongValue]];
       m->decisions  = (uint64_t) [[words objectAtIndex:2] longLongValue];
       m->waiting    = [[words objectAtIndex:3] intValue] != 0;
-      m->heard      = (NSUInteger) [[words objectAtIndex:4] longLongValue];
+      m->heard      = (uint64_t) [[words objectAtIndex:4] longLongValue];
       m->awaiting   = (uint32_t) [[words objectAtIndex:5] longLongValue];
       m->awaitSince = [[words objectAtIndex:6] longLongValue];
       m->awaitUntil = [[words objectAtIndex:7] longLongValue];

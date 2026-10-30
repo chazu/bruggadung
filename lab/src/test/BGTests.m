@@ -1788,6 +1788,183 @@ static void   test_memory_decay( void)
 }
 
 
+/* --- salience ------------------------------------------------------------- */
+
+typedef struct
+{
+   BGWorld       *world;
+   BGKnowledge   *knowledge;
+   BGAgency      *agency;
+   BGEntityID    gossip;
+   NSUInteger    idle;           /* the worker's observations of the smith, with nothing in mind */
+   NSUInteger    concerned;      /* ... once the nails concern it */
+   NSUInteger    busy;           /* ... while it drives a nail */
+   NSString      *text;
+} BGSalienceRun;
+
+
+static NSUInteger   observed_by( BGKnowledgeStore *store, uint32_t actor, const char *kind)
+{
+   NSUInteger   i;
+   NSUInteger   n;
+
+   n = 0;
+   for( i = 0; i < [store observationCount]; i++)
+      if( [store observationAt:i]->actor == actor && ! strcmp( [store observationAt:i]->kind, kind))
+         n++;
+   return( n);
+}
+
+
+/* The workshop, with the worker holding nails of its own. At rest, with
+ * nothing in mind, the worker sees the smith take the smith's nails; then,
+ * committed to wedging the lock, which the nails concern, sees the smith put
+ * them back; then, driving a nail, sees the smith take them again, and the
+ * gossip asks it something. The gossip, who keeps four observations, asks
+ * the smith something too, and is told five things. */
+static BGSalienceRun   salience_run( void)
+{
+   BGWorld           *w;
+   BGCommitter       *c;
+   BGScheduler       *s;
+   BGActivities      *activities;
+   BGKnowledge       *knowledge;
+   BGAgency          *agency;
+   BGKnowledgeStore  *store;
+   BGProposalGroup   *g;
+   BGEntityID        h[ 8];
+   BGEntityID        gossip;
+   NSString          *error;
+   NSString          *where;
+   BGAction          action;
+   BGSalienceRun     run;
+   uint32_t          smith;
+   int               i;
+
+   w          = BGTestWorld( 19);
+   c          = BGTestCommitter( w);
+   activities = [BGActivities activitiesWithWorld:w committer:c];
+   knowledge  = [[[BGKnowledge alloc] initWithWorld:w] autorelease];
+   agency     = [[[BGAgency alloc] initWithWorld:w committer:c knowledge:knowledge] autorelease];
+   s          = [[[BGScheduler alloc] initWithWorld:w committer:c] autorelease];
+   [s setActivities:activities];
+   [s setPerception:knowledge];
+   [s setDecision:agency];
+   [c submit:BGWorkshopSetup( YES, h)];
+   g      = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the gossip"];
+   gossip = [g create:"gossip" key:"gossip" at:BGOnTile( 3, 5, 0)];
+   [c submit:g];
+   [s runUntil:BGTimeMake( 1)];
+   gossip = [g idFor:gossip];
+   [agency control:4];
+   store = [knowledge storeOf:4];
+   smith = referent_of( store, 5);
+   where = @"#WhereIs & { what: #Stack & { unit: \"iron_nail\" } }";
+
+   /* at rest, nothing in mind: routine */
+   BG_CHECK( BGPerform( w, c, BGActionMake( "take", 5, 2, BGNoEntity), 0, &error) != nil);
+   [s runUntil:BGTimeMake( [w time].ms + 1000)];
+   run.idle = observed_by( store, smith, "moved");
+   BG_CHECK( [store referent:referent_of( store, 2)]->form == BGLocationHeldBy);   /* seen all the same */
+
+   /* the nails concern it now; it sets to driving one of its own into the lock */
+   BG_CHECK( [agency commit:4 toGoal:"wedge_lock"]);
+   BG_CHECK( BGPerform( w, c, BGActionMake( "put_in", 5, 2, 1), 0, &error) != nil);
+   [s runUntil:BGTimeMake( [w time].ms + 1000)];
+   run.concerned = observed_by( store, smith, "moved");
+
+   /* driving, it misses what concerns it, but not being spoken to */
+   BG_CHECK( BGPerform( w, c, BGActionMake( "take", 5, 2, BGNoEntity), 0, &error) != nil);
+   [s runUntil:BGTimeMake( [w time].ms + 1000)];
+   run.busy = observed_by( store, smith, "moved");
+   action         = BGActionMake( "say", gossip, 4, BGNoEntity);
+   action.content = [w intern:[where UTF8String]];
+   BG_CHECK( BGPerform( w, c, action, 0, &error) != nil);
+   [s runUntil:BGTimeMake( [w time].ms + 1000)];
+
+   /* the gossip asks the smith, and is told five things */
+   action         = BGActionMake( "say", gossip, 5, BGNoEntity);
+   action.content = [w intern:[where UTF8String]];
+   BG_CHECK( BGPerform( w, c, action, 0, &error) != nil);
+   [s runUntil:BGTimeMake( [w time].ms + 1000)];
+   for( i = 0; i < 5; i++)
+   {
+      action         = BGActionMake( "say", 5, gossip, BGNoEntity);
+      action.content = [w intern:[[NSString stringWithFormat:@"#WhereIs & { what: #Stack & { count: %d } }", i + 1]
+                                    UTF8String]];
+      BG_CHECK( BGPerform( w, c, action, 0, &error) != nil);
+      [s runUntil:BGTimeMake( [w time].ms + 1000)];
+   }
+   [s runUntil:BGTimeMake( 30000)];
+
+   run.world     = w;
+   run.knowledge = knowledge;
+   run.agency    = agency;
+   run.gossip    = gossip;
+   run.text      = BGSave( w, c, [NSArray arrayWithObjects:knowledge, agency, nil]);
+   return( run);
+}
+
+
+/* KNOWLEDGE.md §7 and §12, AGENCY.md §10: what is kept is what is salient,
+ * a busy agent notices less, and a store keeps what fits, the least salient
+ * evicted first. */
+static void   test_salience( void)
+{
+   BGSalienceRun      run;
+   BGSalienceRun      again;
+   BGKnowledgeStore   *store;
+   BGKnowledge        *restored;
+   const BGObservation *o;
+   BGWorld            *w2;
+   NSArray            *deferred;
+   NSString           *error;
+   uint64_t           position;
+   NSUInteger         i;
+
+   run   = salience_run();
+   store = [run.knowledge storeOf:4];
+
+   /* routine goes unkept; what its goal concerns is kept; while it drives, not */
+   BG_CHECK( run.idle == 0);
+   BG_CHECK( run.concerned == 1);
+   BG_CHECK( run.busy == 1);
+   BG_CHECK( logged( run.agency, @"[wedge the lock] drive a nail in: drive"));
+   for( i = 0; i < [store observationCount]; i++)
+   {
+      o = [store observationAt:i];
+      if( ! strcmp( o->kind, "moved") && o->actor != [store selfReferent])
+         BG_CHECK( o->salience == BG_CONCERN);
+   }
+   /* being asked is noticed even while driving, and answered */
+   BG_CHECK( logged( run.agency, @"answering: say R"));
+   BG_CHECK( [[run.knowledge dump:4] rangeOfString:@"salience 30"].location != NSNotFound);
+
+   /* the gossip keeps four: what it said itself goes first, then the oldest it was told */
+   store = [run.knowledge storeOf:run.gossip];
+   BG_CHECK( [store observationCount] == 4);
+   for( i = 0; i < [store observationCount]; i++)
+   {
+      o = [store observationAt:i];
+      BG_CHECK( o->salience == BG_ADDRESSED && o->other == [store selfReferent]);
+      BG_CHECK( o->content && strstr( o->content, [[NSString stringWithFormat:@"count: %d", (int) i + 2] UTF8String]));
+   }
+   BG_CHECK( [store nextSerial] > [store observationAt:3]->serial);
+
+   /* the same on replay, and saved and restored the same */
+   again = salience_run();
+   BG_CHECK( [again.world stateHash] == [run.world stateHash]);
+   BG_CHECK( [again.text isEqualToString:run.text]);
+   w2 = BGRestore( run.text, [run.world contentBuild], &deferred, &position, &error);
+   BG_CHECK( w2 != nil);
+   restored = [[[BGKnowledge alloc] initWithWorld:w2] autorelease];
+   [restored restoreSavedState:BGSavedDomainState( run.text, @"knowledge")];
+   BG_CHECK( [[restored dump:4] isEqualToString:[run.knowledge dump:4]]);
+   BG_CHECK( [[restored dump:run.gossip] isEqualToString:[run.knowledge dump:run.gossip]]);
+   BG_CHECK( [[restored storeOf:run.gossip] nextSerial] == [store nextSerial]);
+}
+
+
 /* --- the cistern ----------------------------------------------------------- */
 
 static BGCistern   *run_cistern( BGCisternVariant variant)
@@ -2100,6 +2277,7 @@ const BGTestCase   BGAllTests[] =
    { "asking",                        test_asking },
    { "rumour",                        test_rumour },
    { "memory_decay",                  test_memory_decay },
+   { "salience",                      test_salience },
    { "cistern",                       test_cistern },
    { "cistern_b",                     test_cistern_b },
    { "cistern_d",                     test_cistern_d },

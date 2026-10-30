@@ -33,10 +33,13 @@
 // activity, which can be suspended and resumed, keeping its progress. One
 // without is instant, unless its effect's code makes it an activity that ends
 // by a watch or an event (fill).
+// `attention` is what it demands of the actor while it runs (AGENCY.md
+// §10): it raises what the actor must find salient to notice it.
 #Operation: #Step & {
-    roles:  #Roles
-    stages: [...#Stage]
-    uses:   [...#Provider]
+    roles:     #Roles
+    stages:    [...#Stage]
+    uses:      [...#Provider]
+    attention: *0 | int & >=0 & <=100
 }
 
 // Pick something up into a free hand: from a container, the ground, or an
@@ -72,9 +75,10 @@ put_in: #Operation & {
 // Drive a held nail into an assembly, as a wedge: it bends and takes tool
 // marks. From a stack, one nail is driven.
 drive: #Operation & {
-    effect:   "drive"
-    duration: 4s
-    uses:     ["hands"]
+    effect:    "drive"
+    duration:  4s
+    uses:      ["hands"]
+    attention: 10
     roles: {
         actor:       #Agent & { id: $a }
         item:        #Body & { material: "iron", place: #Held & { by: $a } }
@@ -122,8 +126,9 @@ walk_west:  #Walk @family(operations)
 // free hand. Walking away suspends it; coming back, it can be resumed.
 pry_out: #Operation & {
     effect: "take"
-    stages: [{ duration: 3s, effect: "loosen" }, { duration: 2s, effect: "take" }]
-    uses:   ["hands"]
+    stages:    [{ duration: 3s, effect: "loosen" }, { duration: 2s, effect: "take" }]
+    uses:      ["hands"]
+    attention: 10
     roles: {
         actor: #Agent & { freeHands: >=1 }
         item:  #Body & { place: #Installed }

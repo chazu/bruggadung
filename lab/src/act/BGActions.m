@@ -87,6 +87,11 @@ static TriMatch   match_described( BGWorld *world, const TriNode *pattern, BGAct
       tri_print( tri, tri_at( tri, pattern, "uses"), uses, sizeof( uses));
       [expr appendFormat:@"uses: %s, ", uses];
    }
+   if( tri_at( tri, pattern, "attention"))
+   {
+      tri_print( tri, tri_at( tri, pattern, "attention"), uses, sizeof( uses));
+      [expr appendFormat:@"attention: %s, ", uses];
+   }
    [expr appendString:@"roles: {"];
    for( r = 0; r < BGRoleCount; r++)
       if( descriptions[ r])

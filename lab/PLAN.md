@@ -785,6 +785,42 @@ could lose.
 
 31 tests, 411 checks, under both compilers, ASan and UBSan, and leak-free.
 
-Next: salience and bounded stores (KNOWLEDGE.md §7 and §12), so agents
-keep the observations that matter to them, not every move and utterance in
-sight, within a capacity, evicting the least salient first.
+### After the slice: salience and bounded stores
+
+At rest, with nothing in mind, the worker sees the smith take the smith's
+nails: routine, so it is not kept as an observation, though the worker
+still sees where the nails went. Committed to wedging the lock, which
+concerns the nails, it keeps the observation of the smith putting them
+back. Then it sets to driving a nail of its own, and while it drives it
+misses the smith taking them again. But a gossip asking it something is
+noticed, and answered. The gossip keeps only four observations: asked five
+things, it lets go first of what it said itself, then of the oldest.
+
+- **Salience** (KNOWLEDGE.md §7, AGENCY.md §10) is a score per
+  observation: being addressed 30, the agent's own deeds 20, something its
+  goals concern 15, the rest 0. An observation is kept only if its score
+  reaches the notice threshold, 10, raised by the `attention` the agent's
+  running activity demands (driving and prying demand 10). A claim the
+  agent didn't notice, it doesn't believe. What is seen still updates its
+  referents.
+- **Goals say what they concern** (`concerns: [...#Body]` in content):
+  wedging the lock concerns the lock and nails. Agency tells knowledge
+  (the `BGConcerns` protocol); an observation concerns a goal when its
+  subject, or what was said, is entailed by one of the patterns.
+- **Bounded stores**: an agent's `memory` (content, 64 by default) caps
+  its observations. Over it, the least salient go first, the oldest of
+  those first: deterministic.
+- **Observations have serials**, never reused, so agency's place in what it
+  has heard survives eviction and saves.
+
+Not yet: anomalies and threats as salience (what contradicts a belief,
+harm), salience for referents and testimony (only observations are
+bounded), an interruption threshold (something salient enough stopping an
+activity for a decision), attention budgets per boundary rather than a
+threshold, and decay rates by salience.
+
+32 tests, 458 checks, under both compilers, ASan and UBSan, and leak-free.
+
+Next: saying things in `lab play`, so the player can ask where something
+is, answer, and claim, with content the command builds from what the
+player's character knows.

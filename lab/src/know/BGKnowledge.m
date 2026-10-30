@@ -248,16 +248,47 @@ static NSUInteger   feature_keys( const char *features, char (*keys)[ 32], NSUIn
 }
 
 
-/* `o`'s content is copied */
+- (uint64_t) nextSerial
+{
+   return( _serial);
+}
+
+
+/* `o`'s content is copied; it gets the next serial, unless restoring one */
 - (void) addObservation:(BGObservation) o
+               restored:(BOOL) restored
 {
    if( _nobservations == _ocapacity)
    {
       _ocapacity    = _ocapacity ? _ocapacity * 2 : 16;
       _observations = realloc( _observations, sizeof( BGObservation) * _ocapacity);
    }
+   if( ! restored)
+      o.serial = _serial;
+   if( o.serial >= _serial)
+      _serial = o.serial + 1;
    o.content                         = o.content ? strdup( o.content) : NULL;
    _observations[ _nobservations++] = o;
+}
+
+
+/* Over capacity, the least salient go, the oldest of them first. */
+- (void) keepAtMost:(NSUInteger) capacity
+{
+   NSUInteger   i;
+   NSUInteger   least;
+
+   while( _nobservations > capacity && _nobservations)
+   {
+      least = 0;
+      for( i = 1; i < _nobservations; i++)
+         if( _observations[ i].salience < _observations[ least].salience)
+            least = i;
+      free( _observations[ least].content);
+      memmove( &_observations[ least], &_observations[ least + 1],
+               sizeof( BGObservation) * (_nobservations - least - 1));
+      _nobservations--;
+   }
 }
 
 
@@ -531,6 +562,12 @@ static BOOL   counts( const BGTestimony *t, uint32_t thing, uint32_t container)
 }
 
 
+- (void) setNextSerial:(uint64_t) serial
+{
+   _serial = serial;
+}
+
+
 - (void) setSelf:(uint32_t) selfReferent
 {
    _self = selfReferent;
@@ -605,6 +642,97 @@ static BOOL   counts( const BGTestimony *t, uint32_t thing, uint32_t container)
 - (void) setOmniscient:(BOOL) flag
 {
    _omniscient = flag;
+}
+
+
+- (void) setConcerns:(id <BGConcerns>) concerns
+{
+   _concerns = concerns;
+}
+
+
+- (id <BGConcerns>) concerns
+{
+   return( _concerns);
+}
+
+
+/* --- salience ------------------------------------------------------------------- */
+
+/* What the agent's running activities demand of its attention. */
+- (int) attentionOf:(BGEntityID) agent
+{
+   const BGActivity   *record;
+   BGStore            *activities;
+   TriContent         *tri;
+   const TriNode      *v;
+   NSUInteger         i;
+   int64_t            lo;
+   int64_t            hi;
+   int                demand;
+
+   tri        = [_world tri];
+   activities = [_world storeForKind:[_world kindNamed:"Activity"]];
+   demand     = 0;
+   for( i = 0; i < [activities count]; i++)
+   {
+      record = [activities recordAtIndex:i];
+      if( record->actorRef != agent || record->status != BG_ACTIVITYSTATUS_RUNNING || ! record->operation)
+         continue;
+      v = tri_at( tri, tri_pattern( tri, record->operation), "attention");
+      if( v && tri_node_interval( v, &lo, &hi) && lo == hi && lo > demand)
+         demand = (int) lo;
+   }
+   return( demand);
+}
+
+
+/* Whether the description is entailed by one of the patterns. */
+- (BOOL) concerns:(NSArray *) patterns
+      description:(NSString *) description
+{
+   const TriNode    *d;
+   const TriNode    *p;
+   TriMatchResult   result;
+   TriContent       *tri;
+   TriArena         *arena;
+   NSUInteger       i;
+   BOOL             yes;
+
+   if( ! [patterns count] || ! description)
+      return( NO);
+   tri   = [_world tri];
+   arena = tri_arena_new();
+   d     = tri_value( tri, [description UTF8String], arena, NULL, 0);
+   yes   = NO;
+   for( i = 0; d && i < [patterns count] && ! yes; i++)
+   {
+      p   = tri_value( tri, [[patterns objectAtIndex:i] UTF8String], arena, NULL, 0);
+      yes = p && tri_match( tri, p, d, &result) == TRI_ENTAILED;
+   }
+   tri_arena_free( arena);
+   return( yes);
+}
+
+
+/* What something said is about: its `what`, printed. */
+- (NSString *) topicOf:(const char *) content
+{
+   const TriNode   *said;
+   TriArena        *arena;
+   NSString        *topic;
+   char            printed[ 2048];
+
+   arena = tri_arena_new();
+   said  = content ? tri_value( [_world tri], content, arena, NULL, 0) : NULL;
+   topic = nil;
+   if( said && tri_at( [_world tri], said, "what"))
+   {
+      tri_print( [_world tri], tri_at( [_world tri], said, "what"), printed, sizeof( printed));
+      topic = [NSString stringWithUTF8String:printed];
+   }
+   tri_arena_free( arena);
+   return( topic);
 }
 
 
@@ -1042,6 +1170,9 @@ static uint32_t   bound_to( BGEntityID e, BGEntityID agent, uint32_t me, const B
    uint32_t           *assigned;      /* per visible entity: its referent */
    uint8_t            *taken;         /* per referent index: matched this phase */
    uint32_t           container;
+   const BGAgent      *memory;
+   NSArray            *concerns;
+   int                notice;
    NSUInteger         nlooked;
    NSUInteger         nglimpsed;
    NSUInteger         nwitnessed;
@@ -1260,10 +1391,16 @@ static uint32_t   bound_to( BGEntityID e, BGEntityID agent, uint32_t me, const B
               news);
    }
 
-   /* what it saw happen, in its referents; what it heard said, believed */
+   /* what it saw happen, in its referents, kept if salient; what it heard
+    * said, if it noticed, believed */
+   notice   = BG_NOTICE + [self attentionOf:agent];
+   concerns = _concerns ? [_concerns concernsOf:agent] : nil;
    for( i = 0; i < nwitnessed; i++)
    {
-      ev = [_world eventAt:witnessed[ i]];
+      NSUInteger   lines;
+
+      lines = [news count];
+      ev    = [_world eventAt:witnessed[ i]];
       memset( &o, 0, sizeof( o));
       o.time  = now;
       o.kind  = ev->kind;
@@ -1294,10 +1431,26 @@ static uint32_t   bound_to( BGEntityID e, BGEntityID agent, uint32_t me, const B
             [news addObject:[NSString stringWithFormat:@"R%u says to R%u: %s", o.actor, o.other,
                                                        ev->detail ? ev->detail : ""]];
       }
-      [store addObservation:o];
+      o.salience = 0;
+      if( o.actor == [store selfReferent])
+         o.salience = BG_OWN_DEED;
+      if( ! strcmp( ev->kind, "said") && o.other == [store selfReferent])
+         o.salience = BG_ADDRESSED;
+      if( o.salience < BG_CONCERN &&
+          [self concerns:concerns
+             description:! strcmp( ev->kind, "said") ? [self topicOf:ev->detail] : [store describeReferent:o.subject]])
+         o.salience = BG_CONCERN;
+      if( o.salience < notice)
+      {
+         [news removeObjectsInRange:NSMakeRange( lines, [news count] - lines)];
+         continue;      /* unnoticed */
+      }
+      [store addObservation:o restored:NO];
       if( ! strcmp( ev->kind, "said") && ev->detail && o.actor && o.actor != [store selfReferent])
          [self believe:ev->detail from:o.actor utterance:ev->index at:now store:store news:news];
    }
+   memory = [_world record:[_world kindNamed:"Agent"] for:agent];
+   [store keepAtMost:memory && memory->memory > 0 ? (NSUInteger) memory->memory : 64];
    free( seen);
    free( assigned);
    free( taken);
@@ -1533,7 +1686,7 @@ static NSString   *attribution_text( const BGTestimony *t)
    for( i = 0; i < [store observationCount]; i++)
    {
       o = [store observationAt:i];
-      [s appendFormat:@"  at %lldms: R%u %s R%u%@%@%s\n", (long long) o->time, o->actor, o->kind,
+      [s appendFormat:@"  at %lldms, salience %d: R%u %s R%u%@%@%s\n", (long long) o->time, o->salience, o->actor, o->kind,
                       ! strcmp( o->kind, "said") ? o->other : o->subject,
                       ! strcmp( o->kind, "moved") && o->other ? [NSString stringWithFormat:@" to R%u", o->other] : @"",
                       o->content ? [NSString stringWithFormat:@": %s", o->content] : @"",
@@ -1607,8 +1760,9 @@ static char   *decode( const char *s)
    for( i = 0; i < [_stores count]; i++)
    {
       store = [_stores objectAtIndex:i];
-      [lines addObject:[NSString stringWithFormat:@"store %llu %u %u", (unsigned long long) [store agent],
-                                                  [store nextID], [store selfReferent]]];
+      [lines addObject:[NSString stringWithFormat:@"store %llu %u %u %llu", (unsigned long long) [store agent],
+                                                  [store nextID], [store selfReferent],
+                                                  (unsigned long long) [store nextSerial]]];
       for( y = 0; y < 32; y++)
          for( x = 0; x < 32; x++)
             if( [store tileSeenAtX:x y:y] >= 0)
@@ -1627,9 +1781,11 @@ static char   *decode( const char *s)
       for( j = 0; j < [store observationCount]; j++)
       {
          o = [store observationAt:j];
-         [lines addObject:[NSString stringWithFormat:@"obs %llu %lld %s %u %u %u %d %@", (unsigned long long) [store agent],
+         [lines addObject:[NSString stringWithFormat:@"obs %llu %lld %s %u %u %u %d %d %llu %@",
+                                                     (unsigned long long) [store agent],
                                                      (long long) o->time, o->kind, o->actor, o->subject, o->other,
-                                                     o->unbelieved ? 1 : 0, encode( o->content)]];
+                                                     o->unbelieved ? 1 : 0, o->salience, (unsigned long long) o->serial,
+                                                     encode( o->content)]];
       }
       for( j = 0; j < [store testimonyCount]; j++)
       {
@@ -1688,12 +1844,15 @@ static char   *decode( const char *s)
    for( i = 0; i < [lines count]; i++)
    {
       text = (char *) [[lines objectAtIndex:i] UTF8String];
-      if( sscanf( text, "store %llu %u %u", &agent, &next, &me) == 3)
+      if( sscanf( text, "store %llu %u %u %llu", &agent, &next, &me, &parent) == 4)
+      {
          [[self storeOf:(BGEntityID) agent] setNextID:next self:me];
+         [[self storeOf:(BGEntityID) agent] setNextSerial:parent];
+      }
       else if( sscanf( text, "seen %llu %d %d %lld", &agent, &x, &y, &seen) == 4)
          [[self storeOf:(BGEntityID) agent] setTileSeen:seen x:x y:y];
-      else if( sscanf( text, "obs %llu %lld %15s %u %u %u %d %4095s", &agent, &seen, role, &id, &container, &told,
-                       &present, features) == 8)
+      else if( sscanf( text, "obs %llu %lld %15s %u %u %u %d %d %llu %4095s", &agent, &seen, role, &id, &container,
+                       &told, &present, &trust, &origin, features) == 10)
       {
          memset( &o, 0, sizeof( o));
          o.time       = seen;
@@ -1702,13 +1861,15 @@ static char   *decode( const char *s)
          o.subject    = container;
          o.other      = told;
          o.unbelieved = present != 0;
+         o.salience   = trust;
+         o.serial     = origin;
          o.content    = decode( features);
          if( ! *o.content)
          {
             free( o.content);
             o.content = NULL;
          }
-         [[self storeOf:(BGEntityID) agent] addObservation:o];
+         [[self storeOf:(BGEntityID) agent] addObservation:o restored:YES];
          free( o.content);
       }
       else if( sscanf( text, "told %llu %u %u %lld %lld %u %u %d %d %d %llu", &agent, &id, &container, &seen, &inside,

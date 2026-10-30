@@ -27,8 +27,10 @@
 
 #Intent: { title: text }
 
-// A goal is done when `done` holds.
-#Goal: #Intent & { done: #Condition }
+// A goal is done when `done` holds. What it `concerns` is salient to an agent
+// that holds it (AGENCY.md §10): something like one of them seen moved, or
+// talked of, is worth remembering.
+#Goal: #Intent & { done: #Condition, concerns: [...#Body] }
 
 // How a candidate's referents are ordered, for each slot as it is found:
 // nearest first, or most recently seen first. Ties go to the lower referent.
@@ -63,7 +65,8 @@
 // --- AGENCY.md Scenario 1, as "the missing nails" -----------------------------
 
 wedge_lock: #Goal & {
-    title: "wedge the lock"
+    title:    "wedge the lock"
+    concerns: [#Assembly, #Stack & { unit: "iron_nail" }]
     done: {
         find:  ["lock", "wedge"]
         match: #Wedging & {
@@ -74,7 +77,8 @@ wedge_lock: #Goal & {
 } @family(goals)
 
 have_nails: #Goal & {
-    title: "have nails"
+    title:    "have nails"
+    concerns: [#Stack & { unit: "iron_nail" }]
     done: {
         find:  ["nails"]
         match: #HavingNails & {

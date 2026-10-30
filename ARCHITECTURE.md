@@ -296,8 +296,9 @@ A rebuilt world produces the same next step as one that never saved.
    coworker who saw where something went; and credence, trust, and
    attribution, so a rumour heard twice from one source is weighed once it
    is traced, and a lie is recorded as a fabrication root; and memory
-   that decays along the content's hierarchies. Next, per
-   [lab/PLAN.md](lab/PLAN.md): salience and bounded knowledge stores.
+   that decays along the content's hierarchies; and salience, so agents
+   keep what matters to them within a bounded memory. Next, per
+   [lab/PLAN.md](lab/PLAN.md): saying things in `lab play`.
 
 ## Cross-cutting open questions
 

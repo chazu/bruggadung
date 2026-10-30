@@ -72,13 +72,13 @@ typedef struct
    uint32_t         awaiting;          /* the referent a question was put to, while it waits for the answer */
    int64_t          awaitSince;        /* ms */
    int64_t          awaitUntil;        /* ms: then it stops waiting */
-   NSUInteger       heard;             /* the observations it has considered for questions to answer */
+   uint64_t         heard;             /* the serial of the first observation it has not yet considered for questions */
    NSMutableArray   *log;
 }
 @end
 
 
-@interface BGAgency : NSObject <BGDecisionPhase, BGSavedSystem>
+@interface BGAgency : NSObject <BGDecisionPhase, BGSavedSystem, BGConcerns>
 {
    BGWorld          *_world;
    BGCommitter      *_committer;       /* not retained */

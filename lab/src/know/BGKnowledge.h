@@ -50,6 +50,15 @@
  * restores both. A claim of what the speaker saw says how sure it is, its
  * memory's strength, and weighs no more than that.
  *
+ * Salience (KNOWLEDGE.md §7, AGENCY.md §10): what an agent perceives happen
+ * is kept as an observation only if it is salient enough: being addressed
+ * most, its own deeds next, then what its goals concern (agency says what
+ * they are), and the rest, routine, not at all. What it must reach is
+ * BG_NOTICE, raised by the attention its running activity demands, so a busy
+ * agent notices less. What it does not notice it does not believe, if it was
+ * a claim. A store keeps at most the agent's `memory` observations, evicting
+ * the least salient first, the oldest of those first.
+ *
  * True ancestry is developer-only: each claim said is traced, through what
  * its speaker knew when it spoke, to whoever saw it first, or to the one who
  * made it up (a fabrication root). Speakers know their own lies: their
@@ -77,6 +86,12 @@
 #define BG_UNSTATED       INT32_MAX   /* a claim that says nothing of how sure */
 
 #define BG_MEMORY_STEP    86400000LL  /* ms: a day */
+
+/* salience */
+#define BG_ADDRESSED      30      /* said to the agent */
+#define BG_OWN_DEED       20      /* done by the agent */
+#define BG_CONCERN        15      /* about something its goals concern */
+#define BG_NOTICE         10      /* what an observation must reach to be kept, at rest */
 
 typedef struct
 {
@@ -109,6 +124,8 @@ typedef struct
    uint32_t         other;         /* moved: what it went into, or who took it; said: to whom */
    char             *content;      /* said: what */
    BOOL             unbelieved;    /* said by the agent itself, which didn't believe it: a lie */
+   int              salience;
+   uint64_t         serial;        /* in the order observed, never reused */
 } BGObservation;
 
 
@@ -163,6 +180,7 @@ typedef struct
    BGObservation    *_observations;
    NSUInteger       _nobservations;
    NSUInteger       _ocapacity;
+   uint64_t         _serial;         /* the next observation's */
    BGTestimony      *_testimony;
    NSUInteger       _ntestimony;
    NSUInteger       _tcapacity;
@@ -188,9 +206,11 @@ typedef struct
 /* how strongly it believes the referent is where it is believed, in dB */
 - (int32_t) strengthOf:(uint32_t) referentID;
 
-/* what it perceived happen, oldest first */
+/* what it perceived happen and kept, oldest first */
 - (NSUInteger) observationCount;
 - (const BGObservation *) observationAt:(NSUInteger) i;
+/* the serial the next observation will have */
+- (uint64_t) nextSerial;
 /* when the agent last said something to the referent, or -1 */
 - (int64_t) lastSaidTo:(uint32_t) referentID;
 
@@ -215,8 +235,15 @@ typedef struct
 @end
 
 
+/* What an agent's goals make salient (AGENCY.md §10): Triangle patterns. */
+@protocol BGConcerns
+- (NSArray *) concernsOf:(BGEntityID) agent;
+@end
+
+
 @interface BGKnowledge : NSObject <BGPerceptionPhase, BGSavedSystem>
 {
+   id <BGConcerns>  _concerns;         /* not retained */
    BGWorld          *_world;
    NSMutableArray   *_stores;          /* sorted by agent */
    NSUInteger       _eventsSeen;
@@ -232,6 +259,10 @@ typedef struct
  * everywhere, inside containers too. Agency run on it must behave visibly
  * differently from agency run on what agents can know. */
 - (void) setOmniscient:(BOOL) flag;
+
+/* who says what each agent's goals concern: agency */
+- (void) setConcerns:(id <BGConcerns>) concerns;
+- (id <BGConcerns>) concerns;
 
 /* the agent's store, made when first asked for */
 - (BGKnowledgeStore *) storeOf:(BGEntityID) agent;
