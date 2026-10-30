@@ -2313,8 +2313,7 @@ a wrench (`open_up`):
   declare no new mass: its mass is carved, and the ledger checks the
   assembly lost as much.
 
-Not yet: the interrupted repair's inspection binding the culprit. Checks
-1 and 3's heat follow.
+Checks 1 and 3's heat, and the repair's inspection, follow.
 
 65 tests, 2269 checks, under both compilers, ASan and UBSan, and leak-free.
 
@@ -2350,3 +2349,27 @@ Not yet: the split reaching a running thermal domain's ledger as a
 transfer (the test runs without one).
 
 66 tests, 2289 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: inspection binds the faulty part
+
+ACTIONS.md Scenario 3's steps 3 and 4, "replace the faulty part (unbound
+until inspection reveals one)", and its check 2, on the provisional latent
+pump. *Mend the pump* has two ways:
+
+- **Replace the worn part**: a part seen installed with wear of 60 or
+  more, and a held spare that fits the same role (`fits`, a tag). Nothing
+  can be bound to it until one is seen. It scores +10.
+- **Open it further** with the wrench in hand.
+
+The worker opens the pump a level at a time. It sees the seal worn,
+replaces it with its spare (`replace_part`: the worn one out onto the
+floor, the spare in its place), and the failure is mended. On a pump whose
+culprit is the housing, no part is worn: opened through, it finds nothing
+to replace, and none is invented.
+
+- **Found: habits break ties, and ranks are not scores.** With both ways
+  scoring 0, the habit "open it further" had formed won the tie after two
+  openings (AGENCY.md: "habitual ways win ties"). The replacement now
+  scores 10, as the better way once a worn part is seen.
+
+66 tests, 2305 checks, under both compilers, ASan and UBSan, and leak-free.

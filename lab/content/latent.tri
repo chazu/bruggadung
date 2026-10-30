@@ -38,6 +38,7 @@
     @component(Part)
     wear:     *0 | int & >=0 & <=100           @field(content, saved, proposable, inspect, perceive(sight))
     cameFrom: ref                              @field(saved, proposable, inspect)
+    fits:     text                             @field(saved, proposable, inspect, perceive(sight))
     detached: *false | true                    @field(content, saved, proposable, inspect)
 }
 
@@ -87,6 +88,20 @@ warm_pump: #Pump & #Latent & #ThermalBody & {
 // store, open, at the rate the path allows.
 header_tank: #Assembly & #WaterStore & { material: "oak", mass: 30kg, slots: 2, water: 100L, waterCapacity: 100L }
 leak:        #Tap & { material: "brass", mass: 0g, capacity: 1, rate: 0, open: true }
+
+// Replace a worn part in an assembly with a spare that fits its role, held:
+// the worn one out onto the floor, the spare in its place. A part worn by a
+// failure, replaced, repairs it (provisional, as the rest).
+replace_part: #Operation & {
+    effect:   "replace"
+    duration: 5s
+    uses:     ["hands"]
+    roles: {
+        actor:       #Agent & { id: $a }
+        item:        #Part & { place: #Held & { by: $a }, fits: $r }
+        destination: #Part & { place: #Installed, fits: $r, wear: >=60 }
+    }
+} @family(operations)
 
 // Open an assembly in reach a level further, with a wrench in hand.
 open_up: #Operation & {

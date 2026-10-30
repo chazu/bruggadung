@@ -1036,6 +1036,7 @@ static NSString   *effect_reveal( BGWorld *world, BGAction a, int64_t amount, BG
       }
       [g set:"Part.wear" of:BGWhole( part) to:wear];
       [g set:"Part.cameFrom" of:BGWhole( part) to:(int64_t) assembly];
+      [g set:"Part.fits" of:BGWhole( part) toText:[world intern:role]];
       [g emit:"revealed" subject:BGWhole( part) other:BGWhole( assembly)];
       carved += mass;
    }
@@ -1043,6 +1044,34 @@ static NSString   *effect_reveal( BGWorld *world, BGAction a, int64_t amount, BG
       return( @"there is nothing further to open");
    [g set:"Body.mass" of:BGWhole( assembly) to:[world getField:"Body.mass" of:assembly value:&mass] ? mass - carved : 0];
    [g set:"Latent.revealed" of:BGWhole( assembly) to:depth];
+   return( nil);
+}
+
+
+/* Replacing a part (provisional, content/latent.tri): the worn one out onto
+ * the actor's tile, the spare into its place; a part worn by the assembly's
+ * failure, replaced, repairs it. */
+static NSString   *effect_replace( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
+{
+   const BGPart   *worn;
+   BGLocation     place;
+   BGLocation     floor;
+   BGEntityID     e;
+   int            k;
+
+   worn  = [world record:[world kindNamed:"Part"] for:a.roles[ BGRoleDestination]];
+   place = [world locationOf:a.roles[ BGRoleDestination]];
+   if( ! worn || place.form != BGLocationPartOf)
+      return( @"there is no part in place to replace");
+   for( e = a.roles[ BGRoleActor], k = 0; k < 16 && (floor = [world locationOf:e]).form != BGLocationOnTile; k++)
+      e = floor.place;
+   if( floor.form != BGLocationOnTile)
+      return( @"there is nowhere to put the old part");
+   [g move:BGWhole( a.roles[ BGRoleDestination]) to:floor];
+   [g move:BGWhole( a.roles[ BGRoleItem]) to:place];
+   [g set:"Part.cameFrom" of:BGWhole( a.roles[ BGRoleItem]) to:(int64_t) place.place];
+   if( worn->wear >= 60 && [world record:[world kindNamed:"Latent"] for:place.place])
+      [g set:"Latent.failure" of:BGWhole( place.place) toText:""];
    return( nil);
 }
 
@@ -1210,6 +1239,7 @@ static const struct
    { "pass",      effect_pass },
    { "copy",      effect_copy },
    { "reveal",    effect_reveal },
+   { "replace",   effect_replace },
    { "rest",      effect_rest },
    { "strike",    effect_strike },
 };

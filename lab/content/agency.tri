@@ -31,6 +31,9 @@
 
 // Fetching: a part.
 #Fetching: #Frame & { part: #Body }
+// Mending a latent assembly (ACTIONS.md Scenario 3's steps 3 and 4): the
+// machine, the wrench, the worn part once one is seen, and its spare.
+#Mending:  #Frame & { machine: #Body, wrench: #Body, worn: #Body, spare: #Body }
 
 // Delivering: the goods, and where they are to go.
 #Delivering: #Frame & { goods: #Body, dest: #Container }
@@ -590,6 +593,50 @@ go_and_peer: #Method & {
     rank:  1
     pre:   { find: ["nut"], match: #Tightening & { nut: #Fastener } }
     steps: [#Do & { op: "peer_at", object: "nut" }]
+} @family(methods)
+
+
+// --- ACTIONS.md Scenario 3's inspection and replacement --------------------------
+
+// Mend the pump: done once the faulty part is replaced.
+mend_pump: #Goal & {
+    title: "mend the pump"
+    done:  #Did & { did: "replace_part" }
+} @family(goals)
+
+// Replace a part seen worn with a spare that fits its role: once one is
+// seen, better than opening further. Nothing is bound to `worn` until
+// opening the pump shows one.
+replace_the_worn: #Method & {
+    title: "replace the worn part"
+    goal:  "mend_pump"
+    rank:  1
+    pre: {
+        find:  ["worn", "spare"]
+        match: #Mending & {
+            me:    #Agent & { id: $me }
+            worn:  #Part & { place: #Installed, fits: $r, wear: >=60 }
+            spare: #Part & { place: #Held & { by: $me }, fits: $r }
+        }
+    }
+    score: [#Flat & { value: 10 }]
+    steps: [#Do & { op: "replace_part", object: "spare", target: "worn" }]
+} @family(methods)
+
+// Else open it a level further, to see inside.
+open_it_further: #Method & {
+    title: "open it further"
+    goal:  "mend_pump"
+    rank:  2
+    pre: {
+        find:  ["wrench", "machine"]
+        match: #Mending & {
+            me:      #Agent & { id: $me }
+            wrench:  #Wrench & { place: #Held & { by: $me } }
+            machine: #Pump
+        }
+    }
+    steps: [#Do & { op: "open_up", object: "wrench", target: "machine" }]
 } @family(methods)
 
 

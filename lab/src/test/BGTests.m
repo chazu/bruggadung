@@ -3594,6 +3594,48 @@ static void   test_pump_heat( void)
 }
 
 
+/* ACTIONS.md Scenario 3's steps 3 and 4, and check 2: the worker, with a
+ * wrench and a spare leather cup, is to mend the pump `key`. Nothing is bound
+ * to the worn part until opening shows one: it opens the pump, a level at a
+ * time, sees the worn part, and replaces it. The agency, for its log. */
+static BGAgency   *mend_run( const char *key, BGWorld **world, BGEntityID *spare)
+{
+   BGStage            st;
+   BGActivities       *activities;
+   BGKnowledge        *knowledge;
+   BGAgency           *agency;
+   BGProposalGroup    *g;
+   BGEntityID         pump;
+   BGEntityID         worker;
+
+   st.w       = BGTestWorld( 157);       /* as pump_open: the same units, the same culprits */
+   st.c       = BGTestCommitter( st.w);
+   activities = [BGActivities activitiesWithWorld:st.w committer:st.c];
+   knowledge  = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+   agency     = [[[BGAgency alloc] initWithWorld:st.w committer:st.c knowledge:knowledge] autorelease];
+   st.s       = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [agency setActivities:activities];
+   [st.s setActivities:activities];
+   [st.s setPerception:knowledge];
+   [st.s setDecision:agency];
+   g      = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the pump house"];
+   pump   = [g create:"crank_pump" key:key at:BGOnTile( 5, 5, 0)];
+   worker = [g create:"worker" key:"worker" at:BGOnTile( 4, 5, 0)];
+   [g create:"wrench_250" key:"wrench" at:BGHeldBy( worker, 0)];
+   *spare = [g create:"leather_cup" key:"a spare leather cup" at:BGHeldBy( worker, 1)];
+   [g set:"Part.fits" of:BGWhole( *spare) toText:"piston_seal"];
+   [g set:"Latent.failure" of:BGWhole( pump) toText:"flow_loss"];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   worker = [g idFor:worker];
+   *spare = [g idFor:*spare];
+   BG_CHECK( [agency commit:worker toGoal:"mend_pump"]);
+   [st.s runUntil:BGTimeMake( 60000)];
+   *world = st.w;
+   return( agency);
+}
+
+
 static void   test_latent_pump( void)
 {
    BGPumpRun   early;
@@ -3657,6 +3699,37 @@ static void   test_latent_pump( void)
       BG_CHECK( leaking && conserved && floor > 10000);
       floor = pump_drain( "pump 1", &conserved, &leaking);
       BG_CHECK( leaking && conserved && floor == 0);
+   }
+
+   /* steps 3 and 4: inspection binds the faulty part */
+   {
+      BGAgency     *agency;
+      BGWorld      *w;
+      BGEntityID   spare;
+      BGLocation   at;
+
+      /* "pump 1": the seal. It opens the pump, a level at a time, with
+       * nothing bound to the worn part; seen worn, the seal is replaced
+       * with the spare, and the failure is mended */
+      agency = mend_run( "pump 1", &w, &spare);
+      BG_CHECK( log_index( agency, 2, @"open it further: open_up") < log_index( agency, 2, @"replace the worn part: replace_part"));
+      BG_CHECK( logged_by( agency, 2, @"[mend the pump] replace the worn part: replace_part R4 into R8"));
+      BG_CHECK( logged_by( agency, 2, @"[mend the pump] done"));
+      at = [w locationOf:spare];
+      BG_CHECK( at.form == BGLocationPartOf && ! strcmp( at.role, "piston_seal"));
+      BG_CHECK( ! strcmp( [w textField:"Latent.failure" of:1], ""));
+      /* the housing the culprit: no part is worn, nothing to bind; opened
+       * through, it finds none, and none is invented */
+      for( k = 0; k < 24; k++)
+      {
+         snprintf( key, sizeof( key), "pump %d", k);
+         if( [pump_open( key, "flow_loss", 300 * 3600000LL, 0).culprit isEqualToString:@""])
+            break;
+      }
+      agency = mend_run( key, &w, &spare);
+      BG_CHECK( ! logged_by( agency, 2, @"replace_part"));
+      BG_CHECK( logged_by( agency, 2, @"there is nothing further to open"));
+      BG_CHECK( [w locationOf:spare].form == BGLocationHeldBy);
    }
 
    /* a failure with no candidates: nothing marked */
