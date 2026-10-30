@@ -279,8 +279,8 @@ Rules:
   content. An altered or imperfect copy creates new content with a
   `derivedFrom` relation to the original, so provenance forms a chain.
 - **Destroying a copy** does not destroy its content. Content persists while
-  anything references it: a copy, a memory, or a derivation. Its lifetime is
-  an open question.
+  anything references it: a copy, a memory, or a derivation. Unreferenced,
+  it is collected, and history keeps a summary (decision 10).
 - Organizations and claims are informational entities too. They have no
   location, although they may be represented by physical things: a seal, a
   ledger, a building.
@@ -603,8 +603,9 @@ of the domain simulation doc.
    changes them by exactly the delta for that seal.
 5. **Claim coverage:** the miller's claim covers the pump's parts through
    `partOf`. The detached old seal is still covered through its provenance.
-   The installed new seal keeps the player's claim. Whose it is now is
-   recorded as an open question, not resolved silently.
+   The installed new seal keeps the player's claim, and the miller's does
+   not reach it (decision 11): whether fitting it was a gift, a sale, or a
+   wrong is for people and institutions to settle.
 6. **Domain participation:** the piston is a domain participant only while it
    is detached.
 

@@ -1472,8 +1472,10 @@ NSArray   *BGClaimsCovering( BGWorld *world, BGEntityID entity)
    /* on what it was divided from */
    if( [world edges:BGEdgeSplitFrom from:entity into:&source max:1])
       add_claims( world, source, NO, found);
-   /* on the assemblies it is part of, or came out of, up the chain */
-   for( up = entity, k = 0; up && k < 8; k++)
+   /* on the assemblies it is part of, or came out of, up the chain: only
+    * for a part with no claim of its own (COMPONENTS.md decision 11:
+    * installing transfers nothing) */
+   for( up = [found count] ? BGNoEntity : entity, k = 0; up && k < 8; k++)
    {
       at   = [world locationOf:up];
       part = [world record:[world kindNamed:"Part"] for:up];

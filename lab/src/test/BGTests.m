@@ -3994,14 +3994,15 @@ static int64_t   component_pump( BOOL inPlace, BOOL check)
       /* 6: in again, out of the domain */
       BG_CHECK( ! [thermal participates:piston]);
       /* 5: the miller's claim covers the pump's parts, and the old seal by
-       * its provenance; the new seal keeps the player's too: whose it is
-       * now is an open question, not settled silently */
+       * its provenance; the new seal keeps the player's, and the miller's
+       * doesn't reach it (COMPONENTS.md decision 11: installing transfers
+       * nothing; whether it was a gift is for people to settle) */
       BG_CHECK( [BGClaimsCovering( st.w, piston) containsObject:[NSNumber numberWithUnsignedLongLong:claim]]);
       BG_CHECK( [BGClaimsCovering( st.w, seal) containsObject:[NSNumber numberWithUnsignedLongLong:claim]] &&
                 ! BGOwnershipOpen( st.w, seal));
-      BG_CHECK( [BGClaimsCovering( st.w, strip) containsObject:[NSNumber numberWithUnsignedLongLong:claim]] &&
+      BG_CHECK( ! [BGClaimsCovering( st.w, strip) containsObject:[NSNumber numberWithUnsignedLongLong:claim]] &&
                 [BGClaimsCovering( st.w, strip) containsObject:[NSNumber numberWithUnsignedLongLong:mine]]);
-      BG_CHECK( BGOwnershipOpen( st.w, strip));
+      BG_CHECK( ! BGOwnershipOpen( st.w, strip));
       /* 1: every part is part of exactly one assembly, or elsewhere */
       for( i = 0; i < [parts count]; i++)
          BG_CHECK( [st.w locationOf:[parts entityAtIndex:i]].form != BGLocationNone);
