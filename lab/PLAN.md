@@ -2582,7 +2582,20 @@ Checked: wrench and pipe beside it add 2 s, and the valve hasn't turned a
 millisecond before the stage and the delay are done; a held wrench and a
 pipe from a sack, 2 s too; both in hand, none.
 
-Not yet: the delay on resuming (a resumed stage owes only its remaining
-time), and other operations searching for instruments.
+Not yet: other operations searching for instruments.
 
 69 tests, 2421 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: resuming owes the delay as things lie then
+
+- **Resuming a first stage** owes the stage's duration plus bringing its
+  instruments to bear as they lie now (`BGAccessDelay` again), less the
+  progress before suspending, never below nothing. Nothing is taken up
+  until the stage completes, so what lay beside it may have moved.
+
+Checked: suspended 1.5 s into turning with wrench and pipe beside it
+(2 s + 2 s), the pipe put into a sack meanwhile, resumed at 5 s: due at
+8.5 s (2 s + 1 s + 2 s − 1.5 s); not turned a moment before, turned after,
+both in hand.
+
+70 tests, 2429 checks, under both compilers, ASan, and leak-free.

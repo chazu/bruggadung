@@ -5731,6 +5731,74 @@ static BGValveRun   valve_run( const char *valve, const char *tools, int64_t ste
 }
 
 
+/* Suspended while bringing wrench and pipe to bear, the stage owes, on
+ * resuming, the rest of the stage and bringing them to bear as they lie
+ * then: the pipe, put into a sack meanwhile, takes twice as long. */
+static void   test_access_resume( void)
+{
+   BGStage            st;
+   BGActivities       *activities;
+   BGProposalGroup    *g;
+   BGEntityID         worker;
+   BGEntityID         valve;
+   BGEntityID         wrench;
+   BGEntityID         pipe;
+   BGEntityID         sack;
+   BGEntityID         a;
+   const BGActivity   *record;
+   NSString           *error;
+   int64_t            v;
+
+   st.w       = BGTestWorld( 5);
+   st.c       = BGTestCommitter( st.w);
+   activities = [BGActivities activitiesWithWorld:st.w committer:st.c];
+   st.s       = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [st.s setActivities:activities];
+   g      = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the water line"];
+   worker = [g create:"worker" key:"worker" at:BGOnTile( 5, 5, 0)];
+   valve  = [g create:"seized_valve" key:"valve" at:BGOnTile( 6, 5, 0)];
+   wrench = [g create:"wrench_250" key:"wrench" at:BGOnTile( 4, 5, 0)];
+   pipe   = [g create:"pipe_600" key:"pipe" at:BGOnTile( 4, 6, 0)];
+   sack   = [g create:"sack" key:"sack" at:BGOnTile( 5, 5, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   worker = [g idFor:worker];
+   valve  = [g idFor:valve];
+   wrench = [g idFor:wrench];
+   pipe   = [g idFor:pipe];
+   sack   = [g idFor:sack];
+
+   /* 2 s of turning, 2 s of taking them up */
+   error = nil;
+   g     = BGPerform( st.w, st.c, BGActionMake( "rotate_valve", worker, valve, BGNoEntity), 75, &error);
+   BG_CHECK( g != nil);
+   [st.s runUntil:BGTimeMake( 2)];
+   a      = [g idFor:[g proposals][ 0].handle];
+   record = [st.w record:[st.w kindNamed:"Activity"] for:a];
+   BG_CHECK( record && record->due == 1 + 2000 + 2000);
+   [st.s runUntil:BGTimeMake( 1501)];
+   BG_CHECK( [activities suspend:a because:@"a shout" error:&error] != nil);
+   [st.s runUntil:BGTimeMake( 1502)];
+
+   /* meanwhile the pipe goes into the sack */
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the pipe sacked"];
+   [g move:BGWhole( pipe) to:BGIn( sack)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 5000)];
+
+   /* resumed: 2 s of the stage and 3 s of bringing them to bear, less 1.5 s done */
+   BG_CHECK( [activities resume:a error:&error] != nil);
+   [st.s runUntil:BGTimeMake( 5001)];
+   record = [st.w record:[st.w kindNamed:"Activity"] for:a];
+   BG_CHECK( record->progress == 1500 && record->due == 5000 + 2000 + 3000 - 1500);
+   [st.s runUntil:BGTimeMake( 8499)];
+   BG_CHECK( ! ([st.w getField:"Valve.turned" of:valve value:&v] && v));
+   [st.s runUntil:BGTimeMake( 8600)];
+   BG_CHECK( [st.w getField:"Valve.turned" of:valve value:&v] && v);
+   BG_CHECK( [st.w locationOf:pipe].place == worker && [st.w locationOf:wrench].place == worker);
+}
+
+
 static void   test_seized_valve( void)
 {
    BGValveRun   free_;
@@ -7286,6 +7354,7 @@ const BGTestCase   BGAllTests[] =
    { "coat_at_dusk",                  test_coat_at_dusk },
    { "unknown_nut",                   test_unknown_nut },
    { "seized_valve",                  test_seized_valve },
+   { "access_resume",                 test_access_resume },
    { "resume_recheck",                test_resume_recheck },
    { "interrupted_repair",            test_interrupted_repair },
    { "unattended_stove",              test_unattended_stove },

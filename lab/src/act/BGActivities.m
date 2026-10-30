@@ -375,6 +375,7 @@ static int64_t   next_checkpoint( BGWorld *world, BGEntityID a, const BGActivity
    NSString           *reason;
    NSString           *effect;
    int64_t            duration;
+   int64_t            remaining;
    int64_t            now;
 
    record = [_world record:[_world kindNamed:"Activity"] for:a];
@@ -397,7 +398,12 @@ static int64_t   next_checkpoint( BGWorld *world, BGEntityID a, const BGActivity
    group = [BGProposalGroup groupWithPhase:BGPhaseAction
                                     source:[NSString stringWithFormat:@"activity %llu: resumed", (unsigned long long) a]];
    [group set:"Activity.started" of:BGWhole( a) to:now];
-   [group set:"Activity.due" of:BGWhole( a) to:now + (duration - record->progress)];
+   /* what it owes: the stage, and bringing its instruments to bear as
+    * they lie now, less what it did before */
+   remaining = duration - record->progress;
+   if( record->stage == 0)
+      remaining += BGAccessDelay( _world, action_of( _world, a, record));
+   [group set:"Activity.due" of:BGWhole( a) to:now + (remaining > 0 ? remaining : 0)];
    [group set:"Activity.status" of:BGWhole( a) to:tri_type_named( [_world tri], "\"running\"")];
    [_committer submit:group];
    return( group);
