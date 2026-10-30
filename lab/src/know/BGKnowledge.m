@@ -134,13 +134,15 @@ static NSUInteger   feature_keys( const char *features, char (*keys)[ 32], NSUIn
 - (void) dealloc
 {
    NSUInteger   i;
+   NSUInteger   j;
 
    for( i = 0; i < _count; i++)
    {
       free( _referents[ i].kind);
       free( _referents[ i].features);
       free( _referents[ i].deeper);
-      free( _referents[ i].supposed);
+      for( j = 0; j < BG_HYPOTHESES; j++)
+         free( _referents[ i].supposed[ j]);
    }
    free( _referents);
    for( i = 0; i < _nobservations; i++)
@@ -952,33 +954,77 @@ static NSString   *known_features( const BGReferent *r)
             mass:(int32_t) permille
 {
    BGReferent   *r;
+   NSUInteger   h;
 
-   if( ! (r = [self mutableReferent:referentID]))
+   if( ! overrides || ! (r = [self mutableReferent:referentID]))
       return;
-   free( r->supposed);
-   r->supposed     = overrides ? strdup( [overrides UTF8String]) : NULL;
-   r->supposedMass = overrides ? permille : 0;
+   for( h = 0; h < BG_HYPOTHESES && r->supposed[ h] && strcmp( r->supposed[ h], [overrides UTF8String]); h++)
+      ;
+   if( h == BG_HYPOTHESES)
+      return;
+   if( ! r->supposed[ h])
+      r->supposed[ h] = strdup( [overrides UTF8String]);
+   r->supposedMass[ h] = permille;
 }
 
 
 - (void) dropSupposed:(uint32_t) referentID
 {
-   [self suppose:nil about:referentID mass:0];
+   BGReferent   *r;
+   NSUInteger   h;
+
+   if( ! (r = [self mutableReferent:referentID]))
+      return;
+   for( h = 0; h < BG_HYPOTHESES; h++)
+   {
+      free( r->supposed[ h]);
+      r->supposed[ h]     = NULL;
+      r->supposedMass[ h] = 0;
+   }
+}
+
+
+- (NSUInteger) hypothesesOf:(uint32_t) referentID
+{
+   const BGReferent   *r;
+   NSUInteger         h;
+
+   r = [self referent:referentID];
+   for( h = 0; r && h < BG_HYPOTHESES && r->supposed[ h]; h++)
+      ;
+   return( r ? h : 0);
+}
+
+
+- (const char *) overridesOf:(uint32_t) referentID
+                  hypothesis:(NSUInteger) h
+{
+   return( h < [self hypothesesOf:referentID] ? [self referent:referentID]->supposed[ h] : NULL);
+}
+
+
+- (int32_t) massOf:(uint32_t) referentID
+        hypothesis:(NSUInteger) h
+{
+   return( h < [self hypothesesOf:referentID] ? [self referent:referentID]->supposedMass[ h] : 0);
 }
 
 
 - (int32_t) supposedMassOf:(uint32_t) referentID
 {
-   const BGReferent   *r;
+   NSUInteger   h;
+   int32_t      sum;
 
-   r = [self referent:referentID];
-   return( r && r->supposed ? r->supposedMass : 0);
+   for( sum = 0, h = 0; h < [self hypothesesOf:referentID]; h++)
+      sum += [self massOf:referentID hypothesis:h];
+   return( sum);
 }
 
 
 /* Described as the hypothesis has it: its overrides laid over what it
  * believes, as an analysis's findings are over looks. */
 - (NSString *) describeSupposed:(uint32_t) referentID
+                     hypothesis:(NSUInteger) h
 {
    BGReferent   *r;
    NSString     *s;
@@ -986,12 +1032,12 @@ static NSString   *known_features( const BGReferent *r)
    char         *deeper;
 
    r = [self mutableReferent:referentID];
-   if( ! r || ! r->supposed)
+   if( ! r || h >= [self hypothesesOf:referentID])
       return( nil);
    features    = r->features;
    deeper      = r->deeper;
    r->features = strdup( [known_features( r) UTF8String]);
-   r->deeper   = r->supposed;
+   r->deeper   = r->supposed[ h];
    s           = [self describeReferent:referentID];
    free( r->features);
    r->features = features;
@@ -2540,7 +2586,7 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
             features = [self unified:r in:store kind:kind features:features];
          [self noticeWearLost:r features:features store:store now:now news:news];
          /* seen plainly, a competing hypothesis is settled */
-         if( ! degraded && r->supposed)
+         if( ! degraded && r->supposed[ 0])
          {
             [news addObject:[NSString stringWithFormat:@"R%u is plainly as it seems: no doubt about it now", r->id]];
             [store dropSupposed:r->id];
@@ -3002,6 +3048,7 @@ static NSString   *attribution_text( const BGTestimony *t)
    const BGObservation   *o;
    NSMutableString       *s;
    NSUInteger            i;
+   NSUInteger            j;
 
    store = [self storeOf:agent];
    s     = [NSMutableString stringWithFormat:@"what %llu knows (self R%u):\n", (unsigned long long) agent,
@@ -3017,8 +3064,8 @@ static NSString   *attribution_text( const BGTestimony *t)
                       r->kind && ! strcmp( r->kind, "#Agent") && r->id != [store selfReferent]
                          ? [NSString stringWithFormat:@", trust %+d dB", r->trust] : @"",
                       [store describeReferent:r->id]];
-      if( r->supposed)
-         [s appendFormat:@"    or, %d in 1000: %s\n", r->supposedMass, r->supposed];
+      for( j = 0; j < BG_HYPOTHESES && r->supposed[ j]; j++)
+         [s appendFormat:@"    or, %d in 1000: %s\n", r->supposedMass[ j], r->supposed[ j]];
    }
    for( i = 0; i < [store traceCount]; i++)
    {
@@ -3198,6 +3245,7 @@ char   *BGDecodeWord( const char *s)
    NSMutableArray     *lines;
    NSUInteger         i;
    NSUInteger         j;
+   NSUInteger         k;
    int32_t            x;
    int32_t            y;
 
@@ -3248,10 +3296,10 @@ char   *BGDecodeWord( const char *s)
                                                      [store feels:"hunger"], (long long) [store feltAt],
                                                      [store feels:"cold"], [store feels:"stuffy"]]];
       for( j = 0; j < [store count]; j++)
-         if( [store referentAt:j]->supposed)
+         for( k = 0; k < BG_HYPOTHESES && [store referentAt:j]->supposed[ k]; k++)
             [lines addObject:[NSString stringWithFormat:@"supposes %llu %u %d %@", (unsigned long long) [store agent],
-                                                        [store referentAt:j]->id, [store referentAt:j]->supposedMass,
-                                                        BGEncodeWord( [store referentAt:j]->supposed)]];
+                                                        [store referentAt:j]->id, [store referentAt:j]->supposedMass[ k],
+                                                        BGEncodeWord( [store referentAt:j]->supposed[ k])]];
       for( j = 0; j < [store identityCount]; j++)
       {
          const BGIdentity   *h;

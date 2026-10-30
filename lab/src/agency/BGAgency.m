@@ -553,12 +553,13 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
  * bound so far: entailed if any variant entails it, incompatible if all rule
  * it out. */
 /* The match of the frame as described, with `supposing`'s competing
- * hypothesis in place of its belief (0: none); `path` gets the residual of
- * an unknown match, or where an incompatible one failed. */
+ * hypothesis `h` in place of its belief (0: none); `path` gets the residual
+ * of an unknown match, or where an incompatible one failed. */
 - (TriMatch) match:(BGCondition *) c
           bindings:(const BGSlotBinding *) b
              count:(int) n
          supposing:(uint32_t) supposing
+        hypothesis:(NSUInteger) h
               path:(char *) path
 {
    NSMutableString   *expr;
@@ -577,7 +578,7 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    for( k = 0; k < c->nfind; k++)
       if( (r = bound( b, n, c->find[ k])))
          [expr appendFormat:@", %s: %@", c->find[ k],
-                            r == supposing ? [c->store describeSupposed:r] : [c->store describeReferent:r]];
+                            r == supposing ? [c->store describeSupposed:r hypothesis:h] : [c->store describeReferent:r]];
    [expr appendString:@" }"];
    arena       = tri_arena_new();
    description = tri_value( tri, [expr UTF8String], arena, NULL, 0);
@@ -600,8 +601,8 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
 
 
 /* The match of the condition: per hypothesis (CONTENT_LANGUAGE.md §9), when
- * a bound referent has a competing one. Entailed when the credence mass
- * that entails reaches the condition's threshold; incompatible when every
+ * a bound referent has competing ones. Entailed when the credence mass that
+ * entails reaches the condition's threshold; incompatible when every
  * hypothesis is; otherwise unknown, at the path where they part. */
 - (TriMatch) match:(BGCondition *) c
           bindings:(const BGSlotBinding *) b
@@ -610,6 +611,8 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    TriMatch   believed;
    TriMatch   supposed;
    NSUInteger k;
+   NSUInteger h;
+   BOOL       compatible;
    uint32_t   r;
    uint32_t   doubted;
    const char *slot;
@@ -626,22 +629,28 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
          doubted = r;
          slot    = c->find[ k];
       }
-   believed = [self match:c bindings:b count:n supposing:0 path:path];
+   believed = [self match:c bindings:b count:n supposing:0 hypothesis:0 path:path];
    if( ! doubted)
    {
       if( believed == TRI_UNKNOWN)
          strncpy( _lastResidual, path, sizeof( _lastResidual) - 1);
       return( believed);
    }
-   supposed = [self match:c bindings:b count:n supposing:doubted path:other];
-   mass     = [c->store supposedMassOf:doubted];
-   entailed = (believed == TRI_ENTAILED ? 1000 - mass : 0) + (supposed == TRI_ENTAILED ? mass : 0);
+   mass       = [c->store supposedMassOf:doubted];
+   entailed   = believed == TRI_ENTAILED ? 1000 - mass : 0;
+   compatible = believed != TRI_INCOMPATIBLE;
+   for( h = 0; h < [c->store hypothesesOf:doubted]; h++)
+   {
+      supposed    = [self match:c bindings:b count:n supposing:doubted hypothesis:h path:other];
+      entailed   += supposed == TRI_ENTAILED ? [c->store massOf:doubted hypothesis:h] : 0;
+      compatible  = compatible || supposed != TRI_INCOMPATIBLE;
+   }
    if( entailed >= c->threshold)
       return( TRI_ENTAILED);
-   if( believed == TRI_INCOMPATIBLE && supposed == TRI_INCOMPATIBLE)
+   if( ! compatible)
       return( TRI_INCOMPATIBLE);
-   /* where they part: the doubted slot's feature the hypothesis overrides */
-   strncpy( other, [c->store referent:doubted]->supposed, sizeof( other) - 1);
+   /* where they part: the doubted slot's feature the hypotheses override */
+   strncpy( other, [c->store overridesOf:doubted hypothesis:0], sizeof( other) - 1);
    other[ sizeof( other) - 1] = 0;
    other[ strcspn( other, ":")] = 0;
    snprintf( _lastResidual, sizeof( _lastResidual), "%s.%s (%lld in 1000 entails, under %lld)", slot, other,

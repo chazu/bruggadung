@@ -2071,8 +2071,8 @@ enough, and it tightens the nut without looking.
   Otherwise unknown, at the doubted slot's overridden feature, which
   `onUnknown` makes a goal.
 
-Not yet: more than one competing hypothesis per referent, and perception
-and memory making hypotheses of their own (the test supposes it).
+Not yet: perception and memory making hypotheses of their own (the test
+supposes them).
 
 59 tests, 2093 checks, under both compilers, ASan and UBSan, and leak-free.
 
@@ -2085,3 +2085,15 @@ destination.size)". It excludes an entry only when every hypothesis rules
 it out. Without the doubt it is entailed, as before.
 
 59 tests, 2095 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: more than one hypothesis
+
+A referent holds up to three competing hypotheses (`BG_HYPOTHESES`), each
+with its overrides and mass, and the belief keeps the rest. Agency and the
+menu match each, and add up the mass that entails. The worker half
+remembers the nut as 22 mm (60 in 1000) or 24 mm (50). 890 in 1000 entail,
+under 900, so it looks closer first. With 24 mm at 30, 910 entail, and it
+tightens the nut straight away. All of them are shown in the dump, saved,
+and settled together by a plain sighting.
+
+59 tests, 2104 checks, under both compilers, ASan and UBSan, and leak-free.

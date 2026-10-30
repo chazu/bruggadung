@@ -4105,7 +4105,7 @@ static BGNutRun   nut_run( const char *nut, const char *spanner, BOOL omniscient
 /* CONTENT_LANGUAGE.md Scenario 2's variant C: the worker has seen the nut
  * plainly (19 mm) from beside it, then stands four tiles off; it half
  * remembers the nut was replaced with a 22 mm one, at `doubt` in 1000. */
-static BGNutRun   doubtful_nut_run( int32_t doubt, int64_t *massSeen)
+static BGNutRun   doubtful_nut_run( int32_t doubt, int32_t doubt24, int64_t *massSeen)
 {
    BGStage            st;
    BGActivities       *activities;
@@ -4138,6 +4138,8 @@ static BGNutRun   doubtful_nut_run( int32_t doubt, int64_t *massSeen)
    stage_move( &st, worker, 2, 2);
    store = [knowledge storeOf:worker];
    [store suppose:@"size: 22mm" about:referent_of( store, run.nut) mass:doubt];
+   if( doubt24)
+      [store suppose:@"size: 24mm" about:referent_of( store, run.nut) mass:doubt24];
    *massSeen    = [store supposedMassOf:referent_of( store, run.nut)];
    run.fromAfar = [knowledge dump:worker];
    {
@@ -4269,7 +4271,7 @@ static void   test_unknown_nut( void)
    /* C: two hypotheses, 19 mm as it saw it, or 22 mm as it half remembers.
     * At 300 in 1000 for 22, only 700 entails: under tightening's 900, so it
     * looks closer first, and seen plainly the doubt is gone */
-   doubtful = doubtful_nut_run( 300, &mass);
+   doubtful = doubtful_nut_run( 300, 0, &mass);
    BG_CHECK( mass == 300 && [doubtful.fromAfar rangeOfString:@"or, 300 in 1000: size: 22mm"].location != NSNotFound);
    BG_CHECK( [doubtful.fromAfar rangeOfString:@"size: 19mm"].location != NSNotFound);
    BG_CHECK( logged_by( doubtful.agency, 1, @"tighten it: unknown at nut.size (700 in 1000 entails, under 900): look closer first"));
@@ -4281,8 +4283,20 @@ static void   test_unknown_nut( void)
              != NSNotFound);
    BG_CHECK( [doubtful_menu( 0) rangeOfString:@": entailed"].location != NSNotFound);
    /* at 50 in 1000, 950 entails: sure enough, it tightens it without looking */
-   sure = doubtful_nut_run( 50, &mass);
+   sure = doubtful_nut_run( 50, 0, &mass);
    BG_CHECK( ! logged_by( sure.agency, 1, @"look closer") && tightened( sure));
+
+   /* more than one: 22 mm at 60, 24 mm at 50, so 890 entails, under 900,
+    * and it looks closer; both are kept, and saved, until it does */
+   doubtful = doubtful_nut_run( 60, 50, &mass);
+   BG_CHECK( mass == 110);
+   BG_CHECK( [doubtful.fromAfar rangeOfString:@"or, 60 in 1000: size: 22mm\n    or, 50 in 1000: size: 24mm"].location
+             != NSNotFound);
+   BG_CHECK( logged_by( doubtful.agency, 1, @"tighten it: unknown at nut.size (890 in 1000 entails, under 900)"));
+   BG_CHECK( tightened( doubtful));
+   /* 22 mm at 60, 24 mm at 30: 910 entails, sure enough */
+   sure = doubtful_nut_run( 60, 30, &mass);
+   BG_CHECK( mass == 90 && ! logged_by( sure.agency, 1, @"look closer") && tightened( sure));
 }
 
 

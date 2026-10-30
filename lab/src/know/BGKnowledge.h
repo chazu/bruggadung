@@ -148,14 +148,16 @@
 #define BG_ANOMALY        25      /* against what it believes someone usually does */
 #define BG_NOTICE         10      /* what an observation must reach to be kept, at rest */
 
+#define BG_HYPOTHESES     3       /* competing hypotheses a referent holds at most */
+
 typedef struct
 {
    uint32_t         id;
    char             *kind;         /* a type expression: "#Stack" */
    char             *features;     /* "mass: 90g, material: \"iron\", ..." */
    char             *deeper;       /* what an analysis found beneath its looks: "material: \"steel\"", or NULL */
-   char             *supposed;     /* a competing hypothesis (CONTENT_LANGUAGE.md §9): features in place of what it believes, or NULL */
-   int32_t          supposedMass;  /* its credence mass, in thousandths; the belief has the rest */
+   char             *supposed[ BG_HYPOTHESES];     /* competing hypotheses (CONTENT_LANGUAGE.md §9): features in place of what it believes; packed, NULL after the last */
+   int32_t          supposedMass[ BG_HYPOTHESES];  /* their credence masses, in thousandths; the belief has the rest */
    BGLocationForm   form;          /* how it was placed when last seen */
    uint32_t         container;     /* the referent it was in, held by, or part of */
    int32_t          x;             /* the tile it was on, or its holder's */
@@ -337,12 +339,20 @@ typedef struct
 - (NSString *) describeReferent:(uint32_t) referentID;
 /* A competing hypothesis about the referent (KNOWLEDGE.md §11): `overrides`
  * ("size: 22mm") in place of what it believes, with credence mass `permille`;
- * the belief keeps the rest. Seen plainly again, the doubt is gone. */
+ * the belief keeps the rest. The same overrides again replace their mass;
+ * past BG_HYPOTHESES, it is ignored. Seen plainly again, the doubt is gone. */
 - (void) suppose:(NSString *) overrides
            about:(uint32_t) referentID
             mass:(int32_t) permille;
-/* the referent described as the competing hypothesis has it, or nil */
-- (NSString *) describeSupposed:(uint32_t) referentID;
+- (NSUInteger) hypothesesOf:(uint32_t) referentID;
+/* the referent described as hypothesis `h` has it, or nil */
+- (NSString *) describeSupposed:(uint32_t) referentID
+                     hypothesis:(NSUInteger) h;
+- (const char *) overridesOf:(uint32_t) referentID
+                  hypothesis:(NSUInteger) h;
+- (int32_t) massOf:(uint32_t) referentID
+        hypothesis:(NSUInteger) h;
+/* all its hypotheses' mass */
 - (int32_t) supposedMassOf:(uint32_t) referentID;
 - (void) dropSupposed:(uint32_t) referentID;
 /* the features the referent keeps, as memory has them now */

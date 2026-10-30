@@ -138,7 +138,7 @@ static BOOL   believed_kind_fits( BGWorld *world, const TriNode *pattern, BGRole
 /* As believed, with `supposing`'s competing hypothesis in place of its
  * belief (0: none). */
 static TriMatch   match_believed( BGWorld *world, BGKnowledgeStore *store, BGAction action, TriMatchResult *result,
-                                  NSString **reason, uint32_t supposing)
+                                  NSString **reason, uint32_t supposing, NSUInteger h)
 {
    const TriNode      *pattern;
    const BGReferent   *me;
@@ -176,7 +176,8 @@ static TriMatch   match_believed( BGWorld *world, BGKnowledgeStore *store, BGAct
             *reason = [NSString stringWithFormat:@"R%u is not that kind of thing", ref->id];
          return( TRI_INCOMPATIBLE);
       }
-      descriptions[ r] = ref->id == supposing ? [store describeSupposed:ref->id] : [store describeReferent:ref->id];
+      descriptions[ r] = ref->id == supposing ? [store describeSupposed:ref->id hypothesis:h]
+                                              : [store describeReferent:ref->id];
    }
    return( match_described( world, pattern, action, descriptions, result, reason));
 }
@@ -185,7 +186,7 @@ static TriMatch   match_believed( BGWorld *world, BGKnowledgeStore *store, BGAct
 TriMatch   BGMatchBelieved( BGWorld *world, BGKnowledgeStore *store, BGAction action, TriMatchResult *result,
                             NSString **reason)
 {
-   return( match_believed( world, store, action, result, reason, 0));
+   return( match_believed( world, store, action, result, reason, 0, 0));
 }
 
 
@@ -196,16 +197,25 @@ static int32_t   entailed_mass( BGWorld *world, BGKnowledgeStore *store, BGActio
 {
    TriMatchResult   result;
    TriMatch         supposed;
+   NSUInteger       h;
+   uint32_t         doubted;
    int32_t          mass;
+   int32_t          entailed;
    int              r;
 
    *any = believed != TRI_INCOMPATIBLE;
    for( r = 0; r < BGRoleCount; r++)
       if( action.roles[ r] && (mass = [store supposedMassOf:(uint32_t) action.roles[ r]]) > 0)
       {
-         supposed = match_believed( world, store, action, &result, NULL, (uint32_t) action.roles[ r]);
-         *any     = *any || supposed != TRI_INCOMPATIBLE;
-         return( (believed == TRI_ENTAILED ? 1000 - mass : 0) + (supposed == TRI_ENTAILED ? mass : 0));
+         doubted  = (uint32_t) action.roles[ r];
+         entailed = believed == TRI_ENTAILED ? 1000 - mass : 0;
+         for( h = 0; h < [store hypothesesOf:doubted]; h++)
+         {
+            supposed  = match_believed( world, store, action, &result, NULL, doubted, h);
+            *any      = *any || supposed != TRI_INCOMPATIBLE;
+            entailed += supposed == TRI_ENTAILED ? [store massOf:doubted hypothesis:h] : 0;
+         }
+         return( entailed);
       }
    return( believed == TRI_ENTAILED ? 1000 : 0);
 }
@@ -454,7 +464,7 @@ static int   cmp_string( const void *a, const void *b)
                   {
                      char   key[ 64];
 
-                     strncpy( key, [store referent:(uint32_t) action.roles[ r]]->supposed, sizeof( key) - 1);
+                     strncpy( key, [store overridesOf:(uint32_t) action.roles[ r] hypothesis:0], sizeof( key) - 1);
                      key[ sizeof( key) - 1]   = 0;
                      key[ strcspn( key, ":")] = 0;
                      [[menu->_residuals lastObject] addObject:[NSString stringWithFormat:@"%s.%s", BGRoleNames[ r], key]];
