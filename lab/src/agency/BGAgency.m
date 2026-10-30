@@ -1768,6 +1768,59 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
 }
 
 
+/* Asked where something is (AGENCY.md decision 11): the best lie it knows
+ * (`lies`), with `what` bound to what it holds like it, if one scores more
+ * than nothing: what it says, that it doesn't know. Otherwise nil: it
+ * answers truly. */
+- (NSString *) lieTo:(BGMotivation *) m
+               about:(const TriNode *) question
+               store:(BGKnowledgeStore *) store
+{
+   NSMutableArray   *parts;
+   NSMutableArray   *best;
+   BGSlotBinding    b[ 1];
+   const char       *lie;
+   TriContent       *tri;
+   TriIndex         *family;
+   size_t           i;
+   int32_t          score;
+   int32_t          most;
+   char             title[ 64];
+   char             printed[ 2048];
+
+   tri = [_world tri];
+   if( ! tri_subtype( tri, tri_node_type( question), tri_type_named( tri, "#WhereIs")) ||
+       ! (b[ 0].referent = [self heldLike:tri_at( tri, question, "what") store:store]))
+      return( nil);
+   b[ 0].slot = [_world intern:"what"];
+   family     = tri_family_index( tri, "lies");
+   lie        = NULL;
+   best       = nil;
+   most       = 0;
+   for( i = 0; family && i < tri_index_count( family); i++)
+   {
+      parts = [NSMutableArray array];
+      score = [self sum:tri_index_tag( family, i) path:"score" bindings:b count:1 store:store parts:parts];
+      if( ! lie || score > most)
+      {
+         lie  = tri_index_tag( family, i);
+         most = score;
+         best = parts;
+      }
+   }
+   if( ! lie)
+      return( nil);
+   if( ! text_at( tri, tri_pattern( tri, lie), "title", title, sizeof( title)))
+      snprintf( title, sizeof( title), "%s", lie);
+   [self note:m line:[NSString stringWithFormat:@"%s %+d (%@): %s", title, most, [best componentsJoinedByString:@", "],
+                                                most > 0 ? "lying" : "telling the truth"]];
+   if( most <= 0)
+      return( nil);
+   tri_print( tri, tri_at( tri, question, "what"), printed, sizeof( printed));
+   return( [NSString stringWithFormat:@"#DontKnow & { what: %s }", printed]);
+}
+
+
 /* Something the agent believes is here like the description, not itself:
  * the lowest such referent, or 0. */
 - (uint32_t) believedLike:(const TriNode *) what
@@ -2060,7 +2113,9 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
       else if( question && worth > 0)
       {
          [self note:m line:[NSString stringWithFormat:@"asked by R%u: worth %+d, answering", q->asker, worth]];
-         answer = [self answerTo:question store:store];
+         answer = [self lieTo:m about:question store:store];
+         if( ! answer)
+            answer = [self answerTo:question store:store];
       }
       else if( question)
       {
@@ -2370,6 +2425,29 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
          if( ! curve_at( tri, tri_at( tri, c, "curve"), who ? [store loyaltyTo:who] : 0, &v))
             v = who ? (int32_t) ([store loyaltyTo:who] * int_at( tri, c, "per", 0) / 10) : 0;
          [parts addObject:[NSString stringWithFormat:@"loyal %+d", v]];
+      }
+      else if( text_at( tri, c, "exposing", slot, sizeof( slot)) && text_at( tri, c, "act", act, sizeof( act)))
+      {
+         /* what the truth would expose (AGENCY.md decision 11): holding what
+          * it believes another's, the law it knows against taking it */
+         const BGReferent   *r;
+         const BGFinding    *owned;
+         const BGKnownLaw   *law;
+         uint32_t           thing;
+         NSUInteger         k;
+
+         thing = bound( b, n, slot);
+         r     = thing ? [store referent:thing] : NULL;
+         owned = thing ? [store finding:"#Owned" about:thing] : NULL;
+         v     = 0;
+         for( k = 0; r && r->form == BGLocationHeldBy && r->container == [store selfReferent] && owned &&
+                     owned->choice != [store selfReferent] && k < [store lawCount]; k++)
+         {
+            law = [store lawAt:k];
+            if( ! strcmp( law->forbids, act) && ! strcmp( law->wrong, "\"anothers\"") && law->weighs > v)
+               v = law->weighs;
+         }
+         [parts addObject:[NSString stringWithFormat:@"%s %+d", v ? "exposing" : "nothing to hide", v]];
       }
       else if( text_at( tri, c, "watched", slot, sizeof( slot)))
       {

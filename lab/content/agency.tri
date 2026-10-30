@@ -155,7 +155,10 @@
 // (thousandths); short of that it is unknown, at the path where they part. When no
 // method's `pre` holds, the goal is impossible for now: it is dropped with
 // the reason, and the method that needed it has failed.
-#Method: #Intent & {
+// What is weighed by its score: a method, or a lie.
+#Scored: #Intent & { score: [...#Consideration] }
+
+#Method: #Scored & {
     goal:      text
     rank:      int
     pre:       #Condition
@@ -165,7 +168,6 @@
     places:    *0 | int & >=0 & <=100
     threshold: *1000 | int & >=0 & <=1000
     steps:     [...#MethodStep]
-    score:     [...#Consideration]
     onUnknown: text
     sequence:  *false | true
 }
@@ -198,7 +200,8 @@
 // what the law weighs (INSTITUTIONS.md decision 5): if the agent knows a law
 // forbidding `act` on the slot's referent as it believes it to be (another's),
 // and believes itself seen, what the law weighs; unseen, nothing
-#Unlawful: #Consideration & { unlawful: text, act: text }
+#Acting:   #Consideration & { act: text }
+#Unlawful: #Acting & { unlawful: text }
 
 
 // --- AGENCY.md Scenario 1, as "the missing nails" -----------------------------
@@ -603,6 +606,27 @@ eat_what_i_have: #Method & {
     }
     steps: [#Do & { op: "eat", object: "food" }]
 } @family(methods)
+
+
+// --- AGENCY.md decision 11, lying --------------------------------------------------
+
+// What the truth would expose (a gain from lying): what the law weighs, if
+// the agent holds the slot's referent believing it another's, so that it
+// must have done `act` (taken it), against a law it knows.
+#Exposing: #Acting & { exposing: text }
+
+// A lie it may tell, asked where something like `what` is, weighed like a
+// method: its score, its considerations, with `what` bound to what it holds
+// like it. Worth more than nothing, it says it doesn't know.
+#Lie: #Scored & {}
+
+// Escaping a consequence: the theft the truth would expose, against its
+// honesty, and the risk of being found out (the thing in sight of someone).
+deny_it: #Lie & {
+    title: "deny it"
+    score: [#Exposing & { exposing: "what", act: "take" }, #Trait & { trait: "honesty", per: -5 },
+            #Watched & { watched: "what", penalty: 20 }]
+} @family(lies)
 
 
 // --- AGENCY.md decision 16, what things are worth ---------------------------------

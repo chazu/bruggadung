@@ -4811,6 +4811,8 @@ typedef enum
    BGPurseHonest,                /* B: an honest Kasimir, the same debt */
    BGPurseNoWitness,             /* C: Mira isn't there */
    BGPurseUntold,                /* A, but no one told Kasimir whose the purse is */
+   BGPurseAsked,                 /* the base case, but the merchant asks Kasimir where the purse is */
+   BGPurseAskedUntold,           /* that, and no one told Kasimir whose it is */
    BGPurseWatch,                 /* the base case, and an officer of the town's watch by Mira */
    BGPurseFlight,                /* that, and Kasimir doesn't abide by the rules */
    BGPurseResist,                /* that, and he has a temper */
@@ -4898,7 +4900,7 @@ static BGPurseRun   tempting_purse( BGPurse variant)
    if( variant != BGPurseNoWitness)
    {
       h[ 4] = [g create:"mira" key:"mira" at:BGOnTile( 12, 12, 0)];
-      if( variant == BGPurseNoticed || variant == BGPurseUntold)
+      if( variant == BGPurseNoticed || variant == BGPurseUntold || variant == BGPurseAskedUntold)
          [g set:"Agent.hiding" of:BGWhole( h[ 4]) to:0];
    }
    if( variant == BGPurseWatch || variant == BGPurseFlight || variant == BGPurseResist || variant == BGPurseKin ||
@@ -4995,7 +4997,7 @@ static BGPurseRun   tempting_purse( BGPurse variant)
 
    /* the merchant, beside Kasimir, says the purse is its own; then turns
     * away, out of sight */
-   if( variant != BGPurseUntold)
+   if( variant != BGPurseUntold && variant != BGPurseAskedUntold)
    {
       BGKnowledgeStore   *own;
 
@@ -5009,8 +5011,14 @@ static BGPurseRun   tempting_purse( BGPurse variant)
    BG_CHECK( [agency commit:run.kasimir toGoal:"get_money"]);
    [st.s runUntil:BGTimeMake( 30000)];
 
-   /* the merchant comes back, by Mira, and asks her where the purse is */
-   if( run.mira)
+   /* the merchant comes back, by Mira, and asks her where the purse is; or
+    * by Kasimir, and asks him */
+   if( variant == BGPurseAsked || variant == BGPurseAskedUntold)
+   {
+      stage_move( &st, run.merchant, 9, 11);
+      stage_say( &st, run.merchant, run.kasimir, @"#WhereIs & { what: #Body & { material: \"cloth\" } }");
+   }
+   else if( run.mira)
    {
       stage_move( &st, run.merchant, 12, 13);
       stage_say( &st, run.merchant, run.mira, @"#WhereIs & { what: #Body & { material: \"cloth\" } }");
@@ -5099,6 +5107,8 @@ static void   test_tempting_purse( void)
    BGPurseRun         watch;
    BGPurseRun         flight;
    BGPurseRun         resist;
+   BGPurseRun         asked;
+   BGPurseRun         askedUntold;
    BGPurseRun         gentle;
    BGPurseRun         kin;
    BGPurseRun         wary;
@@ -5429,6 +5439,21 @@ static void   test_tempting_purse( void)
    store = [kin.knowledge storeOf:kin.kasimir];
    BG_CHECK( [store loyaltyTo:referent_of( store, kin.merchant)] == 0);
    BG_CHECK( [kin.text rangeOfString:@" 60 1 "].location != NSNotFound);
+
+   /* AGENCY.md decision 11: the gain from a lie. Asked by the merchant
+    * where the purse is, Kasimir, holding it and told it is the merchant's,
+    * weighs denying it: the theft the truth would expose (the law weighs
+    * 40), against his honesty and the merchant seeing it in his hand. He
+    * says he doesn't know. Never told whose it was, he has nothing to hide,
+    * and says he has it */
+   asked = tempting_purse( BGPurseAsked);
+   BG_CHECK( logged_by( asked.agency, asked.kasimir, @"deny it +15 (exposing +40, honesty -5, watched -20): lying"));
+   BG_CHECK( said_with( asked.world, asked.kasimir, @"#DontKnow") != nil);
+   askedUntold = tempting_purse( BGPurseAskedUntold);
+   BG_CHECK( logged_by( askedUntold.agency, askedUntold.kasimir,
+                        @"deny it -25 (nothing to hide +0, honesty -5, watched -20): telling the truth"));
+   BG_CHECK( said_with( askedUntold.world, askedUntold.kasimir, @"#IsHeld") != nil);
+   BG_CHECK( said_with( askedUntold.world, askedUntold.kasimir, @"#DontKnow") == nil);
 
    /* 1: C: no one is there, and Kasimir decides just the same */
    alone = tempting_purse( BGPurseNoWitness);

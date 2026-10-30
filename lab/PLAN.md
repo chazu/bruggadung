@@ -3593,3 +3593,29 @@ freezing checked end to end (the same accrual, untested with the thermal
 domain); recovery from injury.
 
 89 tests, 2792 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: lying to escape a consequence
+
+AGENCY.md decision 11: the gain from a lie is escaping a consequence the
+agent believes the truth would bring, or advancing one of its goals,
+scored against honesty and the risk of being found out.
+
+- **`#Lie`** (`lies` family): weighed like a method, by its score, with
+  `what` bound to what the agent holds like what it was asked about. Worth
+  more than nothing, the agent says it doesn't know.
+- **`#Exposing`**: what the truth would expose: holding what it believes
+  another's, the law it knows against taking it weighs.
+- **`deny_it`**: exposing, less honesty (half a point a point), less 20 if
+  it believes someone can see the thing.
+- `#Scored` (an intent with a score) and `#Acting` (a consideration about
+  an act) are now common supertypes, as features are declared once.
+
+Checked: asked where the purse is, Kasimir, holding it and told it is the
+merchant's, denies knowing (+15: exposing 40, honesty −5, watched −20);
+never told whose it was, he has nothing to hide (−25) and says he has it.
+
+Not yet: the second kind of gain, a lie that serves a goal (sending a
+rival to the wrong place); a lie naming a false place rather than denying;
+being found out (the asker seeing it in his hand and believing him less).
+
+89 tests, 2802 checks, under both compilers, ASan, and leak-free.
