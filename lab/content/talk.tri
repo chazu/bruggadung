@@ -93,6 +93,13 @@ say: #Operation & {
     writing: text @field(saved, proposable, inspect)
 }
 
+// A label (ACTIONS.md §7's tag on a shelf): a record whose writing anyone
+// within `legible` tiles of it reads at a glance, on sighting it.
+#Label: #Record & {
+    @component(Label)
+    legible: int & >=0 & <=8                @field(content, saved, inspect, perceive(sight))
+}
+
 // What a record holds: who wrote it, by their looks, and the claims written.
 #Writing: { author: #Agent, entries: [...#Telling] }
 

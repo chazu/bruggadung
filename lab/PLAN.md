@@ -2542,3 +2542,27 @@ Not yet: the access cost as time (it is a preference only), and agency
 choosing instruments.
 
 69 tests, 2411 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: a tag on the seal
+
+ACTIONS.md §7: "A physical marker, such as a tag on a shelf, is a separate
+entity that agents can perceive." The two-hands slice's "Not yet":
+reservations perceived other than by being told.
+
+- **`#Label`** (talk.tri): a record whose writing anyone within `legible`
+  tiles of it reads at a glance. `seal_tag` is paper, legible from a step
+  away.
+- **Read on sighting**: perception reads a label when it sights it (a new
+  referent, or one not seen for a minute, the same notion as a sighting for
+  identity hypotheses) and is close enough. Each entry is believed from its
+  author, through the label, as a read record's entries are; a
+  `#ReservedFor` entry makes the `#Reserved` finding, as telling does.
+
+Checked: B, respectful, sights A's tag beside the seal from a step away,
+believes it reserved, and never starts (-30, as when told); a tag legible
+only from on it says nothing a step away, and B takes the seal
+("unreserved +0").
+
+Not yet: grievances, and reservations as claims (institutions, open).
+
+69 tests, 2420 checks, under both compilers, ASan, and leak-free.

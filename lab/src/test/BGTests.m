@@ -68,7 +68,7 @@ static void   test_registry_and_construction( void)
 
    w = BGTestWorld( 1);
    c = BGTestCommitter( w);
-   BG_CHECK( [w kindCount] == 34);
+   BG_CHECK( [w kindCount] == 35);
    BG_CHECK( [w kindNamed:"Body"] != NSNotFound && [w kindNamed:"Nonesuch"] == NSNotFound);
    bin   = commit_create( c, "bin", BGOnTile( 0, 0, 0));
    nails = commit_create( c, "nails_30", BGIn( bin));
@@ -4913,7 +4913,9 @@ static int   seal_race( uint64_t seed, int64_t quickA, int64_t quickB, BOOL swap
 
 /* The scenario with activities: A and B start taking the seal up at the
  * same boundary; B, if `agency`, decides for itself, `respectful` of
- * reservations it knows of, and A tells it first that the seal is A's. */
+ * reservations it knows of, and A tells it first that the seal is A's: by
+ * saying so (1), or by a tag beside the seal B sights, legible from a step
+ * away (2) or only from on it (3). */
 typedef struct
 {
    BGWorld       *world;
@@ -4926,7 +4928,7 @@ typedef struct
 } BGSealRun;
 
 
-static BGSealRun   seal_scene( uint64_t seed, BOOL agency, int64_t respectful)
+static BGSealRun   seal_scene( uint64_t seed, int agency, int64_t respectful)
 {
    BGStage           st;
    BGActivities      *activities;
@@ -4965,10 +4967,26 @@ static BGSealRun   seal_scene( uint64_t seed, BOOL agency, int64_t respectful)
       /* A tells B the seal is A's; B wants it */
       reserved = [[knowledge storeOf:run.a] reservationOf:referent_of( [knowledge storeOf:run.a], run.seal)
                                                       for:[[knowledge storeOf:run.a] selfReferent]];
-      action         = BGActionMake( "say", run.a, run.b, BGNoEntity);
-      action.content = [st.w intern:[reserved UTF8String]];
       error = nil;
-      BG_CHECK( BGPerform( st.w, st.c, action, 0, &error) != nil);
+      if( agency == 1)
+      {
+         action         = BGActionMake( "say", run.a, run.b, BGNoEntity);
+         action.content = [st.w intern:[reserved UTF8String]];
+         BG_CHECK( BGPerform( st.w, st.c, action, 0, &error) != nil);
+      }
+      else
+      {
+         /* a tag beside it, in A's hand: B sights it */
+         g     = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: A's tag"];
+         h[ 0] = [g create:"seal_tag" key:"tag" at:BGOnTile( 6, 6, 0)];
+         [g set:"Record.writing" of:BGWhole( h[ 0])
+         toText:[st.w intern:[[NSString stringWithFormat:@"#Writing & { author: %@, entries: [%@] }",
+                                [[knowledge storeOf:run.a] describeLooks:[[knowledge storeOf:run.a] selfReferent]],
+                                reserved] UTF8String]]];
+         if( agency == 3)
+            [g set:"Label.legible" of:BGWhole( h[ 0]) to:0];
+         [st.c submit:g];
+      }
       [st.s runUntil:BGTimeMake( 1000)];
       BG_CHECK( [minds commit:run.b toGoal:"get_the_seal"]);
       /* A starts as B's decision does: both takes complete at one boundary */
@@ -5049,6 +5067,18 @@ static void   test_two_hands( void)
    BG_CHECK( logged_by( respect.agency, respect.b, @"take the seal -30 (+10, reserved -40)"));
    BG_CHECK( ! logged_by( respect.agency, respect.b, @"take_up R"));
    BG_CHECK( [respect.world locationOf:respect.seal].place == respect.a);
+   /* or B sights a tag beside the seal saying so, a step away, and reads
+    * it at a glance (ACTIONS.md §7's physical marker): the same */
+   respect = seal_scene( 61, 2, 50);
+   BG_CHECK( logged_by( respect.agency, respect.b, @"take the seal -30 (+10, reserved -40)"));
+   BG_CHECK( [respect.world locationOf:respect.seal].place == respect.a);
+   store = [respect.knowledge storeOf:respect.b];
+   BG_CHECK( [store finding:"#Reserved" about:referent_of( store, respect.seal)] != NULL);
+   /* a tag legible only from on it, a step away, says nothing */
+   ignore = seal_scene( 61, 3, 50);
+   BG_CHECK( logged_by( ignore.agency, ignore.b, @"take the seal +10 (+10, unreserved +0)"));
+   store = [ignore.knowledge storeOf:ignore.b];
+   BG_CHECK( [store finding:"#Reserved" about:referent_of( store, ignore.seal)] == NULL);
    /* B: B, who doesn't mind, races A for it, and wins the draw: the
     * reservation doesn't block the commit. A's take fails with the reason;
     * A, who knew the seal was reserved for it, sees it in B's hand */

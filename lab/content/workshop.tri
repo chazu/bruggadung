@@ -71,6 +71,8 @@ mira:     #Agent & { material: "flesh", mass: 25kg, hands: 2, coat: "red", curio
 // reservation of it.
 seal:        #Body & { material: "rubber", mass: 50g }
 reservation: #Claim & { kind: "reservation" }
+// A tag tied beside it, saying whose it is, legible from a step away.
+seal_tag:    #Label & { material: "paper", mass: 5g, legible: 1 }
 
 // For the coat at dusk: someone of the visitor's build, in a brown coat.
 stranger: #Agent & { material: "flesh", mass: 60kg, hands: 2, coat: "brown" }

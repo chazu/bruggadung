@@ -1,4 +1,4 @@
-/* Generated from Triangle content 7d3fb486dfba02be: do not edit. Type IDs are valid
+/* Generated from Triangle content b175fede7d59b303: do not edit. Type IDs are valid
  * only for this content; regenerate when it changes. */
 #ifndef BG_COMPONENTS_H
 #define BG_COMPONENTS_H
@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BG_CONTENT_HASH 0x7d3fb486dfba02beULL
+#define BG_CONTENT_HASH 0xb175fede7d59b303ULL
 
 typedef struct TriNode TriNode;
 
@@ -227,6 +227,11 @@ typedef struct {
     const char *    writing;    /* text; saved, proposable, inspect */
 } BGRecord;
 
+/* Label, from #Label */
+typedef struct {
+    int64_t         legible;    /* int, in quanta of 1; content, saved, inspect, perceive(sight) */
+} BGLabel;
+
 /* Stack, from #Stack */
 typedef struct {
     int64_t         count;    /* int, in quanta of 1; content, saved, proposable, inspect */
@@ -278,59 +283,59 @@ typedef struct {
 
 /* #ActivityStatus */
 enum {
-    BG_ACTIVITYSTATUS_ABORTED = 311,
-    BG_ACTIVITYSTATUS_COMPLETED = 312,
-    BG_ACTIVITYSTATUS_EXHAUSTED = 313,
-    BG_ACTIVITYSTATUS_FAILED = 314,
-    BG_ACTIVITYSTATUS_RUNNING = 315,
-    BG_ACTIVITYSTATUS_SUSPENDED = 316,
+    BG_ACTIVITYSTATUS_ABORTED = 312,
+    BG_ACTIVITYSTATUS_COMPLETED = 313,
+    BG_ACTIVITYSTATUS_EXHAUSTED = 314,
+    BG_ACTIVITYSTATUS_FAILED = 315,
+    BG_ACTIVITYSTATUS_RUNNING = 316,
+    BG_ACTIVITYSTATUS_SUSPENDED = 317,
 };
 
 /* #ClaimKind */
 enum {
-    BG_CLAIMKIND_CUSTODY = 318,
-    BG_CLAIMKIND_OWNERSHIP = 319,
-    BG_CLAIMKIND_RESERVATION = 320,
+    BG_CLAIMKIND_CUSTODY = 319,
+    BG_CLAIMKIND_OWNERSHIP = 320,
+    BG_CLAIMKIND_RESERVATION = 321,
 };
 
 /* #Material */
 enum {
-    BG_MATERIAL_CLOTH = 370,
-    BG_MATERIAL_FOOD = 371,
-    BG_MATERIAL_LEATHER = 372,
-    BG_MATERIAL_RUBBER = 373,
-    BG_MATERIAL_STONE = 374,
-    BG_MATERIAL_FLESH = 400,
-    BG_MATERIAL_BRASS = 402,
-    BG_MATERIAL_IRON = 403,
-    BG_MATERIAL_PAPER = 404,
-    BG_MATERIAL_STEEL = 405,
-    BG_MATERIAL_OAK = 407,
+    BG_MATERIAL_CLOTH = 371,
+    BG_MATERIAL_FOOD = 372,
+    BG_MATERIAL_LEATHER = 373,
+    BG_MATERIAL_RUBBER = 374,
+    BG_MATERIAL_STONE = 375,
+    BG_MATERIAL_FLESH = 401,
+    BG_MATERIAL_BRASS = 403,
+    BG_MATERIAL_IRON = 404,
+    BG_MATERIAL_PAPER = 405,
+    BG_MATERIAL_STEEL = 406,
+    BG_MATERIAL_OAK = 408,
 };
 
 /* "flesh" | "metal" | "natural" | "paper" | "wood" */
 enum {
-    BG_BODY_SURFACE_NATURAL = 250,
-    BG_BODY_SURFACE_FLESH = 400,
-    BG_BODY_SURFACE_BRASS = 402,
-    BG_BODY_SURFACE_IRON = 403,
-    BG_BODY_SURFACE_PAPER = 404,
-    BG_BODY_SURFACE_STEEL = 405,
-    BG_BODY_SURFACE_OAK = 407,
+    BG_BODY_SURFACE_NATURAL = 251,
+    BG_BODY_SURFACE_FLESH = 401,
+    BG_BODY_SURFACE_BRASS = 403,
+    BG_BODY_SURFACE_IRON = 404,
+    BG_BODY_SURFACE_PAPER = 405,
+    BG_BODY_SURFACE_STEEL = 406,
+    BG_BODY_SURFACE_OAK = 408,
 };
 
 /* #Colour */
 enum {
-    BG_COLOUR_BLUE = 323,
-    BG_COLOUR_BLACK = 325,
-    BG_COLOUR_BROWN = 326,
-    BG_COLOUR_GREEN = 327,
-    BG_COLOUR_GREY = 328,
-    BG_COLOUR_NAVY = 329,
-    BG_COLOUR_RED = 330,
-    BG_COLOUR_YELLOW = 331,
-    BG_COLOUR_BEIGE = 345,
-    BG_COLOUR_WHITE = 367,
+    BG_COLOUR_BLUE = 324,
+    BG_COLOUR_BLACK = 326,
+    BG_COLOUR_BROWN = 327,
+    BG_COLOUR_GREEN = 328,
+    BG_COLOUR_GREY = 329,
+    BG_COLOUR_NAVY = 330,
+    BG_COLOUR_RED = 331,
+    BG_COLOUR_YELLOW = 332,
+    BG_COLOUR_BEIGE = 346,
+    BG_COLOUR_WHITE = 368,
 };
 
 /* The field registry: what code needs to read and write any component
@@ -356,7 +361,7 @@ typedef struct {
     const BGFieldInfo *fields;
 } BGComponentInfo;
 
-#define BG_COMPONENT_COUNT 34
+#define BG_COMPONENT_COUNT 35
 
 #ifdef BG_COMPONENT_REGISTRY
 
@@ -550,6 +555,10 @@ static const BGFieldInfo BGRecord_fields[] = {
     { "writing", offsetof(BGRecord, writing), BG_VALUE_TEXT, "text", "saved, proposable, inspect" },
 };
 
+static const BGFieldInfo BGLabel_fields[] = {
+    { "legible", offsetof(BGLabel, legible), BG_VALUE_QUANTITY, "int", "content, saved, inspect, perceive(sight)" },
+};
+
 static const BGFieldInfo BGStack_fields[] = {
     { "count", offsetof(BGStack, count), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "unit", offsetof(BGStack, unit), BG_VALUE_TEXT, "text", "content, saved, inspect, perceive(sight)" },
@@ -620,6 +629,7 @@ static const BGComponentInfo BGComponents[BG_COMPONENT_COUNT + 1] = {
     { "Part", "#Part", sizeof(BGPart), 4, BGPart_fields },
     { "Pump", "#Pump", sizeof(BGPump), 2, BGPump_fields },
     { "Record", "#Record", sizeof(BGRecord), 1, BGRecord_fields },
+    { "Label", "#Label", sizeof(BGLabel), 1, BGLabel_fields },
     { "Stack", "#Stack", sizeof(BGStack), 3, BGStack_fields },
     { "Stamp", "#Stamp", sizeof(BGStamp), 2, BGStamp_fields },
     { "Tap", "#Tap", sizeof(BGTap), 2, BGTap_fields },

@@ -2704,9 +2704,12 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
    int                d;
    int                bestd;
    BOOL               exact;
+   NSUInteger         glance[ 64];
+   NSUInteger         nglance;
 
-   agent = [store agent];
-   news  = [store mutableNews];
+   agent   = [store agent];
+   news    = [store mutableNews];
+   nglance = 0;
    [news removeAllObjects];
    if( ! [_world isLive:agent] || ! ground_tile( _world, agent, &here))
       return;
@@ -2938,6 +2941,10 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
          r->level     = tile.level;
          r->slot      = at.slot;
          memcpy( r->role, at.role, sizeof( r->role));
+         /* a label, on sighting it (not seen for a minute before), is read below */
+         if( nglance < 64 && (! r->seen || now - r->seen > 60000) &&
+             [_world record:[_world kindNamed:"Label"] for:seen[ i].entity])
+            glance[ nglance++] = i;
          r->seen      = now;
          r->present   = YES;
          r->truth     = seen[ i].entity;                /* developer-only */
@@ -2982,6 +2989,38 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
       record  = bound_to( ev->other, agent, [store selfReferent], seen, assigned, nseen);
       for( k = 0; author && k < [entries count]; k++)
          [self believe:[[entries objectAtIndex:k] UTF8String] from:author via:record utterance:ev->index at:now
+                 store:store news:news];
+   }
+
+   /* what a label it sighted says, read at a glance from close enough
+    * (ACTIONS.md §7's tag): each entry, from the author, in the label */
+   for( j = 0; j < nglance; j++)
+   {
+      const TriNode   *who;
+      const BGLabel   *label;
+      TriArena        *arena;
+      NSArray         *entries;
+      NSString        *by;
+      const char      *written;
+      NSUInteger      k;
+      uint32_t        author;
+
+      i     = glance[ j];
+      label = [_world record:[_world kindNamed:"Label"] for:seen[ i].entity];
+      if( ! ground_tile( _world, seen[ i].entity, &tile) || tile.level != here.level ||
+          abs( tile.x - here.x) > label->legible || abs( tile.y - here.y) > label->legible)
+         continue;
+      written = [_world textField:"Record.writing" of:seen[ i].entity];
+      if( ! written || ! *written)
+         continue;
+      by      = nil;
+      entries = BGWritingEntries( written, &by);
+      arena   = tri_arena_new();
+      who     = by ? tri_value( [_world tri], [by UTF8String], arena, NULL, 0) : NULL;
+      author  = who ? [self person:who store:store news:news] : 0;
+      tri_arena_free( arena);
+      for( k = 0; author && k < [entries count]; k++)
+         [self believe:[[entries objectAtIndex:k] UTF8String] from:author via:assigned[ i] utterance:0 at:now
                  store:store news:news];
    }
 
