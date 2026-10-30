@@ -1833,8 +1833,13 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
                                                          q->asker, given, [self worth:given store:store],
                                                          [self lending:given to:q->asker store:store]]];
             [self note:m line:[NSString stringWithFormat:@"asked by R%u: worth %+d, granting", q->asker, worth]];
+            /* on terms (AGENCY.md decision 18): to a friend, none said, the
+             * default between them; to anyone else, a day */
             if( [self act:m why:"granting" store:store operation:"give" object:given target:q->asker units:0 content:NULL])
-               answer = [NSString stringWithFormat:@"#Granted & { what: %@ }", [store describeLooks:given]];
+               answer = [store loyaltyTo:q->asker] > 0
+                           ? [NSString stringWithFormat:@"#Granted & { what: %@ }", [store describeLooks:given]]
+                           : [NSString stringWithFormat:@"#Granted & { what: %@, owedIn: %lldms }",
+                                                       [store describeLooks:given], (long long) BG_LOAN_SHORT];
          }
          else
          {
@@ -1882,21 +1887,27 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
    TriArena        *arena;
    uint32_t        loan;
    int64_t         now;
+   int64_t         term;
    NSString        *promise;
 
    tri     = [_world tri];
    arena   = tri_arena_new();
    granted = answer ? tri_value( tri, answer, arena, NULL, 0) : NULL;
    loan    = 0;
+   /* the terms said; none, the default between them (AGENCY.md decision 18) */
+   term    = [store loyaltyTo:lender] > 0 ? BG_LOAN_TERM : BG_LOAN_SHORT;
    if( granted && tri_subtype( tri, tri_node_type( granted), tri_type_named( tri, "#Granted")))
+   {
       loan = [self heldLike:tri_at( tri, granted, "what") store:store];
+      if( tri_at( tri, granted, "owedIn"))
+         term = (int64_t) int_at( tri, granted, "owedIn", term);
+   }
    tri_arena_free( arena);
    if( ! loan)
       return;
    now     = [_world time].ms;
-   promise = [store promiseThat:loan isHeldBy:lender by:now + BG_LOAN_TERM];
-   if( ! [self undertake:m->agent goal:"repay" from:now + BG_LOAN_TERM - BG_LOAN_DUE until:now + BG_LOAN_TERM
-                  source:"debt"])
+   promise = [store promiseThat:loan isHeldBy:lender by:now + term];
+   if( ! [self undertake:m->agent goal:"repay" from:now + term - term / BG_LOAN_DUE until:now + term source:"debt"])
       return;
    /* and says so, a promise the lender holds as a claim (§7) */
    if( promise)
@@ -1909,7 +1920,7 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
    c->params[ 1].referent = lender;
    c->nparams             = 2;
    [self note:m line:[NSString stringWithFormat:@"owes R%u R%u back by %lldms", lender, loan,
-                                               (long long) (now + BG_LOAN_TERM)]];
+                                               (long long) (now + term)]];
 }
 
 

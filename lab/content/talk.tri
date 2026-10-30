@@ -79,9 +79,11 @@
 #WontSay: #Utterance & {}
 
 // Asked for something like `what`: the speaker has nothing like it; or has
-// given it.
+// lent it, on the terms it says (AGENCY.md decision 18): owed back within
+// `owedIn`. With none said, the borrower takes the terms its relationship
+// with the lender has by default: between friends, a week.
 #HaveNone: #Utterance & {}
-#Granted:  #Utterance & {}
+#Granted:  #Utterance & { owedIn: time & >=1ms & <=1000d }
 
 // Say something to an agent in reach. What is said is the command's.
 say: #Operation & {

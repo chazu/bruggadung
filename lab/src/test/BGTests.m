@@ -4764,6 +4764,7 @@ typedef enum
    BGPurseResist,                /* that, and he has a temper */
    BGPurseKin,                   /* the watch case, and Mira is the merchant's daughter */
    BGPurseWary,                  /* B, and the carter trusts no one */
+   BGPurseStrangers,             /* B, and the carter and Kasimir aren't friends */
    BGPurseRepaid,                /* B, and on until the loan's term is out */
    BGPurseLost                   /* that, but the wages are lost on the third day */
 } BGPurse;
@@ -4854,8 +4855,21 @@ static BGPurseRun   tempting_purse( BGPurse variant)
       [g set:"Bond.toward" of:BGWhole( bond) to:(int64_t) h[ 1]];
       [g set:"Agent.trusting" of:BGWhole( h[ 4]) to:3];
    }
-   if( variant == BGPurseHonest || variant == BGPurseRepaid || variant == BGPurseLost || variant == BGPurseWary)
+   if( variant == BGPurseHonest || variant == BGPurseRepaid || variant == BGPurseLost || variant == BGPurseWary ||
+       variant == BGPurseStrangers)
       [g set:"Agent.honesty" of:BGWhole( h[ 2]) to:90];
+   /* the carter and Kasimir are friends (AGENCY.md decision 12) */
+   if( variant != BGPurseStrangers)
+   {
+      BGEntityID   bond;
+
+      bond = [g create:"friend_bond" key:"the carter's to Kasimir" at:BGLocationMakeNone()];
+      [g set:"Bond.bondOf" of:BGWhole( bond) to:(int64_t) h[ 3]];
+      [g set:"Bond.toward" of:BGWhole( bond) to:(int64_t) h[ 2]];
+      bond = [g create:"friend_bond" key:"Kasimir's to the carter" at:BGLocationMakeNone()];
+      [g set:"Bond.bondOf" of:BGWhole( bond) to:(int64_t) h[ 2]];
+      [g set:"Bond.toward" of:BGWhole( bond) to:(int64_t) h[ 3]];
+   }
    if( variant == BGPurseWary)
       [g set:"Agent.trusting" of:BGWhole( h[ 3]) to:-20];
    [st.c submit:g];
@@ -4918,6 +4932,43 @@ static BGPurseRun   tempting_purse( BGPurse variant)
 }
 
 
+/* What the speaker last said that holds `text`, or nil. */
+static NSString   *said_with( BGWorld *w, BGEntityID speaker, NSString *text)
+{
+   NSString     *said;
+   NSUInteger   i;
+
+   for( i = [w eventCount]; i > 0; i--)
+      if( ! strcmp( [w eventAt:i - 1]->kind, "said") && [w eventAt:i - 1]->actor == speaker && [w eventAt:i - 1]->detail)
+      {
+         said = [NSString stringWithUTF8String:[w eventAt:i - 1]->detail];
+         if( [said rangeOfString:text].location != NSNotFound)
+            return( said);
+      }
+   return( nil);
+}
+
+
+/* When the agent last noted it owes something back by, or 0. */
+static long long   owed_by( BGAgency *agency, BGEntityID agent)
+{
+   NSArray      *log;
+   NSString     *line;
+   NSRange      at;
+   NSUInteger   i;
+
+   log = [agency logOf:agent];
+   for( i = [log count]; i > 0; i--)
+   {
+      line = [log objectAtIndex:i - 1];
+      at   = [line rangeOfString:@" back by "];
+      if( [line rangeOfString:@"owes R"].location != NSNotFound && at.location != NSNotFound)
+         return( [[line substringFromIndex:at.location + at.length] longLongValue]);
+   }
+   return( 0);
+}
+
+
 /* The promise the source made the agent, or NULL. */
 static const BGTestimony   *pledge_from( BGKnowledgeStore *store, uint32_t source)
 {
@@ -4945,6 +4996,7 @@ static void   test_tempting_purse( void)
    BGPurseRun         resist;
    BGPurseRun         kin;
    BGPurseRun         wary;
+   BGPurseRun         strangers;
    BGKnowledgeStore   *store;
    const BGReferent   *purse;
    const BGTestimony  *t;
@@ -5000,28 +5052,41 @@ static void   test_tempting_purse( void)
 
    /* 3: B: an honest Kasimir, unwatched, never takes it; asked, the carter
     * weighs lending at its trust in him less what lending costs it
-    * (AGENCY.md decision 16): the wages' worth to it, 30, a sixth of it at
-    * its trust in him, 20 */
+    * (AGENCY.md decision 16): the wages' worth to it, 30, less by its trust
+    * in him, 22 (untested, and a friend: AGENCY.md decision 12) */
    honest = tempting_purse( BGPurseHonest);
    BG_CHECK( logged_by( honest.agency, honest.kasimir, @"take the purse -20 (+30, honesty -45, scruples -5, unlawful, unwatched +0)"));
    BG_CHECK( ! logged_by( honest.agency, honest.kasimir, @"take R"));
    BG_CHECK( [honest.world locationOf:honest.purse].form == BGLocationOnTile);
-   BG_CHECK( logged_by( honest.agency, honest.carter, @"worth 30 to it: lending it costs 5"));
-   BG_CHECK( logged_by( honest.agency, honest.carter, @"worth +15, granting"));
+   BG_CHECK( logged_by( honest.agency, honest.carter, @"worth 30 to it: lending it costs 4"));
+   BG_CHECK( logged_by( honest.agency, honest.carter, @"worth +18, granting"));
    BG_CHECK( logged_by( honest.agency, honest.carter, @"granting: give R"));
    BG_CHECK( [honest.world locationOf:honest.wages].place == honest.kasimir);
    BG_CHECK( logged_by( noticed.agency, noticed.mira, @"for something it hasn't"));
-   /* a wary carter, disposed to trust no one (-20), trusts him at 0: lending
-    * costs half the wages' worth, and it refuses */
+   /* a wary carter, disposed to trust no one (-20), trusts him at 2: lending
+    * costs nearly half the wages' worth, and it refuses */
    wary = tempting_purse( BGPurseWary);
-   BG_CHECK( logged_by( wary.agency, wary.carter, @"worth 30 to it: lending it costs 15"));
-   BG_CHECK( logged_by( wary.agency, wary.carter, @"worth -15, refusing"));
+   BG_CHECK( logged_by( wary.agency, wary.carter, @"worth 30 to it: lending it costs 14"));
+   BG_CHECK( logged_by( wary.agency, wary.carter, @"worth -12, refusing"));
    BG_CHECK( [wary.world locationOf:wary.wages].place == wary.carter);
    /* a loan is a debt (AGENCY.md §7): Kasimir owes the carter its wages
     * back within the week, a commitment, saved like any other */
    BG_CHECK( logged_by( honest.agency, honest.kasimir, @"owes R"));
    BG_CHECK( [honest.text rangeOfString:@" repay "].location != NSNotFound &&
              [honest.text rangeOfString:@" debt "].location != NSNotFound);
+   /* AGENCY.md decision 18: the terms are part of the deal. Between
+    * friends, none are said, and the default holds: a week. Not friends,
+    * the carter lends for a day, and says so; Kasimir owes it back then */
+   strangers = tempting_purse( BGPurseStrangers);
+   BG_CHECK( logged_by( strangers.agency, strangers.carter, @"worth +15, granting"));
+   BG_CHECK( said_with( strangers.world, strangers.carter, @"#Granted") &&
+             [said_with( strangers.world, strangers.carter, @"#Granted") rangeOfString:@"owedIn: 86400000ms"].location
+             != NSNotFound);
+   BG_CHECK( said_with( honest.world, honest.carter, @"#Granted") &&
+             [said_with( honest.world, honest.carter, @"#Granted") rangeOfString:@"owedIn"].location == NSNotFound);
+   BG_CHECK( owed_by( strangers.agency, strangers.kasimir) > 0 &&
+             owed_by( honest.agency, honest.kasimir) - owed_by( strangers.agency, strangers.kasimir) == 6 * 86400000LL);
+
    /* kept on the loan's last day, not before: the wages back in the carter's hand */
    repaid = tempting_purse( BGPurseRepaid);
    BG_CHECK( repaid.owedLate);
@@ -5035,14 +5100,14 @@ static void   test_tempting_purse( void)
    store = [repaid.knowledge storeOf:repaid.carter];
    t     = pledge_from( store, referent_of( store, repaid.kasimir));
    BG_CHECK( t && t->settled == 1 && t->container == [store selfReferent]);
-   BG_CHECK( [store trustIn:referent_of( store, repaid.kasimir)] == BG_TRUST + BG_CONFIRMED);
+   BG_CHECK( [store trustIn:referent_of( store, repaid.kasimir)] == BG_TRUST + BG_CONFIRMED + 2);
    /* lost on the third day, it can't be: due, the carter, with Kasimir in
     * sight and nothing back in its hand, finds the promise broken */
    lost = tempting_purse( BGPurseLost);
    store = [lost.knowledge storeOf:lost.carter];
    t     = pledge_from( store, referent_of( store, lost.kasimir));
    BG_CHECK( t && t->settled == -1);
-   BG_CHECK( [store trustIn:referent_of( store, lost.kasimir)] == BG_TRUST - BG_REFUTED);
+   BG_CHECK( [store trustIn:referent_of( store, lost.kasimir)] == BG_TRUST - BG_REFUTED + 2);
 
    /* INSTITUTIONS.md decisions 5 and 8: everyone knows the town's law
     * against theft from the start; Kasimir weighs it because he believes

@@ -100,8 +100,9 @@
 #define BG_HABIT_FADE      1      /* a day */
 #define BG_DUTY            20     /* what a commitment is worth */
 #define BG_URGENCY         20     /* and more, rising toward its deadline */
-#define BG_LOAN_TERM       (7 * 86400000LL)   /* a loan is owed back within a week, */
-#define BG_LOAN_DUE        (86400000LL)       /* repaid on its last day */
+#define BG_LOAN_TERM       (7 * 86400000LL)   /* a loan between friends is owed back within a week, */
+#define BG_LOAN_SHORT      (86400000LL)       /* to anyone else, a day (AGENCY.md decision 18); */
+#define BG_LOAN_DUE        7                  /* repaid in the last seventh of its term */
 
 
 typedef struct

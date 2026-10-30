@@ -3453,3 +3453,27 @@ Not yet: gifts as opposed to loans (every request is a loan now); the
 raise for tools in use; worth in trade (no trade yet).
 
 88 tests, 2737 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: a loan's terms
+
+AGENCY.md decision 18: a loan's terms are part of the deal, said when
+lending; with none said, a default by relationship (between friends, a
+week, no interest).
+
+- **`#Granted.owedIn`**: the term the lender says. To one it is loyal to
+  (a friend), it says none; to anyone else, a day (`BG_LOAN_SHORT`).
+- **The borrower** owes it back within the term said, or, none said, the
+  default by its own bond to the lender: a week to a friend, a day
+  otherwise. It repays in the term's last seventh (a day of a week).
+- **Friendship** is a tie (`friend_bond`, 20). In the purse scenario the
+  carter and Kasimir are friends, as the scenario has it; that raises the
+  carter's trust in him by 2, so lending costs 4, not 5.
+
+Checked: friends, the carter grants with no terms, and Kasimir owes the
+wages back in a week; strangers, the carter says a day (`owedIn:
+86400000ms`), and Kasimir owes them six days sooner.
+
+Not yet: interest (things lent are single bodies; it needs divisible
+money); a borrower proposing terms; terms written down.
+
+88 tests, 2744 checks, under both compilers, ASan, and leak-free.
