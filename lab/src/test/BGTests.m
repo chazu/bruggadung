@@ -5733,6 +5733,66 @@ static void   test_talking_takes_time( void)
 }
 
 
+/* AGENCY.md §8: a routine is built from commitments "with time windows (a
+ * shift from 8 to 16)", every day. Oskar is to tighten the nut each day
+ * between 60 s and 120 s past midnight: on day one he does; someone
+ * loosens it overnight; on day two, in its window and not before, he does
+ * again. Saved, it recurs. */
+static void   test_daily_commitment( void)
+{
+   BGStage            st;
+   BGActivities       *activities;
+   BGKnowledge        *knowledge;
+   BGAgency           *agency;
+   BGProposalGroup    *g;
+   BGEntityID         worker;
+   BGEntityID         nut;
+   NSString           *text;
+   int64_t            v;
+   int64_t            day;
+
+   day        = 86400000LL;
+   st.w       = BGTestWorld( 71);
+   st.c       = BGTestCommitter( st.w);
+   activities = [BGActivities activitiesWithWorld:st.w committer:st.c];
+   knowledge  = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+   agency     = [[[BGAgency alloc] initWithWorld:st.w committer:st.c knowledge:knowledge] autorelease];
+   st.s       = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [agency setActivities:activities];
+   [st.s setActivities:activities];
+   [st.s setPerception:knowledge];
+   [st.s setDecision:agency];
+   g      = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the pump"];
+   worker = [g create:"worker" key:"Oskar" at:BGOnTile( 5, 2, 0)];
+   [g create:"spanner_19" key:"spanner" at:BGHeldBy( worker, 0)];
+   nut    = [g create:"gland_nut" key:"gland nut" at:BGOnTile( 6, 2, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   worker = [g idFor:worker];
+   nut    = [g idFor:nut];
+   BG_CHECK( ! [agency undertake:worker goal:"tighten_nut" from:60000 until:120000 source:"employment" every:30000]);
+   BG_CHECK( [agency undertake:worker goal:"tighten_nut" from:60000 until:120000 source:"employment" every:day]);
+   [agency control:worker];
+
+   /* day one */
+   [st.s runUntil:BGTimeMake( 120000)];
+   BG_CHECK( [st.w getField:"Fastener.tight" of:nut value:&v] && v);
+   /* overnight, someone loosens it */
+   [st.s runUntil:BGTimeMake( day / 2)];
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: someone loosens it"];
+   [g set:"Fastener.tight" of:BGWhole( nut) to:0];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( day + 59000)];
+   text = BGSave( st.w, st.c, [NSArray arrayWithObjects:knowledge, agency, nil]);
+   BG_CHECK( [text rangeOfString:@"recurs "].location != NSNotFound);
+   BG_CHECK( [st.w getField:"Fastener.tight" of:nut value:&v] && ! v);
+   /* day two, in its window */
+   [st.s runUntil:BGTimeMake( day + 120000)];
+   BG_CHECK( logged_by( agency, worker, @"t=86460000ms [tighten the nut] tighten it"));
+   BG_CHECK( [st.w getField:"Fastener.tight" of:nut value:&v] && v);
+}
+
+
 /* AGENCY.md §14, autopilot "continue my routine": the player hands Oskar,
  * beside the nut with a spanner, to agency from the start, past a
  * threshold of 10; his shift has him tighten the nut between 60 s and
@@ -8202,6 +8262,7 @@ const BGTestCase   BGAllTests[] =
    { "traced_units",                  test_traced_units },
    { "attention_budget",              test_attention_budget },
    { "routine_autopilot",             test_routine_autopilot },
+   { "daily_commitment",              test_daily_commitment },
    { "talking_takes_time",            test_talking_takes_time },
    { "explore_autopilot",             test_explore_autopilot },
    { "recipe_autopilot",              test_recipe_autopilot },

@@ -459,6 +459,47 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
 }
 
 
+- (BOOL) undertake:(BGEntityID) agent
+              goal:(const char *) goal
+              from:(int64_t) from
+             until:(int64_t) until
+            source:(const char *) source
+             every:(int64_t) every
+{
+   BGMotivation   *m;
+
+   if( every <= 0 || until - from > every ||
+       ! [self undertake:agent goal:goal from:from until:until source:source])
+      return( NO);
+   m                                    = [self mindOf:agent];
+   m->commitments[ m->ncommitments - 1].every = every;
+   return( YES);
+}
+
+
+/* A recurring commitment whose window has closed opens its next one. */
+- (void) renewCommitments:(BGMotivation *) m
+{
+   BGCommitment   *c;
+   int64_t        now;
+   int            k;
+
+   now = [_world time].ms;
+   for( k = 0; k < m->ncommitments; k++)
+   {
+      c = &m->commitments[ k];
+      if( ! c->every || now < c->until)
+         continue;
+      while( now >= c->until)
+      {
+         c->from  += c->every;
+         c->until += c->every;
+      }
+      c->settled = NO;
+   }
+}
+
+
 - (BOOL) promise:(BGEntityID) agent
               to:(uint32_t) hearer
            goods:(uint32_t) goods
@@ -2374,6 +2415,7 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
          m->waiting     = NO;
       }
    }
+   [self renewCommitments:m];
    busy = [self busy:m->agent];
    if( [self weigh:m store:store busy:busy])
       return( NO);      /* something else won: decide again, for it */
@@ -2571,8 +2613,9 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
          if( m->commitments[ k].from > [_world time].ms && m->commitments[ k].from < t.ms &&
              ! m->commitments[ k].settled)
             t = BGTimeMake( m->commitments[ k].from);
+         /* closing; a recurring one's, settled too: its next window opens then */
          if( m->commitments[ k].until > [_world time].ms && m->commitments[ k].until < t.ms &&
-             ! m->commitments[ k].settled)
+             (! m->commitments[ k].settled || m->commitments[ k].every))
             t = BGTimeMake( m->commitments[ k].until);
       }
    }
@@ -2641,6 +2684,9 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
          for( q = 0; q < m->commitments[ k].nparams; q++)
             [cl appendFormat:@" %s %u", m->commitments[ k].params[ q].slot, m->commitments[ k].params[ q].referent];
          [lines addObject:cl];
+         if( m->commitments[ k].every)
+            [lines addObject:[NSString stringWithFormat:@"recurs %llu %d %lld", (unsigned long long) m->agent, k,
+                                                        (long long) m->commitments[ k].every]];
       }
       for( k = 0; k < m->nsettled; k++)
          [lines addObject:[NSString stringWithFormat:@"settled %llu %s %u", (unsigned long long) m->agent,
@@ -2714,6 +2760,13 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
       if( [words count] == 3 && [[words objectAtIndex:0] isEqualToString:@"wake"])
       {
          [self mindOf:(BGEntityID) [[words objectAtIndex:1] longLongValue]]->wake = [[words objectAtIndex:2] longLongValue];
+         continue;
+      }
+      if( [words count] == 4 && [[words objectAtIndex:0] isEqualToString:@"recurs"])
+      {
+         m = [self mindOf:(BGEntityID) [[words objectAtIndex:1] longLongValue]];
+         if( [[words objectAtIndex:2] intValue] < m->ncommitments)
+            m->commitments[ [[words objectAtIndex:2] intValue]].every = [[words objectAtIndex:3] longLongValue];
          continue;
       }
       if( [words count] == 3 && [[words objectAtIndex:0] isEqualToString:@"recipe"])

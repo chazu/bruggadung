@@ -145,6 +145,7 @@ typedef struct
    int64_t         from;         /* ms */
    int64_t         until;        /* ms: its deadline */
    const char      *source;      /* interned: "employment", "promise", "self" */
+   int64_t         every;        /* ms: it recurs, a window each period (a daily shift); 0, once */
    BOOL            settled;      /* done, or given up, for this window */
    BGSlotBinding   params[ BG_MAX_SLOTS];
    int             nparams;
@@ -241,6 +242,15 @@ typedef struct
               from:(int64_t) from
              until:(int64_t) until
             source:(const char *) source;
+
+/* The same, recurring (AGENCY.md §8's routine: "a shift from 8 to 16"): when
+ * a window closes, kept or not, the next opens `every` ms after it. */
+- (BOOL) undertake:(BGEntityID) agent
+              goal:(const char *) goal
+              from:(int64_t) from
+             until:(int64_t) until
+            source:(const char *) source
+             every:(int64_t) every;
 
 /* A promise (AGENCY.md §7), a communicate act: the agent tells the hearer
  * (a referent of its, in reach) the goods (a referent) will be in the

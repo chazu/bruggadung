@@ -3039,8 +3039,26 @@ why" above, and):
   consequences, detail fading by salience*: no document says.
 - *Routes as habits, exploring around obstacles*: the lab has no walls.
 
-**Buildable, not yet done**: commitments recurring daily (AGENCY.md §8's
-"a shift from 8 to 16"), reading taking time (as talking does), traces
+**Buildable, not yet done**: reading taking time (as talking does), traces
 left per stage rather than at completion (ACTIONS.md §2, costs "committed
 per stage"), a split reaching a running thermal domain's ledger, and
 hearing a promise's outcome from others.
+
+### After the slice: a commitment every day
+
+AGENCY.md §8: "A routine is the set of default goals active in a time
+window. It is built from commitments (a shift from 8 to 16 ...)". Each
+commitment was one window.
+
+- **`undertake:...every:`**: a commitment recurring each period, its
+  window no longer than the period. When the window closes, kept or not,
+  the next opens a period later, unsettled. Agency wakes at a recurring
+  window's close even when it was kept, so the next is due on time. Saved
+  (`recurs`).
+
+Checked: Oskar tightens the nut in its window on day one; loosened
+overnight, he tightens it again on day two at 60 s past midnight, exactly
+a day on; saved between, it recurs; a window longer than its period is
+refused.
+
+82 tests, 2587 checks, under both compilers, ASan, and leak-free.
