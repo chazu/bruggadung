@@ -91,6 +91,9 @@ Out of scope here, except where they touch agency:
     adds fatigue and then injury over time (hunger slowly, cold faster, air
     fastest): world state, which slows work and is felt as pain (§6).
     Death at the extreme is left for a scenario of its own.
+18. **A loan's terms are part of the deal**, said or written when lending
+    (when it is due, any interest), as employment's are; with none said, a
+    default by relationship (between friends: a week, no interest).
 
 ## Terms
 

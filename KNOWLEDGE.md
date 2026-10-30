@@ -99,6 +99,10 @@ These were made while writing this document and have not yet been reviewed.
     (AGENCY.md decision 12) raises it; being harmed or wronged by them
     lowers it, as does seeing them lie or break a rule. Claims confirmed
     and refuted, and promises kept and broken, still move it (§10).
+16. **Detail fades as strength does**: a memory's features generalize at
+    the same rate its strength fades (§12), slower for what was salient or
+    seen again and again, so a vivid or familiar thing keeps its
+    specifics longer.
 
 ## Terms
 

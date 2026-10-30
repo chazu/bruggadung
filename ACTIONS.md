@@ -59,6 +59,9 @@ Out of scope here, except through the stub interfaces defined below:
     quickness; shoving: strength; talking over someone: voice), in the
     action phase only. Without a declaration, the draw is unweighted;
     process and system phases are never weighted.
+14. **Talking takes as long as what is said**: a second, and a second
+    more for each claim or entry in it, so an account takes longer than a
+    yes. It occupies the voice (§5).
 
 ## Terms
 
