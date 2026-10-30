@@ -23,6 +23,7 @@
 #import "BGTypes.h"
 #import "BGWorld.h"
 #import "BGFluidDomain.h"
+#import "BGTraces.h"
 #import "BGComponents.h"
 #import "BGBodyKind.h"
 #import "BGKnowledge.h"

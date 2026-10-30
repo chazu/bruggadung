@@ -61,37 +61,24 @@ static TriMatch   match_described( BGWorld *world, const TriNode *pattern, BGAct
    TriContent        *tri;
    TriArena          *arena;
    TriMatch          match;
-   char              duration[ 128];
-   char              stages[ 1024];
-   char              uses[ 128];
+   static const char *copied[] = { "duration", "stages", "uses", "attention", "leaves", "removes", NULL };
+   char              value[ 1024];
    char              effect[ 64];
    char              err[ 256];
    int               r;
+   int               k;
 
    tri = [world tri];
    tri_print( tri, tri_at( tri, pattern, "effect"), effect, sizeof( effect));
-   /* the operation's own type: a walk is a #Walk, an operation by its kind */
+   /* the operation's own type: a walk is a #Walk, an operation by its kind;
+    * what the operation itself declares, as it declares it */
    expr = [NSMutableString stringWithFormat:@"%s & { effect: %s, ", tri_type_name( tri, tri_node_type( pattern)), effect];
-   if( tri_at( tri, pattern, "duration"))
-   {
-      tri_print( tri, tri_at( tri, pattern, "duration"), duration, sizeof( duration));
-      [expr appendFormat:@"duration: %s, ", duration];
-   }
-   if( tri_at( tri, pattern, "stages"))
-   {
-      tri_print( tri, tri_at( tri, pattern, "stages"), stages, sizeof( stages));
-      [expr appendFormat:@"stages: %s, ", stages];
-   }
-   if( tri_at( tri, pattern, "uses"))
-   {
-      tri_print( tri, tri_at( tri, pattern, "uses"), uses, sizeof( uses));
-      [expr appendFormat:@"uses: %s, ", uses];
-   }
-   if( tri_at( tri, pattern, "attention"))
-   {
-      tri_print( tri, tri_at( tri, pattern, "attention"), uses, sizeof( uses));
-      [expr appendFormat:@"attention: %s, ", uses];
-   }
+   for( k = 0; copied[ k]; k++)
+      if( tri_at( tri, pattern, copied[ k]))
+      {
+         tri_print( tri, tri_at( tri, pattern, copied[ k]), value, sizeof( value));
+         [expr appendFormat:@"%s: %s, ", copied[ k], value];
+      }
    [expr appendString:@"roles: {"];
    for( r = 0; r < BGRoleCount; r++)
       if( descriptions[ r])
@@ -591,6 +578,13 @@ static NSString   *effect_say( BGWorld *world, BGAction a, int64_t amount, BGPro
 }
 
 
+/* Tending changes nothing but traces, which the operation declares. */
+static NSString   *effect_tend( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
+{
+   return( nil);
+}
+
+
 /* Looking changes nothing in the world; it is an event the looker perceives. */
 static NSString   *effect_look( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
 {
@@ -614,6 +608,7 @@ static const struct
    { "loosen",    effect_loosen },
    { "look",      effect_look },
    { "say",       effect_say },
+   { "tend",      effect_tend },
 };
 
 
@@ -728,6 +723,121 @@ BGProposalGroup   *BGPerformBelieved( BGWorld *world, BGCommitter *committer, BG
          other:BGWhole( where)];
    [committer submit:group];
    return( group);
+}
+
+
+/* The entity a trace site names, or the actor's tile for "tile" (0). */
+static BOOL   trace_site( BGWorld *world, BGAction action, const char *site, BGEntityID *bearer, BGLocation *tile)
+{
+   BGLocation   at;
+   BGEntityID   e;
+   int          k;
+
+   *bearer = BGNoEntity;
+   memset( tile, 0, sizeof( *tile));
+   if( ! strcmp( site, "tile"))
+   {
+      for( e = action.roles[ BGRoleActor], k = 0; e && k < 64; k++)
+      {
+         at = [world locationOf:e];
+         if( at.form == BGLocationOnTile)
+         {
+            *tile = at;
+            return( YES);
+         }
+         e = at.place;
+      }
+      return( NO);
+   }
+   *bearer = ! strcmp( site, "actor") ? action.roles[ BGRoleActor]
+           : ! strcmp( site, "item") ? action.roles[ BGRoleItem]
+           : ! strcmp( site, "destination") ? action.roles[ BGRoleDestination] : BGNoEntity;
+   return( *bearer != BGNoEntity);
+}
+
+
+static BOOL   text_of( TriContent *tri, const TriNode *node, const char *path, char *buf, size_t len)
+{
+   const TriNode   *v;
+   size_t          n;
+
+   v = node ? tri_at( tri, node, path) : NULL;
+   if( ! v)
+      return( NO);
+   n = tri_print( tri, v, buf, len);
+   if( n < 2 || buf[ 0] != '"' || buf[ n - 1] != '"')
+      return( NO);
+   memmove( buf, buf + 1, n - 2);
+   buf[ n - 2] = 0;
+   return( YES);
+}
+
+
+void   BGLeaveTraces( BGWorld *world, BGAction action, BGProposalGroup *group)
+{
+   const TriNode      *pattern;
+   const TriNode      *list;
+   const TriNode      *v;
+   const BGTrace      *record;
+   BGStore            *traces;
+   BGEntityID         bearer;
+   BGEntityID         t;
+   BGLocation         tile;
+   TriContent         *tri;
+   NSUInteger         i;
+   int64_t            lo;
+   int64_t            hi;
+   int64_t            strength;
+   int64_t            lasts;
+   char               kind[ 64];
+   char               site[ 32];
+   char               key[ 128];
+   const char         *text;
+
+   tri     = [world tri];
+   pattern = action.operation ? tri_pattern( tri, action.operation) : NULL;
+   traces  = [world storeForKind:[world kindNamed:"Trace"]];
+   for( list = pattern ? tri_at( tri, pattern, "removes") : NULL; list && tri_at( tri, list, "first");
+        list = tri_at( tri, list, "rest"))
+   {
+      if( ! text_of( tri, tri_at( tri, list, "first"), "trace", kind, sizeof( kind)) ||
+          ! text_of( tri, tri_at( tri, list, "first"), "on", site, sizeof( site)) ||
+          ! trace_site( world, action, site, &bearer, &tile))
+         continue;
+      for( i = 0; i < [traces count]; i++)
+      {
+         record = [traces recordAtIndex:i];
+         t      = [traces entityAtIndex:i];
+         text   = [world textField:"Trace.traceKind" of:t];
+         if( ! text || strcmp( text, kind) || (BGEntityID) record->bearer != bearer)
+            continue;
+         if( ! bearer && (record->tileX != tile.x || record->tileY != tile.y || record->tileLevel != tile.level))
+            continue;
+         [group destroy:BGWhole( t) reason:"removed"];
+      }
+   }
+   for( list = pattern ? tri_at( tri, pattern, "leaves") : NULL; list && tri_at( tri, list, "first");
+        list = tri_at( tri, list, "rest"))
+   {
+      if( ! text_of( tri, tri_at( tri, list, "first"), "trace", kind, sizeof( kind)) ||
+          ! text_of( tri, tri_at( tri, list, "first"), "on", site, sizeof( site)) ||
+          ! trace_site( world, action, site, &bearer, &tile))
+         continue;
+      v        = tri_at( tri, tri_at( tri, list, "first"), "strength");
+      strength = v && tri_node_interval( v, &lo, &hi) && lo == hi ? lo : 0;
+      v        = tri_at( tri, tri_pattern( tri, kind), "lasts");
+      lasts    = v && tri_node_interval( v, &lo, &hi) && lo == hi ? lo : 0;
+      snprintf( key, sizeof( key), "%s, left by %s", kind, action.operation);
+      t = [group create:"trace" key:key at:BGLocationMakeNone()];
+      [group set:"Trace.traceKind" of:BGWhole( t) toText:[world intern:kind]];
+      [group set:"Trace.bearer" of:BGWhole( t) to:(int64_t) bearer];
+      [group set:"Trace.tileX" of:BGWhole( t) to:tile.x];
+      [group set:"Trace.tileY" of:BGWhole( t) to:tile.y];
+      [group set:"Trace.tileLevel" of:BGWhole( t) to:tile.level];
+      [group set:"Trace.magnitude" of:BGWhole( t) to:strength];
+      [group set:"Trace.created" of:BGWhole( t) to:[world time].ms];
+      [group set:"Trace.expires" of:BGWhole( t) to:[world time].ms + lasts];
+   }
 }
 
 
@@ -898,6 +1008,8 @@ BGProposalGroup   *BGPerform( BGWorld *world, BGCommitter *committer, BGAction a
          *error = reason;
       return( nil);
    }
+   else
+      BGLeaveTraces( world, action, group);
    [committer submit:group];
    return( group);
 }

@@ -11,6 +11,7 @@
 #import "BGKnowledge.h"
 #import "BGWorlds.h"
 #import "BGAgency.h"
+#import "BGTraces.h"
 
 #include <stdio.h>
 
@@ -64,7 +65,7 @@ static void   test_registry_and_construction( void)
 
    w = BGTestWorld( 1);
    c = BGTestCommitter( w);
-   BG_CHECK( [w kindCount] == 9);
+   BG_CHECK( [w kindCount] == 10);
    BG_CHECK( [w kindNamed:"Body"] != NSNotFound && [w kindNamed:"Nonesuch"] == NSNotFound);
    bin   = commit_create( c, "bin", BGOnTile( 0, 0, 0));
    nails = commit_create( c, "nails_30", BGIn( bin));
@@ -569,9 +570,10 @@ static void   test_menu( void)
    [scenario runUntil:BGTimeMake( 0)];
    text = menu_text( w, 4);
    BG_CHECK( [text isEqualToString:@"look_in item 1: entailed; take item 1: entailed; take item 2: entailed; "
-                                   @"take item 3: entailed; take_some item 2: entailed; walk_east: entailed; "
-                                   @"walk_north: entailed; walk_south: entailed; walk_west: entailed"]);
-   if( [text rangeOfString:@"take_some item 2: entailed; walk_east"].location == NSNotFound)
+                                   @"take item 3: entailed; take_some item 2: entailed; touch_up item 3: entailed; "
+                                   @"walk_east: entailed; walk_north: entailed; walk_south: entailed; walk_west: entailed; "
+                                   @"wash_floor: entailed"]);
+   if( [text rangeOfString:@"walk_west: entailed; wash_floor: entailed"].location == NSNotFound)
       fprintf( stderr, "    menu: %s\n", [text UTF8String]);
 
    /* a description carries perceivable fields only: the stack's count is hidden */
@@ -2044,6 +2046,166 @@ static void   test_salience( void)
 }
 
 
+/* --- traces --------------------------------------------------------------- */
+
+/* the agent's percept of a trace of that kind, present, or NULL */
+static const BGTraceSeen   *traced( BGKnowledgeStore *store, const char *kind)
+{
+   NSUInteger   i;
+
+   for( i = 0; i < [store traceCount]; i++)
+      if( ! strcmp( [store traceAt:i]->kind, kind) && [store traceAt:i]->present)
+         return( [store traceAt:i]);
+   return( NULL);
+}
+
+
+static BOOL   any_trace( BGWorld *w, const char *kind)
+{
+   BGStore      *traces;
+   NSUInteger   i;
+
+   traces = [w storeForKind:[w kindNamed:"Trace"]];
+   for( i = 0; i < [traces count]; i++)
+      if( ! strcmp( [w textField:"Trace.traceKind" of:[traces entityAtIndex:i]], kind))
+         return( YES);
+   return( NO);
+}
+
+
+/* KNOWLEDGE.md Scenario 2's first half, "the cleaned workshop", with the
+ * workshop's lock: at night the smith wedges the lock, which leaves tool
+ * marks on it and scuffs on the floor; then washes the floor and touches up
+ * the paint, which removes them and leaves traces of their own. The next
+ * morning the foreman comes by. */
+static void   test_traces( void)
+{
+   BGWorld            *w;
+   BGWorld            *w2;
+   BGCommitter        *c;
+   BGScheduler        *s;
+   BGActivities       *activities;
+   BGKnowledge        *knowledge;
+   BGKnowledge        *restored;
+   BGTraces           *traces;
+   BGKnowledgeStore   *store;
+   BGProposalGroup    *g;
+   const BGTraceSeen  *paint;
+   const BGTraceSeen  *smell;
+   const BGTraceSeen  *soap;
+   const BGEvent      *ev;
+   TriIndex           *family;
+   NSArray            *deferred;
+   NSString           *error;
+   NSString           *text;
+   BGEntityID         lock;
+   BGEntityID         smith;
+   BGEntityID         nails;
+   BGEntityID         foreman;
+   uint64_t           position;
+   int64_t            dried;
+   NSUInteger         boundaries;
+   NSUInteger         i;
+   int                n;
+
+   w          = BGTestWorld( 23);
+   c          = BGTestCommitter( w);
+   activities = [BGActivities activitiesWithWorld:w committer:c];
+   knowledge  = [[[BGKnowledge alloc] initWithWorld:w] autorelease];
+   traces     = [[[BGTraces alloc] initWithWorld:w] autorelease];
+   s          = [[[BGScheduler alloc] initWithWorld:w committer:c] autorelease];
+   [s setActivities:activities];
+   [s setPerception:knowledge];
+   [s addDomain:traces];
+   g       = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the workshop at night"];
+   lock    = [g create:"lock" key:"lock" at:BGOnTile( 5, 4, 0)];
+   smith   = [g create:"smith" key:"smith" at:BGOnTile( 4, 4, 0)];
+   nails   = [g create:"nails_10" key:"nails" at:BGHeldBy( smith, 0)];
+   foreman = [g create:"foreman" key:"foreman" at:BGOnTile( 20, 20, 0)];
+   [c submit:g];
+   [s runUntil:BGTimeMake( 1)];
+   lock    = [g idFor:lock];
+   smith   = [g idFor:smith];
+   nails   = [g idFor:nails];
+   foreman = [g idFor:foreman];
+
+   /* 2: every operation that removes traces leaves some of its own */
+   family = tri_family_index( [w tri], "operations");
+   n      = 0;
+   for( i = 0; family && i < tri_index_count( family); i++)
+      if( tri_at( [w tri], tri_pattern( [w tri], tri_index_tag( family, i)), "removes.first"))
+      {
+         BG_CHECK( tri_at( [w tri], tri_pattern( [w tri], tri_index_tag( family, i)), "leaves.first") != NULL);
+         n++;
+      }
+   BG_CHECK( n == 2);
+
+   /* the wedging leaves tool marks on the lock and scuffs on the floor */
+   BG_CHECK( BGPerform( w, c, BGActionMake( "drive", smith, nails, lock), 0, &error) != nil);
+   [s runUntil:BGTimeMake( 6000)];
+   BG_CHECK( any_trace( w, "tool_marks") && any_trace( w, "scuffs"));
+
+   /* the cover-up: each removal leaves its own */
+   BG_CHECK( BGPerform( w, c, BGActionMake( "wash_floor", smith, BGNoEntity, BGNoEntity), 0, &error) != nil);
+   [s runUntil:BGTimeMake( 17000)];
+   BG_CHECK( ! any_trace( w, "scuffs") && any_trace( w, "damp_floor") && any_trace( w, "soap_smell"));
+   BG_CHECK( BGPerform( w, c, BGActionMake( "touch_up", smith, lock, BGNoEntity), 0, &error) != nil);
+   [s runUntil:BGTimeMake( 38000)];
+   BG_CHECK( ! any_trace( w, "tool_marks") && any_trace( w, "fresh_paint") && any_trace( w, "paint_smell"));
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the smith goes home"];
+   [g move:BGWhole( smith) to:BGOnTile( 25, 25, 0)];
+   [c submit:g];
+   [s runUntil:BGTimeMake( 39000)];
+
+   /* 1: traces cost nothing overnight: the night passes in a boundary or two,
+    * the damp floor's run out, removed exactly when it does */
+   boundaries = 0;
+   while( any_trace( w, "damp_floor") && [s stepUntil:BGTimeMake( 12 * 3600000LL)])
+      boundaries++;
+   dried       = [w time].ms;
+   boundaries += [s runUntil:BGTimeMake( 12 * 3600000LL)];
+   BG_CHECK( boundaries <= 3);
+   BG_CHECK( dried == 16000 + 6 * 3600000LL);          /* washed from 6 s to 16 s */
+   BG_CHECK( ! any_trace( w, "damp_floor") && any_trace( w, "soap_smell"));
+
+   /* the morning: the foreman by the lock perceives fresh paint and smells it,
+    * and a faint smell of soap; nothing of the tool marks, the scuffs, or the
+    * damp; and only what the traces are, never what made them */
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the foreman comes by"];
+   [g move:BGWhole( foreman) to:BGOnTile( 4, 5, 0)];
+   [c submit:g];
+   [s runUntil:BGTimeMake( 12 * 3600000LL + 1000)];
+   store = [knowledge storeOf:foreman];
+   paint = traced( store, "fresh_paint");
+   smell = traced( store, "paint_smell");
+   soap  = traced( store, "soap_smell");
+   BG_CHECK( paint && smell && soap);
+   BG_CHECK( ! traced( store, "tool_marks") && ! traced( store, "scuffs") && ! traced( store, "damp_floor"));
+   BG_CHECK( paint && paint->bearer && [store referent:paint->bearer]->truth == lock);
+   BG_CHECK( soap && ! soap->bearer && soap->x == 4 && soap->y == 4);
+   /* aged analytically, from when each was made (the touch-up done at 37 s,
+    * the wash at 16 s): fresh paint lasts 3 days, the soap smell 2 */
+   BG_CHECK( paint && paint->strength == 80 * (37000 + 3 * 86400000LL - [w time].ms) / (3 * 86400000LL));
+   BG_CHECK( soap && soap->strength == 50 * (16000 + 2 * 86400000LL - [w time].ms) / (2 * 86400000LL));
+   BG_CHECK( soap && smell && soap->strength < smell->strength);
+   /* the developer sees where each came from: its creation, in the touch-up's completion */
+   for( i = 0; i < [w eventCount]; i++)
+   {
+      ev = [w eventAt:i];
+      if( paint && ! strcmp( ev->kind, "created") && ev->subject == paint->truth)
+         BG_CHECK( [[c sourceOfPosition:ev->group] rangeOfString:@"touch_up completes"].location != NSNotFound);
+   }
+
+   /* saved and restored the same */
+   text = BGSave( w, c, [NSArray arrayWithObjects:knowledge, traces, nil]);
+   w2   = BGRestore( text, [w contentBuild], &deferred, &position, &error);
+   BG_CHECK( w2 != nil);
+   restored = [[[BGKnowledge alloc] initWithWorld:w2] autorelease];
+   [restored restoreSavedState:BGSavedDomainState( text, @"knowledge")];
+   BG_CHECK( [[restored dump:foreman] isEqualToString:[knowledge dump:foreman]]);
+}
+
+
 /* --- the cistern ----------------------------------------------------------- */
 
 static BGCistern   *run_cistern( BGCisternVariant variant)
@@ -2358,6 +2520,7 @@ const BGTestCase   BGAllTests[] =
    { "rumour",                        test_rumour },
    { "memory_decay",                  test_memory_decay },
    { "salience",                      test_salience },
+   { "traces",                        test_traces },
    { "cistern",                       test_cistern },
    { "cistern_b",                     test_cistern_b },
    { "cistern_d",                     test_cistern_d },

@@ -50,6 +50,12 @@
  * restores both. A claim of what the speaker saw says how sure it is, its
  * memory's strength, and weighs no more than that.
  *
+ * Traces (KNOWLEDGE.md §3) are perceived by their kind's sense: by sight on
+ * what the agent sees, or on the floor in sight; by smell within
+ * BG_SMELL tiles. What it perceives is the trace's kind, where, and how
+ * strong it seems now (its age fades it), never what made it; a trace it
+ * perceived at a site it perceives again, and no longer finds, is gone.
+ *
  * Salience (KNOWLEDGE.md §7, AGENCY.md §10): what an agent perceives happen
  * is kept as an observation only if it is salient enough: being addressed
  * most, its own deeds next, then what its goals concern (agency says what
@@ -71,6 +77,7 @@
 
 
 #define BG_SIGHT   4
+#define BG_SMELL   1
 
 /* credence and trust, in dB */
 #define BG_PRIOR         -10      /* a claim of where something is, before any testimony */
@@ -129,6 +136,21 @@ typedef struct
 } BGObservation;
 
 
+/* A trace perceived: on a referent, or on the floor. */
+typedef struct
+{
+   uint32_t         bearer;        /* referent; 0 for the floor */
+   int32_t          x;             /* the floor's tile */
+   int32_t          y;
+   int32_t          level;
+   const char       *kind;         /* interned: "fresh_paint" */
+   int32_t          strength;      /* as it seemed, 1..100 */
+   int64_t          seen;          /* ms */
+   BOOL             present;       /* still there, as far as it knows */
+   BGEntityID       truth;         /* developer-only: the trace */
+} BGTraceSeen;
+
+
 typedef enum
 {
    BGSaw = 0,                      /* "I saw it" */
@@ -184,6 +206,9 @@ typedef struct
    BGTestimony      *_testimony;
    NSUInteger       _ntestimony;
    NSUInteger       _tcapacity;
+   BGTraceSeen      *_traces;
+   NSUInteger       _ntraces;
+   NSUInteger       _trcapacity;
 }
 
 - (BGEntityID) agent;
@@ -228,6 +253,10 @@ typedef struct
 - (uint64_t) nextSerial;
 /* when the agent last said something to the referent, or -1 */
 - (int64_t) lastSaidTo:(uint32_t) referentID;
+
+/* the traces it has perceived, first perceived first */
+- (NSUInteger) traceCount;
+- (const BGTraceSeen *) traceAt:(NSUInteger) i;
 
 /* the claims it has heard, oldest first */
 - (NSUInteger) testimonyCount;

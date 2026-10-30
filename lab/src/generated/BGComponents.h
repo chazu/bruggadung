@@ -1,4 +1,4 @@
-/* Generated from Triangle content d671191581fa9b18: do not edit. Type IDs are valid
+/* Generated from Triangle content 93fe613cce7edc2f: do not edit. Type IDs are valid
  * only for this content; regenerate when it changes. */
 #ifndef BG_COMPONENTS_H
 #define BG_COMPONENTS_H
@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BG_CONTENT_HASH 0xd671191581fa9b18ULL
+#define BG_CONTENT_HASH 0x93fe613cce7edc2fULL
 
 /* Activity, from #Activity */
 typedef struct {
@@ -69,6 +69,18 @@ typedef struct {
     int64_t         rate;    /* int, in quanta of 1; content, saved, inspect */
 } BGTap;
 
+/* Trace, from #Trace */
+typedef struct {
+    uint64_t        bearer;    /* a referent; saved, proposable, inspect */
+    int64_t         created;    /* time, in quanta of 1ms; content, saved, proposable, inspect */
+    int64_t         expires;    /* time, in quanta of 1ms; content, saved, proposable, inspect */
+    int64_t         magnitude;    /* int, in quanta of 1; content, saved, proposable, inspect */
+    int64_t         tileLevel;    /* int, in quanta of 1; content, saved, proposable, inspect */
+    int64_t         tileX;    /* int, in quanta of 1; content, saved, proposable, inspect */
+    int64_t         tileY;    /* int, in quanta of 1; content, saved, proposable, inspect */
+    const char *    traceKind;    /* text; content, saved, proposable, inspect */
+} BGTrace;
+
 /* WaterStore, from #WaterStore */
 typedef struct {
     int64_t         water;    /* volume, in quanta of 1mL; content, saved, proposable, inspect, perceive(sight) */
@@ -77,40 +89,40 @@ typedef struct {
 
 /* #ActivityStatus */
 enum {
-    BG_ACTIVITYSTATUS_COMPLETED = 80,
-    BG_ACTIVITYSTATUS_EXHAUSTED = 81,
-    BG_ACTIVITYSTATUS_FAILED = 82,
-    BG_ACTIVITYSTATUS_RUNNING = 83,
-    BG_ACTIVITYSTATUS_SUSPENDED = 84,
+    BG_ACTIVITYSTATUS_COMPLETED = 95,
+    BG_ACTIVITYSTATUS_EXHAUSTED = 96,
+    BG_ACTIVITYSTATUS_FAILED = 97,
+    BG_ACTIVITYSTATUS_RUNNING = 98,
+    BG_ACTIVITYSTATUS_SUSPENDED = 99,
 };
 
 /* #ClaimKind */
 enum {
-    BG_CLAIMKIND_CUSTODY = 86,
-    BG_CLAIMKIND_OWNERSHIP = 87,
+    BG_CLAIMKIND_CUSTODY = 101,
+    BG_CLAIMKIND_OWNERSHIP = 102,
 };
 
 /* #Material */
 enum {
-    BG_MATERIAL_FLESH = 114,
-    BG_MATERIAL_BRASS = 116,
-    BG_MATERIAL_IRON = 117,
-    BG_MATERIAL_PAPER = 118,
-    BG_MATERIAL_OAK = 120,
+    BG_MATERIAL_FLESH = 130,
+    BG_MATERIAL_BRASS = 132,
+    BG_MATERIAL_IRON = 133,
+    BG_MATERIAL_PAPER = 134,
+    BG_MATERIAL_OAK = 136,
 };
 
 /* #Colour */
 enum {
-    BG_COLOUR_BLUE = 90,
-    BG_COLOUR_BLACK = 92,
-    BG_COLOUR_BROWN = 93,
-    BG_COLOUR_GREEN = 94,
-    BG_COLOUR_GREY = 95,
-    BG_COLOUR_BEIGE = 97,
-    BG_COLOUR_NAVY = 98,
-    BG_COLOUR_RED = 99,
-    BG_COLOUR_WHITE = 100,
-    BG_COLOUR_YELLOW = 101,
+    BG_COLOUR_BLUE = 105,
+    BG_COLOUR_BLACK = 107,
+    BG_COLOUR_BROWN = 108,
+    BG_COLOUR_GREEN = 109,
+    BG_COLOUR_GREY = 110,
+    BG_COLOUR_BEIGE = 112,
+    BG_COLOUR_NAVY = 113,
+    BG_COLOUR_RED = 114,
+    BG_COLOUR_WHITE = 115,
+    BG_COLOUR_YELLOW = 116,
 };
 
 /* The field registry: what code needs to read and write any component
@@ -136,7 +148,7 @@ typedef struct {
     const BGFieldInfo *fields;
 } BGComponentInfo;
 
-#define BG_COMPONENT_COUNT 9
+#define BG_COMPONENT_COUNT 10
 
 #ifdef BG_COMPONENT_REGISTRY
 
@@ -193,6 +205,17 @@ static const BGFieldInfo BGTap_fields[] = {
     { "rate", offsetof(BGTap, rate), BG_VALUE_QUANTITY, "int", "content, saved, inspect" },
 };
 
+static const BGFieldInfo BGTrace_fields[] = {
+    { "bearer", offsetof(BGTrace, bearer), BG_VALUE_REF, "ref", "saved, proposable, inspect" },
+    { "created", offsetof(BGTrace, created), BG_VALUE_QUANTITY, "time", "content, saved, proposable, inspect" },
+    { "expires", offsetof(BGTrace, expires), BG_VALUE_QUANTITY, "time", "content, saved, proposable, inspect" },
+    { "magnitude", offsetof(BGTrace, magnitude), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
+    { "tileLevel", offsetof(BGTrace, tileLevel), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
+    { "tileX", offsetof(BGTrace, tileX), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
+    { "tileY", offsetof(BGTrace, tileY), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
+    { "traceKind", offsetof(BGTrace, traceKind), BG_VALUE_TEXT, "text", "content, saved, proposable, inspect" },
+};
+
 static const BGFieldInfo BGWaterStore_fields[] = {
     { "water", offsetof(BGWaterStore, water), BG_VALUE_QUANTITY, "volume", "content, saved, proposable, inspect, perceive(sight)" },
     { "waterCapacity", offsetof(BGWaterStore, waterCapacity), BG_VALUE_QUANTITY, "volume", "content, saved, inspect, perceive(sight)" },
@@ -207,6 +230,7 @@ static const BGComponentInfo BGComponents[BG_COMPONENT_COUNT + 1] = {
     { "Container", "#Container", sizeof(BGContainer), 1, BGContainer_fields },
     { "Stack", "#Stack", sizeof(BGStack), 3, BGStack_fields },
     { "Tap", "#Tap", sizeof(BGTap), 2, BGTap_fields },
+    { "Trace", "#Trace", sizeof(BGTrace), 8, BGTrace_fields },
     { "WaterStore", "#WaterStore", sizeof(BGWaterStore), 2, BGWaterStore_fields },
     { 0 }
 };

@@ -92,7 +92,11 @@ who made it up, and the dump flags false corroboration. Memory decays when
 read: each day since a thing was seen, each feature it keeps generalizes a
 step along the content's hierarchies (an oak chest becomes a wooden one,
 then just a chest), the belief of where it is fades, and too faint, it is
-forgotten. Agents keep observations only if they are salient: being
+forgotten. Operations leave traces (tool marks, scuffs) and remove them,
+and each removal leaves its own (a damp floor, a smell of soap); traces
+fade with age, computed when read, and are removed when they run out,
+with nothing to compute between. Agents perceive them by sight or smell,
+never what made them. Agents keep observations only if they are salient: being
 addressed, their own deeds, or what their goals concern, more than a busy
 agent's activity demands of its attention; and only as many as their
 `memory` holds, the least salient evicted first. The menu `lab play`

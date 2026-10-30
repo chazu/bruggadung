@@ -4,7 +4,7 @@
 // bindings between roles. `effect` names the code that builds the proposal
 // group when the action is performed.
 
-#Effect: "take" | "take_some" | "put_in" | "drive" | "open_tap" | "fill" | "walk" | "loosen" | "look" | "say"
+#Effect: "take" | "take_some" | "put_in" | "drive" | "open_tap" | "fill" | "walk" | "loosen" | "look" | "say" | "tend"
 
 // Which roles an operation has is its roles' type: a structure's type is the
 // most general one with all its features.
@@ -34,12 +34,17 @@
 // without is instant, unless its effect's code makes it an activity that ends
 // by a watch or an event (fill).
 // `attention` is what it demands of the actor while it runs (AGENCY.md
-// §10): it raises what the actor must find salient to notice it.
+// §10): it raises what the actor must find salient to notice it. `leaves`
+// and `removes` are its traces (KNOWLEDGE.md §3, traces.tri), made and
+// removed with its effect, when it completes: an operation that removes
+// traces leaves some of its own, so a cover-up can be found out.
 #Operation: #Step & {
     roles:     #Roles
     stages:    [...#Stage]
     uses:      [...#Provider]
     attention: *0 | int & >=0 & <=100
+    leaves:    [...#Leaves]
+    removes:   [...#Removes]
 }
 
 // Pick something up into a free hand: from a container, the ground, or an
@@ -79,6 +84,8 @@ drive: #Operation & {
     duration:  4s
     uses:      ["hands"]
     attention: 10
+    leaves:    [{ trace: "tool_marks", on: "destination", strength: 60 },
+                { trace: "scuffs", on: "tile", strength: 40 }]
     roles: {
         actor:       #Agent & { id: $a }
         item:        #Body & { material: "iron", place: #Held & { by: $a } }
@@ -142,4 +149,33 @@ look_in: #Operation & {
         actor: #Agent
         item:  #Container
     }
+} @family(operations)
+
+// Wash the floor where the actor stands: the scuffs go, and the floor is left
+// damp, smelling of soap.
+wash_floor: #Operation & {
+    effect:    "tend"
+    duration:  10s
+    uses:      ["hands"]
+    attention: 5
+    roles:     { actor: #Agent & { place: #OnTile } }
+    removes:   [{ trace: "scuffs", on: "tile" }]
+    leaves:    [{ trace: "damp_floor", on: "tile", strength: 60 },
+                { trace: "soap_smell", on: "tile", strength: 50 }]
+} @family(operations)
+
+// Touch up the paint on an assembly: its tool marks go under fresh paint,
+// which smells.
+touch_up: #Operation & {
+    effect:    "tend"
+    duration:  20s
+    uses:      ["hands"]
+    attention: 10
+    roles: {
+        actor: #Agent
+        item:  #Assembly
+    }
+    removes:   [{ trace: "tool_marks", on: "item" }]
+    leaves:    [{ trace: "fresh_paint", on: "item", strength: 80 },
+                { trace: "paint_smell", on: "item", strength: 70 }]
 } @family(operations)

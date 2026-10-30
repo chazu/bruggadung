@@ -80,6 +80,7 @@ src/core/BGStore.h
 src/core/BGTypes.h
 src/core/BGWorld.h
 src/domains/BGFluidDomain.h
+src/domains/BGTraces.h
 src/generated/BGComponents.h
 src/kinds/BGBodyKind.h
 src/know/BGKnowledge.h

@@ -110,7 +110,10 @@ static BGAction   action_of( BGWorld *world, BGEntityID a, const BGActivity *rec
          [group set:"Activity.due" of:BGWhole( a) to:t.ms + duration];
       }
       else
+      {
+         BGLeaveTraces( _world, action_of( _world, a, record), group);
          [group set:"Activity.status" of:BGWhole( a) to:tri_type_named( [_world tri], "\"completed\"")];
+      }
       [_committer submit:group];
       [_completions addObject:group];
       [_completions addObject:[NSNumber numberWithUnsignedLongLong:a]];

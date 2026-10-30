@@ -128,6 +128,12 @@ BOOL               BGOperationStage( BGWorld *world, const char *operation, int6
  * use different providers). nil when it can. */
 NSString           *BGProvidersBusy( BGWorld *world, BGEntityID actor, const char *operation, BGEntityID except);
 
+/* The traces the operation declares (KNOWLEDGE.md §3, content/traces.tri),
+ * as proposals added to `group`: those it removes destroyed, those it leaves
+ * created, made now and running out after their kind's `lasts`. Called with
+ * its effect, when an instant action is performed or an activity completes. */
+void               BGLeaveTraces( BGWorld *world, BGAction action, BGProposalGroup *group);
+
 /* A named effect, as proposals added to `group`. */
 NSString           *BGApplyNamedEffect( BGWorld *world, NSString *effect, BGAction action, int64_t amount,
                                         BGProposalGroup *group);

@@ -1,6 +1,7 @@
 #import "BGKnowledge.h"
 
 #import "BGView.h"
+#import "BGTraces.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -140,6 +141,7 @@ static NSUInteger   feature_keys( const char *features, char (*keys)[ 32], NSUIn
       free( _observations[ i].content);
    free( _observations);
    free( _testimony);
+   free( _traces);
    [_news release];
    [super dealloc];
 }
@@ -305,6 +307,46 @@ static NSUInteger   feature_keys( const char *features, char (*keys)[ 32], NSUIn
          return( o->time);
    }
    return( -1);
+}
+
+
+- (NSUInteger) traceCount
+{
+   return( _ntraces);
+}
+
+
+- (const BGTraceSeen *) traceAt:(NSUInteger) i
+{
+   return( &_traces[ i]);
+}
+
+
+- (BGTraceSeen *) mutableTraceAt:(NSUInteger) i
+{
+   return( &_traces[ i]);
+}
+
+
+/* The trace of that kind at that site, updated, or added; YES if added. */
+- (BOOL) noteTrace:(BGTraceSeen) t
+{
+   NSUInteger   i;
+
+   for( i = 0; i < _ntraces; i++)
+      if( _traces[ i].kind == t.kind && _traces[ i].bearer == t.bearer &&
+          (t.bearer || (_traces[ i].x == t.x && _traces[ i].y == t.y && _traces[ i].level == t.level)))
+      {
+         _traces[ i] = t;
+         return( NO);
+      }
+   if( _ntraces == _trcapacity)
+   {
+      _trcapacity = _trcapacity ? _trcapacity * 2 : 16;
+      _traces     = realloc( _traces, sizeof( BGTraceSeen) * _trcapacity);
+   }
+   _traces[ _ntraces++] = t;
+   return( YES);
 }
 
 
@@ -1248,6 +1290,119 @@ static uint32_t   bound_to( BGEntityID e, BGEntityID agent, uint32_t me, const B
 }
 
 
+/* Traces in reach of their sense: on what it sees, or on the floor; how
+ * strong each seems now. One it perceived at a site it perceives again, and
+ * doesn't find, is gone. */
+- (void) perceiveTraces:(BGKnowledgeStore *) store
+                     at:(BGLocation) here
+                    now:(int64_t) now
+                   seen:(const BGSeen *) seen
+               assigned:(const uint32_t *) assigned
+                  count:(NSUInteger) nseen
+                   news:(NSMutableArray *) news
+{
+   const BGTrace   *record;
+   const TriNode   *v;
+   BGTraceSeen     *old;
+   BGTraceSeen     t;
+   BGLocation      tile;
+   BGStore         *traces;
+   TriContent      *tri;
+   NSUInteger      i;
+   NSUInteger      j;
+   uint8_t         *found;
+   int64_t         strength;
+   int32_t         range[ 2];
+   char            sense[ 16];
+   const char      *kind;
+   BOOL            smell;
+
+   tri      = [_world tri];
+   traces   = [_world storeForKind:[_world kindNamed:"Trace"]];
+   range[ 0] = BG_SIGHT;
+   range[ 1] = BG_SMELL;
+   for( i = 0; i < [traces count]; i++)
+   {
+      record   = [traces recordAtIndex:i];
+      kind     = [_world textField:"Trace.traceKind" of:[traces entityAtIndex:i]];
+      strength = BGTraceStrength( record, now);
+      if( ! kind || strength <= 0)
+         continue;
+      v = tri_at( tri, tri_pattern( tri, kind), "sense");
+      sense[ 0] = 0;
+      if( v)
+         tri_print( tri, v, sense, sizeof( sense));
+      smell = ! strcmp( sense, "\"smell\"");
+      memset( &t, 0, sizeof( t));
+      if( record->bearer)
+      {
+         for( j = 0; j < nseen && seen[ j].entity != (BGEntityID) record->bearer; j++)
+            ;
+         if( j == nseen || ! ground_tile( _world, (BGEntityID) record->bearer, &tile))
+            continue;      /* it doesn't see what bears it */
+         t.bearer = assigned[ j];
+         t.x      = tile.x;
+         t.y      = tile.y;
+         t.level  = tile.level;
+      }
+      else
+      {
+         t.x     = (int32_t) record->tileX;
+         t.y     = (int32_t) record->tileY;
+         t.level = (int32_t) record->tileLevel;
+      }
+      if( ! _omniscient && (t.level != here.level || abs( t.x - here.x) > range[ smell] ||
+                            abs( t.y - here.y) > range[ smell]))
+         continue;
+      t.kind     = [_world intern:kind];
+      t.strength = (int32_t) strength;
+      t.seen     = now;
+      t.present  = YES;
+      t.truth    = [traces entityAtIndex:i];        /* developer-only */
+      if( [store noteTrace:t])
+         [news addObject:t.bearer ? [NSString stringWithFormat:@"R%u bears %s (%d)", t.bearer, t.kind, t.strength]
+                                  : [NSString stringWithFormat:@"%s at (%d, %d) (%d)", t.kind, t.x, t.y, t.strength]];
+   }
+
+   /* gone: perceived before, where it would be perceived now, and not found */
+   found = calloc( [store traceCount] + 1, 1);
+   for( i = 0; i < [store traceCount]; i++)
+      found[ i] = [store traceAt:i]->seen == now;
+   for( i = 0; i < [store traceCount]; i++)
+   {
+      old = [store mutableTraceAt:i];
+      if( found[ i] || ! old->present)
+         continue;
+      v = tri_at( tri, tri_pattern( tri, old->kind), "sense");
+      sense[ 0] = 0;
+      if( v)
+         tri_print( tri, v, sense, sizeof( sense));
+      smell = ! strcmp( sense, "\"smell\"");
+      if( old->bearer)
+      {
+         for( j = 0; j < nseen && assigned[ j] != old->bearer; j++)
+            ;
+         if( j == nseen || ! ground_tile( _world, seen[ j].entity, &tile))
+            continue;      /* not looking at what bore it */
+      }
+      else
+      {
+         tile.x     = old->x;
+         tile.y     = old->y;
+         tile.level = old->level;
+      }
+      if( ! _omniscient && (tile.level != here.level || abs( tile.x - here.x) > range[ smell] ||
+                            abs( tile.y - here.y) > range[ smell]))
+         continue;
+      old->present = NO;
+      old->seen    = now;
+      [news addObject:old->bearer ? [NSString stringWithFormat:@"the %s on R%u is gone", old->kind, old->bearer]
+                                  : [NSString stringWithFormat:@"the %s at (%d, %d) is gone", old->kind, old->x, old->y]];
+   }
+   free( found);
+}
+
+
 - (void) perceive:(BGKnowledgeStore *) store
              from:(NSUInteger) first
                to:(NSUInteger) last
@@ -1446,6 +1601,8 @@ static uint32_t   bound_to( BGEntityID e, BGEntityID agent, uint32_t me, const B
             if( [store referentAt:j]->id == r->id)
                taken[ j] = 1;
       }
+
+   [self perceiveTraces:store at:here now:now seen:seen assigned:assigned count:nseen news:news];
 
    /* absence: believed at a place in sight, and not seen there */
    for( j = 0; j < [store count]; j++)
@@ -1783,6 +1940,16 @@ static NSString   *attribution_text( const BGTestimony *t)
                          ? [NSString stringWithFormat:@", trust %+d dB", r->trust] : @"",
                       [store describeReferent:r->id]];
    }
+   for( i = 0; i < [store traceCount]; i++)
+   {
+      const BGTraceSeen   *t;
+
+      t = [store traceAt:i];
+      [s appendFormat:@"  trace %s %@, strength %d, at %lldms%s, truth %llu\n", t->kind,
+                      t->bearer ? [NSString stringWithFormat:@"on R%u", t->bearer]
+                                : [NSString stringWithFormat:@"at (%d, %d)", t->x, t->y],
+                      t->strength, (long long) t->seen, t->present ? "" : ", gone", (unsigned long long) t->truth];
+   }
    [s appendString:[self dumpTestimony:store]];
    for( i = 0; i < [store observationCount]; i++)
    {
@@ -1888,6 +2055,16 @@ char   *BGDecodeWord( const char *s)
                                                      o->unbelieved ? 1 : 0, o->salience, (unsigned long long) o->serial,
                                                      BGEncodeWord( o->content)]];
       }
+      for( j = 0; j < [store traceCount]; j++)
+      {
+         const BGTraceSeen   *tr;
+
+         tr = [store traceAt:j];
+         [lines addObject:[NSString stringWithFormat:@"tracing %llu %u %d %d %d %d %lld %d %llu %s",
+                                                     (unsigned long long) [store agent], tr->bearer, tr->x, tr->y,
+                                                     tr->level, tr->strength, (long long) tr->seen, tr->present ? 1 : 0,
+                                                     (unsigned long long) tr->truth, tr->kind]];
+      }
       for( j = 0; j < [store testimonyCount]; j++)
       {
          t = [store testimonyAt:j];
@@ -1988,6 +2165,23 @@ char   *BGDecodeWord( const char *s)
          t.sure        = trust;
          t.utterance   = truth;
          [[self storeOf:(BGEntityID) agent] appendTestimony:t];
+      }
+      else if( sscanf( text, "tracing %llu %u %d %d %d %d %lld %d %llu %63s", &agent, &id, &x, &y, &level, &trust,
+                       &seen, &present, &truth, role) == 10)
+      {
+         BGTraceSeen   tr;
+
+         memset( &tr, 0, sizeof( tr));
+         tr.bearer   = id;
+         tr.x        = x;
+         tr.y        = y;
+         tr.level    = level;
+         tr.strength = trust;
+         tr.seen     = seen;
+         tr.present  = present != 0;
+         tr.truth    = (BGEntityID) truth;
+         tr.kind     = [_world intern:role];
+         [[self storeOf:(BGEntityID) agent] noteTrace:tr];
       }
       else if( sscanf( text, "ancestry %llu %llu %llu %llu %d %d", &truth, &agent, &origin, &parent, &form,
                        &present) == 6)

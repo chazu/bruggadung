@@ -1,0 +1,41 @@
+// Traces (KNOWLEDGE.md §3): what committed effects leave on bodies and on
+// the floor. A trace is an informational entity, with no body and no
+// location: what it is, what bears it (or which tile), how strong it was
+// made, and when it was made and runs out. Its cause is its creation's, in
+// history, for the developer.
+
+#Sense: "sight" | "smell"
+
+// A kind of trace: the sense that perceives it, and how long it lasts. It
+// fades evenly from its magnitude to nothing over `lasts`, and is removed
+// when it runs out.
+#TraceKind: { sense: #Sense, lasts: time }
+
+// Where an operation leaves a trace, or removes one: on one of its roles, or
+// on the tile the actor stands on.
+#TraceSite: "actor" | "item" | "destination" | "tile"
+#TraceAt:   { trace: text, on: #TraceSite }
+#Leaves:    #TraceAt & { strength: int & >=1 & <=100 }
+#Removes:   #TraceAt & {}
+
+#Trace: #Thing & {
+    @component(Trace)
+    traceKind: text                       @field(content, saved, proposable, inspect)
+    bearer:    ref                        @field(saved, proposable, inspect)
+    tileX:     int & >=0 & <=1000         @field(content, saved, proposable, inspect)
+    tileY:     int & >=0 & <=1000         @field(content, saved, proposable, inspect)
+    tileLevel: int & >=0 & <=64           @field(content, saved, proposable, inspect)
+    magnitude: int & >=0 & <=100          @field(content, saved, proposable, inspect)
+    created:   time & >=0ms & <=10000d    @field(content, saved, proposable, inspect)
+    expires:   time & >=0ms & <=10000d    @field(content, saved, proposable, inspect)
+}
+
+trace: #Trace & { tileX: 0, tileY: 0, tileLevel: 0, magnitude: 0, created: 0ms, expires: 0ms }
+
+// The workshop's traces.
+tool_marks:  #TraceKind & { sense: "sight", lasts: 365d } @family(traces)
+scuffs:      #TraceKind & { sense: "sight", lasts: 30d }  @family(traces)
+damp_floor:  #TraceKind & { sense: "sight", lasts: 6h }   @family(traces)
+soap_smell:  #TraceKind & { sense: "smell", lasts: 2d }   @family(traces)
+fresh_paint: #TraceKind & { sense: "sight", lasts: 3d }   @family(traces)
+paint_smell: #TraceKind & { sense: "smell", lasts: 4d }   @family(traces)

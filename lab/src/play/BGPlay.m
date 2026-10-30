@@ -17,17 +17,20 @@
    [_committer autorelease];
    [_scheduler autorelease];
    [_fluid autorelease];
+   [_traces autorelease];
    [_activities autorelease];
    [_agency autorelease];
    [_knowledge autorelease];
    _world      = [world retain];
    _committer  = [BGTestCommitter( world) retain];
    _fluid      = [[BGFluidDomain alloc] initWithWorld:world];
+   _traces     = [[BGTraces alloc] initWithWorld:world];
    _activities = [[BGActivities activitiesWithWorld:world committer:_committer] retain];
    _knowledge  = [[BGKnowledge alloc] initWithWorld:world];
    _agency     = [[BGAgency alloc] initWithWorld:world committer:_committer knowledge:_knowledge];
    _scheduler  = [[BGScheduler alloc] initWithWorld:world committer:_committer];
    [_scheduler addDomain:_fluid];
+   [_scheduler addDomain:_traces];
    [_scheduler setActivities:_activities];
    [_scheduler setPerception:_knowledge];
    [_scheduler setDecision:_agency];
@@ -96,6 +99,7 @@
    [_committer release];
    [_scheduler release];
    [_fluid release];
+   [_traces release];
    [_activities release];
    [_agency release];
    [_knowledge release];

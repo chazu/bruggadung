@@ -299,8 +299,9 @@ A rebuilt world produces the same next step as one that never saved.
    that decays along the content's hierarchies; and salience, so agents
    keep what matters to them within a bounded memory; and talking in `lab
    play`, asking, telling, and lying; and answering as a choice weighed by
-   trust, disposition, and how busy the agent is. Next, per
-   [lab/PLAN.md](lab/PLAN.md): traces and appearance.
+   trust, disposition, and how busy the agent is; and traces that operations
+   leave and remove, aging analytically, so a cover-up leaves its own. Next,
+   per [lab/PLAN.md](lab/PLAN.md): appearance and truth.
 
 ## Cross-cutting open questions
 

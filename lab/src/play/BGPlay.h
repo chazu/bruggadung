@@ -37,6 +37,7 @@
 #import "BGCommitter.h"
 #import "BGScheduler.h"
 #import "BGFluidDomain.h"
+#import "BGTraces.h"
 #import "BGActivities.h"
 #import "BGActions.h"
 #import "BGKnowledge.h"
@@ -50,6 +51,7 @@
    BGCommitter      *_committer;
    BGScheduler      *_scheduler;
    BGFluidDomain    *_fluid;
+   BGTraces         *_traces;
    BGActivities     *_activities;
    BGKnowledge      *_knowledge;
    BGAgency         *_agency;

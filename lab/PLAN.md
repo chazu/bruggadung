@@ -887,8 +887,50 @@ considerations add, in dB, without curves).
 
 33 tests, 488 checks, under both compilers, ASan and UBSan, and leak-free.
 
-Next: traces and appearance (KNOWLEDGE.md Scenario 2, its first half).
-Traces as component state that age analytically, removal that leaves
-traces of its own, and appearance that differs from the truth until an
-analysis operation reveals it. Interpretation rules gated by expertise and
-prior beliefs come after.
+### After the slice: traces
+
+KNOWLEDGE.md Scenario 2's first half runs as *the cleaned workshop*, with
+the workshop's lock. At night the smith wedges the lock, which leaves tool
+marks on it and scuffs on the floor. The smith then washes the floor and
+touches up the paint, and each removal leaves traces of its own: a damp
+floor and a smell of soap, fresh paint and a smell of paint. The night
+passes in a boundary or two. The damp floor runs out after six hours and
+is removed exactly then. In the morning the foreman, by the lock, sees the
+fresh paint and smells it, and smells a fainter soap. The tool marks, the
+scuffs, and the damp are gone, and nothing in the foreman's store says
+what made any of it. The developer finds each trace's creation in history,
+in the operation that made it.
+
+- **Traces are component state** (`content/traces.tri`): informational
+  entities with a `#Trace` component (kind, bearer or tile, magnitude, made,
+  runs out). Trace kinds are content (`@family(traces)`): the sense that
+  perceives them, and how long they last.
+- **Operations declare them**: `leaves` (kind, site, strength) and
+  `removes` (kind, site), the site one of the operation's roles or the
+  actor's tile. They are made and removed in the effect's own group, when
+  an instant action is performed or an activity completes. Content holds to
+  the rule that an operation that removes traces leaves some of its own,
+  and the test checks it. New operations: `wash_floor`, `touch_up`, and a
+  `tend` effect that changes nothing but traces.
+- **Aging is analytic**: a trace's strength fades evenly from its
+  magnitude to nothing at its expiry, computed when read
+  (`BGTraceStrength`). The trace domain (`BGTraces`) costs nothing between:
+  its horizon's next event is the earliest expiry, at which boundary it
+  removes what has run out.
+- **Perception** finds traces by their kind's sense: by sight on what the
+  agent sees or on the floor in sight, by smell within a tile. It keeps the
+  kind, the site, how strong it seemed, and when; a trace it perceived at
+  a site it perceives again, and doesn't find, is gone. Saved, with a
+  developer-only truth link.
+
+Not yet: conditions that speed decay (rain, foot traffic), sense acuity
+and kind floors (any strength above nothing is perceived), traces on
+stacks individuating the units they're on, per-stage traces (an activity
+leaves its traces when it completes), and traces from reactions.
+
+34 tests, 510 checks, under both compilers, ASan and UBSan, and leak-free.
+
+Next: appearance and truth (KNOWLEDGE.md §4, Scenario 2's plated fitting):
+appearance fields that perception reads instead of the truth, and an
+analysis operation (a scratch test) that reads the deeper field and leaves
+a scratch.
