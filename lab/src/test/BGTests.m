@@ -7038,6 +7038,79 @@ static void   test_pain( void)
 }
 
 
+/* KNOWLEDGE.md §3: foot traffic speeds a trace's decay, as its kind
+ * declares. A damp floor and scuffs on one tile, a damp floor on the next;
+ * a worker steps onto the first, off, and on again. Each step takes a
+ * quarter of the damp's remaining life there; scuffs, and the damp next
+ * door, keep theirs. */
+static void   test_trodden( void)
+{
+   BGStage            st;
+   BGProposalGroup    *g;
+   BGEntityID         worker;
+   BGEntityID         damp;
+   BGEntityID         scuffs;
+   BGEntityID         beside;
+   NSString           *error;
+   int64_t            v;
+   int64_t            left;
+   int64_t            born;
+
+   st.w   = BGTestWorld( 157);
+   st.c   = BGTestCommitter( st.w);
+   st.s   = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [st.s setActivities:[BGActivities activitiesWithWorld:st.w committer:st.c]];
+   g      = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: a mopped floor"];
+   worker = [g create:"worker" key:"worker" at:BGOnTile( 5, 5, 0)];
+   BGMakeTrace( st.w, g, "damp_floor", BGNoEntity, BGOnTile( 6, 5, 0), 80, "a mop");
+   BGMakeTrace( st.w, g, "scuffs", BGNoEntity, BGOnTile( 6, 5, 0), 50, "boots");
+   BGMakeTrace( st.w, g, "damp_floor", BGNoEntity, BGOnTile( 7, 5, 0), 80, "a mop");
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   worker = [g idFor:worker];
+   damp   = BGNoEntity;
+   scuffs = BGNoEntity;
+   beside = BGNoEntity;
+   {
+      NSUInteger   i;
+
+      for( i = 0; i < [g count]; i++)
+         if( [g proposals][ i].kind == BGProposeCreate)
+         {
+            BGEntityID   e;
+
+            e = [g idFor:[g proposals][ i].handle];
+            if( [st.w textField:"Trace.traceKind" of:e] && ! strcmp( [st.w textField:"Trace.traceKind" of:e], "scuffs"))
+               scuffs = e;
+            else if( [st.w getField:"Trace.tileX" of:e value:&v] && v == 7)
+               beside = e;
+            else if( [st.w getField:"Trace.tileX" of:e value:&v] && v == 6)
+               damp = e;
+         }
+   }
+   BG_CHECK( damp && scuffs && beside);
+
+   /* onto it: a quarter of what is left of six hours, gone (within the
+    * second the step takes) */
+   BG_CHECK( [st.w getField:"Trace.created" of:damp value:&born]);
+   error = nil;
+   BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "walk_east", worker, BGNoEntity, BGNoEntity), 0, &error) != nil);
+   [st.s runUntil:BGTimeMake( 1001)];
+   BG_CHECK( [st.w getField:"Trace.expires" of:damp value:&left]);
+   BG_CHECK( llabs( (left - born) - 6 * 3600000LL * 3 / 4) < 2000);
+   BG_CHECK( [st.w getField:"Trace.expires" of:scuffs value:&v] && v == born + 30 * 86400000LL);
+   BG_CHECK( [st.w getField:"Trace.expires" of:beside value:&v] && v == born + 6 * 3600000LL);
+   /* off, and on again: another quarter of what is left */
+   BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "walk_west", worker, BGNoEntity, BGNoEntity), 0, &error) != nil);
+   [st.s runUntil:BGTimeMake( 2002)];
+   BG_CHECK( [st.w getField:"Trace.expires" of:damp value:&v] && v == left);
+   BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "walk_east", worker, BGNoEntity, BGNoEntity), 0, &error) != nil);
+   [st.s runUntil:BGTimeMake( 3003)];
+   BG_CHECK( [st.w getField:"Trace.expires" of:damp value:&v] &&
+             llabs( (v - born) - 6 * 3600000LL * 9 / 16) < 4000);
+}
+
+
 /* KNOWLEDGE.md §12: strength "decays at a rate set by salience and
  * repetition". The worker sees a stone beside it (`sightings` times, going
  * away for two minutes between), or moves it itself into a bin (`moves`),
@@ -7568,6 +7641,7 @@ const BGTestCase   BGAllTests[] =
    { "providers_pending",             test_providers_pending },
    { "memory_rates",                  test_memory_rates },
    { "scheduled_forgetting",          test_scheduled_forgetting },
+   { "trodden",                       test_trodden },
    { "resume_recheck",                test_resume_recheck },
    { "interrupted_repair",            test_interrupted_repair },
    { "unattended_stove",              test_unattended_stove },

@@ -2718,3 +2718,24 @@ else happening, a boundary comes then (two boundaries to an hour past it,
 one to just before), and after it nothing is due.
 
 73 tests, 2463 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: foot traffic wears floor traces
+
+KNOWLEDGE.md §3: a trace holds "the conditions that speed up decay (rain,
+foot traffic, heat)". The traces slice's "Not yet": conditions that speed
+decay. Of the three, the lab has foot traffic (walking); no weather, and
+heat on traces waits for a trace kind it would matter to.
+
+- **`trodden`** (a trace kind's, 0 by default): the percent of the life a
+  floor trace has left that each step onto its tile takes. Still analytic:
+  the step shortens the trace's `expires` in its own group, so the trace
+  fades faster from then on and nothing is computed between. The damp
+  floor is trodden 25.
+
+Checked: a step onto a mopped tile takes a quarter of the damp's six
+hours; scuffs there, and the damp on the next tile, keep theirs; stepping
+off changes nothing; on again, another quarter of what is left.
+
+Not yet: rain and heat.
+
+74 tests, 2474 checks, under both compilers, ASan, and leak-free.

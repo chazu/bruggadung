@@ -603,6 +603,9 @@ static NSString   *effect_open_tap( BGWorld *world, BGAction a, int64_t amount, 
 }
 
 
+static void   tread( BGWorld *world, BGLocation at, BGProposalGroup *g);
+
+
 static NSString   *effect_walk( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
 {
    BGLocation   at;
@@ -621,7 +624,38 @@ static NSString   *effect_walk( BGWorld *world, BGAction a, int64_t amount, BGPr
    default:  return( @"walk where?");
    }
    [g move:BGWhole( a.roles[ BGRoleActor]) to:at];
+   tread( world, at, g);
    return( nil);
+}
+
+
+/* A step onto a tile (KNOWLEDGE.md §3, foot traffic): each floor trace
+ * there whose kind is `trodden` loses that percent of the life it has
+ * left, in the step's group. */
+static void   tread( BGWorld *world, BGLocation at, BGProposalGroup *g)
+{
+   const BGTrace   *trace;
+   const TriNode   *v;
+   BGStore         *traces;
+   NSUInteger      i;
+   int64_t         now;
+   int64_t         lo;
+   int64_t         hi;
+
+   traces = [world storeForKind:[world kindNamed:"Trace"]];
+   now    = [world time].ms;
+   for( i = 0; i < [traces count]; i++)
+   {
+      trace = [traces recordAtIndex:i];
+      if( trace->bearer || trace->tileX != at.x || trace->tileY != at.y || trace->tileLevel != at.level ||
+          ! trace->traceKind || trace->expires <= now)
+         continue;
+      v = tri_at( [world tri], tri_pattern( [world tri], trace->traceKind), "trodden");
+      if( ! v || ! tri_node_interval( v, &lo, &hi) || lo != hi || lo <= 0)
+         continue;
+      [g set:"Trace.expires" of:BGWhole( [traces entityAtIndex:i])
+          to:now + (trace->expires - now) * (100 - lo) / 100];
+   }
 }
 
 
