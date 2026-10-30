@@ -68,7 +68,7 @@ static void   test_registry_and_construction( void)
 
    w = BGTestWorld( 1);
    c = BGTestCommitter( w);
-   BG_CHECK( [w kindCount] == 24);
+   BG_CHECK( [w kindCount] == 25);
    BG_CHECK( [w kindNamed:"Body"] != NSNotFound && [w kindNamed:"Nonesuch"] == NSNotFound);
    bin   = commit_create( c, "bin", BGOnTile( 0, 0, 0));
    nails = commit_create( c, "nails_30", BGIn( bin));
@@ -3078,6 +3078,95 @@ static void   test_wrench_replaced( void)
 }
 
 
+/* KNOWLEDGE.md Scenario 3's check 2, the bump. By day the worker sees the
+ * door open, and goes off; night falls, and someone shuts it. Back beside it
+ * in the dark, it can't make it out, and remembers it open: the menu offers
+ * going through, from the stale belief. Going through is a bump into the
+ * shut door, which it feels: it believes it shut, and stays where it was.
+ * `lamp`: it carries a shining lamp, and sees the door shut beside it. */
+static NSString   *door_run( BOOL lamp, NSString **menuText, NSString **afar, BGEntityID *where)
+{
+   BGStage            st;
+   BGKnowledge        *knowledge;
+   BGKnowledgeStore   *store;
+   BGProposalGroup    *g;
+   BGMenu             *menu;
+   BGEntityID         worker;
+   BGEntityID         door;
+   NSString           *error;
+   NSMutableArray     *entries;
+   NSUInteger         i;
+   uint32_t           rdoor;
+
+   st.w      = BGTestWorld( 137);
+   st.c      = BGTestCommitter( st.w);
+   knowledge = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+   st.s      = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [st.s setPerception:knowledge];
+   g      = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the loft door"];
+   worker = [g create:"worker" key:"worker" at:BGOnTile( 4, 5, 0)];
+   door   = [g create:"room_door" key:"the loft door" at:BGOnTile( 4, 6, 0)];
+   [g set:"Door.ajar" of:BGWhole( door) to:1];
+   if( lamp)
+      [g create:"lamp" key:"lamp" at:BGHeldBy( worker, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   worker = [g idFor:worker];
+   door   = [g idFor:door];
+   store  = [knowledge storeOf:worker];
+   rdoor  = referent_of( store, door);
+
+   /* off, night, the door shut behind its back */
+   stage_move( &st, worker, 4, 15);
+   [knowledge setAmbient:0];
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: someone shuts the loft door"];
+   [g set:"Door.ajar" of:BGWhole( door) to:0];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( [st.w time].ms + 1000)];
+   /* coming back: three tiles off, in the dark, it sees nothing there, and
+    * doesn't take that for its absence */
+   stage_move( &st, worker, 4, 3);
+   *afar = [[store describeReferent:rdoor] stringByAppendingString:[store referent:rdoor]->present ? @" (there)" : @" (gone)"];
+   stage_move( &st, worker, 4, 5);
+
+   menu    = [BGMenu menuFor:store world:st.w believed:YES];
+   entries = [NSMutableArray array];
+   for( i = 0; i < [menu count]; i++)
+      [entries addObject:[menu describeAt:i]];
+   *menuText = [entries componentsJoinedByString:@"; "];
+   error = nil;
+   if( [*menuText rangeOfString:@"go_through"].location != NSNotFound)
+   {
+      BG_CHECK( BGPerformBelieved( st.w, st.c, store, BGActionMake( "go_through", [store selfReferent], rdoor, BGNoEntity), 0,
+                                   &error) != nil);
+      [st.s runUntil:BGTimeMake( [st.w time].ms + 1000)];
+   }
+   *where = [st.w locationOf:worker].form == BGLocationOnTile ? (BGEntityID) [st.w locationOf:worker].y : 0;
+   return( [store describeReferent:rdoor]);
+}
+
+
+static void   test_door_in_the_dark( void)
+{
+   NSString     *menu;
+   NSString     *afar;
+   NSString     *door;
+   BGEntityID   y;
+
+   door = door_run( NO, &menu, &afar, &y);
+   BG_CHECK( [afar rangeOfString:@"ajar: true"].location != NSNotFound && [afar hasSuffix:@" (there)"]);
+   BG_CHECK( [menu rangeOfString:@"go_through item R"].location != NSNotFound);
+   BG_CHECK( [door rangeOfString:@"ajar: false"].location != NSNotFound);
+   BG_CHECK( y == 5);
+
+   /* with a lamp (its reach two tiles), beside the door it sees it shut,
+    * and the menu doesn't offer going through */
+   door = door_run( YES, &menu, &afar, &y);
+   BG_CHECK( [door rangeOfString:@"ajar: false"].location != NSNotFound);
+   BG_CHECK( [menu rangeOfString:@"go_through"].location == NSNotFound && y == 5);
+}
+
+
 /* --- the false alarm -------------------------------------------------------- */
 
 typedef enum
@@ -5875,6 +5964,7 @@ const BGTestCase   BGAllTests[] =
    { "partial_effects",               test_partial_effects },
    { "hard_fail",                     test_hard_fail },
    { "tired_worker",                  test_tired_worker },
+   { "door_in_the_dark",              test_door_in_the_dark },
    { "wrench_replaced",               test_wrench_replaced },
    { "rumour",                        test_rumour },
    { "memory_decay",                  test_memory_decay },

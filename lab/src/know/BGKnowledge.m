@@ -1161,6 +1161,7 @@ static NSString   *known_features( const BGReferent *r)
    _world      = [world retain];
    _stores     = [NSMutableArray new];
    _eventsSeen = [world eventCount];
+   _ambient    = 2;
    return( self);
 }
 
@@ -1194,7 +1195,49 @@ static NSString   *known_features( const BGReferent *r)
 
 - (void) setDusk:(BOOL) flag
 {
-   _dusk = flag;
+   _ambient = flag ? 1 : 2;
+}
+
+
+- (void) setAmbient:(int) light
+{
+   _ambient = light < 0 ? 0 : light > 2 ? 2 : light;
+}
+
+
+- (int) lightAt:(BGLocation) tile
+{
+   const BGLamp   *lamp;
+   BGStore        *lamps;
+   BGLocation     at;
+   NSUInteger     i;
+
+   if( _ambient >= 2)
+      return( _ambient);
+   lamps = [_world storeForKind:[_world kindNamed:"Lamp"]];
+   for( i = 0; i < [lamps count]; i++)
+   {
+      lamp = [lamps recordAtIndex:i];
+      if( lamp->shining && ground_tile( _world, [lamps entityAtIndex:i], &at) && at.level == tile.level &&
+          abs( at.x - tile.x) <= lamp->reach && abs( at.y - tile.y) <= lamp->reach)
+         return( 2);
+   }
+   return( _ambient);
+}
+
+
+/* Whether the agent here can see the tile: in sight, and lit, or within
+ * arm's reach. */
+- (BOOL) sees:(BGLocation) tile
+         from:(BGLocation) here
+{
+   if( _omniscient)
+      return( YES);
+   if( tile.level != here.level || abs( tile.x - here.x) > BG_SIGHT || abs( tile.y - here.y) > BG_SIGHT)
+      return( NO);
+   if( abs( tile.x - here.x) <= 1 && abs( tile.y - here.y) <= 1)
+      return( YES);
+   return( [self lightAt:tile] > 0);
 }
 
 
@@ -2502,9 +2545,7 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
       BGEntityID   e;
 
       e = [bodies entityAtIndex:i];
-      if( ! ground_tile( _world, e, &tile) ||
-          (! _omniscient && (tile.level != here.level ||
-                             abs( tile.x - here.x) > BG_SIGHT || abs( tile.y - here.y) > BG_SIGHT)))
+      if( ! ground_tile( _world, e, &tile) || ! [self sees:tile from:here])
          continue;
       at = [_world locationOf:e];
       if( at.form == BGLocationIn && ! _omniscient && ! contains( lookedIn, nlooked, at.place) &&
@@ -2521,7 +2562,13 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
    qsort( seen, nseen, sizeof( BGSeen), cmp_seen);
    for( y = here.y - BG_SIGHT; y <= here.y + BG_SIGHT; y++)
       for( x = here.x - BG_SIGHT; x <= here.x + BG_SIGHT; x++)
-         [store setTileSeen:now x:x y:y];
+      {
+         tile       = here;
+         tile.x     = x;
+         tile.y     = y;
+         if( [self sees:tile from:here])
+            [store setTileSeen:now x:x y:y];
+      }
 
    /* recognition: the same kind, at that very place first, then the nearest */
    view     = [BGView viewOf:agent inWorld:_world];
@@ -2536,9 +2583,11 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
          features = [view featuresOf:seen[ i].entity all:_omniscient];
          at       = [_world locationOf:seen[ i].entity];
          ground_tile( _world, seen[ i].entity, &tile);
-         /* at dusk, beyond arm's reach, a step less precisely */
-         degraded = _dusk && ! _omniscient && seen[ i].entity != agent &&
-                    (abs( tile.x - here.x) > 1 || abs( tile.y - here.y) > 1);
+         /* by the light: at dusk, beyond arm's reach, a step less precisely;
+          * at night, within it, unless just handled */
+         degraded = ! _omniscient && seen[ i].entity != agent &&
+                    (([self lightAt:tile] == 1 && (abs( tile.x - here.x) > 1 || abs( tile.y - here.y) > 1)) ||
+                     ([self lightAt:tile] == 0 && ! contains( lookedIn, nlooked, seen[ i].entity)));
          if( degraded)
             features = [store generalize:features kind:[kind UTF8String] steps:1];
          /* from afar, sizes only roughly */
@@ -2742,8 +2791,16 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
       r = (BGReferent *) [store referentAt:j];
       if( taken[ j] || ! r->present)
          continue;
-      if( ! _omniscient && (r->level != here.level || abs( r->x - here.x) > BG_SIGHT || abs( r->y - here.y) > BG_SIGHT))
-         continue;
+      {
+         BGLocation   believed;
+
+         believed       = here;
+         believed.x     = r->x;
+         believed.y     = r->y;
+         believed.level = r->level;
+         if( ! [self sees:believed from:here])
+            continue;       /* out of sight, or dark there */
+      }
       if( r->form == BGLocationIn && ! _omniscient)
       {
          holder = [store referent:r->container];

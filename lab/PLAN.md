@@ -2011,10 +2011,6 @@ The remaining scenario checks that aren't run, after the passes above:
     "The latent assembly document will specify materialization …"
   - institutions: COMPONENTS.md Scenario 2, grievances, and reporting to
     the miller. ARCHITECTURE.md: "Institutions (§6) … To be specified".
-  - light: the lamp, and KNOWLEDGE.md Scenario 3's closed-door bump. A
-    door within arm's reach is seen plainly, so the stale "open" can reach
-    the menu only if darkness hides it; no doc specifies light beyond
-    naming the lamp.
   - told, featureless referents in recognition: AGENCY.md Scenario 2's
     variant C by asking (see its section).
   - how considerations combine beyond adding (AGENCY.md's open question 1
@@ -2165,3 +2161,35 @@ Not yet: the rest of the store's parsing through the arena (it parses into
 scratch arenas still), and §12's memory bound counted in bytes.
 
 60 tests, 2122 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: light, and the bump in the dark
+
+KNOWLEDGE.md §5: "Conditions limit perception: light … These come from a
+conditions provider. Light and sound may become domains later; for now
+they are stubs with authored values." The ambient light is authored: day,
+dusk, or night. A shining `#Lamp` makes it day within its reach. At dusk,
+what is beyond arm's reach is seen a step less precisely, as before. At
+night, what is beyond it isn't seen, and isn't taken for absent either.
+What is within reach is felt a step less precisely, unless the agent just
+handled it.
+
+KNOWLEDGE.md Scenario 3's check 2 runs:
+
+1. By day, the worker sees the loft door open, and goes off.
+2. Night falls, and the door is shut.
+3. Back beside it in the dark, the worker can't make it out, and its
+   memory keeps "open". The menu offers *go through*, from the stale
+   belief.
+4. Going through is a bump: the attempt is what happens. The worker felt
+   it, so it now believes the door shut, and it stays where it was.
+
+With a lamp, it sees the door shut beside it, and the menu doesn't offer
+going through.
+
+- **`go_through`** (`pass`): onto the door's tile.
+- **Day is the default**, and `setDusk:` is the ambient's dusk.
+
+Not yet: light as a domain (lamps burning down), sound conditions, and the
+lamp in CONTENT_LANGUAGE.md Scenario 2's inspection.
+
+61 tests, 2129 checks, under both compilers, ASan and UBSan, and leak-free.

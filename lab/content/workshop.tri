@@ -106,3 +106,12 @@ diagram:     #Record & { material: "paper", mass: 20g }
 #HandSaw: #Body & {}
 log:      #Log & { material: "oak", mass: 20kg }
 hand_saw: #HandSaw & { material: "steel", mass: 700g }
+
+// Light (KNOWLEDGE.md §5's conditions, authored): a lamp, shining, makes it
+// day within `reach` tiles of where it is, held or set down.
+#Lamp: #Body & {
+    @component(Lamp)
+    shining: *true | false                     @field(content, saved, proposable, inspect, perceive(sight))
+    reach:   int & >=0 & <=10                  @field(content, saved, inspect)
+}
+lamp: #Lamp & { material: "brass", mass: 900g, reach: 2 }

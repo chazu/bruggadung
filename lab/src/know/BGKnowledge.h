@@ -450,7 +450,7 @@ typedef struct
    NSMutableArray   *_stores;          /* sorted by agent */
    NSUInteger       _eventsSeen;
    BOOL             _omniscient;
-   BOOL             _dusk;
+   int              _ambient;          /* the light where no lamp shines: 2 day, 1 dusk, 0 night */
    BOOL             _compactAlways;
    BGAncestry       *_ancestry;        /* developer-only, by utterance */
    NSUInteger       _nancestry;
@@ -464,7 +464,14 @@ typedef struct
  * differently from agency run on what agents can know. */
 - (void) setOmniscient:(BOOL) flag;
 
-/* A conditions stub (KNOWLEDGE.md §5): dusk, or day. */
+/* Conditions (KNOWLEDGE.md §5), stubbed with authored values: the ambient
+ * light, 2 day, 1 dusk, 0 night; a shining lamp (`#Lamp`, workshop.tri)
+ * makes day within its reach. At dusk what is beyond arm's
+ * reach is seen a step less precisely; at night it isn't seen, and what is
+ * within it is felt a step less precisely, unless the agent just handled it. */
+- (void) setAmbient:(int) light;
+- (int) lightAt:(BGLocation) tile;
+/* dusk, or day */
 - (void) setDusk:(BOOL) flag;
 /* Compact every store's knowledge arena at every boundary, not only when it
  * is half garbage: which must change nothing observable. */

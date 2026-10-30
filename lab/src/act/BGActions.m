@@ -877,6 +877,14 @@ static NSString   *effect_shut( BGWorld *world, BGAction a, int64_t amount, BGPr
 }
 
 
+/* Through a door: onto its tile. */
+static NSString   *effect_pass( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
+{
+   [g move:BGWhole( a.roles[ BGRoleActor]) to:[world locationOf:a.roles[ BGRoleItem]]];
+   return( nil);
+}
+
+
 /* Sawing's end: the log is sawn through. */
 static NSString   *effect_saw( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
 {
@@ -995,6 +1003,7 @@ static const struct
    { "light",     effect_light },
    { "open_door", effect_open_door },
    { "saw",       effect_saw },
+   { "pass",      effect_pass },
    { "rest",      effect_rest },
    { "strike",    effect_strike },
 };

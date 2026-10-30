@@ -4,7 +4,7 @@
 // bindings between roles. `effect` names the code that builds the proposal
 // group when the action is performed.
 
-#Effect: "take" | "take_some" | "put_in" | "drive" | "open_tap" | "fill" | "walk" | "loosen" | "look" | "say" | "tend" | "analyse" | "write" | "read" | "eat" | "give" | "investigate" | "tighten" | "rotate" | "strike" | "shut" | "dismantle" | "light" | "rest" | "open_door" | "saw"
+#Effect: "take" | "take_some" | "put_in" | "drive" | "open_tap" | "fill" | "walk" | "loosen" | "look" | "say" | "tend" | "analyse" | "write" | "read" | "eat" | "give" | "investigate" | "tighten" | "rotate" | "strike" | "shut" | "dismantle" | "light" | "rest" | "open_door" | "saw" | "pass"
 
 // Which roles an operation has is its roles' type: a structure's type is the
 // most general one with all its features.
@@ -351,6 +351,16 @@ saw_through: #Operation & {
         actor:       #Agent & { id: $a }
         item:        #HandSaw & { place: #Held & { by: $a } }
         destination: #Log & { sawn: <=99 }
+    }
+} @family(operations)
+
+// Go through an open door in reach (KNOWLEDGE.md Scenario 3): onto its
+// tile, and so past it. Believed open and shut, it is a bump into it.
+go_through: #Operation & {
+    effect: "pass"
+    roles: {
+        actor: #Agent
+        item:  #Door & { ajar: true }
     }
 } @family(operations)
 
