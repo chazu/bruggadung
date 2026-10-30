@@ -1761,3 +1761,18 @@ Not yet: talking taking time as an activity on the voice, abort committing
 partial effects, and the rest that waits on latent assembly.
 
 53 tests, 2002 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: risk tolerance
+
+AGENCY.md Scenario 2's "risk, weighted by risk tolerance" (§9's
+disposition). An agent's `riskTolerance` (0 to 100, 50 by default) weighs
+a goal's `#Cost`: in full at 50, double at 0, and not at all at 100. At the
+default every decision stays as it was. A bold watchman (100), in variant
+C's conditions, makes nothing of the risk: 35 against supper's 30, so it
+gets up and looks. A timid one (0), in B's, makes double of it: 30, not
+more than 30, so it stays at supper.
+
+Not yet: risk as a believed quantity (it is a flat cost per goal), and
+consideration curves.
+
+53 tests, 2014 checks, under both compilers, ASan and UBSan, and leak-free.

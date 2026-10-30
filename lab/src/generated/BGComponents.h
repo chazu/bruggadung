@@ -1,4 +1,4 @@
-/* Generated from Triangle content 46effeb1e179b9a7: do not edit. Type IDs are valid
+/* Generated from Triangle content 0dd854c4c18d7363: do not edit. Type IDs are valid
  * only for this content; regenerate when it changes. */
 #ifndef BG_COMPONENTS_H
 #define BG_COMPONENTS_H
@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BG_CONTENT_HASH 0x46effeb1e179b9a7ULL
+#define BG_CONTENT_HASH 0x0dd854c4c18d7363ULL
 
 /* Combustor, from #Combustor */
 typedef struct {
@@ -113,6 +113,7 @@ typedef struct {
     int64_t         painting;    /* int, in quanta of 1; content, saved, inspect */
     int64_t         quickness;    /* int, in quanta of 1; content, saved, proposable, inspect */
     int64_t         respectful;    /* int, in quanta of 1; content, saved, proposable, inspect */
+    int64_t         riskTolerance;    /* int, in quanta of 1; content, saved, proposable, inspect */
     int64_t         scruples;    /* int, in quanta of 1; content, saved, proposable, inspect */
 } BGAgent;
 
@@ -367,6 +368,7 @@ static const BGFieldInfo BGAgent_fields[] = {
     { "painting", offsetof(BGAgent, painting), BG_VALUE_QUANTITY, "int", "content, saved, inspect" },
     { "quickness", offsetof(BGAgent, quickness), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "respectful", offsetof(BGAgent, respectful), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
+    { "riskTolerance", offsetof(BGAgent, riskTolerance), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "scruples", offsetof(BGAgent, scruples), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
 };
 
@@ -444,7 +446,7 @@ static const BGComponentInfo BGComponents[BG_COMPONENT_COUNT + 1] = {
     { "Activity", "#Activity", sizeof(BGActivity), 15, BGActivity_fields },
     { "Claim", "#Claim", sizeof(BGClaim), 2, BGClaim_fields },
     { "Body", "#Body", sizeof(BGBody), 5, BGBody_fields },
-    { "Agent", "#Agent", sizeof(BGAgent), 14, BGAgent_fields },
+    { "Agent", "#Agent", sizeof(BGAgent), 15, BGAgent_fields },
     { "Assembly", "#Assembly", sizeof(BGAssembly), 1, BGAssembly_fields },
     { "Cock", "#Cock", sizeof(BGCock), 2, BGCock_fields },
     { "Container", "#Container", sizeof(BGContainer), 1, BGContainer_fields },

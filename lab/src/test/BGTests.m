@@ -2980,8 +2980,9 @@ typedef struct
  * tiles off, out of sight and in earshot. The carter and the porter tell it
  * someone has been getting into the storeroom (B, D: neither names a source;
  * C: both heard it from the neighbour). Then a cat by the storeroom knocks
- * something over (D: again and again). */
-static BGAlarmRun   false_alarm( BGAlarm variant, int64_t saveAt)
+ * something over (D: again and again). `tolerance`: the watchman's risk
+ * tolerance. */
+static BGAlarmRun   false_alarm( BGAlarm variant, int64_t saveAt, int tolerance)
 {
    BGStage           st;
    BGActivities      *activities;
@@ -3014,6 +3015,7 @@ static BGAlarmRun   false_alarm( BGAlarm variant, int64_t saveAt)
    h[ 1] = [g create:"cat" key:"cat" at:BGOnTile( 12, 5, 0)];
    h[ 2] = [g create:"watchman" key:"watchman" at:BGOnTile( 9, 4, 0)];
    h[ 3] = [g create:"supper" key:"supper" at:BGHeldBy( h[ 2], 0)];
+   [g set:"Agent.riskTolerance" of:BGWhole( h[ 2]) to:tolerance];
    h[ 4] = [g create:"carter" key:"carter" at:BGOnTile( 3, 5, 0)];
    h[ 5] = [g create:"porter" key:"porter" at:BGOnTile( 5, 5, 0)];
    [st.c submit:g];
@@ -3117,11 +3119,13 @@ static void   test_false_alarm( void)
    BGAlarmRun         resumed;
    BGAlarmRun         e;
    BGAlarmRun         quiet;
+   BGAlarmRun         bold;
+   BGAlarmRun         timid;
    BGKnowledgeStore   *store;
 
-   a = false_alarm( BGAlarmNoRumour, 0);
-   b = false_alarm( BGAlarmRumour, 0);
-   c = false_alarm( BGAlarmDeflated, 0);
+   a = false_alarm( BGAlarmNoRumour, 0, 50);
+   b = false_alarm( BGAlarmRumour, 0, 50);
+   c = false_alarm( BGAlarmDeflated, 0, 50);
 
    /* everyone hears the cat, and makes of it that something stirred by the storeroom */
    BG_CHECK( logged_by( a.agency, a.watchman, @"weighing investigate the disturbance"));
@@ -3139,6 +3143,18 @@ static void   test_false_alarm( void)
    BG_CHECK( logged_by( c.agency, c.watchman, @"+30 (credence +15, +20, risk -5) against eat supper +20 (+20) + margin 5 + "
                                               @"interruption 5: staying"));
    BG_CHECK( ! logged_by( a.agency, a.watchman, @"switching") && ! logged_by( c.agency, c.watchman, @"switching"));
+
+   /* the risk, as risk tolerance weighs it: a bold watchman, in C's
+    * conditions, makes nothing of it, 35, and gets up; a timid one, in B's,
+    * makes double of it, 30, and stays */
+   bold  = false_alarm( BGAlarmDeflated, 0, 100);
+   timid = false_alarm( BGAlarmRumour, 0, 0);
+   BG_CHECK( logged_by( bold.agency, bold.watchman, @"+35 (credence +15, +20, risk +0) against eat supper +20 (+20) + "
+                                                    @"margin 5 + interruption 5: switching"));
+   BG_CHECK( happened( bold.world, "looked", bold.watchman, bold.storeroom));
+   BG_CHECK( logged_by( timid.agency, timid.watchman, @"+30 (credence +20, +20, risk -10) against eat supper +20 (+20) + "
+                                                      @"margin 5 + interruption 5: staying"));
+   BG_CHECK( ! happened( timid.world, "looked", timid.watchman, timid.storeroom));
    BG_CHECK( ! happened( a.world, "looked", a.watchman, a.storeroom) && ! happened( c.world, "looked", c.watchman, c.storeroom));
 
    /* B: it puts supper down, looks, and goes back to it, resuming where it left off */
@@ -3161,21 +3177,21 @@ static void   test_false_alarm( void)
    BG_CHECK( [store trustIn:referent_of( store, c.carter)] == BG_TRUST);
 
    /* 3: no dithering: noise after noise, the intention changes once */
-   d = false_alarm( BGAlarmRepeated, 0);
+   d = false_alarm( BGAlarmRepeated, 0, 50);
    BG_CHECK( log_count( d.agency, d.watchman, @"switching") == 1);
    BG_CHECK( log_count( d.agency, d.watchman, @"staying") == 0);
    BG_CHECK( log_count( d.agency, d.watchman, @"suspending eat") == 1);
    BG_CHECK( happened( d.world, "looked", d.watchman, d.storeroom));
 
    /* 6: determinism */
-   again = false_alarm( BGAlarmRumour, 0);
+   again = false_alarm( BGAlarmRumour, 0, 50);
    BG_CHECK( [again.world stateHash] == [b.world stateHash]);
    BG_CHECK( [again.text isEqualToString:b.text]);
    BG_CHECK( [[again.agency logOf:again.watchman] isEqualToArray:[b.agency logOf:b.watchman]]);
 
    /* saved mid-investigation, supper suspended beneath it, restored: the same
     * end (a boundary the run has: a step toward the storeroom) */
-   resumed = false_alarm( BGAlarmRumour, 10003);
+   resumed = false_alarm( BGAlarmRumour, 10003, 50);
    BG_CHECK( [resumed.world stateHash] == [b.world stateHash]);
    BG_CHECK( [resumed.text isEqualToString:b.text]);
    BG_CHECK( logged_by( resumed.agency, resumed.watchman, @"[eat supper] eat: resuming eat"));
@@ -3183,7 +3199,7 @@ static void   test_false_alarm( void)
    /* 5: E, autopilot: in B's conditions, the noise is worth more than the
     * player's 25: control returns at that weighing, supper still under way,
     * nothing looked into; autopilot used nothing the watchman didn't know */
-   e = false_alarm( BGAlarmAutopilot, 0);
+   e = false_alarm( BGAlarmAutopilot, 0, 50);
    BG_CHECK( [e.notices count] == 1 &&
              [[e.notices objectAtIndex:0] isEqualToString:@"Control returns to you: investigate the disturbance (R2) is "
                                                          @"worth +35, more than your +25."]);
@@ -3191,7 +3207,7 @@ static void   test_false_alarm( void)
    BG_CHECK( ! logged_by( e.agency, e.watchman, @"switching") && ! logged_by( e.agency, e.watchman, @"suspending"));
    BG_CHECK( ! happened( e.world, "looked", e.watchman, e.storeroom));
    /* in A's, it eats on, and hands back when supper is done */
-   quiet = false_alarm( BGAlarmAutopilotQuiet, 0);
+   quiet = false_alarm( BGAlarmAutopilotQuiet, 0, 50);
    BG_CHECK( [quiet.notices count] == 1 &&
              [[quiet.notices objectAtIndex:0] isEqualToString:@"Control returns to you: there is nothing left to do."]);
    BG_CHECK( logged_by( quiet.agency, quiet.watchman, @"[eat supper] done"));

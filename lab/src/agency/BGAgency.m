@@ -1604,7 +1604,11 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
       }
       else if( tri_at( tri, c, "cost"))
       {
-         v = - (int32_t) int_at( tri, c, "cost", 0);
+         const BGAgent   *agent;
+
+         /* in full at the middling tolerance, double at none, nothing at all */
+         agent = [_world record:[_world kindNamed:"Agent"] for:[store agent]];
+         v     = - (int32_t) (int_at( tri, c, "cost", 0) * (100 - (agent ? agent->riskTolerance : 50)) / 50);
          [parts addObject:[NSString stringWithFormat:@"risk %+d", v]];
       }
       else if( text_at( tri, c, "inside", slot, sizeof( slot)))

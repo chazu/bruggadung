@@ -57,7 +57,7 @@
 // one that scales something of the agent's: `per` tenths of a point for
 // each point of it
 #Scaled:    #Consideration & { per: int }
-// a cost, the believed risk
+// a cost, the believed risk, as the agent's risk tolerance weighs it
 #Cost:      #Consideration & { cost: int }
 // how strongly the agent believes something like `suspect` is in the slot's
 // referent: the credence of what it was told, with its findings of
