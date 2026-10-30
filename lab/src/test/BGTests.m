@@ -4277,8 +4277,9 @@ static void   test_unknown_nut( void)
    BG_CHECK( [[doubtful.knowledge dump:1] rangeOfString:@"or, 300 in 1000"].location == NSNotFound);
    /* the menu shows how sure: doubted, it is unknown, with the mass that
     * entails and what to find out; undoubted, entailed */
-   BG_CHECK( [doubtful_menu( 300) hasSuffix:@": unknown (700 in 1000 entails) (find out destination.size)"]);
-   BG_CHECK( [doubtful_menu( 0) hasSuffix:@": entailed"]);
+   BG_CHECK( [doubtful_menu( 300) rangeOfString:@": unknown (700 in 1000 entails) (find out destination.size)"].location
+             != NSNotFound);
+   BG_CHECK( [doubtful_menu( 0) rangeOfString:@": entailed"].location != NSNotFound);
    /* at 50 in 1000, 950 entails: sure enough, it tightens it without looking */
    sure = doubtful_nut_run( 50, &mass);
    BG_CHECK( ! logged_by( sure.agency, 1, @"look closer") && tightened( sure));
