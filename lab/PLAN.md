@@ -1744,3 +1744,20 @@ for now, and the nut stays loose.
   `onUnknown` goes first, ahead of a lower-ranked method that holds.
 
 53 tests, 1999 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: the repair's provider and save checks
+
+Two of ACTIONS.md Scenario 3's acceptance checks that ran only in part:
+
+- **3, provider allocation**: while dismantling, the worker says something
+  to the smith, which runs alongside it (a voice is not the hands). A
+  second dismantling is refused: "its hands are busy with activity …".
+- **5, save and load during suspension**: the save is restored into a
+  fresh world, committer, knowledge and agency. Nothing is due while the
+  activity is suspended, so the next boundary is the run's stop. Both runs
+  take it, and their state hashes and saves are the same.
+
+Not yet: talking taking time as an activity on the voice, abort committing
+partial effects, and the rest that waits on latent assembly.
+
+53 tests, 2002 checks, under both compilers, ASan and UBSan, and leak-free.

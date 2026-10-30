@@ -4240,6 +4240,9 @@ typedef struct
    int64_t       progress;
    BOOL          openWhileSuspended;
    BOOL          saved;          /* a save while suspended restores the same */
+   BOOL          nextSame;       /* and, restored, takes the same next boundary */
+   BOOL          talked;         /* saying something while dismantling */
+   NSString      *refused;       /* why a second activity for the hands was refused */
 } BGRepairRun;
 
 
@@ -4313,6 +4316,21 @@ static BGRepairRun   repair_run( BOOL omniscient, BOOL shout)
    start = 0;
    BG_CHECK( a && [st.w getField:"Activity.started" of:a value:&start]);
 
+   /* 3: talking runs with the dismantling; a second activity for the hands
+    * is refused, with the reason */
+   [st.s runUntil:BGTimeMake( start + 1000)];
+   {
+      BGAction   talk;
+
+      talk         = BGActionMake( "say", run.worker, smith, BGNoEntity);
+      talk.content = [st.w intern:"#Here & {}"];
+      run.talked   = BGPerform( st.w, st.c, talk, 0, &error) != nil;
+      error        = nil;
+      if( ! BGPerform( st.w, st.c, BGActionMake( "dismantle", run.worker, wrench, run.pump), 0, &error))
+         run.refused = [[error copy] autorelease];
+      error = nil;
+   }
+
    /* stage 3 is 60% done: called away, it puts the work down; the smith takes the wrench */
    [st.s runUntil:BGTimeMake( start + 3000 + 3000 + 3000)];
    if( shout)
@@ -4344,8 +4362,37 @@ static BGRepairRun   repair_run( BOOL omniscient, BOOL shout)
    w2        = BGRestore( text, [st.w contentBuild], &deferred, &position, &error);
    run.saved = w2 && [w2 stateHash] == [st.w stateHash];
 
+   /* 5: restored, with its own knowledge and agency, it takes the next
+    * boundary exactly as the run that never saved */
+   {
+      BGStage        st2;
+      BGActivities   *activities2;
+      BGKnowledge    *knowledge2;
+      BGAgency       *agency2;
+      int64_t        next;
+
+      st2.w       = restore( text, [st.w contentBuild], &st2.c, &error);
+      activities2 = [BGActivities activitiesWithWorld:st2.w committer:st2.c];
+      knowledge2  = [[[BGKnowledge alloc] initWithWorld:st2.w] autorelease];
+      agency2     = [[[BGAgency alloc] initWithWorld:st2.w committer:st2.c knowledge:knowledge2] autorelease];
+      st2.s       = [[[BGScheduler alloc] initWithWorld:st2.w committer:st2.c] autorelease];
+      [knowledge2 setOmniscient:omniscient];
+      [knowledge2 restoreSavedState:BGSavedDomainState( text, @"knowledge")];
+      [agency2 restoreSavedState:BGSavedDomainState( text, @"agency")];
+      [agency2 setActivities:activities2];
+      [st2.s setActivities:activities2];
+      [st2.s setPerception:knowledge2];
+      [st2.s setDecision:agency2];
+      /* nothing is due while it is suspended: the next boundary is the stop */
+      next         = [st.w time].ms + 2000;
+      run.nextSame = [st2.s runUntil:BGTimeMake( next)] == 1;
+      run.nextSame = [st.s runUntil:BGTimeMake( next)] == 1 && run.nextSame && [st2.w time].ms == next &&
+                     [st2.w stateHash] == [st.w stateHash] &&
+                     [BGSave( st2.w, st2.c, [NSArray arrayWithObjects:knowledge2, agency2, nil])
+                        isEqualToString:BGSave( st.w, st.c, [NSArray arrayWithObjects:knowledge, agency, nil])];
+   }
+
    /* the wrench back: the repair goes on */
-   [st.s runUntil:BGTimeMake( [st.w time].ms + 2000)];
    g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the wrench back"];
    [g move:BGWhole( wrench) to:BGHeldBy( run.worker, 0)];
    [st.c submit:g];
@@ -4378,8 +4425,12 @@ static void   test_interrupted_repair( void)
    BG_CHECK( ! run.openWhileSuspended);
    /* 6: resuming without the wrench is refused, with the reason */
    BG_CHECK( logged_by( run.agency, run.worker, @"could not resume dismantle: what it needs no longer holds"));
-   /* 5: saved while suspended, restored the same */
+   /* 5: saved while suspended, restored the same, and the next boundary the same */
    BG_CHECK( run.saved);
+   BG_CHECK( run.nextSame);
+   /* 3: talking ran with the dismantling; a second dismantling was refused, its hands busy */
+   BG_CHECK( run.talked);
+   BG_CHECK( run.refused && [run.refused rangeOfString:@"its hands are busy with activity"].location != NSNotFound);
    /* the wrench back, it resumes, and the pump is open */
    BG_CHECK( logged_by( run.agency, run.worker, @"follow the recipe: resuming dismantle"));
    BG_CHECK( [run.world getField:"Pump.opened" of:run.pump value:&v] && v);
