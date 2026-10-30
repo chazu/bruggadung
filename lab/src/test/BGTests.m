@@ -4106,6 +4106,58 @@ static void   test_seized_valve( void)
 }
 
 
+/* ACTIONS.md Scenario 3's recheck on resume: the worker, driving a nail of
+ * its own into the lock, puts the drive down at 2 s; the smith takes its
+ * nails; resuming is refused, with the reason, until they are back in its
+ * hand. */
+static void   test_resume_recheck( void)
+{
+   BGWorld           *w;
+   BGCommitter       *c;
+   BGScheduler       *s;
+   BGActivities      *activities;
+   BGProposalGroup   *g;
+   BGEntityID        h[ 8];
+   BGEntityID        a;
+   NSString          *error;
+
+   w          = BGTestWorld( 79);
+   c          = BGTestCommitter( w);
+   activities = [BGActivities activitiesWithWorld:w committer:c];
+   s          = [[[BGScheduler alloc] initWithWorld:w committer:c] autorelease];
+   [s setActivities:activities];
+   [c submit:BGWorkshopSetup( YES, h)];
+   [s runUntil:BGTimeMake( 1)];
+
+   g = BGPerform( w, c, BGActionMake( "drive", 4, 7, 3), 0, &error);
+   BG_CHECK( g != nil);
+   [s runUntil:BGTimeMake( 2001)];
+   a = [g idFor:[g proposals][ 0].handle];
+   BG_CHECK( [activities suspend:a because:@"a shout" error:&error] != nil);
+   [s runUntil:BGTimeMake( 2002)];
+   BG_CHECK( ! strcmp( status_of( w, a), "\"suspended\""));
+
+   /* the smith, beside the worker, takes the nails: still within reach, no
+    * longer in its hand */
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the smith takes the nails"];
+   [g move:BGWhole( 5) to:BGOnTile( 4, 5, 0)];
+   [g move:BGWhole( 7) to:BGHeldBy( 5, 0)];
+   [c submit:g];
+   [s runUntil:BGTimeMake( 3000)];
+   error = nil;
+   BG_CHECK( ! [activities resume:a error:&error]);
+   BG_CHECK( error && [error rangeOfString:@"what it needs no longer holds, at "].location != NSNotFound);
+   BG_CHECK( ! strcmp( status_of( w, a), "\"suspended\""));
+
+   /* back in its hand: it resumes */
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the nails back"];
+   [g move:BGWhole( 7) to:BGHeldBy( 4, 0)];
+   [c submit:g];
+   [s runUntil:BGTimeMake( 4000)];
+   BG_CHECK( [activities resume:a error:&error] != nil);
+}
+
+
 /* --- the cistern ----------------------------------------------------------- */
 
 static BGCistern   *run_cistern( BGCisternVariant variant)
@@ -4425,6 +4477,7 @@ const BGTestCase   BGAllTests[] =
    { "coat_at_dusk",                  test_coat_at_dusk },
    { "unknown_nut",                   test_unknown_nut },
    { "seized_valve",                  test_seized_valve },
+   { "resume_recheck",                test_resume_recheck },
    { "rumour",                        test_rumour },
    { "memory_decay",                  test_memory_decay },
    { "salience",                      test_salience },

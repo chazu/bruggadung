@@ -223,6 +223,22 @@ static BGAction   action_of( BGWorld *world, BGEntityID a, const BGActivity *rec
 }
 
 
+/* What the operation needs, rechecked on resume (ACTIONS.md Scenario 3):
+ * its pattern against what is so now; the reason if it no longer holds,
+ * else nil. Unknown doesn't block. */
+- (NSString *) requirementsOf:(BGEntityID) a
+                       record:(const BGActivity *) record
+{
+   TriMatchResult   result;
+   NSString         *why;
+
+   why = nil;
+   if( BGMatchAction( _world, action_of( _world, a, record), &result, &why) != TRI_INCOMPATIBLE)
+      return( nil);
+   return( [NSString stringWithFormat:@"what it needs no longer holds, at %s", result.failure.path]);
+}
+
+
 - (BGProposalGroup *) resume:(BGEntityID) a
                        error:(NSString **) error
 {
@@ -242,6 +258,7 @@ static BGAction   action_of( BGWorld *world, BGEntityID a, const BGActivity *rec
    }
    if( (reason = [self obstacleTo:a record:record]) ||
        (reason = BGProvidersBusy( _world, record->actorRef, [_world textField:"Activity.operation" of:a], a)) ||
+       (reason = [self requirementsOf:a record:record]) ||
        ! BGOperationStage( _world, [_world textField:"Activity.operation" of:a], record->stage, &duration, &effect))
    {
       if( error)

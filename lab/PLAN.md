@@ -1484,3 +1484,21 @@ bending as percepts, the actor's exertion, and impact as a graded effect.
 
 49 tests, 1895 checks, under both compilers, ASan and UBSan, and leak-free.
 
+### After the slice: rechecking on resume
+
+ACTIONS.md Scenario 3's sixth check, and an item from the activities
+slice's list. The worker, driving a nail of its own into the lock, puts the
+drive down at two seconds; the smith, beside it, takes its nails. Still
+within reach, but no longer in its hand: resuming is refused, with the
+reason, and the drive stays suspended until the nails are back.
+
+- **A resumed stage rechecks the operation's pattern** against what is so
+  now (`BGMatchAction`), as well as reach and providers: incompatible
+  blocks it with the failing path; unknown doesn't.
+
+Not yet, of ACTIONS.md Scenario 3: recipes expanded through knowledge (a
+diagram binding the wrong cock), child activities, a shout as a soft
+interruption, partial effects on abort, and the watch on rising water.
+
+50 tests, 1902 checks, under both compilers, ASan and UBSan, and leak-free.
+
