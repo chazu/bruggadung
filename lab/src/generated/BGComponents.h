@@ -1,4 +1,4 @@
-/* Generated from Triangle content 521384cc205e44e1: do not edit. Type IDs are valid
+/* Generated from Triangle content e2b987385daa3bee: do not edit. Type IDs are valid
  * only for this content; regenerate when it changes. */
 #ifndef BG_COMPONENTS_H
 #define BG_COMPONENTS_H
@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BG_CONTENT_HASH 0x521384cc205e44e1ULL
+#define BG_CONTENT_HASH 0xe2b987385daa3beeULL
 
 typedef struct TriNode TriNode;
 

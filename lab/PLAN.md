@@ -3039,8 +3039,7 @@ why" above, and):
   consequences, detail fading by salience*: no document says.
 - *Routes as habits, exploring around obstacles*: the lab has no walls.
 
-**Buildable, not yet done**: a split reaching a running thermal domain's ledger, and
-hearing a promise's outcome from others.
+**Buildable, not yet done**: hearing a promise's outcome from others.
 
 ### After the slice: a commitment every day
 
@@ -3089,3 +3088,19 @@ and a half, the loosening done and the pulling under way, the nail bears
 a scratch; at six, the activity has completed, the nail in hand.
 
 84 tests, 2594 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: the piston's heat with the domain running
+
+The heat slice's "Not yet": the split reaching a running thermal domain's
+ledger. It needed no change: the domain loads its bodies from their
+records before it works, so the reaction's move between steps reaches it,
+and the total is the same. Now checked, with `yard_pump` (the warm pump,
+out in the yard: 50 W/K to the outdoors).
+
+Checked: ten minutes of cooling, the domain stepping; the piston taken
+out joins the domain at the pump's temperature (warmer only by the
+second's cooling the pump had since, 15 mK); the ledger balances then and
+an hour on, the pump cooler than the piston, which has no outdoors of its
+own.
+
+85 tests, 2604 checks, under both compilers, ASan, and leak-free.

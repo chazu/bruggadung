@@ -84,6 +84,23 @@ warm_pump: #Pump & #Latent & #ThermalBody & {
     }
 }
 
+// The same pump out in the yard: it gives its heat to the outdoors.
+yard_pump: #Pump & #Latent & #ThermalBody & {
+    material: "iron", mass: 40kg, slots: 8, heat: 5490000, heatCapacity: 18000, toAir: 0, toOutdoors: 50
+    latent: {
+        parts: [{ roleName: "handle", partKind: "pump_handle", depth: 1 },
+                { roleName: "cover", partKind: "pump_cover", depth: 1 },
+                { roleName: "piston", partKind: "piston", depth: 2 },
+                { roleName: "piston_seal", partKind: "leather_cup", depth: 2 },
+                { roleName: "inlet_valve", partKind: "inlet_valve", depth: 2 },
+                { roleName: "outlet_valve", partKind: "outlet_valve", depth: 2 }]
+        culprits: [{ failing: "flow_loss", candidates: ["piston_seal", "inlet_valve", "outlet_valve", "housing"] },
+                   { failing: "seized", candidates: [] }]
+        pathWhenOut: "piston"
+        pathThrough: "outlet_valve"
+    }
+}
+
 // COMPONENTS.md Scenario 3's hand pump: its piston is itself an assembly,
 // with the seal inside. A culprit that is itself an assembly isn't worn: it
 // takes the failure on, and its own descriptor finds its culprit. A part's

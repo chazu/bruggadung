@@ -3660,6 +3660,68 @@ static int64_t   pump_drain( const char *key, BOOL *conserved, BOOL *leaking)
 /* Check 3's heat: the warm pump (305 K, 18 kJ/K) opened and its piston
  * (1.8 kJ/K) taken out: the piston leaves with its share of the heat, by
  * heat capacity; the total is the same, and both are at 305 K. */
+/* The same, with the thermal domain running (the heat slice's "Not yet"):
+ * the pump in the yard, cooling, the domain stepping. The piston's share,
+ * moved by the reaction between steps, reaches the domain, which loads its
+ * bodies from their records: once out it takes part, at the pump's
+ * temperature, and every joule is accounted for, then and an hour on. */
+static void   test_pump_heat_running( void)
+{
+   BGStage            st;
+   BGThermal          *thermal;
+   BGProposalGroup    *g;
+   BGEntityID         pump;
+   BGEntityID         worker;
+   BGEntityID         wrench;
+   BGEntityID         piston;
+   BGStore            *parts;
+   NSString           *error;
+   NSUInteger         i;
+
+   st.w    = BGTestWorld( 167);
+   st.c    = BGTestCommitter( st.w);
+   st.s    = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   thermal = [[[BGThermal alloc] initWithWorld:st.w] autorelease];
+   [st.s addDomain:thermal];
+   g      = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: a warm pump"];
+   /* out in the yard: it cools toward the outdoors, the domain stepping */
+   pump   = [g create:"yard_pump" key:"pump 1" at:BGOnTile( 5, 5, 0)];
+   worker = [g create:"worker" key:"worker" at:BGOnTile( 4, 5, 0)];
+   wrench = [g create:"wrench_250" key:"wrench" at:BGHeldBy( worker, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   pump   = [g idFor:pump];
+   worker = [g idFor:worker];
+   wrench = [g idFor:wrench];
+   error  = nil;
+   [st.s runUntil:BGTimeMake( 600000)];
+   BG_CHECK( [thermal steps] > 0 && [thermal temperatureOf:pump] < 305000);
+   BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "open_up", worker, wrench, pump), 0, &error) != nil);
+   [st.s runUntil:BGTimeMake( [st.w time].ms + 1000)];
+   BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "open_up", worker, wrench, pump), 0, &error) != nil);
+   [st.s runUntil:BGTimeMake( [st.w time].ms + 1000)];
+   piston = BGNoEntity;
+   parts  = [st.w storeForKind:[st.w kindNamed:"Part"]];
+   for( i = 0; i < [parts count]; i++)
+      if( ! strcmp( [st.w info:[parts entityAtIndex:i]]->blueprint, "piston"))
+         piston = [parts entityAtIndex:i];
+   BG_CHECK( piston && ! [thermal participates:piston]);
+   BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "take", worker, piston, BGNoEntity), 0, &error) != nil);
+   [st.s runUntil:BGTimeMake( [st.w time].ms + 1000)];
+   BG_CHECK( [thermal participates:piston] && [thermal participates:pump]);
+   /* taken out at the pump's temperature; the pump has cooled on for the
+    * second since (some 250 W to the outdoors, 15 mK), the piston not */
+   BG_CHECK( [thermal temperatureOf:piston] >= [thermal temperatureOf:pump] &&
+             [thermal temperatureOf:piston] - [thermal temperatureOf:pump] <= 20);
+   BG_CHECK( [thermal balanced]);
+   /* and on, the domain stepping with both: the pump cools on, the piston
+    * (no outdoors of its own) keeps what it took */
+   [st.s runUntil:BGTimeMake( 3600000)];
+   BG_CHECK( [thermal balanced]);
+   BG_CHECK( [thermal temperatureOf:pump] < [thermal temperatureOf:piston]);
+}
+
+
 static void   test_pump_heat( void)
 {
    BGStage            st;
@@ -8381,6 +8443,7 @@ const BGTestCase   BGAllTests[] =
    { "issue_permit",                  test_issue_permit },
    { "latent_pump",                   test_latent_pump },
    { "pump_heat",                     test_pump_heat },
+   { "pump_heat_running",             test_pump_heat_running },
    { "component_pump",                test_component_pump },
    { "improvise",                     test_improvise },
    { "door_in_the_dark",              test_door_in_the_dark },
