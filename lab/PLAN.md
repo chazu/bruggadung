@@ -3205,3 +3205,30 @@ design document:
 - latent assembly: LATENT_ASSEMBLY.md (the lab's rules adopted; culprits
   by history and wear by use still to design);
 - Triangle packages: CONTENT_LANGUAGE.md decision 12.
+
+### After the slice: laws, and what breaks them
+
+INSTITUTIONS.md decisions 2 and 3: an organization's rules are content it
+issues; whether an act breaks one is true; nothing blocks it.
+
+- **`#Law`** (content/institutions.tri): content (`#Content`) with what it
+  `forbids` (an operation's effect), what makes that a wrong (`"anothers"`:
+  the thing claimed by someone else, owned or in custody, with no
+  authorization over it; `"unauthorized"`: no authorization at all), what
+  breaking it `brings` (arrest, a fine, confiscation), the organization it
+  is the law of, and whether it is common knowledge. The town and its law
+  against theft are the first.
+- **`BGLawsBroken(action)`**: the laws an action breaks, true, for the
+  inspector and for whoever acts on it. A reservation is no claim to a
+  thing (institutions could make one so later).
+- **COMPONENTS.md decision 11 applied**: an installed part keeps its own
+  claim, and an assembly's claim covers only parts with none. Scenario 3's
+  check 5 now reads so: the new seal is the player's; whether fitting it
+  was a gift is for people to settle.
+
+Checked: Kasimir taking the merchant's purse breaks the town's law, and
+takes it all the same; the merchant taking its own, or Kasimir given an
+authorization over it, or taking a seal only reserved for the merchant,
+breaks none.
+
+87 tests, 2666 checks, under both compilers, ASan, and leak-free.

@@ -68,7 +68,7 @@ static void   test_registry_and_construction( void)
 
    w = BGTestWorld( 1);
    c = BGTestCommitter( w);
-   BG_CHECK( [w kindCount] == 35);
+   BG_CHECK( [w kindCount] == 36);
    BG_CHECK( [w kindNamed:"Body"] != NSNotFound && [w kindNamed:"Nonesuch"] == NSNotFound);
    bin   = commit_create( c, "bin", BGOnTile( 0, 0, 0));
    nails = commit_create( c, "nails_30", BGIn( bin));
@@ -7857,6 +7857,75 @@ static BOOL   disturbed( BGKnowledgeStore *store)
 }
 
 
+/* INSTITUTIONS.md decisions 2 and 3: a law is content an organization
+ * issues, and whether an act breaks it is true (for the inspector); nothing
+ * blocks it. The town's law against theft: Kasimir taking the merchant's
+ * purse breaks it; the merchant taking its own doesn't; nor Kasimir, given
+ * an authorization over it; nor taking a thing only reserved for someone. */
+static void   test_laws( void)
+{
+   BGWorld           *w;
+   BGCommitter       *c;
+   BGProposalGroup   *g;
+   BGEntityID        town;
+   BGEntityID        law;
+   BGEntityID        merchant;
+   BGEntityID        kasimir;
+   BGEntityID        purse;
+   BGEntityID        claim;
+   BGEntityID        seal;
+   BGEntityID        held;
+   NSArray           *broken;
+   NSString          *error;
+
+   w = BGTestWorld( 197);
+   c = BGTestCommitter( w);
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the market"];
+   town     = [g create:"town" key:"the town" at:BGLocationMakeNone()];
+   law      = [g create:"theft_law" key:"the law against theft" at:BGLocationMakeNone()];
+   [g set:"Law.lawOf" of:BGWhole( law) to:(int64_t) town];
+   merchant = [g create:"merchant" key:"merchant" at:BGOnTile( 11, 10, 0)];
+   kasimir  = [g create:"kasimir" key:"kasimir" at:BGOnTile( 9, 10, 0)];
+   purse    = [g create:"purse" key:"purse" at:BGOnTile( 10, 10, 0)];
+   claim    = [g create:"ownership" key:"the merchant's purse" at:BGLocationMakeNone()];
+   [g relate:BGEdgeClaimant from:BGWhole( claim) to:BGWhole( merchant)];
+   [g relate:BGEdgeClaimSubject from:BGWhole( claim) to:BGWhole( purse)];
+   seal     = [g create:"seal" key:"seal" at:BGOnTile( 10, 11, 0)];
+   held     = [g create:"reservation" key:"the seal, reserved" at:BGLocationMakeNone()];
+   [g relate:BGEdgeClaimant from:BGWhole( held) to:BGWhole( merchant)];
+   [g relate:BGEdgeClaimSubject from:BGWhole( held) to:BGWhole( seal)];
+   [c submit:g];
+   [c commitBoundary];
+   BG_CHECK( [g applied]);
+   town     = [g idFor:town];
+   law      = [g idFor:law];
+   merchant = [g idFor:merchant];
+   kasimir  = [g idFor:kasimir];
+   purse    = [g idFor:purse];
+   seal     = [g idFor:seal];
+
+   broken = BGLawsBroken( w, BGActionMake( "take", kasimir, purse, BGNoEntity));
+   BG_CHECK( [broken count] == 1 && [[broken objectAtIndex:0] unsignedLongLongValue] == law);
+   BG_CHECK( [BGLawsBroken( w, BGActionMake( "take", merchant, purse, BGNoEntity)) count] == 0);
+   BG_CHECK( [BGLawsBroken( w, BGActionMake( "take", kasimir, seal, BGNoEntity)) count] == 0);
+   /* walking isn't taking */
+   BG_CHECK( [BGLawsBroken( w, BGActionMake( "walk_east", kasimir, BGNoEntity, BGNoEntity)) count] == 0);
+   /* the act isn't blocked: he takes it */
+   error = nil;
+   BG_CHECK( BGPerform( w, c, BGActionMake( "take", kasimir, purse, BGNoEntity), 0, &error) != nil);
+   [c commitBoundary];
+   BG_CHECK( [w locationOf:purse].place == kasimir);
+   /* given an authorization over it, taking it is no theft */
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the merchant lets him"];
+   held = [g create:"authorization" key:"leave to take it" at:BGLocationMakeNone()];
+   [g set:"Authorization.grantee" of:BGWhole( held) to:(int64_t) kasimir];
+   [g set:"Authorization.over" of:BGWhole( held) to:(int64_t) purse];
+   [c submit:g];
+   [c commitBoundary];
+   BG_CHECK( [BGLawsBroken( w, BGActionMake( "take", kasimir, purse, BGNoEntity)) count] == 0);
+}
+
+
 /* KNOWLEDGE.md §3: "Traces on stacks trigger automatic individuation ...
  * marked units never merge." Ten nails on the floor; a scratch and a creak
  * put on the stack in one group mark one nail, split off first, and it
@@ -8578,6 +8647,7 @@ const BGTestCase   BGAllTests[] =
    { "work_rate",                     test_work_rate },
    { "traced_units",                  test_traced_units },
    { "attention_budget",              test_attention_budget },
+   { "laws",                          test_laws },
    { "routine_autopilot",             test_routine_autopilot },
    { "daily_commitment",              test_daily_commitment },
    { "talking_takes_time",            test_talking_takes_time },

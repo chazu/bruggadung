@@ -1,0 +1,28 @@
+// Institutions (INSTITUTIONS.md): real organizations, made of people, that
+// act only through their members. An organization's rules are content it
+// issues: a law says what it forbids, what makes doing it wrong, and what
+// breaking it brings. Whether an act breaks one is true or not (the
+// inspector shows it, `BGLawsBroken`); nothing blocks the act.
+
+// What makes an act a wrong: taking what someone else claims, with no
+// authorization over it; or acting without an authorization at all.
+#Wrong:   "anothers" | "unauthorized"
+// What breaking it brings, done by the organization's members (decision 7).
+#Penalty: "arrest" | "fine" | "confiscate"
+
+// A law: content an organization issues (`lawOf`), forbidding an
+// operation's effect (`forbids`, as operations.tri names effects) when it
+// is a wrong of its kind. A common law is one everyone in its society
+// knows from the start (decision 8).
+#Law: #Content & {
+    @component(Law)
+    forbids: text                              @field(content, saved, proposable, inspect)
+    wrong:   #Wrong                            @field(content, saved, inspect)
+    brings:  #Penalty                          @field(content, saved, inspect)
+    lawOf:   ref                               @field(saved, proposable, inspect)
+    common:  bool                              @field(content, saved, inspect)
+}
+
+// The town and its watch; the law against theft.
+town:      #Organization & {}
+theft_law: #Law & { forbids: "take", wrong: "anothers", brings: "arrest", common: true }

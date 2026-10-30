@@ -180,6 +180,15 @@ BOOL               BGContentAuthorizes( BGWorld *world, BGEntityID content);
 /* ACTIONS.md §3's authorize(action): the authorizations granting the actor
  * something over what the action binds. Never blocks an attempt. */
 NSArray            *BGAuthorize( BGWorld *world, BGAction action);
+/* The laws the action breaks (INSTITUTIONS.md decision 2), as entity IDs in
+ * NSNumbers: true, for the inspector and for those who act on it; nothing
+ * blocks it. A law forbids its effect when the act is its kind of wrong:
+ * "anothers", the item claimed (owned or held in custody) by someone else
+ * and no authorization of the actor over it; "unauthorized", no
+ * authorization over what it binds. */
+NSArray            *BGLawsBroken( BGWorld *world, BGAction action);
+/* Whether someone other than `who` claims it (ownership or custody). */
+BOOL               BGClaimedByAnother( BGWorld *world, BGEntityID entity, BGEntityID who);
 /* A trace of `kind` (traces.tri) on the bearer, or on the tile if none, at
  * `strength`, made in the group; `by` says what left it. */
 void               BGMakeTrace( BGWorld *world, BGProposalGroup *group, const char *kind, BGEntityID bearer,

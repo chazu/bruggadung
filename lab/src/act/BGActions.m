@@ -1561,6 +1561,61 @@ NSArray   *BGAuthorize( BGWorld *world, BGAction action)
 }
 
 
+BOOL   BGClaimedByAnother( BGWorld *world, BGEntityID entity, BGEntityID who)
+{
+   const BGClaim   *claim;
+   NSArray         *claims;
+   BGEntityID      c;
+   BGEntityID      claimant;
+   NSUInteger      i;
+
+   claims = BGClaimsCovering( world, entity);
+   for( i = 0; i < [claims count]; i++)
+   {
+      c     = (BGEntityID) [[claims objectAtIndex:i] unsignedLongLongValue];
+      claim = [world record:[world kindNamed:"Claim"] for:c];
+      if( ! claim || claim->kind == (uint32_t) tri_type_named( [world tri], "\"reservation\""))
+         continue;      /* a reservation is no claim to it, unless an institution says so */
+      if( [world edges:BGEdgeClaimant from:c into:&claimant max:1] && claimant != who)
+         return( YES);
+   }
+   return( NO);
+}
+
+
+NSArray   *BGLawsBroken( BGWorld *world, BGAction action)
+{
+   const BGLaw      *law;
+   NSMutableArray   *broken;
+   NSString         *effect;
+   BGStore          *laws;
+   TriContent       *tri;
+   NSUInteger       i;
+   BOOL             authorized;
+   BOOL             wrong;
+
+   broken     = [NSMutableArray array];
+   effect     = BGOperationEffect( world, action.operation);
+   tri        = [world tri];
+   laws       = [world storeForKind:[world kindNamed:"Law"]];
+   authorized = [BGAuthorize( world, action) count] > 0;
+   for( i = 0; effect && i < [laws count]; i++)
+   {
+      law = [laws recordAtIndex:i];
+      if( ! law->forbids || ! [effect isEqualToString:[NSString stringWithUTF8String:law->forbids]])
+         continue;
+      if( law->wrong == (uint32_t) tri_type_named( tri, "\"anothers\""))
+         wrong = ! authorized && action.roles[ BGRoleItem] &&
+                 BGClaimedByAnother( world, action.roles[ BGRoleItem], action.roles[ BGRoleActor]);
+      else
+         wrong = ! authorized;
+      if( wrong)
+         [broken addObject:[NSNumber numberWithUnsignedLongLong:[laws entityAtIndex:i]]];
+   }
+   return( broken);
+}
+
+
 /* Whether any authorization links to the content. */
 BOOL   BGContentAuthorizes( BGWorld *world, BGEntityID content)
 {
