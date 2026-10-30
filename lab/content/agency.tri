@@ -51,6 +51,8 @@
 // A wrong (INSTITUTIONS.md): what was taken, someone of the watch to tell,
 // and who took it.
 #Wronging: #Frame & { loot: #Body, officer: #Agent, culprit: #Agent }
+// Under arrest: the arrested, and the one holding it.
+#Custody: #Frame & { arrested: #Agent, warden: #Agent }
 
 // Eating: the food. Watching: the spot where something stirred.
 #Supper:   #Frame & { food: #Body }
@@ -361,6 +363,26 @@ take_it_back: #Method & {
         match: #Wronging & { loot: #Body & { place: #Held & { by: $t } }, culprit: #Agent & { id: $t } }
     }
     steps: [#Do & { op: "arrest", object: "culprit" }, #Do & { op: "confiscate", object: "loot" }]
+} @family(methods)
+
+
+// Arrested (INSTITUTIONS.md decision 7): flee, or comply by not. Escaping
+// what the arrest brings is worth 40; the disposition to abide weighs
+// against it, so that by default one complies.
+flee_arrest: #Goal & {
+    title:  "get away"
+    done:   #Did & { did: "flee" }
+    arises: { finding: "#Arrested", slot: "arrested", lapse: 60s, of: #Agent }
+    worth:  [#Flat & { value: 40 }, #Trait & { trait: "abiding", per: -8 }]
+} @family(goals)
+
+run_off: #Method & {
+    title: "run off"
+    goal:  "flee_arrest"
+    rank:  1
+    pre:   { find: ["warden"], match: #Custody & { warden: #Agent & #OfficeHolder & { badge: "watch" } } }
+    order: ["near"]
+    steps: [#Do & { op: "flee", object: "warden" }]
 } @family(methods)
 
 

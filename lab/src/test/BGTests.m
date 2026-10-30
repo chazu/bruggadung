@@ -941,7 +941,7 @@ static void   test_play_talk( void)
    uint64_t   h2;
 
    commands = [NSArray arrayWithObjects:@"do 1", @"walk w", @"tell R4 R5", @"ask R4 where R5", @"ask R4 who R5",
-                                        @"menu", @"do 5", @"tell R4 R5 in R2", @"knows", @"knows 5", @"tell R4",
+                                        @"menu", @"do 6", @"tell R4 R5 in R2", @"knows", @"knows 5", @"tell R4",
                                         @"ask R4 where R99", @"help", nil];
    out   = session( @"workshop", commands, &h1);
    again = session( @"workshop", commands, &h2);
@@ -4745,6 +4745,7 @@ typedef enum
    BGPurseNoWitness,             /* C: Mira isn't there */
    BGPurseUntold,                /* A, but no one told Kasimir whose the purse is */
    BGPurseWatch,                 /* the base case, and an officer of the town's watch by Mira */
+   BGPurseFlight,                /* that, and Kasimir doesn't abide by the rules */
    BGPurseRepaid,                /* B, and on until the loan's term is out */
    BGPurseLost                   /* that, but the wages are lost on the third day */
 } BGPurse;
@@ -4820,8 +4821,10 @@ static BGPurseRun   tempting_purse( BGPurse variant)
       if( variant == BGPurseNoticed || variant == BGPurseUntold)
          [g set:"Agent.hiding" of:BGWhole( h[ 4]) to:0];
    }
-   if( variant == BGPurseWatch)
+   if( variant == BGPurseWatch || variant == BGPurseFlight)
       run.officer = [g create:"watch_officer" key:"an officer of the watch" at:BGOnTile( 13, 12, 0)];
+   if( variant == BGPurseFlight)
+      [g set:"Agent.abiding" of:BGWhole( h[ 2]) to:0];
    if( variant == BGPurseHonest || variant == BGPurseRepaid || variant == BGPurseLost)
       [g set:"Agent.honesty" of:BGWhole( h[ 2]) to:90];
    [st.c submit:g];
@@ -4907,6 +4910,7 @@ static void   test_tempting_purse( void)
    BGPurseRun         lost;
    BGPurseRun         untold;
    BGPurseRun         watch;
+   BGPurseRun         flight;
    BGKnowledgeStore   *store;
    const BGReferent   *purse;
    const BGTestimony  *t;
@@ -5078,6 +5082,26 @@ static void   test_tempting_purse( void)
              [watch.world eventAt:i]->other == watch.officer)
             arrested = YES;
       BG_CHECK( arrested);
+   }
+
+   /* decision 7: arrested, Kasimir decides for himself. Disposed to abide
+    * (as by default), getting away is worth nothing to him: he complies,
+    * and stays. Not, he runs off, four tiles straight from the officer */
+   store = [watch.knowledge storeOf:watch.kasimir];
+   BG_CHECK( [store finding:"#Arrested" about:[store selfReferent]] &&
+             [store finding:"#Arrested" about:[store selfReferent]]->choice == referent_of( store, watch.officer));
+   BG_CHECK( logged_by( watch.agency, watch.kasimir, @"get away: +0 (+40, abiding -40)") ||
+             ! logged_by( watch.agency, watch.kasimir, @"[get away] run off"));
+   BG_CHECK( [watch.world locationOf:watch.kasimir].x == 9 && [watch.world locationOf:watch.kasimir].y == 10);
+   flight = tempting_purse( BGPurseFlight);
+   BG_CHECK( logged_by( flight.agency, flight.kasimir, @"[get away] run off: flee R"));
+   {
+      BGLocation   k;
+      BGLocation   o;
+
+      k = [flight.world locationOf:flight.kasimir];
+      o = [flight.world locationOf:flight.officer];
+      BG_CHECK( k.form == BGLocationOnTile && (abs( k.x - o.x) >= 4 || abs( k.y - o.y) >= 4));
    }
 
    /* 1: C: no one is there, and Kasimir decides just the same */

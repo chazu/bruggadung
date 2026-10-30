@@ -3313,3 +3313,28 @@ the watch has no form yet: harmless, it finds no one to tell); and
 returning confiscated things to their owners.
 
 87 tests, 2692 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: arrested, complying or fleeing
+
+INSTITUTIONS.md decision 7: the target of a sanction complies, resists, or
+flees, as its own agency decides.
+
+- **`#Arrested`**: an agent perceives its own arrest (the "arrested" event
+  naming it), and by whom.
+- **`flee_arrest`**: a goal arising from it, worth 40 for getting away,
+  less the agent's disposition to abide (`Agent.abiding`, new, 50 by
+  default: decision 5's "disposition to abide"), so by default it
+  complies. Its method runs off from the warden (`flee`: four tiles
+  straight away, four seconds, on the legs).
+- `lab play`'s menu has `flee` for anyone in reach of someone; the scripted
+  talk session's menu numbers moved by one.
+
+Checked: arrested by the officer, Kasimir, disposed to abide, stays where
+he is; not disposed to (abiding 0), he runs off, four tiles from the
+officer.
+
+Not yet: resisting (it needs harm: AGENCY.md decision 13, not built), the
+officer pursuing one who flees, and what custody leads to (a court, a
+fine, release: INSTITUTIONS.md's procedures, as decided only so far).
+
+87 tests, 2700 checks, under both compilers, ASan, and leak-free.

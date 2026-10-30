@@ -57,3 +57,16 @@ arrest: #Operation & {
         item:  #Agent
     }
 } @family(operations)
+
+// Flee: run from someone, straight away from them, four tiles in four
+// seconds (INSTITUTIONS.md decision 7: the arrested complies, resists, or
+// flees, as its own agency decides).
+flee: #Operation & {
+    effect:   "flee"
+    duration: 4s
+    uses:     ["legs"]
+    roles: {
+        actor: #Agent & { place: #OnTile }
+        item:  #Agent
+    }
+} @family(operations)

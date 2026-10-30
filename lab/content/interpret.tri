@@ -21,6 +21,8 @@
 #Owned: #Finding & {}
 // Someone, the finding's choice, took it from its owner: seen, or told.
 #Taken: #Finding & {}
+// It (the agent itself) is under arrest, by the finding's choice.
+#Arrested: #Finding & {}
 // Someone does something the same way, again and again (AGENCY.md §8): the
 // finding's choice is the way.
 #Habit: #Finding & {}

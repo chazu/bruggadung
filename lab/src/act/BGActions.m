@@ -1667,6 +1667,34 @@ static NSString   *effect_arrest( BGWorld *world, BGAction a, int64_t amount, BG
 }
 
 
+/* Fleeing: four tiles straight away from the one fled, on the map. */
+static NSString   *effect_flee( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
+{
+   BGLocation   at;
+   BGLocation   from;
+   int32_t      dx;
+   int32_t      dy;
+   int          k;
+
+   at   = [world locationOf:a.roles[ BGRoleActor]];
+   from = [world locationOf:a.roles[ BGRoleItem]];
+   if( at.form != BGLocationOnTile || from.form != BGLocationOnTile)
+      return( @"one can flee only on the ground");
+   dx = at.x > from.x ? 1 : at.x < from.x ? -1 : 0;
+   dy = at.y > from.y ? 1 : at.y < from.y ? -1 : 0;
+   if( ! dx && ! dy)
+      dx = 1;
+   for( k = 0; k < 4 && [world isTileX:at.x + dx y:at.y + dy level:at.level]; k++)
+   {
+      at.x += dx;
+      at.y += dy;
+   }
+   [g move:BGWhole( a.roles[ BGRoleActor]) to:at];
+   tread( world, at, g);
+   return( nil);
+}
+
+
 /* Through a door: onto its tile. */
 static NSString   *effect_pass( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
 {
@@ -1790,6 +1818,7 @@ static const struct
    { "rotate",    effect_rotate },
    { "confiscate", effect_confiscate },
    { "arrest",    effect_arrest },
+   { "flee",      effect_flee },
    { "shut",      effect_shut },
    { "dismantle", effect_dismantle },
    { "light",     effect_light },

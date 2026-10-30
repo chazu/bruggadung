@@ -3385,6 +3385,26 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
                  store:store news:news];
    }
 
+   /* arrested (INSTITUTIONS.md decision 7): it knows it, and by whom */
+   for( i = first; i < last; i++)
+   {
+      BGFinding   f;
+
+      ev = [_world eventAt:i];
+      if( strcmp( ev->kind, "arrested") || ev->subject != agent)
+         continue;
+      memset( &f, 0, sizeof( f));
+      f.kind     = [_world intern:"#Arrested"];
+      f.about    = [store selfReferent];
+      f.choice   = bound_to( ev->other, agent, [store selfReferent], seen, assigned, nseen);
+      f.credence = BG_SEEN;
+      f.rule     = [_world intern:"seen"];
+      f.time     = now;
+      [store retractFinding:"#Arrested" about:f.about];
+      [store addFinding:f];
+      [news addObject:[NSString stringWithFormat:@"you are under arrest, by R%u", f.choice]];
+   }
+
    /* what its own analyses found beneath the looks of what they analysed */
    for( i = first; i < last; i++)
    {
