@@ -2724,13 +2724,17 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
    memory   = [_world record:[_world kindNamed:"Agent"] for:agent];
    notice   = BG_NOTICE + [self attentionOf:agent] - (memory ? (int) memory->curious / 10 : 0);
 
-   /* interoception: hunger, to the band, dulled by attention */
+   /* interoception: hunger, to the band, dulled by attention, blurred by
+    * exhaustion */
    if( memory)
    {
       int64_t   hunger;
+      int64_t   band;
 
+      /* exhaustion blurs it (AGENCY.md §6): felt half as precisely */
+      band   = memory->fatigue >= 80 ? 2 * BG_HUNGER_BAND : BG_HUNGER_BAND;
       hunger = 100 - BGSatiety( memory, now) - 2 * [self attentionOf:agent];
-      hunger = hunger < 0 ? 0 : (hunger / BG_HUNGER_BAND) * BG_HUNGER_BAND;
+      hunger = hunger < 0 ? 0 : (hunger / band) * band;
       if( [store feelHunger:(int32_t) hunger at:now])
          [news addObject:[NSString stringWithFormat:@"you feel hunger (%d)", (int) hunger]];
    }

@@ -5475,11 +5475,26 @@ static void   test_tired_worker( void)
    log    = [g idFor:log];
    saw    = [g idFor:saw];
    BG_CHECK( [[knowledge storeOf:worker] feels:"tired"] == 40);
+   /* fed 80, it feels hunger 20, as precisely as ever */
+   BG_CHECK( [[knowledge storeOf:worker] feels:"hunger"] == 20);
    error = nil;
    BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "saw_through", worker, saw, log), 0, &error) != nil);
    [st.s runUntil:BGTimeMake( 10000)];
    BG_CHECK( [st.w getField:"Agent.fatigue" of:worker value:&fatigue] && fatigue == 70);
    BG_CHECK( [[knowledge storeOf:worker] feels:"tired"] == 70);
+   /* exhausted, it would feel hunger only to the twenty: at 90, its 30 is felt 20 */
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: worn out, and hungrier"];
+   [g set:"Agent.fatigue" of:BGWhole( worker) to:90];
+   [g set:"Agent.fed" of:BGWhole( worker) to:70];
+   [g set:"Agent.fedAt" of:BGWhole( worker) to:[st.w time].ms];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( [st.w time].ms + 2)];
+   BG_CHECK( [[knowledge storeOf:worker] feels:"hunger"] == 20 && [[knowledge storeOf:worker] feels:"tired"] == 90);
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: as tired as it was"];
+   [g set:"Agent.fatigue" of:BGWhole( worker) to:70];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( [st.w time].ms + 2)];
+   BG_CHECK( [[knowledge storeOf:worker] feels:"hunger"] == 30);
    [agency control:worker];
    [st.s runUntil:BGTimeMake( 20000)];
    BG_CHECK( logged_by( agency, worker, @"weighing get some rest: +35 (tired +35)"));

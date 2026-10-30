@@ -2139,3 +2139,17 @@ Not yet: a rest cut short by its watch restoring part of it, exertion from
 force (the valve's torque) rather than per stage, and fatigue slowing work.
 
 60 tests, 2116 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: exhaustion blurs hunger
+
+AGENCY.md §6's misperception, "exhaustion blurs hunger": modifiers change
+how precisely interoception feels, not the body. Worn out (fatigue 80 or
+more), an agent feels its hunger only to the nearest twenty, not ten. Fed
+to 70, it feels hunger 30, but 20 when exhausted. Its body is as hungry
+either way.
+
+Not yet: the other modifiers §6 names, adrenaline dulling pain and
+numbness hiding cold. Neither pain, injury's percept, nor numbness exists
+in the lab yet, and §6 gives no source for them.
+
+60 tests, 2119 checks, under both compilers, ASan and UBSan, and leak-free.
