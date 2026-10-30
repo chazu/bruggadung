@@ -673,6 +673,17 @@ static BOOL   counts( const BGTestimony *t, uint32_t thing, uint32_t container)
 }
 
 
+- (NSString *) reservationOf:(uint32_t) thing
+                         for:(uint32_t) holder
+{
+   if( ! [self describeLooks:thing] || ! [self describeLooks:holder])
+      return( nil);
+   return( [NSString stringWithFormat:@"#ReservedFor & { what: %@, holder: %@, when: %lldms, attribution: #Saw & { sure: %d } }",
+                                      [self describeLooks:thing], [self describeLooks:holder],
+                                      (long long) (_world ? [_world time].ms : 0), BG_SEEN]);
+}
+
+
 - (NSString *) promiseThat:(uint32_t) thing
                       isIn:(uint32_t) container
                         by:(int64_t) deadline
@@ -1162,6 +1173,54 @@ static char   *concrete_features( const char *printed)
 }
 
 
+/* Told something is reserved for someone (ACTIONS.md §7): a #Reserved
+ * finding about the thing, recognized among the referents of its kind that
+ * look alike, its choice whom it is reserved for. */
+- (void) reserved:(const TriNode *) claim
+             from:(uint32_t) speaker
+            store:(BGKnowledgeStore *) store
+             news:(NSMutableArray *) news
+{
+   const TriNode      *what;
+   const BGReferent   *r;
+   BGFinding          f;
+   NSString           *kind;
+   NSUInteger         i;
+   uint32_t           holder;
+   uint32_t           thing;
+   char               printed[ 2048];
+   char               *features;
+
+   holder = [self person:tri_at( [_world tri], claim, "holder") store:store news:news];
+   what   = tri_at( [_world tri], claim, "what");
+   if( ! holder || ! what)
+      return;
+   kind = [NSString stringWithUTF8String:(char *) tri_type_name( [_world tri], tri_node_type( what))];
+   tri_print( [_world tri], what, printed, sizeof( printed));
+   features = concrete_features( printed);
+   thing    = 0;
+   for( i = 0; i < [store count] && ! thing; i++)
+   {
+      r = [store referentAt:i];
+      if( r->kind && ! strcmp( r->kind, [kind UTF8String]) && r->id != holder &&
+          [self looksAlike:r in:store kind:kind features:[NSString stringWithUTF8String:features]])
+         thing = r->id;
+   }
+   free( features);
+   if( ! thing || [store finding:"#Reserved" about:thing])
+      return;
+   memset( &f, 0, sizeof( f));
+   f.kind     = [_world intern:"#Reserved"];
+   f.about    = thing;
+   f.choice   = holder;
+   f.credence = [store trustIn:speaker];
+   f.rule     = [_world intern:"told"];
+   f.time     = [_world time].ms;
+   [store addFinding:f];
+   [news addObject:[NSString stringWithFormat:@"R%u is reserved for R%u, R%u says", thing, holder, speaker]];
+}
+
+
 /* The referent of someone a claim names by how they look ("heard it from
  * ..."): one of that kind that looks alike, the lowest first, or a new one,
  * believed nowhere. 0 if the description says no more than its kind does. */
@@ -1265,6 +1324,12 @@ static char   *concrete_features( const char *printed)
    tri   = [_world tri];
    arena = tri_arena_new();
    claim = tri_value( tri, content, arena, NULL, 0);
+   if( claim && tri_subtype( tri, tri_node_type( claim), tri_type_named( tri, "#ReservedFor")))
+   {
+      [self reserved:claim from:speaker store:store news:news];
+      tri_arena_free( arena);
+      return;
+   }
    held  = claim && tri_subtype( tri, tri_node_type( claim), tri_type_named( tri, "#IsHeld"));
    if( ! claim || (! held && (! tri_subtype( tri, tri_node_type( claim), tri_type_named( tri, "#IsIn")) ||
                               ! node_int( tri, claim, "within.place.x", &x) || ! node_int( tri, claim, "within.place.y", &y) ||

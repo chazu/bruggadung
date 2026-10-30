@@ -69,6 +69,8 @@ typedef struct
    const char       *name;      /* create: blueprint; set field: "Kind.field"; event: its kind; destroy: reason */
    const char       *key;       /* create: the stable key the seed derives from */
    BGEntityID       handle;     /* create, split: the new entity */
+   BGLocation       expected;   /* move: where the target must still be, if `expects` */
+   BOOL             expects;
 } BGProposal;
 
 extern const char   *BGPhaseNames[ BGPhaseCount];
@@ -129,6 +131,11 @@ extern const char   *BGPhaseNames[ BGPhaseCount];
       toText:(const char *) text;
 - (void) move:(BGRef) target
            to:(BGLocation) location;
+/* A move that holds only if the target is still where it was: taking it
+ * from there (ACTIONS.md Scenario 2, two hands, one seal). */
+- (void) move:(BGRef) target
+           to:(BGLocation) location
+    expecting:(BGLocation) from;
 /* Splits `count` units off a stack; returns the new entity's handle. */
 - (BGEntityID) split:(BGRef) stack
                count:(int64_t) count

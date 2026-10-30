@@ -289,6 +289,9 @@ typedef struct
  * not believed on the ground. */
 - (NSString *) claimThat:(uint32_t) thing
                     isIn:(uint32_t) container;
+/* That the thing is reserved for someone (ACTIONS.md §7). */
+- (NSString *) reservationOf:(uint32_t) thing
+                         for:(uint32_t) holder;
 /* A promise (AGENCY.md §7): the thing will be in the container by then. */
 - (NSString *) promiseThat:(uint32_t) thing
                       isIn:(uint32_t) container

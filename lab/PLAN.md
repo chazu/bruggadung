@@ -1343,3 +1343,39 @@ age), and agency choosing to investigate.
 
 45 tests, 778 checks, under both compilers, ASan and UBSan, and leak-free.
 
+### After the slice: two hands, one seal
+
+ACTIONS.md Scenario 2. The spare piston seal lies on the bench, reserved
+for A (the worker). A and B (the smith) start taking it up at the same
+time; their takes complete at the same boundary, and exactly one applies:
+the other is rejected whole, its activity fails with the reason, and the
+loser sees the seal in the winner's hand. Over 1,000 seeds each wins about
+half the time, and swapping their IDs changes nothing; weighted one to
+three by quickness, B wins about three times in four; the same seed gives
+the same winner; and the reservation blocks nothing. With agency: B, told
+by A that the seal is A's and disposed to respect that, never starts (taking
+it scores -30); B, who doesn't mind, races A for it.
+
+- **A move can expect where its target is** (`move:to:expecting:`), and
+  validation rejects the group if it isn't there any more. `take` and
+  `take_up` expect the item where it was when the effect was built, so two
+  simultaneous takes can't both apply. Saved with deferred groups.
+- **Weighted fair order** (ACTIONS.md §8): an agent's `quickness` (a
+  derived reaction speed) weights its groups; when weights differ, the
+  order is drawn by successive weighted sampling from the same seeded
+  stream, in integers. With equal weights the order is the seeded
+  permutation as before.
+- **Reservations** are reified claims (`#ClaimKind` "reservation") that
+  never block a commit. Told of one (`#ReservedFor`, a claim naming a
+  holder), an agent keeps a `#Reserved` finding about the thing, and a
+  `#Respect` consideration, scaled by its `respectful` disposition, costs a
+  method that takes what it believes reserved for someone else.
+- **`take_up`**: taking up carefully, a second's activity.
+
+Not yet: reservations perceived other than by being told (a tag on the
+thing), grievances (A, who knew of the reservation, losing the seal), and
+weights from other derived values.
+
+46 tests, 1799 checks (a thousand of them the fairness draws), under both
+compilers, ASan and UBSan, and leak-free.
+

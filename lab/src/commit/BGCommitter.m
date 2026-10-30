@@ -168,8 +168,22 @@ static void   declare( BGTally *t, const char *unit, int64_t units, int64_t mass
 
 /* --- ordering -------------------------------------------------------------- */
 
+/* What weights a group in the permutation (ACTIONS.md §8): its actor's
+ * quickness, a derived reaction speed; 10 for a group with no agent. */
+- (uint64_t) orderWeightOf:(BGProposalGroup *) g
+{
+   int64_t   v;
+
+   if( [g actor] && [_world getField:"Agent.quickness" of:[g actor] value:&v] && v > 0)
+      return( (uint64_t) v);
+   return( 10);
+}
+
+
 /* By phase, then a permutation seeded by the world seed, the boundary, and
- * the round: nobody wins by being older, lower in ID, or submitted first. */
+ * the round: nobody wins by being older, lower in ID, or submitted first.
+ * Weighted, when the groups' weights differ: drawn one at a time, each in
+ * proportion to its weight, from the same seeded stream, in integers. */
 - (NSArray *) order:(NSArray *) groups
 {
    NSMutableArray   *ordered;
@@ -191,6 +205,26 @@ static void   declare( BGTally *t, const char *unit, int64_t units, int64_t mass
             [phase addObject:g];
       }
       state = BGMix( [_world seed] ^ BGMix( [_world boundary] * 0x100 + _round) ^ (p << 56));
+      for( i = 1; i < [phase count] && [self orderWeightOf:[phase objectAtIndex:i]] == [self orderWeightOf:[phase objectAtIndex:0]]; i++)
+         ;
+      if( i < [phase count])
+      {
+         /* weighted: successive sampling without replacement */
+         while( [phase count])
+         {
+            uint64_t   total;
+            uint64_t   r;
+
+            for( total = 0, i = 0; i < [phase count]; i++)
+               total += [self orderWeightOf:[phase objectAtIndex:i]];
+            r = BGNext( &state) % total;
+            for( i = 0; i + 1 < [phase count] && r >= [self orderWeightOf:[phase objectAtIndex:i]]; i++)
+               r -= [self orderWeightOf:[phase objectAtIndex:i]];
+            [ordered addObject:[phase objectAtIndex:i]];
+            [phase removeObjectAtIndex:i];
+         }
+         continue;
+      }
       for( i = [phase count]; i > 1; i--)
       {
          j = (NSUInteger) (BGNext( &state) % i);
@@ -508,6 +542,17 @@ static NSString   *live_check( BGWorld *w, BGEntityID e, const char *role)
       loc = resolve_location( g, p->location);
       if( loc.form == BGLocationNone)
          return( @"a physical entity cannot be moved nowhere");
+      if( p->expects)
+      {
+         BGLocation   now;
+         BGLocation   was;
+
+         now = [_world locationOf:e];
+         was = resolve_location( g, p->expected);
+         if( now.form != was.form || now.place != was.place || now.slot != was.slot ||
+             (now.form == BGLocationOnTile && (now.x != was.x || now.y != was.y || now.level != was.level)))
+            return( [NSString stringWithFormat:@"%llu is no longer where it was taken from", (unsigned long long) e]);
+      }
       [_world setLocation:loc
                        of:e];
       [self emit:"moved" subject:e other:loc.place amount:0 detail:NULL location:loc group:g];

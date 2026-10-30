@@ -233,3 +233,15 @@ watch_closely: #Operation & {
     attention: 20
     roles:     { actor: #Agent & { place: #OnTile } }
 } @family(operations)
+
+// Take something up, carefully: a second, then into a free hand. Two who
+// start together finish together, and only one gets it.
+take_up: #Operation & {
+    effect:   "take"
+    duration: 1s
+    uses:     ["hands"]
+    roles: {
+        actor: #Agent & { freeHands: >=1 }
+        item:  #Body & { place: #OnTile | #Inside }
+    }
+} @family(operations)

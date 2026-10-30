@@ -64,3 +64,8 @@ purse:    #Body & { material: "cloth", mass: 150g }
 merchant: #Agent & { material: "flesh", mass: 85kg, hands: 2, coat: "white" }
 kasimir:  #Agent & { material: "flesh", mass: 70kg, hands: 2, coat: "beige", honesty: 10, scruples: 5 }
 mira:     #Agent & { material: "flesh", mass: 25kg, hands: 2, coat: "red", curious: 100, hiding: true }
+
+// For ACTIONS.md's two hands, one seal: the spare piston seal, and a
+// reservation of it.
+seal:        #Body & { material: "rubber", mass: 50g }
+reservation: #Claim & { kind: "reservation" }

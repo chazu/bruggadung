@@ -572,7 +572,8 @@ static void   test_menu( void)
    [scenario runUntil:BGTimeMake( 0)];
    text = menu_text( w, 4);
    BG_CHECK( [text isEqualToString:@"look_in item 1: entailed; take item 1: entailed; take item 2: entailed; "
-                                   @"take item 3: entailed; take_some item 2: entailed; test_scratch item 1: entailed; "
+                                   @"take item 3: entailed; take_some item 2: entailed; take_up item 1: entailed; "
+                                   @"take_up item 2: entailed; take_up item 3: entailed; test_scratch item 1: entailed; "
                                    @"test_scratch item 3: entailed; touch_up item 3: entailed; "
                                    @"walk_east: entailed; walk_north: entailed; walk_south: entailed; walk_west: entailed; "
                                    @"wash_floor: entailed; watch_closely: entailed"]);
@@ -3503,6 +3504,201 @@ static void   test_promises( void)
 }
 
 
+/* --- two hands, one seal ---------------------------------------------------- */
+
+/* ACTIONS.md Scenario 2's conflict, on the committer: the spare seal on the
+ * bench, reserved for A (the worker); A and B (the smith) take it at the same
+ * boundary. 1 if A gets it, 2 if B does. `swap` creates B first, so their
+ * IDs swap. */
+static int   seal_race( uint64_t seed, int64_t quickA, int64_t quickB, BOOL swap)
+{
+   BGWorld           *w;
+   BGCommitter       *c;
+   BGProposalGroup   *g;
+   BGProposalGroup   *ga;
+   BGProposalGroup   *gb;
+   BGEntityID        seal;
+   BGEntityID        a;
+   BGEntityID        b;
+   BGEntityID        claim;
+
+   w    = BGTestWorld( seed);
+   c    = BGTestCommitter( w);
+   g    = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the bench"];
+   seal = [g create:"seal" key:"seal" at:BGOnTile( 6, 6, 0)];
+   b    = swap ? [g create:"smith" key:"B" at:BGOnTile( 7, 6, 0)] : BGNoEntity;
+   a    = [g create:"worker" key:"A" at:BGOnTile( 5, 6, 0)];
+   if( ! swap)
+      b = [g create:"smith" key:"B" at:BGOnTile( 7, 6, 0)];
+   claim = [g create:"reservation" key:"A's reservation" at:BGLocationMakeNone()];
+   [g relate:BGEdgeClaimant from:BGWhole( claim) to:BGWhole( a)];
+   [g relate:BGEdgeClaimSubject from:BGWhole( claim) to:BGWhole( seal)];
+   [g set:"Agent.quickness" of:BGWhole( a) to:quickA];
+   [g set:"Agent.quickness" of:BGWhole( b) to:quickB];
+   [c submit:g];
+   [c commitBoundary];
+   seal = [g idFor:seal];
+   a    = [g idFor:a];
+   b    = [g idFor:b];
+   [w setBoundary:7];
+   ga = [BGProposalGroup groupWithPhase:BGPhaseAction source:@"A takes the seal"];
+   [ga setActor:a];
+   [ga move:BGWhole( seal) to:BGHeldBy( a, 0) expecting:BGOnTile( 6, 6, 0)];
+   gb = [BGProposalGroup groupWithPhase:BGPhaseAction source:@"B takes the seal"];
+   [gb setActor:b];
+   [gb move:BGWhole( seal) to:BGHeldBy( b, 0) expecting:BGOnTile( 6, 6, 0)];
+   [c submit:ga];
+   [c submit:gb];
+   [c commitBoundary];
+   if( [ga applied] == [gb applied])
+      return( 0);
+   return( [ga applied] ? 1 : 2);
+}
+
+
+/* The scenario with activities: A and B start taking the seal up at the
+ * same boundary; B, if `agency`, decides for itself, `respectful` of
+ * reservations it knows of, and A tells it first that the seal is A's. */
+typedef struct
+{
+   BGWorld       *world;
+   BGCommitter   *committer;
+   BGKnowledge   *knowledge;
+   BGAgency      *agency;
+   BGEntityID    seal;
+   BGEntityID    a;
+   BGEntityID    b;
+} BGSealRun;
+
+
+static BGSealRun   seal_scene( uint64_t seed, BOOL agency, int64_t respectful)
+{
+   BGStage           st;
+   BGActivities      *activities;
+   BGKnowledge       *knowledge;
+   BGAgency          *minds;
+   BGProposalGroup   *g;
+   BGEntityID        h[ 3];
+   NSString          *error;
+   NSString          *reserved;
+   BGAction          action;
+   BGSealRun         run;
+
+   memset( &run, 0, sizeof( run));
+   st.w       = BGTestWorld( seed);
+   st.c       = BGTestCommitter( st.w);
+   activities = [BGActivities activitiesWithWorld:st.w committer:st.c];
+   knowledge  = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+   minds      = [[[BGAgency alloc] initWithWorld:st.w committer:st.c knowledge:knowledge] autorelease];
+   st.s       = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [minds setActivities:activities];
+   [st.s setActivities:activities];
+   [st.s setPerception:knowledge];
+   [st.s setDecision:minds];
+   g     = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the bench"];
+   h[ 0] = [g create:"seal" key:"seal" at:BGOnTile( 6, 6, 0)];
+   h[ 1] = [g create:"worker" key:"A" at:BGOnTile( 5, 6, 0)];
+   h[ 2] = [g create:"smith" key:"B" at:BGOnTile( 6, 7, 0)];
+   [g set:"Agent.respectful" of:BGWhole( h[ 2]) to:respectful];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   run.seal = [g idFor:h[ 0]];
+   run.a    = [g idFor:h[ 1]];
+   run.b    = [g idFor:h[ 2]];
+   if( agency)
+   {
+      /* A tells B the seal is A's; B wants it */
+      reserved = [[knowledge storeOf:run.a] reservationOf:referent_of( [knowledge storeOf:run.a], run.seal)
+                                                      for:[[knowledge storeOf:run.a] selfReferent]];
+      action         = BGActionMake( "say", run.a, run.b, BGNoEntity);
+      action.content = [st.w intern:[reserved UTF8String]];
+      error = nil;
+      BG_CHECK( BGPerform( st.w, st.c, action, 0, &error) != nil);
+      [st.s runUntil:BGTimeMake( 1000)];
+      BG_CHECK( [minds commit:run.b toGoal:"get_the_seal"]);
+      BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "take_up", run.a, run.seal, BGNoEntity), 0, &error) != nil);
+   }
+   else
+   {
+      error = nil;
+      BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "take_up", run.a, run.seal, BGNoEntity), 0, &error) != nil);
+      BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "take_up", run.b, run.seal, BGNoEntity), 0, &error) != nil);
+   }
+   [st.s runUntil:BGTimeMake( 6000)];
+   run.world     = st.w;
+   run.committer = st.c;
+   run.knowledge = knowledge;
+   run.agency    = minds;
+   return( run);
+}
+
+
+static void   test_two_hands( void)
+{
+   BGSealRun          race;
+   BGSealRun          respect;
+   BGSealRun          ignore;
+   BGKnowledgeStore   *store;
+   const BGReferent   *seal;
+   NSString           *trace;
+   BGEntityID         winner;
+   BGEntityID         loser;
+   uint64_t           seed;
+   int                a;
+   int                swapped;
+   int                weighted;
+   int                w;
+
+   /* 1, 2: exactly one take applies; the other is rejected whole, and its
+    * activity fails with the reason; the loser sees the seal in the winner's
+    * hand */
+   race = seal_scene( 61, NO, 50);
+   BG_CHECK( [race.world locationOf:race.seal].form == BGLocationHeldBy);
+   winner = [race.world locationOf:race.seal].place;
+   loser  = winner == race.a ? race.b : race.a;
+   BG_CHECK( winner == race.a || winner == race.b);
+   trace = [[race.committer trace] componentsJoinedByString:@"\n"];
+   BG_CHECK( [trace rangeOfString:@": failed ("].location != NSNotFound);
+   store = [race.knowledge storeOf:loser];
+   seal  = [store referent:referent_of( store, race.seal)];
+   BG_CHECK( seal && seal->form == BGLocationHeldBy && seal->container == referent_of( store, winner));
+
+   /* 3, 5, 6: fair: with equal weights, over 1,000 seeds, each wins about
+    * half; swapping their IDs leaves that so; the reservation blocks
+    * nothing; the same seed, the same winner */
+   a        = 0;
+   swapped  = 0;
+   weighted = 0;
+   for( seed = 1; seed <= 1000; seed++)
+   {
+      w = seal_race( seed, 10, 10, NO);
+      BG_CHECK( w != 0);
+      if( w == 1)
+         a++;
+      if( seal_race( seed, 10, 10, YES) == 1)
+         swapped++;
+      /* 4: weighted 1 to 3, B wins about three times in four */
+      if( seal_race( seed, 10, 30, NO) == 2)
+         weighted++;
+   }
+   BG_CHECK( a > 430 && a < 570);
+   BG_CHECK( swapped > 430 && swapped < 570);
+   BG_CHECK( weighted > 700 && weighted < 800);
+   BG_CHECK( seal_race( 77, 10, 10, NO) == seal_race( 77, 10, 10, NO));
+
+   /* A: B, told the seal is A's and disposed to respect that, never starts:
+    * taking it scores below nothing; A takes it */
+   respect = seal_scene( 61, YES, 50);
+   BG_CHECK( logged_by( respect.agency, respect.b, @"take the seal -30 (+10, reserved -40)"));
+   BG_CHECK( ! logged_by( respect.agency, respect.b, @"take_up R"));
+   BG_CHECK( [respect.world locationOf:respect.seal].place == respect.a);
+   /* B: B, who doesn't mind, races A for it */
+   ignore = seal_scene( 61, YES, 0);
+   BG_CHECK( logged_by( ignore.agency, ignore.b, @"take the seal +10 (+10, reserved +0)"));
+   BG_CHECK( logged_by( ignore.agency, ignore.b, @"take_up R"));
+}
+
+
 /* --- the cistern ----------------------------------------------------------- */
 
 static BGCistern   *run_cistern( BGCisternVariant variant)
@@ -3818,6 +4014,7 @@ const BGTestCase   BGAllTests[] =
    { "needs",                         test_needs },
    { "habits",                        test_habits },
    { "promises",                      test_promises },
+   { "two_hands",                     test_two_hands },
    { "rumour",                        test_rumour },
    { "memory_decay",                  test_memory_decay },
    { "salience",                      test_salience },

@@ -166,7 +166,10 @@ by whether the agent believes itself watched; one that scores below nothing
 is unthinkable. Habits grow with repetition and fade: a habitual method
 wins ties, a slot can prefer the habitual referent, and an observer who
 saw someone do the same thing three times believes they usually do, and
-finds it salient when they don't. The player can hand their character to
+finds it salient when they don't. Simultaneous takes are fair: one applies and the
+other is rejected whole, ordered by a seeded permutation weighted by the
+agents' quickness; reservations block nothing, though an agent told of one
+may respect it. The player can hand their character to
 agency on autopilot, and control comes back when something arises worth
 more than the player said, or the goal is done.
 

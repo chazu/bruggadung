@@ -211,6 +211,8 @@ NSString   *BGSave( BGWorld *world, BGCommitter *committer, NSArray *domains)
          put_string( out, p->key);
          [out appendFormat:@" %llu", (unsigned long long) p->handle];
          put_location( out, p->location);
+         [out appendFormat:@" %d", p->expects ? 1 : 0];
+         put_location( out, p->expected);
          [out appendString:@"\n"];
       }
    }
@@ -562,6 +564,8 @@ BGWorld   *BGRestore( NSString *text,
          p.key           = token_string( &line, 9);
          p.handle        = token_u64( &line, 10);
          p.location      = token_location( &line, 11);
+         p.expects       = token_i64( &line, 18) != 0;
+         p.expected      = token_location( &line, 19);
          [group addProposal:p];
       }
       else if( ! strcmp( s, "domain"))

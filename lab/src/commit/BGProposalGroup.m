@@ -205,6 +205,20 @@ static BGProposal   proposal( BGProposalKind kind, BGRef target)
 }
 
 
+- (void) move:(BGRef) target
+           to:(BGLocation) location
+    expecting:(BGLocation) from
+{
+   BGProposal   p;
+
+   p          = proposal( BGProposeMove, target);
+   p.location = location;
+   p.expected = from;
+   p.expects  = YES;
+   [self addProposal:p];
+}
+
+
 - (BGEntityID) split:(BGRef) stack
                count:(int64_t) count
                   to:(BGLocation) location

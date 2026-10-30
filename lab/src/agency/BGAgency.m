@@ -1485,6 +1485,17 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
          v = (int32_t) ([store feels:slot] * int_at( tri, c, "per", 0) / 10);
          [parts addObject:[NSString stringWithFormat:@"%s %+d", slot, v]];
       }
+      else if( text_at( tri, c, "reserved", slot, sizeof( slot)))
+      {
+         /* believed reserved for someone else: what its respect makes of that */
+         const BGFinding   *f;
+
+         f = bound( b, n, slot) ? [store finding:"#Reserved" about:bound( b, n, slot)] : NULL;
+         trait = 0;
+         [_world getField:"Agent.respectful" of:[store agent] value:&trait];
+         v = f && f->choice != [store selfReferent] ? (int32_t) (trait * int_at( tri, c, "per", 0) / 10) : 0;
+         [parts addObject:[NSString stringWithFormat:@"%s %+d", f ? "reserved" : "unreserved", v]];
+      }
       else if( text_at( tri, c, "trait", slot, sizeof( slot)))
       {
          /* its own disposition or norm, which it knows */

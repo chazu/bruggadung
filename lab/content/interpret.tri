@@ -14,6 +14,9 @@
 #Disturbance: #Finding & {}
 // Someone cleaned up beside it.
 #Cleaned: #Finding & {}
+// It is reserved for someone (ACTIONS.md §7), the finding's choice: what
+// the agent was told.
+#Reserved: #Finding & {}
 // Someone does something the same way, again and again (AGENCY.md §8): the
 // finding's choice is the way.
 #Habit: #Finding & {}

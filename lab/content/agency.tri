@@ -19,6 +19,9 @@
 // to ask.
 #HavingNails: #WithNails & { box: #Container, someone: #Agent }
 
+// Fetching: a part.
+#Fetching: #Frame & { part: #Body }
+
 // Delivering: the goods, and where they are to go.
 #Delivering: #Frame & { goods: #Body, dest: #Container }
 
@@ -119,6 +122,10 @@
 // what a disposition or a norm of the agent's adds: `per` tenths of a point
 // for each point of it
 #Trait:   #Scaled & { trait: text }
+// what respect for reservations costs: if the agent believes the slot's
+// referent reserved for someone else, `per` tenths of a point for each point
+// of its respect
+#Respect: #Scaled & { reserved: text }
 // a penalty if the agent believes someone, not itself, could see the slot's
 // referent
 #Watched: #Consideration & { watched: text, penalty: int }
@@ -387,4 +394,28 @@ pick_it_up: #Method & {
     rank:  1
     pre:   { find: ["goods"], match: #Delivering & { goods: #Body & { place: #Inside | #OnTile } } }
     steps: [#Do & { op: "take", object: "goods" }]
+} @family(methods)
+
+
+// --- ACTIONS.md Scenario 2, "two hands, one seal" -------------------------------
+
+get_the_seal: #Goal & {
+    title: "get the seal"
+    done: {
+        find:  ["part"]
+        match: #Fetching & {
+            me:   #Agent & { id: $me }
+            part: #Body & { material: "rubber", place: #Held & { by: $me } }
+        }
+    }
+} @family(goals)
+
+// Take it up from the bench, unless the agent minds that it is reserved.
+take_the_seal: #Method & {
+    title: "take the seal"
+    goal:  "get_the_seal"
+    rank:  1
+    pre:   { find: ["part"], match: #Fetching & { part: #Body & { material: "rubber", place: #OnTile } } }
+    steps: [#Do & { op: "take_up", object: "part" }]
+    score: [#Flat & { value: 10 }, #Respect & { reserved: "part", per: -8 }]
 } @family(methods)

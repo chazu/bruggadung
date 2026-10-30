@@ -313,7 +313,9 @@ A rebuilt world produces the same next step as one that never saved.
    generator; and habits, an agent's own and those others believe it has.
    And promises, a speaker's commitment and a hearer's claim about a time
    to come; requests, granted or refused; and investigation, a close look
-   that notices faint traces and draws the rules that take thought.
+   that notices faint traces and draws the rules that take thought; and
+   fair, weighted conflict resolution with soft reservations (ACTIONS.md's
+   two hands, one seal).
 
 ## Cross-cutting open questions
 

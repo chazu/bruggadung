@@ -36,8 +36,11 @@
 // A claim: something like `what` is inside `within`.
 #IsIn: #Placing & #Telling & {}
 
+// A claim naming someone like `holder`.
+#Naming: #Telling & { holder: #Agent }
+
 // A claim: something like `what` is held by someone like `holder`.
-#IsHeld: #Telling & { holder: #Agent }
+#IsHeld: #Naming & {}
 
 // Give me something like `what`? A request is a question: the asker waits
 // for the answer.
@@ -45,6 +48,10 @@
 
 // The speaker knows of nothing like `what` that it could say where it is.
 #DontKnow: #Utterance & {}
+
+// A claim: something like `what` is reserved for someone like `holder`
+// (ACTIONS.md §7): a soft claim, which never blocks anyone taking it.
+#ReservedFor: #Naming & {}
 
 // The speaker won't say where something like `what` is, or give it
 // (AGENCY.md §11).

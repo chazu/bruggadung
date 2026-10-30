@@ -6,7 +6,7 @@
 // What things are made of, and the colours they come in: hierarchies, so a
 // memory loses detail along them (KNOWLEDGE.md §12): an oak chest is
 // remembered as wooden, then as made of something.
-#Material: "metal" | "wood" | "flesh" | "paper" | "food" | "cloth"
+#Material: "metal" | "wood" | "flesh" | "paper" | "food" | "cloth" | "rubber"
 "metal":   "iron" | "brass" | "steel"
 "wood":    "oak"
 
@@ -78,6 +78,11 @@
     honesty:  *50 | int & >=0 & <=100        @field(content, saved, proposable, inspect)
     curious:  *0 | int & >=0 & <=100         @field(content, saved, proposable, inspect)
     scruples: *20 | int & >=0 & <=100        @field(content, saved, proposable, inspect)
+    // respect for reservations (AGENCY.md §9, ACTIONS.md §7), 0 to 100
+    respectful: *50 | int & >=0 & <=100      @field(content, saved, proposable, inspect)
+    // reaction speed (ACTIONS.md §8): it weights the order of the agent's
+    // actions among others' at the same boundary
+    quickness:  *10 | int & >=1 & <=100      @field(content, saved, proposable, inspect)
     // half hidden: seen only from close by, though it sees as well as anyone
     hiding:   *false | true                  @field(content, saved, proposable, inspect)
     // a body stock (AGENCY.md §6): how fed it is, 0 to 100, as of `fedAt`;
@@ -98,7 +103,7 @@
     slots: int & >=1 & <=64 @field(content, saved, inspect, perceive(sight))
 }
 
-#ClaimKind: "ownership" | "custody"
+#ClaimKind: "ownership" | "custody" | "reservation"
 
 // A reified claim: an informational entity, with no body and no location.
 // Its claimant and subjects are edges.

@@ -473,7 +473,9 @@ static NSString   *effect_take( BGWorld *world, BGAction a, int64_t amount, BGPr
    hand = BGFreeHand( world, a.roles[ BGRoleActor]);
    if( hand < 0)
       return( @"no hand is free");
-   [g move:BGWhole( a.roles[ BGRoleItem]) to:BGHeldBy( a.roles[ BGRoleActor], hand)];
+   /* from where it is now: if someone else gets it first, this fails */
+   [g move:BGWhole( a.roles[ BGRoleItem]) to:BGHeldBy( a.roles[ BGRoleActor], hand)
+ expecting:[world locationOf:a.roles[ BGRoleItem]]];
    return( nil);
 }
 
