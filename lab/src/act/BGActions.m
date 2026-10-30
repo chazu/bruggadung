@@ -64,7 +64,7 @@ static TriMatch   match_described( BGWorld *world, const TriNode *pattern, BGAct
    TriArena          *arena;
    TriMatch          match;
    static const char *copied[] = { "duration", "stages", "uses", "attention", "leaves", "removes", "partial",
-                                   "checkpoints", "hard", NULL };
+                                   "checkpoints", "hard", "exertion", NULL };
    char              value[ 1024];
    char              effect[ 64];
    char              err[ 256];
@@ -949,6 +949,15 @@ static NSString   *effect_tend( BGWorld *world, BGAction a, int64_t amount, BGPr
 }
 
 
+/* A rest, rested through: fatigue is gone. */
+static NSString   *effect_rest( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
+{
+   if( [world record:[world kindNamed:"Agent"] for:a.roles[ BGRoleActor]])
+      [g set:"Agent.fatigue" of:BGWhole( a.roles[ BGRoleActor]) to:0];
+   return( nil);
+}
+
+
 /* Looking changes nothing in the world; it is an event the looker perceives. */
 static NSString   *effect_look( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
 {
@@ -986,7 +995,7 @@ static const struct
    { "light",     effect_light },
    { "open_door", effect_open_door },
    { "saw",       effect_saw },
-   { "rest",      effect_tend },
+   { "rest",      effect_rest },
    { "strike",    effect_strike },
 };
 
@@ -1100,6 +1109,33 @@ BOOL   BGOperationPartial( BGWorld *world, const char *operation, int64_t index,
       *role = BGRoleItem;
    *checkpoints = tri_node_interval( tri_at( tri, stage, "checkpoints"), &lo, &hi) && lo == hi ? lo : 0;
    return( YES);
+}
+
+
+int64_t   BGOperationExertion( BGWorld *world, const char *operation, int64_t index)
+{
+   const TriNode     *pattern;
+   const TriNode     *stage;
+   NSMutableString   *path;
+   TriContent        *tri;
+   int64_t           k;
+   int64_t           lo;
+   int64_t           hi;
+
+   tri     = [world tri];
+   pattern = operation ? tri_pattern( tri, operation) : NULL;
+   if( ! pattern)
+      return( 0);
+   stage = pattern;
+   if( tri_at( tri, pattern, "stages.first"))
+   {
+      path = [NSMutableString stringWithString:@"stages"];
+      for( k = 0; k < index; k++)
+         [path appendString:@".rest"];
+      [path appendString:@".first"];
+      stage = tri_at( tri, pattern, [path UTF8String]);
+   }
+   return( stage && tri_node_interval( tri_at( tri, stage, "exertion"), &lo, &hi) && lo == hi ? lo : 0);
 }
 
 

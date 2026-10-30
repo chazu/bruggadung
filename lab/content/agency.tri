@@ -384,6 +384,23 @@ open_a_door: #Method & {
     steps: [#Do & { op: "open_door", object: "exit" }]
 } @family(methods)
 
+// Tiredness raises resting: worth what the agent feels of it; done once a
+// rest has run its course.
+rest_when_tired: #Goal & {
+    title:   "get some rest"
+    done:    #Did & { did: "while_away" }
+    pressed: { need: "tired", above: 50 }
+    worth:   [#Need & { pressure: "tired", per: 5 }]
+} @family(goals)
+
+lie_down: #Method & {
+    title: "lie down"
+    goal:  "rest_when_tired"
+    rank:  1
+    pre:   { find: [], match: #Frame & { me: #Agent & { id: $me, place: #OnTile } } }
+    steps: [#Do & { op: "while_away" }]
+} @family(methods)
+
 eat_what_i_have: #Method & {
     title: "eat what I have"
     goal:  "eat_when_hungry"

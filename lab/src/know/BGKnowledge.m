@@ -362,7 +362,8 @@ static NSUInteger   feature_keys( const char *features, char (*keys)[ 32], NSUIn
 
 - (int32_t) feels:(const char *) need
 {
-   return( ! strcmp( need, "hunger") ? _hunger : ! strcmp( need, "cold") ? _cold : ! strcmp( need, "stuffy") ? _stuffy : 0);
+   return( ! strcmp( need, "hunger") ? _hunger : ! strcmp( need, "cold") ? _cold : ! strcmp( need, "stuffy") ? _stuffy :
+           ! strcmp( need, "tired") ? _tired : 0);
 }
 
 
@@ -391,6 +392,16 @@ static NSUInteger   feature_keys( const char *features, char (*keys)[ 32], NSUIn
 
    changed = cold != _cold;
    _cold   = cold;
+   return( changed);
+}
+
+
+- (BOOL) feelTired:(int32_t) tired
+{
+   BOOL   changed;
+
+   changed = tired != _tired;
+   _tired  = tired;
    return( changed);
 }
 
@@ -2736,6 +2747,16 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
          [news addObject:[NSString stringWithFormat:@"you feel cold (%d)", (int) cold]];
    }
 
+   /* and tired, from its fatigue (a component field), to the band */
+   if( memory)
+   {
+      int64_t   tired;
+
+      tired = (memory->fatigue / BG_HUNGER_BAND) * BG_HUNGER_BAND;
+      if( [store feelTired:(int32_t) tired])
+         [news addObject:[NSString stringWithFormat:@"you feel tired (%d)", (int) tired]];
+   }
+
    /* and short of breath, for something that breathes: from the carbon
     * dioxide in the air over it (the atmosphere's; the blood's gases stand
     * in for by the air's), ten points for every 0.1% above 0.1%, to the band */
@@ -3078,8 +3099,8 @@ static NSString   *attribution_text( const BGTestimony *t)
                       t->strength, (long long) t->seen, t->present ? "" : ", gone", (unsigned long long) t->truth];
    }
    if( [store feltAt] >= 0)
-      [s appendFormat:@"  feels hunger %d, cold %d, short of breath %d, at %lldms\n", [store feels:"hunger"],
-                      [store feels:"cold"], [store feels:"stuffy"], (long long) [store feltAt]];
+      [s appendFormat:@"  feels hunger %d, cold %d, short of breath %d, tired %d, at %lldms\n", [store feels:"hunger"],
+                      [store feels:"cold"], [store feels:"stuffy"], [store feels:"tired"], (long long) [store feltAt]];
    for( i = 0; i < [store findingCount]; i++)
    {
       const BGFinding   *f;
@@ -3292,9 +3313,9 @@ char   *BGDecodeWord( const char *s)
                                                      (unsigned long long) tr->truth, tr->kind]];
       }
       if( [store feltAt] >= 0)
-         [lines addObject:[NSString stringWithFormat:@"feels %llu %d %lld %d %d", (unsigned long long) [store agent],
+         [lines addObject:[NSString stringWithFormat:@"feels %llu %d %lld %d %d %d", (unsigned long long) [store agent],
                                                      [store feels:"hunger"], (long long) [store feltAt],
-                                                     [store feels:"cold"], [store feels:"stuffy"]]];
+                                                     [store feels:"cold"], [store feels:"stuffy"], [store feels:"tired"]]];
       for( j = 0; j < [store count]; j++)
          for( k = 0; k < BG_HYPOTHESES && [store referentAt:j]->supposed[ k]; k++)
             [lines addObject:[NSString stringWithFormat:@"supposes %llu %u %d %@", (unsigned long long) [store agent],
@@ -3350,6 +3371,7 @@ char   *BGDecodeWord( const char *s)
    unsigned long long   parent;
    int                  cold;
    int                  stuffy;
+   int                  tired;
    int                  trust;
    BGTestimony          t;
    BGAncestry           a;
@@ -3461,8 +3483,9 @@ char   *BGDecodeWord( const char *s)
          free( paths);
          [[self storeOf:(BGEntityID) agent] addIdentity:h];
       }
-      else if( sscanf( text, "feels %llu %d %lld %d %d", &agent, &trust, &seen, &cold, &stuffy) == 5)
+      else if( sscanf( text, "feels %llu %d %lld %d %d %d", &agent, &trust, &seen, &cold, &stuffy, &tired) == 6)
       {
+         [[self storeOf:(BGEntityID) agent] feelTired:tired];
          [[self storeOf:(BGEntityID) agent] feelHunger:trust at:seen];
          [[self storeOf:(BGEntityID) agent] feelCold:cold];
          [[self storeOf:(BGEntityID) agent] feelStuffy:stuffy];

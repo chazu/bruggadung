@@ -184,6 +184,16 @@ static int64_t   next_checkpoint( BGWorld *world, BGEntityID a, const BGActivity
       reason = [self requirementsOf:a record:record];
       if( ! reason)
          reason = BGApplyNamedEffect( _world, effect, action_of( _world, a, record), record->amount, group);
+      /* the effort tells on the actor */
+      if( ! reason && BGOperationExertion( _world, operation, record->stage))
+      {
+         int64_t   fatigue;
+
+         fatigue = 0;
+         [_world getField:"Agent.fatigue" of:(BGEntityID) record->actorRef value:&fatigue];
+         fatigue += BGOperationExertion( _world, operation, record->stage);
+         [group set:"Agent.fatigue" of:BGWhole( (BGEntityID) record->actorRef) to:fatigue > 100 ? 100 : fatigue];
+      }
       if( reason)
       {
          [self end:a status:"failed" because:reason cause:[self startOf:a]];

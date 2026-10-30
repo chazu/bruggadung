@@ -5437,6 +5437,60 @@ static void   test_hard_fail( void)
 }
 
 
+/* AGENCY.md §6's rest: a worker already somewhat tired (40) saws a log
+ * through, which takes it out of it (exertion 30): it feels tired 70, more
+ * than 50, and lies down; rested through, eight hours on, its fatigue is
+ * gone. */
+static void   test_tired_worker( void)
+{
+   BGStage            st;
+   BGActivities       *activities;
+   BGKnowledge        *knowledge;
+   BGAgency           *agency;
+   BGProposalGroup    *g;
+   BGEntityID         worker;
+   BGEntityID         log;
+   BGEntityID         saw;
+   NSString           *error;
+   int64_t            fatigue;
+
+   st.w       = BGTestWorld( 131);
+   st.c       = BGTestCommitter( st.w);
+   activities = [BGActivities activitiesWithWorld:st.w committer:st.c];
+   knowledge  = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+   agency     = [[[BGAgency alloc] initWithWorld:st.w committer:st.c knowledge:knowledge] autorelease];
+   st.s       = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [agency setActivities:activities];
+   [st.s setActivities:activities];
+   [st.s setPerception:knowledge];
+   [st.s setDecision:agency];
+   g      = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the sawhorse"];
+   worker = [g create:"worker" key:"worker" at:BGOnTile( 3, 3, 0)];
+   log    = [g create:"log" key:"log" at:BGOnTile( 4, 3, 0)];
+   saw    = [g create:"hand_saw" key:"saw" at:BGHeldBy( worker, 0)];
+   [g set:"Agent.fatigue" of:BGWhole( worker) to:40];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   worker = [g idFor:worker];
+   log    = [g idFor:log];
+   saw    = [g idFor:saw];
+   BG_CHECK( [[knowledge storeOf:worker] feels:"tired"] == 40);
+   error = nil;
+   BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "saw_through", worker, saw, log), 0, &error) != nil);
+   [st.s runUntil:BGTimeMake( 10000)];
+   BG_CHECK( [st.w getField:"Agent.fatigue" of:worker value:&fatigue] && fatigue == 70);
+   BG_CHECK( [[knowledge storeOf:worker] feels:"tired"] == 70);
+   [agency control:worker];
+   [st.s runUntil:BGTimeMake( 20000)];
+   BG_CHECK( logged_by( agency, worker, @"weighing get some rest: +35 (tired +35)"));
+   BG_CHECK( logged_by( agency, worker, @"[get some rest] lie down: while_away"));
+   [st.s runUntil:BGTimeMake( 9 * 3600000LL)];
+   BG_CHECK( [st.w getField:"Agent.fatigue" of:worker value:&fatigue] && fatigue == 0);
+   BG_CHECK( [[knowledge storeOf:worker] feels:"tired"] == 0);
+   BG_CHECK( logged_by( agency, worker, @"[get some rest] done"));
+}
+
+
 static void   test_partial_effects( void)
 {
    int64_t      cut[ 12];
@@ -5794,6 +5848,7 @@ const BGTestCase   BGAllTests[] =
    { "stuffy_lodger",                 test_stuffy_lodger },
    { "partial_effects",               test_partial_effects },
    { "hard_fail",                     test_hard_fail },
+   { "tired_worker",                  test_tired_worker },
    { "wrench_replaced",               test_wrench_replaced },
    { "rumour",                        test_rumour },
    { "memory_decay",                  test_memory_decay },

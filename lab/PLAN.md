@@ -2032,10 +2032,9 @@ The remaining scenario checks that aren't run, after the passes above:
   - perception or memory making feature hypotheses of their own: the docs
     give "half-remembers" (CONTENT_LANGUAGE.md Scenario 2, C), not how
     memory forms a doubt.
-  - the actor's exertion as a percept (ACTIONS.md Scenario 1, "their
-    exertion"): named only.
-  - loyalty: AGENCY.md lists it among dispositions and says it favours
-    reporting to the miller, with nothing more.
+  - loyalty: no doc beyond AGENCY.md (searched every .md); "those it is
+    loyal to" makes it a relation, with no word on its parties or on the
+    *report* and *confront* goals it decides between.
 
 ### After the slice: the wrench was replaced
 
@@ -2124,3 +2123,19 @@ The open question that stays is how considerations combine. They still
 add, in dB.
 
 59 tests, 2107 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: exertion, fatigue, and rest
+
+AGENCY.md §6's fourth need. Fatigue is a component field (`Agent.fatigue`,
+0 to 100), as §6 has it. An operation's stage may declare `exertion`, the
+fatigue its completion adds to the actor: sawing a log through takes 30.
+Interoception feels the fatigue as tiredness, to the band. Above 50, the
+needs generator raises *get some rest*, and the worker lies down
+(`while_away`). Rested through, eight hours on, the fatigue is gone. A
+worker at 40 saws a log, feels tired at 70, and rests. ACTIONS.md
+Scenario 1's "their exertion" is that felt tiredness.
+
+Not yet: a rest cut short by its watch restoring part of it, exertion from
+force (the valve's torque) rather than per stage, and fatigue slowing work.
+
+60 tests, 2116 checks, under both compilers, ASan and UBSan, and leak-free.

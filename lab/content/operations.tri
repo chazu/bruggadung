@@ -18,7 +18,8 @@
 // reaches as the stage completes. It is set in proportion to the stage's
 // progress at each of its `checkpoints` (evenly spaced; each a step
 // boundary), and when the activity is interrupted: suspended, aborted, or
-// failed. Its effect proper commits on completion. A hard interruption
+// failed. Its effect proper commits on completion, with its `exertion`: the
+// fatigue it adds to the actor (AGENCY.md §6). A hard interruption
 // (what it binds gone or out of reach, or what it needs no longer holding)
 // suspends it, or fails it, as it declares (`hard`).
 #Partial: { field: text, showsOn: *"destination" | "item", whole: int }
@@ -28,6 +29,7 @@
     partial:     #Partial
     checkpoints: *0 | int & >=0 & <=100
     hard:        *"suspend" | "fail"
+    exertion:    *0 | int & >=0 & <=100
 }
 
 // A stage of an activity: it takes `duration`, and its effect commits when
@@ -344,6 +346,7 @@ saw_through: #Operation & {
     uses:        ["hands"]
     partial:     { field: "Log.sawn", whole: 100 }
     checkpoints: 3
+    exertion:    30
     roles: {
         actor:       #Agent & { id: $a }
         item:        #HandSaw & { place: #Held & { by: $a } }
@@ -360,7 +363,7 @@ open_door: #Operation & {
     }
 } @family(operations)
 
-// Rest a while, 8 hours, with a watch on the air: woken when its carbon
+// Rest a while, 8 hours (rested through, fatigue is gone), with a watch on the air: woken when its carbon
 // dioxide reaches the command's amount (mmol; 4,000 if none).
 while_away: #Operation & {
     effect:   "rest"
