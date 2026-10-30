@@ -26,3 +26,18 @@ the contract follows once enough is decided.
    about sanctions, weighed against whether they believe they are
    observed), because the legitimate way is easier (a licence from the
    office rather than a forgery), and by a disposition to abide.
+6. **Wrongs reach an institution through people.** A grievance is a
+   claim told to an office holder ("B took the seal reserved for me");
+   members also act on what they witness themselves. Either way it is
+   ordinary knowledge (KNOWLEDGE.md): the holder weighs who said it and
+   decides whether to act.
+7. **Sanctions are ordinary operations** an office gives its holders, as
+   issuing a permit is: arrest (into custody, a location), fine (a debt,
+   as a loan is), confiscate (a take, with a custody claim), revoke (a
+   permit marked void). Each is an activity the holder chooses; its target
+   complies, resists, or flees, as its own agency decides.
+8. **Knowing the rules**: an agent kind starts knowing its society's
+   common rules and what breaking them brings (authored in content:
+   theft brings arrest); particular rules (an office's permits, a new
+   ordinance) are learned like anything else, by reading a posted notice,
+   being told, or seeing someone sanctioned.
