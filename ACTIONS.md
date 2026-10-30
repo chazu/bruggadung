@@ -49,6 +49,11 @@ Out of scope here, except through the stub interfaces defined below:
     the requirement; an operation declares curves for its duration
     multiplier (percent), the chance of a mishap (thousandths), and the
     result's quality (percent).
+12. **Knowing a recipe is knowledge**, held as a rule is (INSTITUTIONS.md):
+    an agent kind starts with its trade's recipes (a fitter knows pump
+    repair); others are learned by being taught, by reading (a manual is a
+    record with a recipe in it), or by practice. An agent without a recipe
+    can't choose it; one with a wrong recipe follows it wrongly.
 
 ## Terms
 
@@ -692,7 +697,6 @@ DOMAIN_SIMULATION.md and Scenario 3 of COMPONENTS.md.
 6. **Joint activities.** How do activities with several actors work, such as
    two people lifting a beam? Pooled capabilities, a shared activity entity,
    and dividing up the risk.
-7. **Recipe knowledge.** How is recipe knowledge represented, and how do
-   recipes interact with §4 beliefs?
+7. **Recipe knowledge.** Decided: decision 12.
 8. **Weights.** Which derived values may weight the commit permutation, and
    in which phases?
