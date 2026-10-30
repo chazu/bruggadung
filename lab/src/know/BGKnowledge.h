@@ -154,6 +154,8 @@ typedef struct
    char             *kind;         /* a type expression: "#Stack" */
    char             *features;     /* "mass: 90g, material: \"iron\", ..." */
    char             *deeper;       /* what an analysis found beneath its looks: "material: \"steel\"", or NULL */
+   char             *supposed;     /* a competing hypothesis (CONTENT_LANGUAGE.md §9): features in place of what it believes, or NULL */
+   int32_t          supposedMass;  /* its credence mass, in thousandths; the belief has the rest */
    BGLocationForm   form;          /* how it was placed when last seen */
    uint32_t         container;     /* the referent it was in, held by, or part of */
    int32_t          x;             /* the tile it was on, or its holder's */
@@ -333,6 +335,16 @@ typedef struct
 /* the referent as a Triangle description, for the knowledge view, with the
  * detail memory has kept */
 - (NSString *) describeReferent:(uint32_t) referentID;
+/* A competing hypothesis about the referent (KNOWLEDGE.md §11): `overrides`
+ * ("size: 22mm") in place of what it believes, with credence mass `permille`;
+ * the belief keeps the rest. Seen plainly again, the doubt is gone. */
+- (void) suppose:(NSString *) overrides
+           about:(uint32_t) referentID
+            mass:(int32_t) permille;
+/* the referent described as the competing hypothesis has it, or nil */
+- (NSString *) describeSupposed:(uint32_t) referentID;
+- (int32_t) supposedMassOf:(uint32_t) referentID;
+- (void) dropSupposed:(uint32_t) referentID;
 /* the features the referent keeps, as memory has them now */
 - (NSString *) recall:(const BGReferent *) r;
 /* memory steps since the time */

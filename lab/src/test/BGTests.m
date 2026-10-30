@@ -4102,6 +4102,64 @@ static BGNutRun   nut_run( const char *nut, const char *spanner, BOOL omniscient
 }
 
 
+/* CONTENT_LANGUAGE.md Scenario 2's variant C: the worker has seen the nut
+ * plainly (19 mm) from beside it, then stands four tiles off; it half
+ * remembers the nut was replaced with a 22 mm one, at `doubt` in 1000. */
+static BGNutRun   doubtful_nut_run( int32_t doubt, int64_t *massSeen)
+{
+   BGStage            st;
+   BGActivities       *activities;
+   BGKnowledge        *knowledge;
+   BGAgency           *agency;
+   BGProposalGroup    *g;
+   BGKnowledgeStore   *store;
+   BGEntityID         worker;
+   BGNutRun           run;
+
+   memset( &run, 0, sizeof( run));
+   st.w       = BGTestWorld( 71);
+   st.c       = BGTestCommitter( st.w);
+   activities = [BGActivities activitiesWithWorld:st.w committer:st.c];
+   knowledge  = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+   agency     = [[[BGAgency alloc] initWithWorld:st.w committer:st.c knowledge:knowledge] autorelease];
+   st.s       = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [agency setActivities:activities];
+   [st.s setActivities:activities];
+   [st.s setPerception:knowledge];
+   [st.s setDecision:agency];
+   g       = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the pump"];
+   worker  = [g create:"worker" key:"Oskar" at:BGOnTile( 5, 2, 0)];
+   [g create:"spanner_19" key:"spanner" at:BGHeldBy( worker, 0)];
+   run.nut = [g create:"gland_nut" key:"gland nut" at:BGOnTile( 6, 2, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   worker  = [g idFor:worker];
+   run.nut = [g idFor:run.nut];
+   stage_move( &st, worker, 2, 2);
+   store = [knowledge storeOf:worker];
+   [store suppose:@"size: 22mm" about:referent_of( store, run.nut) mass:doubt];
+   *massSeen    = [store supposedMassOf:referent_of( store, run.nut)];
+   run.fromAfar = [knowledge dump:worker];
+   {
+      BGKnowledge   *restored;
+      NSString      *text;
+
+      /* the doubt is saved */
+      text     = BGSave( st.w, st.c, [NSArray arrayWithObject:knowledge]);
+      restored = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+      [restored restoreSavedState:BGSavedDomainState( text, @"knowledge")];
+      BG_CHECK( [[restored dump:worker] isEqualToString:run.fromAfar]);
+   }
+   BG_CHECK( [agency commit:worker toGoal:"tighten_nut"]);
+   [st.s runUntil:BGTimeMake( 30000)];
+   run.world     = st.w;
+   run.knowledge = knowledge;
+   run.agency    = agency;
+   run.text      = BGSave( st.w, st.c, [NSArray arrayWithObjects:knowledge, agency, nil]);
+   return( run);
+}
+
+
 static BOOL   tightened( BGNutRun run)
 {
    int64_t   v;
@@ -4119,6 +4177,9 @@ static void   test_unknown_nut( void)
    BGNutRun   again;
    BGNutRun   spare;
    BGNutRun   misfit;
+   BGNutRun   doubtful;
+   BGNutRun   sure;
+   int64_t    mass;
 
    /* 1: four tiles off, the nut's size is only 16 to 22 mm: whether the 19
     * mm spanner fits is unknown, with the residual nut.size and nothing else */
@@ -4167,6 +4228,19 @@ static void   test_unknown_nut( void)
    /* 5: determinism */
    again = nut_run( "gland_nut", "spanner_19", NO, NULL);
    BG_CHECK( [again.text isEqualToString:base.text]);
+
+   /* C: two hypotheses, 19 mm as it saw it, or 22 mm as it half remembers.
+    * At 300 in 1000 for 22, only 700 entails: under tightening's 900, so it
+    * looks closer first, and seen plainly the doubt is gone */
+   doubtful = doubtful_nut_run( 300, &mass);
+   BG_CHECK( mass == 300 && [doubtful.fromAfar rangeOfString:@"or, 300 in 1000: size: 22mm"].location != NSNotFound);
+   BG_CHECK( [doubtful.fromAfar rangeOfString:@"size: 19mm"].location != NSNotFound);
+   BG_CHECK( logged_by( doubtful.agency, 1, @"tighten it: unknown at nut.size (700 in 1000 entails, under 900): look closer first"));
+   BG_CHECK( tightened( doubtful));
+   BG_CHECK( [[doubtful.knowledge dump:1] rangeOfString:@"or, 300 in 1000"].location == NSNotFound);
+   /* at 50 in 1000, 950 entails: sure enough, it tightens it without looking */
+   sure = doubtful_nut_run( 50, &mass);
+   BG_CHECK( ! logged_by( sure.agency, 1, @"look closer") && tightened( sure));
 }
 
 

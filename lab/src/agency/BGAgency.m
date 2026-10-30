@@ -146,6 +146,7 @@ typedef struct
    NSUInteger         norder;
    char               search[ 32];                 /* the slot to search, or "" */
    int64_t            places;                      /* how many to search, curiosity included; 0, no end */
+   int64_t            threshold;                   /* the credence mass, in thousandths, that must entail */
    int64_t            since;                       /* searched means its inside was seen since */
    const char         *instance;                   /* the method or goal */
    const char         *slot;                       /* the slot being bound */
@@ -539,6 +540,7 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    c->norder = texts_at( tri, variants[ 0], "order", c->order, 4);
    if( ! text_at( tri, variants[ 0], "search", c->search, sizeof( c->search)))
       c->search[ 0] = 0;
+   c->threshold = int_at( tri, variants[ 0], "threshold", 1000);
    /* a search looks into so many places; curiosity widens it */
    if( (c->places = int_at( tri, variants[ 0], "places", 0)) > 0 &&
        (agent = [_world record:[_world kindNamed:"Agent"] for:[store agent]]))
@@ -550,9 +552,14 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
 /* The match of the condition's frame, with `me` and the slots of `find`
  * bound so far: entailed if any variant entails it, incompatible if all rule
  * it out. */
+/* The match of the frame as described, with `supposing`'s competing
+ * hypothesis in place of its belief (0: none); `path` gets the residual of
+ * an unknown match, or where an incompatible one failed. */
 - (TriMatch) match:(BGCondition *) c
           bindings:(const BGSlotBinding *) b
              count:(int) n
+         supposing:(uint32_t) supposing
+              path:(char *) path
 {
    NSMutableString   *expr;
    const TriNode     *description;
@@ -569,25 +576,77 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    expr = [NSMutableString stringWithFormat:@"%s & { me: %@", c->frame, [c->store describeReferent:c->me->id]];
    for( k = 0; k < c->nfind; k++)
       if( (r = bound( b, n, c->find[ k])))
-         [expr appendFormat:@", %s: %@", c->find[ k], [c->store describeReferent:r]];
+         [expr appendFormat:@", %s: %@", c->find[ k],
+                            r == supposing ? [c->store describeSupposed:r] : [c->store describeReferent:r]];
    [expr appendString:@" }"];
    arena       = tri_arena_new();
    description = tri_value( tri, [expr UTF8String], arena, NULL, 0);
    best        = TRI_INCOMPATIBLE;
+   path[ 0]    = 0;
    for( v = 0; description && v < c->nvariants && best != TRI_ENTAILED; v++)
    {
       match = tri_match( tri, c->match[ v], description, &result);
       if( match != TRI_INCOMPATIBLE)
          best = match;
-      if( match == TRI_UNKNOWN)
-      {
-         _lastResidual[ 0] = 0;
-         if( result.nresidual)
-            strncpy( _lastResidual, result.residual[ 0], sizeof( _lastResidual) - 1);
-      }
+      if( match == TRI_UNKNOWN && result.nresidual)
+         strncpy( path, result.residual[ 0], 255);
+      if( match == TRI_INCOMPATIBLE && best == TRI_INCOMPATIBLE && result.failure.path[ 0])
+         strncpy( path, result.failure.path, 255);
    }
+   path[ 255] = 0;
    tri_arena_free( arena);
    return( best);
+}
+
+
+/* The match of the condition: per hypothesis (CONTENT_LANGUAGE.md §9), when
+ * a bound referent has a competing one. Entailed when the credence mass
+ * that entails reaches the condition's threshold; incompatible when every
+ * hypothesis is; otherwise unknown, at the path where they part. */
+- (TriMatch) match:(BGCondition *) c
+          bindings:(const BGSlotBinding *) b
+             count:(int) n
+{
+   TriMatch   believed;
+   TriMatch   supposed;
+   NSUInteger k;
+   uint32_t   r;
+   uint32_t   doubted;
+   const char *slot;
+   int64_t    mass;
+   int64_t    entailed;
+   char       path[ 256];
+   char       other[ 256];
+
+   doubted = 0;
+   slot    = NULL;
+   for( k = 0; k < c->nfind && ! doubted; k++)
+      if( (r = bound( b, n, c->find[ k])) && [c->store supposedMassOf:r] > 0)
+      {
+         doubted = r;
+         slot    = c->find[ k];
+      }
+   believed = [self match:c bindings:b count:n supposing:0 path:path];
+   if( ! doubted)
+   {
+      if( believed == TRI_UNKNOWN)
+         strncpy( _lastResidual, path, sizeof( _lastResidual) - 1);
+      return( believed);
+   }
+   supposed = [self match:c bindings:b count:n supposing:doubted path:other];
+   mass     = [c->store supposedMassOf:doubted];
+   entailed = (believed == TRI_ENTAILED ? 1000 - mass : 0) + (supposed == TRI_ENTAILED ? mass : 0);
+   if( entailed >= c->threshold)
+      return( TRI_ENTAILED);
+   if( believed == TRI_INCOMPATIBLE && supposed == TRI_INCOMPATIBLE)
+      return( TRI_INCOMPATIBLE);
+   /* where they part: the doubted slot's feature the hypothesis overrides */
+   strncpy( other, [c->store referent:doubted]->supposed, sizeof( other) - 1);
+   other[ sizeof( other) - 1] = 0;
+   other[ strcspn( other, ":")] = 0;
+   snprintf( _lastResidual, sizeof( _lastResidual), "%s.%s (%lld in 1000 entails, under %lld)", slot, other,
+             (long long) entailed, (long long) c->threshold);
+   return( TRI_UNKNOWN);
 }
 
 

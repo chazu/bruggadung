@@ -117,7 +117,10 @@
 // whose inside the agent has seen since the goal was adopted is passed over.
 // An agent asked since the goal was adopted is passed over too. A search
 // looks into so many `places` (0, no end), counting those seen into or asked
-// since; curiosity widens it, a place more for every 25 (AGENCY.md §9). When no
+// since; curiosity widens it, a place more for every 25 (AGENCY.md §9).
+// Against a referent with a competing hypothesis (CONTENT_LANGUAGE.md §9),
+// `pre` holds when the credence mass that entails it reaches `threshold`
+// (thousandths); short of that it is unknown, at the path where they part. When no
 // method's `pre` holds, the goal is impossible for now: it is dropped with
 // the reason, and the method that needed it has failed.
 #Method: #Intent & {
@@ -127,6 +130,7 @@
     order:     [...#Order]
     search:    text
     places:    *0 | int & >=0 & <=100
+    threshold: *1000 | int & >=0 & <=1000
     steps:     [...#MethodStep]
     score:     [...#Consideration]
     onUnknown: text
@@ -489,7 +493,8 @@ tighten_nut: #Goal & {
     done:  { find: ["nut"], match: #Tightening & { nut: #Fastener & { tight: true } } }
 } @family(goals)
 
-// With a spanner that fits: if whether it fits is unknown, look closer.
+// With a spanner that fits: if whether it fits is unknown, look closer;
+// sure to nine in ten is sure enough.
 tighten_it: #Method & {
     title: "tighten it"
     goal:  "tighten_nut"
@@ -503,6 +508,7 @@ tighten_it: #Method & {
         }
     }
     onUnknown: "look_closer"
+    threshold: 900
     steps:     [#Do & { op: "tighten", object: "spanner", target: "nut" }]
 } @family(methods)
 

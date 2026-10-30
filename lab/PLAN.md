@@ -2019,8 +2019,6 @@ The remaining scenario checks that aren't run, after the passes above:
   - closed doors and failed moves: KNOWLEDGE.md Scenario 3's check 2;
   - told, featureless referents in recognition: AGENCY.md Scenario 2's
     variant C by asking;
-  - competing feature hypotheses with masses: CONTENT_LANGUAGE.md
-    Scenario 2's variant C;
   - light as a domain: the lamp;
   - urgency curves, belief from habit, loyalty.
 
@@ -2043,3 +2041,30 @@ one, and concludes nothing. The prior belief gates it.
   things don't, which the rule reads as a swap.
 
 59 tests, 2083 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: two hypotheses of the nut (credence mass)
+
+CONTENT_LANGUAGE.md Scenario 2's variant C, with §9's matching per
+hypothesis. The worker saw the nut plainly at 19 mm. Four tiles off, it
+half remembers it was replaced with a 22 mm one. The test supposes that,
+at 300 in 1000. Matching *tighten it* per hypothesis, 700 in 1000 entails.
+The method's threshold is 900, so the precondition is unknown at
+`nut.size`, and the worker looks closer first. Seen plainly, the doubt is
+gone, and it tightens the nut. At 50 in 1000 the 950 that entail are sure
+enough, and it tightens the nut without looking.
+
+- **A referent may hold a competing hypothesis**: overrides of its
+  features (`suppose:about:mass:`), with a credence mass in thousandths.
+  The belief keeps the rest. A plain sighting settles it, a blurred one
+  keeps it. It is saved, and the dump shows it.
+- **Agency matches per hypothesis.** Entailed when the mass that entails
+  reaches the method's `threshold` (1000 by default, so every method
+  without one behaves as before). Incompatible when every hypothesis is.
+  Otherwise unknown, at the doubted slot's overridden feature, which
+  `onUnknown` makes a goal.
+
+Not yet: more than one competing hypothesis per referent, perception and
+memory making hypotheses of their own (the test supposes it), and the
+menu showing masses.
+
+59 tests, 2093 checks, under both compilers, ASan and UBSan, and leak-free.
