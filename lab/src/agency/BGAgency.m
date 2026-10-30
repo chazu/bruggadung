@@ -77,38 +77,7 @@ static NSUInteger   texts_at( TriContent *tri, const TriNode *node, const char *
  * its points, level beyond its ends. NO if it has no points. */
 static BOOL   curve_at( TriContent *tri, const TriNode *curve, int64_t x, int32_t *worth)
 {
-   const TriNode   *p;
-   int64_t         at[ 16];
-   int64_t         w[ 16];
-   int64_t         lo;
-   int64_t         hi;
-   int             n;
-   int             k;
-
-   for( n = 0; curve && n < 16 && (p = tri_at( tri, curve, "first")); curve = tri_at( tri, curve, "rest"))
-   {
-      if( ! tri_node_interval( tri_at( tri, p, "input"), &lo, &hi) || lo != hi)
-         continue;
-      at[ n] = lo;
-      if( ! tri_node_interval( tri_at( tri, p, "output"), &lo, &hi) || lo != hi)
-         continue;
-      w[ n++] = lo;
-   }
-   if( ! n)
-      return( NO);
-   if( x <= at[ 0])
-   {
-      *worth = (int32_t) w[ 0];
-      return( YES);
-   }
-   for( k = 1; k < n; k++)
-      if( x <= at[ k])
-      {
-         *worth = (int32_t) (w[ k - 1] + (w[ k] - w[ k - 1]) * (x - at[ k - 1]) / (at[ k] - at[ k - 1]));
-         return( YES);
-      }
-   *worth = (int32_t) w[ n - 1];
-   return( YES);
+   return( BGCurveAt( tri, curve, x, worth));
 }
 
 

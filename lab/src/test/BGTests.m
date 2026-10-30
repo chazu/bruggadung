@@ -68,7 +68,7 @@ static void   test_registry_and_construction( void)
 
    w = BGTestWorld( 1);
    c = BGTestCommitter( w);
-   BG_CHECK( [w kindCount] == 37);
+   BG_CHECK( [w kindCount] == 38);
    BG_CHECK( [w kindNamed:"Body"] != NSNotFound && [w kindNamed:"Nonesuch"] == NSNotFound);
    bin   = commit_create( c, "bin", BGOnTile( 0, 0, 0));
    nails = commit_create( c, "nails_30", BGIn( bin));
@@ -9063,6 +9063,83 @@ static void   test_habitual_belief( void)
 }
 
 
+/* ACTIONS.md decision 11: graded shortfall is curves. The worker saws the
+ * log with a saw `sharpness` sharp (the oak is 60 hard): the time it takes,
+ * in ms; the cut's finish; and whether the saw slipped, scratching the log. */
+static int64_t   shortfall_run( uint64_t seed, int64_t sharpness, int64_t *finish, BOOL *slipped)
+{
+   BGStage            st;
+   BGProposalGroup    *g;
+   BGEntityID         worker;
+   BGEntityID         log;
+   BGEntityID         saw;
+   BGEntityID         a;
+   NSString           *error;
+   int64_t            start;
+   int64_t            sawn;
+   int64_t            t;
+
+   st.w = BGTestWorld( seed);
+   st.c = BGTestCommitter( st.w);
+   st.s = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [st.s setActivities:[BGActivities activitiesWithWorld:st.w committer:st.c]];
+   g      = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the sawhorse"];
+   worker = [g create:"worker" key:"worker" at:BGOnTile( 3, 3, 0)];
+   log    = [g create:"log" key:"log" at:BGOnTile( 4, 3, 0)];
+   saw    = [g create:"hand_saw" key:"saw" at:BGHeldBy( worker, 0)];
+   [g set:"HandSaw.sharpness" of:BGWhole( saw) to:sharpness];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   worker = [g idFor:worker];
+   log    = [g idFor:log];
+   error  = nil;
+   g      = BGPerform( st.w, st.c, BGActionMake( "saw_through", worker, [g idFor:saw], log), 0, &error);
+   BG_CHECK( g != nil);
+   [st.s runUntil:BGTimeMake( 2)];
+   a = [g idFor:[g proposals][ 0].handle];
+   [st.w getField:"Activity.started" of:a value:&start];
+   for( t = start; t < start + 60000; t += 500)
+   {
+      [st.s runUntil:BGTimeMake( t)];
+      sawn = 0;
+      if( [st.w getField:"Log.sawn" of:log value:&sawn] && sawn == 100)
+         break;
+   }
+   *finish  = -1;
+   [st.w getField:"Log.finish" of:log value:finish];
+   *slipped = any_trace( st.w, "scratch");
+   return( t - start);
+}
+
+
+static void   test_shortfall( void)
+{
+   int64_t    finish;
+   int64_t    took;
+   BOOL       slipped;
+   uint64_t   seed;
+   int        slips;
+
+   /* as sharp as the oak is hard: eight seconds, a fine cut, no slip */
+   took = shortfall_run( 7, 60, &finish, &slipped);
+   BG_CHECK( took == 8000 && finish == 90 && ! slipped);
+   /* half as sharp: three times as long (a third of the rate, in whole
+    * percent), a rough cut, and a slip about one time in two, by the
+    * seeded draw */
+   took = shortfall_run( 7, 30, &finish, &slipped);
+   BG_CHECK( took > 24000 && took <= 24500 && finish == 40);      /* at a 33% rate, to the half second */
+   for( slips = 0, seed = 1; seed <= 40; seed++)
+   {
+      shortfall_run( seed, 30, &finish, &slipped);
+      slips += slipped;
+   }
+   BG_CHECK( slips > 10 && slips < 30);
+   /* sharper than it needs: no faster, and the finest cut */
+   took = shortfall_run( 7, 90, &finish, &slipped);
+   BG_CHECK( took == 8000 && finish == 100 && ! slipped);
+}
+
+
 static void   test_partial_effects( void)
 {
    int64_t      cut[ 12];
@@ -9456,6 +9533,7 @@ const BGTestCase   BGAllTests[] =
    { "going_without",                 test_going_without },
    { "doubts",                        test_doubts },
    { "account",                       test_account },
+   { "shortfall",                     test_shortfall },
    { "traces",                        test_traces },
    { "appearance",                    test_appearance },
    { "interpretation",                test_interpretation },

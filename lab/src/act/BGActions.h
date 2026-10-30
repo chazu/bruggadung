@@ -140,6 +140,18 @@ static inline int64_t   BGAtRate( int64_t effort, int64_t rate)
  * 14), added the same way. */
 int64_t            BGAccessDelay( BGWorld *world, BGAction action);
 
+/* A curve's value at x (AGENCY.md §3's lookup tables, ACTIONS.md decision
+ * 11): its points' `output` at their `input`, straight between them and
+ * level beyond the ends. NO if it has no points. */
+BOOL               BGCurveAt( TriContent *tri, const TriNode *curve, int64_t x, int32_t *out);
+
+/* A graded requirement (ACTIONS.md decision 11): what the operation's
+ * offering role brings, as a percent of what its demanding role demands;
+ * -1 if it has none, or either can't be read. */
+int64_t            BGCapacity( BGWorld *world, BGAction action);
+/* The work rate, slowed by the graded requirement's `slowing` curve. */
+int64_t            BGGradedRate( BGWorld *world, BGAction action, int64_t rate);
+
 /* What weights the actor's groups for the operation when they conflict
  * (ACTIONS.md decision 13): its value of the field the operation declares
  * (`contest`, an Agent field: "quickness"); 0 if it declares none. */

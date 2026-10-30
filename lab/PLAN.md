@@ -3771,3 +3771,32 @@ Not yet: shoving (strength) and talking over someone (voice), as there are
 no such operations.
 
 91 tests, 2827 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: graded shortfall as curves
+
+ACTIONS.md decision 11: the input is capacity as a percent of the
+requirement; an operation declares curves for its duration multiplier,
+the chance of a mishap (thousandths), and the result's quality.
+
+- **`#Operation.graded`** (`#Graded`): what one role offers (a field of
+  its entity's) against what another demands; `slowing` (percent of the
+  time), `mishap` (thousandths) with its `slip` (a trace), and `quality`
+  (percent) set on the demander's `grades` field.
+- **The pace** is the work rate slowed by the curve (`BGGradedRate`),
+  applied wherever the rate is set (starting, a next stage, resuming, a
+  change of pace), so progress, checkpoints and resumption stay right.
+- **Mishap and quality** are applied as the effect commits, with the
+  operation's traces: a seeded draw for the mishap (a `mishap` event and
+  its trace), the quality set on the result.
+- `BGCurveAt` is now shared: agency's considerations use the same curves.
+- **Sawing** declares one: the saw's `sharpness` against the log's
+  `hardness` (both new, 60 by default); the cut's `finish` (new).
+
+Checked: a saw as sharp as the oak is hard cuts in 8 s, finish 90, no
+slip; half as sharp, about three times as long, finish 40, and a slip on
+about half of 40 seeds; sharper than needed, no faster, finish 100.
+
+Not yet: excess (too much, as the valve's lever already has in its own
+code), injury as a mishap, other operations declaring grades.
+
+92 tests, 2874 checks, under both compilers, ASan, and leak-free.

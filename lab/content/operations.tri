@@ -63,6 +63,25 @@
     uses:      [...#Provider]
     attention: *0 | int & >=0 & <=100
     contest:   text
+    graded:    #Graded
+}
+
+// A graded requirement (ACTIONS.md decision 11): what a role brings (the
+// `offers` field of the `offerer`'s entity) as a percent of what another
+// demands (`demands`, of the `demander`'s). Curves over that percent, as
+// agency's considerations have: how long it takes, in percent (`slowing`);
+// the chance of a mishap, in thousandths (`mishap`), leaving its `slip`;
+// and the result's quality, in percent, set on the demander's `grades`.
+#Graded: {
+    offerer:  #TraceSite
+    offers:   text
+    demander: #TraceSite
+    demands:  text
+    slowing:  [...#Point]
+    mishap:   [...#Point]
+    slip:     #Leaves
+    quality:  [...#Point]
+    grades:   text
 }
 
 // `contest` (ACTIONS.md decision 13): the actor's field that weights its
@@ -373,6 +392,17 @@ saw_through: #Operation & {
     partial:     { field: "Log.sawn", whole: 100 }
     checkpoints: 3
     exertion:    30
+    // the saw's sharpness against the log's hardness: half as sharp as the
+    // wood is hard, three times as long, a slip one time in two, and a
+    // rough cut
+    graded: {
+        offerer: "item", offers: "HandSaw.sharpness", demander: "destination", demands: "Log.hardness"
+        slowing: [{ input: 50, output: 300 }, { input: 100, output: 100 }]
+        mishap:  [{ input: 50, output: 500 }, { input: 100, output: 0 }]
+        slip:    { trace: "scratch", on: "destination", strength: 40 }
+        quality: [{ input: 50, output: 40 }, { input: 100, output: 90 }, { input: 150, output: 100 }]
+        grades:  "Log.finish"
+    }
     roles: {
         actor:       #Agent & { id: $a }
         item:        #HandSaw & { place: #Held & { by: $a } }

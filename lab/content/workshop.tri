@@ -104,8 +104,15 @@ diagram:     #Record & { material: "paper", mass: 20g }
 #Log: #Body & {
     @component(Log)
     sawn: *0 | int & >=0 & <=100               @field(content, saved, proposable, inspect, perceive(sight))
+    // how hard its wood is to cut, and how clean the cut came out (ACTIONS.md
+    // decision 11)
+    hardness: *60 | int & >=1 & <=100          @field(content, saved, inspect)
+    finish:   *0 | int & >=0 & <=100           @field(content, saved, proposable, inspect, perceive(sight))
 }
-#HandSaw: #Body & {}
+#HandSaw: #Body & {
+    @component(HandSaw)
+    sharpness: *60 | int & >=0 & <=100         @field(content, saved, proposable, inspect, perceive(sight))
+}
 log:      #Log & { material: "oak", mass: 20kg }
 hand_saw: #HandSaw & { material: "steel", mass: 700g }
 

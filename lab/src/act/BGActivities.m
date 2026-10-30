@@ -219,7 +219,8 @@ static int64_t   next_checkpoint( BGWorld *world, BGEntityID a, const BGActivity
          [group set:"Activity.stage" of:BGWhole( a) to:record->stage + 1];
          [group set:"Activity.progress" of:BGWhole( a) to:0];
          [group set:"Activity.started" of:BGWhole( a) to:t.ms];
-         rate = BGWorkRate( _world, (BGEntityID) record->actorRef, operation, record->stage + 1);
+         rate = BGGradedRate( _world, action_of( _world, a, record),
+                              BGWorkRate( _world, (BGEntityID) record->actorRef, operation, record->stage + 1));
          [group set:"Activity.pace" of:BGWhole( a) to:rate];
          [group set:"Activity.due" of:BGWhole( a) to:t.ms + BGAtRate( duration, rate)];
       }
@@ -417,8 +418,9 @@ static int64_t   next_checkpoint( BGWorld *world, BGEntityID a, const BGActivity
    [group set:"Activity.started" of:BGWhole( a) to:now];
    /* what it owes: the stage, and bringing its instruments to bear as
     * they lie now, less what it did before */
-   rate      = BGWorkRate( _world, (BGEntityID) record->actorRef, [_world textField:"Activity.operation" of:a],
-                           record->stage);
+   rate      = BGGradedRate( _world, action_of( _world, a, record),
+                             BGWorkRate( _world, (BGEntityID) record->actorRef,
+                                         [_world textField:"Activity.operation" of:a], record->stage));
    remaining = BGAtRate( duration - record->progress, rate);
    if( record->stage == 0)
       remaining += BGAccessDelay( _world, action_of( _world, a, record));
@@ -487,7 +489,8 @@ static int64_t   next_checkpoint( BGWorld *world, BGEntityID a, const BGActivity
    operation = [_world textField:"Activity.operation" of:a];
    if( ! BGOperationStage( _world, operation, record->stage, &duration, &effect))
       return;
-   pace = BGWorkRate( _world, (BGEntityID) record->actorRef, operation, record->stage);
+   pace = BGGradedRate( _world, action_of( _world, a, record),
+                        BGWorkRate( _world, (BGEntityID) record->actorRef, operation, record->stage));
    if( pace == (record->pace > 0 ? record->pace : 100))
       return;
    now   = [_world time].ms;

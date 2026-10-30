@@ -930,6 +930,141 @@ int64_t   BGWorkRate( BGWorld *world, BGEntityID actor, const char *operation, i
 }
 
 
+BOOL   BGCurveAt( TriContent *tri, const TriNode *curve, int64_t x, int32_t *out)
+{
+   const TriNode   *p;
+   int64_t         at[ 16];
+   int64_t         w[ 16];
+   int64_t         lo;
+   int64_t         hi;
+   int             n;
+   int             k;
+
+   for( n = 0; curve && n < 16 && (p = tri_at( tri, curve, "first")); curve = tri_at( tri, curve, "rest"))
+   {
+      if( ! tri_node_interval( tri_at( tri, p, "input"), &lo, &hi) || lo != hi)
+         continue;
+      at[ n] = lo;
+      if( ! tri_node_interval( tri_at( tri, p, "output"), &lo, &hi) || lo != hi)
+         continue;
+      w[ n++] = lo;
+   }
+   if( ! n)
+      return( NO);
+   if( x <= at[ 0])
+   {
+      *out = (int32_t) w[ 0];
+      return( YES);
+   }
+   for( k = 1; k < n; k++)
+      if( x <= at[ k])
+      {
+         *out = (int32_t) (w[ k - 1] + (w[ k] - w[ k - 1]) * (x - at[ k - 1]) / (at[ k] - at[ k - 1]));
+         return( YES);
+      }
+   *out = (int32_t) w[ n - 1];
+   return( YES);
+}
+
+
+static BOOL   trace_site( BGWorld *world, BGAction action, const char *site, BGEntityID *bearer, BGLocation *tile);
+static BOOL   text_of( TriContent *tri, const TriNode *node, const char *path, char *buf, size_t len);
+
+
+/* A role's entity by its site's name ("item"), or none. */
+static BGEntityID   role_named( BGAction action, const char *site)
+{
+   int   r;
+
+   for( r = 0; r < BGRoleCount; r++)
+      if( ! strcmp( BGRoleNames[ r], site))
+         return( action.roles[ r]);
+   return( BGNoEntity);
+}
+
+
+int64_t   BGCapacity( BGWorld *world, BGAction action)
+{
+   const TriNode   *graded;
+   TriContent      *tri;
+   int64_t         offered;
+   int64_t         demanded;
+   char            site[ 32];
+   char            field[ 96];
+
+   tri    = [world tri];
+   graded = action.operation ? tri_at( tri, tri_pattern( tri, action.operation), "graded") : NULL;
+   if( ! graded || ! text_of( tri, graded, "offerer", site, sizeof( site)) ||
+       ! text_of( tri, graded, "offers", field, sizeof( field)) ||
+       ! [world getField:field of:role_named( action, site) value:&offered] ||
+       ! text_of( tri, graded, "demander", site, sizeof( site)) ||
+       ! text_of( tri, graded, "demands", field, sizeof( field)) ||
+       ! [world getField:field of:role_named( action, site) value:&demanded] || demanded <= 0)
+      return( -1);
+   return( offered * 100 / demanded);
+}
+
+
+int64_t   BGGradedRate( BGWorld *world, BGAction action, int64_t rate)
+{
+   int64_t   capacity;
+   int32_t   slowing;
+
+   capacity = BGCapacity( world, action);
+   if( capacity < 0 ||
+       ! BGCurveAt( [world tri], tri_at( [world tri], tri_pattern( [world tri], action.operation), "graded.slowing"),
+                    capacity, &slowing) || slowing <= 0)
+      return( rate);
+   return( rate * 100 / slowing);
+}
+
+
+/* As the effect commits (ACTIONS.md decision 11): a mishap, by the chance
+ * the `mishap` curve gives the capacity, a seeded draw, leaving its `slip`;
+ * and the result's quality, as the `quality` curve gives it, set on
+ * `grades`, a field of the demanding role's entity. */
+static void   grade( BGWorld *world, BGAction action, BGProposalGroup *group)
+{
+   const TriNode   *graded;
+   const TriNode   *v;
+   TriContent      *tri;
+   BGEntityID      bearer;
+   BGLocation      tile;
+   int64_t         capacity;
+   int64_t         lo;
+   int64_t         hi;
+   int32_t         chance;
+   int32_t         quality;
+   uint64_t        state;
+   char            kind[ 64];
+   char            site[ 32];
+   char            field[ 96];
+
+   tri      = [world tri];
+   capacity = BGCapacity( world, action);
+   graded   = capacity >= 0 ? tri_at( tri, tri_pattern( tri, action.operation), "graded") : NULL;
+   if( ! graded)
+      return;
+   if( BGCurveAt( tri, tri_at( tri, graded, "mishap"), capacity, &chance) && chance > 0)
+   {
+      state = BGMix( [world seed] ^ BGMix( [world boundary] * 0x100 + action.roles[ BGRoleActor]) ^ 0x6d6973686170ULL);
+      if( (int64_t) (BGNext( &state) % 1000) < chance &&
+          text_of( tri, graded, "slip.trace", kind, sizeof( kind)) && text_of( tri, graded, "slip.on", site, sizeof( site)) &&
+          trace_site( world, action, site, &bearer, &tile))
+      {
+         v = tri_at( tri, graded, "slip.strength");
+         BGMakeTrace( world, group, kind, bearer, tile, v && tri_node_interval( v, &lo, &hi) && lo == hi ? lo : 0,
+                      action.operation);
+         [group emit:"mishap" subject:BGWhole( action.roles[ BGRoleActor]) other:BGWhole( bearer) detail:"slip"];
+      }
+   }
+   if( BGCurveAt( tri, tri_at( tri, graded, "quality"), capacity, &quality) &&
+       text_of( tri, graded, "grades", field, sizeof( field)) &&
+       text_of( tri, graded, "demander", site, sizeof( site)) && role_named( action, site))
+      [group set:field of:BGWhole( role_named( action, site)) to:quality];
+}
+
+
 uint64_t   BGContestWeight( BGWorld *world, BGEntityID actor, const char *operation)
 {
    const TriNode   *pattern;
@@ -2261,6 +2396,7 @@ void   BGLeaveTraces( BGWorld *world, BGAction action, BGProposalGroup *group)
       strength = v && tri_node_interval( v, &lo, &hi) && lo == hi ? lo : 0;
       BGMakeTrace( world, group, kind, bearer, tile, strength, action.operation);
    }
+   grade( world, action, group);
 }
 
 
@@ -2498,7 +2634,7 @@ BGProposalGroup   *BGPerform( BGWorld *world, BGCommitter *committer, BGAction a
       /* a timed activity: its first stage's effect commits when the stage is due */
       activity = start_activity( world, action, amount, group);
       [group set:"Activity.started" of:BGWhole( activity) to:[world time].ms];
-      rate = BGWorkRate( world, action.roles[ BGRoleActor], action.operation, 0);
+      rate = BGGradedRate( world, action, BGWorkRate( world, action.roles[ BGRoleActor], action.operation, 0));
       [group set:"Activity.pace" of:BGWhole( activity) to:rate];
       [group set:"Activity.due" of:BGWhole( activity)
               to:[world time].ms + BGAtRate( duration, rate) + BGAccessDelay( world, action)];
