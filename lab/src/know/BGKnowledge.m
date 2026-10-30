@@ -2289,6 +2289,41 @@ static BOOL   near( BGKnowledgeStore *store, const BGReferent *r, const char *ki
 
 /* The container the agent was seen to put things into at least `times`
  * times, by that referent; the most often, the lowest first; or 0. */
+/* Where the agent itself has put the thing at least `times` times, the most;
+ * or 0: its habit for it (AGENCY.md §8), as it remembers doing it. */
+static uint32_t   own_usual_place( BGKnowledgeStore *store, uint32_t thing, int64_t times)
+{
+   const BGObservation   *o;
+   const BGReferent      *c;
+   NSUInteger            i;
+   NSUInteger            j;
+   uint32_t              best;
+   int64_t               n;
+   int64_t               most;
+
+   best = 0;
+   most = 0;
+   for( i = 0; i < [store observationCount]; i++)
+   {
+      o = [store observationAt:i];
+      c = [store referent:o->other];
+      if( strcmp( o->kind, "moved") || o->actor != [store selfReferent] || o->subject != thing || ! c || ! c->kind ||
+          ! strcmp( c->kind, "#Agent"))
+         continue;
+      for( n = 0, j = 0; j < [store observationCount]; j++)
+         if( ! strcmp( [store observationAt:j]->kind, "moved") && [store observationAt:j]->actor == [store selfReferent] &&
+             [store observationAt:j]->subject == thing && [store observationAt:j]->other == o->other)
+            n++;
+      if( n >= times && (n > most || (n == most && o->other < best)))
+      {
+         most = n;
+         best = o->other;
+      }
+   }
+   return( best);
+}
+
+
 static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t times)
 {
    const BGObservation   *o;
@@ -2850,9 +2885,23 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
    /* what has faded too far, forgotten */
    for( j = 0; j < [store count]; j++)
    {
+      uint32_t   habit;
+
       r = (BGReferent *) [store referentAt:j];
       if( ! r->present || r->id == [store selfReferent] || [store strengthOf:r->id] >= BG_BELIEVE)
          continue;
+      /* what it always puts in the same place, it believes is there (AGENCY.md
+       * Scenario 1: Oskar always hangs the wrench on the hook) */
+      if( (habit = own_usual_place( store, r->id, 3)))
+      {
+         if( r->form != BGLocationIn || r->container != habit)
+         {
+            r->form      = BGLocationIn;
+            r->container = habit;
+            [news addObject:[NSString stringWithFormat:@"R%u: where it always goes, in R%u", r->id, habit]];
+         }
+         continue;
+      }
       r->present = NO;
       [news addObject:[NSString stringWithFormat:@"R%u: forgotten where it was", r->id]];
    }

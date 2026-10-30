@@ -5686,6 +5686,76 @@ static void   test_pain( void)
 }
 
 
+/* AGENCY.md Scenario 1's belief from habit. The worker puts the wrench
+ * in the bin `times` times, taking it out again, then once in the crate,
+ * and goes away. A month on, its memory of where the wrench is has faded:
+ * by habit it believes it in the bin (wrongly, as Oskar does the hook);
+ * with no habit, it doesn't know. The referent, described. */
+static NSString   *habitual_belief( int times, BOOL *present)
+{
+   BGStage            st;
+   BGKnowledge        *knowledge;
+   BGKnowledgeStore   *store;
+   BGProposalGroup    *g;
+   BGEntityID         worker;
+   BGEntityID         wrench;
+   BGEntityID         bin;
+   BGEntityID         crate;
+   NSString           *error;
+   int                i;
+
+   st.w      = BGTestWorld( 149);
+   st.c      = BGTestCommitter( st.w);
+   knowledge = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+   st.s      = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [st.s setPerception:knowledge];
+   g      = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the tool bin"];
+   worker = [g create:"worker" key:"worker" at:BGOnTile( 5, 5, 0)];
+   bin    = [g create:"bin" key:"bin" at:BGOnTile( 6, 5, 0)];
+   crate  = [g create:"crate" key:"crate" at:BGOnTile( 4, 5, 0)];
+   wrench = [g create:"wrench_250" key:"wrench" at:BGHeldBy( worker, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   worker = [g idFor:worker];
+   bin    = [g idFor:bin];
+   crate  = [g idFor:crate];
+   wrench = [g idFor:wrench];
+   error  = nil;
+   for( i = 0; i < times; i++)
+   {
+      BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "put_in", worker, wrench, bin), 0, &error) != nil);
+      [st.s runUntil:BGTimeMake( [st.w time].ms + 1000)];
+      BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "take", worker, wrench, BGNoEntity), 0, &error) != nil);
+      [st.s runUntil:BGTimeMake( [st.w time].ms + 1000)];
+   }
+   BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "put_in", worker, wrench, crate), 0, &error) != nil);
+   [st.s runUntil:BGTimeMake( [st.w time].ms + 1000)];
+   stage_move( &st, worker, 25, 25);
+   [st.s runUntil:BGTimeMake( 30 * BG_MEMORY_STEP)];
+   store    = [knowledge storeOf:worker];
+   *present = [store referent:referent_of( store, wrench)]->present;
+   return( [NSString stringWithFormat:@"%@ (bin R%u, crate R%u)", [store describeReferent:referent_of( store, wrench)],
+                                      referent_of( store, bin), referent_of( store, crate)]);
+}
+
+
+static void   test_habitual_belief( void)
+{
+   NSString   *habit;
+   NSString   *none;
+   BOOL       present;
+
+   /* three times in the bin: a month on, it believes the wrench there,
+    * though it last put it in the crate */
+   habit = habitual_belief( 3, &present);
+   BG_CHECK( present && [habit rangeOfString:@"place: #Inside & { container: ref(2) }"].location != NSNotFound &&
+             [habit rangeOfString:@"(bin R2, crate R3)"].location != NSNotFound);
+   /* once: no habit, and it doesn't know where it is, last seen in the crate */
+   none  = habitual_belief( 1, &present);
+   BG_CHECK( ! present && [none rangeOfString:@"container: ref(3)"].location != NSNotFound);
+}
+
+
 static void   test_partial_effects( void)
 {
    int64_t      cut[ 12];
@@ -6045,6 +6115,7 @@ const BGTestCase   BGAllTests[] =
    { "hard_fail",                     test_hard_fail },
    { "tired_worker",                  test_tired_worker },
    { "pain",                          test_pain },
+   { "habitual_belief",               test_habitual_belief },
    { "door_in_the_dark",              test_door_in_the_dark },
    { "wrench_replaced",               test_wrench_replaced },
    { "rumour",                        test_rumour },

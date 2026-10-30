@@ -2013,10 +2013,6 @@ The remaining scenario checks that aren't run, after the passes above:
     the miller. ARCHITECTURE.md: "Institutions (§6) … To be specified".
   - how considerations combine beyond adding (AGENCY.md's open question 1
     asks product, weighted sum, or a mix). The lab adds them, in dB.
-  - belief from one's own habit: AGENCY.md §8 has habits supplying method
-    defaults (the lab's `habit` order) and others forming beliefs about
-    habits (`usually_puts`). Scenario 1's setup states Oskar's belief, not
-    how his habit makes it.
   - perception or memory making feature hypotheses of their own: the docs
     give "half-remembers" (CONTENT_LANGUAGE.md Scenario 2, C), not how
     memory forms a doubt.
@@ -2222,3 +2218,20 @@ fields, authored like the light: harm, fright, and frostbite would set
 them. Pain raises no goal, since §6 names none for it.
 
 62 tests, 2145 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: believing by habit
+
+AGENCY.md Scenario 1's "Oskar has a strong habit of hanging the wrench on
+the hook. Oskar believes it is on the hook", and the habits slice's "habits
+feeding back into belief". When memory of where a thing is fades too far,
+the agent falls back on its own habit for it: where it remembers putting
+that thing at least three times. It believes the thing there and doesn't
+forget it. The worker puts the wrench in the bin three times, then once in
+the crate, and goes off. A month on, it believes the wrench in the bin,
+wrongly, as Oskar believes it on the hook. Having put it in the bin only
+once, it simply doesn't know.
+
+Not yet: habits by kind of thing (this one wrench, not any wrench), and
+the belief by habit weighing less than one seen.
+
+63 tests, 2157 checks, under both compilers, ASan and UBSan, and leak-free.
