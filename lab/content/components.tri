@@ -141,7 +141,10 @@
 }
 
 // A spanner: its size is the nut it fits.
-#Spanner: #Sized & #Body & {}
+// What turns a nut: a spanner, or a wrench.
+#Turner: {}
+
+#Spanner: #Sized & #Body & #Turner & {}
 
 // A lever (ACTIONS.md Scenario 1, instrument chains): how far it reaches
 // for a turn, and the torque it bears before it bends. A sleeve fits over
@@ -152,7 +155,7 @@
     limit:    torque & >=1Nm & <=100000Nm    @field(content, saved, proposable, inspect)
     sleeve:   *false | true                  @field(content, saved, inspect, perceive(sight))
 }
-#Wrench: #Body & #Lever & {}
+#Wrench: #Body & #Lever & #Turner & {}
 #Pipe:   #Body & #Lever & {}
 
 // A valve: the turn its rating says, what (hidden) it takes to break it

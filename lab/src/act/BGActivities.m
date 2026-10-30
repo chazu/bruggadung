@@ -404,6 +404,45 @@ static int64_t   next_checkpoint( BGWorld *world, BGEntityID a, const BGActivity
 }
 
 
+/* Resuming with another instrument in the item role (ACTIONS.md Scenario 3:
+ * the wrench gone, the player improvises): the operation's pattern is
+ * rechecked with it, and the activity binds it from now on. */
+- (BGProposalGroup *) improvise:(BGEntityID) a
+                           with:(BGEntityID) instrument
+                          error:(NSString **) error
+{
+   const BGActivity   *record;
+   BGProposalGroup    *group;
+   TriMatchResult     result;
+   BGAction           action;
+   NSString           *why;
+
+   record = [_world record:[_world kindNamed:"Activity"] for:a];
+   if( ! record || record->status != (uint32_t) tri_type_named( [_world tri], "\"suspended\""))
+   {
+      if( error)
+         *error = [NSString stringWithFormat:@"%llu is not suspended", (unsigned long long) a];
+      return( nil);
+   }
+   action                   = action_of( _world, a, record);
+   action.roles[ BGRoleItem] = instrument;
+   why                      = nil;
+   if( BGMatchAction( _world, action, &result, &why) == TRI_INCOMPATIBLE)
+   {
+      if( error)
+         *error = [NSString stringWithFormat:@"%llu won't do for it: %@", (unsigned long long) instrument,
+                                            why ? why : [NSString stringWithUTF8String:result.failure.path]];
+      return( nil);
+   }
+   group = [BGProposalGroup groupWithPhase:BGPhaseAction
+                                    source:[NSString stringWithFormat:@"activity %llu: improvised with %llu",
+                                                                      (unsigned long long) a, (unsigned long long) instrument]];
+   [group set:"Activity.itemRef" of:BGWhole( a) to:(int64_t) instrument];
+   [_committer submit:group];
+   return( group);
+}
+
+
 - (void) committer:(BGCommitter *) committer
     didCommitRound:(uint32_t) round
         eventsFrom:(NSUInteger) first

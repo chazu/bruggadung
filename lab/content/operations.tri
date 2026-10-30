@@ -326,7 +326,7 @@ dismantle: #Operation & {
     uses:   ["hands"]
     roles: {
         actor:       #Agent & { id: $a }
-        item:        #Wrench & { place: #Held & { by: $a } }
+        item:        #Turner & #Body & { place: #Held & { by: $a } }
         destination: #Pump & { opened: false }
     }
 } @family(operations)

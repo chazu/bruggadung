@@ -3894,6 +3894,69 @@ static const char   *flood_run( const char *key, int64_t *crossed, int64_t *inte
 }
 
 
+/* ACTIONS.md Scenario 3's step 5: dismantling suspended, the wrench taken;
+ * resuming is refused, for nothing turns the gland nut; the worker
+ * improvises with a spanner, and the dismantling goes on to the end. */
+static void   test_improvise( void)
+{
+   BGStage            st;
+   BGActivities       *activities;
+   BGProposalGroup    *g;
+   BGEntityID         worker;
+   BGEntityID         smith;
+   BGEntityID         wrench;
+   BGEntityID         spanner;
+   BGEntityID         pump;
+   BGEntityID         a;
+   NSString           *error;
+   int64_t            v;
+
+   st.w       = BGTestWorld( 181);
+   st.c       = BGTestCommitter( st.w);
+   activities = [BGActivities activitiesWithWorld:st.w committer:st.c];
+   st.s       = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [st.s setActivities:activities];
+   g       = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the mill"];
+   pump    = [g create:"pump" key:"pump" at:BGOnTile( 5, 5, 0)];
+   worker  = [g create:"worker" key:"worker" at:BGOnTile( 4, 5, 0)];
+   smith   = [g create:"smith" key:"smith" at:BGOnTile( 4, 6, 0)];
+   wrench  = [g create:"wrench_250" key:"wrench" at:BGHeldBy( worker, 0)];
+   spanner = [g create:"spanner_19" key:"spanner" at:BGOnTile( 4, 5, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   pump    = [g idFor:pump];
+   worker  = [g idFor:worker];
+   smith   = [g idFor:smith];
+   wrench  = [g idFor:wrench];
+   spanner = [g idFor:spanner];
+   error   = nil;
+   g = BGPerform( st.w, st.c, BGActionMake( "dismantle", worker, wrench, pump), 0, &error);
+   BG_CHECK( g != nil);
+   [st.s runUntil:BGTimeMake( 4000)];
+   a = [g idFor:[g proposals][ 0].handle];
+   BG_CHECK( [activities suspend:a because:@"called away" error:&error] != nil);
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the smith takes the wrench"];
+   [g move:BGWhole( wrench) to:BGHeldBy( smith, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 5000)];
+   /* resuming finds nothing to turn the gland nut */
+   BG_CHECK( [activities resume:a error:&error] == nil && [error rangeOfString:@"no longer holds"].location != NSNotFound);
+   /* the wrench won't do from the smith's hand; a spanner, taken up, will */
+   BG_CHECK( [activities improvise:a with:wrench error:&error] == nil);
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the worker picks up the spanner"];
+   [g move:BGWhole( spanner) to:BGHeldBy( worker, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 6000)];
+   BG_CHECK( [activities improvise:a with:spanner error:&error] != nil);
+   [st.s runUntil:BGTimeMake( 7000)];
+   BG_CHECK( [st.w getField:"Activity.itemRef" of:a value:&v] && v == (int64_t) spanner);
+   BG_CHECK( [activities resume:a error:&error] != nil);
+   [st.s runUntil:BGTimeMake( 20000)];
+   BG_CHECK( ! strcmp( status_of( st.w, a), "\"completed\""));
+   BG_CHECK( [st.w getField:"Pump.opened" of:pump value:&v] && v);
+}
+
+
 static void   test_latent_pump( void)
 {
    BGPumpRun   early;
@@ -6973,6 +7036,7 @@ const BGTestCase   BGAllTests[] =
    { "latent_pump",                   test_latent_pump },
    { "pump_heat",                     test_pump_heat },
    { "component_pump",                test_component_pump },
+   { "improvise",                     test_improvise },
    { "door_in_the_dark",              test_door_in_the_dark },
    { "wrench_replaced",               test_wrench_replaced },
    { "rumour",                        test_rumour },

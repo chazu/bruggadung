@@ -2428,3 +2428,17 @@ the seal at fault nothing comes, and the work runs its ten minutes.
   when it completes, as when it ends otherwise.
 
 67 tests, 2359 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: improvising another instrument
+
+ACTIONS.md Scenario 3's step 5: "Rechecking requirements finds no
+instrument for the gland nut, so the activity is blocked. The player
+improvises another chain." `improvise:with:` gives a suspended activity
+another instrument for its item role. The operation's pattern is
+rechecked with it, and the activity binds it from then on. Dismantling
+turns the gland nut with any `#Turner`, a wrench or a spanner (a common
+supertype). The wrench taken mid-dismantling, resuming is refused. The
+wrench in the smith's hand won't do. A spanner taken up will, and the
+dismantling goes on to the end.
+
+68 tests, 2368 checks, under both compilers, ASan and UBSan, and leak-free.

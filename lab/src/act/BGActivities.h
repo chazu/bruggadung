@@ -47,6 +47,11 @@
                         error:(NSString **) error;
 - (BGProposalGroup *) resume:(BGEntityID) activity
                        error:(NSString **) error;
+/* Another instrument for its item role, when what it had is gone: the
+ * operation rechecked with it, and bound from now on; resume after. */
+- (BGProposalGroup *) improvise:(BGEntityID) activity
+                           with:(BGEntityID) instrument
+                          error:(NSString **) error;
 /* The actor's choice to give it up: its progress is discarded, what it
  * showed of it stays. */
 - (BGProposalGroup *) abort:(BGEntityID) activity
