@@ -4,6 +4,12 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+
+
+#define BG_MAX_VARIANTS   16
+#define BG_MAX_METHODS    32
+#define BG_MAX_TRIES      4096     /* the matches one condition may take */
 
 
 @implementation BGMotivation
@@ -25,16 +31,151 @@
 @end
 
 
-static const char   *goal_name( BGGoal g)
+/* --- reading content ------------------------------------------------------------- */
+
+/* The text at `path` (the node itself for NULL), without its quotes. NO when
+ * there is none, or it is left open. */
+static BOOL   text_at( TriContent *tri, const TriNode *node, const char *path, char *buf, size_t len)
 {
-   switch( g)
+   const TriNode   *v;
+   char            tmp[ 256];
+   size_t          n;
+
+   v = node && path ? tri_at( tri, node, path) : node;
+   if( ! v)
+      return( NO);
+   tri_print( tri, v, tmp, sizeof( tmp));
+   n = strlen( tmp);
+   if( n < 2 || tmp[ 0] != '"' || tmp[ n - 1] != '"')
+      return( NO);
+   snprintf( buf, len, "%.*s", (int) (n - 2), tmp + 1);
+   return( YES);
+}
+
+
+/* The texts of the list at `path`, in order. */
+static NSUInteger   texts_at( TriContent *tri, const TriNode *node, const char *path, char (*out)[ 32], NSUInteger max)
+{
+   const TriNode   *list;
+   NSUInteger      n;
+
+   n = 0;
+   for( list = node ? tri_at( tri, node, path) : NULL; list && n < max; list = tri_at( tri, list, "rest"))
    {
-   case BGGoalWedgeLock:
-      return( "wedge the lock");
-   case BGGoalSeekNails:
-      return( "seek nails");
+      if( ! tri_at( tri, list, "first"))
+         break;
+      if( text_at( tri, tri_at( tri, list, "first"), NULL, out[ n], 32))
+         n++;
    }
-   return( "?");
+   return( n);
+}
+
+
+/* An int at `path`, or `otherwise` when it is left open. */
+static int64_t   int_at( TriContent *tri, const TriNode *node, const char *path, int64_t otherwise)
+{
+   const TriNode   *v;
+   int64_t         lo;
+   int64_t         hi;
+
+   v = node ? tri_at( tri, node, path) : NULL;
+   if( ! v || ! tri_node_interval( v, &lo, &hi) || lo != hi)
+      return( otherwise);
+   return( lo);
+}
+
+
+/* An instance's patterns, one per variant. */
+static NSUInteger   variants_of( TriContent *tri, const char *instance, const TriNode **out, NSUInteger max)
+{
+   size_t   n;
+   size_t   i;
+
+   n = tri_pattern_variant_count( tri, instance);
+   if( ! n)
+   {
+      out[ 0] = tri_pattern( tri, instance);
+      return( out[ 0] ? 1 : 0);
+   }
+   for( i = 0; i < n && i < max; i++)
+      out[ i] = tri_pattern_variant( tri, instance, i);
+   return( i);
+}
+
+
+static uint32_t   bound( const BGSlotBinding *b, int n, const char *slot)
+{
+   int   i;
+
+   for( i = 0; i < n; i++)
+      if( ! strcmp( b[ i].slot, slot))
+         return( b[ i].referent);
+   return( 0);
+}
+
+
+/* --- what the agent believes ------------------------------------------------------- */
+
+static BOOL   in_reach( const BGReferent *me, const BGReferent *r)
+{
+   return( r && me->level == r->level && abs( me->x - r->x) <= 1 && abs( me->y - r->y) <= 1);
+}
+
+
+static int   distance( const BGReferent *me, const BGReferent *r)
+{
+   int   dx;
+   int   dy;
+
+   dx = abs( me->x - r->x);
+   dy = abs( me->y - r->y);
+   return( dx > dy ? dx : dy);
+}
+
+
+/* A condition (a goal's `done`, a method's `pre`), ready to bind. */
+typedef struct
+{
+   const TriNode      *match[ BG_MAX_VARIANTS];    /* per variant */
+   NSUInteger         nvariants;
+   const char         *frame;                      /* the frame's type: "#Wedging" */
+   char               find[ BG_MAX_SLOTS][ 32];
+   NSUInteger         nfind;
+   char               order[ 4][ 32];
+   NSUInteger         norder;
+   char               search[ 32];                 /* the slot to search, or "" */
+   int64_t            since;                       /* searched means its inside was seen since */
+   BGKnowledgeStore   *store;
+   const BGReferent   *me;
+   NSUInteger         tries;
+} BGCondition;
+
+
+static int   compare_candidates( BGCondition *c, const BGReferent *a, const BGReferent *b)
+{
+   NSUInteger   k;
+   int          da;
+   int          db;
+
+   for( k = 0; k < c->norder; k++)
+      if( ! strcmp( c->order[ k], "near"))
+      {
+         da = distance( c->me, a);
+         db = distance( c->me, b);
+         if( da != db)
+            return( da < db ? -1 : 1);
+      }
+      else if( ! strcmp( c->order[ k], "recent") && a->seen != b->seen)
+         return( a->seen > b->seen ? -1 : 1);
+   return( a->id < b->id ? -1 : a->id > b->id);
+}
+
+
+static const char   *goal_title( TriContent *tri, const char *goal, char *buf, size_t len)
+{
+   if( ! text_at( tri, tri_pattern( tri, goal), "title", buf, len))
+      snprintf( buf, len, "%s", goal);
+   return( buf);
 }
 
 
@@ -95,100 +236,266 @@ static const char   *goal_name( BGGoal g)
 }
 
 
-- (void) commitToWedging:(BGEntityID) agent
+- (void) adopt:(const char *) goal
+          mind:(BGMotivation *) m
+        params:(const BGSlotBinding *) params
+         count:(int) n
+{
+   BGIntention   *intention;
+
+   intention            = &m->intentions[ m->nintentions++];
+   memset( intention, 0, sizeof( *intention));
+   intention->goal      = [_world intern:goal];
+   intention->adopted   = [_world time].ms;
+   intention->pending   = -1;
+   intention->following = -1;
+   for( ; intention->nparams < n && intention->nparams < BG_MAX_SLOTS; intention->nparams++)
+      intention->params[ intention->nparams] = params[ intention->nparams];
+}
+
+
+- (BOOL) commit:(BGEntityID) agent
+         toGoal:(const char *) goal
 {
    BGMotivation   *m;
 
-   m             = [self mindOf:agent];
-   m->ngoals     = 1;
-   m->goals[ 0]  = BGGoalWedgeLock;
-   m->nsearched  = 0;
-   m->waiting    = NO;
+   if( ! tri_at( [_world tri], tri_pattern( [_world tri], goal), "done"))
+      return( NO);
+   m              = [self mindOf:agent];
+   m->nintentions = 0;
+   m->waiting     = NO;
+   [self adopt:goal mind:m params:NULL count:0];
+   return( YES);
 }
 
 
-/* --- what the agent believes ------------------------------------------------------- */
+/* --- conditions ---------------------------------------------------------------------- */
 
-static BOOL   in_reach( const BGReferent *me, const BGReferent *r)
+/* `path` is "done" for a goal, "pre" for a method. */
+- (BOOL) load:(BGCondition *) c
+     instance:(const char *) instance
+         path:(const char *) path
+        store:(BGKnowledgeStore *) store
 {
-   return( r && me->level == r->level && abs( me->x - r->x) <= 1 && abs( me->y - r->y) <= 1);
-}
+   const TriNode   *variants[ BG_MAX_VARIANTS];
+   TriContent      *tri;
+   NSUInteger      v;
+   char            sub[ 32];
 
-
-static int   distance( const BGReferent *me, const BGReferent *r)
-{
-   int   dx;
-   int   dy;
-
-   dx = abs( me->x - r->x);
-   dy = abs( me->y - r->y);
-   return( dx > dy ? dx : dy);
-}
-
-
-static BOOL   is_nails( const BGReferent *r)
-{
-   return( r->kind && ! strcmp( r->kind, "#Stack") && r->features && strstr( r->features, "unit: \"iron_nail\""));
-}
-
-
-/* Nails the agent believes are there for it: in its hand, or somewhere not
- * held by someone else. The first by: in hand, then nearest, then id. */
-- (const BGReferent *) nailsFor:(BGKnowledgeStore *) store
-                             me:(const BGReferent *) me
-                         inHand:(BOOL) inHand
-{
-   const BGReferent   *best;
-   const BGReferent   *r;
-   NSUInteger         i;
-   BOOL               held;
-
-   best = NULL;
-   for( i = 0; i < [store count]; i++)
+   tri = [_world tri];
+   memset( c, 0, sizeof( *c));
+   c->store = store;
+   c->me    = [store referent:[store selfReferent]];
+   for( v = 0; v < variants_of( tri, instance, variants, BG_MAX_VARIANTS); v++)
    {
-      r = [store referentAt:i];
-      if( ! r->present || ! is_nails( r))
-         continue;
-      held = r->form == BGLocationHeldBy && r->container == me->id;
-      if( inHand != held)
-         continue;
-      if( ! inHand && r->form == BGLocationHeldBy)
-         continue;                   /* someone else holds them */
-      if( ! best || distance( me, r) < distance( me, best))
-         best = r;
+      snprintf( sub, sizeof( sub), "%s.match", path);
+      if( (c->match[ c->nvariants] = tri_at( tri, variants[ v], sub)))
+         c->nvariants++;
    }
+   if( ! c->nvariants || ! c->me)
+      return( NO);
+   c->frame  = tri_type_name( tri, tri_node_type( c->match[ 0]));
+   snprintf( sub, sizeof( sub), "%s.find", path);
+   c->nfind  = texts_at( tri, variants[ 0], sub, c->find, BG_MAX_SLOTS);
+   c->norder = texts_at( tri, variants[ 0], "order", c->order, 4);
+   if( ! text_at( tri, variants[ 0], "search", c->search, sizeof( c->search)))
+      c->search[ 0] = 0;
+   return( YES);
+}
+
+
+/* The match of the condition's frame, with `me` and the slots of `find`
+ * bound so far: entailed if any variant entails it, incompatible if all rule
+ * it out. */
+- (TriMatch) match:(BGCondition *) c
+          bindings:(const BGSlotBinding *) b
+             count:(int) n
+{
+   NSMutableString   *expr;
+   const TriNode     *description;
+   TriMatchResult    result;
+   TriContent        *tri;
+   TriArena          *arena;
+   TriMatch          best;
+   TriMatch          match;
+   NSUInteger        k;
+   NSUInteger        v;
+   uint32_t          r;
+
+   tri  = [_world tri];
+   expr = [NSMutableString stringWithFormat:@"%s & { me: %@", c->frame, [c->store describeReferent:c->me->id]];
+   for( k = 0; k < c->nfind; k++)
+      if( (r = bound( b, n, c->find[ k])))
+         [expr appendFormat:@", %s: %@", c->find[ k], [c->store describeReferent:r]];
+   [expr appendString:@" }"];
+   arena       = tri_arena_new();
+   description = tri_value( tri, [expr UTF8String], arena, NULL, 0);
+   best        = TRI_INCOMPATIBLE;
+   for( v = 0; description && v < c->nvariants && best != TRI_ENTAILED; v++)
+   {
+      match = tri_match( tri, c->match[ v], description, &result);
+      if( match != TRI_INCOMPATIBLE)
+         best = match;
+   }
+   tri_arena_free( arena);
    return( best);
 }
 
 
-- (const BGReferent *) lockFor:(BGKnowledgeStore *) store
+/* A believed kind more general than the slot's isn't one (as for an
+ * operation's roles). */
+- (BOOL) kind:(const char *) kind
+     fitsSlot:(const char *) slot
+           of:(BGCondition *) c
 {
-   const BGReferent   *r;
-   NSUInteger         i;
+   const TriNode   *k;
+   const TriNode   *filler;
+   TriContent      *tri;
+   TriArena        *arena;
+   NSUInteger      v;
+   BOOL            fits;
 
-   for( i = 0; i < [store count]; i++)
+   tri   = [_world tri];
+   arena = tri_arena_new();
+   k     = kind ? tri_value( tri, kind, arena, NULL, 0) : NULL;
+   fits  = NO;
+   for( v = 0; k && v < c->nvariants && ! fits; v++)
    {
-      r = [store referentAt:i];
-      if( r->present && r->kind && ! strcmp( r->kind, "#Assembly"))
-         return( r);
+      filler = tri_at( tri, c->match[ v], slot);
+      fits   = filler && tri_subtype( tri, tri_node_type( k), tri_node_type( filler));
    }
-   return( NULL);
+   tri_arena_free( arena);
+   return( fits);
 }
 
 
-- (BOOL) believesWedged:(BGKnowledgeStore *) store
-                   lock:(const BGReferent *) lock
+/* Binds the slots of `find` from slot `k` on, depth first, each slot's
+ * candidates in the condition's order; a partial binding the match rules out
+ * is not followed. YES with the bindings when the condition holds. */
+- (BOOL) bind:(BGCondition *) c
+         slot:(NSUInteger) k
+     bindings:(BGSlotBinding *) b
+        count:(int *) n
 {
+   const BGReferent   *candidates[ 64];
    const BGReferent   *r;
+   const BGReferent   *t;
+   NSUInteger         ncandidates;
    NSUInteger         i;
+   NSUInteger         j;
+   const char         *slot;
+   int                before;
 
-   for( i = 0; lock && i < [store count]; i++)
+   if( k == c->nfind)
+      return( [self match:c bindings:b count:*n] == TRI_ENTAILED);
+   slot = c->find[ k];
+   if( bound( b, *n, slot))
+      return( [self bind:c slot:k + 1 bindings:b count:n]);
+   if( *n >= BG_MAX_SLOTS)
+      return( NO);
+
+   ncandidates = 0;
+   for( i = 0; i < [c->store count] && ncandidates < 64; i++)
    {
-      r = [store referentAt:i];
-      if( r->present && r->form == BGLocationPartOf && r->container == lock->id && ! strcmp( r->role, "wedge"))
+      r = [c->store referentAt:i];
+      if( ! r->present || r->id == c->me->id)
+         continue;
+      for( j = 0; j < (NSUInteger) *n && b[ j].referent != r->id; j++)
+         ;
+      if( j < (NSUInteger) *n)
+         continue;      /* one referent fills one slot */
+      if( c->search[ 0] && ! strcmp( slot, c->search) && r->insideSeen >= c->since)
+         continue;      /* searched already */
+      if( ! [self kind:r->kind fitsSlot:slot of:c])
+         continue;
+      /* in the condition's order */
+      for( j = ncandidates; j > 0 && compare_candidates( c, r, candidates[ j - 1]) < 0; j--)
+         candidates[ j] = candidates[ j - 1];
+      candidates[ j] = r;
+      ncandidates++;
+   }
+
+   for( i = 0; i < ncandidates; i++)
+   {
+      if( ++c->tries > BG_MAX_TRIES)
+         return( NO);
+      t               = candidates[ i];
+      before          = *n;
+      b[ *n].slot     = [_world intern:slot];
+      b[ *n].referent = t->id;
+      (*n)++;
+      if( [self match:c bindings:b count:*n] != TRI_INCOMPATIBLE &&
+          [self bind:c slot:k + 1 bindings:b count:n])
          return( YES);
+      *n = before;
    }
    return( NO);
+}
+
+
+/* Whether the instance's condition holds in the agent's view. `b` starts as
+ * the slots already bound, and gains those it binds. */
+- (BOOL) holds:(const char *) instance
+          path:(const char *) path
+         since:(int64_t) since
+      bindings:(BGSlotBinding *) b
+         count:(int *) n
+         store:(BGKnowledgeStore *) store
+{
+   BGCondition   c;
+   int           start;
+
+   if( ! [self load:&c instance:instance path:path store:store])
+      return( NO);
+   c.since = since;
+   start   = *n;
+   if( [self bind:&c slot:0 bindings:b count:n])
+      return( YES);
+   *n = start;
+   return( NO);
+}
+
+
+/* A goal's methods: by rank, then by name. */
+- (NSUInteger) methodsFor:(const char *) goal
+                     into:(const char **) out
+                      max:(NSUInteger) max
+{
+   TriContent   *tri;
+   TriIndex     *family;
+   const char   *name;
+   const char   *t;
+   NSUInteger   n;
+   NSUInteger   j;
+   size_t       i;
+   char         buf[ 64];
+
+   tri    = [_world tri];
+   family = tri_family_index( tri, "methods");
+   n      = 0;
+   for( i = 0; family && i < tri_index_count( family) && n < max; i++)
+   {
+      name = tri_index_tag( family, i);
+      if( ! text_at( tri, tri_pattern( tri, name), "goal", buf, sizeof( buf)) || strcmp( buf, goal))
+         continue;
+      for( j = 0; j < n && strcmp( out[ j], name); j++)
+         ;
+      if( j < n)
+         continue;      /* an entry per variant */
+      name = [_world intern:name];
+      for( j = n; j > 0; j--)
+      {
+         t = out[ j - 1];
+         if( int_at( tri, tri_pattern( tri, t), "rank", 0) < int_at( tri, tri_pattern( tri, name), "rank", 0) ||
+             (int_at( tri, tri_pattern( tri, t), "rank", 0) == int_at( tri, tri_pattern( tri, name), "rank", 0) &&
+              strcmp( t, name) < 0))
+            break;
+         out[ j] = t;
+      }
+      out[ j] = name;
+      n++;
+   }
+   return( n);
 }
 
 
@@ -199,34 +506,40 @@ static BOOL   is_nails( const BGReferent *r)
 - (void) note:(BGMotivation *) m
          line:(NSString *) line
 {
+   char   title[ 64];
+
    [m->log addObject:[NSString stringWithFormat:@"d%llu t=%lldms [%s] %@", (unsigned long long) m->decisions,
                                                 (long long) [_world time].ms,
-                                                m->ngoals ? goal_name( m->goals[ m->ngoals - 1]) : "-", line]];
+                                                m->nintentions ? goal_title( [_world tri], m->intentions[ m->nintentions - 1].goal,
+                                                                             title, sizeof( title)) : "-",
+                                                line]];
 }
 
 
 - (void) act:(BGMotivation *) m
+         why:(const char *) why
        store:(BGKnowledgeStore *) store
    operation:(const char *) operation
-        item:(uint32_t) item
- destination:(uint32_t) destination
-      amount:(int64_t) amount
+      object:(uint32_t) object
+      target:(uint32_t) target
+       units:(int64_t) units
 {
    NSString   *error;
 
    error = nil;
    if( ! BGPerformBelieved( _world, _committer, store,
-                            BGActionMake( [_world intern:operation], [store selfReferent], item, destination),
-                            amount, &error))
-      [self note:m line:[NSString stringWithFormat:@"could not %s: %@", operation, error]];
+                            BGActionMake( [_world intern:operation], [store selfReferent], object, target),
+                            units, &error))
+      [self note:m line:[NSString stringWithFormat:@"%s: could not %s: %@", why, operation, error]];
    else
-      [self note:m line:[NSString stringWithFormat:@"%s R%u%@", operation, item,
-                          destination ? [NSString stringWithFormat:@" into R%u", destination] : @""]];
+      [self note:m line:[NSString stringWithFormat:@"%s: %s R%u%@", why, operation, object,
+                          target ? [NSString stringWithFormat:@" into R%u", target] : @""]];
 }
 
 
 /* One step toward a believed place: the longer way first. */
 - (void) walk:(BGMotivation *) m
+          why:(const char *) why
            me:(const BGReferent *) me
        toward:(const BGReferent *) target
 {
@@ -243,9 +556,9 @@ static BOOL   is_nails( const BGReferent *r)
       op = dy > 0 ? "walk_south" : "walk_north";
    error = nil;
    if( ! BGPerform( _world, _committer, BGActionMake( [_world intern:op], m->agent, BGNoEntity, BGNoEntity), 0, &error))
-      [self note:m line:[NSString stringWithFormat:@"could not %s: %@", op, error]];
+      [self note:m line:[NSString stringWithFormat:@"%s: could not %s: %@", why, op, error]];
    else
-      [self note:m line:[NSString stringWithFormat:@"%s, toward R%u at (%d, %d)", op, target->id, target->x, target->y]];
+      [self note:m line:[NSString stringWithFormat:@"%s: %s, toward R%u at (%d, %d)", why, op, target->id, target->x, target->y]];
 }
 
 
@@ -270,127 +583,201 @@ static BOOL   is_nails( const BGReferent *r)
 
 /* --- deciding ----------------------------------------------------------------------- */
 
-/* One decision. YES when it acted or settled into waiting; NO when it only
- * changed the intention, so the agent decides again at once. */
+/* The method's failure: the goal tries its next. */
+- (void) fail:(BGMotivation *) m
+       method:(int) index
+          why:(NSString *) why
+{
+   BGIntention   *top;
+
+   top          = &m->intentions[ m->nintentions - 1];
+   top->failed |= 1u << index;
+   top->pending = -1;
+   [self note:m line:why];
+}
+
+
+/* Follows a method whose `pre` holds, with its bindings: passes over the
+ * subgoals already done, adopts the first that isn't, or performs the
+ * operation. YES when it acted. */
+- (BOOL) follow:(BGMotivation *) m
+         method:(const char *) method
+          index:(int) index
+       bindings:(BGSlotBinding *) b
+          count:(int) n
+          store:(BGKnowledgeStore *) store
+{
+   const TriNode      *pattern;
+   const TriNode      *steps;
+   const TriNode      *step;
+   const BGReferent   *me;
+   const BGReferent   *r;
+   TriContent         *tri;
+   TriType            achieve;
+   uint32_t           roles[ 2];
+   char               title[ 64];
+   char               goal[ 64];
+   char               op[ 64];
+   char               slot[ 32];
+   const char         *names[ 2] = { "object", "target" };
+   int                k;
+
+   tri     = [_world tri];
+   pattern = tri_pattern( tri, method);
+   me      = [store referent:[store selfReferent]];
+   achieve = tri_type_named( tri, "#Achieve");
+   if( ! text_at( tri, pattern, "title", title, sizeof( title)))
+      snprintf( title, sizeof( title), "%s", method);
+
+   for( steps = tri_at( tri, pattern, "steps"); steps && (step = tri_at( tri, steps, "first")); steps = tri_at( tri, steps, "rest"))
+   {
+      if( tri_node_type( step) == achieve)
+      {
+         if( ! text_at( tri, step, "subgoal", goal, sizeof( goal)) || ! tri_at( tri, tri_pattern( tri, goal), "done"))
+         {
+            [self fail:m method:index why:[NSString stringWithFormat:@"%s: there is no goal %s", title, goal]];
+            return( NO);
+         }
+         if( [self holds:goal path:"done" since:0 bindings:b count:&n store:store])
+            continue;
+         if( m->nintentions == BG_MAX_INTENTIONS)
+         {
+            [self fail:m method:index why:[NSString stringWithFormat:@"%s: too many goals deep", title]];
+            return( NO);
+         }
+         [self note:m line:[NSString stringWithFormat:@"%s: %s first", title, goal_title( tri, goal, op, sizeof( op))]];
+         m->intentions[ m->nintentions - 1].pending = index;
+         [self adopt:goal mind:m params:b count:n];
+         return( NO);
+      }
+
+      /* the operation, within reach of what it names */
+      if( ! text_at( tri, step, "op", op, sizeof( op)))
+         continue;
+      for( k = 0; k < 2; k++)
+      {
+         roles[ k] = 0;
+         if( ! text_at( tri, step, names[ k], slot, sizeof( slot)))
+            continue;
+         if( ! (roles[ k] = bound( b, n, slot)))
+         {
+            [self fail:m method:index why:[NSString stringWithFormat:@"%s: %s names %s, which nothing fills", title, op, slot]];
+            return( NO);
+         }
+      }
+      for( k = 0; k < 2; k++)
+         if( roles[ k] && ! in_reach( me, r = [store referent:roles[ k]]) && r)
+         {
+            [self walk:m why:title me:me toward:r];
+            return( YES);
+         }
+      [self act:m why:title store:store operation:op object:roles[ 0] target:roles[ 1]
+          units:int_at( tri, step, "units", 0)];
+      return( YES);
+   }
+   [self fail:m method:index why:[NSString stringWithFormat:@"%s: every step is done, and the goal is not", title]];
+   return( NO);
+}
+
+
+/* The titles of the methods before `count` that haven't failed, so their
+ * precondition doesn't hold: "fetch nails", or nil if none. */
+- (NSString *) passedOver:(const char **) methods
+                    count:(NSUInteger) count
+                   failed:(uint32_t) failed
+{
+   NSMutableArray   *titles;
+   NSUInteger       i;
+   char             title[ 64];
+
+   titles = [NSMutableArray array];
+   for( i = 0; i < count; i++)
+      if( ! (failed & (1u << i)))
+      {
+         if( ! text_at( [_world tri], tri_pattern( [_world tri], methods[ i]), "title", title, sizeof( title)))
+            snprintf( title, sizeof( title), "%s", methods[ i]);
+         [titles addObject:[NSString stringWithUTF8String:title]];
+      }
+   return( [titles count] ? [titles componentsJoinedByString:@", "] : nil);
+}
+
+
+/* One decision, for the current intention. YES when it acted or settled into
+ * waiting; NO when it only changed its intentions, so it decides again. */
 - (BOOL) decide:(BGMotivation *) m
 {
    BGKnowledgeStore   *store;
    const BGReferent   *me;
-   const BGReferent   *lock;
-   const BGReferent   *nails;
-   const BGReferent   *best;
-   const BGReferent   *r;
-   const BGReferent   *gone;
+   BGIntention        *top;
+   BGSlotBinding      b[ BG_MAX_SLOTS];
+   const char         *methods[ BG_MAX_METHODS];
+   NSUInteger         nmethods;
    NSUInteger         i;
-   int                k;
-   int                score;
-   int                bestScore;
-   BOOL               searched;
+   char               title[ 64];
+   char               method[ 64];
+   NSString           *passed;
+   int                n;
 
    store = [_knowledge storeOf:m->agent];
    me    = [store referent:[store selfReferent]];
-   if( ! me || ! m->ngoals || [self busy:m->agent])
+   if( ! me || ! m->nintentions || [self busy:m->agent])
       return( YES);     /* mid-activity, or nothing to do: no cost */
    if( m->waiting && ! [[store news] count])
       return( YES);
    m->waiting = NO;
    m->decisions++;
-   lock = [self lockFor:store];
+   top = &m->intentions[ m->nintentions - 1];
 
-   switch( m->goals[ m->ngoals - 1])
+   n = top->nparams;
+   memcpy( b, top->params, sizeof( BGSlotBinding) * n);
+   if( [self holds:top->goal path:"done" since:0 bindings:b count:&n store:store])
    {
-   case BGGoalWedgeLock:
-      if( [self believesWedged:store lock:lock])
+      [self note:m line:@"done"];
+      if( --m->nintentions)
       {
-         [self note:m line:[NSString stringWithFormat:@"the lock is wedged: done"]];
-         m->ngoals--;
-         return( YES);
-      }
-      if( ! lock)
-      {
-         [self note:m line:[NSString stringWithFormat:@"I know of no lock: impossible for now"]];
-         m->ngoals = 0;
-         return( YES);
-      }
-      /* the method: nails in hand, then drive one */
-      if( (nails = [self nailsFor:store me:me inHand:YES]))
-      {
-         if( in_reach( me, lock))
-            [self act:m store:store operation:"drive" item:nails->id destination:lock->id amount:0];
-         else
-            [self walk:m me:me toward:lock];
-         return( YES);
-      }
-      if( (nails = [self nailsFor:store me:me inHand:NO]))
-      {
-         if( in_reach( me, nails))
-            /* two, so they stay a stack; drive splits one off */
-            [self act:m store:store operation:"take_some" item:nails->id destination:0 amount:2];
-         else
-            [self walk:m me:me toward:nails];
-         return( YES);
-      }
-      /* a failed precondition: the instrumental goal (AGENCY.md §3, step 6) */
-      [self note:m line:[NSString stringWithFormat:@"no nails where I believed them: seek nails (wedging stays the intention)"]];
-      m->goals[ m->ngoals++] = BGGoalSeekNails;
-      m->nsearched           = 0;
-      /* where it last believed nails to be, it has just found none */
-      for( i = 0; i < [store count]; i++)
-      {
-         r = [store referentAt:i];
-         if( is_nails( r) && ! r->present && r->container && m->nsearched < BG_MAX_SEARCHED)
-            m->searched[ m->nsearched++] = r->container;
-      }
-      return( NO);
-
-   case BGGoalSeekNails:
-      if( [self nailsFor:store me:me inHand:YES] || [self nailsFor:store me:me inHand:NO])
-      {
-         [self note:m line:[NSString stringWithFormat:@"found nails: back to wedging the lock"]];
-         m->ngoals--;
+         m->intentions[ m->nintentions - 1].pending = -1;
+         [self note:m line:[NSString stringWithFormat:@"back to it: %s is done",
+                                                       goal_title( [_world tri], top->goal, title, sizeof( title))]];
          return( NO);
       }
-      /* the containers it knows, in the order of its belief that the nails are there */
-      best      = NULL;
-      bestScore = -1;
-      for( i = 0; i < [store count]; i++)
-      {
-         r = [store referentAt:i];
-         if( ! r->present || ! r->kind || (strcmp( r->kind, "#Container") && ! strstr( r->kind, "Container")))
-            continue;
-         for( searched = NO, k = 0; k < m->nsearched && ! searched; k++)
-            searched = m->searched[ k] == r->id;
-         if( searched)
-            continue;
-         score = 0;
-         gone  = NULL;
-         for( k = 0; k < (int) [store count] && ! gone; k++)
-            if( is_nails( [store referentAt:k]) && [store referentAt:k]->container == r->id)
-               gone = [store referentAt:k];
-         score = (gone ? 1000000 : 0) + (int) (r->seen / 1000) * 10 - distance( me, r);
-         if( score > bestScore || (score == bestScore && best && r->id < best->id))
-         {
-            best      = r;
-            bestScore = score;
-         }
-      }
-      if( ! best)
-      {
-         [self note:m line:[NSString stringWithFormat:@"nowhere left to look: wedging the lock is impossible for now"]];
-         m->ngoals  = 0;
-         m->waiting = YES;
-         return( YES);
-      }
-      if( in_reach( me, best))
-      {
-         [self act:m store:store operation:"look_in" item:best->id destination:0 amount:0];
-         if( m->nsearched < BG_MAX_SEARCHED)
-            m->searched[ m->nsearched++] = best->id;
-      }
-      else
-         [self walk:m me:me toward:best];
       return( YES);
    }
+
+   /* the first method, by rank, that hasn't failed and whose precondition holds */
+   nmethods = [self methodsFor:top->goal into:methods max:BG_MAX_METHODS];
+   for( i = 0; i < nmethods; i++)
+   {
+      if( top->failed & (1u << i))
+         continue;
+      n = top->nparams;
+      memcpy( b, top->params, sizeof( BGSlotBinding) * n);
+      if( [self holds:methods[ i] path:"pre" since:top->adopted bindings:b count:&n store:store])
+      {
+         if( top->following != (int) i && (passed = [self passedOver:methods count:i failed:top->failed]))
+            [self note:m line:[NSString stringWithFormat:@"%@ no longer holds", passed]];
+         top->following = (int) i;
+         return( [self follow:m method:methods[ i] index:(int) i bindings:b count:n store:store]);
+      }
+   }
+
+   /* no way left: impossible for now, and the method that needed it has failed */
+   [self note:m line:@"nothing I know of will do: impossible for now"];
+   goal_title( [_world tri], top->goal, title, sizeof( title));
+   if( --m->nintentions)
+   {
+      top = &m->intentions[ m->nintentions - 1];
+      if( top->pending >= 0)
+      {
+         [self methodsFor:top->goal into:methods max:BG_MAX_METHODS];
+         if( ! text_at( [_world tri], tri_pattern( [_world tri], methods[ top->pending]), "title", method, sizeof( method)))
+            snprintf( method, sizeof( method), "%s", methods[ top->pending]);
+         [self fail:m method:top->pending
+                why:[NSString stringWithFormat:@"%s has failed: it needed %s", method, title]];
+      }
+      return( NO);
+   }
+   m->waiting = YES;
+   return( YES);
 }
 
 
@@ -401,7 +788,7 @@ static BOOL   is_nails( const BGReferent *r)
 
    /* in stable ID order; each reads only its own stores and committed state */
    for( i = 0; i < [_minds count]; i++)
-      for( k = 0; k < 4 && ! [self decide:[_minds objectAtIndex:i]]; k++)
+      for( k = 0; k < 2 * BG_MAX_INTENTIONS && ! [self decide:[_minds objectAtIndex:i]]; k++)
          ;
 }
 
@@ -418,20 +805,25 @@ static BOOL   is_nails( const BGReferent *r)
    NSMutableArray    *lines;
    NSMutableString   *line;
    BGMotivation      *m;
+   BGIntention       *t;
    NSUInteger        i;
    int               k;
+   int               p;
 
    lines = [NSMutableArray array];
    for( i = 0; i < [_minds count]; i++)
    {
       m    = [_minds objectAtIndex:i];
       line = [NSMutableString stringWithFormat:@"mind %llu %llu %d %d", (unsigned long long) m->agent,
-                                               (unsigned long long) m->decisions, m->waiting ? 1 : 0, m->ngoals];
-      for( k = 0; k < m->ngoals; k++)
-         [line appendFormat:@" %d", (int) m->goals[ k]];
-      [line appendFormat:@" %d", m->nsearched];
-      for( k = 0; k < m->nsearched; k++)
-         [line appendFormat:@" %u", m->searched[ k]];
+                                               (unsigned long long) m->decisions, m->waiting ? 1 : 0, m->nintentions];
+      for( k = 0; k < m->nintentions; k++)
+      {
+         t = &m->intentions[ k];
+         [line appendFormat:@" %s %lld %u %d %d %d", t->goal, (long long) t->adopted, t->failed, t->pending,
+                                                 t->following, t->nparams];
+         for( p = 0; p < t->nparams; p++)
+            [line appendFormat:@" %s %u", t->params[ p].slot, t->params[ p].referent];
+      }
       [lines addObject:line];
    }
    return( lines);
@@ -442,26 +834,41 @@ static BOOL   is_nails( const BGReferent *r)
 {
    NSArray        *words;
    BGMotivation   *m;
+   BGIntention    *t;
    NSUInteger     i;
    NSUInteger     w;
+   int            n;
    int            k;
+   int            p;
 
    [_minds removeAllObjects];
    for( i = 0; i < [lines count]; i++)
    {
       words = [[lines objectAtIndex:i] componentsSeparatedByString:@" "];
-      if( [words count] < 6 || ! [[words objectAtIndex:0] isEqualToString:@"mind"])
+      if( [words count] < 5 || ! [[words objectAtIndex:0] isEqualToString:@"mind"])
          continue;
       m            = [self mindOf:(BGEntityID) [[words objectAtIndex:1] longLongValue]];
       m->decisions = (uint64_t) [[words objectAtIndex:2] longLongValue];
       m->waiting   = [[words objectAtIndex:3] intValue] != 0;
-      m->ngoals    = [[words objectAtIndex:4] intValue];
+      n            = [[words objectAtIndex:4] intValue];
       w            = 5;
-      for( k = 0; k < m->ngoals && k < BG_MAX_GOALS && w < [words count]; k++)
-         m->goals[ k] = (BGGoal) [[words objectAtIndex:w++] intValue];
-      m->nsearched = w < [words count] ? [[words objectAtIndex:w++] intValue] : 0;
-      for( k = 0; k < m->nsearched && k < BG_MAX_SEARCHED && w < [words count]; k++)
-         m->searched[ k] = (uint32_t) [[words objectAtIndex:w++] intValue];
+      for( k = 0; k < n && k < BG_MAX_INTENTIONS && w + 6 <= [words count]; k++)
+      {
+         t          = &m->intentions[ m->nintentions++];
+         memset( t, 0, sizeof( *t));
+         t->goal    = [_world intern:[[words objectAtIndex:w++] UTF8String]];
+         t->adopted = [[words objectAtIndex:w++] longLongValue];
+         t->failed  = (uint32_t) [[words objectAtIndex:w++] longLongValue];
+         t->pending   = [[words objectAtIndex:w++] intValue];
+         t->following = [[words objectAtIndex:w++] intValue];
+         t->nparams   = [[words objectAtIndex:w++] intValue];
+         for( p = 0; p < t->nparams && p < BG_MAX_SLOTS && w + 2 <= [words count]; p++)
+         {
+            t->params[ p].slot     = [_world intern:[[words objectAtIndex:w++] UTF8String]];
+            t->params[ p].referent = (uint32_t) [[words objectAtIndex:w++] intValue];
+         }
+         t->nparams = p;
+      }
    }
 }
 

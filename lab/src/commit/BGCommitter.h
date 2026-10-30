@@ -70,8 +70,10 @@
  * groups processed, in order, each marked applied or rejected. */
 - (NSArray *) commitBoundary;
 
-/* Saved state: the last commit position, and the groups deferred to the
- * next boundary. */
+/* Saved state: the last commit position, and the groups waiting for the
+ * next boundary: those deferred to it, then those submitted since (a
+ * decision phase's actions, a player's command), the order it commits them
+ * in. Restored, they are all deferred. */
 - (uint64_t) position;
 /* the source of the group committed at a position, if this committer did it */
 - (NSString *) sourceOfPosition:(uint64_t) position;

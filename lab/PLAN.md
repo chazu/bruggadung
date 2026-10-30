@@ -529,5 +529,49 @@ decision committing at its own boundary.
 
 28 tests, 255 checks, under both compilers, ASan and UBSan, and leak-free.
 
-Next: goals and methods in content; event perception and communication, so
-the scenario's "ask a coworker" can run; walking as an activity.
+### After the slice: goals and methods in content
+
+Agency's goals and methods are content now (`content/agency.tri`, AGENCY.md
+§5), and `BGAgency` interprets them; nothing about nails or locks is left in
+its code. A goal has a `done` condition; a method has its goal, a `rank`, a
+`pre` condition, an `order` for its candidates, an optional `search` slot,
+and `steps`: `#Achieve` a subgoal, `#Do` an operation on slots. A condition
+binds the slots it names (`find`) to referents believed present, depth
+first, and matches the frame they describe (the type of its pattern, say
+`#Wedging`) against its pattern: entailed holds, incompatible prunes,
+unknown is followed but never holds. The missing nails is *wedge the lock*
+(drive a nail in, after *have nails*) and *have nails* (fetch, else search),
+and runs as before, its log saying what it does in content's words.
+
+What it settled:
+
+- **Slots are a frame type's features.** Triangle's types are closed, so a
+  goal's slots are declared by a type, and a slot a goal shares with its
+  subgoal is declared once on a type both frames inherit (`#WithNails`); its
+  binding passes down when the subgoal is adopted and back up when it is
+  done.
+- **A condition lists the slots it binds**, in order. A slot left out of a
+  description reads as its declared type, which a pattern that only names
+  the type entails, so whether a slot was bound can't be read off a match.
+- **Steps are re-read at every decision**, not tracked by position: a
+  subgoal already done is passed over. The plan position AGENCY.md §2 keeps
+  is derived from what the agent believes, so a belief that changes under a
+  plan changes the plan.
+- **Searched means seen inside since the goal was adopted.** Referents now
+  keep when the agent last saw inside them (`insideSeen`, saved), so the
+  bin it just reached into is passed over without the search being told.
+- **Saves keep the groups submitted since the last boundary**, not only the
+  deferred ones: the decision phase submits after the commit, and a save
+  between boundaries had dropped the agent's next step. A run saved
+  mid-search and restored into fresh knowledge and agency now ends in the
+  same state, with the same decisions.
+
+Not yet: method scores (believed cost, habits, dispositions), credence
+thresholds and residuals as subgoals (`onUnknown`), parameters that are
+values rather than referents (*have nails* should be *have some of a unit*),
+and the rest of what the agency slice left open.
+
+28 tests, 271 checks, under both compilers, ASan and UBSan, and leak-free.
+
+Next: event perception and communication, so the scenario's "ask a
+coworker" can run; walking as an activity.

@@ -1,25 +1,24 @@
 /*
- * BGAgency — agents that choose for themselves (AGENCY.md), first slice. In
- * the decision phase after perception, each agent agency controls, and that
- * has no activity under way, decides one step from its intention, reading
- * only its own knowledge store (the knowledge view). Everything it does is an
- * action, through the menu's machinery.
+ * BGAgency — agents that choose for themselves (AGENCY.md). In the decision
+ * phase after perception, each agent agency controls, and that has no
+ * activity under way, decides one step from its intention, reading only its
+ * own knowledge store (the knowledge view). Everything it does is an action,
+ * through the menu's machinery.
  *
- * The slice has one commitment and one instrumental goal, written in code
- * against the knowledge view (AGENCY.md wants methods in content; that is the
- * next step):
+ * Goals and methods are content (content/agency.tri, AGENCY.md §5). A goal
+ * is done when its `done` condition holds; a condition binds slots to
+ * referents the agent believes present and matches the frame they describe,
+ * so nothing reads world state or truth. A method is followed when its `pre`
+ * holds, its steps re-read at each decision: a subgoal not yet done is
+ * adopted above the goal, which stays the intention beneath it; an operation
+ * is performed once the agent has walked within reach of what it names. A
+ * goal no method can serve is impossible for now: it is dropped, with the
+ * reason, and the method that needed it has failed, so the goal beneath
+ * tries its next.
  *
- *   wedge the lock: nails in hand, then drive one into the lock; to get
- *     nails, go to where they are believed to be and take one
- *   seek nails: when no nails are believed anywhere reachable, look into the
- *     containers the agent knows of, in the order of its belief (where it
- *     last saw nails first, then by recency, then by distance); when nowhere
- *     is left, the commitment is believed impossible for now and dropped,
- *     with the reason
- *
- * Each agent's motivation store (its intentions, the places searched, the
- * decision count) is private and saved, and every decision is logged for the
- * developer.
+ * Each agent's motivation store (its intentions, with their bindings and
+ * failed methods, and the decision count) is private and saved, and every
+ * decision is logged for the developer.
  */
 #import "BGTypes.h"
 
@@ -29,24 +28,37 @@
 #import "BGKnowledge.h"
 
 
-typedef enum
-{
-   BGGoalWedgeLock = 1,
-   BGGoalSeekNails
-} BGGoal;
+#define BG_MAX_INTENTIONS  8
+#define BG_MAX_SLOTS       8
 
-#define BG_MAX_GOALS     4
-#define BG_MAX_SEARCHED  32
+
+typedef struct
+{
+   const char   *slot;           /* interned */
+   uint32_t     referent;
+} BGSlotBinding;
+
+
+/* A goal adopted: the commitment at the bottom of the stack, a subgoal above
+ * the goal whose method needed it. */
+typedef struct
+{
+   const char      *goal;        /* interned: the goal's instance name */
+   int64_t         adopted;      /* ms */
+   uint32_t        failed;       /* the goal's methods that failed since, by rank order */
+   int             pending;      /* the method whose subgoal is above, or -1 */
+   int             following;    /* the method last followed, or -1 */
+   BGSlotBinding   params[ BG_MAX_SLOTS];
+   int             nparams;
+} BGIntention;
 
 
 @interface BGMotivation : NSObject
 {
 @public
    BGEntityID       agent;
-   BGGoal           goals[ BG_MAX_GOALS];     /* the intention on top, the commitment below */
-   int              ngoals;
-   uint32_t         searched[ BG_MAX_SEARCHED];
-   int              nsearched;
+   BGIntention      intentions[ BG_MAX_INTENTIONS];     /* the commitment first, the current intention last */
+   int              nintentions;
    uint64_t         decisions;
    BOOL             waiting;
    NSMutableArray   *log;
@@ -66,8 +78,10 @@ typedef enum
            committer:(BGCommitter *) committer
            knowledge:(BGKnowledge *) knowledge;
 
-/* Agency takes the agent over, committed to wedging the lock. */
-- (void) commitToWedging:(BGEntityID) agent;
+/* Agency takes the agent over, committed to the goal (a #Goal instance).
+ * NO if content has no such goal. */
+- (BOOL) commit:(BGEntityID) agent
+         toGoal:(const char *) goal;
 
 - (BGMotivation *) mindOf:(BGEntityID) agent;
 /* the agent's decision log, for the developer */

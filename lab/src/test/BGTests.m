@@ -993,7 +993,12 @@ typedef struct
 /* AGENCY.md Scenario 1, as "the missing nails". The worker looks into the bin
  * and walks off past the crate; the smith takes the nails away; then agency
  * takes the worker over, committed to wedging the lock. */
-static BGNailsRun   missing_nails( BOOL spares, BOOL omniscient)
+static BGWorld   *restore( NSString *text, BGContent *content, BGCommitter **committer, NSString **error);
+
+
+/* `saveAt`, if not 0, is when to save, restore into a fresh world, with fresh
+ * knowledge and agency from the save, and carry on there. */
+static BGNailsRun   missing_nails( BOOL spares, BOOL omniscient, int64_t saveAt)
 {
    BGWorld           *w;
    BGCommitter       *c;
@@ -1006,6 +1011,7 @@ static BGNailsRun   missing_nails( BOOL spares, BOOL omniscient)
    BGEntityID        crate;
    BGEntityID        ch;
    NSString          *error;
+   NSString          *text;
    BGNailsRun        run;
    int               i;
 
@@ -1047,8 +1053,27 @@ static BGNailsRun   missing_nails( BOOL spares, BOOL omniscient)
    }
 
    /* the shift: agency has the worker now */
-   [agency commitToWedging:4];
+   BG_CHECK( [agency commit:4 toGoal:"wedge_lock"]);
    [s runUntil:BGTimeMake( [w time].ms + 1)];
+   if( saveAt)
+   {
+      [s runUntil:BGTimeMake( saveAt)];
+      text  = BGSave( w, c, [NSArray arrayWithObjects:knowledge, agency, nil]);
+      error = nil;
+      w     = restore( text, [w contentBuild], &c, &error);
+      BG_CHECK( w != nil);
+      activities = [BGActivities activitiesWithWorld:w committer:c];
+      knowledge  = [[[BGKnowledge alloc] initWithWorld:w] autorelease];
+      agency     = [[[BGAgency alloc] initWithWorld:w committer:c knowledge:knowledge] autorelease];
+      s          = [[[BGScheduler alloc] initWithWorld:w committer:c] autorelease];
+      [knowledge setOmniscient:omniscient];
+      [knowledge restoreSavedState:BGSavedDomainState( text, @"knowledge")];
+      [agency restoreSavedState:BGSavedDomainState( text, @"agency")];
+      [s setActivities:activities];
+      [s setPerception:knowledge];
+      [s setDecision:agency];
+      BG_CHECK( [BGSave( w, c, [NSArray arrayWithObjects:knowledge, agency, nil]) isEqualToString:text]);
+   }
    [s runUntil:BGTimeMake( 120000)];
    run.world  = w;
    run.agency = agency;
@@ -1114,40 +1139,59 @@ static void   test_missing_nails( void)
    BGNailsRun   again;
    BGNailsRun   spares;
    BGNailsRun   seer;
+   BGNailsRun   resumed;
    BGEntityID   crate;
+   NSArray      *full;
+   NSArray      *rest;
 
    crate = 7;           /* after the workshop's six */
 
    /* base: the bin first (believed), then the crate; nowhere left: dropped, with why */
-   base = missing_nails( NO, NO);
+   base = missing_nails( NO, NO, 0);
 
    BG_CHECK( happened( base.world, "attempted", 4, 1));
    BG_CHECK( happened( base.world, "looked", 4, crate));
    BG_CHECK( first_at( base.world, "attempted", 4, 1) < first_at( base.world, "looked", 4, crate));
-   BG_CHECK( logged( base.agency, @"[wedge the lock] no nails where I believed them: seek nails"));
-   BG_CHECK( logged( base.agency, @"[seek nails] look_in"));
-   BG_CHECK( logged( base.agency, @"nowhere left to look: wedging the lock is impossible for now"));
-   BG_CHECK( ! wedged( base.world) && [base.agency mindOf:4]->ngoals == 0);
+   BG_CHECK( logged( base.agency, @"[wedge the lock] drive a nail in: have nails first"));
+   BG_CHECK( logged( base.agency, @"[have nails] fetch nails: take_some"));
+   BG_CHECK( logged( base.agency, @"[have nails] fetch nails no longer holds"));
+   BG_CHECK( logged( base.agency, @"[have nails] search for nails: look_in"));
+   BG_CHECK( logged( base.agency, @"[have nails] nothing I know of will do: impossible for now"));
+   BG_CHECK( logged( base.agency, @"[wedge the lock] drive a nail in has failed: it needed have nails"));
+   BG_CHECK( logged( base.agency, @"[wedge the lock] nothing I know of will do: impossible for now"));
+   BG_CHECK( ! wedged( base.world) && [base.agency mindOf:4]->nintentions == 0);
 
    /* the same run is the same, decisions and all */
-   again = missing_nails( NO, NO);
+   again = missing_nails( NO, NO, 0);
    BG_CHECK( [again.world stateHash] == [base.world stateHash]);
    BG_CHECK( [[again.agency logOf:4] isEqualToArray:[base.agency logOf:4]]);
    BG_CHECK( [again.text isEqualToString:base.text]);
 
    /* A: spare nails in the crate: found, taken, and the lock wedged; wedging was the intention throughout */
-   spares = missing_nails( YES, NO);
+   spares = missing_nails( YES, NO, 0);
    BG_CHECK( happened( spares.world, "attempted", 4, 1));
-   BG_CHECK( logged( spares.agency, @"[seek nails] found nails: back to wedging the lock"));
-   BG_CHECK( logged( spares.agency, @"[wedge the lock] the lock is wedged: done"));
+   BG_CHECK( logged( spares.agency, @"[wedge the lock] back to it: have nails is done"));
+   BG_CHECK( logged( spares.agency, @"[wedge the lock] drive a nail in: drive"));
+   BG_CHECK( logged( spares.agency, @"[wedge the lock] done"));
    BG_CHECK( wedged( spares.world));
 
    /* B: the omniscient stub knows better, and the behaviour shows it: straight to the crate */
-   seer = missing_nails( YES, YES);
+   seer = missing_nails( YES, YES, 0);
    BG_CHECK( ! happened( seer.world, "attempted", 4, 1));
-   BG_CHECK( ! logged( seer.agency, @"seek nails"));
+   BG_CHECK( ! logged( seer.agency, @"search for nails"));
    BG_CHECK( wedged( seer.world));
    BG_CHECK( [[seer.agency logOf:4] count] < [[spares.agency logOf:4] count]);
+
+   /* saved mid-search, the commitment and the subgoal stacked, fetching passed
+    * over: restored, the agent carries on exactly as it would have */
+   resumed = missing_nails( YES, NO, 12012);
+   BG_CHECK( [resumed.world stateHash] == [spares.world stateHash]);
+   BG_CHECK( [resumed.text isEqualToString:spares.text]);
+   full = [spares.agency logOf:4];
+   rest = [resumed.agency logOf:4];
+   BG_CHECK( [rest count] > 0 && [rest count] < [full count]);
+   BG_CHECK( [rest count] <= [full count] &&
+             [rest isEqualToArray:[full subarrayWithRange:NSMakeRange( [full count] - [rest count], [rest count])]]);
 }
 
 

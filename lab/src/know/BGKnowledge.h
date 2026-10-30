@@ -41,6 +41,7 @@ typedef struct
    int32_t          slot;
    char             role[ 16];
    int64_t          seen;          /* ms */
+   int64_t          insideSeen;    /* when it last saw inside it (ms), or -1 */
    BOOL             present;       /* still believed where it was last seen */
    BGEntityID       truth;         /* developer-only */
 } BGReferent;

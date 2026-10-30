@@ -176,6 +176,7 @@ static void   append_quoted( NSMutableString *s, const char *text)
    }
    r = &_referents[ _count++];
    memset( r, 0, sizeof( *r));
+   r->insideSeen = -1;
    r->id = referentID ? referentID : _next;
    if( r->id >= _next)
       _next = r->id + 1;
@@ -482,6 +483,8 @@ static int   cmp_seen( const void *a, const void *b)
          r->seen      = now;
          r->present   = YES;
          r->truth     = seen[ i].entity;                /* developer-only */
+         if( _omniscient || contains( lookedIn, nlooked, seen[ i].entity))
+            r->insideSeen = now;
          assigned[ i] = r->id;
          for( j = 0; j < [store count]; j++)
             if( [store referentAt:j]->id == r->id)
@@ -545,8 +548,10 @@ static int   cmp_seen( const void *a, const void *b)
    for( i = 0; i < [store count]; i++)
    {
       r = [store referentAt:i];
-      [s appendFormat:@"  R%u %s, seen at %lldms%s, truth %llu: %@\n", r->id, r->kind, (long long) r->seen,
+      [s appendFormat:@"  R%u %s, seen at %lldms%s, truth %llu%@: %@\n", r->id, r->kind, (long long) r->seen,
                       r->present ? "" : ", not there any more", (unsigned long long) r->truth,
+                      r->insideSeen >= 0 ? [NSString stringWithFormat:@", inside seen at %lldms", (long long) r->insideSeen]
+                                         : @"",
                       [store describeReferent:r->id]];
    }
    return( s);
@@ -625,10 +630,10 @@ static char   *decode( const char *s)
       for( j = 0; j < [store count]; j++)
       {
          r = [store referentAt:j];
-         [lines addObject:[NSString stringWithFormat:@"ref %llu %u %d %u %d %d %d %d %lld %d %llu %@ %@ %@",
+         [lines addObject:[NSString stringWithFormat:@"ref %llu %u %d %u %d %d %d %d %lld %lld %d %llu %@ %@ %@",
                                                      (unsigned long long) [store agent], r->id, (int) r->form,
                                                      r->container, r->x, r->y, r->level, r->slot, (long long) r->seen,
-                                                     r->present ? 1 : 0, (unsigned long long) r->truth,
+                                                     (long long) r->insideSeen, r->present ? 1 : 0, (unsigned long long) r->truth,
                                                      encode( r->role), encode( r->kind), encode( r->features)]];
       }
    }
@@ -643,6 +648,7 @@ static char   *decode( const char *s)
    unsigned long long   agent;
    unsigned long long   truth;
    long long            seen;
+   long long            inside;
    unsigned             id;
    unsigned             next;
    unsigned             me;
@@ -667,8 +673,9 @@ static char   *decode( const char *s)
          [[self storeOf:(BGEntityID) agent] setNextID:next self:me];
       else if( sscanf( text, "seen %llu %d %d %lld", &agent, &x, &y, &seen) == 4)
          [[self storeOf:(BGEntityID) agent] setTileSeen:seen x:x y:y];
-      else if( sscanf( text, "ref %llu %u %d %u %d %d %d %d %lld %d %llu %63s %511s %4095s", &agent, &id, &form,
-                       &container, &x, &y, &level, &slot, &seen, &present, &truth, role, kind, features) == 14)
+      else if( sscanf( text, "ref %llu %u %d %u %d %d %d %d %lld %lld %d %llu %63s %511s %4095s", &agent, &id, &form,
+                       &container, &x, &y, &level, &slot, &seen, &inside, &present, &truth, role, kind,
+                       features) == 15)
       {
          store        = [self storeOf:(BGEntityID) agent];
          next         = [store nextID];
@@ -679,8 +686,9 @@ static char   *decode( const char *s)
          r->y         = y;
          r->level     = level;
          r->slot      = slot;
-         r->seen      = seen;
-         r->present   = present != 0;
+         r->seen       = seen;
+         r->insideSeen = inside;
+         r->present    = present != 0;
          r->truth     = (BGEntityID) truth;
          text         = decode( role);
          strncpy( r->role, text, sizeof( r->role) - 1);

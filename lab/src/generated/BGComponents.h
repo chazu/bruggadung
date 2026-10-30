@@ -1,4 +1,4 @@
-/* Generated from Triangle content 3301c411ef410aec: do not edit. Type IDs are valid
+/* Generated from Triangle content cbeb4432d6aa0594: do not edit. Type IDs are valid
  * only for this content; regenerate when it changes. */
 #ifndef BG_COMPONENTS_H
 #define BG_COMPONENTS_H
@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BG_CONTENT_HASH 0x3301c411ef410aecULL
+#define BG_CONTENT_HASH 0xcbeb4432d6aa0594ULL
 
 /* Activity, from #Activity */
 typedef struct {
@@ -74,26 +74,26 @@ typedef struct {
 
 /* #ActivityStatus */
 enum {
-    BG_ACTIVITYSTATUS_COMPLETED = 33,
-    BG_ACTIVITYSTATUS_EXHAUSTED = 34,
-    BG_ACTIVITYSTATUS_FAILED = 35,
-    BG_ACTIVITYSTATUS_RUNNING = 36,
-    BG_ACTIVITYSTATUS_SUSPENDED = 37,
+    BG_ACTIVITYSTATUS_COMPLETED = 62,
+    BG_ACTIVITYSTATUS_EXHAUSTED = 63,
+    BG_ACTIVITYSTATUS_FAILED = 64,
+    BG_ACTIVITYSTATUS_RUNNING = 65,
+    BG_ACTIVITYSTATUS_SUSPENDED = 66,
 };
 
 /* #ClaimKind */
 enum {
-    BG_CLAIMKIND_CUSTODY = 39,
-    BG_CLAIMKIND_OWNERSHIP = 40,
+    BG_CLAIMKIND_CUSTODY = 68,
+    BG_CLAIMKIND_OWNERSHIP = 69,
 };
 
 /* #Material */
 enum {
-    BG_MATERIAL_BRASS = 52,
-    BG_MATERIAL_FLESH = 53,
-    BG_MATERIAL_IRON = 54,
-    BG_MATERIAL_OAK = 55,
-    BG_MATERIAL_PAPER = 56,
+    BG_MATERIAL_BRASS = 81,
+    BG_MATERIAL_FLESH = 82,
+    BG_MATERIAL_IRON = 83,
+    BG_MATERIAL_OAK = 84,
+    BG_MATERIAL_PAPER = 85,
 };
 
 /* The field registry: what code needs to read and write any component

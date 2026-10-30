@@ -1,0 +1,121 @@
+// Goals and methods (AGENCY.md §4, §5): what an agent can want, and the ways
+// it knows to get it. Agency reads them against the agent's knowledge view
+// only: every slot is bound to a referent the agent believes present, and
+// every condition is matched against the descriptions it last perceived.
+
+// What a goal and its methods are about: the agent itself, as `me`, and
+// slots for the things involved, each bound to a referent. A goal's frame is
+// the type of its `done` pattern. A slot that a goal and its subgoal share is
+// declared once, on a type both frames inherit, and its binding passes
+// between them.
+#Frame: { me: #Agent }
+
+#WithNails: #Frame & { nails: #Stack }
+
+// Wedging a lock: the lock, and the nail driven into it as a wedge.
+#Wedging: #WithNails & { lock: #Assembly, wedge: #Body }
+
+// Having nails: the nails, and the containers to look in for them.
+#HavingNails: #WithNails & { box: #Container }
+
+// A condition over the knowledge view: `find` names the slots to bind, in
+// order, to referents believed present (slots already bound keep their
+// referent); it holds when the frame's description, with those referents
+// in its slots, is entailed by `match`. Unknown never holds.
+#Condition: { find: [...text], match: #Frame }
+
+#Intent: { title: text }
+
+// A goal is done when `done` holds.
+#Goal: #Intent & { done: #Condition }
+
+// How a candidate's referents are ordered, for each slot as it is found:
+// nearest first, or most recently seen first. Ties go to the lower referent.
+#Order: "near" | "recent"
+
+// A method's steps, done in order and re-read at every decision: a subgoal
+// whose goal is already done is passed over, and its bindings join the
+// method's; the first operation is performed, after walking within reach of
+// what it names. Slots name the step's roles.
+#MethodStep: {}
+#Achieve:    #MethodStep & { subgoal: text }
+#Do:         #MethodStep & { op: text, object: text, target: text, units: int }
+
+// A way to achieve a goal. Its alternatives are tried by `rank`, lowest first,
+// skipping those that have failed since the goal was adopted; the first whose
+// `pre` holds is followed. A `search` slot is somewhere to look: a referent
+// whose inside the agent has seen since the goal was adopted is passed over.
+// When no method's `pre` holds, the goal is impossible for now: it is dropped
+// with the reason, and the method that needed it has failed.
+#Method: #Intent & {
+    goal:   text
+    rank:   int
+    pre:    #Condition
+    order:  [...#Order]
+    search: text
+    steps:  [...#MethodStep]
+}
+
+
+// --- AGENCY.md Scenario 1, as "the missing nails" -----------------------------
+
+wedge_lock: #Goal & {
+    title: "wedge the lock"
+    done: {
+        find:  ["lock", "wedge"]
+        match: #Wedging & {
+            lock:  #Assembly & { id: $l }
+            wedge: #Body & { place: #Installed & { assembly: $l, role: "wedge" } }
+        }
+    }
+} @family(goals)
+
+have_nails: #Goal & {
+    title: "have nails"
+    done: {
+        find:  ["nails"]
+        match: #HavingNails & {
+            me:    #Agent & { id: $me }
+            nails: #Stack & { unit: "iron_nail", place: #Held & { by: $me } }
+        }
+    }
+} @family(goals)
+
+// Nails in hand, then drive one into the lock.
+drive_a_nail: #Method & {
+    title: "drive a nail in"
+    goal:  "wedge_lock"
+    rank:  1
+    pre:   { find: ["lock"], match: #Wedging & { lock: #Assembly } }
+    order: ["near"]
+    steps: [
+        #Achieve & { subgoal: "have_nails" },
+        #Do & { op: "drive", object: "nails", target: "lock" },
+    ]
+}  @family(methods)
+
+// Take two from nails believed lying about or in a container, nearest first:
+// two, so what is taken stays a stack, and drive splits one off.
+fetch_nails: #Method & {
+    title: "fetch nails"
+    goal:  "have_nails"
+    rank:  1
+    pre: {
+        find:  ["nails"]
+        match: #HavingNails & { nails: #Stack & { unit: "iron_nail", place: #Inside | #OnTile } }
+    }
+    order: ["near"]
+    steps: [#Do & { op: "take_some", object: "nails", units: 2 }]
+} @family(methods)
+
+// Look into the containers the agent knows of, the most recently seen first,
+// then the nearest.
+search_for_nails: #Method & {
+    title:  "search for nails"
+    goal:   "have_nails"
+    rank:   2
+    pre:    { find: ["box"], match: #HavingNails & { box: #Container } }
+    order:  ["recent", "near"]
+    search: "box"
+    steps:  [#Do & { op: "look_in", object: "box" }]
+} @family(methods)

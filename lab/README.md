@@ -31,7 +31,7 @@ CFLAGS`.
 
 | Path | Contents |
 | --- | --- |
-| `content/` | `components.tri`: the component kinds and their field registry, plus what descriptions say besides fields (ids, places, free hands); `water.tri`: water stores and taps; `activities.tri`: the Activity component; `operations.tri`: the operations; `workshop.tri`: the scenarios' blueprints |
+| `content/` | `components.tri`: the component kinds and their field registry, plus what descriptions say besides fields (ids, places, free hands); `water.tri`: water stores and taps; `activities.tri`: the Activity component; `operations.tri`: the operations; `agency.tri`: goals and methods; `workshop.tri`: the scenarios' blueprints |
 | `src/generated/BGComponents.h` | Generated from `content/` by `make gen`: one struct per component, enums, and the field registry. Committed; the lab refuses to run on content with another hash. |
 | `src/core/` | `BGTypes.h` (IDs, time, seeds, locations), `BGStore` (records of one kind, sorted by ID), `BGWorld` (all authoritative state, journaled for rollback) |
 | `src/commit/` | `BGProposalGroup` (proposals, handles, unit references), `BGCommitter` (ordering, individuation, apply, validation, events, reactions) |
@@ -77,14 +77,27 @@ gone, the attempt commits, and perception corrects the belief.
 
 In the decision phase after perception, each agent agency controls decides
 one step from its intention, reading only its own knowledge store, and acts
-through the same believed actions a player uses. The first slice has one
-commitment (wedge the lock) and one instrumental goal (seek nails), written
-in code against the knowledge view: a failed precondition yields the
-subgoal, the search follows the agent's beliefs, the commitment stays the
-intention throughout, and when nowhere is left the goal is dropped with the
-reason. Every decision is logged. Run on an omniscient knowledge view, the
-same agent walks straight to the spare nails: the behaviour depends on what
-the agent knows.
+through the same believed actions a player uses.
+
+Goals and methods are content (`content/agency.tri`). A goal is done when
+its `done` condition holds: a condition names slots to bind to referents the
+agent believes present, each tried in the condition's order (nearest, most
+recently seen), and holds when the frame they describe is entailed by its
+pattern; a partial binding the pattern already rules out isn't followed. A
+goal's methods are tried by rank; the first whose `pre` holds is followed,
+its steps re-read at each decision: a subgoal already done is passed over and
+its bindings join the method's, one not done is adopted above the goal, and
+an operation is performed once the agent has walked within reach of what it
+names. A method's `search` slot is somewhere to look, passed over once the
+agent has seen inside it since adopting the goal. When no method's `pre`
+holds, the goal is impossible for now: dropped with the reason, and the
+method that needed it has failed, so the goal beneath tries its next.
+
+The missing nails runs on three goals' worth of content: *wedge the lock*
+(drive a nail in, after *have nails*), and *have nails* (fetch them, else
+search for them). Every decision is logged, including why a method was
+passed over. Run on an omniscient knowledge view, the same agent walks
+straight to the spare nails: the behaviour depends on what the agent knows.
 
 ## Playing
 

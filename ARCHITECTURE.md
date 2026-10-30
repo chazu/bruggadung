@@ -290,9 +290,9 @@ A rebuilt world produces the same next step as one that never saved.
    text map, the menu, and the developer inspector, water spreading across
    the floor, and agents' knowledge stores filled by perception, with the
    menu and map built from them, and a first slice of agency: agents that
-   decide from what they know, with a subgoal when a belief fails them.
-   Next, per [lab/PLAN.md](lab/PLAN.md): goals and methods as content,
-   event perception and communication.
+   decide from what they know, with a subgoal when a belief fails them,
+   following goals and methods written as content. Next, per
+   [lab/PLAN.md](lab/PLAN.md): event perception and communication.
 
 ## Cross-cutting open questions
 

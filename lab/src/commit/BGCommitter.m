@@ -143,7 +143,7 @@ static void   declare( BGTally *t, const char *unit, int64_t units, int64_t mass
 
 - (NSArray *) deferredGroups
 {
-   return( _deferred);
+   return( [_deferred arrayByAddingObjectsFromArray:_submitted]);
 }
 
 
