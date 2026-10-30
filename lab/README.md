@@ -150,7 +150,9 @@ interoception, dulled while they concentrate; the needs generator raises
 eating, worth what they feel. Habits grow with repetition and fade: a habitual method wins ties, a slot
 can prefer the habitual referent, and an observer who saw someone do the
 same thing three times believes they usually do, and finds it salient
-when they don't. The player can hand their character to agency
+when they don't. A promise is a communicate act: the promiser commits to it, and hearers
+hold it as a claim about a time to come, kept or broken as they find. The
+player can hand their character to agency
 on autopilot, and control comes back when something arises worth more
 than the player said, or the goal is done. Being asked is a choice for agents agency
 controls: answering is worth their trust in the

@@ -3352,6 +3352,131 @@ static void   test_tempting_purse( void)
 }
 
 
+/* AGENCY.md §7: in the workshop, the smith, having looked into the bin,
+ * promises the worker beside it that the nails will be in the crate by the
+ * deadline. The worker looks into the crate once early, and once after. */
+typedef struct
+{
+   BGWorld       *world;
+   BGKnowledge   *knowledge;
+   BGAgency      *agency;
+   BGEntityID    crate;
+   int           earlySettled;   /* the worker's promise testimony, after looking early */
+   NSString      *text;
+} BGPromiseRun;
+
+
+static void   look_into( BGStage *st, BGEntityID agent, BGEntityID container, int32_t x, int32_t y)
+{
+   NSString   *error;
+
+   stage_move( st, agent, x, y);
+   error = nil;
+   BG_CHECK( BGPerform( st->w, st->c, BGActionMake( "look_in", agent, container, BGNoEntity), 0, &error) != nil);
+   [st->s runUntil:BGTimeMake( [st->w time].ms + 500)];
+}
+
+
+static BGPromiseRun   promise_run( int64_t deadline)
+{
+   BGStage            st;
+   BGActivities       *activities;
+   BGKnowledge        *knowledge;
+   BGAgency           *agency;
+   BGKnowledgeStore   *smith;
+   BGProposalGroup    *g;
+   BGEntityID         h[ 8];
+   NSString           *error;
+   BGPromiseRun       run;
+
+   memset( &run, 0, sizeof( run));
+   st.w       = BGTestWorld( 59);
+   st.c       = BGTestCommitter( st.w);
+   activities = [BGActivities activitiesWithWorld:st.w committer:st.c];
+   knowledge  = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+   agency     = [[[BGAgency alloc] initWithWorld:st.w committer:st.c knowledge:knowledge] autorelease];
+   st.s       = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [agency setActivities:activities];
+   [st.s setActivities:activities];
+   [st.s setPerception:knowledge];
+   [st.s setDecision:agency];
+   [st.c submit:BGWorkshopSetup( NO, h)];
+   [st.s runUntil:BGTimeMake( 1)];
+   g         = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the crate"];
+   run.crate = [g create:"crate" key:"crate" at:BGOnTile( 6, 4, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 2)];
+   run.crate = [g idFor:run.crate];
+
+   /* the smith looks into the bin; the worker stands beside it */
+   error = nil;
+   BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "look_in", 5, 1, BGNoEntity), 0, &error) != nil);
+   [st.s runUntil:BGTimeMake( 3)];
+   stage_move( &st, 4, 3, 5);
+
+   /* the promise */
+   smith = [knowledge storeOf:5];
+   BG_CHECK( [agency promise:5 to:referent_of( smith, 4) goods:referent_of( smith, 2) in:referent_of( smith, run.crate)
+                          by:[st.w time].ms + deadline]);
+   [st.s runUntil:BGTimeMake( [st.w time].ms + 1000)];
+
+   /* the worker looks into the crate early: not due, nothing settled */
+   look_into( &st, 4, run.crate, 7, 5);
+   run.earlySettled = [[knowledge storeOf:4] testimonyCount] ? [[knowledge storeOf:4] testimonyAt:0]->settled : 9;
+   stage_move( &st, 4, 3, 7);
+
+   /* after the deadline, it looks again */
+   [st.s runUntil:BGTimeMake( [st.w time].ms + deadline + 5000)];
+   look_into( &st, 4, run.crate, 7, 5);
+   run.world     = st.w;
+   run.knowledge = knowledge;
+   run.agency    = agency;
+   run.text      = BGSave( st.w, st.c, [NSArray arrayWithObjects:knowledge, agency, nil]);
+   return( run);
+}
+
+
+static void   test_promises( void)
+{
+   BGPromiseRun        kept;
+   BGPromiseRun        broken;
+   BGPromiseRun        again;
+   BGKnowledgeStore    *store;
+   const BGTestimony   *t;
+
+   /* kept: the promise is the smith's commitment, and it delivers */
+   kept = promise_run( 60000);
+   BG_CHECK( logged_by( kept.agency, 5, @"promising: say R"));
+   BG_CHECK( logged_by( kept.agency, 5, @"weighing deliver it: +20 (promise, duty +20, urgency +0) against nothing: switching"));
+   BG_CHECK( logged_by( kept.agency, 5, @"[hold it] pick it up: take R"));
+   BG_CHECK( logged_by( kept.agency, 5, @"[deliver it] bring it: put_in R"));
+   BG_CHECK( logged_by( kept.agency, 5, @"[deliver it] done"));
+   BG_CHECK( [kept.world locationOf:2].form == BGLocationIn && [kept.world locationOf:2].place == kept.crate);
+   /* the worker held it as a promise, about then: looking early settled nothing; after, kept, and it trusts the smith more */
+   store = [kept.knowledge storeOf:4];
+   t     = [store testimonyCount] ? [store testimonyAt:0] : NULL;
+   BG_CHECK( t && t->attribution == BGPledged && t->source == referent_of( store, 5));
+   BG_CHECK( kept.earlySettled == 0);
+   BG_CHECK( t && t->settled == 1 && [store trustIn:t->source] == BG_TRUST + BG_CONFIRMED);
+   BG_CHECK( [[kept.knowledge dump:4] rangeOfString:@"promised, root R"].location != NSNotFound);
+
+   /* broken: three seconds isn't enough; the window closes, the promise is
+    * broken, and the worker, finding the crate empty after the deadline,
+    * trusts the smith less */
+   broken = promise_run( 3000);
+   BG_CHECK( logged_by( broken.agency, 5, @"deliver it is over: its window has closed; the promise is broken"));
+   BG_CHECK( [broken.world locationOf:2].form != BGLocationIn || [broken.world locationOf:2].place != broken.crate);
+   store = [broken.knowledge storeOf:4];
+   t     = [store testimonyCount] ? [store testimonyAt:0] : NULL;
+   BG_CHECK( broken.earlySettled == 0);
+   BG_CHECK( t && t->settled == -1 && [store trustIn:t->source] == BG_TRUST - BG_REFUTED);
+
+   /* the same on replay */
+   again = promise_run( 60000);
+   BG_CHECK( [again.text isEqualToString:kept.text]);
+}
+
+
 /* --- the cistern ----------------------------------------------------------- */
 
 static BGCistern   *run_cistern( BGCisternVariant variant)
@@ -3666,6 +3791,7 @@ const BGTestCase   BGAllTests[] =
    { "routine",                       test_routine },
    { "needs",                         test_needs },
    { "habits",                        test_habits },
+   { "promises",                      test_promises },
    { "rumour",                        test_rumour },
    { "memory_decay",                  test_memory_decay },
    { "salience",                      test_salience },

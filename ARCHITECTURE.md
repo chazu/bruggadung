@@ -311,7 +311,8 @@ A rebuilt world produces the same next step as one that never saved.
    tempting purse); and commitments with windows and rising urgency, the
    routine generator; and needs felt through interoception, the needs
    generator; and habits, an agent's own and those others believe it has.
-   Next, per [lab/PLAN.md](lab/PLAN.md): promises.
+   And promises, a speaker's commitment and a hearer's claim about a time
+   to come. Next, per [lab/PLAN.md](lab/PLAN.md): granting requests.
 
 ## Cross-cutting open questions
 

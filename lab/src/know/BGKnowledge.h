@@ -66,6 +66,12 @@
  * the thing now, or perceived before and gone) adds its finding, with the
  * rule as its provenance.
  *
+ * A promise heard is testimony about a time to come: not believed of now,
+ * and settled only when it is due: kept, if the agent sees the thing in
+ * the container, and trusts the promiser more; broken, if it looks and the
+ * thing isn't there, and trusts the promiser less. Looking early settles
+ * nothing.
+ *
  * Reading a record (KNOWLEDGE.md §15) is how claims are heard from someone
  * absent: each entry the agent reads is testimony whose source is the
  * author, recognized by the looks the writing gives, and whose medium is
@@ -182,7 +188,8 @@ typedef enum
 {
    BGSaw = 0,                      /* "I saw it" */
    BGHeardFrom,                    /* "I heard it from ..." */
-   BGHeard                         /* "I heard it", from no one named */
+   BGHeard,                        /* "I heard it", from no one named */
+   BGPledged                       /* "I promise it", by `when` */
 } BGAttribution;
 
 
@@ -276,6 +283,10 @@ typedef struct
  * not believed on the ground. */
 - (NSString *) claimThat:(uint32_t) thing
                     isIn:(uint32_t) container;
+/* A promise (AGENCY.md §7): the thing will be in the container by then. */
+- (NSString *) promiseThat:(uint32_t) thing
+                      isIn:(uint32_t) container
+                        by:(int64_t) deadline;
 /* "where is something like it?"; "who told you it is where you believe it?"
  * (nil if it believes it nowhere inside something) */
 - (NSString *) askWhereIs:(uint32_t) thing;

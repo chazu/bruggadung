@@ -62,7 +62,8 @@ static void   append_quoted( NSMutableString *s, const char *text)
 
 
 static char   *concrete_features( const char *printed);
-static void   settle( BGKnowledgeStore *store, uint32_t thing, uint32_t container, BOOL true_, NSMutableArray *news);
+static void   settle( BGKnowledgeStore *store, uint32_t thing, uint32_t container, BOOL true_, int64_t now,
+                      NSMutableArray *news);
 
 
 /* The top-level keys of a features text: "mass: 90g, unit: ..." */
@@ -497,15 +498,18 @@ static NSUInteger   feature_keys( const char *features, char (*keys)[ 32], NSUIn
       return( (source < root ? source : root) - BG_HEARSAY);
    case BGHeard :
       return( source - BG_RUMOUR);
+   case BGPledged :
+      return( source);
    default :
       return( t->sure < source ? t->sure : source);
    }
 }
 
 
+/* What counts toward credence now: open or seen true, and not a promise. */
 static BOOL   counts( const BGTestimony *t, uint32_t thing, uint32_t container)
 {
-   return( t->thing == thing && t->container == container && t->settled >= 0);
+   return( t->thing == thing && t->container == container && t->settled >= 0 && t->attribution != BGPledged);
 }
 
 
@@ -666,6 +670,21 @@ static BOOL   counts( const BGTestimony *t, uint32_t thing, uint32_t container)
    if( ! claim || ! [self describeLooks:_self])
       return( nil);
    return( [NSString stringWithFormat:@"#Writing & { author: %@, entries: [%@] }", [self describeLooks:_self], claim]);
+}
+
+
+- (NSString *) promiseThat:(uint32_t) thing
+                      isIn:(uint32_t) container
+                        by:(int64_t) deadline
+{
+   const BGReferent   *r;
+   const BGReferent   *c;
+
+   r = [self referent:thing];
+   c = [self referent:container];
+   if( ! r || ! c || ! r->kind || ! c->kind || c->form != BGLocationOnTile)
+      return( nil);
+   return( [self claimThat:r isIn:c attribution:@"#Pledged" when:deadline]);
 }
 
 
@@ -1271,7 +1290,9 @@ static char   *concrete_features( const char *printed)
    attribution   = tri_at( tri, claim, "attribution");
    if( attribution && node_int( tri, attribution, "sure", &sure))
       t.sure = (int32_t) sure;
-   if( attribution && tri_subtype( tri, tri_node_type( attribution), tri_type_named( tri, "#Heard")))
+   if( attribution && tri_subtype( tri, tri_node_type( attribution), tri_type_named( tri, "#Pledged")))
+      t.attribution = BGPledged;
+   else if( attribution && tri_subtype( tri, tri_node_type( attribution), tri_type_named( tri, "#Heard")))
    {
       description   = tri_at( tri, attribution, "from");
       t.root        = description ? [self person:description store:store news:news] : 0;
@@ -1346,6 +1367,14 @@ static char   *concrete_features( const char *printed)
    t.heard     = now;
    t.utterance = utterance;
    [store addTestimony:t];
+   if( t.attribution == BGPledged)
+   {
+      /* about a time to come: held, not believed of now */
+      [news addObject:[NSString stringWithFormat:@"R%u promises R%u will be in R%u by %lldms", speaker, thing, cid,
+                                                 (long long) when]];
+      tri_arena_free( arena);
+      return;
+   }
    credence = [store credenceThat:thing isIn:cid];
 
    m = [store mutableReferent:thing];
@@ -1353,7 +1382,7 @@ static char   *concrete_features( const char *printed)
    {
       /* seen elsewhere since: sight outranks it, and seen elsewhere as it was said, it is false */
       if( m->seen == when)
-         settle( store, thing, cid, NO, news);
+         settle( store, thing, cid, NO, now, news);
       else
          [news addObject:[NSString stringWithFormat:@"R%u says R%u is in R%u: seen elsewhere since", speaker, thing,
                                                     cid]];
@@ -1430,7 +1459,8 @@ static NSString   *lasting( NSString *features)
 /* Testimony that the thing is inside the container is settled: seen true,
  * and its source and root are trusted more, or found false, and they are
  * trusted less. */
-static void   settle( BGKnowledgeStore *store, uint32_t thing, uint32_t container, BOOL true_, NSMutableArray *news)
+static void   settle( BGKnowledgeStore *store, uint32_t thing, uint32_t container, BOOL true_, int64_t now,
+                      NSMutableArray *news)
 {
    BGTestimony   *t;
    NSUInteger    i;
@@ -1442,12 +1472,18 @@ static void   settle( BGKnowledgeStore *store, uint32_t thing, uint32_t containe
       t = [store mutableTestimonyAt:i];
       if( t->settled || t->thing != thing || t->container != container)
          continue;
+      if( t->attribution == BGPledged && ! true_ && now < t->when)
+         continue;      /* not due yet */
       t->settled = true_ ? 1 : -1;
       [store adjustTrustIn:t->source by:delta];
       if( t->root && t->root != t->source)
          [store adjustTrustIn:t->root by:delta];
-      [news addObject:[NSString stringWithFormat:@"R%u said R%u was in R%u: %s", t->source, thing, container,
-                                                 true_ ? "so it is" : "it isn't"]];
+      if( t->attribution == BGPledged)
+         [news addObject:[NSString stringWithFormat:@"R%u promised R%u would be in R%u: %s", t->source, thing, container,
+                                                    true_ ? "kept" : "broken"]];
+      else
+         [news addObject:[NSString stringWithFormat:@"R%u said R%u was in R%u: %s", t->source, thing, container,
+                                                    true_ ? "so it is" : "it isn't"]];
    }
 }
 
@@ -1943,7 +1979,7 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
          if( _omniscient || contains( lookedIn, nlooked, seen[ i].entity))
             r->insideSeen = now;
          if( r->form == BGLocationIn || r->form == BGLocationHeldBy)
-            settle( store, r->id, r->container, YES, news);
+            settle( store, r->id, r->container, YES, now, news);
          assigned[ i] = r->id;
          for( j = 0; j < [store count]; j++)
             if( [store referentAt:j]->id == r->id)
@@ -2034,7 +2070,7 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
          continue;
       r = [store mutableReferent:t->thing];
       settle( store, t->thing, t->container, r && r->present && r->form == BGLocationIn && r->container == t->container,
-              news);
+              now, news);
    }
 
    /* what it saw happen, in its referents, kept if salient; what it heard
@@ -2208,6 +2244,12 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
    }
    kind  = tri_type_name( tri, tri_node_type( tri_at( tri, claim, "what")));
    ckind = tri_type_name( tri, tri_node_type( tri_at( tri, claim, "within")));
+   if( tri_at( tri, claim, "attribution") &&
+       tri_subtype( tri, tri_node_type( tri_at( tri, claim, "attribution")), tri_type_named( tri, "#Pledged")))
+   {
+      tri_arena_free( arena);
+      return;      /* a promise, not a claim of what is */
+   }
    tri_arena_free( arena);
 
    memset( &a, 0, sizeof( a));
@@ -2273,6 +2315,7 @@ static NSString   *attribution_text( const BGTestimony *t)
    {
    case BGHeardFrom : return( [NSString stringWithFormat:@"heard from R%u", t->root]);
    case BGHeard     : return( @"heard");
+   case BGPledged   : return( @"promised");
    default          : return( @"saw");
    }
 }

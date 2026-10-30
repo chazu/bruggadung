@@ -139,6 +139,8 @@ typedef struct
    int64_t         until;        /* ms: its deadline */
    const char      *source;      /* interned: "employment", "promise", "self" */
    BOOL            settled;      /* done, or given up, for this window */
+   BGSlotBinding   params[ BG_MAX_SLOTS];
+   int             nparams;
 } BGCommitment;
 
 
@@ -225,6 +227,16 @@ typedef struct
               from:(int64_t) from
              until:(int64_t) until
             source:(const char *) source;
+
+/* A promise (AGENCY.md §7), a communicate act: the agent tells the hearer
+ * (a referent of its, in reach) the goods (a referent) will be in the
+ * container by the deadline, and undertakes to deliver them, a commitment
+ * from now until then. NO if it can't say so. */
+- (BOOL) promise:(BGEntityID) agent
+              to:(uint32_t) hearer
+           goods:(uint32_t) goods
+              in:(uint32_t) container
+              by:(int64_t) deadline;
 
 /* Agency lets the agent go, its mind with it: someone else controls it. */
 - (void) relinquish:(BGEntityID) agent;

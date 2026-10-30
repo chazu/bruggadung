@@ -19,6 +19,9 @@
 // to ask.
 #HavingNails: #WithNails & { box: #Container, someone: #Agent }
 
+// Delivering: the goods, and where they are to go.
+#Delivering: #Frame & { goods: #Body, dest: #Container }
+
 // Tidying: what to put away, and the bin to put it in.
 #Tidying:  #Frame & { stuff: #Body, bin: #Container }
 
@@ -339,4 +342,49 @@ put_them_in_a_box: #Method & {
     }
     order: ["habit", "near"]
     steps: [#Do & { op: "put_in", object: "stuff", target: "bin" }]
+} @family(methods)
+
+
+// --- AGENCY.md §7, promises -----------------------------------------------------
+
+// The goods in the destination: what a promise to put them there commits to.
+deliver: #Goal & {
+    title: "deliver it"
+    done: {
+        find:  ["goods", "dest"]
+        match: #Delivering & {
+            goods: #Body & { place: #Inside & { container: $c } }
+            dest:  #Container & { id: $c }
+        }
+    }
+} @family(goals)
+
+hold_it: #Goal & {
+    title: "hold it"
+    done: {
+        find:  ["goods"]
+        match: #Delivering & {
+            me:    #Agent & { id: $me }
+            goods: #Body & { place: #Held & { by: $me } }
+        }
+    }
+} @family(goals)
+
+bring_it: #Method & {
+    title: "bring it"
+    goal:  "deliver"
+    rank:  1
+    pre:   { find: ["goods", "dest"], match: #Delivering & { dest: #Container } }
+    steps: [
+        #Achieve & { subgoal: "hold_it" },
+        #Do & { op: "put_in", object: "goods", target: "dest" },
+    ]
+} @family(methods)
+
+pick_it_up: #Method & {
+    title: "pick it up"
+    goal:  "hold_it"
+    rank:  1
+    pre:   { find: ["goods"], match: #Delivering & { goods: #Body & { place: #Inside | #OnTile } } }
+    steps: [#Do & { op: "take", object: "goods" }]
 } @family(methods)

@@ -373,6 +373,37 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
 }
 
 
+- (BOOL) promise:(BGEntityID) agent
+              to:(uint32_t) hearer
+           goods:(uint32_t) goods
+              in:(uint32_t) container
+              by:(int64_t) deadline
+{
+   BGKnowledgeStore   *store;
+   BGMotivation       *m;
+   BGCommitment       *c;
+   NSString           *content;
+
+   [self control:agent];
+   m       = [self mindOf:agent];
+   store   = [_knowledge storeOf:agent];
+   content = [store promiseThat:goods isIn:container by:deadline];
+   if( ! content || m->ncommitments == BG_MAX_COMMITMENTS ||
+       ! [self act:m why:"promising" store:store operation:"say" object:hearer target:0 units:0
+           content:[content UTF8String]])
+      return( NO);
+   if( ! [self undertake:agent goal:"deliver" from:[_world time].ms until:deadline source:"promise"])
+      return( NO);
+   c                   = &m->commitments[ m->ncommitments - 1];
+   c->params[ 0].slot     = [_world intern:"goods"];
+   c->params[ 0].referent = goods;
+   c->params[ 1].slot     = [_world intern:"dest"];
+   c->params[ 1].referent = container;
+   c->nparams          = 2;
+   return( YES);
+}
+
+
 - (BOOL) controls:(BGEntityID) agent
 {
    NSUInteger   i;
@@ -1696,7 +1727,11 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    }
    b.slot     = bestSlot;
    b.referent = bestAbout;
-   [self adopt:best mind:m params:&b count:bestSlot ? 1 : 0];
+   if( bestCommitment >= 0)
+      [self adopt:best mind:m params:m->commitments[ bestCommitment].params
+            count:m->commitments[ bestCommitment].nparams];
+   else
+      [self adopt:best mind:m params:&b count:bestSlot ? 1 : 0];
    m->intentions[ m->nintentions - 1].arose      = bestAbout;
    m->intentions[ m->nintentions - 1].commitment = bestCommitment + 1;
    m->intentions[ m->nintentions - 1].pressed    = bestPressed;
@@ -1749,8 +1784,10 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
       if( it->commitment > 0 && it->commitment <= m->ncommitments &&
           [_world time].ms >= m->commitments[ it->commitment - 1].until)
       {
-         [self note:m line:[NSString stringWithFormat:@"%s is over: its window has closed",
-                                                       goal_title( [_world tri], it->goal, title, sizeof( title))]];
+         [self note:m line:[NSString stringWithFormat:@"%s is over: its window has closed%s",
+                                                       goal_title( [_world tri], it->goal, title, sizeof( title)),
+                                                       ! strcmp( m->commitments[ it->commitment - 1].source, "promise")
+                                                          ? "; the promise is broken" : ""]];
          m->commitments[ it->commitment - 1].settled = YES;
          m->nintentions = k;      /* it, and what it needed */
          m->waiting     = NO;
@@ -1960,10 +1997,18 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
                                                      m->habits[ k].context, m->habits[ k].choice, m->habits[ k].strength,
                                                      (long long) m->habits[ k].at]];
       for( k = 0; k < m->ncommitments; k++)
-         [lines addObject:[NSString stringWithFormat:@"commitment %llu %s %lld %lld %s %d", (unsigned long long) m->agent,
-                                                     m->commitments[ k].goal, (long long) m->commitments[ k].from,
-                                                     (long long) m->commitments[ k].until, m->commitments[ k].source,
-                                                     m->commitments[ k].settled ? 1 : 0]];
+      {
+         NSMutableString   *cl;
+         int               q;
+
+         cl = [NSMutableString stringWithFormat:@"commitment %llu %s %lld %lld %s %d %d", (unsigned long long) m->agent,
+                                                m->commitments[ k].goal, (long long) m->commitments[ k].from,
+                                                (long long) m->commitments[ k].until, m->commitments[ k].source,
+                                                m->commitments[ k].settled ? 1 : 0, m->commitments[ k].nparams];
+         for( q = 0; q < m->commitments[ k].nparams; q++)
+            [cl appendFormat:@" %s %u", m->commitments[ k].params[ q].slot, m->commitments[ k].params[ q].referent];
+         [lines addObject:cl];
+      }
       for( k = 0; k < m->nsettled; k++)
          [lines addObject:[NSString stringWithFormat:@"settled %llu %s %u", (unsigned long long) m->agent,
                                                      m->settled[ k].goal, m->settled[ k].about]];
@@ -1996,9 +2041,10 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    for( i = 0; i < [lines count]; i++)
    {
       words = [[lines objectAtIndex:i] componentsSeparatedByString:@" "];
-      if( [words count] == 7 && [[words objectAtIndex:0] isEqualToString:@"commitment"])
+      if( [words count] >= 8 && [[words objectAtIndex:0] isEqualToString:@"commitment"])
       {
          BGCommitment   *c;
+         NSUInteger     q;
 
          m = [self mindOf:(BGEntityID) [[words objectAtIndex:1] longLongValue]];
          if( m->ncommitments == BG_MAX_COMMITMENTS)
@@ -2009,6 +2055,13 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
          c->until   = [[words objectAtIndex:4] longLongValue];
          c->source  = [_world intern:[[words objectAtIndex:5] UTF8String]];
          c->settled = [[words objectAtIndex:6] intValue] != 0;
+         c->nparams = 0;
+         for( q = 8; q + 1 < [words count] && c->nparams < BG_MAX_SLOTS; q += 2)
+         {
+            c->params[ c->nparams].slot     = [_world intern:[[words objectAtIndex:q] UTF8String]];
+            c->params[ c->nparams].referent = (uint32_t) [[words objectAtIndex:q + 1] longLongValue];
+            c->nparams++;
+         }
          continue;
       }
       if( [words count] == 6 && [[words objectAtIndex:0] isEqualToString:@"habit"])

@@ -1262,7 +1262,40 @@ decaying.
 
 44 tests, 741 checks, under both compilers, ASan and UBSan, and leak-free.
 
-Next: promises (AGENCY.md §7): a promise made by saying so becomes the
-speaker's commitment, held by hearers as a claim; keeping or breaking it is
-a history event the hearers come to learn, and it moves their trust in the
-promiser.
+### After the slice: promises
+
+AGENCY.md §7. The smith, having looked into the bin, promises the worker
+beside it that the nails will be in the crate within a minute. The promise
+is the smith's commitment, from then until the deadline: it takes the
+nails from the bin and puts them in the crate. The worker holds the promise
+as a claim about then: looking into the crate early settles nothing, and
+looking after the deadline, it finds the promise kept and trusts the smith
+more. Given three seconds instead, the smith can't make it: the window
+closes, the promise is broken, and the worker, finding the crate empty
+after the deadline, trusts the smith less.
+
+- **A promise is a claim about a time to come**: `#IsIn` with the
+  attribution `#Pledged`, `when` its deadline (`promiseThat:isIn:by:`).
+  Hearers hold it as testimony, not believed of now and counted toward no
+  credence; it settles only when due, kept if they see the thing there,
+  broken if they look and it isn't, and their trust in the promiser moves
+  as for any claim. Promises aren't traced as claims of what is.
+- **Making one is a communicate act** (`promise:to:goods:in:by:`): agency
+  says it, and undertakes a commitment, with its slots bound (`deliver`,
+  the goods and the destination), from now until the deadline. A promise
+  whose window closes undone is logged as broken.
+- **Commitments carry slot bindings**, adopted with the goal.
+- **Goals with a subgoal for holding** (`deliver` needs `hold_it`) carry
+  something from one place to another.
+
+Not yet: breaking a promise as a history event others learn of without
+looking, promises of things other than where something will be, the
+player promising in `lab play`, and promises' worth beyond the duty (the
+weight of one's word, a disposition).
+
+45 tests, 768 checks, under both compilers, ASan and UBSan, and leak-free.
+
+Next: granting requests (AGENCY.md §11): a request for something is a
+decision for the one asked, *comply or refuse*, scored by trust in the
+asker, disposition, its own commitments, and the cost, so a friend asked
+to lend can lend.

@@ -26,6 +26,9 @@
 #Source: {}
 #Saw:    #Source & { sure: int }
 #Heard:  #Source & { from: #Agent }
+// A promise (AGENCY.md §7): the speaker will see to it, by `when`. Hearers
+// hold it as a claim about then, kept or broken as they come to find.
+#Pledged: #Source & {}
 
 // A claim, as of `when`, with how the speaker says it knows.
 #Telling: #Utterance & { when: time, attribution: #Source }
