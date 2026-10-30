@@ -1628,6 +1628,45 @@ BOOL   BGContentAuthorizes( BGWorld *world, BGEntityID content)
 }
 
 
+/* A custody claim (INSTITUTIONS.md decision 7) of the actor's on the
+ * entity, in the group. */
+static void   take_custody( BGProposalGroup *g, BGEntityID actor, BGEntityID of, const char *key)
+{
+   BGEntityID   claim;
+
+   claim = [g create:"custody" key:key at:BGLocationMakeNone()];
+   [g relate:BGEdgeClaimant from:BGWhole( claim) to:BGWhole( actor)];
+   [g relate:BGEdgeClaimSubject from:BGWhole( claim) to:BGWhole( of)];
+}
+
+
+/* Confiscating: the thing out of its holder's hand into the officer's, from
+ * where it is (if it has moved meanwhile, the stage fails), and into the
+ * watch's custody. */
+static NSString   *effect_confiscate( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
+{
+   int32_t   hand;
+
+   hand = BGFreeHand( world, a.roles[ BGRoleActor]);
+   if( hand < 0)
+      return( @"no hand is free");
+   [g move:BGWhole( a.roles[ BGRoleItem]) to:BGHeldBy( a.roles[ BGRoleActor], hand)
+ expecting:[world locationOf:a.roles[ BGRoleItem]]];
+   take_custody( g, a.roles[ BGRoleActor], a.roles[ BGRoleItem], "confiscated");
+   return( nil);
+}
+
+
+/* Arresting: the person into the watch's custody, an event it perceives;
+ * what it does then is its own decision. */
+static NSString   *effect_arrest( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
+{
+   take_custody( g, a.roles[ BGRoleActor], a.roles[ BGRoleItem], "under arrest");
+   [g emit:"arrested" subject:BGWhole( a.roles[ BGRoleItem]) other:BGWhole( a.roles[ BGRoleActor]) detail:NULL];
+   return( nil);
+}
+
+
 /* Through a door: onto its tile. */
 static NSString   *effect_pass( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
 {
@@ -1749,6 +1788,8 @@ static const struct
    { "investigate", effect_investigate },
    { "tighten",   effect_tighten },
    { "rotate",    effect_rotate },
+   { "confiscate", effect_confiscate },
+   { "arrest",    effect_arrest },
    { "shut",      effect_shut },
    { "dismantle", effect_dismantle },
    { "light",     effect_light },

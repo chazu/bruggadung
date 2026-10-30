@@ -4802,6 +4802,14 @@ static BGPurseRun   tempting_purse( BGPurse variant)
    h[ 6] = [g create:"town" key:"the town" at:BGLocationMakeNone()];
    h[ 7] = [g create:"theft_law" key:"the law against theft" at:BGLocationMakeNone()];
    [g set:"Law.lawOf" of:BGWhole( h[ 7]) to:(int64_t) h[ 6]];
+   /* the purse is truly the merchant's */
+   {
+      BGEntityID   claim;
+
+      claim = [g create:"ownership" key:"the merchant's purse" at:BGLocationMakeNone()];
+      [g relate:BGEdgeClaimant from:BGWhole( claim) to:BGWhole( h[ 1])];
+      [g relate:BGEdgeClaimSubject from:BGWhole( claim) to:BGWhole( h[ 0])];
+   }
    h[ 2] = [g create:"kasimir" key:"kasimir" at:BGOnTile( 9, 10, 0)];
    h[ 3] = [g create:"carter" key:"carter" at:BGOnTile( 5, 10, 0)];
    h[ 5] = [g create:"purse" key:"the carter's wages" at:BGHeldBy( h[ 3], 0)];
@@ -4827,6 +4835,8 @@ static BGPurseRun   tempting_purse( BGPurse variant)
    run.carter    = [g idFor:h[ 3]];
    run.wages     = [g idFor:h[ 5]];
    run.officer   = run.officer ? [g idFor:run.officer] : BGNoEntity;
+   if( run.officer)
+      [agency control:run.officer];
    [agency control:run.carter];
    run.mira      = h[ 4] ? [g idFor:h[ 4]] : BGNoEntity;
    if( run.mira)
@@ -5026,6 +5036,48 @@ static void   test_tempting_purse( void)
       }
       BG_CHECK( taken && taken->choice == referent_of( store, watch.kasimir) && ! strcmp( taken->rule, "told"));
       BG_CHECK( owned && owned->about == taken->about && owned->choice == referent_of( store, watch.merchant));
+   }
+   /* decision 7: the officer acts on it, its office's duty weighed like any
+    * goal: it arrests Kasimir, as the law against theft brings, and takes
+    * the purse back; both in the watch's custody. The law was truly broken */
+   BG_CHECK( log_index( watch.agency, watch.officer, @"take it back: arrest R") <
+             log_index( watch.agency, watch.officer, @"take it back: confiscate R"));
+   BG_CHECK( log_index( watch.agency, watch.officer, @"take it back: confiscate R") != NSNotFound);
+   BG_CHECK( [watch.world locationOf:watch.purse].form == BGLocationHeldBy &&
+             [watch.world locationOf:watch.purse].place == watch.officer);
+   {
+      NSArray      *claims;
+      NSUInteger   i;
+      BOOL         purseHeld;
+      BOOL         kasimirHeld;
+      BGEntityID   who;
+
+      purseHeld   = NO;
+      kasimirHeld = NO;
+      claims      = BGClaimsCovering( watch.world, watch.purse);
+      for( i = 0; i < [claims count]; i++)
+         if( [watch.world edges:BGEdgeClaimant from:(BGEntityID) [[claims objectAtIndex:i] unsignedLongLongValue]
+                           into:&who max:1] && who == watch.officer)
+            purseHeld = YES;
+      claims = BGClaimsCovering( watch.world, watch.kasimir);
+      for( i = 0; i < [claims count]; i++)
+         if( [watch.world edges:BGEdgeClaimant from:(BGEntityID) [[claims objectAtIndex:i] unsignedLongLongValue]
+                           into:&who max:1] && who == watch.officer)
+            kasimirHeld = YES;
+      BG_CHECK( purseHeld && kasimirHeld);
+      /* the purse is still the merchant's: custody isn't ownership */
+      BG_CHECK( BGClaimedByAnother( watch.world, watch.purse, watch.officer));
+   }
+   {
+      NSUInteger   i;
+      BOOL         arrested;
+
+      arrested = NO;
+      for( i = 0; i < [watch.world eventCount]; i++)
+         if( ! strcmp( [watch.world eventAt:i]->kind, "arrested") && [watch.world eventAt:i]->subject == watch.kasimir &&
+             [watch.world eventAt:i]->other == watch.officer)
+            arrested = YES;
+      BG_CHECK( arrested);
    }
 
    /* 1: C: no one is there, and Kasimir decides just the same */

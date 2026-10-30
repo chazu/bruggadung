@@ -48,8 +48,9 @@
 // and who lent it.
 #Repaying: #Frame & { loan: #Body, lender: #Agent }
 
-// Reporting a wrong: what was taken, and someone of the watch to tell.
-#Reporting: #Frame & { loot: #Body, officer: #Agent }
+// A wrong (INSTITUTIONS.md): what was taken, someone of the watch to tell,
+// and who took it.
+#Wronging: #Frame & { loot: #Body, officer: #Agent, culprit: #Agent }
 
 // Eating: the food. Watching: the spot where something stirred.
 #Supper:   #Frame & { food: #Body }
@@ -92,8 +93,10 @@
 
 // Where a goal arises (AGENCY.md §4's reactive generator): a candidate for
 // each finding of the kind about something of kind `of`, the slot bound to
-// it, while the finding is salient: drawn no longer ago than `lapse`.
-#Arising: { finding: text, slot: text, lapse: time, of: #Body }
+// it, while the finding is salient: drawn no longer ago than `lapse`; with
+// a `duty`, only for an agent whose office's badge it is (INSTITUTIONS.md:
+// an officer's duty).
+#Arising: { finding: text, slot: text, lapse: time, of: #Body, duty: text }
 
 // A goal is done when `done` holds. What it `concerns` is salient to an agent
 // that holds it (AGENCY.md §10): something like one of them seen moved, or
@@ -331,10 +334,33 @@ tell_the_watch: #Method & {
     rank:  1
     pre: {
         find:  ["loot", "officer"]
-        match: #Reporting & { officer: #Agent & #OfficeHolder & { badge: "watch" } }
+        match: #Wronging & { officer: #Agent & #OfficeHolder & { badge: "watch" } }
     }
     order: ["near"]
     steps: [#Do & { op: "say", object: "officer", says: #Grievance, regarding: "loot" }]
+} @family(methods)
+
+
+// An officer of the watch who believes something was taken (INSTITUTIONS.md
+// decisions 4 and 7): its office's duty, weighed like any goal: arrest the
+// taker, as the law against theft brings, and take the thing back.
+enforce: #Goal & {
+    title:  "recover it and arrest the taker"
+    done:   #Did & { did: "confiscate" }
+    arises: { finding: "#Taken", slot: "loot", lapse: 1h, of: #Body, duty: "watch" }
+    worth:  [#Flat & { value: 30 }]
+} @family(goals)
+
+take_it_back: #Method & {
+    title:    "take it back"
+    goal:     "enforce"
+    rank:     1
+    sequence: true
+    pre: {
+        find:  ["loot", "culprit"]
+        match: #Wronging & { loot: #Body & { place: #Held & { by: $t } }, culprit: #Agent & { id: $t } }
+    }
+    steps: [#Do & { op: "arrest", object: "culprit" }, #Do & { op: "confiscate", object: "loot" }]
 } @family(methods)
 
 

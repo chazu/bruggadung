@@ -3284,3 +3284,32 @@ Not yet: the officer acting on it (sanctions, next), and grievances by
 the wronged themselves when they find their things gone.
 
 87 tests, 2686 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: the watch acts
+
+INSTITUTIONS.md decisions 4 and 7: an organization acts only when a member
+acts in office; sanctions are ordinary operations its office gives its
+holders, each an activity the holder chooses.
+
+- **`arrest` and `confiscate`** (institutions.tri), operations for an
+  office holder: arrest takes someone into the watch's custody (a
+  `custody` claim, and an "arrested" event they perceive); confiscate
+  takes a thing from someone's hand into the officer's, in custody too.
+  Custody isn't ownership: the purse is still the merchant's.
+- **`enforce`**, a goal arising from `#Taken` only for one whose office's
+  badge is the watch (`#Arising`'s new `duty`): worth its office's duty,
+  weighed like any goal. Its method arrests the taker and takes the thing
+  back, in that order: who took it is who holds it, until it is taken.
+- The purse is truly the merchant's in the scene now (an ownership claim),
+  as well as told so.
+
+Checked: the officer, told by Mira, walks to Kasimir, arrests him and
+takes the purse back; the purse is in the officer's hand, both in the
+watch's custody, and still the merchant's.
+
+Not yet: what the arrested does (comply, resist, flee: next); the officer
+not also "reporting the theft" to itself (a goal arising for everyone but
+the watch has no form yet: harmless, it finds no one to tell); and
+returning confiscated things to their owners.
+
+87 tests, 2692 checks, under both compilers, ASan, and leak-free.

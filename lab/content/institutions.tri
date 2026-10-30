@@ -28,3 +28,32 @@
 // The town and its watch; the law against theft.
 town:      #Organization & {}
 theft_law: #Law & { forbids: "take", wrong: "anothers", brings: "arrest", weighs: 40, common: true }
+
+// Custody (decision 7): a claim the watch takes on what it confiscates, and
+// on whom it arrests.
+custody: #Claim & { kind: "custody" }
+
+// Sanctions are operations an office gives its holders (decision 7), chosen
+// like any other. Confiscate: take a thing out of someone's hand into one's
+// own, in the watch's custody.
+confiscate: #Operation & {
+    effect:   "confiscate"
+    duration: 2s
+    uses:     ["hands"]
+    roles: {
+        actor: #Agent & #OfficeHolder & { freeHands: >=1 }
+        item:  #Body & { place: #Held }
+    }
+} @family(operations)
+
+// Arrest: take someone into the watch's custody. What the arrested does is
+// its own decision.
+arrest: #Operation & {
+    effect:   "arrest"
+    duration: 3s
+    uses:     ["hands"]
+    roles: {
+        actor: #Agent & #OfficeHolder
+        item:  #Agent
+    }
+} @family(operations)

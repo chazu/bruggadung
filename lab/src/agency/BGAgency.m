@@ -2209,6 +2209,15 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
       if( ! text_at( tri, tri_pattern( tri, goal), "arises.finding", finding, sizeof( finding)) ||
           ! text_at( tri, tri_pattern( tri, goal), "arises.slot", slot, sizeof( slot)))
          continue;
+      /* an office's duty: only for one who holds it, which it knows */
+      if( text_at( tri, tri_pattern( tri, goal), "arises.duty", title, sizeof( title)))
+      {
+         const char   *badge;
+
+         badge = [_world textField:"OfficeHolder.badge" of:m->agent];
+         if( ! badge || strcmp( badge, title))
+            continue;
+      }
       for( j = 0; j < [store findingCount]; j++)
       {
          f = [store findingAt:j];
