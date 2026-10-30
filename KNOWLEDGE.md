@@ -88,6 +88,11 @@ These were made while writing this document and have not yet been reviewed.
     them into one: features unified, beliefs and testimony pooled. A wrong
     merge is the "two people taken for one" error (§6), and stands until
     evidence splits them again (both seen at once).
+14. **Light and sound are domains** (DOMAIN_SIMULATION.md), giving
+    perception its conditions (§5). Light: lamps and fires burn their fuel
+    down, daylight follows the clock, rooms and doors shade it. Sound:
+    it propagates through rooms and doors, walls muffle it, and noise
+    masks what is quieter.
 
 ## Terms
 
@@ -724,8 +729,7 @@ notebooks as stealable records, and out-of-character notes.
 1. **Proposition and rule language.** Specified in
    [CONTENT_LANGUAGE.md](CONTENT_LANGUAGE.md). Knowledge remains its most
    demanding user: recognition, hypotheses, and decay all run on it.
-2. **Light and sound.** Should they become domains for perception
-   conditions, or stay authored?
+2. **Light and sound.** Decided: decision 14.
 3. **Background agents.** How does reduced-fidelity perception and memory work
    for distant agents, and how is a background agent promoted back to full
    fidelity?
