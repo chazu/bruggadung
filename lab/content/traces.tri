@@ -41,3 +41,7 @@ fresh_paint: #TraceKind & { sense: "sight", lasts: 3d }   @family(traces)
 paint_smell: #TraceKind & { sense: "smell", lasts: 4d }   @family(traces)
 scratch:     #TraceKind & { sense: "sight", lasts: 365d } @family(traces)
 clatter:     #TraceKind & { sense: "hearing", lasts: 2s } @family(traces)
+// ACTIONS.md Scenario 1's sounds: a seized valve breaking free, a lever
+// giving
+creak:       #TraceKind & { sense: "hearing", lasts: 2s } @family(traces)
+clang:       #TraceKind & { sense: "hearing", lasts: 2s } @family(traces)

@@ -1,6 +1,7 @@
 #import "BGValveKind.h"
 
 #import "BGProposalGroup.h"
+#import "BGActions.h"
 
 
 @implementation BGValveKind
@@ -27,7 +28,11 @@
                                                                      event->detail ? event->detail : "no expectation"]];
       [g setCause:event->index];
       if( event->amount >= valve->breakaway && ! valve->turned)
+      {
+         /* it breaks free, with a creak */
          [g set:"Valve.turned" of:BGWhole( event->subject) to:1];
+         BGMakeTrace( world, g, "creak", event->subject, BGLocationMakeNone(), 60, "a valve breaking free");
+      }
       else
          [g emit:"held" subject:BGWhole( event->subject) other:BGWhole( event->other)];
       [committer submit:g];

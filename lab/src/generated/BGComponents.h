@@ -1,4 +1,4 @@
-/* Generated from Triangle content 2d818b3ce739bc86: do not edit. Type IDs are valid
+/* Generated from Triangle content 7beeed7e32165ab7: do not edit. Type IDs are valid
  * only for this content; regenerate when it changes. */
 #ifndef BG_COMPONENTS_H
 #define BG_COMPONENTS_H
@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BG_CONTENT_HASH 0x2d818b3ce739bc86ULL
+#define BG_CONTENT_HASH 0x7beeed7e32165ab7ULL
 
 /* Combustor, from #Combustor */
 typedef struct {

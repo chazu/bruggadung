@@ -1904,3 +1904,24 @@ sawing, whose saw is taken from the hand, is suspended as before.
   operation declaring them matched as unknown on its own fields.
 
 57 tests, 2055 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: what the valve sounds like
+
+ACTIONS.md Scenario 1's observable outcome: "whether the handle moves,
+sounds, the wrench visibly bending". A valve breaking free leaves a
+`creak` on it, and a lever giving leaves a `clang` on it. Both are traces
+heard for two seconds. The worker perceives them as it does the cat's
+clatter:
+
+- freed at a steady 75 Nm, it hears the creak and sees the valve turned;
+- bent, it hears the clang and sees the wrench bent;
+- holding, it hears nothing.
+
+None of it carries the breakaway torque.
+
+- **`BGMakeTrace`**: a trace made in any group, by an effect or a reaction,
+  not only the traces an operation declares.
+
+Not yet: the actor's exertion as a percept, and impact as a graded effect.
+
+57 tests, 2063 checks, under both compilers, ASan and UBSan, and leak-free.

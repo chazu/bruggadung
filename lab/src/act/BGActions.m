@@ -778,8 +778,9 @@ static NSString   *effect_rotate( BGWorld *world, BGAction a, int64_t amount, BG
          state = BGMix( [world seed] ^ BGMix( [world boundary] * 0x100 + a.roles[ BGRoleItem]));
          if( (int64_t) (BGNext( &state) % (uint64_t) applied) < applied - limit)
          {
-            /* it bends: a trace, and less it bears from now on */
+            /* it bends: a trace, a clang, and less it bears from now on */
             [g set:"Body.bent" of:BGWhole( lever) to:1];
+            BGMakeTrace( world, g, "clang", lever, BGLocationMakeNone(), 80, "a lever giving");
             [g set:"Lever.limit" of:BGWhole( lever) to:limit / 2];
             wear( world, g, lever, 60);
             applied = limit / 2;
@@ -1172,10 +1173,8 @@ void   BGLeaveTraces( BGWorld *world, BGAction action, BGProposalGroup *group)
    int64_t            lo;
    int64_t            hi;
    int64_t            strength;
-   int64_t            lasts;
    char               kind[ 64];
    char               site[ 32];
-   char               key[ 128];
    const char         *text;
 
    tri     = [world tri];
@@ -1209,19 +1208,33 @@ void   BGLeaveTraces( BGWorld *world, BGAction action, BGProposalGroup *group)
          continue;
       v        = tri_at( tri, tri_at( tri, list, "first"), "strength");
       strength = v && tri_node_interval( v, &lo, &hi) && lo == hi ? lo : 0;
-      v        = tri_at( tri, tri_pattern( tri, kind), "lasts");
-      lasts    = v && tri_node_interval( v, &lo, &hi) && lo == hi ? lo : 0;
-      snprintf( key, sizeof( key), "%s, left by %s", kind, action.operation);
-      t = [group create:"trace" key:key at:BGLocationMakeNone()];
-      [group set:"Trace.traceKind" of:BGWhole( t) toText:[world intern:kind]];
-      [group set:"Trace.bearer" of:BGWhole( t) to:(int64_t) bearer];
-      [group set:"Trace.tileX" of:BGWhole( t) to:tile.x];
-      [group set:"Trace.tileY" of:BGWhole( t) to:tile.y];
-      [group set:"Trace.tileLevel" of:BGWhole( t) to:tile.level];
-      [group set:"Trace.magnitude" of:BGWhole( t) to:strength];
-      [group set:"Trace.created" of:BGWhole( t) to:[world time].ms];
-      [group set:"Trace.expires" of:BGWhole( t) to:[world time].ms + lasts];
+      BGMakeTrace( world, group, kind, bearer, tile, strength, action.operation);
    }
+}
+
+
+void   BGMakeTrace( BGWorld *world, BGProposalGroup *group, const char *kind, BGEntityID bearer,
+                    BGLocation tile, int64_t strength, const char *by)
+{
+   const TriNode   *v;
+   BGEntityID      t;
+   int64_t         lo;
+   int64_t         hi;
+   int64_t         lasts;
+   char            key[ 128];
+
+   v     = tri_at( [world tri], tri_pattern( [world tri], kind), "lasts");
+   lasts = v && tri_node_interval( v, &lo, &hi) && lo == hi ? lo : 0;
+   snprintf( key, sizeof( key), "%s, left by %s", kind, by);
+   t = [group create:"trace" key:key at:BGLocationMakeNone()];
+   [group set:"Trace.traceKind" of:BGWhole( t) toText:[world intern:kind]];
+   [group set:"Trace.bearer" of:BGWhole( t) to:(int64_t) bearer];
+   [group set:"Trace.tileX" of:BGWhole( t) to:tile.x];
+   [group set:"Trace.tileY" of:BGWhole( t) to:tile.y];
+   [group set:"Trace.tileLevel" of:BGWhole( t) to:tile.level];
+   [group set:"Trace.magnitude" of:BGWhole( t) to:strength];
+   [group set:"Trace.created" of:BGWhole( t) to:[world time].ms];
+   [group set:"Trace.expires" of:BGWhole( t) to:[world time].ms + lasts];
 }
 
 

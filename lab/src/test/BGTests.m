@@ -4187,6 +4187,23 @@ static void   test_seized_valve( void)
    seen = [bare.knowledge dump:1];
    BG_CHECK( [seen rangeOfString:@"breakaway"].location == NSNotFound && [seen rangeOfString:@"70Nm"].location == NSNotFound);
    BG_CHECK( [seen rangeOfString:@"rating: 12Nm, turned: false"].location != NSNotFound);
+   /* and what it perceives of the outcome: freed, it hears the valve creak
+    * and sees it turned; bent, it hears the clang and sees the wrench bent;
+    * held, it hears nothing */
+   seen = [steady.knowledge dump:1];
+   BG_CHECK( [seen rangeOfString:@"trace creak on"].location != NSNotFound);
+   BG_CHECK( [seen rangeOfString:@"turned: true"].location != NSNotFound);
+   for( seed = 1; seed <= 20; seed++)
+   {
+      full = valve_run( "seized_valve", "wrench pipe", 0, seed);
+      if( full.bent)
+         break;
+   }
+   seen = [full.knowledge dump:1];
+   BG_CHECK( full.bent && [seen rangeOfString:@"trace clang on"].location != NSNotFound);
+   BG_CHECK( [seen rangeOfString:@"bent: true"].location != NSNotFound);
+   seen = [bare.knowledge dump:1];
+   BG_CHECK( [seen rangeOfString:@"trace creak"].location == NSNotFound && [seen rangeOfString:@"trace clang"].location == NSNotFound);
 }
 
 
