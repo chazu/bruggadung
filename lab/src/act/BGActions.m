@@ -1362,40 +1362,120 @@ static int64_t   latent_quality( TriContent *tri, const TriNode *schema, uint64_
 
 
 /* How fast a role wears, in hundredths of a point per 100 h of use: what it
- * `wears`, by its quality (half again as fast at 0, half as fast at 100). */
-static int64_t   latent_rate( TriContent *tri, const TriNode *schema, uint64_t seed, const char *role)
+ * `wears`, by the quality of what fills it (half again as fast at 0, half
+ * as fast at 100). */
+static int64_t   role_rate( TriContent *tri, const TriNode *schema, const char *role, int64_t quality)
 {
-   return( int_feature( tri, latent_role( tri, schema, role), "wears", BG_WEARS) *
-           (150 - latent_quality( tri, schema, seed, role)));
+   return( int_feature( tri, latent_role( tri, schema, role), "wears", BG_WEARS) * (150 - quality));
 }
 
 
-/* A role's wear, in hundredths of a point, after `used` ms of use, `abused`
- * of them abused (it wears `strain` times as fast then). */
-static int64_t   latent_wear( TriContent *tri, const TriNode *schema, uint64_t seed, const char *role,
-                              int64_t used, int64_t abused)
+/* What `used` ms of use, `abused` of them abused (the role wears `strain`
+ * times as fast then), wear what fills a role, in ten-thousandths of a
+ * point. */
+static int64_t   role_attrition( TriContent *tri, const TriNode *schema, const char *role, int64_t quality,
+                                 int64_t used, int64_t abused)
 {
    int64_t   strain;
 
    strain = int_feature( tri, latent_role( tri, schema, role), "strain", 1);
-   return( latent_rate( tri, schema, seed, role) * (used + abused * (strain - 1)) / BG_WEAR_SPAN);
+   return( role_rate( tri, schema, role, quality) * 100 * (used + abused * (strain - 1)) / BG_WEAR_SPAN);
 }
 
 
-/* The culprit of `failure` among its candidates: drawn by the seed, each
- * weighted by its wear, as if a hundred hours more worn, so that a unit new
- * to use is weighted by how fast each wears. "" if it has no candidates. */
-static void   latent_culprit( TriContent *tri, const TriNode *schema, uint64_t seed, const char *failure,
-                              int64_t used, int64_t abused, char *culprit, size_t len)
+/* A role's wear unopened, in hundredths of a point: by the assembly's
+ * history and the role's hidden quality. */
+static int64_t   latent_wear( TriContent *tri, const TriNode *schema, uint64_t seed, const char *role,
+                              int64_t used, int64_t abused)
+{
+   return( role_attrition( tri, schema, role, latent_quality( tri, schema, seed, role), used, abused) / 100);
+}
+
+
+/* A part's quality: what it was made with, revealed from its assembly;
+ * else 50, give or take 20, by its own seed. */
+static int64_t   part_quality( BGWorld *world, BGEntityID part, const BGPart *p)
+{
+   return( p->grade >= 0 ? p->grade : 30 + (int64_t) (BGMix( [world info:part]->seed ^ 0x7175616c697479ULL) % 41));
+}
+
+
+/* How worn a part is, in ten-thousandths of a point: its attrition, or its
+ * wear if that says more (a part content made worn). */
+static int64_t   part_attrition( const BGPart *p)
+{
+   return( p->attrition > p->wear * 10000 ? p->attrition : p->wear * 10000);
+}
+
+
+/* The part in an assembly's role, or none. */
+static BGEntityID   latent_part( BGWorld *world, BGEntityID assembly, const char *role)
+{
+   BGEntityID   in[ 64];
+   NSUInteger   n;
+   NSUInteger   i;
+
+   n = [world entitiesAt:assembly form:BGLocationPartOf into:in max:64];
+   for( i = 0; i < n; i++)
+      if( ! strcmp( [world locationOf:in[ i]].role, role))
+         return( in[ i]);
+   return( BGNoEntity);
+}
+
+
+/* A role's wear, in hundredths of a point, after `d` ms more use, `dry` of
+ * them abused; and how fast it wears (decision 7). Opened, it is the part's
+ * in it, by that part's quality; an opened role empty has none. Unopened,
+ * or no part (the housing), it is the role's, by the assembly's history. */
+static int64_t   latent_condition( BGWorld *world, BGEntityID assembly, const BGLatent *latent, const TriNode *schema,
+                                   const char *role, int64_t d, int64_t dry, int64_t *rate)
+{
+   const TriNode   *entry;
+   const BGPart    *p;
+   TriContent      *tri;
+   BGEntityID      part;
+   uint64_t        seed;
+   int64_t         q;
+
+   tri   = [world tri];
+   seed  = [world info:assembly]->seed;
+   entry = latent_role( tri, schema, role);
+   if( entry && int_feature( tri, entry, "depth", 1) <= latent->revealed)
+   {
+      part = latent_part( world, assembly, role);
+      p    = part ? [world record:[world kindNamed:"Part"] for:part] : NULL;
+      if( ! p)
+      {
+         *rate = 0;
+         return( 0);
+      }
+      q     = part_quality( world, part, p);
+      *rate = role_rate( tri, schema, role, q);
+      return( (part_attrition( p) + role_attrition( tri, schema, role, q, d, dry)) / 100);
+   }
+   *rate = role_rate( tri, schema, role, latent_quality( tri, schema, seed, role));
+   return( latent_wear( tri, schema, seed, role, latent->used + d, latent->abused + dry));
+}
+
+
+/* The culprit of `failure` among its candidates, after `d` ms more use,
+ * `dry` of them abused: drawn by the seed, each weighted by its wear, as if
+ * a hundred hours more worn, so that a unit new to use is weighted by how
+ * fast each wears. "" if it has no candidates. */
+static void   latent_culprit( BGWorld *world, BGEntityID assembly, const BGLatent *latent, const TriNode *schema,
+                              const char *failure, int64_t d, int64_t dry, char *culprit, size_t len)
 {
    const TriNode   *list;
    const TriNode   *entry;
    const TriNode   *cands;
+   TriContent      *tri;
    char            text[ 64];
    char            role[ 64];
    int64_t         total;
+   int64_t         rate;
    int64_t         k;
 
+   tri         = [world tri];
    culprit[ 0] = 0;
    for( list = tri_at( tri, schema, "culprits"); list && (entry = tri_at( tri, list, "first")); list = tri_at( tri, list, "rest"))
    {
@@ -1404,14 +1484,14 @@ static void   latent_culprit( TriContent *tri, const TriNode *schema, uint64_t s
       total = 0;
       for( cands = tri_at( tri, entry, "candidates"); cands && text_feature( tri, cands, "first", role, sizeof( role));
            cands = tri_at( tri, cands, "rest"))
-         total += latent_wear( tri, schema, seed, role, used, abused) + latent_rate( tri, schema, seed, role);
+         total += latent_condition( world, assembly, latent, schema, role, d, dry, &rate) + rate;
       if( total <= 0)
          return;
-      k = (int64_t) (BGMixString( BGMix( seed ^ 0x63756c70726974ULL), failure) % (uint64_t) total);
+      k = (int64_t) (BGMixString( BGMix( [world info:assembly]->seed ^ 0x63756c70726974ULL), failure) % (uint64_t) total);
       for( cands = tri_at( tri, entry, "candidates"); cands && text_feature( tri, cands, "first", role, sizeof( role));
            cands = tri_at( tri, cands, "rest"))
       {
-         k -= latent_wear( tri, schema, seed, role, used, abused) + latent_rate( tri, schema, seed, role);
+         k -= latent_condition( world, assembly, latent, schema, role, d, dry, &rate) + rate;
          if( k < 0)
          {
             snprintf( culprit, len, "%s", role);
@@ -1423,12 +1503,69 @@ static void   latent_culprit( TriContent *tri, const TriNode *schema, uint64_t s
 }
 
 
+/* An assembly's use, `d` ms, `dry` of them abused, passed on to the parts
+ * in it: each wears as its role does, by its own quality; one that is
+ * itself an assembly is used as long, and so on in. The part blamed for a
+ * failure now is worn at least as a failure leaves it; one that is an
+ * assembly takes the failure on. */
+static void   latent_use( BGWorld *world, BGProposalGroup *g, BGEntityID assembly, int64_t d, int64_t dry,
+                          const char *blamed, const char *failure, int depth)
+{
+   const BGLatent       *latent;
+   const BGLatent       *inner;
+   const BGPart         *p;
+   const BGEntityInfo   *info;
+   const TriNode        *schema;
+   TriContent           *tri;
+   BGEntityID           in[ 64];
+   BGLocation           at;
+   NSUInteger           n;
+   NSUInteger           i;
+   int64_t              worn;
+   BOOL                 culprit;
+
+   tri    = [world tri];
+   latent = [world record:[world kindNamed:"Latent"] for:assembly];
+   info   = [world info:assembly];
+   schema = latent && info ? tri_at( tri, tri_pattern( tri, info->blueprint), "latent") : NULL;
+   if( ! schema || depth > 8)
+      return;
+   n = [world entitiesAt:assembly form:BGLocationPartOf into:in max:64];
+   for( i = 0; i < n; i++)
+   {
+      if( ! (p = [world record:[world kindNamed:"Part"] for:in[ i]]))
+         continue;
+      at      = [world locationOf:in[ i]];
+      culprit = blamed && ! strcmp( at.role, blamed);
+      if( (inner = [world record:[world kindNamed:"Latent"] for:in[ i]]))
+      {
+         [g set:"Latent.used" of:BGWhole( in[ i]) to:inner->used + d];
+         [g set:"Latent.abused" of:BGWhole( in[ i]) to:inner->abused + dry];
+         if( culprit)
+         {
+            [g set:"Latent.failure" of:BGWhole( in[ i]) toText:[world intern:failure]];
+            [g set:"Latent.failedAt" of:BGWhole( in[ i]) to:[world time].ms];
+         }
+         latent_use( world, g, in[ i], d, dry, NULL, NULL, depth + 1);
+         continue;
+      }
+      worn = part_attrition( p) + role_attrition( tri, schema, at.role, part_quality( world, in[ i], p), d, dry);
+      if( culprit && worn < BG_PART_FAILED * 10000)
+         worn = BG_PART_FAILED * 10000;
+      worn = worn > 1000000 ? 1000000 : worn;
+      [g set:"Part.attrition" of:BGWhole( in[ i]) to:worn];
+      [g set:"Part.wear" of:BGWhole( in[ i]) to:worn / 10000];
+   }
+}
+
+
 /* Working a pump an hour (content/latent.tri): it lifts water from the store
  * it draws from into its riser, at its flow; what it can't draw, the store
  * dry, it is worked dry, abused. The use risks each failure the schema
  * names: its chance, by the wear of its most worn candidate, drawn by the
  * seed and the use so far. Failed, its culprit is decided then, and a flow
- * loss costs it the flow its culprit's loss does. Seized, it can't be worked. */
+ * loss costs it the flow its culprit's loss does. The parts opened in it
+ * wear on. Seized, it can't be worked. */
 static NSString   *effect_work( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
 {
    const BGLatent       *latent;
@@ -1449,9 +1586,11 @@ static NSString   *effect_work( BGWorld *world, BGAction a, int64_t amount, BGPr
    int64_t              dry;
    int64_t              worst;
    int64_t              w;
+   int64_t              rate;
    int64_t              ppm;
    int64_t              cap;
    BOOL                 store;
+   BOOL                 failed;
    char                 failing[ 64];
    char                 role[ 64];
    char                 culprit[ 64];
@@ -1496,30 +1635,37 @@ static NSString   *effect_work( BGWorld *world, BGAction a, int64_t amount, BGPr
    [g set:"Latent.abused" of:BGWhole( e) to:latent->abused + dry];
 
    /* the risk: each failure in turn, while none has happened */
-   if( latent->failure && *latent->failure)
-      return( nil);
-   for( list = tri_at( tri, schema, "culprits"); list && (entry = tri_at( tri, list, "first")); list = tri_at( tri, list, "rest"))
+   failed      = NO;
+   culprit[ 0] = 0;
+   if( ! latent->failure || ! *latent->failure)
+      for( list = tri_at( tri, schema, "culprits"); ! failed && list && (entry = tri_at( tri, list, "first"));
+           list = tri_at( tri, list, "rest"))
+      {
+         if( ! text_feature( tri, entry, "failing", failing, sizeof( failing)))
+            continue;
+         worst = 0;
+         for( cands = tri_at( tri, entry, "candidates"); cands && text_feature( tri, cands, "first", role, sizeof( role));
+              cands = tri_at( tri, cands, "rest"))
+            if( latent_role( tri, schema, role) &&
+                (w = latent_condition( world, e, latent, schema, role, 0, 0, &rate) / 100) > worst)
+               worst = w > 100 ? 100 : w;
+         /* in a million, for this use: chance/1000 per 100 h, ×(1 + 3 wear/100) */
+         ppm = int_feature( tri, entry, "chance", 0) * 10 * (100 + 3 * worst) * d / BG_WEAR_SPAN;
+         failed = (int64_t) (BGMixString( BGMix( info->seed ^ (uint64_t) latent->used ^ 0x6661696cULL), failing) % 1000000) < ppm;
+         if( failed)
+            latent_culprit( world, e, latent, schema, failing, d, dry, culprit, sizeof( culprit));
+      }
+
+   /* the parts opened in it wear on; the culprit among them, as a failure leaves it */
+   latent_use( world, g, e, d, dry, failed ? culprit : NULL, failed ? failing : NULL, 0);
+   if( failed)
    {
-      if( ! text_feature( tri, entry, "failing", failing, sizeof( failing)))
-         continue;
-      worst = 0;
-      for( cands = tri_at( tri, entry, "candidates"); cands && text_feature( tri, cands, "first", role, sizeof( role));
-           cands = tri_at( tri, cands, "rest"))
-         if( latent_role( tri, schema, role) &&
-             (w = latent_wear( tri, schema, info->seed, role, latent->used, latent->abused) / 100) > worst)
-            worst = w > 100 ? 100 : w;
-      /* in a million, for this use: chance/1000 per 100 h, ×(1 + 3 wear/100) */
-      ppm = int_feature( tri, entry, "chance", 0) * 10 * (100 + 3 * worst) * d / BG_WEAR_SPAN;
-      if( (int64_t) (BGMixString( BGMix( info->seed ^ (uint64_t) latent->used ^ 0x6661696cULL), failing) % 1000000) >= ppm)
-         continue;
-      latent_culprit( tri, schema, info->seed, failing, latent->used + d, latent->abused + dry, culprit, sizeof( culprit));
       [g set:"Latent.failure" of:BGWhole( e) toText:[world intern:failing]];
       [g set:"Latent.failedAt" of:BGWhole( e) to:[world time].ms];
       [g set:"Latent.blamed" of:BGWhole( e) toText:[world intern:culprit]];
       if( ! strcmp( failing, "flow_loss") && latent_role( tri, schema, culprit))
          [g set:"Pump.flow" of:BGWhole( e) to:pump->flow > 80 ? pump->flow - 80 : 0];
       [g emit:"failed" subject:BGWhole( e) other:BGWhole( a.roles[ BGRoleActor])];
-      break;
    }
    return( nil);
 }
@@ -1547,7 +1693,8 @@ static NSString   *effect_reveal( BGWorld *world, BGAction a, int64_t amount, BG
    int64_t              hi;
    int64_t              mass;
    int64_t              carved;
-   int64_t              wear;
+   int64_t              worn;
+   int64_t              quality;
    const char           *failure;
    char                 culprit[ 64];
    char                 role[ 64];
@@ -1574,7 +1721,7 @@ static NSString   *effect_reveal( BGWorld *world, BGAction a, int64_t amount, BG
          snprintf( culprit, sizeof( culprit), "%s", latent->blamed);
       else
       {
-         latent_culprit( tri, schema, seed, failure, latent->used, latent->abused, culprit, sizeof( culprit));
+         latent_culprit( world, assembly, latent, schema, failure, 0, 0, culprit, sizeof( culprit));
          [g set:"Latent.blamed" of:BGWhole( assembly) toText:[world intern:culprit]];
       }
    }
@@ -1591,14 +1738,15 @@ static NSString   *effect_reveal( BGWorld *world, BGAction a, int64_t amount, BG
       any  = YES;
       mass = tri_node_interval( tri_at( tri, tri_pattern( tri, kind), "mass"), &lo, &hi) && lo == hi ? lo : 0;
       part = [g create:[world intern:kind] key:[world intern:role] at:BGPartOf( assembly, [world intern:role], 0)];
-      wear = latent_wear( tri, schema, seed, role, latent->used, latent->abused) / 100;
-      if( ! strcmp( role, culprit) && wear < BG_PART_FAILED)
-         wear = BG_PART_FAILED;
+      quality = latent_quality( tri, schema, seed, role);
+      worn    = role_attrition( tri, schema, role, quality, latent->used, latent->abused);
+      if( ! strcmp( role, culprit) && worn < BG_PART_FAILED * 10000)
+         worn = BG_PART_FAILED * 10000;
       /* an assembly within: worn by its own parts, as long used; the
        * culprit, it takes the failure on */
       if( tri_at( tri, tri_pattern( tri, kind), "latent"))
       {
-         wear = 0;
+         worn = 0;
          [g set:"Latent.used" of:BGWhole( part) to:latent->used];
          [g set:"Latent.abused" of:BGWhole( part) to:latent->abused];
          if( ! strcmp( role, culprit))
@@ -1607,8 +1755,10 @@ static NSString   *effect_reveal( BGWorld *world, BGAction a, int64_t amount, BG
             [g set:"Latent.failedAt" of:BGWhole( part) to:latent->failedAt];
          }
       }
-      wear = wear > 100 ? 100 : wear;
-      [g set:"Part.wear" of:BGWhole( part) to:wear];
+      worn = worn > 1000000 ? 1000000 : worn;
+      [g set:"Part.attrition" of:BGWhole( part) to:worn];
+      [g set:"Part.wear" of:BGWhole( part) to:worn / 10000];
+      [g set:"Part.grade" of:BGWhole( part) to:quality];
       [g set:"Part.cameFrom" of:BGWhole( part) to:(int64_t) assembly];
       [g set:"Part.fits" of:BGWhole( part) toText:[world intern:role]];
       [g emit:"revealed" subject:BGWhole( part) other:BGWhole( assembly)];

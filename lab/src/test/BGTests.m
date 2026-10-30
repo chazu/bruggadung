@@ -3940,6 +3940,192 @@ static void   test_pump_wear( void)
 }
 
 
+/* LATENT_ASSEMBLY.md decision 7: a part's wear is its own. The pump
+ * `blueprint` `key`, `hours` worked dry behind it, opened two levels; its
+ * seal replaced, if `spare` is 0 or more, with a new cup worn that much;
+ * then worked `work` hours from a full well, saved and restored after hour
+ * `saveAfter` if not 0. */
+typedef struct
+{
+   int64_t    oldSeal;          /* the seal opened, its attrition then */
+   int64_t    oldSealAfter;     /* and after the work, wherever it is */
+   int64_t    seal;             /* the seal in place, its attrition before the work */
+   int64_t    sealAfter;        /* and after */
+   int64_t    valve;            /* the inlet valve's, before and after */
+   int64_t    valveAfter;
+   NSString   *blamed;
+   int        failedIn;
+} BGPartRun;
+
+
+static BGEntityID   part_in( BGStage st, BGEntityID pump, const char *role)
+{
+   BGEntityID   in[ 16];
+   NSUInteger   n;
+   NSUInteger   i;
+
+   n = [st.w entitiesAt:pump form:BGLocationPartOf into:in max:16];
+   for( i = 0; i < n; i++)
+      if( ! strcmp( [st.w locationOf:in[ i]].role, role))
+         return( in[ i]);
+   return( BGNoEntity);
+}
+
+
+static BGPartRun   part_work( const char *blueprint, const char *key, int64_t hours, int64_t spare, int work,
+                              int saveAfter)
+{
+   BGStage            st;
+   BGProposalGroup    *g;
+   BGEntityID         pump;
+   BGEntityID         well;
+   BGEntityID         worker;
+   BGEntityID         wrench;
+   BGEntityID         cup;
+   BGEntityID         old;
+   BGPartRun          run;
+   NSString           *error;
+   const char         *text;
+   int64_t            t;
+   int                h;
+
+   memset( &run, 0, sizeof( run));
+   st.w   = BGTestWorld( 157);
+   st.c   = BGTestCommitter( st.w);
+   st.s   = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [st.s setActivities:[BGActivities activitiesWithWorld:st.w committer:st.c]];
+   g      = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the pump on its well, worn"];
+   pump   = [g create:blueprint key:key at:BGOnTile( 5, 5, 0)];
+   well   = [g create:"well" key:"the well" at:BGOnTile( 5, 6, 0)];
+   worker = [g create:"worker" key:"worker" at:BGOnTile( 4, 5, 0)];
+   wrench = [g create:"wrench_250" key:"wrench" at:BGHeldBy( worker, 0)];
+   cup    = spare >= 0 ? [g create:"leather_cup" key:"a new cup" at:BGHeldBy( worker, 1)] : BGNoEntity;
+   [g set:"Pump.draws" of:BGWhole( pump) to:(int64_t) well];
+   [g set:"Latent.used" of:BGWhole( pump) to:hours * 3600000LL];
+   [g set:"Latent.abused" of:BGWhole( pump) to:hours * 3600000LL];
+   if( cup)
+   {
+      [g set:"Part.fits" of:BGWhole( cup) toText:"piston_seal"];
+      [g set:"Part.wear" of:BGWhole( cup) to:spare];
+   }
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   pump   = [g idFor:pump];
+   well   = [g idFor:well];
+   worker = [g idFor:worker];
+   wrench = [g idFor:wrench];
+   cup    = cup ? [g idFor:cup] : BGNoEntity;
+
+   error = nil;
+   BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "open_up", worker, wrench, pump), 0, &error) != nil);
+   [st.s runUntil:BGTimeMake( 1000)];
+   BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "open_up", worker, wrench, pump), 0, &error) != nil);
+   [st.s runUntil:BGTimeMake( 2000)];
+   old = part_in( st, pump, "piston_seal");
+   [st.w getField:"Part.attrition" of:old value:&run.oldSeal];
+   if( cup)
+   {
+      BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "replace_part", worker, cup, old), 0, &error) != nil);
+      [st.s runUntil:BGTimeMake( 10000)];
+      BG_CHECK( part_in( st, pump, "piston_seal") == cup);
+   }
+   [st.w getField:"Part.attrition" of:part_in( st, pump, "piston_seal") value:&run.seal];
+   [st.w getField:"Part.wear" of:part_in( st, pump, "piston_seal") value:&t];
+   run.seal = run.seal > t * 10000 ? run.seal : t * 10000;
+   [st.w getField:"Part.attrition" of:part_in( st, pump, "inlet_valve") value:&run.valve];
+
+   for( h = 1; h <= work; h++)
+   {
+      t = [st.w time].ms;
+      g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the worker rested and fed"];
+      [g set:"Agent.fatigue" of:BGWhole( worker) to:0];
+      [g set:"Agent.injury" of:BGWhole( worker) to:0];
+      [g set:"Agent.fed" of:BGWhole( worker) to:80];
+      [g set:"Agent.fedAt" of:BGWhole( worker) to:t];
+      [st.c submit:g];
+      BGPerform( st.w, st.c, BGActionMake( "work_pump", worker, pump, BGNoEntity), 0, &error);
+      [st.s runUntil:BGTimeMake( t + 3600000LL + 1000)];
+      text = [st.w textField:"Latent.failure" of:pump];
+      if( ! run.failedIn && text && *text)
+         run.failedIn = h;
+      if( h == saveAfter)
+      {
+         st.w = restore( BGSave( st.w, st.c, [NSArray array]), [st.w contentBuild], &st.c, &error);
+         st.s = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+         [st.s setActivities:[BGActivities activitiesWithWorld:st.w committer:st.c]];
+      }
+   }
+   [st.w getField:"Part.attrition" of:old value:&run.oldSealAfter];
+   [st.w getField:"Part.attrition" of:part_in( st, pump, "piston_seal") value:&run.sealAfter];
+   [st.w getField:"Part.attrition" of:part_in( st, pump, "inlet_valve") value:&run.valveAfter];
+   text       = [st.w textField:"Latent.blamed" of:pump];
+   run.blamed = [NSString stringWithUTF8String:(char *) (text ? text : "")];
+   return( run);
+}
+
+
+static void   test_part_condition( void)
+{
+   BGPartRun   kept;
+   BGPartRun   fresh;
+   BGPartRun   used;
+   BGPartRun   saved;
+   BGPartRun   cheap;
+   BGPartRun   plain;
+   char        key[ 32];
+   int64_t     worn;
+   int         failedKept;
+   int         failedFresh;
+   int         sealKept;
+   int         sealFresh;
+   int         k;
+
+   /* opened, a seal 1000 hours worked dry is worn through; worked on, the
+    * parts opened wear on, each as its role does */
+   kept = part_work( "crank_pump", "pump 2", 1000, -1, 50, 0);
+   BG_CHECK( kept.oldSeal == 1000000 && kept.seal == 1000000 && kept.sealAfter == 1000000);
+   BG_CHECK( kept.valveAfter > kept.valve && kept.valve > 0);
+
+   /* a new cup in its place brings its own wear in, none, and wears on from
+    * there; the old one, out on the floor, wears no further */
+   fresh = part_work( "crank_pump", "pump 2", 1000, 0, 50, 0);
+   BG_CHECK( fresh.oldSeal == 1000000 && fresh.oldSealAfter == 1000000);
+   BG_CHECK( fresh.seal == 0 && fresh.sealAfter > 0 && fresh.sealAfter < 100000);
+   BG_CHECK( fresh.valveAfter - fresh.valve == kept.valveAfter - kept.valve);
+   /* a cup already worn 30 brings that in: it wears on the same */
+   used = part_work( "crank_pump", "pump 2", 1000, 30, 50, 0);
+   BG_CHECK( used.seal == 300000 && used.sealAfter - used.seal == fresh.sealAfter);
+   /* saved and restored halfway, the same */
+   saved = part_work( "crank_pump", "pump 2", 1000, 30, 50, 25);
+   BG_CHECK( saved.sealAfter == used.sealAfter && saved.valveAfter == used.valveAfter);
+
+   /* its quality is its own: the cheap make's own cup wears faster than the
+    * plain make's, but the same new cup fitted in either wears the same */
+   cheap = part_work( "cheap_pump", "pump 2", 0, -1, 50, 0);
+   plain = part_work( "crank_pump", "pump 2", 0, -1, 50, 0);
+   BG_CHECK( plain.sealAfter > 0 && cheap.sealAfter > plain.sealAfter);
+   worn  = part_work( "cheap_pump", "pump 2", 1000, 0, 50, 0).sealAfter;
+   BG_CHECK( worn == fresh.sealAfter);
+
+   /* the risk and the blame follow what is fitted: of 12 rickety pumps 1000
+    * hours worked dry, worked 20 hours more, fewer fail with a new cup in
+    * them, and fewer of those blame the cup */
+   failedKept = failedFresh = sealKept = sealFresh = 0;
+   for( k = 0; k < 12; k++)
+   {
+      snprintf( key, sizeof( key), "pump %d", k);
+      kept         = part_work( "rickety_pump", key, 1000, -1, 20, 0);
+      fresh        = part_work( "rickety_pump", key, 1000, 0, 20, 0);
+      failedKept  += kept.failedIn > 0;
+      failedFresh += fresh.failedIn > 0;
+      sealKept    += [kept.blamed isEqualToString:@"piston_seal"];
+      sealFresh   += [fresh.blamed isEqualToString:@"piston_seal"];
+   }
+   BG_CHECK( failedFresh < failedKept);
+   BG_CHECK( sealFresh < sealKept);
+}
+
+
 /* DOMAIN_SIMULATION.md Scenario 2's drain: the pump `key` under its header
  * tank (100 L), opened, and its piston taken out: through a leaky outlet
  * valve the tank drains onto the floor; an hour on, how much left the tank,
@@ -10002,6 +10188,7 @@ const BGTestCase   BGAllTests[] =
    { "issue_permit",                  test_issue_permit },
    { "latent_pump",                   test_latent_pump },
    { "pump_wear",                     test_pump_wear },
+   { "part_condition",                test_part_condition },
    { "pump_heat",                     test_pump_heat },
    { "pump_heat_running",             test_pump_heat_running },
    { "component_pump",                test_component_pump },

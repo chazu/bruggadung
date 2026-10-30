@@ -3905,3 +3905,33 @@ Not yet: maintenance, and replacement, resetting a role's wear; age
 wearing parts; agents working pumps of their own accord.
 
 96 tests, 3079 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: a part's wear is its own
+
+LATENT_ASSEMBLY.md decision 7: once a role is opened, its wear is the
+part's in it, so replacing a part resets the role to the spare's own wear.
+
+- **Part condition** (`Part.attrition`, `grade`, new): a part's wear in
+  ten-thousandths of a point, and its hidden quality. Revealed, a part gets
+  its role's wear and quality from the assembly; a spare's quality is from
+  its own seed, its wear what content made it.
+- **Opened parts wear on**: working an assembly wears each part in it as
+  its role wears, by the part's own quality; an assembly within is used as
+  long, and so on in. Out of place, a part wears no further. A culprit
+  already opened is worn to 60 at the failure; one that is an assembly
+  takes the failure on.
+- **Risk and blame read what is fitted**: an opened role's wear is its
+  part's (an empty one, none); unopened roles still come from the history,
+  exactly as before.
+
+Checked: a seal worked dry 1000 hours is worn through, stays so, and the
+valves wear on; a new cup in its place starts at 0 and wears on, the old
+one on the floor no further; a cup fitted worn 30 starts there and wears
+the same; the same after a save; the cheap make's own cup wears faster,
+but a new cup wears the same in either make. Of 12 rickety pumps worn
+1000 hours, fewer fail in 20 hours with a new cup, and fewer blame it.
+
+Not yet: maintenance reducing wear; age wearing parts; a pump refusing
+work with a role empty; agents working pumps of their own accord.
+
+97 tests, 3184 checks, under both compilers, ASan, and leak-free.

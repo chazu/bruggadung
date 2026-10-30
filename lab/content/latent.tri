@@ -17,7 +17,9 @@
 // `chance` in a thousand, per hundred hours, when new, four times that when
 // its most worn candidate is worn through. The culprit is drawn among the
 // candidates by the unit's seed, weighted by their wear, and decided once.
-// Not among the level's parts, it isn't marked: none is invented.
+// Not among the level's parts, it isn't marked: none is invented. Once a
+// role is opened, its wear is the part's in it (decision 7): fitting another
+// brings that one's wear in, and the role wears on from there.
 
 #LatentRole:   { roleName: text, partKind: text, depth: int, wears: int & >=0 & <=100, strain: int & >=1 & <=10 }
 #Culprit:      { failing: text, candidates: [...text], chance: int & >=0 & <=1000 }
@@ -46,13 +48,20 @@
 }
 
 // A revealed part: how worn it is (0 to 100), which can be seen; the
-// assembly it came from; whether it has left it.
+// assembly it came from; whether it has left it. Its wear is its own: it
+// brings it into the role it is fitted in, and wears on there as the role
+// does, by its own quality; out of place, it doesn't. `attrition` is its
+// wear finer, in ten-thousandths of a point (a part made worn in content is
+// as worn as its `wear`); `grade`, hidden, its quality, what it was made
+// with (revealed, its assembly's for the role; -1: by its own seed).
 #Part: #Body & {
     @component(Part)
-    wear:     *0 | int & >=0 & <=100           @field(content, saved, proposable, inspect, perceive(sight))
-    cameFrom: ref                              @field(saved, proposable, inspect)
-    fits:     text                             @field(saved, proposable, inspect, perceive(sight))
-    detached: *false | true                    @field(content, saved, proposable, inspect)
+    wear:      *0 | int & >=0 & <=100          @field(content, saved, proposable, inspect, perceive(sight))
+    attrition: *0 | int & >=0 & <=1000000      @field(content, saved, proposable, inspect)
+    grade:     *-1 | int & >=-1 & <=100        @field(content, saved, proposable, inspect)
+    cameFrom:  ref                             @field(saved, proposable, inspect)
+    fits:      text                            @field(saved, proposable, inspect, perceive(sight))
+    detached:  *false | true                   @field(content, saved, proposable, inspect)
 }
 
 pump_handle:  #Part & { material: "iron", mass: 2kg }

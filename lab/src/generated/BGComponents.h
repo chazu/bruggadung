@@ -1,4 +1,4 @@
-/* Generated from Triangle content 0a80e37ab2e53298: do not edit. Type IDs are valid
+/* Generated from Triangle content aa02c564fb79b95b: do not edit. Type IDs are valid
  * only for this content; regenerate when it changes. */
 #ifndef BG_COMPONENTS_H
 #define BG_COMPONENTS_H
@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BG_CONTENT_HASH 0x0a80e37ab2e53298ULL
+#define BG_CONTENT_HASH 0xaa02c564fb79b95bULL
 
 typedef struct TriNode TriNode;
 
@@ -249,9 +249,11 @@ typedef struct {
 
 /* Part, from #Part */
 typedef struct {
+    int64_t         attrition;    /* int, in quanta of 1; content, saved, proposable, inspect */
     uint64_t        cameFrom;    /* a referent; saved, proposable, inspect */
     bool            detached;    /* bool; content, saved, proposable, inspect */
     const char *    fits;    /* text; saved, proposable, inspect, perceive(sight) */
+    int64_t         grade;    /* int, in quanta of 1; content, saved, proposable, inspect */
     int64_t         wear;    /* int, in quanta of 1; content, saved, proposable, inspect, perceive(sight) */
 } BGPart;
 
@@ -638,9 +640,11 @@ static const BGFieldInfo BGLog_fields[] = {
 };
 
 static const BGFieldInfo BGPart_fields[] = {
+    { "attrition", offsetof(BGPart, attrition), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "cameFrom", offsetof(BGPart, cameFrom), BG_VALUE_REF, "ref", "saved, proposable, inspect" },
     { "detached", offsetof(BGPart, detached), BG_VALUE_BOOL, "bool", "content, saved, proposable, inspect" },
     { "fits", offsetof(BGPart, fits), BG_VALUE_TEXT, "text", "saved, proposable, inspect, perceive(sight)" },
+    { "grade", offsetof(BGPart, grade), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "wear", offsetof(BGPart, wear), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect, perceive(sight)" },
 };
 
@@ -729,7 +733,7 @@ static const BGComponentInfo BGComponents[BG_COMPONENT_COUNT + 1] = {
     { "Lamp", "#Lamp", sizeof(BGLamp), 4, BGLamp_fields },
     { "Latent", "#Latent", sizeof(BGLatent), 9, BGLatent_fields },
     { "Log", "#Log", sizeof(BGLog), 3, BGLog_fields },
-    { "Part", "#Part", sizeof(BGPart), 4, BGPart_fields },
+    { "Part", "#Part", sizeof(BGPart), 6, BGPart_fields },
     { "Pump", "#Pump", sizeof(BGPump), 4, BGPump_fields },
     { "Record", "#Record", sizeof(BGRecord), 1, BGRecord_fields },
     { "Label", "#Label", sizeof(BGLabel), 1, BGLabel_fields },

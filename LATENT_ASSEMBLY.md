@@ -50,6 +50,18 @@ designed.
    blueprint's bias for that kind of part (a cheap pump whose leather is
    poor). Poor parts wear faster, half again as fast at 0, half as fast at
    100, and so are more often to blame.
+7. **Once opened, a role's wear is the part's in it.** A revealed part
+   carries its wear and its quality as its own (`attrition`, finer than
+   the wear that can be seen, and the hidden `grade`). Worked on, the
+   assembly's use wears each part in it as its role wears, by that part's
+   quality; a part that is itself an assembly is used as long, and so on
+   in. A part out of place wears no further. Fitting a part brings its own
+   wear in: a new spare starts the role at 0, a worn one at its wear, and
+   the role wears on from there. The failure chance and the culprit's
+   weighting read the part in each opened role; an opened role left empty
+   has none. Roles not yet opened still come from the assembly's history.
+   A spare's quality comes from its own seed, unless it was revealed from
+   an assembly, when it keeps that one's.
 
 ## Provisional
 
@@ -59,6 +71,7 @@ designed.
   flow, are the lab's numbers, not derived.
 - A candidate that is no part (the housing) wears at the default rate, two
   points per hundred hours, with a quality like any other.
-- Neither maintenance nor replacing a part resets a role's wear yet: the
-  failure chance and the culprit's weighting count the assembly's whole
-  use, even past a new spare. A revealed part wears no further with use.
+- Maintenance doesn't reduce wear yet; only replacing a part does.
+- A part that is itself an assembly (the hand pump's piston) doesn't wear
+  as a whole: its own parts do, and as a candidate it weighs as unworn.
+- A pump can be worked with an opened role empty; nothing stops it yet.
