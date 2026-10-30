@@ -25,6 +25,7 @@ src/domains/BGFluidDomain.m
 src/domains/BGThermal.m
 src/domains/BGTraces.m
 src/kinds/BGBodyKind.m
+src/kinds/BGLatentKind.m
 src/kinds/BGValveKind.m
 src/know/BGKnowledge.m
 src/main.m
