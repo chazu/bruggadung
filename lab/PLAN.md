@@ -1724,3 +1724,23 @@ still recency and distance), and curiosity weighing in elsewhere (which
 methods to try, what to notice).
 
 53 tests, 1990 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: seeking a spanner that fits
+
+CONTENT_LANGUAGE.md Scenario 2's variant A, all of it. The nut is truly
+22 mm, and the worker holds a 19 mm spanner. Up close the match is
+incompatible, and the failed precondition yields *find a spanner that
+fits*, AGENCY.md §5's *seek 22 mm wrench*. A 22 mm spanner lies on the
+bench by the nut, so the worker picks it up and tightens the nut with it.
+Knowing of none, or of only another 19 mm one, it finds the goal impossible
+for now, and the nut stays loose.
+
+- **A value parameter through the frame**: *find a spanner that fits*
+  shares *tighten the nut*'s slots. Its `done` and its method tie the
+  spanner's size to the nut's by the tag `$s`, so the size sought is the
+  nut's as the agent believes it, with no parameter of its own.
+- **A better way, unknown, is found out before a worse one is settled
+  for**: a method whose precondition is unknown and which declares
+  `onUnknown` goes first, ahead of a lower-ranked method that holds.
+
+53 tests, 1999 checks, under both compilers, ASan and UBSan, and leak-free.

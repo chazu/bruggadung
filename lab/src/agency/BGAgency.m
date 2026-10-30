@@ -2100,6 +2100,9 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
       chosenN = n;
       memcpy( chosenB, b, sizeof( BGSlotBinding) * n);
    }
+   /* a better way, unknown, is found out before a worse one is settled for */
+   if( chosen >= 0 && unknownMethod >= 0 && unknownMethod < chosen)
+      chosen = -1;
    if( chosen >= 0)
    {
       if( top->following != chosen && [scores count])

@@ -3873,8 +3873,9 @@ typedef struct
 
 /* CONTENT_LANGUAGE.md Scenario 2, "the nut of unknown size": the worker,
  * holding a spanner, is to tighten the pump's gland nut, four tiles off,
- * whose size it sees only roughly from there. */
-static BGNutRun   nut_run( const char *nut, const char *spanner, BOOL omniscient)
+ * whose size it sees only roughly from there. `spare`, if not NULL: another
+ * spanner lying on the bench by the nut. */
+static BGNutRun   nut_run( const char *nut, const char *spanner, BOOL omniscient, const char *spare)
 {
    BGStage            st;
    BGActivities       *activities;
@@ -3900,6 +3901,8 @@ static BGNutRun   nut_run( const char *nut, const char *spanner, BOOL omniscient
    worker  = [g create:"worker" key:"Oskar" at:BGOnTile( 2, 2, 0)];
    [g create:spanner key:"spanner" at:BGHeldBy( worker, 0)];
    run.nut = [g create:nut key:"gland nut" at:BGOnTile( 6, 2, 0)];
+   if( spare)
+      [g create:spare key:"spare spanner" at:BGOnTile( 5, 3, 0)];
    [st.c submit:g];
    [st.s runUntil:BGTimeMake( 1)];
    worker   = [g idFor:worker];
@@ -3930,10 +3933,12 @@ static void   test_unknown_nut( void)
    BGNutRun   seer;
    BGNutRun   tag;
    BGNutRun   again;
+   BGNutRun   spare;
+   BGNutRun   misfit;
 
    /* 1: four tiles off, the nut's size is only 16 to 22 mm: whether the 19
     * mm spanner fits is unknown, with the residual nut.size and nothing else */
-   base = nut_run( "gland_nut", "spanner_19", NO);
+   base = nut_run( "gland_nut", "spanner_19", NO, NULL);
    BG_CHECK( [base.fromAfar rangeOfString:@"size: >=16mm & <=22mm"].location != NSNotFound);
    /* 2: the residual becomes a goal: it looks closer, and then tightens it */
    BG_CHECK( logged_by( base.agency, 1, @"[tighten the nut] tighten it: unknown at nut.size: look closer first"));
@@ -3944,24 +3949,39 @@ static void   test_unknown_nut( void)
    BG_CHECK( logged_by( base.agency, 1, @"[tighten the nut] tighten it: tighten R"));
    BG_CHECK( tightened( base));
 
-   /* A: the nut is truly 22 mm: up close it is incompatible, and the method fails */
-   wrong = nut_run( "gland_nut_22", "spanner_19", NO);
+   /* A: the nut is truly 22 mm: up close it is incompatible, and the method
+    * fails; finding a spanner that fits (22 mm, the size it now believes) is
+    * impossible too, for it knows of none */
+   wrong = nut_run( "gland_nut_22", "spanner_19", NO, NULL);
    BG_CHECK( logged_by( wrong.agency, 1, @"look closer first"));
+   BG_CHECK( logged_by( wrong.agency, 1, @"[tighten the nut] get one that fits: find a spanner that fits first"));
+   BG_CHECK( logged_by( wrong.agency, 1, @"[find a spanner that fits] nothing I know of will do: impossible for now"));
    BG_CHECK( logged_by( wrong.agency, 1, @"[tighten the nut] nothing I know of will do: impossible for now"));
    BG_CHECK( ! tightened( wrong));
 
+   /* A, with a 22 mm spanner on the bench by the nut: up close, it picks that
+    * one up, and tightens the nut with it */
+   spare = nut_run( "gland_nut_22", "spanner_19", NO, "spanner_22");
+   BG_CHECK( logged_by( spare.agency, 1, @"look closer first"));
+   BG_CHECK( logged_by( spare.agency, 1, @"[find a spanner that fits] pick up one that fits: take_up"));
+   BG_CHECK( logged_by( spare.agency, 1, @"[tighten the nut] back to it: find a spanner that fits is done"));
+   BG_CHECK( tightened( spare));
+   /* with a 19 mm one there instead, nothing fits: it leaves it lying */
+   misfit = nut_run( "gland_nut_22", "spanner_19", NO, "spanner_19");
+   BG_CHECK( ! logged_by( misfit.agency, 1, @"take_up") && ! tightened( misfit));
+
    /* 3, B: the omniscient stub knows the size from afar: it never looks closer */
-   seer = nut_run( "gland_nut", "spanner_19", YES);
+   seer = nut_run( "gland_nut", "spanner_19", YES, NULL);
    BG_CHECK( ! logged_by( seer.agency, 1, @"look closer") && ! logged_by( seer.agency, 1, @"peer_at"));
    BG_CHECK( tightened( seer));
 
    /* 4: tags: with a 22 mm spanner instead, the same closer look finds it incompatible */
-   tag = nut_run( "gland_nut", "spanner_22", NO);
+   tag = nut_run( "gland_nut", "spanner_22", NO, NULL);
    BG_CHECK( logged_by( tag.agency, 1, @"look closer first"));
    BG_CHECK( logged_by( tag.agency, 1, @"impossible for now") && ! tightened( tag));
 
    /* 5: determinism */
-   again = nut_run( "gland_nut", "spanner_19", NO);
+   again = nut_run( "gland_nut", "spanner_19", NO, NULL);
    BG_CHECK( [again.text isEqualToString:base.text]);
 }
 

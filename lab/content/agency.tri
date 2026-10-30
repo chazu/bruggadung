@@ -467,6 +467,46 @@ tighten_it: #Method & {
     steps:     [#Do & { op: "tighten", object: "spanner", target: "nut" }]
 } @family(methods)
 
+// Else get a spanner that fits it (AGENCY.md §5's *seek 22 mm wrench*: the
+// size is the nut's, as the agent now believes it, through the frame's
+// slots), and tighten it with that.
+get_one_that_fits: #Method & {
+    title: "get one that fits"
+    goal:  "tighten_nut"
+    rank:  2
+    pre:   { find: ["nut"], match: #Tightening & { nut: #Fastener & { tight: false } } }
+    steps: [#Achieve & { subgoal: "fitting_spanner" },
+            #Do & { op: "tighten", object: "spanner", target: "nut" }]
+} @family(methods)
+
+fitting_spanner: #Goal & {
+    title: "find a spanner that fits"
+    done: {
+        find:  ["spanner", "nut"]
+        match: #Tightening & {
+            me:      #Agent & { id: $me }
+            spanner: #Spanner & { size: $s, place: #Held & { by: $me } }
+            nut:     #Fastener & { size: $s }
+        }
+    }
+} @family(goals)
+
+// Pick up a spanner of the nut's size, lying about or in something.
+pick_up_spanner: #Method & {
+    title: "pick up one that fits"
+    goal:  "fitting_spanner"
+    rank:  1
+    pre: {
+        find:  ["spanner", "nut"]
+        match: #Tightening & {
+            spanner: #Spanner & { size: $s, place: #OnTile | #Inside }
+            nut:     #Fastener & { size: $s }
+        }
+    }
+    order: ["near"]
+    steps: [#Do & { op: "take_up", object: "spanner" }]
+} @family(methods)
+
 look_closer: #Goal & {
     title: "look closer"
     done:  #Reached & { reached: "nut" }
