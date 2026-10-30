@@ -2977,3 +2977,70 @@ the lock. Without `likely`, the same scene searches the crate, gives up,
 and the lock stays unwedged.
 
 80 tests, 2574 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: a trace kind's floor
+
+KNOWLEDGE.md §3: "A trace whose perceivability would fall below its kind's
+floor is removed at that time, which the trace system reports to the
+scheduler as a `nextEvent`." Every trace ran to its expiry.
+
+- **`floor`** (a trace kind's, 0 by default): below it, the trace is gone.
+  `BGTraceGone` solves for the first such moment from the even fade; the
+  traces domain's next event is the earliest, and it removes what is gone
+  there. The soap smell's floor is 20: a smell is there or it isn't.
+
+Checked: a soap smell made at 60 to last a day is gone at 16 h, at a
+boundary of its own (one boundary to just before, two to an hour after);
+scuffs beside it, with no floor, stay.
+
+81 tests, 2580 checks, under both compilers, ASan, and leak-free.
+
+### The "Not yet" lists, audited
+
+Each slice's "Not yet" was written when it was; many were done later. As
+of the slice above, every one of them is in one of three places.
+
+**Done by a later slice** (its heading above): event perception,
+observations, rules, claims, credence and trust, memory decay and its
+rates, scheduled forgetting, salience and bounded stores, attention
+budgets (events, new traces, interpretation), the notebook, goals and
+methods in content, method scores, `onUnknown`, needs (hunger, cold, air,
+rest, pain), routines, commitments and urgency curves, habits and belief
+by habit, promises (made by saying, kept or broken, of a thing held),
+granting and lending, risk tolerance, walking as an activity, provider
+allocation (committed and pending), interruption, suspension, resuming,
+partial effects, failing hard, talking taking time, answering as a
+choice, saying and asking in `lab play`, traces (on stacks, worn by foot
+traffic, kind floors), appearance and analysis, competing hypotheses
+(identity, features, testimony), the knowledge arena, light and the lamp,
+credence thresholds, the seized valve's chain (in reach, with access
+time), its sounds, exertion and fatigue, the interrupted repair (recipe
+through a diagram, the shout, the watch on rising water, inspection,
+improvising, saves), all four autopilot modes, reservations by a tag, and
+search ordered by belief.
+
+**Waiting on a decision** (the document text in "What stays open, and
+why" above, and):
+- *Retracting a finding when a premise is* (KNOWLEDGE.md §9): the
+  lab's premises are perceived traces, and a trace fading isn't a premise
+  found false (fresh paint dries; it was still touched up). Which is a
+  retraction isn't said.
+- *Rates from capabilities and modifiers* (walking speed from the
+  walker, fatigue slowing work, impact as a graded effect): ACTIONS.md §5
+  "rate = f(capabilities, shortfall, actor modifiers)", f being open
+  question 4.
+- *Weights from other derived values*: ACTIONS.md open question 8.
+- *Light and sound as domains*: KNOWLEDGE.md open question 2.
+- *How long content lives once unreferenced*: COMPONENTS.md, open.
+- *Threats as salience*: AGENCY.md §10 lists "harm to the agent or to
+  those it is loyal to"; there is no harm, and loyalty is open.
+- *Trust beyond confirmation and refutation, the weight of one's word,
+  the value of what is parted with, interest and loan terms, starvation's
+  consequences, detail fading by salience*: no document says.
+- *Routes as habits, exploring around obstacles*: the lab has no walls.
+
+**Buildable, not yet done**: commitments recurring daily (AGENCY.md §8's
+"a shift from 8 to 16"), reading taking time (as talking does), traces
+left per stage rather than at completion (ACTIONS.md §2, costs "committed
+per stage"), a split reaching a running thermal domain's ledger, and
+hearing a promise's outcome from others.

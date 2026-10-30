@@ -10,7 +10,9 @@
 // fades evenly from its magnitude to nothing over `lasts`, and is removed
 // when it runs out. Foot traffic speeds that (KNOWLEDGE.md §3): each step
 // onto its tile takes `trodden` percent of the life a floor trace has left.
-#TraceKind: { sense: #Sense, lasts: time, trodden: int & >=0 & <=100 | *0 }
+// Below its `floor` (strength), a trace of the kind is gone, removed then
+// (KNOWLEDGE.md §3), though `lasts` would have it fade on.
+#TraceKind: { sense: #Sense, lasts: time, trodden: int & >=0 & <=100 | *0, floor: int & >=0 & <=100 | *0 }
 
 // Where an operation leaves a trace, or removes one: on one of its roles, or
 // on the tile the actor stands on.
@@ -37,7 +39,7 @@ trace: #Trace & { tileX: 0, tileY: 0, tileLevel: 0, magnitude: 0, created: 0ms, 
 tool_marks:  #TraceKind & { sense: "sight", lasts: 365d } @family(traces)
 scuffs:      #TraceKind & { sense: "sight", lasts: 30d }  @family(traces)
 damp_floor:  #TraceKind & { sense: "sight", lasts: 6h, trodden: 25 } @family(traces)
-soap_smell:  #TraceKind & { sense: "smell", lasts: 1d }   @family(traces)
+soap_smell:  #TraceKind & { sense: "smell", lasts: 1d, floor: 20 } @family(traces)
 fresh_paint: #TraceKind & { sense: "sight", lasts: 3d }   @family(traces)
 paint_smell: #TraceKind & { sense: "smell", lasts: 4d }   @family(traces)
 scratch:     #TraceKind & { sense: "sight", lasts: 365d } @family(traces)

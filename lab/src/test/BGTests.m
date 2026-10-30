@@ -7548,6 +7548,52 @@ static void   test_traced_units( void)
 }
 
 
+/* KNOWLEDGE.md §3: "A trace whose perceivability would fall below its
+ * kind's floor is removed at that time, which the trace system reports to
+ * the scheduler as a nextEvent." A soap smell (floor 20), made at 60 to
+ * last a day, is gone when it falls below 20: two thirds of the way, at
+ * 16 h, a boundary of its own; scuffs (no floor) last their thirty days. */
+static void   test_trace_floor( void)
+{
+   BGStage            st;
+   BGTraces           *traces;
+   BGProposalGroup    *g;
+   BGEntityID         soap;
+   BGEntityID         scuffs;
+   const BGTrace      *record;
+   int64_t            born;
+
+   st.w   = BGTestWorld( 181);
+   st.c   = BGTestCommitter( st.w);
+   st.s   = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   traces = [[[BGTraces alloc] initWithWorld:st.w] autorelease];
+   [st.s addDomain:traces];
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: a washed floor"];
+   BGMakeTrace( st.w, g, "soap_smell", BGNoEntity, BGOnTile( 4, 4, 0), 60, "a scrubbing");
+   BGMakeTrace( st.w, g, "scuffs", BGNoEntity, BGOnTile( 4, 5, 0), 60, "boots");
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   soap   = [g idFor:[g proposals][ 0].handle];
+   scuffs = BGNoEntity;
+   {
+      NSUInteger   i;
+
+      for( i = 1; i < [g count]; i++)
+         if( [g proposals][ i].kind == BGProposeCreate)
+            scuffs = [g idFor:[g proposals][ i].handle];
+   }
+   record = [st.w record:[st.w kindNamed:"Trace"] for:soap];
+   BG_CHECK( record && BGTraceGone( st.w, record) == record->created + 16 * 3600000LL + 1);
+   born = record->created;
+   BG_CHECK( [traces horizonAt:[st.w time]].nextEvent.ms == born + 16 * 3600000LL + 1);
+   /* still there just before; gone at its own boundary */
+   BG_CHECK( [st.s runUntil:BGTimeMake( born + 16 * 3600000LL)] == 1);
+   BG_CHECK( [st.w isLive:soap]);
+   BG_CHECK( [st.s runUntil:BGTimeMake( born + 17 * 3600000LL)] == 2);
+   BG_CHECK( ! [st.w isLive:soap] && [st.w isLive:scuffs]);
+}
+
+
 /* KNOWLEDGE.md §3: foot traffic speeds a trace's decay, as its kind
  * declares. A damp floor and scuffs on one tile, a damp floor on the next;
  * a worker steps onto the first, off, and on again. Each step takes a
@@ -8152,6 +8198,7 @@ const BGTestCase   BGAllTests[] =
    { "memory_rates",                  test_memory_rates },
    { "scheduled_forgetting",          test_scheduled_forgetting },
    { "trodden",                       test_trodden },
+   { "trace_floor",                   test_trace_floor },
    { "traced_units",                  test_traced_units },
    { "attention_budget",              test_attention_budget },
    { "routine_autopilot",             test_routine_autopilot },

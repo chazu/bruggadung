@@ -14,6 +14,33 @@ int64_t   BGTraceStrength( const BGTrace *trace, int64_t t)
 }
 
 
+int64_t   BGTraceGone( BGWorld *world, const BGTrace *trace)
+{
+   const TriNode   *v;
+   int64_t         floor;
+   int64_t         lo;
+   int64_t         hi;
+   int64_t         life;
+   int64_t         t;
+
+   v     = trace->traceKind ? tri_at( [world tri], tri_pattern( [world tri], trace->traceKind), "floor") : NULL;
+   floor = v && tri_node_interval( v, &lo, &hi) && lo == hi ? lo : 0;
+   life  = trace->expires - trace->created;
+   if( floor <= 0 || life <= 0)
+      return( trace->expires);
+   if( trace->magnitude < floor)
+      return( trace->created);
+   /* strength(t) = magnitude * (expires - t) / life, below floor from about
+    * expires - floor * life / magnitude; settled to the first such moment */
+   t = trace->expires - floor * life / trace->magnitude;
+   while( t > trace->created && BGTraceStrength( trace, t - 1) < floor)
+      t--;
+   while( t < trace->expires && BGTraceStrength( trace, t) >= floor)
+      t++;
+   return( t);
+}
+
+
 @implementation BGTraces
 
 - (id) initWithWorld:(BGWorld *) world
@@ -50,13 +77,14 @@ int64_t   BGTraceStrength( const BGTrace *trace, int64_t t)
 }
 
 
-/* Nothing continuous: only the next expiry. */
+/* Nothing continuous: only the next trace gone. */
 - (BGHorizon) horizonAt:(BGTime) t
 {
    const BGTrace   *record;
    BGStore         *traces;
    BGHorizon       h;
    NSUInteger      i;
+   int64_t         gone;
 
    h.safeStep  = BGTimeNever;
    h.nextEvent = BGTimeNever;
@@ -64,14 +92,15 @@ int64_t   BGTraceStrength( const BGTrace *trace, int64_t t)
    for( i = 0; i < [traces count]; i++)
    {
       record = [traces recordAtIndex:i];
-      if( record->expires > t.ms && record->expires < h.nextEvent.ms)
-         h.nextEvent = BGTimeMake( record->expires);
+      gone   = BGTraceGone( _world, record);
+      if( gone > t.ms && gone < h.nextEvent.ms)
+         h.nextEvent = BGTimeMake( gone);
    }
    return( h);
 }
 
 
-/* What has run out by t1 is removed at t1, in trace order. */
+/* What is gone by t1 is removed at t1, in trace order. */
 - (void) advanceFrom:(BGTime) t0
                   to:(BGTime) t1
                world:(BGWorld *) world
@@ -87,7 +116,7 @@ int64_t   BGTraceStrength( const BGTrace *trace, int64_t t)
    for( i = 0; i < [traces count]; i++)
    {
       record = [traces recordAtIndex:i];
-      if( record->expires > t1.ms)
+      if( BGTraceGone( world, record) > t1.ms)
          continue;
       if( ! group)
          group = [BGProposalGroup groupWithPhase:BGPhaseProcess source:@"traces: run out"];
