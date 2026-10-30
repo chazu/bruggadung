@@ -70,6 +70,10 @@ Out of scope here, except where they touch agency:
     is its own or its loyalties' (taken, broken, sanctioned). A threat is a
     belief that harm is happening or about to; it is salient (§10), and
     can raise a soft interruption.
+14. **Considerations add, in dB, and some veto.** A worth is the sum of its
+    considerations in dB (a product of odds factors); a consideration
+    content declares a veto rules the option out when it applies, whatever
+    else scores (a deeply held norm: never harm a child).
 
 ## Terms
 
@@ -625,8 +629,8 @@ a body need, and consequences flowing through knowledge.
 
 ## Open questions
 
-1. **Consideration curves.** How are they represented in content, and how are
-   considerations combined (product, weighted sum, or a mix)?
+1. **Consideration curves.** How are they represented in content? (How
+   they combine is decided: decision 14.)
 2. **Theory of mind.** How deeply do agents model each other: trust,
    inferred goals, predicted reactions? Trust is the minimum.
 3. **Fidelity levels.** What each level computes, how promotion and demotion
