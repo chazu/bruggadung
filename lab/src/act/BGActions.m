@@ -940,6 +940,112 @@ static NSString   *effect_copy( BGWorld *world, BGAction a, int64_t amount, BGPr
 }
 
 
+/* A text feature of a node, unquoted, into buf; NO if it hasn't one. */
+static BOOL   text_feature( TriContent *tri, const TriNode *node, const char *path, char *buf, size_t len)
+{
+   size_t   n;
+
+   n = node ? tri_print( tri, tri_at( tri, node, path), buf, len) : 0;
+   if( n < 2 || n >= len || buf[ 0] != '"')
+      return( NO);
+   memmove( buf, buf + 1, n - 2);
+   buf[ n - 2] = 0;
+   return( YES);
+}
+
+
+/* Opening a latent assembly a level further (content/latent.tri, provisional):
+ * the level's parts become entities, part of it, their mass carved out of its
+ * own; each one's wear from the assembly's seed and its role. The culprit of
+ * a failure committed against it is drawn from the seed and the failure: if
+ * it is among these parts, it is worn by the failure, and more so the longer
+ * since. */
+static NSString   *effect_reveal( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
+{
+   const BGLatent       *latent;
+   const BGEntityInfo   *info;
+   const TriNode        *schema;
+   const TriNode        *list;
+   const TriNode        *entry;
+   const TriNode        *cands;
+   TriContent           *tri;
+   BGEntityID           assembly;
+   BGEntityID           part;
+   uint64_t             seed;
+   int64_t              depth;
+   int64_t              lo;
+   int64_t              hi;
+   int64_t              mass;
+   int64_t              carved;
+   int64_t              wear;
+   int64_t              n;
+   int64_t              k;
+   const char           *failure;
+   char                 culprit[ 64];
+   char                 role[ 64];
+   char                 kind[ 64];
+   char                 text[ 64];
+   BOOL                 any;
+
+   tri      = [world tri];
+   assembly = a.roles[ BGRoleDestination];
+   latent   = [world record:[world kindNamed:"Latent"] for:assembly];
+   info     = [world info:assembly];
+   schema   = latent && info ? tri_at( tri, tri_pattern( tri, info->blueprint), "latent") : NULL;
+   if( ! schema)
+      return( @"there is nothing inside to open");
+   seed  = info->seed;
+   depth = latent->revealed + 1;
+
+   /* the culprit: from the seed and the failure alone */
+   culprit[ 0] = 0;
+   failure     = [world textField:"Latent.failure" of:assembly];
+   for( list = tri_at( tri, schema, "culprits"); failure && *failure && list && (entry = tri_at( tri, list, "first"));
+        list = tri_at( tri, list, "rest"))
+   {
+      if( ! text_feature( tri, entry, "failing", text, sizeof( text)) || strcmp( text, failure))
+         continue;
+      for( n = 0, cands = tri_at( tri, entry, "candidates"); cands && tri_at( tri, cands, "first");
+           cands = tri_at( tri, cands, "rest"))
+         n++;
+      if( ! n)
+         break;
+      k = (int64_t) (BGMixString( BGMix( seed ^ 0x63756c70726974ULL), failure) % (uint64_t) n);
+      for( cands = tri_at( tri, entry, "candidates"); k-- > 0; cands = tri_at( tri, cands, "rest"))
+         ;
+      text_feature( tri, cands, "first", culprit, sizeof( culprit));
+   }
+
+   /* the level's parts */
+   any    = NO;
+   carved = 0;
+   for( list = tri_at( tri, schema, "parts"); list && (entry = tri_at( tri, list, "first")); list = tri_at( tri, list, "rest"))
+   {
+      if( ! tri_node_interval( tri_at( tri, entry, "depth"), &lo, &hi) || lo != depth ||
+          ! text_feature( tri, entry, "roleName", role, sizeof( role)) ||
+          ! text_feature( tri, entry, "partKind", kind, sizeof( kind)))
+         continue;
+      any  = YES;
+      mass = tri_node_interval( tri_at( tri, tri_pattern( tri, kind), "mass"), &lo, &hi) && lo == hi ? lo : 0;
+      part = [g create:[world intern:kind] key:[world intern:role] at:BGPartOf( assembly, [world intern:role], 0)];
+      wear = (int64_t) (BGMixString( BGMix( seed), role) % 20);
+      if( ! strcmp( role, culprit))
+      {
+         wear = 60 + ([world time].ms - latent->failedAt) / 36000000;      /* a point every ten hours since */
+         wear = wear > 100 ? 100 : wear;
+      }
+      [g set:"Part.wear" of:BGWhole( part) to:wear];
+      [g emit:"revealed" subject:BGWhole( part) other:BGWhole( assembly)];
+      carved += mass;
+   }
+   if( ! any)
+      return( @"there is nothing further to open");
+   [g set:"Body.mass" of:BGWhole( assembly) to:[world getField:"Body.mass" of:assembly value:&mass] ? mass - carved : 0];
+   [g set:"Latent.revealed" of:BGWhole( assembly) to:depth];
+   return( nil);
+}
+
+
 /* What authority there is over an entity (COMPONENTS.md Scenario 2): the
  * reified authorizations over it, each linked to the content that states
  * it. Content no authorization links to confers nothing. */
@@ -1102,6 +1208,7 @@ static const struct
    { "saw",       effect_saw },
    { "pass",      effect_pass },
    { "copy",      effect_copy },
+   { "reveal",    effect_reveal },
    { "rest",      effect_rest },
    { "strike",    effect_strike },
 };

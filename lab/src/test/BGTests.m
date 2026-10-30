@@ -68,7 +68,7 @@ static void   test_registry_and_construction( void)
 
    w = BGTestWorld( 1);
    c = BGTestCommitter( w);
-   BG_CHECK( [w kindCount] == 31);
+   BG_CHECK( [w kindCount] == 33);
    BG_CHECK( [w kindNamed:"Body"] != NSNotFound && [w kindNamed:"Nonesuch"] == NSNotFound);
    bin   = commit_create( c, "bin", BGOnTile( 0, 0, 0));
    nails = commit_create( c, "nails_30", BGIn( bin));
@@ -3366,6 +3366,157 @@ static void   test_forged_permit( void)
 }
 
 
+/* DOMAIN_SIMULATION.md Scenario 2 and COMPONENTS.md §7, latent assembly
+ * (provisional): the crank pump `key` (its seed), a "flow loss" committed
+ * against it at hour 300, opened two levels by a worker with a wrench at
+ * `openAt`; `saveAt`, if not 0: saved then, and opened in the restored world.
+ * What was revealed: "role blueprint wear; ..." in role order, and the
+ * culprit's role, or "" if none. */
+typedef struct
+{
+   NSString     *parts;
+   NSString     *culprit;
+   NSString     *menu;          /* the worker's, before opening */
+   int64_t      pumpMass;      /* g, after */
+   int64_t      total;         /* g, the pump and its parts */
+   BOOL         inside;        /* every part partOf the pump */
+} BGPumpRun;
+
+
+static BGPumpRun   pump_open( const char *key, const char *failure, int64_t openAt, int64_t saveAt)
+{
+   BGStage            st;
+   BGProposalGroup    *g;
+   BGEntityID         pump;
+   BGEntityID         worker;
+   BGEntityID         wrench;
+   BGStore            *parts;
+   BGLocation         at;
+   BGMenu             *menu;
+   NSMutableArray     *found;
+   NSMutableArray     *entries;
+   NSString           *error;
+   BGPumpRun          run;
+   NSUInteger         i;
+   int64_t            v;
+
+   memset( &run, 0, sizeof( run));
+   st.w   = BGTestWorld( 157);
+   st.c   = BGTestCommitter( st.w);
+   st.s   = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   g      = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the pump house"];
+   pump   = [g create:"crank_pump" key:key at:BGOnTile( 5, 5, 0)];
+   worker = [g create:"worker" key:"worker" at:BGOnTile( 4, 5, 0)];
+   wrench = [g create:"wrench_250" key:"wrench" at:BGHeldBy( worker, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   pump   = [g idFor:pump];
+   worker = [g idFor:worker];
+   wrench = [g idFor:wrench];
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"history: a failure"];
+   [g set:"Latent.failure" of:BGWhole( pump) toText:failure];
+   [g set:"Latent.failedAt" of:BGWhole( pump) to:300 * 3600000LL];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 2)];
+
+   menu    = [BGMenu menuFor:worker world:st.w];
+   entries = [NSMutableArray array];
+   for( i = 0; i < [menu count]; i++)
+      [entries addObject:[menu describeAt:i]];
+   run.menu = [entries componentsJoinedByString:@"; "];
+
+   if( saveAt)
+   {
+      NSString   *text;
+
+      [st.s runUntil:BGTimeMake( saveAt)];
+      text = BGSave( st.w, st.c, [NSArray array]);
+      error = nil;
+      st.w  = restore( text, [st.w contentBuild], &st.c, &error);
+      st.s  = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   }
+   [st.s runUntil:BGTimeMake( openAt)];
+   error = nil;
+   BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "open_up", worker, wrench, pump), 0, &error) != nil);
+   [st.s runUntil:BGTimeMake( openAt + 1000)];
+   BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "open_up", worker, wrench, pump), 0, &error) != nil);
+   [st.s runUntil:BGTimeMake( openAt + 2000)];
+
+   found       = [NSMutableArray array];
+   run.culprit = @"";
+   run.inside  = YES;
+   parts       = [st.w storeForKind:[st.w kindNamed:"Part"]];
+   [st.w getField:"Body.mass" of:pump value:&run.pumpMass];
+   run.total = run.pumpMass;
+   for( i = 0; i < [parts count]; i++)
+   {
+      BGEntityID   e;
+
+      e  = [parts entityAtIndex:i];
+      at = [st.w locationOf:e];
+      run.inside = run.inside && at.form == BGLocationPartOf && at.place == pump;
+      [st.w getField:"Part.wear" of:e value:&v];
+      [found addObject:[NSString stringWithFormat:@"%s %s %lld", at.role, [st.w info:e]->blueprint, (long long) v]];
+      if( v >= 60)
+         run.culprit = [NSString stringWithUTF8String:at.role];
+      [st.w getField:"Body.mass" of:e value:&v];
+      run.total += v;
+   }
+   run.parts = [found componentsJoinedByString:@"; "];
+   return( run);
+}
+
+
+static void   test_latent_pump( void)
+{
+   BGPumpRun   early;
+   BGPumpRun   late;
+   BGPumpRun   saved;
+   BGPumpRun   seized;
+   BGPumpRun   other;
+   BOOL        seal;
+   BOOL        outlet;
+   BOOL        none;
+   char        key[ 32];
+   int         k;
+
+   /* opened two levels: six parts, part of it; 3: its mass carved, not duplicated */
+   early = pump_open( "pump 1", "flow_loss", 300 * 3600000LL, 0);
+   BG_CHECK( early.inside && [[early.parts componentsSeparatedByString:@"; "] count] == 6);
+   BG_CHECK( early.total == 40000 && early.pumpMass < 40000);
+
+   /* 2: deterministic reveal: at hour 400, the same parts and culprit; only
+    * the culprit's wear, grown since the failure, differs */
+   late = pump_open( "pump 1", "flow_loss", 400 * 3600000LL, 0);
+   BG_CHECK( [early.parts isEqualToString:@"handle pump_handle 9; cover pump_cover 8; piston piston 12; "
+                                          @"piston_seal leather_cup 60; inlet_valve inlet_valve 0; outlet_valve outlet_valve 2"]);
+   BG_CHECK( [late.culprit isEqualToString:early.culprit] && [early.culprit isEqualToString:@"piston_seal"]);
+   BG_CHECK( [late.parts isEqualToString:[early.parts stringByReplacingOccurrencesOfString:@"leather_cup 60"
+                                                                                withString:@"leather_cup 70"]]);
+   /* reloading a save made before opening gives the same */
+   saved = pump_open( "pump 1", "flow_loss", 300 * 3600000LL, 200 * 3600000LL);
+   BG_CHECK( [saved.parts isEqualToString:early.parts]);
+
+   /* the culprit varies with the unit's seed, among the candidates; the
+    * housing is no part at these levels: cause unresolved, none invented */
+   seal = outlet = none = NO;
+   for( k = 0; k < 24; k++)
+   {
+      snprintf( key, sizeof( key), "pump %d", k);
+      other  = pump_open( key, "flow_loss", 300 * 3600000LL, 0);
+      seal   = seal || [other.culprit isEqualToString:@"piston_seal"];
+      outlet = outlet || [other.culprit isEqualToString:@"outlet_valve"];
+      none   = none || [other.culprit isEqualToString:@""];
+      /* 6: the menu before opening says nothing of it */
+      BG_CHECK( [other.menu isEqualToString:early.menu]);
+   }
+   BG_CHECK( seal && outlet && none);
+   /* a failure with no candidates: nothing marked */
+   seized = pump_open( "pump 1", "seized", 300 * 3600000LL, 0);
+   BG_CHECK( [seized.culprit isEqualToString:@""]);
+}
+
+
 /* --- the false alarm -------------------------------------------------------- */
 
 typedef enum
@@ -6316,6 +6467,7 @@ const BGTestCase   BGAllTests[] =
    { "pain",                          test_pain },
    { "habitual_belief",               test_habitual_belief },
    { "forged_permit",                 test_forged_permit },
+   { "latent_pump",                   test_latent_pump },
    { "door_in_the_dark",              test_door_in_the_dark },
    { "wrench_replaced",               test_wrench_replaced },
    { "rumour",                        test_rumour },

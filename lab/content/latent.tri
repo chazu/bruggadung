@@ -1,0 +1,66 @@
+// Latent physical assembly (COMPONENTS.md §7, DOMAIN_SIMULATION.md Scenario
+// 2). PROVISIONAL: the latent assembly document is to specify materialization,
+// consistency with history, and culprit attribution; until it does, this is
+// the least that meets §7 and the scenario's checks.
+//
+// An assembly's descriptor (`latent`, in content with its blueprint) lists its
+// roles: each a part blueprint, at a depth (the level opening reveals it at);
+// and, per failure, the roles that could be its culprit. The assembly keeps
+// what is revealed, and the failures committed against it (its history).
+// Opening a level makes its parts entities, `partOf` the assembly, their mass
+// carved out of the aggregate's. A part's wear derives from the assembly's
+// seed and its role, never its ID. The culprit is drawn from the seed and the
+// failure alone, so it is the same whenever it is opened; only its wear, grown
+// since the failure, differs. Not among the level's parts, it isn't marked:
+// none is invented.
+
+#LatentRole:   { roleName: text, partKind: text, depth: int }
+#Culprit:      { failing: text, candidates: [...text] }
+#LatentSchema: { parts: [...#LatentRole], culprits: [...#Culprit] }
+
+#Latent: #Body & {
+    @component(Latent)
+    revealed: *0 | int & >=0 & <=8             @field(content, saved, proposable, inspect)
+    failure:  text                             @field(saved, proposable, inspect)
+    failedAt: *0ms | time & >=0ms & <=10000d   @field(content, saved, proposable, inspect)
+    latent:   #LatentSchema
+}
+
+// A revealed part: how worn it is (0 to 100), which can be seen.
+#Part: #Body & {
+    @component(Part)
+    wear: *0 | int & >=0 & <=100               @field(content, saved, proposable, inspect, perceive(sight))
+}
+
+pump_handle:  #Part & { material: "iron", mass: 2kg }
+pump_cover:   #Part & { material: "iron", mass: 3kg }
+piston:       #Part & { material: "iron", mass: 4kg }
+leather_cup:  #Part & { material: "rubber", mass: 200g }
+inlet_valve:  #Part & { material: "brass", mass: 500g }
+outlet_valve: #Part & { material: "brass", mass: 500g }
+
+// The crank-driven piston pump: 40 kg in all, its parts inside until opened.
+crank_pump: #Pump & #Latent & {
+    material: "iron", mass: 40kg, slots: 8
+    latent: {
+        parts: [{ roleName: "handle", partKind: "pump_handle", depth: 1 },
+                { roleName: "cover", partKind: "pump_cover", depth: 1 },
+                { roleName: "piston", partKind: "piston", depth: 2 },
+                { roleName: "piston_seal", partKind: "leather_cup", depth: 2 },
+                { roleName: "inlet_valve", partKind: "inlet_valve", depth: 2 },
+                { roleName: "outlet_valve", partKind: "outlet_valve", depth: 2 }]
+        culprits: [{ failing: "flow_loss", candidates: ["piston_seal", "inlet_valve", "outlet_valve", "housing"] },
+                   { failing: "seized", candidates: [] }]
+    }
+}
+
+// Open an assembly in reach a level further, with a wrench in hand.
+open_up: #Operation & {
+    effect: "reveal"
+    uses:   ["hands"]
+    roles: {
+        actor:       #Agent & { id: $a }
+        item:        #Wrench & { place: #Held & { by: $a } }
+        destination: #Latent
+    }
+} @family(operations)

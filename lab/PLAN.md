@@ -2006,9 +2006,10 @@ The remaining scenario checks that aren't run, after the passes above:
   field the inspector alone prints. A text check can't tell entity IDs
   from store IDs, both small integers.
 - **Needing design**, with where the docs leave it:
-  - latent assembly: DOMAIN_SIMULATION.md Scenario 2, COMPONENTS.md
-    Scenario 3, and ACTIONS.md Scenario 3's steps 2 and 7. COMPONENTS.md:
-    "The latent assembly document will specify materialization …"
+  - latent assembly's own rules: materialization, consistency with
+    history, culprit attribution. COMPONENTS.md: "The latent assembly
+    document will specify materialization …" The lab's are provisional
+    (below), and so are the scenarios built on them.
   - institutions: grievances, reporting to the miller, and whether a guard
     *believes* a permit. ARCHITECTURE.md: "Institutions (§6) … To be
     specified". (COMPONENTS.md Scenario 2 needed none of it; see below.)
@@ -2274,3 +2275,47 @@ and how long content lives once nothing references it (COMPONENTS.md: an
 open question).
 
 64 tests, 2181 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: latent assembly, provisionally
+
+COMPONENTS.md §7 and DOMAIN_SIMULATION.md Scenario 2's reveal, under
+provisional rules (content/latent.tri) until the latent assembly document
+gives its own. §7 fixes these:
+
+- an assembly (`Latent`) keeps what is revealed and its history;
+- revealed parts are entities `partOf` it, their mass carved out of its
+  own, so the total is unchanged;
+- a part's properties come from the parent's seed and role, never its ID;
+- parts join no domains while inside.
+
+Provisional, and for the document to replace:
+
+- the descriptor lists roles, each a part blueprint at a depth, and the
+  culprit candidates per failure;
+- the culprit is drawn from the unit's seed and the failure alone, and is
+  marked only if it is among the revealed parts;
+- the culprit's wear is 60, plus a point every ten hours since the
+  failure.
+
+The crank pump, a "flow loss" committed at hour 300, opened two levels with
+a wrench (`open_up`):
+
+- **Six parts**, `partOf` it. 40 kg in all, 29.8 kg left in the pump.
+- **Check 2**: opened at hour 300 or 400, the same parts and culprit (the
+  piston seal); only its wear differs, 60 or 70. Reloading a save made
+  before opening gives the same.
+- **Variants**: over the units' seeds the culprit is the seal, or the
+  outlet valve, or the housing. The housing is no part at these levels, so
+  the cause is unresolved and none is invented. A failure with no
+  candidates marks nothing.
+- **Check 6**: the menu before opening is the same for every unit.
+- **The committer** lets a part revealed `partOf` a latent assembly
+  declare no new mass: its mass is carved, and the ledger checks the
+  assembly lost as much.
+
+Not yet: extracting a part as a topology change for the fluid domain (the
+outlet valve draining the header tank, check 1), the piston leaving with
+its share of heat (check 3's thermal half), and the interrupted repair's
+inspection binding the culprit.
+
+65 tests, 2269 checks, under both compilers, ASan and UBSan, and leak-free.

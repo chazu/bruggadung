@@ -494,7 +494,12 @@ static NSString   *live_check( BGWorld *w, BGEntityID e, const char *role)
       else
          if( loc.form != BGLocationNone)
             return( [NSString stringWithFormat:@"%s is informational and has no location", p->name]);
-      declare( tally, [_world isPhysical:e] ? [_world unitOf:e] : NULL, [_world unitsOf:e], [_world massOf:e]);
+      /* a part revealed in a latent assembly (COMPONENTS.md §7): its mass
+       * is carved out of the assembly's, which the group lowers as much, so
+       * none is created */
+      declare( tally, [_world isPhysical:e] ? [_world unitOf:e] : NULL, [_world unitsOf:e],
+               loc.form == BGLocationPartOf && [_world record:[_world kindNamed:"Latent"] for:loc.place] ? 0
+                                                                                                   : [_world massOf:e]);
       [self emit:"created" subject:e other:BGNoEntity amount:0 detail:p->name location:loc group:g];
       return( nil);
 
