@@ -3627,6 +3627,7 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
          continue;
       [store retractFinding:"#Struck" about:f.about];
       [store addFinding:f];
+      [store adjustTrustIn:f.about by:-BG_WRONGED];
       [news addObject:[NSString stringWithFormat:@"R%u struck you", f.about]];
    }
 
@@ -3937,6 +3938,7 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
             f.rule     = [_world intern:"seen"];
             f.time     = now;
             [store addFinding:f];
+            [store adjustTrustIn:o.actor by:-BG_WRONGED];
             [news addObject:[NSString stringWithFormat:@"R%u took R%u, R%u's", o.actor, o.subject, owned->choice]];
          }
       }

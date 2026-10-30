@@ -3642,3 +3642,20 @@ still be some, and no longer concludes the lock was touched up.
 Not yet: being told a credible other cause.
 
 89 tests, 2806 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: trust lost to harm and wrongs
+
+KNOWLEDGE.md decision 15: being harmed or wronged by someone lowers trust
+in them, as does seeing them break a rule.
+
+- **`BG_WRONGED`** (10): trust lost in one who strikes the agent, and in
+  one it sees take what it believes another's.
+
+Checked: Mira, having seen Kasimir take the merchant's purse, trusts him at
+10, not 20; the officer, struck by him, trusts him at 10 or less.
+
+Not yet: seeing someone lie (lies aren't seen through yet); the
+relationship's own starting trust beyond loyalty (coworker, employer, as
+kinds of tie).
+
+89 tests, 2808 checks, under both compilers, ASan, and leak-free.

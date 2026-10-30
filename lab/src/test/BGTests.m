@@ -5336,6 +5336,8 @@ static void   test_tempting_purse( void)
    BG_CHECK( [store finding:"#Taken" about:referent_of( store, watch.purse)] &&
              [store finding:"#Taken" about:referent_of( store, watch.purse)]->choice == referent_of( store, watch.kasimir));
    BG_CHECK( logged_by( watch.agency, watch.mira, @"[report the theft] tell the watch: say R"));
+   /* KNOWLEDGE.md decision 15: seeing him wrong another, she trusts him less */
+   BG_CHECK( [store trustIn:referent_of( store, watch.kasimir)] == BG_TRUST - BG_WRONGED);
    store = [watch.knowledge storeOf:watch.officer];
    {
       const BGFinding   *taken;
@@ -5432,6 +5434,8 @@ static void   test_tempting_purse( void)
    store = [resist.knowledge storeOf:resist.officer];
    BG_CHECK( [store finding:"#Struck" about:referent_of( store, resist.kasimir)] &&
              ! strcmp( [store finding:"#Struck" about:referent_of( store, resist.kasimir)]->rule, "felt"));
+   /* KNOWLEDGE.md decision 15: harmed by him, it trusts him less */
+   BG_CHECK( [store trustIn:referent_of( store, resist.kasimir)] <= BG_TRUST - BG_WRONGED);
    /* the threat is weighed: getting clear, worth the hurt, not the officer's
     * temper; hitting back, nothing to it. It finishes its duty first, and
     * by then Kasimir has run, so there is nothing to get clear of */

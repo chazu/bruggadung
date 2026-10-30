@@ -138,6 +138,7 @@
 #define BG_BELIEVE         0      /* credence at which a claim is believed */
 #define BG_CONFIRMED       5      /* trust gained when a claim is seen to be true */
 #define BG_REFUTED        15      /* trust lost when a claim is found false */
+#define BG_WRONGED        10      /* trust lost in one who harms it, or is seen to wrong another (KNOWLEDGE.md decision 15) */
 #define BG_SEEN           30      /* the strength of a belief of where a thing is, seen just now */
 #define BG_FADE            2      /* strength lost each memory step */
 #define BG_UNSTATED       INT32_MAX   /* a claim that says nothing of how sure */
