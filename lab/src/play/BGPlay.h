@@ -11,7 +11,12 @@
  *   wait <ms>             let time pass
  *   step                  run to the next boundary
  *   idle                  run until the actor has no activity under way
- *   as <id>               control another agent
+ *   ask <R> where <R>     ask someone in reach where something like it is
+ *   ask <R> who <R>       ask someone who told them where it is
+ *   tell <R> <R> [in <R>] tell someone where something is, as you believe;
+ *                         in a container you don't believe it is in: a lie
+ *   as <id>               control another agent; agency answers for the
+ *                         others when they are asked
  *   activities            the actor's activities, with their stages
  *   suspend <id>, resume <id>
  *                         the actor's choice: suspend keeps the progress
@@ -35,6 +40,7 @@
 #import "BGActivities.h"
 #import "BGActions.h"
 #import "BGKnowledge.h"
+#import "BGAgency.h"
 
 
 @interface BGPlay : NSObject <BGInputSource>
@@ -46,6 +52,7 @@
    BGFluidDomain    *_fluid;
    BGActivities     *_activities;
    BGKnowledge      *_knowledge;
+   BGAgency         *_agency;
    BGMenu           *_menu;
    BGEntityID       _actor;
    NSMutableString  *_out;

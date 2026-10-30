@@ -297,8 +297,9 @@ A rebuilt world produces the same next step as one that never saved.
    attribution, so a rumour heard twice from one source is weighed once it
    is traced, and a lie is recorded as a fabrication root; and memory
    that decays along the content's hierarchies; and salience, so agents
-   keep what matters to them within a bounded memory. Next, per
-   [lab/PLAN.md](lab/PLAN.md): saying things in `lab play`.
+   keep what matters to them within a bounded memory; and talking in `lab
+   play`, asking, telling, and lying. Next, per [lab/PLAN.md](lab/PLAN.md):
+   answering as a choice.
 
 ## Cross-cutting open questions
 

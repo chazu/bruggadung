@@ -861,6 +861,44 @@ static void   test_play( void)
 }
 
 
+/* Talking in a session: the worker looks into the bin, steps over by the
+ * smith, tells the smith where the nails are, asks where they are and who
+ * said so, then takes them and says they are still in the bin: a lie. The
+ * smith answers through agency. */
+static void   test_play_talk( void)
+{
+   NSArray    *commands;
+   NSString   *out;
+   NSString   *again;
+   uint64_t   h1;
+   uint64_t   h2;
+
+   commands = [NSArray arrayWithObjects:@"do 1", @"walk w", @"tell R4 R5", @"ask R4 where R5", @"ask R4 who R5",
+                                        @"menu", @"do 5", @"tell R4 R5 in R2", @"knows", @"knows 5", @"tell R4",
+                                        @"ask R4 where R99", @"help", nil];
+   out   = session( @"workshop", commands, &h1);
+   again = session( @"workshop", commands, &h2);
+   BG_CHECK( h1 == h2);
+   BG_CHECK( [out isEqualToString:again]);
+   /* told, from what the worker saw */
+   BG_CHECK( [out rangeOfString:@"said: 4, other 5, #IsIn & { what: #Stack"].location != NSNotFound);
+   BG_CHECK( [out rangeOfString:@"attribution: #Saw & { sure: 30 } }"].location != NSNotFound);
+   /* asked, the smith answers, naming the worker by its coat */
+   BG_CHECK( [out rangeOfString:@"said: 4, other 5, #WhereIs"].location != NSNotFound);
+   BG_CHECK( [out rangeOfString:@"you notice: R4 says to R1: #IsIn"].location != NSNotFound);
+   BG_CHECK( [out rangeOfString:@"#Heard & { from: #Agent & {"].location != NSNotFound);
+   BG_CHECK( [out rangeOfString:@"coat: \"blue\""].location != NSNotFound);
+   BG_CHECK( [out rangeOfString:@"said: 4, other 5, #WhoToldYou"].location != NSNotFound);
+   /* the lie: the worker knows it didn't believe it, and the developer sees it made up */
+   BG_CHECK( [out rangeOfString:@"(not believed)"].location != NSNotFound);
+   BG_CHECK( [out rangeOfString:@"truly made up by 4"].location != NSNotFound);
+   /* what it can't say */
+   BG_CHECK( [out rangeOfString:@"Tell whom what?"].location != NSNotFound);
+   BG_CHECK( [out rangeOfString:@"Ask whom, where or who, of what?"].location != NSNotFound);
+   BG_CHECK( [out rangeOfString:@"ask <R> where|who <R>, tell <R> <R> [in <R>]"].location != NSNotFound);
+}
+
+
 /* --- knowledge ------------------------------------------------------------- */
 
 static uint32_t   referent_of( BGKnowledgeStore *store, BGEntityID truth)
@@ -2272,6 +2310,7 @@ const BGTestCase   BGAllTests[] =
    { "activity_fails",                test_activity_fails },
    { "stages_and_suspension",         test_stages_and_suspension },
    { "play",                          test_play },
+   { "play_talk",                     test_play_talk },
    { "stale_belief",                  test_stale_belief },
    { "missing_nails",                 test_missing_nails },
    { "asking",                        test_asking },

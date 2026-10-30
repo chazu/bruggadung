@@ -99,6 +99,9 @@ typedef struct
 - (BOOL) commit:(BGEntityID) agent
          toGoal:(const char *) goal;
 
+/* Agency lets the agent go, its mind with it: someone else controls it. */
+- (void) relinquish:(BGEntityID) agent;
+
 - (BGMotivation *) mindOf:(BGEntityID) agent;
 /* the agent's decision log, for the developer */
 - (NSArray *) logOf:(BGEntityID) agent;

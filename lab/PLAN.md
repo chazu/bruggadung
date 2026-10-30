@@ -821,6 +821,47 @@ threshold, and decay rates by salience.
 
 32 tests, 458 checks, under both compilers, ASan and UBSan, and leak-free.
 
-Next: saying things in `lab play`, so the player can ask where something
-is, answer, and claim, with content the command builds from what the
-player's character knows.
+### After the slice: saying things in `lab play`
+
+The player's character can talk. `ask <R> where <R>` asks someone in
+reach where something like a referent is; `ask <R> who <R>` asks who told
+them where it is; `tell <R> <R>` says where the character believes it is,
+with how it knows; and `tell <R> <R> in <R>`, for a container it doesn't
+believe the thing is in, is a lie, said as "saw" and traced to a
+fabrication root. The session runs agency for every agent but the one
+played, so they answer, and waits a few boundaries for the answer. In the
+test, the worker tells the smith where the nails are, asks where they are
+(the smith answers that it heard so from someone in a blue coat), asks who
+said so, then takes the nails and says they are still in the bin.
+
+- **What an agent can say is composed in one place**: the knowledge store
+  builds claims (`claimAbout:`, `claimThat:isIn:`) and questions
+  (`askWhereIs:`, `askWhoToldOf:`) from what it knows, naming no
+  referents. Agency's answers use the same code.
+- **`as <id>` hands the agent played over**: agency lets it go, and takes
+  back the one left. `control:` is idempotent, so the others keep their
+  place in what they've heard. Saves in play include agency.
+
+What it settled:
+
+- **Sight outranks a claim about the present.** A claim that a thing is
+  somewhere, as of a moment when the hearer saw it elsewhere, is found
+  false at once, and the speaker is trusted less; seen elsewhere since the
+  claim's moment, the claim is not believed but stays open. The smith,
+  told by the worker holding the nails that they are in the bin, still
+  can't tell those nails from others: it believes other nails are in the
+  bin, until it looks.
+- **A person named can be the hearer itself** ("you told me"): with
+  descriptions that say no more than their type ruled out, recognizing
+  oneself is no longer a false match.
+
+Not yet: free content from the player (anything beyond where something
+is), answering as a choice rather than agency's reflex, and conversations
+that take turns over time.
+
+33 tests, 472 checks, under both compilers, ASan and UBSan, and leak-free.
+
+Next: answering as a choice (AGENCY.md §11). Being addressed raises a
+decision point, and *answer* is a goal scored by trust in the asker, the
+agent's commitments, and the cost, rather than a reflex every agent obeys
+at once.

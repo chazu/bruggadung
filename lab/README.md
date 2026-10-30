@@ -143,7 +143,11 @@ straight to the spare nails: the behaviour depends on what the agent knows.
 the map as the actor knows it (what it sees, and what it remembers, with the
 memory's age), `menu` numbers the actions it believes it can take, `do <n> [amount]` performs one, `walk n|s|e|w` takes a step (a second; the session runs until it lands), and `wait`,
 `step`, and `idle` run time. `activities`, `suspend`, and `resume` manage
-what the actor has under way. The developer's side: `inspect <id>` shows an
+what the actor has under way. `ask <R> where <R>` and `ask <R> who <R>`
+put a question to someone in reach, and `tell <R> <R> [in <R>]` says where
+something is, as the actor believes it, or, in a container it doesn't
+believe, a lie; the other agents answer through agency. The developer's
+side: `inspect <id>` shows an
 entity's truth, relations, activities, and history; `why <id>` follows the
 chain of causes behind its last change back to the command that began it;
 `knows [id]` shows an agent's store with its truth links; `trace`, `save`,

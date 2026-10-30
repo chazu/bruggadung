@@ -60,6 +60,7 @@ static void   append_quoted( NSMutableString *s, const char *text)
 
 
 static char   *concrete_features( const char *printed);
+static void   settle( BGKnowledgeStore *store, uint32_t thing, uint32_t container, BOOL true_, NSMutableArray *news);
 
 
 /* The top-level keys of a features text: "mass: 90g, unit: ..." */
@@ -466,6 +467,96 @@ static BOOL   counts( const BGTestimony *t, uint32_t thing, uint32_t container)
    if( ! [features length])
       return( [NSString stringWithUTF8String:r->kind]);
    return( [NSString stringWithFormat:@"%s & { %@ }", r->kind, features]);
+}
+
+
+/* --- what it can say ------------------------------------------------------------- */
+
+- (NSString *) describeHere:(const BGReferent *) c
+{
+   NSString   *features;
+
+   features = [self recall:c];
+   return( [NSString stringWithFormat:@"%s & { place: #OnTile & { x: %d, y: %d, level: %d }%@ }", c->kind, c->x, c->y,
+                                      c->level, [features length] ? [NSString stringWithFormat:@", %@", features] : @""]);
+}
+
+
+- (NSString *) claimThat:(const BGReferent *) r
+                    isIn:(const BGReferent *) c
+             attribution:(NSString *) attribution
+                    when:(int64_t) when
+{
+   return( [NSString stringWithFormat:@"#IsIn & { what: %@, within: %@, when: %lldms, attribution: %@ }",
+                                      [self describeLooks:r->id], [self describeHere:c], (long long) when, attribution]);
+}
+
+
+/* how it knows the thing is where it believes: saw it, as sure as its memory
+ * is strong, or heard it, from whoever its strongest testimony names */
+- (NSString *) attributionOf:(const BGReferent *) r
+{
+   const BGTestimony   *t;
+   NSString            *from;
+
+   if( ! r->toldBy)
+      return( [NSString stringWithFormat:@"#Saw & { sure: %d }", [self strengthOf:r->id]]);
+   t    = [self strongestThat:r->id isIn:r->container];
+   from = t && t->root ? [self describeLooks:t->root] : nil;
+   return( from ? [NSString stringWithFormat:@"#Heard & { from: %@ }", from] : @"#Heard");
+}
+
+
+- (NSString *) claimAbout:(uint32_t) thing
+{
+   const BGReferent   *r;
+   const BGReferent   *c;
+
+   r = [self referent:thing];
+   c = r && r->present && r->form == BGLocationIn ? [self referent:r->container] : NULL;
+   if( ! c || c->form != BGLocationOnTile || ! r->kind || ! c->kind)
+      return( nil);
+   return( [self claimThat:r isIn:c attribution:[self attributionOf:r] when:r->seen]);
+}
+
+
+- (NSString *) claimThat:(uint32_t) thing
+                    isIn:(uint32_t) container
+{
+   const BGReferent   *r;
+   const BGReferent   *c;
+
+   r = [self referent:thing];
+   c = [self referent:container];
+   if( ! r || ! c || ! r->kind || ! c->kind || c->form != BGLocationOnTile)
+      return( nil);
+   if( r->present && r->form == BGLocationIn && r->container == container)
+      return( [self claimAbout:thing]);
+   return( [self claimThat:r isIn:c attribution:[NSString stringWithFormat:@"#Saw & { sure: %d }", BG_SEEN]
+                      when:_world ? [_world time].ms : 0]);
+}
+
+
+- (NSString *) askWhereIs:(uint32_t) thing
+{
+   NSString   *looks;
+
+   looks = [self describeLooks:thing];
+   return( looks ? [NSString stringWithFormat:@"#WhereIs & { what: %@ }", looks] : nil);
+}
+
+
+- (NSString *) askWhoToldOf:(uint32_t) thing
+{
+   const BGReferent   *r;
+   const BGReferent   *c;
+
+   r = [self referent:thing];
+   c = r && r->present && r->form == BGLocationIn ? [self referent:r->container] : NULL;
+   if( ! c || c->form != BGLocationOnTile || ! c->kind)
+      return( nil);
+   return( [NSString stringWithFormat:@"#WhoToldYou & { what: %@, within: %@ }", [self describeLooks:thing],
+                                      [self describeHere:c]]);
 }
 
 
@@ -901,8 +992,7 @@ static char   *concrete_features( const char *printed)
    for( i = 0; i < [store count]; i++)
    {
       r = [store referentAt:i];
-      if( r->id != [store selfReferent] && r->kind && ! strcmp( r->kind, [kind UTF8String]) &&
-          [self looksAlike:r in:store kind:kind features:features])
+      if( r->kind && ! strcmp( r->kind, [kind UTF8String]) && [self looksAlike:r in:store kind:kind features:features])
       {
          free( concrete);
          return( r->id);
@@ -1056,6 +1146,17 @@ static char   *concrete_features( const char *printed)
    credence = [store credenceThat:thing isIn:cid];
 
    m = [store mutableReferent:thing];
+   if( m->present && ! m->toldBy && m->seen >= when && ! (m->form == BGLocationIn && m->container == cid))
+   {
+      /* seen elsewhere since: sight outranks it, and seen elsewhere as it was said, it is false */
+      if( m->seen == when)
+         settle( store, thing, cid, NO, news);
+      else
+         [news addObject:[NSString stringWithFormat:@"R%u says R%u is in R%u: seen elsewhere since", speaker, thing,
+                                                    cid]];
+      tri_arena_free( arena);
+      return;
+   }
    if( m->present && m->form == BGLocationIn && m->container == cid)
    {
       [news addObject:[NSString stringWithFormat:@"R%u is in R%u, R%u says too (%+d dB)", thing, cid, speaker,

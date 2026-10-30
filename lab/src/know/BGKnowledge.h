@@ -196,6 +196,21 @@ typedef struct
                       y:(int32_t) y;
 /* lines saying what the last perception phase changed */
 - (NSArray *) news;
+/* What the agent can say (talk.tri), from what it knows, naming no
+ * referents. A claim that the thing is in the container, as the agent
+ * believes: where, as of when, and how it knows; nil if it believes the thing
+ * nowhere inside something on the ground. */
+- (NSString *) claimAbout:(uint32_t) thing;
+/* A claim that the thing is in the container: the agent's own if it believes
+ * so, otherwise one it makes up, saying it saw it. nil if the container is
+ * not believed on the ground. */
+- (NSString *) claimThat:(uint32_t) thing
+                    isIn:(uint32_t) container;
+/* "where is something like it?"; "who told you it is where you believe it?"
+ * (nil if it believes it nowhere inside something) */
+- (NSString *) askWhereIs:(uint32_t) thing;
+- (NSString *) askWhoToldOf:(uint32_t) thing;
+
 /* the referent as a Triangle description, for the knowledge view, with the
  * detail memory has kept */
 - (NSString *) describeReferent:(uint32_t) referentID;

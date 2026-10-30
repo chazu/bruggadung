@@ -261,9 +261,26 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
 - (void) control:(BGEntityID) agent
 {
    BGMotivation   *m;
+   NSUInteger     i;
 
+   for( i = 0; i < [_minds count]; i++)
+      if( ((BGMotivation *) [_minds objectAtIndex:i])->agent == agent)
+         return;        /* already */
    m        = [self mindOf:agent];
    m->heard = [[_knowledge storeOf:agent] nextSerial];
+}
+
+
+- (void) relinquish:(BGEntityID) agent
+{
+   NSUInteger   i;
+
+   for( i = 0; i < [_minds count]; i++)
+      if( ((BGMotivation *) [_minds objectAtIndex:i])->agent == agent)
+      {
+         [_minds removeObjectAtIndex:i];
+         return;
+      }
 }
 
 
@@ -804,12 +821,9 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    const BGReferent   *r;
    const BGReferent   *c;
    const BGReferent   *best;
-   const BGTestimony  *t;
    TriMatchResult     result;
    TriContent         *tri;
    TriArena           *arena;
-   NSString           *attribution;
-   NSString           *from;
    NSUInteger         i;
    char               printed[ 2048];
 
@@ -843,24 +857,7 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    }
    tri_arena_free( arena);
    if( best)
-   {
-      c           = [store referent:best->container];
-      attribution = [NSString stringWithFormat:@"#Saw & { sure: %d }", [store strengthOf:best->id]];
-      if( best->toldBy)
-      {
-         t           = [store strongestThat:best->id isIn:c->id];
-         from        = t && t->root ? [store describeLooks:t->root] : nil;
-         attribution = from ? [NSString stringWithFormat:@"#Heard & { from: %@ }", from] : @"#Heard";
-      }
-      return( [NSString stringWithFormat:@"#IsIn & { what: %s%@, within: %s & { place: #OnTile & { x: %d, y: %d, level: %d }%@ }, "
-                                         @"when: %lldms, attribution: %@ }",
-                                         best->kind,
-                                         [[store recall:best] length]
-                                            ? [NSString stringWithFormat:@" & { %@ }", [store recall:best]] : @"",
-                                         c->kind, c->x, c->y, c->level,
-                                         [[store recall:c] length] ? [NSString stringWithFormat:@", %@", [store recall:c]] : @"",
-                                         (long long) best->seen, attribution]);
-   }
+      return( [store claimAbout:best->id]);
    tri_print( tri, what, printed, sizeof( printed));
    return( [NSString stringWithFormat:@"#DontKnow & { what: %s }", printed]);
 }

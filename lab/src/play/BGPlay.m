@@ -18,16 +18,19 @@
    [_scheduler autorelease];
    [_fluid autorelease];
    [_activities autorelease];
+   [_agency autorelease];
    [_knowledge autorelease];
    _world      = [world retain];
    _committer  = [BGTestCommitter( world) retain];
    _fluid      = [[BGFluidDomain alloc] initWithWorld:world];
    _activities = [[BGActivities activitiesWithWorld:world committer:_committer] retain];
    _knowledge  = [[BGKnowledge alloc] initWithWorld:world];
+   _agency     = [[BGAgency alloc] initWithWorld:world committer:_committer knowledge:_knowledge];
    _scheduler  = [[BGScheduler alloc] initWithWorld:world committer:_committer];
    [_scheduler addDomain:_fluid];
    [_scheduler setActivities:_activities];
    [_scheduler setPerception:_knowledge];
+   [_scheduler setDecision:_agency];
    [_scheduler setInputs:self];
    _traceShown = 0;
 }
@@ -64,10 +67,25 @@
    play->_inputDue = YES;
    [play->_scheduler stepUntil:[world time]];
    play->_actor      = [setup idFor:[name isEqualToString:@"workshop"] ? h[ 3] : h[ 6]];
+   [play controlOthers];
    play->_traceShown = [[play->_committer trace] count];
    [play->_out appendFormat:@"The %@, seed %llu. You are %llu. Type help for the commands.\n", name,
                             (unsigned long long) seed, (unsigned long long) play->_actor];
    return( play);
+}
+
+
+/* Agency answers for every agent but the one played. */
+- (void) controlOthers
+{
+   BGStore      *agents;
+   NSUInteger   i;
+
+   agents = [_world storeForKind:[_world kindNamed:"Agent"]];
+   for( i = 0; i < [agents count]; i++)
+      if( [agents entityAtIndex:i] != _actor)
+         [_agency control:[agents entityAtIndex:i]];
+   [_agency relinquish:_actor];
 }
 
 
@@ -79,6 +97,7 @@
    [_scheduler release];
    [_fluid release];
    [_activities release];
+   [_agency release];
    [_knowledge release];
    [_menu release];
    [_out release];
@@ -402,7 +421,7 @@ static char   glyph_of_kind( const char *kind)
    NSString   *text;
    FILE       *f;
 
-   text = BGSave( _world, _committer, [NSArray arrayWithObjects:_fluid, _knowledge, nil]);
+   text = BGSave( _world, _committer, [NSArray arrayWithObjects:_fluid, _knowledge, _agency, nil]);
    f    = fopen( [path UTF8String], "w");
    if( ! f)
    {
@@ -452,7 +471,96 @@ static char   glyph_of_kind( const char *kind)
    [_committer restoreDeferred:deferred];
    [_fluid restoreSavedState:BGSavedDomainState( text, @"fluid")];
    [_knowledge restoreSavedState:BGSavedDomainState( text, @"knowledge")];
+   [_agency restoreSavedState:BGSavedDomainState( text, @"agency")];
    [_out appendFormat:@"Loaded %@: t=%lldms.\n", path, (long long) [_world time].ms];
+}
+
+
+/* --- saying things ---------------------------------------------------------------- */
+
+/* "R5" or "5": a referent of the actor's, or 0 */
+- (uint32_t) referentNamed:(NSString *) word
+{
+   if( [word hasPrefix:@"R"] || [word hasPrefix:@"r"])
+      word = [word substringFromIndex:1];
+   if( ! [word length] || ! [[_knowledge storeOf:_actor] referent:(uint32_t) [word longLongValue]])
+      return( 0);
+   return( (uint32_t) [word longLongValue]);
+}
+
+
+/* Says it to the referent; a question waits a little for the answer. */
+- (void) say:(NSString *) content
+          to:(uint32_t) hearer
+    question:(BOOL) question
+{
+   BGKnowledgeStore   *store;
+   BGAction           action;
+   int                k;
+
+   store          = [_knowledge storeOf:_actor];
+   action         = BGActionMake( [_world intern:"say"], [store selfReferent], hearer, BGNoEntity);
+   action.content = [_world intern:[content UTF8String]];
+   if( ! [self perform:action amount:0] || ! question)
+      return;
+   /* the answer comes at the next boundaries, if it comes */
+   for( k = 0; k < 4; k++)
+      if( ! [_scheduler stepUntil:BGTimeMake( [_world time].ms + 1000)])
+         break;
+   [self showTrace];
+   [self showNews];
+}
+
+
+- (void) ask:(NSArray *) words
+{
+   BGKnowledgeStore   *store;
+   NSString           *content;
+   uint32_t           who;
+   uint32_t           what;
+
+   store = [_knowledge storeOf:_actor];
+   who   = [words count] > 3 ? [self referentNamed:[words objectAtIndex:1]] : 0;
+   what  = [words count] > 3 ? [self referentNamed:[words objectAtIndex:3]] : 0;
+   if( ! who || ! what)
+   {
+      [_out appendString:@"Ask whom, where or who, of what? ask <R> where <R>, ask <R> who <R>.\n"];
+      return;
+   }
+   content = [[words objectAtIndex:2] isEqualToString:@"who"] ? [store askWhoToldOf:what] : [store askWhereIs:what];
+   if( ! content)
+   {
+      [_out appendFormat:@"You don't believe R%u is in anything, to ask who told you.\n", what];
+      return;
+   }
+   [self say:content to:who question:YES];
+}
+
+
+- (void) tell:(NSArray *) words
+{
+   BGKnowledgeStore   *store;
+   NSString           *content;
+   uint32_t           who;
+   uint32_t           what;
+   uint32_t           within;
+
+   store  = [_knowledge storeOf:_actor];
+   who    = [words count] > 2 ? [self referentNamed:[words objectAtIndex:1]] : 0;
+   what   = [words count] > 2 ? [self referentNamed:[words objectAtIndex:2]] : 0;
+   within = [words count] > 4 ? [self referentNamed:[words objectAtIndex:4]] : 0;
+   if( ! who || ! what || ([words count] > 3 && ! within))
+   {
+      [_out appendString:@"Tell whom what? tell <R> <R> [in <R>].\n"];
+      return;
+   }
+   content = within ? [store claimThat:what isIn:within] : [store claimAbout:what];
+   if( ! content)
+   {
+      [_out appendFormat:@"You can't say where R%u is: you believe it in nothing on the ground.\n", what];
+      return;
+   }
+   [self say:content to:who question:NO];
 }
 
 
@@ -545,7 +653,8 @@ static char   glyph_of_kind( const char *kind)
    if( [verb isEqualToString:@"quit"])
       return( NO);
    if( [verb isEqualToString:@"help"])
-      [_out appendString:@"look, menu, do <n> [amount], walk n|s|e|w, wait <ms>, step, idle, as <id>,\n"
+      [_out appendString:@"look, menu, do <n> [amount], walk n|s|e|w, ask <R> where|who <R>, tell <R> <R> [in <R>],\n"
+                         @"wait <ms>, step, idle, as <id>,\n"
                          @"activities, suspend <id>, resume <id>, knows [id], inspect <id>, why <id>, trace [n],\n"
                          @"save <file>, load <file>, time, hash, quit\n"];
    else if( [verb isEqualToString:@"look"])
@@ -565,6 +674,10 @@ static char   glyph_of_kind( const char *kind)
          [self perform:*a amount:amount];
       }
    }
+   else if( [verb isEqualToString:@"ask"])
+      [self ask:words];
+   else if( [verb isEqualToString:@"tell"])
+      [self tell:words];
    else if( [verb isEqualToString:@"walk"] && [words count] > 1)
    {
       w = [words objectAtIndex:1];
@@ -608,6 +721,7 @@ static char   glyph_of_kind( const char *kind)
       else
       {
          _actor = e;
+         [self controlOthers];
          [_menu release];
          _menu = nil;
          [_out appendFormat:@"You are %llu.\n", (unsigned long long) e];
