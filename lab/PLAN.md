@@ -2136,9 +2136,7 @@ more), an agent feels its hunger only to the nearest twenty, not ten. Fed
 to 70, it feels hunger 30, but 20 when exhausted. Its body is as hungry
 either way.
 
-Not yet: the other modifiers §6 names, adrenaline dulling pain and
-numbness hiding cold. Neither pain, injury's percept, nor numbness exists
-in the lab yet, and §6 gives no source for them.
+The other modifiers §6 names follow below.
 
 60 tests, 2119 checks, under both compilers, ASan and UBSan, and leak-free.
 
@@ -2208,3 +2206,19 @@ neighbour. The two groups merge, credence falls to 15, and Bela stays at
 supper, as in C with the source named from the start.
 
 61 tests, 2139 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: pain, adrenaline, numbness
+
+AGENCY.md §6's injury, "a component field", with interoception's percept of
+it, and the modifiers of precision §6 names: "adrenaline dulls pain,
+numbness hides cold". `Agent.injury` is felt as pain, to the band.
+`Agent.adrenaline` dulls it point for point, and `Agent.numbness` hides as
+much cold. Neither touches the body. A worker hurt at 45 feels pain 40, and
+with adrenaline 30, pain 10, its injury still 45. A numb lodger (30) at
+305 K feels cold 20, not 50, and leaves the stove cold.
+
+§6 names no source for injury, adrenaline, or numbness, so they are
+fields, authored like the light: harm, fright, and frostbite would set
+them. Pain raises no goal, since §6 names none for it.
+
+62 tests, 2145 checks, under both compilers, ASan and UBSan, and leak-free.

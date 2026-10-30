@@ -294,6 +294,7 @@ typedef struct
    int32_t          _cold;
    int32_t          _stuffy;
    int32_t          _tired;
+   int32_t          _pain;
    int64_t          _feltAt;         /* ms, or -1 */
    BGIdentity       *_identities;
    NSUInteger       _nidentities;
@@ -390,7 +391,7 @@ typedef struct
 - (const BGTraceSeen *) traceAt:(NSUInteger) i;
 
 /* how much it feels the need, 0 to 100, as of its last perception phase:
- * "hunger", "cold", "stuffy", "tired" */
+ * "hunger", "cold", "stuffy", "tired", "pain" */
 - (int32_t) feels:(const char *) need;
 /* YES if it feels differently now */
 - (BOOL) feelHunger:(int32_t) hunger
@@ -398,6 +399,7 @@ typedef struct
 - (BOOL) feelCold:(int32_t) cold;
 - (BOOL) feelStuffy:(int32_t) stuffy;
 - (BOOL) feelTired:(int32_t) tired;
+- (BOOL) feelPain:(int32_t) pain;
 
 /* its identity hypotheses, first made first */
 - (NSUInteger) identityCount;

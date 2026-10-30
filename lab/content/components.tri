@@ -96,6 +96,12 @@
     // fatigue (AGENCY.md §6, a component field), 0 to 100: effort raises
     // it, a night's rest clears it
     fatigue:  *0 | int & >=0 & <=100         @field(content, saved, proposable, inspect)
+    // injury (AGENCY.md §6, a component field), 0 to 100, felt as pain; and
+    // what changes how precisely the body is felt, not the body: adrenaline
+    // dulls pain, numbness hides cold, by as many points
+    injury:     *0 | int & >=0 & <=100       @field(content, saved, proposable, inspect)
+    adrenaline: *0 | int & >=0 & <=100       @field(content, saved, proposable, inspect)
+    numbness:   *0 | int & >=0 & <=100       @field(content, saved, proposable, inspect)
     fedAt:    *0ms | time & >=0ms & <=10000d @field(content, saved, proposable, inspect)
 }
 

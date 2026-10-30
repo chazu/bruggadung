@@ -1,4 +1,4 @@
-/* Generated from Triangle content 6c63399900204c41: do not edit. Type IDs are valid
+/* Generated from Triangle content db519a38b37dd222: do not edit. Type IDs are valid
  * only for this content; regenerate when it changes. */
 #ifndef BG_COMPONENTS_H
 #define BG_COMPONENTS_H
@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BG_CONTENT_HASH 0x6c63399900204c41ULL
+#define BG_CONTENT_HASH 0xdb519a38b37dd222ULL
 
 /* Combustor, from #Combustor */
 typedef struct {
@@ -100,6 +100,7 @@ typedef struct {
 
 /* Agent, from #Agent */
 typedef struct {
+    int64_t         adrenaline;    /* int, in quanta of 1; content, saved, proposable, inspect */
     uint32_t        coat;    /* #Colour: a type ID; content, saved, proposable, inspect, perceive(sight) */
     int64_t         curious;    /* int, in quanta of 1; content, saved, proposable, inspect */
     int64_t         fatigue;    /* int, in quanta of 1; content, saved, proposable, inspect */
@@ -110,7 +111,9 @@ typedef struct {
     int64_t         helpful;    /* int, in quanta of 1; content, saved, proposable, inspect */
     bool            hiding;    /* bool; content, saved, proposable, inspect */
     int64_t         honesty;    /* int, in quanta of 1; content, saved, proposable, inspect */
+    int64_t         injury;    /* int, in quanta of 1; content, saved, proposable, inspect */
     int64_t         memory;    /* int, in quanta of 1; content, saved, inspect */
+    int64_t         numbness;    /* int, in quanta of 1; content, saved, proposable, inspect */
     int64_t         painting;    /* int, in quanta of 1; content, saved, inspect */
     int64_t         quickness;    /* int, in quanta of 1; content, saved, proposable, inspect */
     int64_t         respectful;    /* int, in quanta of 1; content, saved, proposable, inspect */
@@ -368,6 +371,7 @@ static const BGFieldInfo BGBody_fields[] = {
 };
 
 static const BGFieldInfo BGAgent_fields[] = {
+    { "adrenaline", offsetof(BGAgent, adrenaline), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "coat", offsetof(BGAgent, coat), BG_VALUE_TYPE, "#Colour", "content, saved, proposable, inspect, perceive(sight)" },
     { "curious", offsetof(BGAgent, curious), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "fatigue", offsetof(BGAgent, fatigue), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
@@ -378,7 +382,9 @@ static const BGFieldInfo BGAgent_fields[] = {
     { "helpful", offsetof(BGAgent, helpful), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "hiding", offsetof(BGAgent, hiding), BG_VALUE_BOOL, "bool", "content, saved, proposable, inspect" },
     { "honesty", offsetof(BGAgent, honesty), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
+    { "injury", offsetof(BGAgent, injury), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "memory", offsetof(BGAgent, memory), BG_VALUE_QUANTITY, "int", "content, saved, inspect" },
+    { "numbness", offsetof(BGAgent, numbness), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "painting", offsetof(BGAgent, painting), BG_VALUE_QUANTITY, "int", "content, saved, inspect" },
     { "quickness", offsetof(BGAgent, quickness), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "respectful", offsetof(BGAgent, respectful), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
@@ -469,7 +475,7 @@ static const BGComponentInfo BGComponents[BG_COMPONENT_COUNT + 1] = {
     { "Activity", "#Activity", sizeof(BGActivity), 15, BGActivity_fields },
     { "Claim", "#Claim", sizeof(BGClaim), 2, BGClaim_fields },
     { "Body", "#Body", sizeof(BGBody), 5, BGBody_fields },
-    { "Agent", "#Agent", sizeof(BGAgent), 16, BGAgent_fields },
+    { "Agent", "#Agent", sizeof(BGAgent), 19, BGAgent_fields },
     { "Assembly", "#Assembly", sizeof(BGAssembly), 1, BGAssembly_fields },
     { "Cock", "#Cock", sizeof(BGCock), 2, BGCock_fields },
     { "Container", "#Container", sizeof(BGContainer), 1, BGContainer_fields },

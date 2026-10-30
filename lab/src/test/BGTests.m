@@ -5269,7 +5269,7 @@ static void   test_local_wake( void)
  * (mK). Interoception feels its body's heat, the thermal domain's, as
  * cold; cold enough, the needs generator raises *get warm*, and it lights
  * the stove. */
-static BGStoveRun   cold_lodger( int64_t kelvin, BGAgency **minds, BGKnowledge **known)
+static BGStoveRun   cold_lodger( int64_t kelvin, int64_t numbness, BGAgency **minds, BGKnowledge **known)
 {
    BGStage            st;
    BGActivities       *activities;
@@ -5301,6 +5301,7 @@ static BGStoveRun   cold_lodger( int64_t kelvin, BGAgency **minds, BGKnowledge *
    run.stove = [g create:"stove" key:"stove" at:BGOnTile( 2, 2, 0)];
    lodger    = [g create:"lodger" key:"lodger" at:BGOnTile( 3, 2, 0)];
    [g set:"ThermalBody.heat" of:BGWhole( lodger) to:kelvin * 245000 / 1000];
+   [g set:"Agent.numbness" of:BGWhole( lodger) to:numbness];
    [st.c submit:g];
    [st.s runUntil:BGTimeMake( 1)];
    run.room  = [g idFor:run.room];
@@ -5368,7 +5369,7 @@ static void   test_cold_lodger( void)
    int64_t      below;
 
    /* 305 K, five below: it feels cold 50, more than 30: it lights the stove */
-   cold = cold_lodger( 305000, &agency, &knowledge);
+   cold = cold_lodger( 305000, 0, &agency, &knowledge);
    BG_CHECK( [[knowledge storeOf:cold.rest] feels:"cold"] == 50);
    BG_CHECK( logged_by( agency, cold.rest, @"[get warm] light the stove: light R"));
    /* the pressure, by its curve: cold 50 is worth 30 (a straight line by 5
@@ -5381,8 +5382,14 @@ static void   test_cold_lodger( void)
    below = cooling_lodger();
    BG_CHECK( below >= 0 && below < 5);
 
+   /* numb (30), at 305 K it feels only 20: its body is as cold, but it
+    * leaves the stove cold (AGENCY.md §6: numbness hides cold) */
+   cool = cold_lodger( 305000, 30, &agency, &knowledge);
+   BG_CHECK( [[knowledge storeOf:cool.rest] feels:"cold"] == 20);
+   BG_CHECK( [cool.world getField:"Combustor.lit" of:cool.stove value:&v] && ! v);
+
    /* 308.5 K: cold 10, not pressing: the stove stays cold */
-   cool = cold_lodger( 308500, &agency, &knowledge);
+   cool = cold_lodger( 308500, 0, &agency, &knowledge);
    BG_CHECK( [[knowledge storeOf:cool.rest] feels:"cold"] == 10);
    BG_CHECK( ! logged_by( agency, cool.rest, @"get warm"));
    BG_CHECK( [cool.world getField:"Combustor.lit" of:cool.stove value:&v] && ! v);
@@ -5644,6 +5651,38 @@ static void   test_tired_worker( void)
    BG_CHECK( [st.w getField:"Agent.fatigue" of:worker value:&fatigue] && fatigue == 0);
    BG_CHECK( [[knowledge storeOf:worker] feels:"tired"] == 0);
    BG_CHECK( logged_by( agency, worker, @"[get some rest] done"));
+}
+
+
+/* AGENCY.md §6's pain: injury, a component field, is felt as pain, to the
+ * band; adrenaline dulls it, not the injury. */
+static void   test_pain( void)
+{
+   BGStage            st;
+   BGKnowledge        *knowledge;
+   BGProposalGroup    *g;
+   BGEntityID         worker;
+   int64_t            injury;
+
+   st.w      = BGTestWorld( 139);
+   st.c      = BGTestCommitter( st.w);
+   knowledge = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+   st.s      = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [st.s setPerception:knowledge];
+   g      = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: a hurt hand"];
+   worker = [g create:"worker" key:"worker" at:BGOnTile( 3, 3, 0)];
+   [g set:"Agent.injury" of:BGWhole( worker) to:45];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   worker = [g idFor:worker];
+   BG_CHECK( [[knowledge storeOf:worker] feels:"pain"] == 40);
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: a fright"];
+   [g set:"Agent.adrenaline" of:BGWhole( worker) to:30];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 2)];
+   BG_CHECK( [[knowledge storeOf:worker] feels:"pain"] == 10);
+   BG_CHECK( [st.w getField:"Agent.injury" of:worker value:&injury] && injury == 45);
+   BG_CHECK( [[knowledge dump:worker] rangeOfString:@"pain 10"].location != NSNotFound);
 }
 
 
@@ -6005,6 +6044,7 @@ const BGTestCase   BGAllTests[] =
    { "partial_effects",               test_partial_effects },
    { "hard_fail",                     test_hard_fail },
    { "tired_worker",                  test_tired_worker },
+   { "pain",                          test_pain },
    { "door_in_the_dark",              test_door_in_the_dark },
    { "wrench_replaced",               test_wrench_replaced },
    { "rumour",                        test_rumour },

@@ -367,7 +367,7 @@ static NSUInteger   feature_keys( const char *features, char (*keys)[ 32], NSUIn
 - (int32_t) feels:(const char *) need
 {
    return( ! strcmp( need, "hunger") ? _hunger : ! strcmp( need, "cold") ? _cold : ! strcmp( need, "stuffy") ? _stuffy :
-           ! strcmp( need, "tired") ? _tired : 0);
+           ! strcmp( need, "tired") ? _tired : ! strcmp( need, "pain") ? _pain : 0);
 }
 
 
@@ -396,6 +396,16 @@ static NSUInteger   feature_keys( const char *features, char (*keys)[ 32], NSUIn
 
    changed = cold != _cold;
    _cold   = cold;
+   return( changed);
+}
+
+
+- (BOOL) feelPain:(int32_t) pain
+{
+   BOOL   changed;
+
+   changed = pain != _pain;
+   _pain   = pain;
    return( changed);
 }
 
@@ -2889,9 +2899,23 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
       int64_t   cold;
 
       cold = (310000 - body->heat * 1000 / body->heatCapacity) / 100;
+      /* numbness hides it */
+      if( memory)
+         cold -= memory->numbness;
       cold = cold < 0 ? 0 : cold > 100 ? 100 : (cold / BG_HUNGER_BAND) * BG_HUNGER_BAND;
       if( [store feelCold:(int32_t) cold])
          [news addObject:[NSString stringWithFormat:@"you feel cold (%d)", (int) cold]];
+   }
+
+   /* and pain, from its injury (a component field), dulled by adrenaline */
+   if( memory)
+   {
+      int64_t   pain;
+
+      pain = (int64_t) memory->injury - memory->adrenaline;
+      pain = pain < 0 ? 0 : (pain / BG_HUNGER_BAND) * BG_HUNGER_BAND;
+      if( [store feelPain:(int32_t) pain])
+         [news addObject:[NSString stringWithFormat:@"you feel pain (%d)", (int) pain]];
    }
 
    /* and tired, from its fatigue (a component field), to the band */
@@ -3250,8 +3274,9 @@ static NSString   *attribution_text( const BGTestimony *t)
                       t->strength, (long long) t->seen, t->present ? "" : ", gone", (unsigned long long) t->truth];
    }
    if( [store feltAt] >= 0)
-      [s appendFormat:@"  feels hunger %d, cold %d, short of breath %d, tired %d, at %lldms\n", [store feels:"hunger"],
-                      [store feels:"cold"], [store feels:"stuffy"], [store feels:"tired"], (long long) [store feltAt]];
+      [s appendFormat:@"  feels hunger %d, cold %d, short of breath %d, tired %d, pain %d, at %lldms\n",
+                      [store feels:"hunger"], [store feels:"cold"], [store feels:"stuffy"], [store feels:"tired"],
+                      [store feels:"pain"], (long long) [store feltAt]];
    for( i = 0; i < [store findingCount]; i++)
    {
       const BGFinding   *f;
@@ -3464,9 +3489,10 @@ char   *BGDecodeWord( const char *s)
                                                      (unsigned long long) tr->truth, tr->kind]];
       }
       if( [store feltAt] >= 0)
-         [lines addObject:[NSString stringWithFormat:@"feels %llu %d %lld %d %d %d", (unsigned long long) [store agent],
+         [lines addObject:[NSString stringWithFormat:@"feels %llu %d %lld %d %d %d %d", (unsigned long long) [store agent],
                                                      [store feels:"hunger"], (long long) [store feltAt],
-                                                     [store feels:"cold"], [store feels:"stuffy"], [store feels:"tired"]]];
+                                                     [store feels:"cold"], [store feels:"stuffy"], [store feels:"tired"],
+                                                     [store feels:"pain"]]];
       for( j = 0; j < [store count]; j++)
          for( k = 0; k < BG_HYPOTHESES && [store referentAt:j]->supposed[ k]; k++)
             [lines addObject:[NSString stringWithFormat:@"supposes %llu %u %d %@", (unsigned long long) [store agent],
@@ -3523,6 +3549,7 @@ char   *BGDecodeWord( const char *s)
    int                  cold;
    int                  stuffy;
    int                  tired;
+   int                  pain;
    int                  trust;
    BGTestimony          t;
    BGAncestry           a;
@@ -3634,8 +3661,9 @@ char   *BGDecodeWord( const char *s)
          free( paths);
          [[self storeOf:(BGEntityID) agent] addIdentity:h];
       }
-      else if( sscanf( text, "feels %llu %d %lld %d %d %d", &agent, &trust, &seen, &cold, &stuffy, &tired) == 6)
+      else if( sscanf( text, "feels %llu %d %lld %d %d %d %d", &agent, &trust, &seen, &cold, &stuffy, &tired, &pain) == 7)
       {
+         [[self storeOf:(BGEntityID) agent] feelPain:pain];
          [[self storeOf:(BGEntityID) agent] feelTired:tired];
          [[self storeOf:(BGEntityID) agent] feelHunger:trust at:seen];
          [[self storeOf:(BGEntityID) agent] feelCold:cold];
