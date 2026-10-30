@@ -1298,6 +1298,29 @@ static NSString   *known_features( const BGReferent *r)
 }
 
 
+/* Whether memory holds anything concrete of the referent to know it by: a
+ * feature with one value. One told of only as "someone" has nothing, and a
+ * percept matching it is a weak match (KNOWLEDGE.md §6), not a binding. */
+- (BOOL) knowsAnythingOf:(const BGReferent *) r
+                      in:(BGKnowledgeStore *) store
+{
+   NSArray      *pairs;
+   NSString     *pair;
+   NSUInteger   k;
+
+   pairs = BGSplitTopLevel( [store recall:r]);
+   for( k = 0; k < [pairs count]; k++)
+   {
+      pair = [pairs objectAtIndex:k];
+      if( [pair rangeOfString:@"|"].location == NSNotFound && [pair rangeOfString:@">="].location == NSNotFound &&
+          [pair rangeOfString:@"<="].location == NSNotFound && [pair rangeOfString:@": #"].location == NSNotFound &&
+          ! [pair hasPrefix:@"id:"] && ! [pair hasPrefix:@"place:"])
+         return( YES);
+   }
+   return( NO);
+}
+
+
 /* Whether every conflict is on a feature that changes within a week. */
 - (BOOL) shortLived:(const char *) paths
 {
@@ -2622,6 +2645,9 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
                        (container || (r->x == tile.x && r->y == tile.y));
                d = exact ? 0 : (r->present ? 1 : 2) + (int) max64( abs( r->x - tile.x), abs( r->y - tile.y));
                if( pass == 0 && ! exact)
+                  continue;
+               /* elsewhere, a referent known by nothing matches anyone: weakly */
+               if( ! exact && ! [self knowsAnythingOf:r in:store])
                   continue;
                /* elsewhere than believed, it must look the same: the crate isn't the chest;
                 * unless only what changes daily differs, when it may be the same, changed */

@@ -3175,6 +3175,7 @@ typedef enum
    BGAlarmRumour,                /* B */
    BGAlarmDeflated,              /* C: the rumour has one named source */
    BGAlarmRepeated,              /* D: B, with noise after noise */
+   BGAlarmAsked,                 /* C, the long way: B's rumours, both from the neighbour, and Bela asks */
    BGAlarmAutopilot,             /* E: B, the watchman the player's, on autopilot */
    BGAlarmAutopilotQuiet         /* E under A: the noise alone */
 } BGAlarm;
@@ -3254,6 +3255,30 @@ static BGAlarmRun   false_alarm( BGAlarm variant, int64_t saveAt, int tolerance)
    /* past the storeroom (it sees it, under the cat's eye), to the gate */
    stage_move( &st, run.watchman, 4, 4);
 
+   /* C, the long way: far off, out of earshot, the neighbour tells the
+    * carter and the porter; they come back; they will answer through agency */
+   if( variant == BGAlarmAsked)
+   {
+      BGProposalGroup   *n;
+      BGEntityID        neighbour;
+
+      n         = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the neighbour"];
+      neighbour = [n create:"neighbour" key:"neighbour" at:BGOnTile( 20, 25, 0)];
+      [st.c submit:n];
+      [st.s runUntil:BGTimeMake( [st.w time].ms + 1000)];
+      neighbour = [n idFor:neighbour];
+      stage_move( &st, run.carter, 20, 24);
+      stage_move( &st, run.porter, 21, 25);
+      rumour = @"#IsIn & { what: #Agent, within: #Container & { place: #OnTile & { x: 12, y: 4, level: 0 } }, "
+               @"attribution: #Saw & { sure: 30 } }";
+      stage_say( &st, neighbour, run.carter, rumour);
+      stage_say( &st, neighbour, run.porter, rumour);
+      stage_move( &st, run.carter, 3, 5);
+      stage_move( &st, run.porter, 5, 5);
+      [agency control:run.carter];
+      [agency control:run.porter];
+   }
+
    /* the rumour */
    if( variant != BGAlarmNoRumour && variant != BGAlarmAutopilotQuiet)
    {
@@ -3264,6 +3289,13 @@ static BGAlarmRun   false_alarm( BGAlarm variant, int64_t saveAt, int tolerance)
                                           @"{ x: 12, y: 4, level: 0 } }, attribution: %@ }", source];
       stage_say( &st, run.carter, run.watchman, rumour);
       stage_say( &st, run.porter, run.watchman, rumour);
+   }
+   if( variant == BGAlarmAsked)
+   {
+      /* where did you hear it? both answer: from the neighbour */
+      rumour = @"#WhoToldYou & { what: #Agent, within: #Container & { place: #OnTile & { x: 12, y: 4, level: 0 } } }";
+      stage_say( &st, run.watchman, run.carter, rumour);
+      stage_say( &st, run.watchman, run.porter, rumour);
    }
    stage_move( &st, run.carter, 3, 20);
    stage_move( &st, run.porter, 5, 20);
@@ -3341,6 +3373,7 @@ static void   test_false_alarm( void)
    BGAlarmRun         e;
    BGAlarmRun         quiet;
    BGAlarmRun         bold;
+   BGAlarmRun         asked;
    BGAlarmRun         timid;
    BGKnowledgeStore   *store;
 
@@ -3364,6 +3397,14 @@ static void   test_false_alarm( void)
    BG_CHECK( logged_by( c.agency, c.watchman, @"+30 (credence +15, +20, risk -5) against eat supper +20 (+20) + margin 5 + "
                                               @"interruption 5: staying"));
    BG_CHECK( ! logged_by( a.agency, a.watchman, @"switching") && ! logged_by( c.agency, c.watchman, @"switching"));
+
+   /* C, the long way: B's two rumours, naming no one, but Bela asks each
+    * where it came from; both heard it from the neighbour, the groups merge,
+    * and credence falls to C's: it stays at supper */
+   asked = false_alarm( BGAlarmAsked, 0, 50);
+   BG_CHECK( logged_by( asked.agency, asked.watchman, @"+30 (credence +15, +20, risk -5) against eat supper +20 (+20) + "
+                                                      @"margin 5 + interruption 5: staying"));
+   BG_CHECK( ! happened( asked.world, "looked", asked.watchman, asked.storeroom));
 
    /* the risk, as risk tolerance weighs it: a bold watchman, in C's
     * conditions, makes nothing of it, 35, and gets up; a timid one, in B's,

@@ -1971,7 +1971,7 @@ isn't true:
 
 58 tests, 2075 checks, under both compilers, ASan and UBSan, and leak-free.
 
-### Needs design: told referents and recognition
+### Found: told referents and recognition (settled below)
 
 Found trying AGENCY.md Scenario 2's variant C the long way. In B's
 conditions, Bela asks the carter and the porter where the rumour came
@@ -2011,8 +2011,6 @@ The remaining scenario checks that aren't run, after the passes above:
     "The latent assembly document will specify materialization …"
   - institutions: COMPONENTS.md Scenario 2, grievances, and reporting to
     the miller. ARCHITECTURE.md: "Institutions (§6) … To be specified".
-  - told, featureless referents in recognition: AGENCY.md Scenario 2's
-    variant C by asking (see its section).
   - how considerations combine beyond adding (AGENCY.md's open question 1
     asks product, weighted sum, or a mix). The lab adds them, in dB.
   - belief from one's own habit: AGENCY.md §8 has habits supplying method
@@ -2193,3 +2191,20 @@ Not yet: light as a domain (lamps burning down), sound conditions, and the
 lamp in CONTENT_LANGUAGE.md Scenario 2's inspection.
 
 61 tests, 2129 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: weak matches don't bind
+
+KNOWLEDGE.md §6: "a strong match binds the percept to that referent; a
+weak match may create a new referent, or tentatively link to one."
+Elsewhere than it is believed to be, a referent known by nothing concrete
+(a told "someone", all open fields) matches anyone, so it is a weak match,
+and recognition no longer binds a percept to it. That settles the
+carter's rumoured someone: it stays the rumour's subject, not the porter.
+
+AGENCY.md Scenario 2's variant C now runs the long way. The neighbour
+tells the carter and the porter, out of Bela's earshot. They tell Bela,
+naming no one. Bela asks each where it came from, and both answer: the
+neighbour. The two groups merge, credence falls to 15, and Bela stays at
+supper, as in C with the source named from the start.
+
+61 tests, 2139 checks, under both compilers, ASan and UBSan, and leak-free.
