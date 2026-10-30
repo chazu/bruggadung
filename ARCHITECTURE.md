@@ -25,7 +25,7 @@ proven on COMPONENTS.md's first scenario.
 | [KNOWLEDGE.md](KNOWLEDGE.md) | §4: history, traces, perception, referents, claims, beliefs, memory | Contract proposed, 3 scenarios; all run in [lab/](lab/README.md) |
 | [AGENCY.md](AGENCY.md) | §5: goals, methods, needs, commitments, habits, dispositions, salience | Contract proposed, 3 scenarios; all run in [lab/](lab/README.md), Scenario 1 adapted, its step 5 (loyalty) aside |
 | [INSTITUTIONS.md](INSTITUTIONS.md) | §6: institutions | Decisions being made |
-| — | Latent physical assembly | Not specified; the lab runs provisional rules (lab/content/latent.tri) to COMPONENTS.md §7's hooks |
+| [LATENT_ASSEMBLY.md](LATENT_ASSEMBLY.md) | Latent physical assembly | The lab's rules adopted; culprits by history and wear by use still to design |
 | [CONTENT_LANGUAGE.md](CONTENT_LANGUAGE.md) | Triangle, the content language: typed feature structures, TDL semantics, CUE-style syntax, the engine | Contract proposed, 3 scenarios; Scenario 1 runs in triangle/, 2 and 3 in [lab/](lab/README.md) |
 | [CHAT.md](CHAT.md) | Original brainstorm. The setting is discarded. | Reference |
 
