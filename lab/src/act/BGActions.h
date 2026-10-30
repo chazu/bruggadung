@@ -26,6 +26,7 @@ typedef struct
 {
    const char   *operation;              /* interned */
    BGEntityID   roles[ BGRoleCount];     /* BGNoEntity for a role the operation doesn't have */
+   const char   *content;                /* interned: what is said, for say; or NULL */
 } BGAction;
 
 static inline BGAction   BGActionMake( const char *operation, BGEntityID actor, BGEntityID item, BGEntityID destination)
@@ -36,6 +37,7 @@ static inline BGAction   BGActionMake( const char *operation, BGEntityID actor, 
    a.roles[ BGRoleActor]         = actor;
    a.roles[ BGRoleItem]          = item;
    a.roles[ BGRoleDestination]   = destination;
+   a.content                     = NULL;
    return( a);
 }
 

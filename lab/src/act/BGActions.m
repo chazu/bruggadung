@@ -575,6 +575,17 @@ static NSString   *effect_loosen( BGWorld *world, BGAction a, int64_t amount, BG
 }
 
 
+/* Saying changes nothing in the world either: the "said" event carries the
+ * content, and whoever is in earshot perceives it (KNOWLEDGE.md §10). */
+static NSString   *effect_say( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
+{
+   if( ! a.content || ! *a.content)
+      return( @"say what?");
+   [g emit:"said" subject:BGWhole( a.roles[ BGRoleActor]) other:BGWhole( a.roles[ BGRoleItem]) detail:a.content];
+   return( nil);
+}
+
+
 /* Looking changes nothing in the world; it is an event the looker perceives. */
 static NSString   *effect_look( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
 {
@@ -597,6 +608,7 @@ static const struct
    { "walk",      effect_walk },
    { "loosen",    effect_loosen },
    { "look",      effect_look },
+   { "say",       effect_say },
 };
 
 

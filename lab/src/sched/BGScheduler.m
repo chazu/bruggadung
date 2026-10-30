@@ -80,6 +80,8 @@ static BGTime   earlier( BGTime a, BGTime b)
       bound = earlier( bound, [_inputs nextInputTime]);
    if( _activities)
       bound = earlier( bound, [_activities nextCompletion]);
+   if( _decision)
+      bound = earlier( bound, [_decision nextDecisionTime]);
    for( i = 0; i < [_domains count]; i++)
    {
       d = [_domains objectAtIndex:i];

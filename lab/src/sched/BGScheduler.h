@@ -84,6 +84,9 @@ typedef struct
 @protocol BGDecisionPhase
 
 - (void) decideBoundary:(uint64_t) boundary;
+/* when a decision is due though nothing else happens: a wait's deadline; or
+ * BGTimeNever */
+- (BGTime) nextDecisionTime;
 
 @end
 

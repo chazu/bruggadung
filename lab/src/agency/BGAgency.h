@@ -16,9 +16,15 @@
  * reason, and the method that needed it has failed, so the goal beneath
  * tries its next.
  *
+ * A step can say something (talk.tri): after a question, the agent waits
+ * for the one it asked to answer, a while at most, and a search slot passes
+ * over whoever it has asked since adopting the goal. Agents agency controls
+ * answer when asked, from what they know: where they believe something like
+ * it is, and whether they saw it or were told, or that they don't know.
+ *
  * Each agent's motivation store (its intentions, with their bindings and
- * failed methods, and the decision count) is private and saved, and every
- * decision is logged for the developer.
+ * failed methods, what it waits for, and the decision count) is private and
+ * saved, and every decision is logged for the developer.
  */
 #import "BGTypes.h"
 
@@ -61,6 +67,10 @@ typedef struct
    int              nintentions;
    uint64_t         decisions;
    BOOL             waiting;
+   uint32_t         awaiting;          /* the referent a question was put to, while it waits for the answer */
+   int64_t          awaitSince;        /* ms */
+   int64_t          awaitUntil;        /* ms: then it stops waiting */
+   NSUInteger       heard;             /* the observations it has considered for questions to answer */
    NSMutableArray   *log;
 }
 @end
@@ -77,6 +87,10 @@ typedef struct
 - (id) initWithWorld:(BGWorld *) world
            committer:(BGCommitter *) committer
            knowledge:(BGKnowledge *) knowledge;
+
+/* Agency takes the agent over, with nothing to do but answer when it is
+ * asked something. */
+- (void) control:(BGEntityID) agent;
 
 /* Agency takes the agent over, committed to the goal (a #Goal instance).
  * NO if content has no such goal. */

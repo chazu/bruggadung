@@ -15,8 +15,9 @@
 // Wedging a lock: the lock, and the nail driven into it as a wedge.
 #Wedging: #WithNails & { lock: #Assembly, wedge: #Body }
 
-// Having nails: the nails, and the containers to look in for them.
-#HavingNails: #WithNails & { box: #Container }
+// Having nails: the nails, the containers to look in for them, and someone
+// to ask.
+#HavingNails: #WithNails & { box: #Container, someone: #Agent }
 
 // A condition over the knowledge view: `find` names the slots to bind, in
 // order, to referents believed present (slots already bound keep their
@@ -36,17 +37,19 @@
 // A method's steps, done in order and re-read at every decision: a subgoal
 // whose goal is already done is passed over, and its bindings join the
 // method's; the first operation is performed, after walking within reach of
-// what it names. Slots name the step's roles.
+// what it names. Slots name the step's roles. An operation can say something
+// (talk.tri): after a question, the agent waits a while for the answer.
 #MethodStep: {}
 #Achieve:    #MethodStep & { subgoal: text }
-#Do:         #MethodStep & { op: text, object: text, target: text, units: int }
+#Do:         #MethodStep & { op: text, object: text, target: text, units: int, says: #Utterance }
 
 // A way to achieve a goal. Its alternatives are tried by `rank`, lowest first,
 // skipping those that have failed since the goal was adopted; the first whose
 // `pre` holds is followed. A `search` slot is somewhere to look: a referent
 // whose inside the agent has seen since the goal was adopted is passed over.
-// When no method's `pre` holds, the goal is impossible for now: it is dropped
-// with the reason, and the method that needed it has failed.
+// An agent asked since the goal was adopted is passed over too. When no
+// method's `pre` holds, the goal is impossible for now: it is dropped with
+// the reason, and the method that needed it has failed.
 #Method: #Intent & {
     goal:   text
     rank:   int
@@ -118,4 +121,17 @@ search_for_nails: #Method & {
     order:  ["recent", "near"]
     search: "box"
     steps:  [#Do & { op: "look_in", object: "box" }]
+} @family(methods)
+
+// Ask someone the agent knows of where nails are, the nearest first. What
+// they answer, the agent believes (KNOWLEDGE.md §10): told where nails are,
+// fetching them holds again.
+ask_for_nails: #Method & {
+    title:  "ask where nails are"
+    goal:   "have_nails"
+    rank:   3
+    pre:    { find: ["someone"], match: #HavingNails & { someone: #Agent } }
+    order:  ["near"]
+    search: "someone"
+    steps:  [#Do & { op: "say", object: "someone", says: #WhereIs & { what: #Stack & { unit: "iron_nail" } } }]
 } @family(methods)

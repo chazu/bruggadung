@@ -1,0 +1,32 @@
+// What agents say (KNOWLEDGE.md §10). An utterance's content is a structure,
+// carried by the "said" event, and whoever is in earshot perceives it.
+// Content names no referents: it describes things by kind, features, and
+// where they are, and each hearer binds them to referents of its own by
+// recognition.
+
+// Every utterance is about something like `what`.
+#Utterance: { what: #Body }
+
+// A question expects an answer from the one it is put to.
+#Question: #Utterance & {}
+
+// Where is something like `what`?
+#WhereIs: #Question & {}
+
+#Attribution: "saw" | "heard"
+
+// A claim: something like `what` is inside `within`, as of `when`, and the
+// speaker saw it or heard it.
+#IsIn: #Utterance & { within: #Body, when: time, attribution: #Attribution }
+
+// The speaker knows of nothing like `what` that it could say where it is.
+#DontKnow: #Utterance & {}
+
+// Say something to an agent in reach. What is said is the command's.
+say: #Operation & {
+    effect: "say"
+    roles: {
+        actor: #Agent
+        item:  #Agent
+    }
+} @family(operations)

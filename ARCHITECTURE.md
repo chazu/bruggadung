@@ -22,7 +22,7 @@ proven on COMPONENTS.md's first scenario.
 | [DOMAIN_SIMULATION.md](DOMAIN_SIMULATION.md) | §3: domains, stocks, horizons, the scheduler | Contract proposed, 3 scenarios; Scenario 3 runs in [lab/](lab/README.md) |
 | [COMPONENTS.md](COMPONENTS.md) | §2: entities, components, relations, identity on demand | Contract proposed, 3 scenarios; Scenario 1 runs in [lab/](lab/README.md) |
 | [ACTIONS.md](ACTIONS.md) | §1: capabilities, actions, activities; change commitment | Contract proposed, 3 scenarios |
-| [KNOWLEDGE.md](KNOWLEDGE.md) | §4: history, traces, perception, referents, claims, beliefs, memory | Contract proposed, 3 scenarios; Scenario 3's stale map and menu run in [lab/](lab/README.md) |
+| [KNOWLEDGE.md](KNOWLEDGE.md) | §4: history, traces, perception, referents, claims, beliefs, memory | Contract proposed, 3 scenarios; Scenario 3's stale map and menu run in [lab/](lab/README.md), with event perception and claims believed |
 | [AGENCY.md](AGENCY.md) | §5: goals, methods, needs, commitments, habits, dispositions, salience | Contract proposed, 3 scenarios; Scenario 1 runs, adapted, in [lab/](lab/README.md) |
 | — | §6: institutions | Next |
 | — | Latent physical assembly | Not started; hooks exist in COMPONENTS.md §7 |
@@ -291,8 +291,10 @@ A rebuilt world produces the same next step as one that never saved.
    the floor, and agents' knowledge stores filled by perception, with the
    menu and map built from them, and a first slice of agency: agents that
    decide from what they know, with a subgoal when a belief fails them,
-   following goals and methods written as content. Next, per
-   [lab/PLAN.md](lab/PLAN.md): event perception and communication.
+   following goals and methods written as content; walking that takes
+   time; and event perception and communication, so an agent can ask a
+   coworker who saw where something went. Next, per
+   [lab/PLAN.md](lab/PLAN.md): credence, trust, and attribution for claims.
 
 ## Cross-cutting open questions
 

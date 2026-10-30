@@ -31,7 +31,7 @@ CFLAGS`.
 
 | Path | Contents |
 | --- | --- |
-| `content/` | `components.tri`: the component kinds and their field registry, plus what descriptions say besides fields (ids, places, free hands); `water.tri`: water stores and taps; `activities.tri`: the Activity component; `operations.tri`: the operations; `agency.tri`: goals and methods; `workshop.tri`: the scenarios' blueprints |
+| `content/` | `components.tri`: the component kinds and their field registry, plus what descriptions say besides fields (ids, places, free hands); `water.tri`: water stores and taps; `activities.tri`: the Activity component; `operations.tri`: the operations; `agency.tri`: goals and methods; `talk.tri`: what agents say, and the say operation; `workshop.tri`: the scenarios' blueprints |
 | `src/generated/BGComponents.h` | Generated from `content/` by `make gen`: one struct per component, enums, and the field registry. Committed; the lab refuses to run on content with another hash. |
 | `src/core/` | `BGTypes.h` (IDs, time, seeds, locations), `BGStore` (records of one kind, sorted by ID), `BGWorld` (all authoritative state, journaled for rollback) |
 | `src/commit/` | `BGProposalGroup` (proposals, handles, unit references), `BGCommitter` (ordering, individuation, apply, validation, events, reactions) |
@@ -68,8 +68,21 @@ from it, puts into it, or reaches into it. Its private knowledge store holds
 referents (R1, R2, ...): agent-local handles with a kind, the features last
 perceived, a believed place naming other referents, and when they were seen.
 Recognition binds percepts by kind and place, never by the developer-only
-truth link. A referent believed where the agent can see, and not seen there,
-is marked absent. The menu `lab play` shows comes from this store, so it can
+truth link: a percept at the very place a referent was believed is that
+referent; one elsewhere must also look the same (its features unify), so
+the crate isn't taken for the chest. A referent believed where the agent
+can see, and not seen there, is marked absent.
+
+Agents also perceive what happens, by an actor in sight: a thing seen put
+somewhere is perceived there, inside a container too, though nothing else in
+it is. What they see happen, and hear said, they keep as observations, in
+their referents. What is said is a Triangle structure (`content/talk.tri`)
+carried by the "said" event; it describes things by kind, features, and
+place, never by referents. A claim heard (`#IsIn`: something like this is in
+that, as of then, seen or heard) becomes a belief: its things bound to the
+hearer's referents by recognition, or new ones, believed where the claim
+puts them and marked as told by the speaker. Every claim is believed, for
+now. The menu `lab play` shows comes from this store, so it can
 offer what is no longer so: performing it, the world's side finds the thing
 gone, the attempt commits, and perception corrects the belief.
 
@@ -93,9 +106,20 @@ agent has seen inside it since adopting the goal. When no method's `pre`
 holds, the goal is impossible for now: dropped with the reason, and the
 method that needed it has failed, so the goal beneath tries its next.
 
-The missing nails runs on three goals' worth of content: *wedge the lock*
+A step can say something: *ask where nails are* puts a `#WhereIs` to the
+nearest agent the worker knows of, then waits up to five seconds for the
+answer (the scheduler wakes it then if nothing else does), and a search slot
+passes over whoever it has asked since adopting the goal. Agents agency
+controls answer when asked, from what they know: where they believe
+something like it is, and whether they saw it or were told; or that they
+don't know.
+
+The missing nails runs on this content: *wedge the lock*
 (drive a nail in, after *have nails*), and *have nails* (fetch them, else
-search for them). Every decision is logged, including why a method was
+search for them, else ask). With an apprentice who saw the smith put the
+nails in a chest, the worker asks, is told, walks to a chest it has never
+seen, and wedges the lock; with one who didn't, it is told "I don't know"
+and drops the goal. Every decision is logged, including why a method was
 passed over. Run on an omniscient knowledge view, the same agent walks
 straight to the spare nails: the behaviour depends on what the agent knows.
 

@@ -144,6 +144,12 @@ extern const char   *BGPhaseNames[ BGPhaseCount];
 - (void) emit:(const char *) kind
       subject:(BGRef) subject
         other:(BGRef) other;
+/* An event with a detail: what was said, for "said". `detail` must stay
+ * valid (interned). */
+- (void) emit:(const char *) kind
+      subject:(BGRef) subject
+        other:(BGRef) other
+       detail:(const char *) detail;
 
 /* --- results ------------------------------------------------------------- */
 

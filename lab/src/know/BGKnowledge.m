@@ -88,6 +88,9 @@ static void   append_quoted( NSMutableString *s, const char *text)
       free( _referents[ i].features);
    }
    free( _referents);
+   for( i = 0; i < _nobservations; i++)
+      free( _observations[ i].content);
+   free( _observations);
    [_news release];
    [super dealloc];
 }
@@ -181,6 +184,46 @@ static void   append_quoted( NSMutableString *s, const char *text)
    if( r->id >= _next)
       _next = r->id + 1;
    return( r);
+}
+
+
+- (NSUInteger) observationCount
+{
+   return( _nobservations);
+}
+
+
+- (const BGObservation *) observationAt:(NSUInteger) i
+{
+   return( &_observations[ i]);
+}
+
+
+/* `o`'s content is copied */
+- (void) addObservation:(BGObservation) o
+{
+   if( _nobservations == _ocapacity)
+   {
+      _ocapacity    = _ocapacity ? _ocapacity * 2 : 16;
+      _observations = realloc( _observations, sizeof( BGObservation) * _ocapacity);
+   }
+   o.content                         = o.content ? strdup( o.content) : NULL;
+   _observations[ _nobservations++] = o;
+}
+
+
+- (int64_t) lastSaidTo:(uint32_t) referentID
+{
+   const BGObservation   *o;
+   NSUInteger            i;
+
+   for( i = _nobservations; i > 0; i--)
+   {
+      o = &_observations[ i - 1];
+      if( ! strcmp( o->kind, "said") && o->actor == _self && o->other == referentID)
+         return( o->time);
+   }
+   return( -1);
 }
 
 
@@ -326,6 +369,231 @@ static int   cmp_seen( const void *a, const void *b)
 }
 
 
+static BOOL   node_int( TriContent *tri, const TriNode *node, const char *path, int64_t *value)
+{
+   const TriNode   *v;
+   int64_t         hi;
+
+   v = node ? tri_at( tri, node, path) : NULL;
+   return( v && tri_node_interval( v, value, &hi) && *value == hi);
+}
+
+
+/* The features a printed description fixes, without its id and place: what
+ * a claim says of a thing, as a referent keeps them. A field left open
+ * prints as its bare type, and says nothing. */
+static char   *concrete_features( const char *printed)
+{
+   static const char   *open[] = { "int", "fixed", "text", "ref", "bool", "atom", "mass", "length", "time",
+                                   "force", "torque", "heat", "temperature", "volume", "amount", "_", NULL };
+   NSMutableString     *out;
+   const char          *start;
+   const char          *end;
+   const char          *p;
+   const char          *field;
+   NSString            *pair;
+   NSString            *key;
+   NSString            *value;
+   NSRange             colon;
+   int                 depth;
+   int                 k;
+   BOOL                quoted;
+   BOOL                keep;
+
+   out   = [NSMutableString string];
+   start = strchr( printed, '{');
+   end   = strrchr( printed, '}');
+   if( ! start || ! end || end < start)
+      return( strdup( ""));
+   depth  = 0;
+   quoted = NO;
+   for( field = p = start + 1; p <= end; p++)
+   {
+      if( *p == '"' && p[ -1] != '\\')
+         quoted = ! quoted;
+      if( quoted)
+         continue;
+      if( *p == '{' || *p == '[')
+         depth++;
+      else if( (*p == '}' || *p == ']') && depth > 0)
+         depth--;
+      else if( (*p == ',' && ! depth) || p == end)
+      {
+         pair  = [[[NSString alloc] initWithBytes:(void *) field length:(NSUInteger) (p - field)
+                                         encoding:NSUTF8StringEncoding] autorelease];
+         pair  = [pair stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+         field = p + 1;
+         colon = [pair rangeOfString:@": "];
+         if( colon.location == NSNotFound)
+            continue;
+         key   = [pair substringToIndex:colon.location];
+         value = [pair substringFromIndex:colon.location + 2];
+         keep  = ! [key isEqualToString:@"id"] && ! [key isEqualToString:@"place"];
+         for( k = 0; keep && open[ k]; k++)
+            keep = ! [value isEqualToString:[NSString stringWithUTF8String:(char *) open[ k]]];
+         if( keep && [value hasPrefix:@"#"] && [value rangeOfString:@" "].location == NSNotFound)
+            keep = NO;
+         if( keep)
+            [out appendFormat:@"%@%@", [out length] ? @", " : @"", pair];
+      }
+   }
+   return( strdup( [out UTF8String]));
+}
+
+
+/* A claim heard becomes a belief (KNOWLEDGE.md §10). For #IsIn: the
+ * container, recognized by its kind on the tile the claim gives, or a new
+ * referent there; the thing, recognized as one of its kind believed in it,
+ * else as one not where it was believed that the claim's description fits,
+ * else a new referent; believed in the container, as of the claim's `when`,
+ * told by the speaker. */
+- (void) believe:(const char *) content
+            from:(uint32_t) speaker
+              at:(int64_t) now
+           store:(BGKnowledgeStore *) store
+            news:(NSMutableArray *) news
+{
+   const TriNode      *claim;
+   const TriNode      *what;
+   const TriNode      *within;
+   const TriNode      *description;
+   const BGReferent   *r;
+   BGReferent         *m;
+   TriContent         *tri;
+   TriArena           *arena;
+   TriMatchResult     result;
+   const char         *kind;
+   const char         *ckind;
+   const BGReferent   *c;
+   int64_t            x;
+   int64_t            y;
+   int64_t            level;
+   int64_t            when;
+   uint32_t           cid;
+   uint32_t           thing;
+   NSUInteger         i;
+   int                pass;
+   char               printed[ 2048];
+
+   tri   = [_world tri];
+   arena = tri_arena_new();
+   claim = tri_value( tri, content, arena, NULL, 0);
+   if( ! claim || ! tri_subtype( tri, tri_node_type( claim), tri_type_named( tri, "#IsIn")) ||
+       ! node_int( tri, claim, "within.place.x", &x) || ! node_int( tri, claim, "within.place.y", &y) ||
+       ! node_int( tri, claim, "within.place.level", &level))
+   {
+      tri_arena_free( arena);
+      return;
+   }
+   if( ! node_int( tri, claim, "when", &when))
+      when = now;
+   what   = tri_at( tri, claim, "what");
+   within = tri_at( tri, claim, "within");
+   kind   = tri_type_name( tri, tri_node_type( what));
+   ckind  = tri_type_name( tri, tri_node_type( within));
+
+   /* the container */
+   cid = 0;
+   for( i = 0; i < [store count] && ! cid; i++)
+   {
+      r = [store referentAt:i];
+      if( r->kind && ! strcmp( r->kind, ckind) && r->form == BGLocationOnTile && r->x == x && r->y == y &&
+          r->level == level)
+         cid = r->id;
+   }
+   if( ! cid)
+   {
+      tri_print( tri, within, printed, sizeof( printed));
+      m           = [store addReferent:0];
+      m->kind     = strdup( ckind);
+      m->features = concrete_features( printed);
+      m->form     = BGLocationOnTile;
+      m->x        = (int32_t) x;
+      m->y        = (int32_t) y;
+      m->level    = (int32_t) level;
+      m->seen     = when;
+      m->present  = YES;
+      m->toldBy   = speaker;
+      cid         = m->id;
+      [news addObject:[NSString stringWithFormat:@"R%u: %s, at (%d, %d), R%u says", cid, ckind, (int) x, (int) y,
+                                                 speaker]];
+   }
+
+   /* the thing */
+   thing = 0;
+   for( pass = 0; pass < 2 && ! thing; pass++)
+      for( i = 0; i < [store count] && ! thing; i++)
+      {
+         r = [store referentAt:i];
+         if( ! r->kind || strcmp( r->kind, kind) || r->id == cid || r->id == [store selfReferent])
+            continue;
+         if( pass == 0 && r->present && r->form == BGLocationIn && r->container == cid)
+            thing = r->id;
+         if( pass == 1 && ! r->present)
+         {
+            description = tri_value( tri, [[store describeReferent:r->id] UTF8String], arena, NULL, 0);
+            if( description && tri_match( tri, what, description, &result) != TRI_INCOMPATIBLE)
+               thing = r->id;
+         }
+      }
+   if( ! thing)
+   {
+      tri_print( tri, what, printed, sizeof( printed));
+      m           = [store addReferent:0];
+      m->kind     = strdup( kind);
+      m->features = concrete_features( printed);
+      thing       = m->id;
+   }
+   c            = [store referent:cid];
+   m            = [store mutableReferent:thing];
+   m->form      = BGLocationIn;
+   m->container = cid;
+   m->x         = c->x;
+   m->y         = c->y;
+   m->level     = c->level;
+   m->slot      = 0;
+   m->role[ 0]  = 0;
+   m->seen      = when;
+   m->present   = YES;
+   m->toldBy    = speaker;
+   [news addObject:[NSString stringWithFormat:@"R%u is in R%u, R%u says", thing, cid, speaker]];
+   tri_arena_free( arena);
+}
+
+
+/* Whether a percept could be the referent by its looks: the features the
+ * referent keeps unify with those perceived. */
+- (BOOL) looksAlike:(const BGReferent *) r
+               kind:(NSString *) kind
+           features:(NSString *) features
+{
+   const TriNode   *both;
+   TriArena        *arena;
+   NSString        *expr;
+
+   expr  = [NSString stringWithFormat:@"%@ & { %s } & { %@ }", kind, r->features ? r->features : "", features];
+   arena = tri_arena_new();
+   both  = tri_value( [_world tri], [expr UTF8String], arena, NULL, 0);
+   tri_arena_free( arena);
+   return( both != NULL);
+}
+
+
+/* The referent a perceived entity was bound to this phase, or 0. */
+static uint32_t   bound_to( BGEntityID e, BGEntityID agent, uint32_t me, const BGSeen *seen, const uint32_t *assigned,
+                            NSUInteger nseen)
+{
+   NSUInteger   i;
+
+   if( e == agent)
+      return( me);
+   for( i = 0; e && i < nseen; i++)
+      if( seen[ i].entity == e)
+         return( assigned[ i]);
+   return( 0);
+}
+
+
 - (void) perceive:(BGKnowledgeStore *) store
              from:(NSUInteger) first
                to:(NSUInteger) last
@@ -336,6 +604,9 @@ static int   cmp_seen( const void *a, const void *b)
    BGView             *view;
    BGSeen             *seen;
    BGEntityID         lookedIn[ 64];
+   BGEntityID         glimpsed[ 64];
+   NSUInteger         witnessed[ 64];
+   BGObservation      o;
    BGEntityID         agent;
    BGLocation         here;
    BGLocation         at;
@@ -347,6 +618,8 @@ static int   cmp_seen( const void *a, const void *b)
    uint8_t            *taken;         /* per referent index: matched this phase */
    uint32_t           container;
    NSUInteger         nlooked;
+   NSUInteger         nglimpsed;
+   NSUInteger         nwitnessed;
    NSUInteger         nseen;
    NSUInteger         i;
    NSUInteger         j;
@@ -384,6 +657,25 @@ static int   cmp_seen( const void *a, const void *b)
          lookedIn[ nlooked++] = [_world locationOf:ev->subject].place;
    }
 
+   /* what happens in sight, by an actor it can see (event perception); a
+    * thing seen put somewhere is seen there, though nothing else inside is */
+   nwitnessed = 0;
+   nglimpsed  = 0;
+   for( i = first; i < last && nwitnessed < 64; i++)
+   {
+      ev = [_world eventAt:i];
+      if( ! ev->actor || (strcmp( ev->kind, "moved") && strcmp( ev->kind, "said")))
+         continue;
+      if( ! strcmp( ev->kind, "moved") && ev->subject == ev->actor)
+         continue;      /* a step: where the walker is, it is seen */
+      if( ! _omniscient && (! ground_tile( _world, ev->actor, &tile) || tile.level != here.level ||
+                            abs( tile.x - here.x) > BG_SIGHT || abs( tile.y - here.y) > BG_SIGHT))
+         continue;
+      witnessed[ nwitnessed++] = i;
+      if( ! strcmp( ev->kind, "moved") && nglimpsed < 64)
+         glimpsed[ nglimpsed++] = ev->subject;
+   }
+
    /* what is in sight, holders before what they hold */
    bodies = [_world storeForKind:[_world kindNamed:"Body"]];
    seen   = malloc( sizeof( BGSeen) * ([bodies count] + 1));
@@ -398,7 +690,8 @@ static int   cmp_seen( const void *a, const void *b)
                              abs( tile.x - here.x) > BG_SIGHT || abs( tile.y - here.y) > BG_SIGHT)))
          continue;
       at = [_world locationOf:e];
-      if( at.form == BGLocationIn && ! _omniscient && ! contains( lookedIn, nlooked, at.place))
+      if( at.form == BGLocationIn && ! _omniscient && ! contains( lookedIn, nlooked, at.place) &&
+          ! contains( glimpsed, nglimpsed, e))
          continue;          /* inside, unseen */
       seen[ nseen].entity = e;
       seen[ nseen].depth  = depth_of( _world, e);
@@ -418,8 +711,9 @@ static int   cmp_seen( const void *a, const void *b)
       {
          if( assigned[ i])
             continue;
-         kind = [view kindOf:seen[ i].entity];
-         at   = [_world locationOf:seen[ i].entity];
+         kind     = [view kindOf:seen[ i].entity];
+         features = [view featuresOf:seen[ i].entity];
+         at       = [_world locationOf:seen[ i].entity];
          ground_tile( _world, seen[ i].entity, &tile);
          container = 0;
          for( j = 0; j < i; j++)
@@ -446,6 +740,9 @@ static int   cmp_seen( const void *a, const void *b)
                d = exact ? 0 : (r->present ? 1 : 2) + (int) max64( abs( r->x - tile.x), abs( r->y - tile.y));
                if( pass == 0 && ! exact)
                   continue;
+               /* elsewhere than believed, it must look the same: the crate isn't the chest */
+               if( ! exact && ! [self looksAlike:r kind:kind features:features])
+                  continue;
                if( d < bestd)
                {
                   bestd = d;
@@ -468,7 +765,6 @@ static int   cmp_seen( const void *a, const void *b)
             }
          }
          /* the referent takes what was perceived */
-         features = [view featuresOf:seen[ i].entity];
          free( r->kind);
          free( r->features);
          r->kind      = strdup( [kind UTF8String]);
@@ -510,6 +806,40 @@ static int   cmp_seen( const void *a, const void *b)
       r->present = NO;
       [news addObject:[NSString stringWithFormat:@"R%u is not where it was", r->id]];
    }
+
+   /* what it saw happen, in its referents; what it heard said, believed */
+   for( i = 0; i < nwitnessed; i++)
+   {
+      ev = [_world eventAt:witnessed[ i]];
+      memset( &o, 0, sizeof( o));
+      o.time  = now;
+      o.kind  = ev->kind;
+      o.actor = bound_to( ev->actor, agent, [store selfReferent], seen, assigned, nseen);
+      if( ! strcmp( ev->kind, "moved"))
+      {
+         o.subject = bound_to( ev->subject, agent, [store selfReferent], seen, assigned, nseen);
+         if( ev->location.form == BGLocationIn || ev->location.form == BGLocationHeldBy)
+            o.other = bound_to( ev->location.place, agent, [store selfReferent], seen, assigned, nseen);
+         if( o.actor != [store selfReferent])
+            [news addObject:[NSString stringWithFormat:@"R%u %s R%u%@", o.actor,
+                                                       ev->location.form == BGLocationIn ? "put" :
+                                                       ev->location.form == BGLocationHeldBy ? "took" : "moved",
+                                                       o.subject,
+                                                       ev->location.form == BGLocationIn
+                                                          ? [NSString stringWithFormat:@" into R%u", o.other] : @""]];
+      }
+      else
+      {
+         o.other   = bound_to( ev->other, agent, [store selfReferent], seen, assigned, nseen);
+         o.content = (char *) ev->detail;
+         if( o.actor != [store selfReferent])
+            [news addObject:[NSString stringWithFormat:@"R%u says to R%u: %s", o.actor, o.other,
+                                                       ev->detail ? ev->detail : ""]];
+      }
+      [store addObservation:o];
+      if( ! strcmp( ev->kind, "said") && ev->detail && o.actor && o.actor != [store selfReferent])
+         [self believe:ev->detail from:o.actor at:now store:store news:news];
+   }
    free( seen);
    free( assigned);
    free( taken);
@@ -537,10 +867,11 @@ static int   cmp_seen( const void *a, const void *b)
 
 - (NSString *) dump:(BGEntityID) agent
 {
-   BGKnowledgeStore   *store;
-   const BGReferent   *r;
-   NSMutableString    *s;
-   NSUInteger         i;
+   BGKnowledgeStore      *store;
+   const BGReferent      *r;
+   const BGObservation   *o;
+   NSMutableString       *s;
+   NSUInteger            i;
 
    store = [self storeOf:agent];
    s     = [NSMutableString stringWithFormat:@"what %llu knows (self R%u):\n", (unsigned long long) agent,
@@ -548,11 +879,20 @@ static int   cmp_seen( const void *a, const void *b)
    for( i = 0; i < [store count]; i++)
    {
       r = [store referentAt:i];
-      [s appendFormat:@"  R%u %s, seen at %lldms%s, truth %llu%@: %@\n", r->id, r->kind, (long long) r->seen,
+      [s appendFormat:@"  R%u %s, seen at %lldms%s, truth %llu%@%@: %@\n", r->id, r->kind, (long long) r->seen,
                       r->present ? "" : ", not there any more", (unsigned long long) r->truth,
                       r->insideSeen >= 0 ? [NSString stringWithFormat:@", inside seen at %lldms", (long long) r->insideSeen]
                                          : @"",
+                      r->toldBy ? [NSString stringWithFormat:@", told by R%u", r->toldBy] : @"",
                       [store describeReferent:r->id]];
+   }
+   for( i = 0; i < [store observationCount]; i++)
+   {
+      o = [store observationAt:i];
+      [s appendFormat:@"  at %lldms: R%u %s R%u%@%@\n", (long long) o->time, o->actor, o->kind,
+                      ! strcmp( o->kind, "said") ? o->other : o->subject,
+                      ! strcmp( o->kind, "moved") && o->other ? [NSString stringWithFormat:@" to R%u", o->other] : @"",
+                      o->content ? [NSString stringWithFormat:@": %s", o->content] : @""];
    }
    return( s);
 }
@@ -608,8 +948,9 @@ static char   *decode( const char *s)
 
 - (NSArray *) savedState
 {
-   BGKnowledgeStore   *store;
-   const BGReferent   *r;
+   BGKnowledgeStore      *store;
+   const BGObservation   *o;
+   const BGReferent      *r;
    NSMutableArray     *lines;
    NSUInteger         i;
    NSUInteger         j;
@@ -630,11 +971,18 @@ static char   *decode( const char *s)
       for( j = 0; j < [store count]; j++)
       {
          r = [store referentAt:j];
-         [lines addObject:[NSString stringWithFormat:@"ref %llu %u %d %u %d %d %d %d %lld %lld %d %llu %@ %@ %@",
+         [lines addObject:[NSString stringWithFormat:@"ref %llu %u %d %u %d %d %d %d %lld %lld %u %d %llu %@ %@ %@",
                                                      (unsigned long long) [store agent], r->id, (int) r->form,
                                                      r->container, r->x, r->y, r->level, r->slot, (long long) r->seen,
-                                                     (long long) r->insideSeen, r->present ? 1 : 0, (unsigned long long) r->truth,
+                                                     (long long) r->insideSeen, r->toldBy, r->present ? 1 : 0, (unsigned long long) r->truth,
                                                      encode( r->role), encode( r->kind), encode( r->features)]];
+      }
+      for( j = 0; j < [store observationCount]; j++)
+      {
+         o = [store observationAt:j];
+         [lines addObject:[NSString stringWithFormat:@"obs %llu %lld %s %u %u %u %@", (unsigned long long) [store agent],
+                                                     (long long) o->time, o->kind, o->actor, o->subject, o->other,
+                                                     encode( o->content)]];
       }
    }
    return( lines);
@@ -649,6 +997,8 @@ static char   *decode( const char *s)
    unsigned long long   truth;
    long long            seen;
    long long            inside;
+   unsigned             told;
+   BGObservation        o;
    unsigned             id;
    unsigned             next;
    unsigned             me;
@@ -673,9 +1023,27 @@ static char   *decode( const char *s)
          [[self storeOf:(BGEntityID) agent] setNextID:next self:me];
       else if( sscanf( text, "seen %llu %d %d %lld", &agent, &x, &y, &seen) == 4)
          [[self storeOf:(BGEntityID) agent] setTileSeen:seen x:x y:y];
-      else if( sscanf( text, "ref %llu %u %d %u %d %d %d %d %lld %lld %d %llu %63s %511s %4095s", &agent, &id, &form,
-                       &container, &x, &y, &level, &slot, &seen, &inside, &present, &truth, role, kind,
-                       features) == 15)
+      else if( sscanf( text, "obs %llu %lld %15s %u %u %u %4095s", &agent, &seen, role, &id, &container, &told,
+                       features) == 7)
+      {
+         memset( &o, 0, sizeof( o));
+         o.time    = seen;
+         o.kind    = [_world intern:role];
+         o.actor   = id;
+         o.subject = container;
+         o.other   = told;
+         o.content = decode( features);
+         if( ! *o.content)
+         {
+            free( o.content);
+            o.content = NULL;
+         }
+         [[self storeOf:(BGEntityID) agent] addObservation:o];
+         free( o.content);
+      }
+      else if( sscanf( text, "ref %llu %u %d %u %d %d %d %d %lld %lld %u %d %llu %63s %511s %4095s", &agent, &id,
+                       &form, &container, &x, &y, &level, &slot, &seen, &inside, &told, &present, &truth, role, kind,
+                       features) == 16)
       {
          store        = [self storeOf:(BGEntityID) agent];
          next         = [store nextID];
@@ -688,6 +1056,7 @@ static char   *decode( const char *s)
          r->slot      = slot;
          r->seen       = seen;
          r->insideSeen = inside;
+         r->toldBy     = told;
          r->present    = present != 0;
          r->truth     = (BGEntityID) truth;
          text         = decode( role);

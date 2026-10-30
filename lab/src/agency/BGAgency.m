@@ -10,6 +10,7 @@
 #define BG_MAX_VARIANTS   16
 #define BG_MAX_METHODS    32
 #define BG_MAX_TRIES      4096     /* the matches one condition may take */
+#define BG_REPLY_WAIT     5000     /* ms an agent waits for an answer */
 
 
 @implementation BGMotivation
@@ -254,6 +255,15 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
 }
 
 
+- (void) control:(BGEntityID) agent
+{
+   BGMotivation   *m;
+
+   m        = [self mindOf:agent];
+   m->heard = [[_knowledge storeOf:agent] observationCount];
+}
+
+
 - (BOOL) commit:(BGEntityID) agent
          toGoal:(const char *) goal
 {
@@ -404,8 +414,9 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
          ;
       if( j < (NSUInteger) *n)
          continue;      /* one referent fills one slot */
-      if( c->search[ 0] && ! strcmp( slot, c->search) && r->insideSeen >= c->since)
-         continue;      /* searched already */
+      if( c->search[ 0] && ! strcmp( slot, c->search) &&
+          (r->insideSeen >= c->since || [c->store lastSaidTo:r->id] >= c->since))
+         continue;      /* searched already: looked into, or asked */
       if( ! [self kind:r->kind fitsSlot:slot of:c])
          continue;
       /* in the condition's order */
@@ -516,24 +527,46 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
 }
 
 
-- (void) act:(BGMotivation *) m
+/* The type of what is said: "#IsIn". */
+- (const char *) kindOfContent:(const char *) content
+{
+   const TriNode   *node;
+   const char      *kind;
+   TriArena        *arena;
+
+   arena = tri_arena_new();
+   node  = content ? tri_value( [_world tri], content, arena, NULL, 0) : NULL;
+   kind  = node ? tri_type_name( [_world tri], tri_node_type( node)) : "?";
+   tri_arena_free( arena);
+   return( kind);
+}
+
+
+/* YES if it was attempted. `content` is what is said, or NULL. */
+- (BOOL) act:(BGMotivation *) m
          why:(const char *) why
        store:(BGKnowledgeStore *) store
    operation:(const char *) operation
       object:(uint32_t) object
       target:(uint32_t) target
        units:(int64_t) units
+     content:(const char *) content
 {
    NSString   *error;
+   BGAction   action;
 
-   error = nil;
-   if( ! BGPerformBelieved( _world, _committer, store,
-                            BGActionMake( [_world intern:operation], [store selfReferent], object, target),
-                            units, &error))
+   error          = nil;
+   action         = BGActionMake( [_world intern:operation], [store selfReferent], object, target);
+   action.content = content ? [_world intern:content] : NULL;
+   if( ! BGPerformBelieved( _world, _committer, store, action, units, &error))
+   {
       [self note:m line:[NSString stringWithFormat:@"%s: could not %s: %@", why, operation, error]];
-   else
-      [self note:m line:[NSString stringWithFormat:@"%s: %s R%u%@", why, operation, object,
-                          target ? [NSString stringWithFormat:@" into R%u", target] : @""]];
+      return( NO);
+   }
+   [self note:m line:[NSString stringWithFormat:@"%s: %s R%u%@%@", why, operation, object,
+                       target ? [NSString stringWithFormat:@" into R%u", target] : @"",
+                       content ? [NSString stringWithFormat:@": %s", [self kindOfContent:content]] : @""]];
+   return( YES);
 }
 
 
@@ -620,10 +653,15 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    char               op[ 64];
    char               slot[ 32];
    const char         *names[ 2] = { "object", "target" };
+   const TriNode      *says;
+   const char         *content;
+   TriType            utterance;
+   char               text[ 2048];
    int                k;
 
-   tri     = [_world tri];
-   pattern = tri_pattern( tri, method);
+   tri       = [_world tri];
+   utterance = tri_type_named( tri, "#Utterance");
+   pattern   = tri_pattern( tri, method);
    me      = [store referent:[store selfReferent]];
    achieve = tri_type_named( tri, "#Achieve");
    if( ! text_at( tri, pattern, "title", title, sizeof( title)))
@@ -671,8 +709,22 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
             [self walk:m why:title me:me toward:r];
             return( YES);
          }
-      [self act:m why:title store:store operation:op object:roles[ 0] target:roles[ 1]
-          units:int_at( tri, step, "units", 0)];
+      /* what it says, if anything: after a question, it waits for the answer */
+      says    = tri_at( tri, step, "says");
+      content = NULL;
+      if( says && tri_node_type( says) != utterance)
+      {
+         tri_print( tri, says, text, sizeof( text));
+         content = text;
+      }
+      if( [self act:m why:title store:store operation:op object:roles[ 0] target:roles[ 1]
+              units:int_at( tri, step, "units", 0) content:content] &&
+          content && tri_subtype( tri, tri_node_type( says), tri_type_named( tri, "#Question")))
+      {
+         m->awaiting   = roles[ 0];
+         m->awaitSince = [_world time].ms;
+         m->awaitUntil = m->awaitSince + BG_REPLY_WAIT;
+      }
       return( YES);
    }
    [self fail:m method:index why:[NSString stringWithFormat:@"%s: every step is done, and the goal is not", title]];
@@ -702,6 +754,126 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
 }
 
 
+/* An answer to a #WhereIs, from what the agent knows: where it believes the
+ * thing like `what` it saw last is, inside something on the ground, and
+ * whether it saw it or was told; or that it doesn't know. */
+- (NSString *) answerTo:(const TriNode *) question
+                  store:(BGKnowledgeStore *) store
+{
+   const TriNode      *what;
+   const TriNode      *kind;
+   const TriNode      *description;
+   const BGReferent   *r;
+   const BGReferent   *c;
+   const BGReferent   *best;
+   TriMatchResult     result;
+   TriContent         *tri;
+   TriArena           *arena;
+   NSUInteger         i;
+   char               printed[ 2048];
+
+   tri   = [_world tri];
+   what  = tri_at( tri, question, "what");
+   arena = tri_arena_new();
+   best  = NULL;
+   for( i = 0; what && i < [store count]; i++)
+   {
+      r = [store referentAt:i];
+      if( ! r->present || r->form != BGLocationIn || r->id == [store selfReferent] || ! r->kind)
+         continue;
+      c = [store referent:r->container];
+      if( ! c || c->form != BGLocationOnTile)
+         continue;
+      kind        = tri_value( tri, r->kind, arena, NULL, 0);
+      description = tri_value( tri, [[store describeReferent:r->id] UTF8String], arena, NULL, 0);
+      if( ! kind || ! tri_subtype( tri, tri_node_type( kind), tri_node_type( what)) ||
+          ! description || tri_match( tri, what, description, &result) == TRI_INCOMPATIBLE)
+         continue;
+      if( ! best || r->seen > best->seen)
+         best = r;
+   }
+   tri_arena_free( arena);
+   if( best)
+   {
+      c = [store referent:best->container];
+      return( [NSString stringWithFormat:@"#IsIn & { what: %s%@, within: %s & { place: #OnTile & { x: %d, y: %d, level: %d }%@ }, "
+                                         @"when: %lldms, attribution: \"%s\" }",
+                                         best->kind,
+                                         best->features && *best->features
+                                            ? [NSString stringWithFormat:@" & { %s }", best->features] : @"",
+                                         c->kind, c->x, c->y, c->level,
+                                         c->features && *c->features ? [NSString stringWithFormat:@", %s", c->features] : @"",
+                                         (long long) best->seen, best->toldBy ? "heard" : "saw"]);
+   }
+   tri_print( tri, what, printed, sizeof( printed));
+   return( [NSString stringWithFormat:@"#DontKnow & { what: %s }", printed]);
+}
+
+
+/* Answering when asked (AGENCY.md §11), for now a reflex: every question
+ * put to the agent since it last considered what it heard is answered. */
+- (void) answerQuestions:(BGMotivation *) m
+                   store:(BGKnowledgeStore *) store
+{
+   const BGObservation   *o;
+   const TriNode         *question;
+   TriContent            *tri;
+   TriArena              *arena;
+   NSString              *answer;
+   uint32_t              me;
+   uint32_t              asker;
+
+   tri = [_world tri];
+   me  = [store selfReferent];
+   for( ; m->heard < [store observationCount]; m->heard++)
+   {
+      o = [store observationAt:m->heard];
+      if( strcmp( o->kind, "said") || o->other != me || ! o->actor || o->actor == me || ! o->content)
+         continue;
+      asker    = o->actor;
+      arena    = tri_arena_new();
+      question = tri_value( tri, o->content, arena, NULL, 0);
+      answer   = nil;
+      if( question && tri_subtype( tri, tri_node_type( question), tri_type_named( tri, "#WhereIs")))
+         answer = [self answerTo:question store:store];
+      tri_arena_free( arena);
+      if( answer)
+         [self act:m why:"answering" store:store operation:"say" object:asker target:0 units:0
+           content:[answer UTF8String]];
+   }
+}
+
+
+/* YES while the agent waits for an answer: none yet from the one it asked,
+ * and the while not over. */
+- (BOOL) awaits:(BGMotivation *) m
+          store:(BGKnowledgeStore *) store
+{
+   const BGObservation   *o;
+   NSUInteger            i;
+
+   if( ! m->awaiting)
+      return( NO);
+   for( i = [store observationCount]; i > 0; i--)
+   {
+      o = [store observationAt:i - 1];
+      if( o->time < m->awaitSince)
+         break;
+      if( ! strcmp( o->kind, "said") && o->actor == m->awaiting && o->other == [store selfReferent])
+      {
+         [self note:m line:[NSString stringWithFormat:@"R%u answered: %s", m->awaiting, [self kindOfContent:o->content]]];
+         m->awaiting = 0;
+         return( NO);
+      }
+   }
+   if( [_world time].ms < m->awaitUntil)
+      return( YES);
+   [self note:m line:[NSString stringWithFormat:@"R%u did not answer", m->awaiting]];
+   m->awaiting = 0;
+   return( NO);
+}
+
+
 /* One decision, for the current intention. YES when it acted or settled into
  * waiting; NO when it only changed its intentions, so it decides again. */
 - (BOOL) decide:(BGMotivation *) m
@@ -720,8 +892,11 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
 
    store = [_knowledge storeOf:m->agent];
    me    = [store referent:[store selfReferent]];
-   if( ! me || ! m->nintentions || [self busy:m->agent])
-      return( YES);     /* mid-activity, or nothing to do: no cost */
+   if( ! me)
+      return( YES);
+   [self answerQuestions:m store:store];
+   if( [self awaits:m store:store] || ! m->nintentions || [self busy:m->agent])
+      return( YES);     /* waiting for an answer, mid-activity, or nothing to do: no cost */
    if( m->waiting && ! [[store news] count])
       return( YES);
    m->waiting = NO;
@@ -793,6 +968,23 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
 }
 
 
+- (BGTime) nextDecisionTime
+{
+   BGMotivation   *m;
+   BGTime         t;
+   NSUInteger     i;
+
+   t = BGTimeNever;
+   for( i = 0; i < [_minds count]; i++)
+   {
+      m = [_minds objectAtIndex:i];
+      if( m->awaiting && m->awaitUntil < t.ms)
+         t = BGTimeMake( m->awaitUntil);
+   }
+   return( t);
+}
+
+
 /* --- saves ------------------------------------------------------------------------- */
 
 - (void) checkInAll
@@ -814,8 +1006,10 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    for( i = 0; i < [_minds count]; i++)
    {
       m    = [_minds objectAtIndex:i];
-      line = [NSMutableString stringWithFormat:@"mind %llu %llu %d %d", (unsigned long long) m->agent,
-                                               (unsigned long long) m->decisions, m->waiting ? 1 : 0, m->nintentions];
+      line = [NSMutableString stringWithFormat:@"mind %llu %llu %d %llu %u %lld %lld %d", (unsigned long long) m->agent,
+                                               (unsigned long long) m->decisions, m->waiting ? 1 : 0,
+                                               (unsigned long long) m->heard, m->awaiting, (long long) m->awaitSince,
+                                               (long long) m->awaitUntil, m->nintentions];
       for( k = 0; k < m->nintentions; k++)
       {
          t = &m->intentions[ k];
@@ -845,13 +1039,17 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    for( i = 0; i < [lines count]; i++)
    {
       words = [[lines objectAtIndex:i] componentsSeparatedByString:@" "];
-      if( [words count] < 5 || ! [[words objectAtIndex:0] isEqualToString:@"mind"])
+      if( [words count] < 9 || ! [[words objectAtIndex:0] isEqualToString:@"mind"])
          continue;
-      m            = [self mindOf:(BGEntityID) [[words objectAtIndex:1] longLongValue]];
-      m->decisions = (uint64_t) [[words objectAtIndex:2] longLongValue];
-      m->waiting   = [[words objectAtIndex:3] intValue] != 0;
-      n            = [[words objectAtIndex:4] intValue];
-      w            = 5;
+      m             = [self mindOf:(BGEntityID) [[words objectAtIndex:1] longLongValue]];
+      m->decisions  = (uint64_t) [[words objectAtIndex:2] longLongValue];
+      m->waiting    = [[words objectAtIndex:3] intValue] != 0;
+      m->heard      = (NSUInteger) [[words objectAtIndex:4] longLongValue];
+      m->awaiting   = (uint32_t) [[words objectAtIndex:5] longLongValue];
+      m->awaitSince = [[words objectAtIndex:6] longLongValue];
+      m->awaitUntil = [[words objectAtIndex:7] longLongValue];
+      n             = [[words objectAtIndex:8] intValue];
+      w             = 9;
       for( k = 0; k < n && k < BG_MAX_INTENTIONS && w + 6 <= [words count]; k++)
       {
          t          = &m->intentions[ m->nintentions++];

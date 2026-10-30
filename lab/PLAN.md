@@ -566,10 +566,9 @@ What it settled:
   mid-search and restored into fresh knowledge and agency now ends in the
   same state, with the same decisions.
 
-Open: recognition binds the crate's spare nails to the referent of the
-bin's missing ones (same kind, the nearest absent referent), so the agent in
-effect concludes it has found its missing nails. Whether that is right is
-undecided; KNOWLEDGE.md's recognition by unification may settle it.
+Open, then: recognition bound the crate's spare nails to the referent of
+the bin's missing ones (same kind, the nearest absent referent). Settled by
+the event perception slice: elsewhere, the features must unify too.
 
 Not yet: method scores (believed cost, habits, dispositions), credence
 thresholds and residuals as subgoals (`onUnknown`), parameters that are
@@ -604,5 +603,66 @@ movement along a path rather than a tile per decision.
 
 28 tests, 276 checks, under both compilers, ASan and UBSan, and leak-free.
 
-Next: event perception and communication, so the scenario's "ask a
-coworker" can run.
+### After the slice: event perception and communication
+
+AGENCY.md Scenario 1's "ask a coworker" runs. An apprentice sees the smith
+put the nails in a chest at the bottom of the map, then comes over by the
+crate. The worker's search fails; *ask where nails are* (have nails' third
+method) walks to the apprentice and asks; the apprentice answers from what
+it saw; the worker believes it, walks to a chest it has never seen, takes
+two, and wedges the lock. The variants: the apprentice didn't see (it says
+"I don't know", and the goal is dropped); it doesn't answer (the worker
+waits five seconds and gives up on it, a wait that survives a save); and
+the omniscient stub, which asks no one.
+
+- **Event perception** (KNOWLEDGE.md §5): an agent perceives the moves and
+  utterances of actors in sight. A thing seen put somewhere is perceived
+  there, inside a container too, though nothing else in it is. What it sees
+  happen and hears said is kept as observations (§7), in its referents, and
+  saved.
+- **Saying** (§10): an action can carry content, and `say` commits a "said"
+  event with it. Content is a Triangle structure (`content/talk.tri`:
+  `#WhereIs`, `#IsIn`, `#DontKnow`) that names no referents; a method writes
+  its question as one (`says:` on a `#Do` step).
+- **Claims become beliefs**: a hearer binds what an `#IsIn` describes to its
+  referents by recognition, or makes new ones, believes the thing in the
+  container as of the claim's `when`, and marks it told by the speaker.
+- **Answering** is a reflex for now: an agent agency controls answers every
+  question put to it, from its knowledge view, saying whether it saw or was
+  told.
+- **Waiting for an answer** has a deadline, and the decision phase tells the
+  scheduler when its next decision is due (`nextDecisionTime`), so a wait
+  ends even when nothing else happens.
+
+What it settled:
+
+- **Recognition elsewhere needs the same looks.** Binding by kind and
+  nearness made the apprentice, come over by the crate, take the crate for
+  the chest it had seen the nails go into, and tell the worker the wrong
+  place. A percept elsewhere than a referent was believed is bound to it
+  only if their features unify; at the very place, kind is enough, so a
+  stack that shrinks where it is stays itself. This also settles the open
+  question the goals-and-methods slice left: the crate's spare nails are no
+  longer taken for the bin's missing ones.
+- **What is said names no referents.** Content describes things by kind,
+  features, and tile, and the hearer recognizes them, so referents stay
+  private to their agent.
+- **Event details ride in the proposal's key**, which saves already keep:
+  a deferred utterance survives a save.
+- **A search slot passes over whoever was asked** since the goal was
+  adopted, as it passes over a container looked into: both are read from
+  what the agent perceived itself do.
+
+Not yet: trust and credence (every claim is believed, at full strength),
+attribution beyond "saw" and "heard", true and perceived ancestry, lying,
+questioning sources, salience (every move and utterance in sight is kept),
+answering as a goal scored against others rather than a reflex, talking
+taking time, hearing that differs from sight, and saying things in `lab
+play` (its menu offers `say`, which needs content the command can't give
+yet).
+
+29 tests, 317 checks, under both compilers, ASan and UBSan, and leak-free.
+
+Next: the rest of AGENCY.md's Scenario 1 and KNOWLEDGE.md's Scenario 1 share
+what is missing: credence from claims, trust in sources, and attribution
+chains, so a coworker's word can be weighed rather than taken.

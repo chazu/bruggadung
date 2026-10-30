@@ -995,19 +995,35 @@ typedef struct
 {
    BGWorld       *world;
    BGAgency      *agency;
+   BGKnowledge   *knowledge;
+   BGEntityID    apprentice;
    NSString      *text;          /* a save at the end, agency and knowledge included */
 } BGNailsRun;
 
 
-/* AGENCY.md Scenario 1, as "the missing nails". The worker looks into the bin
- * and walks off past the crate; the smith takes the nails away; then agency
- * takes the worker over, committed to wedging the lock. */
+/* Whether there is an apprentice, and what it does: sees the smith put the
+ * nails in the chest, or is too far off to; it answers when asked, unless it
+ * is silent (agency doesn't control it). */
+typedef enum
+{
+   BGNoApprentice = 0,
+   BGApprenticeSaw,
+   BGApprenticeMissed,
+   BGApprenticeSilent
+} BGApprentice;
+
+
 static BGWorld   *restore( NSString *text, BGContent *content, BGCommitter **committer, NSString **error);
 
 
-/* `saveAt`, if not 0, is when to save, restore into a fresh world, with fresh
- * knowledge and agency from the save, and carry on there. */
-static BGNailsRun   missing_nails( BOOL spares, BOOL omniscient, int64_t saveAt)
+/* AGENCY.md Scenario 1, as "the missing nails". The worker looks into the bin
+ * and walks off past the crate; the smith takes the nails away (with an
+ * apprentice, into the chest, at the bottom of the map, and the apprentice
+ * then comes over by the crate); then agency takes the worker over,
+ * committed to wedging the lock. `saveAt`, if not 0, is when to save,
+ * restore into a fresh world, with fresh knowledge and agency from the
+ * save, and carry on there. */
+static BGNailsRun   missing_nails( BOOL spares, BOOL omniscient, BGApprentice apprentice, int64_t saveAt)
 {
    BGWorld           *w;
    BGCommitter       *c;
@@ -1019,6 +1035,8 @@ static BGNailsRun   missing_nails( BOOL spares, BOOL omniscient, int64_t saveAt)
    BGEntityID        h[ 8];
    BGEntityID        crate;
    BGEntityID        ch;
+   BGEntityID        chest;
+   BGEntityID        helper;
    NSString          *error;
    NSString          *text;
    BGNailsRun        run;
@@ -1039,10 +1057,22 @@ static BGNailsRun   missing_nails( BOOL spares, BOOL omniscient, int64_t saveAt)
    ch = [g create:"crate" key:"crate" at:BGOnTile( 8, 7, 0)];
    if( spares)
       [g create:"nails_4" key:"spare nails" at:BGIn( ch)];
+   chest  = BGNoEntity;
+   helper = BGNoEntity;
+   if( apprentice)
+   {
+      chest  = [g create:"chest" key:"chest" at:BGOnTile( 2, 12, 0)];
+      helper = [g create:"apprentice" key:"apprentice"
+                      at:apprentice == BGApprenticeMissed ? BGOnTile( 12, 13, 0) : BGOnTile( 3, 13, 0)];
+   }
    [c submit:g];
    [s runUntil:BGTimeMake( 1)];
-   crate = [g idFor:ch];
+   crate  = [g idFor:ch];
+   chest  = [g idFor:chest];
+   helper = [g idFor:helper];
    (void) crate;
+   if( apprentice && apprentice != BGApprenticeSilent)
+      [agency control:helper];
 
    /* the worker looks into the bin, then walks off east */
    BGPerform( w, c, BGActionMake( "look_in", 4, 1, BGNoEntity), 0, &error);
@@ -1058,6 +1088,22 @@ static BGNailsRun   missing_nails( BOOL spares, BOOL omniscient, int64_t saveAt)
    for( i = 0; i < 5; i++)
    {
       BGPerform( w, c, BGActionMake( "walk_south", 5, BGNoEntity, BGNoEntity), 0, &error);
+      [s runUntil:BGTimeMake( [w time].ms + 1000)];
+   }
+   if( apprentice)
+   {
+      /* on into the chest, where the apprentice may see it */
+      for( i = 0; i < 2; i++)
+      {
+         BGPerform( w, c, BGActionMake( "walk_south", 5, BGNoEntity, BGNoEntity), 0, &error);
+         [s runUntil:BGTimeMake( [w time].ms + 1000)];
+      }
+      BG_CHECK( BGPerform( w, c, BGActionMake( "put_in", 5, 2, chest), 0, &error) != nil);
+      [s runUntil:BGTimeMake( [w time].ms + 1000)];
+      /* the apprentice comes over, by the crate */
+      g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the apprentice comes over"];
+      [g move:BGWhole( helper) to:BGOnTile( 10, 8, 0)];
+      [c submit:g];
       [s runUntil:BGTimeMake( [w time].ms + 1000)];
    }
 
@@ -1084,8 +1130,10 @@ static BGNailsRun   missing_nails( BOOL spares, BOOL omniscient, int64_t saveAt)
       BG_CHECK( [BGSave( w, c, [NSArray arrayWithObjects:knowledge, agency, nil]) isEqualToString:text]);
    }
    [s runUntil:BGTimeMake( 120000)];
-   run.world  = w;
-   run.agency = agency;
+   run.world      = w;
+   run.agency     = agency;
+   run.knowledge  = knowledge;
+   run.apprentice = helper;
    run.text   = BGSave( w, c, [NSArray arrayWithObjects:knowledge, agency, nil]);
    return( run);
 }
@@ -1142,6 +1190,20 @@ static BOOL   logged( BGAgency *agency, NSString *text)
 }
 
 
+/* the referent of the agent's that tracks the entity, present or not; developer-only */
+static uint32_t   tracks( BGNailsRun run, BGEntityID agent, BGEntityID truth)
+{
+   BGKnowledgeStore   *store;
+   NSUInteger         i;
+
+   store = [run.knowledge storeOf:agent];
+   for( i = 0; i < [store count]; i++)
+      if( [store referentAt:i]->truth == truth)
+         return( [store referentAt:i]->id);
+   return( 0);
+}
+
+
 static void   test_missing_nails( void)
 {
    BGNailsRun   base;
@@ -1156,7 +1218,7 @@ static void   test_missing_nails( void)
    crate = 7;           /* after the workshop's six */
 
    /* base: the bin first (believed), then the crate; nowhere left: dropped, with why */
-   base = missing_nails( NO, NO, 0);
+   base = missing_nails( NO, NO, BGNoApprentice, 0);
 
    BG_CHECK( happened( base.world, "attempted", 4, 1));
    BG_CHECK( happened( base.world, "looked", 4, crate));
@@ -1171,21 +1233,23 @@ static void   test_missing_nails( void)
    BG_CHECK( ! wedged( base.world) && [base.agency mindOf:4]->nintentions == 0);
 
    /* the same run is the same, decisions and all */
-   again = missing_nails( NO, NO, 0);
+   again = missing_nails( NO, NO, BGNoApprentice, 0);
    BG_CHECK( [again.world stateHash] == [base.world stateHash]);
    BG_CHECK( [[again.agency logOf:4] isEqualToArray:[base.agency logOf:4]]);
    BG_CHECK( [again.text isEqualToString:base.text]);
 
    /* A: spare nails in the crate: found, taken, and the lock wedged; wedging was the intention throughout */
-   spares = missing_nails( YES, NO, 0);
+   spares = missing_nails( YES, NO, BGNoApprentice, 0);
    BG_CHECK( happened( spares.world, "attempted", 4, 1));
    BG_CHECK( logged( spares.agency, @"[wedge the lock] back to it: have nails is done"));
    BG_CHECK( logged( spares.agency, @"[wedge the lock] drive a nail in: drive"));
    BG_CHECK( logged( spares.agency, @"[wedge the lock] done"));
+   /* the spare nails are a thing of their own, not the bin's missing ones found again: they look different */
+   BG_CHECK( tracks( spares, 4, 2) && tracks( spares, 4, 8) && tracks( spares, 4, 2) != tracks( spares, 4, 8));
    BG_CHECK( wedged( spares.world));
 
    /* B: the omniscient stub knows better, and the behaviour shows it: straight to the crate */
-   seer = missing_nails( YES, YES, 0);
+   seer = missing_nails( YES, YES, BGNoApprentice, 0);
    BG_CHECK( ! happened( seer.world, "attempted", 4, 1));
    BG_CHECK( ! logged( seer.agency, @"search for nails"));
    BG_CHECK( wedged( seer.world));
@@ -1195,7 +1259,7 @@ static void   test_missing_nails( void)
     * toward the crate just committed), the commitment and the subgoal stacked,
     * fetching passed over: restored, the agent carries on exactly as it would
     * have */
-   resumed = missing_nails( YES, NO, 20005);
+   resumed = missing_nails( YES, NO, BGNoApprentice, 20005);
    BG_CHECK( [resumed.world stateHash] == [spares.world stateHash]);
    BG_CHECK( [resumed.text isEqualToString:spares.text]);
    full = [spares.agency logOf:4];
@@ -1203,6 +1267,104 @@ static void   test_missing_nails( void)
    BG_CHECK( [rest count] > 0 && [rest count] < [full count]);
    BG_CHECK( [rest count] <= [full count] &&
              [rest isEqualToArray:[full subarrayWithRange:NSMakeRange( [full count] - [rest count], [rest count])]]);
+}
+
+
+static BOOL   logged_by( BGAgency *agency, BGEntityID agent, NSString *text)
+{
+   NSArray      *log;
+   NSUInteger   i;
+
+   log = [agency logOf:agent];
+   for( i = 0; i < [log count]; i++)
+      if( [[log objectAtIndex:i] rangeOfString:text].location != NSNotFound)
+         return( YES);
+   return( NO);
+}
+
+
+static const BGReferent   *believed( BGNailsRun run, BGEntityID agent, BGEntityID truth)
+{
+   BGKnowledgeStore   *store;
+   NSUInteger         i;
+
+   store = [run.knowledge storeOf:agent];
+   for( i = 0; i < [store count]; i++)
+      if( [store referentAt:i]->truth == truth && [store referentAt:i]->present)
+         return( [store referentAt:i]);
+   return( NULL);
+}
+
+
+/* AGENCY.md Scenario 1's "ask a coworker", with KNOWLEDGE.md's event
+ * perception and claims: the search fails, and the worker asks the
+ * apprentice, who may have seen the smith put the nails in the chest. */
+static void   test_asking( void)
+{
+   BGNailsRun         saw;
+   BGNailsRun         again;
+   BGNailsRun         missed;
+   BGNailsRun         silent;
+   BGNailsRun         resumed;
+   BGNailsRun         seer;
+   const BGReferent   *nails;
+   const BGReferent   *chest;
+   NSArray            *full;
+   NSArray            *rest;
+   BGEntityID         c;
+
+   /* it saw: told where, the worker goes to a chest it has never seen, and wedges the lock */
+   saw = missing_nails( NO, NO, BGApprenticeSaw, 0);
+   c   = 8;                 /* the crate is 7 */
+   BG_CHECK( logged( saw.agency, @"[have nails] ask where nails are: say R"));
+   BG_CHECK( logged( saw.agency, @": #WhereIs"));
+   BG_CHECK( logged( saw.agency, @"answered: #IsIn"));
+   BG_CHECK( logged_by( saw.agency, saw.apprentice, @"answering: say R"));
+   BG_CHECK( happened( saw.world, "said", 4, saw.apprentice) && happened( saw.world, "said", saw.apprentice, 4));
+   BG_CHECK( first_at( saw.world, "looked", 4, 7) < first_at( saw.world, "said", 4, saw.apprentice));
+   BG_CHECK( ! happened( saw.world, "looked", 4, c));
+   BG_CHECK( wedged( saw.world));
+   /* the apprentice saw the nails go in: believed in the chest, not told */
+   nails = believed( saw, saw.apprentice, 2);
+   chest = believed( saw, saw.apprentice, c);
+   BG_CHECK( nails && chest && nails->form == BGLocationIn && nails->container == chest->id && ! nails->toldBy);
+   /* the worker was told of the chest, then saw it */
+   chest = believed( saw, 4, c);
+   BG_CHECK( chest && chest->toldBy);
+   BG_CHECK( [[saw.knowledge dump:4] rangeOfString:@"said R"].location != NSNotFound);
+
+   again = missing_nails( NO, NO, BGApprenticeSaw, 0);
+   BG_CHECK( [again.world stateHash] == [saw.world stateHash]);
+   BG_CHECK( [again.text isEqualToString:saw.text]);
+   BG_CHECK( [[again.agency logOf:4] isEqualToArray:[saw.agency logOf:4]]);
+
+   /* it didn't see: it says so, and the goal is dropped */
+   missed = missing_nails( NO, NO, BGApprenticeMissed, 0);
+   BG_CHECK( logged( missed.agency, @"answered: #DontKnow"));
+   BG_CHECK( logged( missed.agency, @"[wedge the lock] nothing I know of will do: impossible for now"));
+   BG_CHECK( ! wedged( missed.world));
+   BG_CHECK( ! believed( missed, missed.apprentice, 2));
+
+   /* nobody answers: the worker waits a while, then gives up on it */
+   silent = missing_nails( NO, NO, BGApprenticeSilent, 0);
+   BG_CHECK( logged( silent.agency, @"did not answer"));
+   BG_CHECK( ! happened( silent.world, "said", silent.apprentice, 4) && ! wedged( silent.world));
+
+   /* saved while it waits, the wait goes on in the restored world, and ends as it would have */
+   resumed = missing_nails( NO, NO, BGApprenticeSilent, 30006);
+   BG_CHECK( [resumed.world stateHash] == [silent.world stateHash]);
+   BG_CHECK( [resumed.text isEqualToString:silent.text]);
+   full = [silent.agency logOf:4];
+   rest = [resumed.agency logOf:4];
+   BG_CHECK( [rest count] > 0 && [rest count] < [full count] &&
+             [rest isEqualToArray:[full subarrayWithRange:NSMakeRange( [full count] - [rest count], [rest count])]]);
+   BG_CHECK( [rest count] && [[rest objectAtIndex:0] rangeOfString:@"t=35005ms"].location != NSNotFound &&
+             [[rest objectAtIndex:0] rangeOfString:@"did not answer"].location != NSNotFound);
+
+   /* the omniscient stub needs no one: straight to the chest */
+   seer = missing_nails( NO, YES, BGApprenticeSaw, 0);
+   BG_CHECK( ! happened( seer.world, "said", 4, seer.apprentice));
+   BG_CHECK( ! happened( seer.world, "attempted", 4, 1) && wedged( seer.world));
 }
 
 
@@ -1515,6 +1677,7 @@ const BGTestCase   BGAllTests[] =
    { "play",                          test_play },
    { "stale_belief",                  test_stale_belief },
    { "missing_nails",                 test_missing_nails },
+   { "asking",                        test_asking },
    { "cistern",                       test_cistern },
    { "cistern_b",                     test_cistern_b },
    { "cistern_d",                     test_cistern_d },

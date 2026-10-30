@@ -662,7 +662,8 @@ static NSString   *live_check( BGWorld *w, BGEntityID e, const char *role)
    case BGProposeEvent:
       a = resolve_ref( g, p->target);
       b = resolve_ref( g, p->other);
-      [self emit:[_world intern:p->name] subject:a other:b amount:p->value detail:NULL
+      [self emit:[_world intern:p->name] subject:a other:b amount:p->value
+          detail:p->key ? [_world intern:p->key] : NULL
         location:BGLocationMakeNone() group:g];
       return( nil);
    }

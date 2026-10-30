@@ -19,6 +19,15 @@
  * Recognition binds a percept to a referent of the same kind, preferring one
  * believed at that very place, then the nearest. A referent believed at a
  * place the agent can see, and not seen there, is marked absent.
+ *
+ * Event perception: an agent perceives what happens where it can see, by an
+ * actor in sight. A thing it sees put somewhere is perceived there, inside a
+ * container too, though nothing else inside is. What it perceives happen is
+ * kept as observations, in its referents: who moved what where, who said
+ * what to whom. A claim it hears (talk.tri's #IsIn) becomes a belief: the
+ * things described are bound to its referents by recognition, or become new
+ * ones, believed where the claim puts them, told by the speaker. Every claim
+ * is believed, for now: trust and credence come later.
  */
 #import "BGTypes.h"
 
@@ -42,9 +51,22 @@ typedef struct
    char             role[ 16];
    int64_t          seen;          /* ms */
    int64_t          insideSeen;    /* when it last saw inside it (ms), or -1 */
+   uint32_t         toldBy;        /* the referent who said it is where it is believed; 0 if seen */
    BOOL             present;       /* still believed where it was last seen */
    BGEntityID       truth;         /* developer-only */
 } BGReferent;
+
+
+/* What the agent perceived happen (KNOWLEDGE.md §7), in its referents. */
+typedef struct
+{
+   int64_t          time;          /* ms */
+   const char       *kind;         /* "moved", "said" */
+   uint32_t         actor;         /* who did it; 0 if no referent */
+   uint32_t         subject;       /* moved: what */
+   uint32_t         other;         /* moved: what it went into, or who took it; said: to whom */
+   char             *content;      /* said: what */
+} BGObservation;
 
 
 @interface BGKnowledgeStore : NSObject
@@ -57,6 +79,9 @@ typedef struct
    uint32_t         _next;
    int64_t          _seenAt[ 32 * 32];
    NSMutableArray   *_news;          /* what perception changed, this boundary */
+   BGObservation    *_observations;
+   NSUInteger       _nobservations;
+   NSUInteger       _ocapacity;
 }
 
 - (BGEntityID) agent;
@@ -71,6 +96,12 @@ typedef struct
 - (NSArray *) news;
 /* the referent as a Triangle description, for the knowledge view */
 - (NSString *) describeReferent:(uint32_t) referentID;
+
+/* what it perceived happen, oldest first */
+- (NSUInteger) observationCount;
+- (const BGObservation *) observationAt:(NSUInteger) i;
+/* when the agent last said something to the referent, or -1 */
+- (int64_t) lastSaidTo:(uint32_t) referentID;
 
 @end
 

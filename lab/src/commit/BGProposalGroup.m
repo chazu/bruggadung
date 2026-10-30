@@ -270,6 +270,21 @@ static BGProposal   proposal( BGProposalKind kind, BGRef target)
 }
 
 
+- (void) emit:(const char *) kind
+      subject:(BGRef) subject
+        other:(BGRef) other
+       detail:(const char *) detail
+{
+   BGProposal   p;
+
+   p       = proposal( BGProposeEvent, subject);
+   p.other = other;
+   p.name  = kind;
+   p.key   = detail;          /* an event has no key: its detail rides there, and saves keep it */
+   [self addProposal:p];
+}
+
+
 - (BOOL) applied
 {
    return( _applied);
