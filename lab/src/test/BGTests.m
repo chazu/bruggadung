@@ -7038,6 +7038,104 @@ static void   test_pain( void)
 }
 
 
+/* KNOWLEDGE.md §5: "Each perceiver has an attention budget per boundary.
+ * Salience decides what gets attention first." Mira, curious (she notices
+ * anything), watches twelve workers take up a stone each at one boundary,
+ * the last of them speaking to her as well. At rest she attends to ten: the
+ * remark first (being addressed), then the first nine takes; the other
+ * three go unnoticed. */
+static void   test_attention_budget( void)
+{
+   BGStage            st;
+   BGKnowledge        *knowledge;
+   BGKnowledgeStore   *store;
+   BGProposalGroup    *g;
+   BGEntityID         mira;
+   BGEntityID         workers[ 12];
+   BGEntityID         stones[ 12];
+   BGAction           say;
+   NSString           *error;
+   NSUInteger         i;
+   NSUInteger         moves;
+   NSUInteger         said;
+   NSUInteger         n;
+   NSUInteger         e;
+   int64_t            at;
+
+   st.w      = BGTestWorld( 167);
+   st.c      = BGTestCommitter( st.w);
+   knowledge = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+   st.s      = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [st.s setPerception:knowledge];
+   g    = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: a yard"];
+   /* two rows of six, in sight of her; the last beside her */
+   mira = [g create:"mira" key:"mira" at:BGOnTile( 8, 8, 0)];
+   [g set:"Agent.hiding" of:BGWhole( mira) to:0];
+   for( i = 0; i < 12; i++)
+   {
+      BGLocation   at;
+
+      at          = BGOnTile( 4 + (int32_t) (i % 6), i < 6 ? 7 : 9, 0);
+      workers[ i] = [g create:"worker" key:[[NSString stringWithFormat:@"worker %lu", (unsigned long) i] UTF8String]
+                           at:at];
+      stones[ i]  = [g create:"stone" key:[[NSString stringWithFormat:@"stone %lu", (unsigned long) i] UTF8String]
+                           at:at];
+   }
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   mira = [g idFor:mira];
+   for( i = 0; i < 12; i++)
+   {
+      workers[ i] = [g idFor:workers[ i]];
+      stones[ i]  = [g idFor:stones[ i]];
+   }
+   [st.s runUntil:BGTimeMake( 1000)];
+
+   error = nil;
+   for( i = 0; i < 12; i++)
+      BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "take", workers[ i], stones[ i], BGNoEntity), 0, &error) != nil);
+   say         = BGActionMake( "say", workers[ 11], mira, BGNoEntity);
+   say.content = [st.w intern:"#Here & { what: #Agent }"];
+   BG_CHECK( BGPerform( st.w, st.c, say, 0, &error) != nil);
+   [st.s runUntil:BGTimeMake( 1001)];
+   at = [st.w time].ms;
+
+   store = [knowledge storeOf:mira];
+   moves = 0;
+   said  = 0;
+   for( i = 0; i < [store observationCount]; i++)
+   {
+      if( [store observationAt:i]->time != at)
+         continue;
+      if( ! strcmp( [store observationAt:i]->kind, "moved"))
+         moves++;
+      if( ! strcmp( [store observationAt:i]->kind, "said"))
+         said++;
+   }
+   BG_CHECK( said == 1 && moves == 9);
+   /* the first nine takes, in the order they happened (committed) */
+   n = 0;
+   for( e = 0; e < [st.w eventCount]; e++)
+   {
+      const BGEvent   *ev;
+      NSUInteger      k;
+      BOOL            kept;
+
+      ev = [st.w eventAt:e];
+      if( strcmp( ev->kind, "moved") || ev->actor == ev->subject || ! ev->actor || ev->actor == mira)
+         continue;
+      kept = NO;
+      for( k = 0; k < [store observationCount]; k++)
+         if( [store observationAt:k]->time == at && ! strcmp( [store observationAt:k]->kind, "moved") &&
+             [store observationAt:k]->actor == referent_of( store, ev->actor))
+            kept = YES;
+      BG_CHECK( kept == (n < 9));
+      n++;
+   }
+   BG_CHECK( n == 12);
+}
+
+
 /* KNOWLEDGE.md §3: "Traces on stacks trigger automatic individuation ...
  * marked units never merge." Ten nails on the floor; a scratch and a creak
  * put on the stack in one group mark one nail, split off first, and it
@@ -7709,6 +7807,7 @@ const BGTestCase   BGAllTests[] =
    { "scheduled_forgetting",          test_scheduled_forgetting },
    { "trodden",                       test_trodden },
    { "traced_units",                  test_traced_units },
+   { "attention_budget",              test_attention_budget },
    { "resume_recheck",                test_resume_recheck },
    { "interrupted_repair",            test_interrupted_repair },
    { "unattended_stove",              test_unattended_stove },

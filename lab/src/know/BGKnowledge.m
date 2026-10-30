@@ -1628,6 +1628,28 @@ typedef struct
 } BGSeen;
 
 
+/* An event noticed, waiting for attention: its observation, where it is in
+ * history, and the news it would make. */
+typedef struct
+{
+   BGObservation   o;
+   NSUInteger      event;
+   NSArray         *news;     /* autoreleased */
+} BGCandidate;
+
+
+/* the most salient first; in event order among equals */
+static int   cmp_candidates( const void *a, const void *b)
+{
+   const BGCandidate   *x = a;
+   const BGCandidate   *y = b;
+
+   if( x->o.salience != y->o.salience)
+      return( x->o.salience > y->o.salience ? -1 : 1);
+   return( x->event < y->event ? -1 : x->event > y->event);
+}
+
+
 static int   cmp_seen( const void *a, const void *b)
 {
    const BGSeen   *x;
@@ -2758,10 +2780,14 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
    BOOL               exact;
    NSUInteger         glance[ 64];
    NSUInteger         nglance;
+   BGCandidate        candidates[ 64];
+   NSUInteger         ncandidates;
+   NSInteger          budget;
 
-   agent   = [store agent];
-   news    = [store mutableNews];
-   nglance = 0;
+   agent       = [store agent];
+   news        = [store mutableNews];
+   nglance     = 0;
+   ncandidates = 0;
    [news removeAllObjects];
    if( ! [_world isLive:agent] || ! ground_tile( _world, agent, &here))
       return;
@@ -3318,6 +3344,30 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
          [news removeObjectsInRange:NSMakeRange( lines, [news count] - lines)];
          continue;      /* unnoticed */
       }
+      /* a candidate for attention: its news held back until it gets it */
+      candidates[ ncandidates].o     = o;
+      candidates[ ncandidates].event = witnessed[ i];
+      candidates[ ncandidates].news  = [news subarrayWithRange:NSMakeRange( lines, [news count] - lines)];
+      [news removeObjectsInRange:NSMakeRange( lines, [news count] - lines)];
+      ncandidates++;
+   }
+
+   /* the attention budget (KNOWLEDGE.md §5, AGENCY.md §10): what is left of
+    * BG_ATTENTION after the running activity's demand, BG_PERCEPT_COST a
+    * percept; the most salient first, in event order among equals */
+   budget = (BG_ATTENTION - [self attentionOf:agent]) / BG_PERCEPT_COST;
+   qsort( candidates, ncandidates, sizeof( BGCandidate), cmp_candidates);
+   for( i = 0; i < ncandidates; i++)
+   {
+      if( (NSInteger) i >= budget)
+      {
+         [news addObject:[NSString stringWithFormat:@"no attention left for event %llu",
+                                                    (unsigned long long) [_world eventAt:candidates[ i].event]->index]];
+         continue;
+      }
+      o  = candidates[ i].o;
+      ev = [_world eventAt:candidates[ i].event];
+      [news addObjectsFromArray:candidates[ i].news];
       [store addObservation:o restored:NO];
       /* what took part in it is remembered as long as its most salient part */
       {

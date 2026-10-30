@@ -150,6 +150,8 @@
 #define BG_CONCERN        15      /* about something its goals concern */
 #define BG_ANOMALY        25      /* against what it believes someone usually does */
 #define BG_NOTICE         10      /* what an observation must reach to be kept, at rest */
+#define BG_ATTENTION      100     /* attention a boundary, at rest (KNOWLEDGE.md §5) */
+#define BG_PERCEPT_COST   10      /* what attending to one event takes of it */
 
 #define BG_HYPOTHESES     3       /* competing hypotheses a referent holds at most */
 

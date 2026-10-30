@@ -2760,3 +2760,28 @@ the stack, which bears both; it won't merge back. A nail with a creak
 alone merges back once the creak has run out.
 
 75 tests, 2482 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: an attention budget
+
+KNOWLEDGE.md §5: "Each perceiver has an attention budget per boundary.
+Salience decides what gets attention first." AGENCY.md: agency "splits the
+attention budget according to how demanding the current activity is." The
+salience slice's "Not yet": attention budgets per boundary rather than a
+threshold.
+
+- **The budget**: `BG_ATTENTION` (100) less the running activity's
+  demand, `BG_PERCEPT_COST` (10) an event attended to: ten at rest.
+- **Salience first**: the events noticed (over the threshold, which
+  stays: a busy agent's rises too) wait as candidates; the most salient
+  get attention, in event order among equals. Only those are kept,
+  believed (what was said), and make news; the rest are news only as "no
+  attention left".
+
+Checked: curious Mira, with twelve workers taking up a stone each at one
+boundary and the last speaking to her, attends to ten: the remark first,
+then the first nine takes as committed; the other three go unnoticed.
+
+Not yet: attention for state and trace perception (only events spend it),
+and interpretation within the budget.
+
+76 tests, 2509 checks, under both compilers, ASan, and leak-free.
