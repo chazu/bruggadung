@@ -1,4 +1,4 @@
-/* Generated from Triangle content ddc5a1a9809e0077: do not edit. Type IDs are valid
+/* Generated from Triangle content 5ac702cd9022f4f3: do not edit. Type IDs are valid
  * only for this content; regenerate when it changes. */
 #ifndef BG_COMPONENTS_H
 #define BG_COMPONENTS_H
@@ -6,7 +6,14 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BG_CONTENT_HASH 0xddc5a1a9809e0077ULL
+#define BG_CONTENT_HASH 0x5ac702cd9022f4f3ULL
+
+/* Lever, from #Lever */
+typedef struct {
+    int64_t         leverage;    /* length, in quanta of 0.1mm; content, saved, inspect, perceive(sight) */
+    int64_t         limit;    /* torque, in quanta of 0.001Nm; content, saved, proposable, inspect */
+    bool            sleeve;    /* bool; content, saved, inspect, perceive(sight) */
+} BGLever;
 
 /* Sized, from #Sized */
 typedef struct {
@@ -50,6 +57,7 @@ typedef struct {
     int64_t         curious;    /* int, in quanta of 1; content, saved, proposable, inspect */
     int64_t         fed;    /* int, in quanta of 1; content, saved, proposable, inspect */
     int64_t         fedAt;    /* time, in quanta of 1ms; content, saved, proposable, inspect */
+    int64_t         grip;    /* force, in quanta of 0.001N; content, saved, inspect */
     int64_t         hands;    /* int, in quanta of 1; content, saved, inspect, perceive(sight) */
     int64_t         helpful;    /* int, in quanta of 1; content, saved, proposable, inspect */
     bool            hiding;    /* bool; content, saved, proposable, inspect */
@@ -101,6 +109,13 @@ typedef struct {
     const char *    traceKind;    /* text; content, saved, proposable, inspect */
 } BGTrace;
 
+/* Valve, from #Valve */
+typedef struct {
+    int64_t         breakaway;    /* torque, in quanta of 0.001Nm; content, saved, proposable, inspect */
+    int64_t         rating;    /* torque, in quanta of 0.001Nm; content, saved, inspect, perceive(sight) */
+    bool            turned;    /* bool; content, saved, proposable, inspect, perceive(sight) */
+} BGValve;
+
 /* WaterStore, from #WaterStore */
 typedef struct {
     int64_t         water;    /* volume, in quanta of 1mL; content, saved, proposable, inspect, perceive(sight) */
@@ -114,56 +129,57 @@ typedef struct {
 
 /* #ActivityStatus */
 enum {
-    BG_ACTIVITYSTATUS_COMPLETED = 204,
-    BG_ACTIVITYSTATUS_EXHAUSTED = 205,
-    BG_ACTIVITYSTATUS_FAILED = 206,
-    BG_ACTIVITYSTATUS_RUNNING = 207,
-    BG_ACTIVITYSTATUS_SUSPENDED = 208,
+    BG_ACTIVITYSTATUS_COMPLETED = 206,
+    BG_ACTIVITYSTATUS_EXHAUSTED = 207,
+    BG_ACTIVITYSTATUS_FAILED = 208,
+    BG_ACTIVITYSTATUS_RUNNING = 209,
+    BG_ACTIVITYSTATUS_SUSPENDED = 210,
 };
 
 /* #ClaimKind */
 enum {
-    BG_CLAIMKIND_CUSTODY = 210,
-    BG_CLAIMKIND_OWNERSHIP = 211,
-    BG_CLAIMKIND_RESERVATION = 212,
+    BG_CLAIMKIND_CUSTODY = 212,
+    BG_CLAIMKIND_OWNERSHIP = 213,
+    BG_CLAIMKIND_RESERVATION = 214,
 };
 
 /* #Material */
 enum {
-    BG_MATERIAL_CLOTH = 247,
-    BG_MATERIAL_FOOD = 248,
-    BG_MATERIAL_RUBBER = 249,
-    BG_MATERIAL_FLESH = 274,
-    BG_MATERIAL_BRASS = 276,
-    BG_MATERIAL_IRON = 277,
-    BG_MATERIAL_PAPER = 278,
-    BG_MATERIAL_STEEL = 279,
-    BG_MATERIAL_OAK = 281,
+    BG_MATERIAL_CLOTH = 251,
+    BG_MATERIAL_FOOD = 252,
+    BG_MATERIAL_RUBBER = 253,
+    BG_MATERIAL_STONE = 254,
+    BG_MATERIAL_FLESH = 279,
+    BG_MATERIAL_BRASS = 281,
+    BG_MATERIAL_IRON = 282,
+    BG_MATERIAL_PAPER = 283,
+    BG_MATERIAL_STEEL = 284,
+    BG_MATERIAL_OAK = 286,
 };
 
 /* "flesh" | "metal" | "natural" | "paper" | "wood" */
 enum {
-    BG_BODY_SURFACE_NATURAL = 174,
-    BG_BODY_SURFACE_FLESH = 274,
-    BG_BODY_SURFACE_BRASS = 276,
-    BG_BODY_SURFACE_IRON = 277,
-    BG_BODY_SURFACE_PAPER = 278,
-    BG_BODY_SURFACE_STEEL = 279,
-    BG_BODY_SURFACE_OAK = 281,
+    BG_BODY_SURFACE_NATURAL = 176,
+    BG_BODY_SURFACE_FLESH = 279,
+    BG_BODY_SURFACE_BRASS = 281,
+    BG_BODY_SURFACE_IRON = 282,
+    BG_BODY_SURFACE_PAPER = 283,
+    BG_BODY_SURFACE_STEEL = 284,
+    BG_BODY_SURFACE_OAK = 286,
 };
 
 /* #Colour */
 enum {
-    BG_COLOUR_BLUE = 215,
-    BG_COLOUR_BLACK = 217,
-    BG_COLOUR_BROWN = 218,
-    BG_COLOUR_GREEN = 219,
-    BG_COLOUR_GREY = 220,
-    BG_COLOUR_BEIGE = 222,
-    BG_COLOUR_NAVY = 223,
-    BG_COLOUR_RED = 224,
-    BG_COLOUR_WHITE = 225,
-    BG_COLOUR_YELLOW = 226,
+    BG_COLOUR_BLUE = 217,
+    BG_COLOUR_BLACK = 219,
+    BG_COLOUR_BROWN = 220,
+    BG_COLOUR_GREEN = 221,
+    BG_COLOUR_GREY = 222,
+    BG_COLOUR_BEIGE = 224,
+    BG_COLOUR_NAVY = 225,
+    BG_COLOUR_RED = 226,
+    BG_COLOUR_WHITE = 227,
+    BG_COLOUR_YELLOW = 228,
 };
 
 /* The field registry: what code needs to read and write any component
@@ -189,9 +205,15 @@ typedef struct {
     const BGFieldInfo *fields;
 } BGComponentInfo;
 
-#define BG_COMPONENT_COUNT 13
+#define BG_COMPONENT_COUNT 15
 
 #ifdef BG_COMPONENT_REGISTRY
+
+static const BGFieldInfo BGLever_fields[] = {
+    { "leverage", offsetof(BGLever, leverage), BG_VALUE_QUANTITY, "length", "content, saved, inspect, perceive(sight)" },
+    { "limit", offsetof(BGLever, limit), BG_VALUE_QUANTITY, "torque", "content, saved, proposable, inspect" },
+    { "sleeve", offsetof(BGLever, sleeve), BG_VALUE_BOOL, "bool", "content, saved, inspect, perceive(sight)" },
+};
 
 static const BGFieldInfo BGSized_fields[] = {
     { "size", offsetof(BGSized, size), BG_VALUE_QUANTITY, "length", "content, saved, inspect, perceive(sight)" },
@@ -230,6 +252,7 @@ static const BGFieldInfo BGAgent_fields[] = {
     { "curious", offsetof(BGAgent, curious), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "fed", offsetof(BGAgent, fed), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "fedAt", offsetof(BGAgent, fedAt), BG_VALUE_QUANTITY, "time", "content, saved, proposable, inspect" },
+    { "grip", offsetof(BGAgent, grip), BG_VALUE_QUANTITY, "force", "content, saved, inspect" },
     { "hands", offsetof(BGAgent, hands), BG_VALUE_QUANTITY, "int", "content, saved, inspect, perceive(sight)" },
     { "helpful", offsetof(BGAgent, helpful), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "hiding", offsetof(BGAgent, hiding), BG_VALUE_BOOL, "bool", "content, saved, proposable, inspect" },
@@ -275,6 +298,12 @@ static const BGFieldInfo BGTrace_fields[] = {
     { "traceKind", offsetof(BGTrace, traceKind), BG_VALUE_TEXT, "text", "content, saved, proposable, inspect" },
 };
 
+static const BGFieldInfo BGValve_fields[] = {
+    { "breakaway", offsetof(BGValve, breakaway), BG_VALUE_QUANTITY, "torque", "content, saved, proposable, inspect" },
+    { "rating", offsetof(BGValve, rating), BG_VALUE_QUANTITY, "torque", "content, saved, inspect, perceive(sight)" },
+    { "turned", offsetof(BGValve, turned), BG_VALUE_BOOL, "bool", "content, saved, proposable, inspect, perceive(sight)" },
+};
+
 static const BGFieldInfo BGWaterStore_fields[] = {
     { "water", offsetof(BGWaterStore, water), BG_VALUE_QUANTITY, "volume", "content, saved, proposable, inspect, perceive(sight)" },
     { "waterCapacity", offsetof(BGWaterStore, waterCapacity), BG_VALUE_QUANTITY, "volume", "content, saved, inspect, perceive(sight)" },
@@ -285,17 +314,19 @@ static const BGFieldInfo BGFastener_fields[] = {
 };
 
 static const BGComponentInfo BGComponents[BG_COMPONENT_COUNT + 1] = {
+    { "Lever", "#Lever", sizeof(BGLever), 3, BGLever_fields },
     { "Sized", "#Sized", sizeof(BGSized), 1, BGSized_fields },
     { "Activity", "#Activity", sizeof(BGActivity), 12, BGActivity_fields },
     { "Claim", "#Claim", sizeof(BGClaim), 2, BGClaim_fields },
     { "Body", "#Body", sizeof(BGBody), 5, BGBody_fields },
-    { "Agent", "#Agent", sizeof(BGAgent), 13, BGAgent_fields },
+    { "Agent", "#Agent", sizeof(BGAgent), 14, BGAgent_fields },
     { "Assembly", "#Assembly", sizeof(BGAssembly), 1, BGAssembly_fields },
     { "Container", "#Container", sizeof(BGContainer), 1, BGContainer_fields },
     { "Record", "#Record", sizeof(BGRecord), 1, BGRecord_fields },
     { "Stack", "#Stack", sizeof(BGStack), 3, BGStack_fields },
     { "Tap", "#Tap", sizeof(BGTap), 2, BGTap_fields },
     { "Trace", "#Trace", sizeof(BGTrace), 8, BGTrace_fields },
+    { "Valve", "#Valve", sizeof(BGValve), 3, BGValve_fields },
     { "WaterStore", "#WaterStore", sizeof(BGWaterStore), 2, BGWaterStore_fields },
     { "Fastener", "#Fastener", sizeof(BGFastener), 1, BGFastener_fields },
     { 0 }

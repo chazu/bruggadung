@@ -151,6 +151,12 @@ extern const char   *BGPhaseNames[ BGPhaseCount];
 - (void) emit:(const char *) kind
       subject:(BGRef) subject
         other:(BGRef) other;
+/* An event with an amount: the torque applied. `detail` may be NULL. */
+- (void) emit:(const char *) kind
+      subject:(BGRef) subject
+        other:(BGRef) other
+       amount:(int64_t) amount
+       detail:(const char *) detail;
 /* An event with a detail: what was said, for "said". `detail` must stay
  * valid (interned). */
 - (void) emit:(const char *) kind

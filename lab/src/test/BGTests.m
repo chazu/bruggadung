@@ -66,7 +66,7 @@ static void   test_registry_and_construction( void)
 
    w = BGTestWorld( 1);
    c = BGTestCommitter( w);
-   BG_CHECK( [w kindCount] == 13);
+   BG_CHECK( [w kindCount] == 15);
    BG_CHECK( [w kindNamed:"Body"] != NSNotFound && [w kindNamed:"Nonesuch"] == NSNotFound);
    bin   = commit_create( c, "bin", BGOnTile( 0, 0, 0));
    nails = commit_create( c, "nails_30", BGIn( bin));
@@ -3939,6 +3939,173 @@ static void   test_unknown_nut( void)
 }
 
 
+/* --- the seized valve ------------------------------------------------------- */
+
+typedef struct
+{
+   BGWorld       *world;
+   BGCommitter   *committer;
+   BGKnowledge   *knowledge;
+   BGEntityID    valve;
+   BGEntityID    wrench;
+   NSString      *menu;          /* the worker's, before it acts */
+   NSString      *trace;
+   BOOL          turned;
+   BOOL          bent;
+} BGValveRun;
+
+
+/* ACTIONS.md Scenario 1: the worker beside a valve (`valve`, seized or
+ * not), holding what `tools` names ("", "wrench", "wrench pipe", "stone
+ * wrench"), turns it; `steady`, if not 0, holds the torque there (Nm). With
+ * a stone, it strikes the valve first and then holds the wrench alone. */
+static BGValveRun   valve_run( const char *valve, const char *tools, int64_t steady, uint64_t seed)
+{
+   BGStage            st;
+   BGActivities       *activities;
+   BGKnowledge        *knowledge;
+   BGProposalGroup    *g;
+   BGEntityID         worker;
+   BGEntityID         pipe;
+   BGEntityID         stone;
+   BGKnowledgeStore   *store;
+   BGMenu             *menu;
+   NSMutableArray     *entries;
+   NSString           *error;
+   NSUInteger         i;
+   BGValveRun         run;
+   int64_t            v;
+
+   memset( &run, 0, sizeof( run));
+   st.w       = BGTestWorld( seed);
+   st.c       = BGTestCommitter( st.w);
+   activities = [BGActivities activitiesWithWorld:st.w committer:st.c];
+   knowledge  = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+   st.s       = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [st.s setActivities:activities];
+   [st.s setPerception:knowledge];
+   [st.s addDomain:[[[BGTraces alloc] initWithWorld:st.w] autorelease]];
+   g          = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the water line"];
+   worker     = [g create:"worker" key:"worker" at:BGOnTile( 5, 5, 0)];
+   run.valve  = [g create:valve key:"valve" at:BGOnTile( 6, 5, 0)];
+   run.wrench = BGNoEntity;
+   pipe       = BGNoEntity;
+   stone      = BGNoEntity;
+   if( strstr( tools, "stone"))
+      stone = [g create:"stone" key:"stone" at:BGHeldBy( worker, 0)];
+   else if( strstr( tools, "wrench"))
+      run.wrench = [g create:"wrench_250" key:"wrench" at:BGHeldBy( worker, 0)];
+   if( strstr( tools, "pipe"))
+      pipe = [g create:"pipe_600" key:"pipe" at:BGHeldBy( worker, 1)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   worker     = [g idFor:worker];
+   run.valve  = [g idFor:run.valve];
+   run.wrench = run.wrench ? [g idFor:run.wrench] : BGNoEntity;
+   stone      = stone ? [g idFor:stone] : BGNoEntity;
+
+   /* the menu, as the worker knows it */
+   store   = [knowledge storeOf:worker];
+   menu    = [BGMenu menuFor:store world:st.w believed:YES];
+   entries = [NSMutableArray array];
+   for( i = 0; i < [menu count]; i++)
+      [entries addObject:[menu describeAt:i]];
+   run.menu = [entries componentsJoinedByString:@"; "];
+
+   error = nil;
+   if( stone)
+   {
+      /* a blow first, then the wrench in that hand */
+      BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "strike", worker, stone, run.valve), 0, &error) != nil);
+      [st.s runUntil:BGTimeMake( 1000)];
+      g          = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the stone down, the wrench up"];
+      [g move:BGWhole( stone) to:BGOnTile( 4, 5, 0)];
+      run.wrench = [g create:"wrench_250" key:"wrench" at:BGHeldBy( worker, 0)];
+      [st.c submit:g];
+      [st.s runUntil:BGTimeMake( 2000)];
+      run.wrench = [g idFor:run.wrench];
+   }
+   BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "rotate_valve", worker, run.valve, BGNoEntity), steady, &error) != nil);
+   [st.s runUntil:BGTimeMake( [st.w time].ms + 3000)];
+   run.world     = st.w;
+   run.committer = st.c;
+   run.knowledge = knowledge;
+   run.trace     = [[st.c trace] componentsJoinedByString:@"\n"];
+   run.turned    = [st.w getField:"Valve.turned" of:run.valve value:&v] && v;
+   run.bent      = run.wrench && [st.w getField:"Body.bent" of:run.wrench value:&v] && v;
+   (void) pipe;
+   return( run);
+}
+
+
+static void   test_seized_valve( void)
+{
+   BGValveRun   free_;
+   BGValveRun   bare;
+   BGValveRun   wrench;
+   BGValveRun   full;
+   BGValveRun   steady;
+   BGValveRun   struck;
+   BGValveRun   again;
+   NSString     *seen;
+   uint64_t     seed;
+   int          bends;
+   int          frees;
+
+   /* 1: no leak: the menu for a seized valve is the menu for a free one */
+   free_ = valve_run( "water_valve", "", 0, 73);
+   bare  = valve_run( "seized_valve", "", 0, 73);
+   BG_CHECK( [free_.menu isEqualToString:bare.menu]);
+   BG_CHECK( [bare.menu rangeOfString:@"rotate_valve item"].location != NSNotFound);
+   BG_CHECK( free_.turned);
+
+   /* bare hands: 15 Nm, which the valve answers with nothing */
+   BG_CHECK( ! bare.turned);
+   BG_CHECK( [bare.trace rangeOfString:@": 15 Nm against 70 Nm: holds (expected to turn: rated 12 Nm)"].location != NSNotFound);
+
+   /* the wrench: 50 Nm, still nothing; the wrench is worn, in the stage's group */
+   wrench = valve_run( "seized_valve", "wrench", 0, 73);
+   BG_CHECK( ! wrench.turned && ! wrench.bent);
+   BG_CHECK( [wrench.trace rangeOfString:@": 50 Nm against 70 Nm: holds"].location != NSNotFound);
+   BG_CHECK( any_trace( wrench.world, "tool_marks"));
+
+   /* 2, 3: wrench and pipe: the chain found reaches 0.6 m, 120 Nm, past the
+    * wrench's 80: risk, not refusal. Over seeds, sometimes the wrench bends
+    * first, sometimes the valve frees; the same seed, the same */
+   bends = 0;
+   frees = 0;
+   for( seed = 1; seed <= 20; seed++)
+   {
+      full = valve_run( "seized_valve", "wrench pipe", 0, seed);
+      BG_CHECK( full.turned != full.bent);
+      if( full.bent)
+         bends++;
+      if( full.turned)
+         frees++;
+   }
+   BG_CHECK( bends > 0 && frees > 0);
+   full  = valve_run( "seized_valve", "wrench pipe", 0, 5);
+   again = valve_run( "seized_valve", "wrench pipe", 0, 5);
+   BG_CHECK( full.turned == again.turned && [full.trace isEqualToString:again.trace]);
+
+   /* a steady 75 Nm frees it, no risk */
+   steady = valve_run( "seized_valve", "wrench pipe", 75, 5);
+   BG_CHECK( steady.turned && ! steady.bent);
+   BG_CHECK( [steady.trace rangeOfString:@": 75 Nm against 70 Nm: turns"].location != NSNotFound);
+
+   /* 5: a blow with the stone loosens the bond, and the wrench alone turns it */
+   struck = valve_run( "seized_valve", "stone", 0, 73);
+   BG_CHECK( [struck.trace rangeOfString:@"struck, breaks free at 40 Nm now"].location != NSNotFound);
+   BG_CHECK( struck.turned);
+
+   /* 4: outcomes in the player's text are what can be perceived: the
+    * breakaway never appears */
+   seen = [bare.knowledge dump:1];
+   BG_CHECK( [seen rangeOfString:@"breakaway"].location == NSNotFound && [seen rangeOfString:@"70Nm"].location == NSNotFound);
+   BG_CHECK( [seen rangeOfString:@"rating: 12Nm, turned: false"].location != NSNotFound);
+}
+
+
 /* --- the cistern ----------------------------------------------------------- */
 
 static BGCistern   *run_cistern( BGCisternVariant variant)
@@ -4257,6 +4424,7 @@ const BGTestCase   BGAllTests[] =
    { "two_hands",                     test_two_hands },
    { "coat_at_dusk",                  test_coat_at_dusk },
    { "unknown_nut",                   test_unknown_nut },
+   { "seized_valve",                  test_seized_valve },
    { "rumour",                        test_rumour },
    { "memory_decay",                  test_memory_decay },
    { "salience",                      test_salience },

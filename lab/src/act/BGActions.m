@@ -690,6 +690,118 @@ static NSString   *effect_tighten( BGWorld *world, BGAction a, int64_t amount, B
 }
 
 
+/* A trace of wear made by an effect: tool marks on what was used. */
+static void   wear( BGWorld *world, BGProposalGroup *g, BGEntityID on, int64_t strength)
+{
+   BGEntityID   t;
+
+   t = [g create:"trace" key:"tool marks, from use" at:BGLocationMakeNone()];
+   [g set:"Trace.traceKind" of:BGWhole( t) toText:[world intern:"tool_marks"]];
+   [g set:"Trace.bearer" of:BGWhole( t) to:(int64_t) on];
+   [g set:"Trace.magnitude" of:BGWhole( t) to:strength];
+   [g set:"Trace.created" of:BGWhole( t) to:[world time].ms];
+   [g set:"Trace.expires" of:BGWhole( t) to:[world time].ms + 365 * 86400000LL];
+}
+
+
+/* Turning a valve (ACTIONS.md Scenario 1). The chain is what the actor
+ * holds, searched the same way every time to depth 3: the bare hand on the
+ * handle (75 mm), a lever, or a lever with a sleeve over its handle; the one
+ * that reaches furthest, the lower entity first. Torque is grip times reach,
+ * held at the command's amount (Nm) if any. Past the lever's limit there is
+ * risk, not refusal: a seeded draw, in proportion to the excess, bends it,
+ * giving way before the valve does (the valve feels half its limit). The stage commits the
+ * torque applied, with what the turner expected from the valve's rating;
+ * the valve decides. Using a lever wears it. */
+static NSString   *effect_rotate( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
+{
+   const BGAgent   *agent;
+   const BGLever   *l;
+   const BGLever   *s;
+   const BGLever   *inner;
+   const BGValve   *valve;
+   BGEntityID      held[ 4];
+   BGEntityID      lever;
+   NSUInteger      n;
+   NSUInteger      i;
+   NSUInteger      j;
+   NSUInteger      lk;
+   int64_t         reach;
+   int64_t         best;
+   int64_t         applied;
+   int64_t         limit;
+   uint64_t        state;
+   char            detail[ 96];
+
+   agent = [world record:[world kindNamed:"Agent"] for:a.roles[ BGRoleActor]];
+   valve = [world record:[world kindNamed:"Valve"] for:a.roles[ BGRoleItem]];
+   if( ! agent || ! valve)
+      return( @"there is nothing to turn");
+   lk    = [world kindNamed:"Lever"];
+   n     = [world entitiesAt:a.roles[ BGRoleActor] form:BGLocationHeldBy into:held max:4];
+   best  = 750;                  /* the bare hand on the handle: 75 mm */
+   lever = BGNoEntity;
+   inner = NULL;
+   for( i = 0; i < n; i++)
+   {
+      l = [world record:lk for:held[ i]];
+      if( ! l || l->sleeve)
+         continue;
+      reach = l->leverage;
+      if( reach > best)
+      {
+         best  = reach;
+         lever = held[ i];
+         inner = l;
+      }
+      for( j = 0; j < n; j++)
+      {
+         s = [world record:lk for:held[ j]];
+         if( j == i || ! s || ! s->sleeve || s->leverage <= best)
+            continue;
+         best  = s->leverage;
+         lever = held[ i];
+         inner = l;
+      }
+   }
+   applied = agent->grip * best / 10000;
+   if( amount > 0 && amount * 1000 < applied)
+      applied = amount * 1000;
+   snprintf( detail, sizeof( detail), "expected to %s: rated %lld Nm",
+             applied >= valve->rating ? "turn" : "hold", (long long) valve->rating / 1000);
+   if( inner)
+   {
+      limit = inner->limit;
+      if( applied > limit)
+      {
+         state = BGMix( [world seed] ^ BGMix( [world boundary] * 0x100 + a.roles[ BGRoleItem]));
+         if( (int64_t) (BGNext( &state) % (uint64_t) applied) < applied - limit)
+         {
+            /* it bends: a trace, and less it bears from now on */
+            [g set:"Body.bent" of:BGWhole( lever) to:1];
+            [g set:"Lever.limit" of:BGWhole( lever) to:limit / 2];
+            wear( world, g, lever, 60);
+            applied = limit / 2;
+            strncat( detail, "; the lever bends", sizeof( detail) - strlen( detail) - 1);
+         }
+      }
+      wear( world, g, lever, 10);
+   }
+   [g emit:"torqued" subject:BGWhole( a.roles[ BGRoleItem]) other:BGWhole( a.roles[ BGRoleActor]) amount:applied
+    detail:[world intern:detail]];
+   return( nil);
+}
+
+
+/* A blow with a stone: the valve feels it, and loosens. */
+static NSString   *effect_strike( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
+{
+   [g emit:"struck" subject:BGWhole( a.roles[ BGRoleDestination]) other:BGWhole( a.roles[ BGRoleActor]) amount:30000
+    detail:NULL];
+   return( nil);
+}
+
+
 /* Tending changes nothing but traces, which the operation declares. */
 static NSString   *effect_tend( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
 {
@@ -728,6 +840,8 @@ static const struct
    { "give",      effect_give },
    { "investigate", effect_investigate },
    { "tighten",   effect_tighten },
+   { "rotate",    effect_rotate },
+   { "strike",    effect_strike },
 };
 
 

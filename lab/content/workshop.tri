@@ -79,3 +79,11 @@ gland_nut:    #Fastener & { material: "brass", mass: 50g, size: 19mm }
 gland_nut_22: #Fastener & { material: "brass", mass: 70g, size: 22mm }
 spanner_19:   #Spanner & { material: "steel", mass: 850g, size: 19mm }
 spanner_22:   #Spanner & { material: "steel", mass: 950g, size: 22mm }
+
+// For ACTIONS.md's seized valve: a valve rated 12 Nm, free or seized; a
+// wrench, a length of pipe that fits over its handle, and a stone.
+water_valve:  #Valve & { material: "brass", mass: 2kg, rating: 12Nm, breakaway: 12Nm }
+seized_valve: #Valve & { material: "brass", mass: 2kg, rating: 12Nm, breakaway: 70Nm }
+wrench_250:   #Wrench & { material: "steel", mass: 400g, leverage: 250mm, limit: 80Nm }
+pipe_600:     #Pipe & { material: "iron", mass: 1500g, leverage: 600mm, limit: 2000Nm, sleeve: true }
+stone:        #Body & { material: "stone", mass: 800g }

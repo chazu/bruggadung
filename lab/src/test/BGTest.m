@@ -1,6 +1,7 @@
 #import "BGTest.h"
 
 #import "BGBodyKind.h"
+#import "BGValveKind.h"
 
 #include <dirent.h>
 #include <stdio.h>
@@ -112,6 +113,8 @@ BGCommitter   *BGTestCommitter( BGWorld *world)
    committer = [[[BGCommitter alloc] initWithWorld:world] autorelease];
    [committer addReactor:[[BGBodyKind new] autorelease]
                  forKind:"Body"];
+   [committer addReactor:[[BGValveKind new] autorelease]
+                 forKind:"Valve"];
    return( committer);
 }
 

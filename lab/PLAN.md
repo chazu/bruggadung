@@ -1448,3 +1448,39 @@ closer (asking, measuring), and the lamp (light as a condition).
 
 48 tests, 1831 checks, under both compilers, ASan and UBSan, and leak-free.
 
+### After the slice: the seized valve
+
+ACTIONS.md Scenario 1. A valve on the water line is rated 12 Nm; hidden
+corrosion has seized it, and it takes 70 Nm to break free. The worker's
+menu offers *rotate valve*, exactly as for a valve that isn't seized. Bare
+hands put 15 Nm to the handle; the valve answers with nothing. A wrench
+gives 50 Nm: still nothing, and the wrench wears. The wrench with the pipe
+over its handle reaches 0.6 m: 120 Nm, past the wrench's 80, so there is
+risk, not refusal: over seeds, sometimes the wrench bends first, sometimes
+the valve frees. A steady 75 Nm frees it with no risk. A blow with a stone
+loosens the bond to 40 Nm, and the wrench alone turns it. The worker's
+store never holds the breakaway.
+
+- **Instrument chains**: `#Lever` (reach, the torque it bears, and whether
+  it is a sleeve over another's handle), `#Wrench` and `#Pipe`; an agent's
+  `grip` (N). The `rotate` effect searches what the actor holds the same way
+  every time, to depth 3 (hand; hand, lever; hand, lever, sleeve), for the
+  furthest reach, and applies grip times reach, held at the command's
+  amount if given.
+- **Effects with no success flag**: the stage commits "torqued", the
+  torque applied with the turner's expectation from the rating; the valve's
+  reactor (`BGValveKind`) turns it or holds, and records the attempt, its
+  torque, breakaway, expectation, and outcome. A blow (`strike`) commits
+  "struck", and the valve loosens.
+- **Graded excess**: past a lever's limit, a seeded draw in proportion to
+  the excess bends it (a trace, half the limit from then on), and it gives
+  way before the valve does. Using a lever leaves tool marks, in the
+  stage's group.
+- **Events can carry amounts** (`emit:subject:other:amount:detail:`).
+
+Not yet: agency choosing instruments and force (the test chooses), the
+chain search over things in reach rather than in hand, sounds and visible
+bending as percepts, the actor's exertion, and impact as a graded effect.
+
+49 tests, 1895 checks, under both compilers, ASan and UBSan, and leak-free.
+

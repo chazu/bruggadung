@@ -6,7 +6,7 @@
 // What things are made of, and the colours they come in: hierarchies, so a
 // memory loses detail along them (KNOWLEDGE.md §12): an oak chest is
 // remembered as wooden, then as made of something.
-#Material: "metal" | "wood" | "flesh" | "paper" | "food" | "cloth" | "rubber"
+#Material: "metal" | "wood" | "flesh" | "paper" | "food" | "cloth" | "rubber" | "stone"
 "metal":   "iron" | "brass" | "steel"
 "wood":    "oak"
 
@@ -83,6 +83,8 @@
     // reaction speed (ACTIONS.md §8): it weights the order of the agent's
     // actions among others' at the same boundary
     quickness:  *10 | int & >=1 & <=100      @field(content, saved, proposable, inspect)
+    // what its hands can put into a turn (ACTIONS.md Scenario 1)
+    grip:       *200N | force & >=0N & <=5000N @field(content, saved, inspect)
     // half hidden: seen only from close by, though it sees as well as anyone
     hiding:   *false | true                  @field(content, saved, proposable, inspect)
     // a body stock (AGENCY.md §6): how fed it is, 0 to 100, as of `fedAt`;
@@ -128,4 +130,25 @@
 
 // A spanner: its size is the nut it fits.
 #Spanner: #Sized & #Body & {}
+
+// A lever (ACTIONS.md Scenario 1, instrument chains): how far it reaches
+// for a turn, and the torque it bears before it bends. A sleeve fits over
+// another lever's handle and lengthens it.
+#Lever: {
+    @component(Lever)
+    leverage: length & >=1mm & <=5000mm      @field(content, saved, inspect, perceive(sight))
+    limit:    torque & >=1Nm & <=100000Nm    @field(content, saved, proposable, inspect)
+    sleeve:   *false | true                  @field(content, saved, inspect, perceive(sight))
+}
+#Wrench: #Body & #Lever & {}
+#Pipe:   #Body & #Lever & {}
+
+// A valve: the turn its rating says, what (hidden) it takes to break it
+// free, and whether it has turned.
+#Valve: #Body & {
+    @component(Valve)
+    rating:    torque & >=1Nm & <=100000Nm   @field(content, saved, inspect, perceive(sight))
+    breakaway: torque & >=1Nm & <=100000Nm   @field(content, saved, proposable, inspect)
+    turned:    *false | true                 @field(content, saved, proposable, inspect, perceive(sight))
+}
 

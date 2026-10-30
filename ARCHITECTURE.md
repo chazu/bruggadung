@@ -317,8 +317,9 @@ A rebuilt world produces the same next step as one that never saved.
    fair, weighted conflict resolution with soft reservations (ACTIONS.md's
    two hands, one seal); and recognition weighing failure paths by
    persistence into identity hypotheses (CONTENT_LANGUAGE.md's coat at
-   dusk); and perception's precision, with unknown matches made goals
-   (the nut of unknown size).
+   dusk); perception's precision, with unknown matches made goals (the nut
+   of unknown size); and instrument chains, graded excess, and effects
+   with no success flag (ACTIONS.md's seized valve).
 
 ## Cross-cutting open questions
 

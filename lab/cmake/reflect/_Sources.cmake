@@ -23,6 +23,7 @@ src/domains/BGBodies.m
 src/domains/BGFluidDomain.m
 src/domains/BGTraces.m
 src/kinds/BGBodyKind.m
+src/kinds/BGValveKind.m
 src/know/BGKnowledge.m
 src/main.m
 src/play/BGPlay.m

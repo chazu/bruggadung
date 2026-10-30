@@ -84,6 +84,7 @@ src/domains/BGFluidDomain.h
 src/domains/BGTraces.h
 src/generated/BGComponents.h
 src/kinds/BGBodyKind.h
+src/kinds/BGValveKind.h
 src/know/BGKnowledge.h
 src/lab-version.h
 src/play/BGPlay.h

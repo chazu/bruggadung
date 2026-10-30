@@ -172,7 +172,10 @@ by whether the agent believes itself watched; one that scores below nothing
 is unthinkable. Habits grow with repetition and fade: a habitual method
 wins ties, a slot can prefer the habitual referent, and an observer who
 saw someone do the same thing three times believes they usually do, and
-finds it salient when they don't. Simultaneous takes are fair: one applies and the
+finds it salient when they don't. Effects carry no success flag: turning a valve commits the torque the
+actor's chain of tools applies, and the valve's reaction decides, by a
+breakaway no menu or percept reveals; past a tool's limit there is risk,
+not refusal. Simultaneous takes are fair: one applies and the
 other is rejected whole, ordered by a seeded permutation weighted by the
 agents' quickness; reservations block nothing, though an agent told of one
 may respect it. The player can hand their character to

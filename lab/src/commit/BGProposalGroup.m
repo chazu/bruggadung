@@ -287,6 +287,23 @@ static BGProposal   proposal( BGProposalKind kind, BGRef target)
 - (void) emit:(const char *) kind
       subject:(BGRef) subject
         other:(BGRef) other
+       amount:(int64_t) amount
+       detail:(const char *) detail
+{
+   BGProposal   p;
+
+   p       = proposal( BGProposeEvent, subject);
+   p.other = other;
+   p.name  = kind;
+   p.value = amount;
+   p.key   = detail;
+   [self addProposal:p];
+}
+
+
+- (void) emit:(const char *) kind
+      subject:(BGRef) subject
+        other:(BGRef) other
        detail:(const char *) detail
 {
    BGProposal   p;

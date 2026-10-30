@@ -4,7 +4,7 @@
 // bindings between roles. `effect` names the code that builds the proposal
 // group when the action is performed.
 
-#Effect: "take" | "take_some" | "put_in" | "drive" | "open_tap" | "fill" | "walk" | "loosen" | "look" | "say" | "tend" | "analyse" | "write" | "read" | "eat" | "give" | "investigate" | "tighten"
+#Effect: "take" | "take_some" | "put_in" | "drive" | "open_tap" | "fill" | "walk" | "loosen" | "look" | "say" | "tend" | "analyse" | "write" | "read" | "eat" | "give" | "investigate" | "tighten" | "rotate" | "strike"
 
 // Which roles an operation has is its roles' type: a structure's type is the
 // most general one with all its features.
@@ -263,5 +263,31 @@ peer_at: #Operation & {
     roles: {
         actor: #Agent
         item:  #Fastener
+    }
+} @family(operations)
+
+// Turn a valve (ACTIONS.md Scenario 1): with the best chain of what the
+// actor holds, hand, wrench, pipe over the wrench; the command's amount, if
+// any, holds the torque steady there (Nm). The stage commits the torque
+// applied; the valve's reaction decides what happens.
+rotate_valve: #Operation & {
+    effect:   "rotate"
+    duration: 2s
+    uses:     ["hands"]
+    roles: {
+        actor: #Agent
+        item:  #Valve & { turned: false }
+    }
+} @family(operations)
+
+// Strike something with a stone the actor holds: a blow, which loosens
+// what has seized.
+strike: #Operation & {
+    effect: "strike"
+    uses:   ["hands"]
+    roles: {
+        actor:       #Agent & { id: $a }
+        item:        #Body & { material: "stone", place: #Held & { by: $a } }
+        destination: #Valve
     }
 } @family(operations)
