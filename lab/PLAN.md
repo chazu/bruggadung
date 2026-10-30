@@ -3566,3 +3566,30 @@ doesn't resist arrest (resist is vetoed, though his temper adds 40); he
 runs instead.
 
 88 tests, 2788 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: going without harms the body
+
+AGENCY.md decision 17: a body stock below its threshold adds fatigue and
+then injury over time (hunger slowly, cold faster, air fastest), world
+state, which slows work and is felt as pain.
+
+- **The bodies domain** now proposes: an agent starving (hunger 90 or
+  more), freezing (cold 50: 5 K below 310 K), or smothering (short of
+  breath 50: 0.6% carbon dioxide) takes a point of harm every period
+  (10 minutes, 1 minute, 10 seconds), at each multiple of it: fatigue up
+  to 50, then injury. Its horizon is the next point. What it reads is the
+  body (`BGColdness`, `BGBreathlessness`), not what is felt: numbness
+  doesn't spare it.
+- Already in place: fatigue and injury slow effortful work, and injury is
+  felt as pain.
+
+Checked: the worker, fed 5 and tired 49, with nothing to eat and left to
+itself, is at fatigue 50 and injury 2 after 31 minutes; fed 50, unharmed.
+The lodger in 1% carbon dioxide takes three points of fatigue in its first
+thirty seconds, the door opened and the air still clearing; at 0.5%, none.
+
+Not yet: death at the extreme (a scenario of its own, as decided);
+freezing checked end to end (the same accrual, untested with the thermal
+domain); recovery from injury.
+
+89 tests, 2792 checks, under both compilers, ASan, and leak-free.

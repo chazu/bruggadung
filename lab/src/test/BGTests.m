@@ -1721,6 +1721,46 @@ static BGHungerRun   hunger_run( int64_t fed, BOOL drive, int64_t until)
 }
 
 
+/* AGENCY.md decision 17: going without food harms the body, slowly. The
+ * worker, nearly starved, with nothing to eat and left to itself: a point of
+ * harm every ten minutes, fatigue up to 50, then injury. */
+static void   test_going_without( void)
+{
+   BGWorld           *w;
+   BGCommitter       *c;
+   BGScheduler       *s;
+   BGProposalGroup   *g;
+   BGEntityID        h[ 8];
+   int64_t           fatigue;
+   int64_t           injury;
+   int               fed;
+
+   for( fed = 5; fed <= 50; fed += 45)
+   {
+      w = BGTestWorld( 49);
+      c = BGTestCommitter( w);
+      s = [[[BGScheduler alloc] initWithWorld:w committer:c] autorelease];
+      [s addDomain:[[[BGBodies alloc] initWithWorld:w] autorelease]];
+      [c submit:BGWorkshopSetup( YES, h)];
+      [s runUntil:BGTimeMake( 1)];
+      g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: how fed and tired the worker is"];
+      [g set:"Agent.fed" of:BGWhole( 4) to:fed];
+      [g set:"Agent.fatigue" of:BGWhole( 4) to:49];
+      [c submit:g];
+      [s runUntil:BGTimeMake( 31 * 60000)];
+      fatigue = injury = 0;
+      [w getField:"Agent.fatigue" of:4 value:&fatigue];
+      [w getField:"Agent.injury" of:4 value:&injury];
+      /* starving (95): at 10, 20 and 30 minutes, fatigue to 50, then two
+       * of injury; fed 50, nothing */
+      if( fed == 5)
+         BG_CHECK( fatigue == 50 && injury == 2);
+      else
+         BG_CHECK( fatigue == 49 && injury == 0);
+   }
+}
+
+
 static void   test_needs( void)
 {
    BGHungerRun        hungry;
@@ -7756,7 +7796,7 @@ static void   test_cold_lodger( void)
 /* AGENCY.md §6's air: a lodger in a room whose air holds `dioxide` mmol,
  * beside its shut door to the corridor. Interoception feels the air's carbon
  * dioxide as shortness of breath; enough, and it airs the room. */
-static BOOL   stuffy_lodger( int64_t dioxide, int32_t *felt, BGAgency **minds, BGEntityID *who)
+static BOOL   stuffy_lodger( int64_t dioxide, int32_t *felt, BGAgency **minds, BGEntityID *who, int64_t *fatigue)
 {
    BGStage            st;
    BGActivities       *activities;
@@ -7782,6 +7822,7 @@ static BOOL   stuffy_lodger( int64_t dioxide, int32_t *felt, BGAgency **minds, B
    [st.s setPerception:knowledge];
    [st.s setDecision:agency];
    [st.s addDomain:air];
+   [st.s addDomain:[[[BGBodies alloc] initWithWorld:st.w] autorelease]];
    g        = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: a shut room"];
    corridor = [g create:"corridor" key:"the corridor" at:BGLocationMakeNone()];
    room     = [g create:"room_air" key:"the room's air" at:BGLocationMakeNone()];
@@ -7805,6 +7846,11 @@ static BOOL   stuffy_lodger( int64_t dioxide, int32_t *felt, BGAgency **minds, B
    [st.s runUntil:BGTimeMake( 30000)];
    *minds = agency;
    *who   = lodger;
+   if( fatigue)
+   {
+      *fatigue = 0;
+      [st.w getField:"Agent.fatigue" of:lodger value:fatigue];
+   }
    return( [st.w getField:"Door.ajar" of:door value:&v] && v);
 }
 
@@ -7815,14 +7861,22 @@ static void   test_stuffy_lodger( void)
    BGEntityID   lodger;
    int32_t      felt;
 
-   /* 0.5% carbon dioxide: short of breath 40, more than 30: it opens the door */
-   BG_CHECK( stuffy_lodger( 10000, &felt, &agency, &lodger));
-   BG_CHECK( felt == 40);
+   int64_t      fatigue;
+
+   /* 0.5% carbon dioxide: short of breath 40, more than 30: it opens the
+    * door; not enough to harm it */
+   BG_CHECK( stuffy_lodger( 10000, &felt, &agency, &lodger, &fatigue));
+   BG_CHECK( felt == 40 && fatigue == 0);
    BG_CHECK( logged_by( agency, lodger, @"[air the room] open a door: open_door R"));
    BG_CHECK( logged_by( agency, lodger, @"[air the room] done"));
    /* 0.12%: 0, and the door stays shut */
-   BG_CHECK( ! stuffy_lodger( 2400, &felt, &agency, &lodger));
+   BG_CHECK( ! stuffy_lodger( 2400, &felt, &agency, &lodger, NULL));
    BG_CHECK( felt == 0 && ! logged_by( agency, lodger, @"air the room"));
+   /* AGENCY.md decision 17: 1%, short of breath 90, harms it, a point of
+    * fatigue every ten seconds: three in its first thirty, the door open
+    * and the air still clearing */
+   BG_CHECK( stuffy_lodger( 20000, &felt, &agency, &lodger, &fatigue));
+   BG_CHECK( felt == 90 && fatigue == 3);
 }
 
 
@@ -9177,6 +9231,7 @@ const BGTestCase   BGAllTests[] =
    { "rumour",                        test_rumour },
    { "memory_decay",                  test_memory_decay },
    { "salience",                      test_salience },
+   { "going_without",                 test_going_without },
    { "traces",                        test_traces },
    { "appearance",                    test_appearance },
    { "interpretation",                test_interpretation },
