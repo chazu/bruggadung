@@ -2011,16 +2011,24 @@ The remaining scenario checks that aren't run, after the passes above:
   data). Descriptions use the store's own `ref(n)`; the truth link is a
   field the inspector alone prints. A text check can't tell entity IDs
   from store IDs, both small integers.
-- **Needing design** (each noted in its section above):
+- **Needing design**, with where the docs leave it:
   - latent assembly: DOMAIN_SIMULATION.md Scenario 2, COMPONENTS.md
-    Scenario 3, and ACTIONS.md Scenario 3's steps 2 and 7;
+    Scenario 3, and ACTIONS.md Scenario 3's steps 2 and 7. COMPONENTS.md:
+    "The latent assembly document will specify materialization …"
   - institutions: COMPONENTS.md Scenario 2, grievances, and reporting to
-    the miller;
-  - closed doors and failed moves: KNOWLEDGE.md Scenario 3's check 2;
+    the miller. ARCHITECTURE.md: "Institutions (§6) … To be specified".
+  - light: the lamp, and KNOWLEDGE.md Scenario 3's closed-door bump. A
+    door within arm's reach is seen plainly, so the stale "open" can reach
+    the menu only if darkness hides it; no doc specifies light beyond
+    naming the lamp.
   - told, featureless referents in recognition: AGENCY.md Scenario 2's
-    variant C by asking;
-  - light as a domain: the lamp;
-  - urgency curves, belief from habit, loyalty.
+    variant C by asking (see its section).
+  - urgency curves other than a line: AGENCY.md names "a curve that
+    rises toward the deadline", no shape.
+  - belief from habit: AGENCY.md Scenario 1's setup states the belief,
+    not how a habit makes one.
+  - loyalty: AGENCY.md lists it among dispositions and says it favours
+    reporting to the miller, with nothing more.
 
 ### After the slice: the wrench was replaced
 
