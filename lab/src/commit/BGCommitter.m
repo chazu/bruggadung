@@ -38,6 +38,22 @@ static BGUnitTally   *tally_unit( BGTally *t, const char *unit)
 }
 
 
+/* Whether the group relates the new entity `splitFrom` something: divided
+ * from an individual (COMPONENTS.md Scenario 3), its mass is carved from
+ * that, which the group lowers as much, so none is created. */
+static BOOL   carved_from_source( BGProposalGroup *g, BGEntityID handle)
+{
+   const BGProposal   *p;
+   NSUInteger         i;
+
+   p = [g proposals];
+   for( i = 0; i < [g count]; i++)
+      if( p[ i].kind == BGProposeAddEdge && p[ i].edge == BGEdgeSplitFrom && p[ i].target.entity == handle)
+         return( YES);
+   return( NO);
+}
+
+
 static void   declare( BGTally *t, const char *unit, int64_t units, int64_t mass)
 {
    BGUnitTally   *u;
@@ -498,8 +514,8 @@ static NSString   *live_check( BGWorld *w, BGEntityID e, const char *role)
        * is carved out of the assembly's, which the group lowers as much, so
        * none is created */
       declare( tally, [_world isPhysical:e] ? [_world unitOf:e] : NULL, [_world unitsOf:e],
-               loc.form == BGLocationPartOf && [_world record:[_world kindNamed:"Latent"] for:loc.place] ? 0
-                                                                                                   : [_world massOf:e]);
+               (loc.form == BGLocationPartOf && [_world record:[_world kindNamed:"Latent"] for:loc.place]) ||
+               carved_from_source( g, p->handle) ? 0 : [_world massOf:e]);
       [self emit:"created" subject:e other:BGNoEntity amount:0 detail:p->name location:loc group:g];
       return( nil);
 

@@ -80,6 +80,10 @@
    for( i = 0; i < [store count]; i++)
    {
       body = [store recordAtIndex:i];
+      /* a part inside an assembly joins no domain (COMPONENTS.md §7): its
+       * heat is the assembly's */
+      if( [_world locationOf:[store entityAtIndex:i]].form == BGLocationPartOf)
+         continue;
       if( (k = [self bodyOf:[store entityAtIndex:i]]) < 0)
          continue;
       _bodies[ k].heat       = body->heat;
@@ -92,6 +96,18 @@
 static int64_t   temperature( const BGThermalState *b)
 {
    return( b->heat * 1000 / b->capacity);
+}
+
+
+- (BOOL) participates:(BGEntityID) body
+{
+   int   i;
+
+   [self load];
+   for( i = 0; i < _nbodies; i++)
+      if( _bodies[ i].entity == body && [_world locationOf:body].form != BGLocationPartOf)
+         return( YES);
+   return( NO);
 }
 
 

@@ -20,12 +20,12 @@ proven on COMPONENTS.md's first scenario.
 | [DESIGN.md](DESIGN.md) | The six systems, ambitions, and development sequence | Proposal |
 | [STACK.md](STACK.md) | Language: mulle Objective-C | Decided |
 | [DOMAIN_SIMULATION.md](DOMAIN_SIMULATION.md) | §3: domains, stocks, horizons, the scheduler | Contract proposed, 3 scenarios; Scenarios 1 and 3 run in [lab/](lab/README.md) |
-| [COMPONENTS.md](COMPONENTS.md) | §2: entities, components, relations, identity on demand | Contract proposed, 3 scenarios; Scenarios 1 and 2 run in [lab/](lab/README.md); 3 waits on latent assembly |
+| [COMPONENTS.md](COMPONENTS.md) | §2: entities, components, relations, identity on demand | Contract proposed, 3 scenarios; all run in [lab/](lab/README.md), 3 on provisional latent assembly |
 | [ACTIONS.md](ACTIONS.md) | §1: capabilities, actions, activities; change commitment | Contract proposed, 3 scenarios; all run in [lab/](lab/README.md), Scenario 3's latent-assembly steps aside |
 | [KNOWLEDGE.md](KNOWLEDGE.md) | §4: history, traces, perception, referents, claims, beliefs, memory | Contract proposed, 3 scenarios; all run in [lab/](lab/README.md) |
 | [AGENCY.md](AGENCY.md) | §5: goals, methods, needs, commitments, habits, dispositions, salience | Contract proposed, 3 scenarios; all run in [lab/](lab/README.md), Scenario 1 adapted, its step 5 (loyalty) aside |
 | — | §6: institutions | Next |
-| — | Latent physical assembly | Not started; hooks exist in COMPONENTS.md §7 |
+| — | Latent physical assembly | Not specified; the lab runs provisional rules (lab/content/latent.tri) to COMPONENTS.md §7's hooks |
 | [CONTENT_LANGUAGE.md](CONTENT_LANGUAGE.md) | Triangle, the content language: typed feature structures, TDL semantics, CUE-style syntax, the engine | Contract proposed, 3 scenarios; Scenario 1 runs in triangle/, 2 and 3 in [lab/](lab/README.md) |
 | [CHAT.md](CHAT.md) | Original brainstorm. The setting is discarded. | Reference |
 

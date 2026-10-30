@@ -49,6 +49,8 @@ typedef struct
 - (int64_t) received;
 - (int64_t) pending;
 - (NSUInteger) steps;
+/* Whether a body takes part in it: not while it is part of an assembly. */
+- (BOOL) participates:(BGEntityID) body;
 /* A body's temperature now, in millikelvin. */
 - (int64_t) temperatureOf:(BGEntityID) body;
 

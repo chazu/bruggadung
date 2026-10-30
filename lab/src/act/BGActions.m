@@ -1034,6 +1034,13 @@ static NSString   *effect_reveal( BGWorld *world, BGAction a, int64_t amount, BG
          wear = 60 + ([world time].ms - latent->failedAt) / 36000000;      /* a point every ten hours since */
          wear = wear > 100 ? 100 : wear;
       }
+      /* a culprit that is itself an assembly takes the failure on */
+      if( ! strcmp( role, culprit) && tri_at( tri, tri_pattern( tri, kind), "latent"))
+      {
+         wear = (int64_t) (BGMixString( BGMix( seed), role) % 20);
+         [g set:"Latent.failure" of:BGWhole( part) toText:failure];
+         [g set:"Latent.failedAt" of:BGWhole( part) to:latent->failedAt];
+      }
       [g set:"Part.wear" of:BGWhole( part) to:wear];
       [g set:"Part.cameFrom" of:BGWhole( part) to:(int64_t) assembly];
       [g set:"Part.fits" of:BGWhole( part) toText:[world intern:role]];
@@ -1072,7 +1079,172 @@ static NSString   *effect_replace( BGWorld *world, BGAction a, int64_t amount, B
    [g set:"Part.cameFrom" of:BGWhole( a.roles[ BGRoleItem]) to:(int64_t) place.place];
    if( worn->wear >= 60 && [world record:[world kindNamed:"Latent"] for:place.place])
       [g set:"Latent.failure" of:BGWhole( place.place) toText:""];
+   /* the pump's flow, by the delta: the old part's loss off, the new one's
+    * on (COMPONENTS.md §7) */
+   {
+      const BGPart   *spare;
+      BGEntityID     pump;
+      int64_t        flow;
+      int64_t        delta;
+      int            n;
+
+      spare = [world record:[world kindNamed:"Part"] for:a.roles[ BGRoleItem]];
+      delta = (worn->wear >= 60 ? 80 : 0) - (spare && spare->wear >= 60 ? 80 : 0);
+      for( pump = place.place, n = 0; pump && n < 8 && ! [world record:[world kindNamed:"Pump"] for:pump]; n++)
+      {
+         const BGPart   *p;
+         BGLocation     in;
+
+         in   = [world locationOf:pump];
+         p    = [world record:[world kindNamed:"Part"] for:pump];
+         pump = in.form == BGLocationPartOf ? in.place : p ? (BGEntityID) p->cameFrom : BGNoEntity;
+      }
+      if( pump && delta && [world getField:"Pump.flow" of:pump value:&flow])
+         [g set:"Pump.flow" of:BGWhole( pump) to:flow + delta > 100 ? 100 : flow + delta < 0 ? 0 : flow + delta];
+   }
    return( nil);
+}
+
+
+/* Cutting a strip from a hide (COMPONENTS.md Scenario 3): an individual
+ * divided; the strip, a new entity on the floor, carved from it, with a
+ * splitFrom edge. */
+static NSString   *effect_cut( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
+{
+   BGLocation   floor;
+   BGEntityID   e;
+   BGEntityID   strip;
+   int64_t      lo;
+   int64_t      hi;
+   int64_t      mass;
+   int64_t      cut;
+   int          k;
+
+   cut = tri_node_interval( tri_at( [world tri], tri_pattern( [world tri], "leather_strip"), "mass"), &lo, &hi) && lo == hi
+            ? lo : 0;
+   if( ! [world getField:"Body.mass" of:a.roles[ BGRoleItem] value:&mass] || mass <= cut)
+      return( @"there is not enough of it to cut a strip");
+   for( e = a.roles[ BGRoleActor], k = 0; k < 16 && (floor = [world locationOf:e]).form != BGLocationOnTile; k++)
+      e = floor.place;
+   strip = [g create:"leather_strip" key:"a strip" at:floor];
+   [g relate:BGEdgeSplitFrom from:BGWhole( strip) to:BGWhole( a.roles[ BGRoleItem])];
+   [g set:"Body.mass" of:BGWhole( a.roles[ BGRoleItem]) to:mass - cut];
+   return( nil);
+}
+
+
+/* Shaping a strip into a seal: it fits a seal's role. */
+static NSString   *effect_shape( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
+{
+   [g set:"Part.fits" of:BGWhole( a.roles[ BGRoleItem]) toText:"seal"];
+   return( nil);
+}
+
+
+/* Putting a part back into its assembly, in its role. */
+static NSString   *effect_install( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
+{
+   const char   *role;
+
+   role = [world textField:"Part.fits" of:a.roles[ BGRoleItem]];
+   if( ! role || ! *role)
+      return( @"it fits no place in it");
+   [g move:BGWhole( a.roles[ BGRoleItem]) to:BGPartOf( a.roles[ BGRoleDestination], role, 0)];
+   [g set:"Part.cameFrom" of:BGWhole( a.roles[ BGRoleItem]) to:(int64_t) a.roles[ BGRoleDestination]];
+   return( nil);
+}
+
+
+/* The claims covering an entity (COMPONENTS.md Scenario 3): on it; on an
+ * assembly it is part of, or came out of, for kinds that cover parts
+ * (content's `coverage`); and on what it was divided from. */
+/* Whether claims of this kind cover what is part of what they claim. */
+static BOOL   covers_parts( BGWorld *world, const BGClaim *claim)
+{
+   const TriNode   *c;
+   TriIndex        *family;
+   size_t          i;
+   char            kind[ 64];
+
+   family = tri_family_index( [world tri], "coverage");
+   for( i = 0; claim && family && i < tri_index_count( family); i++)
+   {
+      c = tri_pattern( [world tri], tri_index_tag( family, i));
+      if( tri_print( [world tri], tri_at( [world tri], c, "claimKind"), kind, sizeof( kind)) > 2 &&
+          ! strncmp( kind + 1, tri_type_name( [world tri], claim->kind) + 1, strlen( kind) - 2) &&
+          tri_node_type( tri_at( [world tri], c, "viaPartOf")) == tri_type_named( [world tri], "true"))
+         return( YES);
+   }
+   return( NO);
+}
+
+
+static void   add_claims( BGWorld *world, BGEntityID on, BOOL partsOnly, NSMutableArray *found)
+{
+   BGEntityID   claims[ 16];
+   NSNumber     *n;
+   NSUInteger   m;
+   NSUInteger   j;
+
+   m = [world edges:BGEdgeClaimSubject to:on into:claims max:16];
+   for( j = 0; j < m; j++)
+   {
+      n = [NSNumber numberWithUnsignedLongLong:claims[ j]];
+      if( ( ! partsOnly || covers_parts( world, [world record:[world kindNamed:"Claim"] for:claims[ j]])) &&
+          ! [found containsObject:n])
+         [found addObject:n];
+   }
+}
+
+
+NSArray   *BGClaimsCovering( BGWorld *world, BGEntityID entity)
+{
+   NSMutableArray   *found;
+   const BGPart     *part;
+   BGLocation       at;
+   BGEntityID       up;
+   BGEntityID       source;
+   int              k;
+
+   found = [NSMutableArray array];
+   /* on it */
+   add_claims( world, entity, NO, found);
+   /* on what it was divided from */
+   if( [world edges:BGEdgeSplitFrom from:entity into:&source max:1])
+      add_claims( world, source, NO, found);
+   /* on the assemblies it is part of, or came out of, up the chain */
+   for( up = entity, k = 0; up && k < 8; k++)
+   {
+      at   = [world locationOf:up];
+      part = [world record:[world kindNamed:"Part"] for:up];
+      up   = at.form == BGLocationPartOf ? at.place : part ? (BGEntityID) part->cameFrom : BGNoEntity;
+      if( up)
+         add_claims( world, up, YES, found);
+   }
+   return( found);
+}
+
+
+/* Whether ownership of it is an open question: claims covering it name
+ * different claimants. */
+BOOL   BGOwnershipOpen( BGWorld *world, BGEntityID entity)
+{
+   NSArray      *claims;
+   BGEntityID   who;
+   BGEntityID   first;
+   NSUInteger   i;
+
+   claims = BGClaimsCovering( world, entity);
+   first  = BGNoEntity;
+   for( i = 0; i < [claims count]; i++)
+   {
+      if( ! [world edges:BGEdgeClaimant from:(BGEntityID) [[claims objectAtIndex:i] unsignedLongLongValue] into:&who max:1])
+         continue;
+      if( first && who != first)
+         return( YES);
+      first = who;
+   }
+   return( NO);
 }
 
 
@@ -1240,6 +1412,9 @@ static const struct
    { "copy",      effect_copy },
    { "reveal",    effect_reveal },
    { "replace",   effect_replace },
+   { "cut",       effect_cut },
+   { "shape",     effect_shape },
+   { "install",   effect_install },
    { "rest",      effect_rest },
    { "strike",    effect_strike },
 };

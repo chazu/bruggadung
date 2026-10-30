@@ -2373,3 +2373,37 @@ to replace, and none is invented.
   scores 10, as the better way once a worn part is seen.
 
 66 tests, 2305 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: the pump from the component side
+
+COMPONENTS.md Scenario 3, all six checks, on the provisional latent
+assembly. The miller owns the hand pump. A flow loss has left it at 20%.
+
+1. Opening it reveals level 1, carved from the pump: 40 kg in all
+   throughout. The piston is itself an assembly, with the seal inside.
+   As the culprit, it takes the failure on rather than wearing.
+2. Taken out, the piston joins the thermal domain; inside, it doesn't
+   (`participates:`).
+3. Opened, it shows its seal worn. The same seal shows whether it is
+   opened in place or after it comes out.
+4. The player cuts a strip from its own hide (`cut_strip`). The hide
+   persists, 900 g, and the strip is 100 g, `splitFrom` it, its mass carved
+   exactly. The player shapes it into a seal (`shape_seal`) and replaces
+   the worn one. The pump's flow changes by the delta, from 20 to 100.
+   Opening the pump, inspection alone, changed nothing.
+5. The piston goes back (`install_part`), out of the domain again.
+
+Claims (`BGClaimsCovering`): the miller's claim covers the pump's parts
+through `partOf`, as the ownership kind declares (`coverage` content). It
+covers the old seal by its provenance. The new seal is covered by the
+miller's claim through the pump and by the player's through the hide it
+was cut from, so its ownership is an open question (`BGOwnershipOpen`),
+recorded, not settled.
+
+- **The committer** lets an entity related `splitFrom` a source in the
+  same group declare no new mass: it is carved from the source, which the
+  group lowers as much.
+- **Provisional additions**: a culprit that is an assembly takes the
+  failure on, and a part's loss is 80 points of flow at wear 60.
+
+67 tests, 2346 checks, under both compilers, ASan and UBSan, and leak-free.

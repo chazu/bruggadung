@@ -3636,6 +3636,192 @@ static BGAgency   *mend_run( const char *key, BGWorld **world, BGEntityID *spare
 }
 
 
+/* COMPONENTS.md Scenario 3, the pump from the component side. The miller
+ * owns the hand pump; a flow loss has left it at 20%. The player opens it,
+ * takes the piston out (itself an assembly, with the seal inside), opens it,
+ * cuts a strip from its own hide, shapes it into a seal, replaces the worn
+ * one, and puts the piston back. `inPlace`: the piston opened before it is
+ * taken out. The new seal's wear, for reveal-order independence. */
+static int64_t   component_pump( BOOL inPlace, BOOL check)
+{
+   BGStage            st;
+   BGThermal          *thermal;
+   BGProposalGroup    *g;
+   BGEntityID         pump;
+   BGEntityID         worker;
+   BGEntityID         miller;
+   BGEntityID         wrench;
+   BGEntityID         hide;
+   BGEntityID         claim;
+   BGEntityID         mine;
+   BGEntityID         piston;
+   BGEntityID         seal;
+   BGEntityID         strip;
+   BGEntityID         source;
+   BGStore            *parts;
+   NSString           *error;
+   NSUInteger         i;
+   int64_t            v;
+   int64_t            sealWear;
+   int64_t            masses;
+
+   st.w    = BGTestWorld( 179);
+   st.c    = BGTestCommitter( st.w);
+   thermal = [[[BGThermal alloc] initWithWorld:st.w] autorelease];
+   st.s    = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [st.s setActivities:[BGActivities activitiesWithWorld:st.w committer:st.c]];
+   [st.s addDomain:thermal];
+   g      = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the miller's pump"];
+   pump   = [g create:"hand_pump" key:"the miller's pump" at:BGOnTile( 5, 5, 0)];
+   miller = [g create:"smith" key:"the miller" at:BGOnTile( 20, 20, 0)];
+   worker = [g create:"worker" key:"the player" at:BGOnTile( 4, 5, 0)];
+   wrench = [g create:"wrench_250" key:"wrench" at:BGHeldBy( worker, 0)];
+   hide   = [g create:"hide" key:"the player's hide" at:BGOnTile( 4, 5, 0)];
+   claim  = [g create:"ownership" key:"the miller's claim" at:BGLocationMakeNone()];
+   [g relate:BGEdgeClaimant from:BGWhole( claim) to:BGWhole( miller)];
+   [g relate:BGEdgeClaimSubject from:BGWhole( claim) to:BGWhole( pump)];
+   mine   = [g create:"ownership" key:"the player's claim" at:BGLocationMakeNone()];
+   [g relate:BGEdgeClaimant from:BGWhole( mine) to:BGWhole( worker)];
+   [g relate:BGEdgeClaimSubject from:BGWhole( mine) to:BGWhole( hide)];
+   [g set:"Latent.failure" of:BGWhole( pump) toText:"flow_loss"];
+   [g set:"Pump.flow" of:BGWhole( pump) to:20];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   pump   = [g idFor:pump];
+   miller = [g idFor:miller];
+   worker = [g idFor:worker];
+   wrench = [g idFor:wrench];
+   hide   = [g idFor:hide];
+   claim  = [g idFor:claim];
+   mine   = [g idFor:mine];
+   error  = nil;
+
+   /* 1: opening the cover reveals level 1, carved from the pump */
+   BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "open_up", worker, wrench, pump), 0, &error) != nil);
+   [st.s runUntil:BGTimeMake( 1000)];
+   piston = BGNoEntity;
+   parts  = [st.w storeForKind:[st.w kindNamed:"Part"]];
+   for( i = 0; i < [parts count]; i++)
+      if( ! strcmp( [st.w info:[parts entityAtIndex:i]]->blueprint, "nested_piston"))
+         piston = [parts entityAtIndex:i];
+   masses = 0;
+   [st.w getField:"Body.mass" of:pump value:&masses];
+   for( i = 0; i < [parts count]; i++)
+      if( [st.w getField:"Body.mass" of:[parts entityAtIndex:i] value:&v])
+         masses += v;
+   if( check)
+   {
+      BG_CHECK( piston && [st.w locationOf:piston].form == BGLocationPartOf && [parts count] == 5);
+      BG_CHECK( masses == 40000);
+      /* the piston, the culprit, takes the failure on; it isn't worn itself */
+      BG_CHECK( ! strcmp( [st.w textField:"Latent.failure" of:piston], "flow_loss"));
+      BG_CHECK( [st.w getField:"Part.wear" of:piston value:&v] && v < 60);
+      /* 4: inspection alone changes nothing aggregate */
+      BG_CHECK( [st.w getField:"Pump.flow" of:pump value:&v] && v == 20);
+      /* 6: inside, the piston joins no domain */
+      BG_CHECK( ! [thermal participates:piston]);
+   }
+
+   /* 2: the piston out; its nested level opened, in place or out */
+   if( inPlace)
+   {
+      BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "open_up", worker, wrench, piston), 0, &error) != nil);
+      [st.s runUntil:BGTimeMake( 2000)];
+   }
+   BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "take", worker, piston, BGNoEntity), 0, &error) != nil);
+   [st.s runUntil:BGTimeMake( 2500)];
+   if( ! inPlace)
+   {
+      BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "open_up", worker, wrench, piston), 0, &error) != nil);
+      [st.s runUntil:BGTimeMake( 3000)];
+   }
+   if( check)
+      BG_CHECK( [st.w locationOf:piston].form == BGLocationHeldBy && [thermal participates:piston]);
+   seal = BGNoEntity;
+   for( i = 0; i < [parts count]; i++)
+      if( [st.w locationOf:[parts entityAtIndex:i]].form == BGLocationPartOf &&
+          [st.w locationOf:[parts entityAtIndex:i]].place == piston)
+         seal = [parts entityAtIndex:i];
+   sealWear = -1;
+   [st.w getField:"Part.wear" of:seal value:&sealWear];
+
+   /* 3: a strip cut from the hide; shaped into a seal (the wrench and the
+    * piston set down, for hands) */
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: hands free for the hide"];
+   [g move:BGWhole( wrench) to:BGOnTile( 4, 5, 0)];
+   [g move:BGWhole( hide) to:BGHeldBy( worker, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 4000)];
+   BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "cut_strip", worker, hide, BGNoEntity), 0, &error) != nil);
+   [st.s runUntil:BGTimeMake( 5000)];
+   strip = BGNoEntity;
+   for( i = 0; i < [parts count]; i++)
+      if( ! strcmp( [st.w info:[parts entityAtIndex:i]]->blueprint, "leather_strip"))
+         strip = [parts entityAtIndex:i];
+   if( check)
+   {
+      /* 2: the strip carved exactly from the hide */
+      BG_CHECK( strip && [st.w getField:"Body.mass" of:hide value:&v] && v == 900);
+      BG_CHECK( [st.w getField:"Body.mass" of:strip value:&v] && v == 100);
+      BG_CHECK( [st.w edges:BGEdgeSplitFrom from:strip into:&source max:1] == 1 && source == hide);
+   }
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the strip in hand"];
+   [g move:BGWhole( hide) to:BGOnTile( 4, 5, 0)];
+   [g move:BGWhole( strip) to:BGHeldBy( worker, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 6000)];
+   BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "shape_seal", worker, strip, BGNoEntity), 0, &error) != nil);
+   [st.s runUntil:BGTimeMake( 7000)];
+
+   /* 4: the new seal installed in the piston, the old one out: the pump's
+    * flow changes by the old seal's loss */
+   BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "replace_part", worker, strip, seal), 0, &error) != nil);
+   [st.s runUntil:BGTimeMake( 13000)];
+   if( check)
+   {
+      BG_CHECK( [st.w locationOf:strip].form == BGLocationPartOf && [st.w locationOf:strip].place == piston);
+      BG_CHECK( [st.w locationOf:seal].form == BGLocationOnTile);
+      BG_CHECK( [st.w getField:"Pump.flow" of:pump value:&v] && v == 100);
+   }
+
+   /* 5: the piston back in its place */
+   BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "install_part", worker, piston, pump), 0, &error) != nil);
+   [st.s runUntil:BGTimeMake( 14000)];
+   if( check)
+   {
+      BG_CHECK( [st.w locationOf:piston].form == BGLocationPartOf && [st.w locationOf:piston].place == pump);
+      /* 6: in again, out of the domain */
+      BG_CHECK( ! [thermal participates:piston]);
+      /* 5: the miller's claim covers the pump's parts, and the old seal by
+       * its provenance; the new seal keeps the player's too: whose it is
+       * now is an open question, not settled silently */
+      BG_CHECK( [BGClaimsCovering( st.w, piston) containsObject:[NSNumber numberWithUnsignedLongLong:claim]]);
+      BG_CHECK( [BGClaimsCovering( st.w, seal) containsObject:[NSNumber numberWithUnsignedLongLong:claim]] &&
+                ! BGOwnershipOpen( st.w, seal));
+      BG_CHECK( [BGClaimsCovering( st.w, strip) containsObject:[NSNumber numberWithUnsignedLongLong:claim]] &&
+                [BGClaimsCovering( st.w, strip) containsObject:[NSNumber numberWithUnsignedLongLong:mine]]);
+      BG_CHECK( BGOwnershipOpen( st.w, strip));
+      /* 1: every part is part of exactly one assembly, or elsewhere */
+      for( i = 0; i < [parts count]; i++)
+         BG_CHECK( [st.w locationOf:[parts entityAtIndex:i]].form != BGLocationNone);
+   }
+   return( sealWear);
+}
+
+
+static void   test_component_pump( void)
+{
+   int64_t   out;
+   int64_t   in;
+
+   out = component_pump( NO, YES);
+   /* 3: the nested level opened in place, before the piston comes out,
+    * gives the same seal */
+   in  = component_pump( YES, NO);
+   BG_CHECK( out >= 60 && out == in);
+}
+
+
 static void   test_latent_pump( void)
 {
    BGPumpRun   early;
@@ -6690,6 +6876,7 @@ const BGTestCase   BGAllTests[] =
    { "forged_permit",                 test_forged_permit },
    { "latent_pump",                   test_latent_pump },
    { "pump_heat",                     test_pump_heat },
+   { "component_pump",                test_component_pump },
    { "door_in_the_dark",              test_door_in_the_dark },
    { "wrench_replaced",               test_wrench_replaced },
    { "rumour",                        test_rumour },

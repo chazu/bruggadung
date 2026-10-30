@@ -6,7 +6,7 @@
 // What things are made of, and the colours they come in: hierarchies, so a
 // memory loses detail along them (KNOWLEDGE.md §12): an oak chest is
 // remembered as wooden, then as made of something.
-#Material: "metal" | "wood" | "flesh" | "paper" | "food" | "cloth" | "rubber" | "stone"
+#Material: "metal" | "wood" | "flesh" | "paper" | "food" | "cloth" | "rubber" | "stone" | "leather"
 "metal":   "iron" | "brass" | "steel"
 "wood":    "oak"
 
@@ -176,5 +176,8 @@
 #Pump: #Assembly & {
     @component(Pump)
     opened: *false | true @field(content, saved, proposable, inspect, perceive(sight))
+    // what it delivers of its rated flow, percent: an aggregate parameter
+    // (COMPONENTS.md §7), changed by repairs as a delta
+    flow:   *100 | int & >=0 & <=100 @field(content, saved, proposable, inspect)
 }
 

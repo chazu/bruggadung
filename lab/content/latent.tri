@@ -84,6 +84,71 @@ warm_pump: #Pump & #Latent & #ThermalBody & {
     }
 }
 
+// COMPONENTS.md Scenario 3's hand pump: its piston is itself an assembly,
+// with the seal inside. A culprit that is itself an assembly isn't worn: it
+// takes the failure on, and its own descriptor finds its culprit. A part's
+// `loss` is the flow it costs its pump while in it (provisional: 80 points
+// at wear 60 or more); replacing it changes the pump's flow by the delta.
+nested_piston: #Part & #Assembly & #Latent & #ThermalBody & {
+    material: "iron", mass: 4kg, slots: 2, heat: 0, heatCapacity: 1800, toAir: 0, toOutdoors: 0
+    latent: {
+        parts:       [{ roleName: "seal", partKind: "leather_cup", depth: 1 }]
+        culprits:    [{ failing: "flow_loss", candidates: ["seal"] }]
+        pathWhenOut: ""
+        pathThrough: ""
+    }
+}
+hand_pump: #Pump & #Latent & {
+    material: "iron", mass: 40kg, slots: 8
+    latent: {
+        parts: [{ roleName: "handle", partKind: "pump_handle", depth: 1 },
+                { roleName: "cover", partKind: "pump_cover", depth: 1 },
+                { roleName: "piston", partKind: "nested_piston", depth: 1 },
+                { roleName: "inlet_valve", partKind: "inlet_valve", depth: 1 },
+                { roleName: "outlet_valve", partKind: "outlet_valve", depth: 1 }]
+        culprits:    [{ failing: "flow_loss", candidates: ["piston"] }]
+        pathWhenOut: ""
+        pathThrough: ""
+    }
+}
+
+// A leather hide, and a strip cut from it: an individual divided.
+hide:          #Body & { material: "leather", mass: 1kg }
+leather_strip: #Part & { material: "leather", mass: 100g }
+
+// Cut a strip from a hide held: the hide persists, smaller.
+cut_strip: #Operation & {
+    effect: "cut"
+    roles: {
+        actor: #Agent & { id: $a }
+        item:  #Body & { material: "leather", place: #Held & { by: $a } }
+    }
+} @family(operations)
+
+// Shape a strip held into a seal: it fits the role a seal fills.
+shape_seal: #Operation & {
+    effect: "shape"
+    roles: {
+        actor: #Agent & { id: $a }
+        item:  #Part & { material: "leather", place: #Held & { by: $a } }
+    }
+} @family(operations)
+
+// Put a part held back into the assembly it came from, in its role.
+install_part: #Operation & {
+    effect: "install"
+    roles: {
+        actor:       #Agent & { id: $a }
+        item:        #Part & { place: #Held & { by: $a } }
+        destination: #Latent
+    }
+} @family(operations)
+
+// Which claims cover parts: a claim of this kind on an assembly covers what
+// is part of it, and what came out of it (COMPONENTS.md Scenario 3).
+#Coverage: { claimKind: #ClaimKind, viaPartOf: *false | true }
+ownership_covers: #Coverage & { claimKind: "ownership", viaPartOf: true } @family(coverage)
+
 // The raised header tank the riser fills, and a leak: a tap installed in a
 // store, open, at the rate the path allows.
 header_tank: #Assembly & #WaterStore & { material: "oak", mass: 30kg, slots: 2, water: 100L, waterCapacity: 100L }

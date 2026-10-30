@@ -150,6 +150,10 @@ BGEntityID         BGAirOver( BGWorld *world, BGEntityID e);
 /* Authority (COMPONENTS.md Scenario 2): the authorizations over an entity, as
  * entity IDs in NSNumbers; and whether any authorization links to content. */
 NSArray            *BGAuthorizationsOver( BGWorld *world, BGEntityID entity);
+/* Claims (COMPONENTS.md Scenario 3): those covering an entity, as entity IDs
+ * in NSNumbers; and whether its ownership is an open question. */
+NSArray            *BGClaimsCovering( BGWorld *world, BGEntityID entity);
+BOOL               BGOwnershipOpen( BGWorld *world, BGEntityID entity);
 BOOL               BGContentAuthorizes( BGWorld *world, BGEntityID content);
 /* A trace of `kind` (traces.tri) on the bearer, or on the tile if none, at
  * `strength`, made in the group; `by` says what left it. */
