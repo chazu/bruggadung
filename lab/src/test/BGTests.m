@@ -4557,7 +4557,8 @@ typedef enum
    BGPurseNoticed,               /* A: Mira isn't hiding, and Kasimir sees her */
    BGPurseHonest,                /* B: an honest Kasimir, the same debt */
    BGPurseNoWitness,             /* C: Mira isn't there */
-   BGPurseRepaid                 /* B, and on until the loan's term is out */
+   BGPurseRepaid,                /* B, and on until the loan's term is out */
+   BGPurseLost                   /* that, but the wages are lost on the third day */
 } BGPurse;
 
 
@@ -4618,7 +4619,7 @@ static BGPurseRun   tempting_purse( BGPurse variant)
       if( variant == BGPurseNoticed)
          [g set:"Agent.hiding" of:BGWhole( h[ 4]) to:0];
    }
-   if( variant == BGPurseHonest || variant == BGPurseRepaid)
+   if( variant == BGPurseHonest || variant == BGPurseRepaid || variant == BGPurseLost)
       [g set:"Agent.honesty" of:BGWhole( h[ 2]) to:90];
    [st.c submit:g];
    [st.s runUntil:BGTimeMake( 1)];
@@ -4649,8 +4650,15 @@ static BGPurseRun   tempting_purse( BGPurse variant)
       stage_say( &st, run.merchant, run.mira, @"#WhereIs & { what: #Body & { material: \"cloth\" } }");
    }
    [st.s runUntil:BGTimeMake( 90000)];
-   if( variant == BGPurseRepaid)
+   if( variant == BGPurseRepaid || variant == BGPurseLost)
    {
+      if( variant == BGPurseLost)
+      {
+         [st.s runUntil:BGTimeMake( 3 * 86400000LL)];
+         g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the wages lost"];
+         [g destroy:BGWhole( run.wages) reason:"lost"];
+         [st.c submit:g];
+      }
       /* still owed on the sixth day; handed back on the seventh */
       [st.s runUntil:BGTimeMake( 6 * 86400000LL - 60000)];
       run.owedLate = [st.w locationOf:run.wages].place == run.kasimir;
@@ -4658,6 +4666,18 @@ static BGPurseRun   tempting_purse( BGPurse variant)
    }
    run.text = BGSave( st.w, st.c, [NSArray arrayWithObjects:knowledge, agency, nil]);
    return( run);
+}
+
+
+/* The promise the source made the agent, or NULL. */
+static const BGTestimony   *pledge_from( BGKnowledgeStore *store, uint32_t source)
+{
+   NSUInteger   i;
+
+   for( i = 0; i < [store testimonyCount]; i++)
+      if( [store testimonyAt:i]->attribution == BGPledged && [store testimonyAt:i]->source == source)
+         return( [store testimonyAt:i]);
+   return( NULL);
 }
 
 
@@ -4669,6 +4689,7 @@ static void   test_tempting_purse( void)
    BGPurseRun         alone;
    BGPurseRun         again;
    BGPurseRun         repaid;
+   BGPurseRun         lost;
    BGKnowledgeStore   *store;
    const BGReferent   *purse;
    const BGTestimony  *t;
@@ -4743,6 +4764,21 @@ static void   test_tempting_purse( void)
    BG_CHECK( logged_by( repaid.agency, repaid.kasimir, @"hand it back: give R"));
    BG_CHECK( [repaid.world locationOf:repaid.wages].form == BGLocationHeldBy &&
              [repaid.world locationOf:repaid.wages].place == repaid.carter);
+   /* and promised so (§7): the carter holds it as a claim about the
+    * seventh day, kept when the wages are back in its hand, and trusts
+    * Kasimir more */
+   BG_CHECK( logged_by( repaid.agency, repaid.kasimir, @"promising: say R"));
+   store = [repaid.knowledge storeOf:repaid.carter];
+   t     = pledge_from( store, referent_of( store, repaid.kasimir));
+   BG_CHECK( t && t->settled == 1 && t->container == [store selfReferent]);
+   BG_CHECK( [store trustIn:referent_of( store, repaid.kasimir)] == BG_TRUST + BG_CONFIRMED);
+   /* lost on the third day, it can't be: due, the carter, with Kasimir in
+    * sight and nothing back in its hand, finds the promise broken */
+   lost = tempting_purse( BGPurseLost);
+   store = [lost.knowledge storeOf:lost.carter];
+   t     = pledge_from( store, referent_of( store, lost.kasimir));
+   BG_CHECK( t && t->settled == -1);
+   BG_CHECK( [store trustIn:referent_of( store, lost.kasimir)] == BG_TRUST - BG_REFUTED);
 
    /* 1: C: no one is there, and Kasimir decides just the same */
    alone = tempting_purse( BGPurseNoWitness);

@@ -778,6 +778,22 @@ static BOOL   counts( const BGTestimony *t, uint32_t thing, uint32_t container)
 }
 
 
+- (NSString *) promiseThat:(uint32_t) thing
+                  isHeldBy:(uint32_t) holder
+                        by:(int64_t) deadline
+{
+   const BGReferent   *r;
+   const BGReferent   *c;
+
+   r = [self referent:thing];
+   c = [self referent:holder];
+   if( ! r || ! c || ! r->kind || ! c->kind || strcmp( c->kind, "#Agent"))
+      return( nil);
+   return( [NSString stringWithFormat:@"#IsHeld & { what: %@, holder: %@, when: %lldms, attribution: #Pledged }",
+                                      [self describeLooks:thing], [self describeLooks:holder], (long long) deadline]);
+}
+
+
 - (NSString *) askWhereIs:(uint32_t) thing
 {
    NSString   *looks;
@@ -2038,7 +2054,9 @@ static int32_t   permille_of( int32_t db)
          for( j = 0; pass == 0 && ! thing && j < [store testimonyCount]; j++)
             if( [store testimonyAt:j]->thing == r->id && [store testimonyAt:j]->container == cid)
                thing = r->id;
-         if( pass == 1 && ! r->present)
+         /* by its looks, among those it doesn't know where they are; or,
+          * promised somewhere, among all: where it is now says nothing of then */
+         if( pass == 1 && (! r->present || t.attribution == BGPledged))
          {
             description = tri_value( tri, [[store describeReferent:r->id] UTF8String], arena, NULL, 0);
             if( description && tri_match( tri, what, description, &result) != TRI_INCOMPATIBLE)
@@ -3088,6 +3106,25 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
       }
       r->present = NO;
       [news addObject:[NSString stringWithFormat:@"R%u: forgotten where it was", r->id]];
+   }
+
+   /* promised into someone's hand, and due: the holder, in sight now,
+    * hasn't it, so the promise is broken (in its hand, it was kept when
+    * seen there) */
+   for( j = 0; j < [store testimonyCount]; j++)
+   {
+      const BGTestimony   *t;
+      const BGReferent    *holder;
+
+      t      = [store testimonyAt:j];
+      holder = [store referent:t->container];
+      if( t->settled || t->attribution != BGPledged || now < t->when || ! holder || ! holder->kind ||
+          strcmp( holder->kind, "#Agent") || holder->seen != now)
+         continue;
+      r = [store mutableReferent:t->thing];
+      if( r && r->present && r->form == BGLocationHeldBy && r->container == t->container)
+         continue;
+      settle( store, t->thing, t->container, NO, now, news);
    }
 
    /* what it was told is inside something it looked into: so it is, or it isn't */

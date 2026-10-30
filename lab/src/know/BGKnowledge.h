@@ -342,6 +342,10 @@ typedef struct
 - (NSString *) promiseThat:(uint32_t) thing
                       isIn:(uint32_t) container
                         by:(int64_t) deadline;
+/* the same, that the thing will be in someone's hand: a loan to be repaid */
+- (NSString *) promiseThat:(uint32_t) thing
+                  isHeldBy:(uint32_t) holder
+                        by:(int64_t) deadline;
 /* "where is something like it?"; "who told you it is where you believe it?"
  * (nil if it believes it nowhere inside something) */
 - (NSString *) askWhereIs:(uint32_t) thing;

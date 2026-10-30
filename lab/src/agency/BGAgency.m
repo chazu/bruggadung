@@ -1549,7 +1549,7 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
 
 /* Granted what it asked for (`answer` a #Granted), the agent owes it back
  * (AGENCY.md §7, a debt): a commitment to repay the lender what it now
- * holds like it, on the loan's last day. */
+ * holds like it, on the loan's last day; and it promises so. */
 - (void) owe:(BGMotivation *) m
       loanIn:(const char *) answer
         from:(uint32_t) lender
@@ -1561,6 +1561,7 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    TriArena        *arena;
    uint32_t        loan;
    int64_t         now;
+   NSString        *promise;
 
    tri     = [_world tri];
    arena   = tri_arena_new();
@@ -1571,10 +1572,15 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    tri_arena_free( arena);
    if( ! loan)
       return;
-   now = [_world time].ms;
+   now     = [_world time].ms;
+   promise = [store promiseThat:loan isHeldBy:lender by:now + BG_LOAN_TERM];
    if( ! [self undertake:m->agent goal:"repay" from:now + BG_LOAN_TERM - BG_LOAN_DUE until:now + BG_LOAN_TERM
                   source:"debt"])
       return;
+   /* and says so, a promise the lender holds as a claim (§7) */
+   if( promise)
+      [self act:m why:"promising" store:store operation:"say" object:lender target:0 units:0
+        content:[promise UTF8String]];
    c                      = &m->commitments[ m->ncommitments - 1];
    c->params[ 0].slot     = [_world intern:"loan"];
    c->params[ 0].referent = loan;

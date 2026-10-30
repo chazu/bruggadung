@@ -2626,3 +2626,32 @@ Not yet: the lender expecting it back (a grievance if not, institutions),
 interest, and loan terms from content or from what is said.
 
 70 tests, 2436 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: a loan promised back
+
+AGENCY.md §7: "Promises are commitments created by a communicate act...
+Hearers hold it as a claim. Keeping or breaking a promise ... updates their
+trust." The promises slice's "Not yet": promises of things other than where
+something will be. The loan slice's: the lender expecting it back.
+
+- **A promise of a thing in someone's hand** (`promiseThat:isHeldBy:by:`):
+  `#IsHeld` with `#Pledged`. The borrower, owing the loan, says it to the
+  lender, due on the loan's last day.
+- **Kept** when the hearer sees the thing in the holder's hand (as any
+  held claim settles); **broken** when it is due and the holder, in sight
+  now, hasn't it. Trust moves as for any claim.
+- **Found: a promise bound a new referent for a thing the hearer knew.**
+  Recognizing what a claim names looked, by looks, only among things the
+  hearer didn't know the place of. A promise is about a time to come, so
+  where the thing is now says nothing against it: a pledged claim
+  recognizes among all of them. The carter's wages, lent to Kasimir, are
+  the wages promised back.
+
+Checked: the carter holds Kasimir's promise; kept on the seventh day,
+trust +5; with the wages lost on the third day, broken when due, with
+Kasimir in sight, trust -15.
+
+Not yet: hearing of a promise's outcome from others, and the weight of
+one's word as a disposition.
+
+70 tests, 2443 checks, under both compilers, ASan, and leak-free.
