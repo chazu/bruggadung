@@ -87,6 +87,10 @@ Out of scope here, except where they touch agency:
     raised for what serves its goals or needs now (food when hungry, its
     tools while it works). Giving a thing away costs its worth; lending
     it costs less, by the agent's trust that it comes back.
+17. **Going without harms the body.** A body stock below its threshold
+    adds fatigue and then injury over time (hunger slowly, cold faster, air
+    fastest): world state, which slows work and is felt as pain (§6).
+    Death at the extreme is left for a scenario of its own.
 
 ## Terms
 
