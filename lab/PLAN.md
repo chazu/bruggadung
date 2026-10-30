@@ -1295,7 +1295,25 @@ weight of one's word, a disposition).
 
 45 tests, 768 checks, under both compilers, ASan and UBSan, and leak-free.
 
-Next: granting requests (AGENCY.md §11): a request for something is a
-decision for the one asked, *comply or refuse*, scored by trust in the
-asker, disposition, its own commitments, and the cost, so a friend asked
-to lend can lend.
+### After the slice: granting requests
+
+AGENCY.md §11, comply or refuse. In the tempting purse, the carter now
+carries his wages. An honest Kasimir, who won't take the purse, asks the
+carter to lend: the carter weighs it at its trust in him (20), less the
+cost of parting with something (15), +5, and gives him his wages, saying
+so. Kasimir has money; his debt's goal is done. A Kasimir who notices Mira
+asks her first: she has nothing like it, and says so; then the carter
+lends.
+
+- **A request is a question** (`#Request`), heard and weighed like one:
+  trust in the asker, the `helpful` disposition, busyness and its own
+  goals, and `BG_PARTING` less. Granted, the agent gives what it holds like
+  it (`give`, a new operation: into the receiver's free hand) and says
+  `#Granted`; refused, `#WontSay`; with nothing like it in hand,
+  `#HaveNone`.
+
+Not yet: requests for help (doing something) rather than for a thing,
+lending as a debt the borrower owes back, the value of what is parted with
+(every thing costs the same), and asking for work.
+
+45 tests, 775 checks, under both compilers, ASan and UBSan, and leak-free.

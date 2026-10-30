@@ -3201,6 +3201,8 @@ typedef struct
    BGEntityID    kasimir;
    BGEntityID    mira;
    BGEntityID    merchant;
+   BGEntityID    carter;
+   BGEntityID    wages;
    NSString      *text;
 } BGPurseRun;
 
@@ -3218,7 +3220,7 @@ static BGPurseRun   tempting_purse( BGPurse variant)
    BGKnowledge       *knowledge;
    BGAgency          *agency;
    BGProposalGroup   *g;
-   BGEntityID        h[ 6];
+   BGEntityID        h[ 8];
    BGPurseRun        run;
 
    memset( &run, 0, sizeof( run));
@@ -3238,6 +3240,7 @@ static BGPurseRun   tempting_purse( BGPurse variant)
    h[ 1] = [g create:"merchant" key:"merchant" at:BGOnTile( 11, 10, 0)];
    h[ 2] = [g create:"kasimir" key:"kasimir" at:BGOnTile( 9, 10, 0)];
    h[ 3] = [g create:"carter" key:"carter" at:BGOnTile( 5, 10, 0)];
+   h[ 5] = [g create:"purse" key:"the carter's wages" at:BGHeldBy( h[ 3], 0)];
    h[ 4] = BGNoEntity;
    if( variant != BGPurseNoWitness)
    {
@@ -3255,6 +3258,9 @@ static BGPurseRun   tempting_purse( BGPurse variant)
    run.purse     = [g idFor:h[ 0]];
    run.merchant  = [g idFor:h[ 1]];
    run.kasimir   = [g idFor:h[ 2]];
+   run.carter    = [g idFor:h[ 3]];
+   run.wages     = [g idFor:h[ 5]];
+   [agency control:run.carter];
    run.mira      = h[ 4] ? [g idFor:h[ 4]] : BGNoEntity;
    if( run.mira)
       [agency control:run.mira];
@@ -3325,21 +3331,29 @@ static void   test_tempting_purse( void)
    BG_CHECK( t && t->settled == 1 && [store trustIn:t->source] == BG_TRUST + BG_CONFIRMED);
 
    /* 2: A: Kasimir sees Mira, believes himself watched, and taking scores
-    * below nothing: unthinkable. He tries to borrow from everyone he knows
-    * of, and, unanswered, gives up */
+    * below nothing: unthinkable. He borrows instead: Mira has nothing to
+    * lend, and the carter lends him his wages */
    noticed = tempting_purse( BGPurseNoticed);
-
    BG_CHECK( referent_of( [noticed.knowledge storeOf:noticed.kasimir], noticed.mira));
    BG_CHECK( logged_by( noticed.agency, noticed.kasimir, @"take the purse -20 (+30, honesty -5, scruples -5, watched -40)"));
    BG_CHECK( logged_by( noticed.agency, noticed.kasimir, @"borrow from a friend: say R"));
-   BG_CHECK( logged_by( noticed.agency, noticed.kasimir, @"[get money] nothing I know of will do: impossible for now"));
+   BG_CHECK( logged_by( noticed.agency, noticed.kasimir, @"answered: #HaveNone"));
+   BG_CHECK( logged_by( noticed.agency, noticed.kasimir, @"answered: #Granted"));
+   BG_CHECK( logged_by( noticed.agency, noticed.kasimir, @"[get money] done"));
    BG_CHECK( [noticed.world locationOf:noticed.purse].form == BGLocationOnTile);
+   BG_CHECK( [noticed.world locationOf:noticed.wages].form == BGLocationHeldBy &&
+             [noticed.world locationOf:noticed.wages].place == noticed.kasimir);
 
-   /* 3: B: an honest Kasimir, unwatched, never takes it */
+   /* 3: B: an honest Kasimir, unwatched, never takes it; asked, the carter
+    * weighs lending at its trust in him less the parting, and lends */
    honest = tempting_purse( BGPurseHonest);
    BG_CHECK( logged_by( honest.agency, honest.kasimir, @"take the purse -20 (+30, honesty -45, scruples -5, unwatched +0)"));
    BG_CHECK( ! logged_by( honest.agency, honest.kasimir, @"take R"));
    BG_CHECK( [honest.world locationOf:honest.purse].form == BGLocationOnTile);
+   BG_CHECK( logged_by( honest.agency, honest.carter, @"worth +5, granting"));
+   BG_CHECK( logged_by( honest.agency, honest.carter, @"granting: give R"));
+   BG_CHECK( [honest.world locationOf:honest.wages].place == honest.kasimir);
+   BG_CHECK( logged_by( noticed.agency, noticed.mira, @"for something it hasn't"));
 
    /* 1: C: no one is there, and Kasimir decides just the same */
    alone = tempting_purse( BGPurseNoWitness);

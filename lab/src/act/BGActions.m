@@ -658,6 +658,19 @@ static NSString   *effect_eat( BGWorld *world, BGAction a, int64_t amount, BGPro
 }
 
 
+/* Giving: into the receiver's free hand. */
+static NSString   *effect_give( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
+{
+   int32_t   hand;
+
+   hand = BGFreeHand( world, a.roles[ BGRoleDestination]);
+   if( hand < 0)
+      return( @"no hand of theirs is free");
+   [g move:BGWhole( a.roles[ BGRoleItem]) to:BGHeldBy( a.roles[ BGRoleDestination], hand)];
+   return( nil);
+}
+
+
 /* Tending changes nothing but traces, which the operation declares. */
 static NSString   *effect_tend( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
 {
@@ -693,6 +706,7 @@ static const struct
    { "write",     effect_write },
    { "read",      effect_read },
    { "eat",       effect_eat },
+   { "give",      effect_give },
 };
 
 

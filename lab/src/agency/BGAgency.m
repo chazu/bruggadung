@@ -1158,7 +1158,8 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
       arena    = tri_arena_new();
       question = tri_value( tri, o->content, arena, NULL, 0);
       if( question && (tri_subtype( tri, tri_node_type( question), tri_type_named( tri, "#WhereIs")) ||
-                       tri_subtype( tri, tri_node_type( question), tri_type_named( tri, "#WhoToldYou"))))
+                       tri_subtype( tri, tri_node_type( question), tri_type_named( tri, "#WhoToldYou")) ||
+                       tri_subtype( tri, tri_node_type( question), tri_type_named( tri, "#Request"))))
       {
          memset( &m->questions[ m->nquestions], 0, sizeof( BGQuestion));
          m->questions[ m->nquestions].asker   = o->actor;
@@ -1180,6 +1181,35 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
 }
 
 
+/* Something the agent holds like the description, or 0. */
+- (uint32_t) heldLike:(const TriNode *) what
+                store:(BGKnowledgeStore *) store
+{
+   const BGReferent   *r;
+   const TriNode      *description;
+   TriMatchResult     result;
+   TriContent         *tri;
+   TriArena           *arena;
+   NSUInteger         i;
+   uint32_t           found;
+
+   tri   = [_world tri];
+   arena = tri_arena_new();
+   found = 0;
+   for( i = 0; what && i < [store count] && ! found; i++)
+   {
+      r = [store referentAt:i];
+      if( ! r->present || r->form != BGLocationHeldBy || r->container != [store selfReferent])
+         continue;
+      description = tri_value( tri, [[store describeReferent:r->id] UTF8String], arena, NULL, 0);
+      if( description && tri_match( tri, what, description, &result) == TRI_ENTAILED)
+         found = r->id;
+   }
+   tri_arena_free( arena);
+   return( found);
+}
+
+
 /* Each question asked, weighed (AGENCY.md §11): answered, put off while the
  * agent is busy, refused, or, waited on too long, let go. */
 - (void) considerQuestions:(BGMotivation *) m
@@ -1194,6 +1224,8 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    NSString        *answer;
    int32_t         worth;
    int32_t         busy;
+   uint32_t        given;
+   BOOL            request;
    int             k;
    char            printed[ 2048];
 
@@ -1209,8 +1241,12 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
          [self dropQuestion:m at:k];
          continue;
       }
+      arena    = tri_arena_new();
+      question = tri_value( tri, q->content, arena, NULL, 0);
+      request  = question && tri_subtype( tri, tri_node_type( question), tri_type_named( tri, "#Request"));
+      tri_arena_free( arena);
       worth = [store trustIn:q->asker] + (agent ? (int32_t) agent->helpful : 0) - busy -
-              (m->nintentions ? BG_COMMITTED : 0);
+              (m->nintentions ? BG_COMMITTED : 0) - (request ? BG_PARTING : 0);
       if( worth <= 0 && worth + busy > 0)
       {
          if( ! q->deferred)
@@ -1222,7 +1258,33 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
       arena    = tri_arena_new();
       question = tri_value( tri, q->content, arena, NULL, 0);
       answer   = nil;
-      if( question && worth > 0)
+      if( question && request)
+      {
+         /* comply or refuse: give what it holds like it */
+         given = [self heldLike:tri_at( tri, question, "what") store:store];
+         what  = tri_at( tri, question, "what");
+         printed[ 0] = 0;
+         if( what)
+            tri_print( tri, what, printed, sizeof( printed));
+         if( ! given)
+         {
+            [self note:m line:[NSString stringWithFormat:@"asked by R%u for something it hasn't", q->asker]];
+            answer = [NSString stringWithFormat:@"#HaveNone & { what: %s }", *printed ? printed : "#Body"];
+            worth  = 1;
+         }
+         else if( worth > 0)
+         {
+            [self note:m line:[NSString stringWithFormat:@"asked by R%u: worth %+d, granting", q->asker, worth]];
+            if( [self act:m why:"granting" store:store operation:"give" object:given target:q->asker units:0 content:NULL])
+               answer = [NSString stringWithFormat:@"#Granted & { what: %@ }", [store describeLooks:given]];
+         }
+         else
+         {
+            [self note:m line:[NSString stringWithFormat:@"asked by R%u: worth %+d, refusing", q->asker, worth]];
+            answer = [NSString stringWithFormat:@"#WontSay & { what: %s }", *printed ? printed : "#Body"];
+         }
+      }
+      else if( question && worth > 0)
       {
          [self note:m line:[NSString stringWithFormat:@"asked by R%u: worth %+d, answering", q->asker, worth]];
          answer = [self answerTo:question store:store];

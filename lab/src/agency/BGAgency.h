@@ -28,7 +28,10 @@
  * knows: where it believes something like it is, and how it knows, or that
  * it doesn't know; asked who told it, the claim again, with its source.
  * Worth nothing only because it is busy, it answers once it isn't, if the
- * asker can still be waiting. Otherwise it says it won't.
+ * asker can still be waiting. Otherwise it says it won't. A request for
+ * something (comply or refuse) costs BG_PARTING more: granted, the agent
+ * gives what it holds like it, and says so; with nothing like it in hand,
+ * it says it has none.
  *
  * Goals have worth (AGENCY.md §3): their considerations, added in dB, among
  * them the credence that something is so. A goal that `arises` from a kind
@@ -86,6 +89,7 @@
 
 #define BG_BUSY_COST       3      /* per point of attention the running activity demands */
 #define BG_COMMITTED       5      /* for holding a goal of its own */
+#define BG_PARTING         15     /* what giving something away costs */
 #define BG_MARGIN          5      /* what another goal must beat the current one by */
 #define BG_INTERRUPT       5      /* and more, to interrupt an activity under way */
 #define BG_MAX_SETTLED     16
