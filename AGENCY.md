@@ -53,6 +53,12 @@ Out of scope here, except where they touch agency:
    every agent is simulated in full detail. Their design comes later.
 10. **The player can delegate decisions to agency** for their own character,
     through autopilot modes. Control returns on salient interruptions.
+11. **The gain from a lie is of two kinds**: escaping a consequence the
+    agent believes the truth would bring (asked where the purse is, the
+    one who took it believes the truth gets it arrested; INSTITUTIONS.md),
+    and advancing one of its goals (sending a rival to the wrong place).
+    Each is scored like any other consideration, against honesty and the
+    risk of being found out.
 
 ## Terms
 
