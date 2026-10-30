@@ -52,6 +52,11 @@ Out of scope here, except where they touch components:
    conflicts are errors. The language is specified in
    [CONTENT_LANGUAGE.md](CONTENT_LANGUAGE.md): TDL semantics with CUE-style
    syntax.
+10. **Unreferenced content is collected; history keeps it.** Content no
+    copy, memory, derivation, or claim references is collected at the next
+    save, and history keeps a summary (who made it, when), so the developer
+    can still trace it. Tombstones compact into history summaries after a
+    retention period that content declares.
 
 ## Terms
 
@@ -620,8 +625,7 @@ of the domain simulation doc.
    Institutions decide, but what does the component layer record?
 3. **Installed parts.** Who owns a part installed in someone else's assembly?
    Does claim coverage through `partOf` override the part's own claim?
-4. **Lifetime of informational entities.** When can content no copy or memory
-   references be collected? What happens to tombstones over long runs?
+4. **Lifetime of informational entities.** Decided: decision 10.
 5. **Reaction rounds.** What is the bound on reaction rounds per boundary, and
    what does the player see when proposals are deferred?
 6. **Field registry.** Decided (CONTENT_LANGUAGE.md §3): it is generated
