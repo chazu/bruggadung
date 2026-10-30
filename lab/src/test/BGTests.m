@@ -7509,7 +7509,7 @@ static void   test_hard_fail( void)
  * (fatigue 100) half again as long, its quarters showing later; suspended
  * partway, what it has done is the effort, not the time. Resting goes at its
  * pace. */
-static int64_t   sawn_after( int64_t fatigue, int64_t at, BOOL suspend, int64_t *done)
+static int64_t   sawn_after( int64_t fatigue, int64_t at, BOOL suspend, int64_t injureAt, int64_t *done)
 {
    BGStage            st;
    BGActivities       *activities;
@@ -7542,6 +7542,14 @@ static int64_t   sawn_after( int64_t fatigue, int64_t at, BOOL suspend, int64_t 
    BG_CHECK( g != nil);
    [st.s runUntil:BGTimeMake( 2)];
    a = [g idFor:[g proposals][ 0].handle];
+   if( injureAt)
+   {
+      /* hurt, mid-stroke: its pace changes from then */
+      [st.s runUntil:BGTimeMake( injureAt)];
+      g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: a cut hand"];
+      [g set:"Agent.injury" of:BGWhole( worker) to:100];
+      [st.c submit:g];
+   }
    [st.s runUntil:BGTimeMake( at)];
    if( suspend)
    {
@@ -7561,17 +7569,24 @@ static void   test_work_rate( void)
    int64_t   done;
 
    /* fresh: through at 8 s */
-   BG_CHECK( sawn_after( 0, 8100, NO, &done) == 100);
+   BG_CHECK( sawn_after( 0, 8100, NO, 0, &done) == 100);
    /* worn out: at 8 s half through (its quarters at 3, 6, 9 s), through at
     * about 12 s */
-   BG_CHECK( sawn_after( 100, 3000, NO, &done) == 0);
-   BG_CHECK( sawn_after( 100, 3100, NO, &done) == 25);
-   BG_CHECK( sawn_after( 100, 8100, NO, &done) == 50);
-   BG_CHECK( sawn_after( 100, 12000, NO, &done) == 75);
-   BG_CHECK( sawn_after( 100, 12200, NO, &done) == 100);
+   BG_CHECK( sawn_after( 100, 3000, NO, 0, &done) == 0);
+   BG_CHECK( sawn_after( 100, 3100, NO, 0, &done) == 25);
+   BG_CHECK( sawn_after( 100, 8100, NO, 0, &done) == 50);
+   BG_CHECK( sawn_after( 100, 12000, NO, 0, &done) == 75);
+   BG_CHECK( sawn_after( 100, 12200, NO, 0, &done) == 100);
    /* suspended at 6 s worn out: four seconds' worth of sawing done, and the
     * log shows half */
-   BG_CHECK( sawn_after( 100, 6001, YES, &done) == 49 && done == 3960);
+   BG_CHECK( sawn_after( 100, 6001, YES, 0, &done) == 49 && done == 3960);
+   /* a fresh worker cuts its hand two seconds in: from then it saws at its
+    * pace hurt, the rest (6 s of sawing) taking about 9 s: half through at
+    * 5 s, not 4, and through at 11 s, not 8 */
+   BG_CHECK( sawn_after( 0, 4900, NO, 2000, &done) == 25);
+   BG_CHECK( sawn_after( 0, 5100, NO, 2000, &done) == 50);
+   BG_CHECK( sawn_after( 0, 11000, NO, 2000, &done) == 75);
+   BG_CHECK( sawn_after( 0, 11200, NO, 2000, &done) == 100);
 }
 
 

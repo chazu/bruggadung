@@ -3145,7 +3145,20 @@ Checked: sawing a log takes a fresh worker 8 s; a worn-out one (fatigue
 12 s; suspended at 6 s, it has done 3960 ms of sawing and the log shows
 49. The tired worker's rest, which takes no effort, is as long as before.
 
-Not yet: recomputing mid-stage when a modifier changes, capabilities and
-shortfall (open question 4).
+Not yet: capabilities and shortfall (open question 4).
 
 86 tests, 2628 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: a change of pace mid-stage
+
+ACTIONS.md §5: "A change to any rate input, such as an injured hand ...,
+recomputes it." With a rate to recompute, the activity system, told of a
+committed change to a running actor's fatigue or injury, re-paces the
+stage: what it has done kept, it goes on from then at the pace now, and
+its due time moves (a group of its own, caused by the change).
+
+Checked: a fresh worker sawing cuts its hand two seconds in; from then it
+saws at the hurt pace: a quarter through at 4.9 s, half at 5.1 s (not 4),
+three quarters at 11 s, through at 11.2 s (not 8).
+
+86 tests, 2636 checks, under both compilers, ASan, and leak-free.

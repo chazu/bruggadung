@@ -468,6 +468,41 @@ static int64_t   next_checkpoint( BGWorld *world, BGEntityID a, const BGActivity
 }
 
 
+/* A rate input changed (ACTIONS.md §5: "A change to any rate input ...
+ * recomputes it"): the stage under way keeps what it has done, and goes on
+ * from now at the actor's pace now. */
+- (void) repace:(BGEntityID) a
+         record:(const BGActivity *) record
+          cause:(uint64_t) cause
+{
+   BGProposalGroup   *group;
+   NSString          *effect;
+   const char        *operation;
+   int64_t           duration;
+   int64_t           pace;
+   int64_t           done;
+   int64_t           now;
+
+   operation = [_world textField:"Activity.operation" of:a];
+   if( ! BGOperationStage( _world, operation, record->stage, &duration, &effect))
+      return;
+   pace = BGWorkRate( _world, (BGEntityID) record->actorRef, operation, record->stage);
+   if( pace == (record->pace > 0 ? record->pace : 100))
+      return;
+   now   = [_world time].ms;
+   done  = progress_at( record, now);
+   group = [BGProposalGroup groupWithPhase:BGPhaseAction
+                                    source:[NSString stringWithFormat:@"activity %llu: its pace now %lld%%",
+                                                                      (unsigned long long) a, (long long) pace]];
+   [group setCause:cause];
+   [group set:"Activity.progress" of:BGWhole( a) to:done];
+   [group set:"Activity.started" of:BGWhole( a) to:now];
+   [group set:"Activity.pace" of:BGWhole( a) to:pace];
+   [group set:"Activity.due" of:BGWhole( a) to:now + BGAtRate( duration > done ? duration - done : 0, pace)];
+   [_committer submit:group];
+}
+
+
 - (void) committer:(BGCommitter *) committer
     didCommitRound:(uint32_t) round
         eventsFrom:(NSUInteger) first
@@ -538,6 +573,9 @@ static int64_t   next_checkpoint( BGWorld *world, BGEntityID a, const BGActivity
             [self end:a status:"exhausted" because:@"the source ran dry" cause:ev->index];
             ended[ nended++ % 64] = a;
          }
+         else if( record->due && ev->subject == (BGEntityID) record->actorRef && ! strcmp( ev->kind, "changed") &&
+                  ev->detail && (! strcmp( ev->detail, "Agent.fatigue") || ! strcmp( ev->detail, "Agent.injury")))
+            [self repace:a record:record cause:ev->index];
          else if( record->due && (ev->subject == (BGEntityID) record->actorRef || ev->subject == (BGEntityID) record->itemRef ||
                                   ev->subject == (BGEntityID) record->destinationRef) &&
                   ((why = [self obstacleTo:a record:record]) || (why = [self requirementsOf:a record:record])))
