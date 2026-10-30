@@ -2878,8 +2878,10 @@ text they give is quoted.
 - **Graded shortfall (effort rates from capabilities)**: ACTIONS.md open
   question 4, "How should graded shortfall functions be represented in
   content, and with what units?"
-- **Recipes, and the "carry out this recipe" autopilot**: ACTIONS.md open
-  question 7, "How is recipe knowledge represented".
+- **Recipe knowledge** (how an agent comes to know a recipe, and recipes
+  over §4 beliefs): ACTIONS.md open question 7, "How is recipe knowledge
+  represented". Recipes themselves run: a `sequence` method, expanded
+  through what the agent knows.
 - **Latent assembly's own rules, how considerations combine, memory making
   hypotheses of its own, loyalty**: as listed above.
 
@@ -2937,3 +2939,20 @@ Not yet: exploring around what blocks the way (the lab has no walls; a
 refused step is only logged).
 
 79 tests, 2557 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: autopilot, "carry out this recipe"
+
+AGENCY.md §14's last mode. A recipe is a `sequence` method (agency.tri,
+ACTIONS.md §6), its bindings found through what the character knows.
+
+- **`autopilot:recipe:threshold:`**: commits the character to the recipe's
+  goal, as "this goal" does, and carries that goal out by the recipe
+  alone; subgoals it needs, by any method. Anything but a `sequence`
+  method is refused. Saved (`recipe`).
+
+Checked: at the mill, the worker reads the diagram and is handed over to
+follow the recipe: it shuts the trough line the diagram names, opens the
+pump, and control returns; saved midway, the recipe is kept; handing it
+over to `borrow_money` is refused.
+
+80 tests, 2565 checks, under both compilers, ASan, and leak-free.

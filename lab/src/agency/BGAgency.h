@@ -196,6 +196,7 @@ typedef struct
    BOOL             autopilot;         /* the player's character, handed over */
    BOOL             routine;           /* to carry on with its commitments */
    BOOL             explore;           /* to go where it hasn't seen */
+   const char       *recipe;           /* interned: the method to carry out its goal by, or NULL */
    int32_t          threshold;         /* worth above which control returns */
    BOOL             handedBack;
    NSMutableArray   *log;
@@ -275,6 +276,14 @@ typedef struct
  * nothing left unseen, too. */
 - (BOOL) autopilotExplore:(BGEntityID) agent
                 threshold:(int32_t) threshold;
+/* Autopilot, "carry out this recipe" (AGENCY.md §14): a recipe is a
+ * `sequence` method (ACTIONS.md §6), expanded through what the character
+ * knows. Agency commits the character to its goal and carries it out by
+ * that method alone (subgoals it needs, by any); otherwise as "this goal".
+ * NO if content has no such recipe. */
+- (BOOL) autopilot:(BGEntityID) agent
+            recipe:(const char *) recipe
+         threshold:(int32_t) threshold;
 /* why control returned since last asked, one line each */
 - (NSArray *) takeNotices;
 

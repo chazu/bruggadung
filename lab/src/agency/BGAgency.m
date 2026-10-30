@@ -492,6 +492,27 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
 }
 
 
+- (BOOL) autopilot:(BGEntityID) agent
+            recipe:(const char *) recipe
+         threshold:(int32_t) threshold
+{
+   const TriNode   *pattern;
+   const TriNode   *v;
+   TriContent      *tri;
+   char            goal[ 64];
+
+   tri     = [_world tri];
+   pattern = recipe ? tri_pattern( tri, recipe) : NULL;
+   v       = pattern ? tri_at( tri, pattern, "sequence") : NULL;
+   if( ! v || tri_node_type( v) != tri_type_named( tri, "true") ||
+       ! text_at( tri, pattern, "goal", goal, sizeof( goal)) ||
+       ! [self autopilot:agent toGoal:goal threshold:threshold])
+      return( NO);
+   [self mindOf:agent]->recipe = [_world intern:recipe];
+   return( YES);
+}
+
+
 - (BOOL) autopilotExplore:(BGEntityID) agent
                 threshold:(int32_t) threshold
 {
@@ -960,6 +981,25 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
          return( [store entityAtIndex:i]);
    }
    return( BGNoEntity);
+}
+
+
+/* The goal's methods, for this mind: carrying out a recipe, its goal has
+ * that method alone. */
+- (NSUInteger) methodsFor:(const char *) goal
+                     mind:(BGMotivation *) m
+                     into:(const char **) out
+                      max:(NSUInteger) max
+{
+   char   buf[ 64];
+
+   if( m->recipe && max && text_at( [_world tri], tri_pattern( [_world tri], m->recipe), "goal", buf, sizeof( buf)) &&
+       ! strcmp( buf, goal))
+   {
+      out[ 0] = m->recipe;
+      return( 1);
+   }
+   return( [self methodsFor:goal into:out max:max]);
 }
 
 
@@ -2334,7 +2374,7 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
    /* the method that scores best (AGENCY.md §5), then by rank, that hasn't
     * failed and whose precondition holds; one that scores below nothing is
     * unthinkable */
-   nmethods = [self methodsFor:top->goal into:methods max:BG_MAX_METHODS];
+   nmethods = [self methodsFor:top->goal mind:m into:methods max:BG_MAX_METHODS];
    chosen   = -1;
    unknownMethod = -1;
    for( i = 0; i < nmethods; i++)
@@ -2427,7 +2467,7 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
       top = &m->intentions[ m->nintentions - 1];
       if( top->pending >= 0)
       {
-         [self methodsFor:top->goal into:methods max:BG_MAX_METHODS];
+         [self methodsFor:top->goal mind:m into:methods max:BG_MAX_METHODS];
          if( ! text_at( [_world tri], tri_pattern( [_world tri], methods[ top->pending]), "title", method, sizeof( method)))
             snprintf( method, sizeof( method), "%s", methods[ top->pending]);
          [self fail:m method:top->pending
@@ -2534,6 +2574,8 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
          [lines addObject:[NSString stringWithFormat:@"routine %llu", (unsigned long long) m->agent]];
       if( m->explore)
          [lines addObject:[NSString stringWithFormat:@"explore %llu", (unsigned long long) m->agent]];
+      if( m->recipe)
+         [lines addObject:[NSString stringWithFormat:@"recipe %llu %s", (unsigned long long) m->agent, m->recipe]];
       if( m->wake)
          [lines addObject:[NSString stringWithFormat:@"wake %llu %lld", (unsigned long long) m->agent, (long long) m->wake]];
       for( k = 0; k < m->nhabits; k++)
@@ -2625,6 +2667,12 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
       if( [words count] == 3 && [[words objectAtIndex:0] isEqualToString:@"wake"])
       {
          [self mindOf:(BGEntityID) [[words objectAtIndex:1] longLongValue]]->wake = [[words objectAtIndex:2] longLongValue];
+         continue;
+      }
+      if( [words count] == 3 && [[words objectAtIndex:0] isEqualToString:@"recipe"])
+      {
+         [self mindOf:(BGEntityID) [[words objectAtIndex:1] longLongValue]]->recipe =
+            [_world intern:[[words objectAtIndex:2] UTF8String]];
          continue;
       }
       if( [words count] == 2 && [[words objectAtIndex:0] isEqualToString:@"explore"])

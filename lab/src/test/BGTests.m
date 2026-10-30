@@ -5494,6 +5494,72 @@ static BGAgency   *urgent_nut( void)
 }
 
 
+/* AGENCY.md §14, autopilot "carry out this recipe": at the mill, the
+ * worker, holding the wrench, reads the diagram; the player hands it to
+ * agency to follow the recipe. It shuts the line the diagram says, opens
+ * the pump, and control returns. Saved midway, the recipe is kept. A
+ * method that isn't a recipe can't be handed over so. */
+static void   test_recipe_autopilot( void)
+{
+   BGStage            st;
+   BGActivities       *activities;
+   BGKnowledge        *knowledge;
+   BGAgency           *agency;
+   BGProposalGroup    *g;
+   BGEntityID         worker;
+   BGEntityID         pump;
+   BGEntityID         trough;
+   BGEntityID         diagram;
+   NSArray            *notices;
+   NSString           *text;
+   NSString           *error;
+   int64_t            v;
+
+   st.w       = BGTestWorld( 83);
+   st.c       = BGTestCommitter( st.w);
+   activities = [BGActivities activitiesWithWorld:st.w committer:st.c];
+   knowledge  = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+   agency     = [[[BGAgency alloc] initWithWorld:st.w committer:st.c knowledge:knowledge] autorelease];
+   st.s       = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [agency setActivities:activities];
+   [st.s setActivities:activities];
+   [st.s setPerception:knowledge];
+   [st.s setDecision:agency];
+   g       = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the mill"];
+   pump    = [g create:"pump" key:"pump" at:BGOnTile( 10, 10, 0)];
+   trough  = [g create:"cock_trough" key:"the trough line's cock" at:BGOnTile( 9, 9, 0)];
+   [g create:"cock_pump" key:"the riser's cock" at:BGOnTile( 11, 9, 0)];
+   worker  = [g create:"worker" key:"worker" at:BGOnTile( 10, 9, 0)];
+   [g create:"wrench_250" key:"wrench" at:BGHeldBy( worker, 0)];
+   diagram = [g create:"diagram" key:"diagram" at:BGHeldBy( worker, 1)];
+   [g set:"Record.writing" of:BGWhole( diagram)
+   toText:[st.w intern:"#Writing & { author: #Agent & { coat: \"white\" }, entries: [#Serves & { what: #Cock & "
+                       "{ place: #OnTile & { x: 9, y: 9, level: 0 } }, line: \"pump\", attribution: #Saw & { sure: 30 } }] }"]];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   pump    = [g idFor:pump];
+   trough  = [g idFor:trough];
+   worker  = [g idFor:worker];
+   diagram = [g idFor:diagram];
+   error   = nil;
+   BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "read", worker, diagram, BGNoEntity), 0, &error) != nil);
+   [st.s runUntil:BGTimeMake( 1000)];
+
+   BG_CHECK( ! [agency autopilot:worker recipe:"borrow_money" threshold:50]);
+   BG_CHECK( [agency autopilot:worker recipe:"the_recipe" threshold:50]);
+   [st.s runUntil:BGTimeMake( 3000)];
+   text = BGSave( st.w, st.c, [NSArray arrayWithObjects:knowledge, agency, nil]);
+   BG_CHECK( [text rangeOfString:@" the_recipe"].location != NSNotFound);
+   [st.s runUntil:BGTimeMake( 60000)];
+   BG_CHECK( logged_by( agency, worker, @"[repair the pump] follow the recipe: shut_off R"));
+   BG_CHECK( [st.w getField:"Cock.shut" of:trough value:&v] && v);
+   BG_CHECK( [st.w getField:"Pump.opened" of:pump value:&v] && v);
+   notices = [agency takeNotices];
+   BG_CHECK( [notices count] == 1 &&
+             [[notices objectAtIndex:0] isEqualToString:@"Control returns to you: there is nothing left to do."]);
+}
+
+
 /* AGENCY.md §14, autopilot "auto-explore": the player hands a worker,
  * alone in the middle of the map, to agency to explore. It walks toward the
  * nearest tile it has never seen, a step at a time, until it has seen every
@@ -8042,6 +8108,7 @@ const BGTestCase   BGAllTests[] =
    { "routine_autopilot",             test_routine_autopilot },
    { "talking_takes_time",            test_talking_takes_time },
    { "explore_autopilot",             test_explore_autopilot },
+   { "recipe_autopilot",              test_recipe_autopilot },
    { "resume_recheck",                test_resume_recheck },
    { "interrupted_repair",            test_interrupted_repair },
    { "unattended_stove",              test_unattended_stove },
