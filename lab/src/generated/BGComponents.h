@@ -1,4 +1,4 @@
-/* Generated from Triangle content db519a38b37dd222: do not edit. Type IDs are valid
+/* Generated from Triangle content 16ba3f6fc5f8d9f8: do not edit. Type IDs are valid
  * only for this content; regenerate when it changes. */
 #ifndef BG_COMPONENTS_H
 #define BG_COMPONENTS_H
@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BG_CONTENT_HASH 0xdb519a38b37dd222ULL
+#define BG_CONTENT_HASH 0x16ba3f6fc5f8d9f8ULL
 
 /* Combustor, from #Combustor */
 typedef struct {
@@ -50,6 +50,11 @@ typedef struct {
     int64_t         restsBelow;    /* int, in quanta of 1; content, saved, proposable, inspect */
 } BGRespirator;
 
+/* Scribe, from #Scribe */
+typedef struct {
+    const char *    handwriting;    /* text; saved, proposable, inspect */
+} BGScribe;
+
 /* Sized, from #Sized */
 typedef struct {
     int64_t         size;    /* length, in quanta of 0.1mm; content, saved, inspect, perceive(sight) */
@@ -83,11 +88,29 @@ typedef struct {
     int64_t         watchWarm;    /* int, in quanta of 1; content, saved, proposable, inspect */
 } BGActivity;
 
+/* Authorization, from #Authorization */
+typedef struct {
+    uint64_t        grantee;    /* a referent; saved, proposable, inspect */
+    const char *    grants;    /* text; saved, proposable, inspect */
+    uint64_t        over;    /* a referent; saved, proposable, inspect */
+} BGAuthorization;
+
 /* Claim, from #Claim */
 typedef struct {
     uint32_t        kind;    /* #ClaimKind: a type ID; content, saved, inspect */
     int64_t         quantity;    /* int, in quanta of 1; content, saved, proposable, inspect */
 } BGClaim;
+
+/* Information, from #Content */
+typedef struct {
+    const char *    issuer;    /* text; saved, proposable, inspect */
+    const char *    text;    /* text; saved, proposable, inspect */
+} BGInformation;
+
+/* Organization, from #Organization */
+typedef struct {
+    const char *    orgName;    /* text; saved, proposable, inspect */
+} BGOrganization;
 
 /* Body, from #Body */
 typedef struct {
@@ -137,6 +160,16 @@ typedef struct {
     int64_t         capacity;    /* int, in quanta of 1; content, saved, inspect, perceive(sight) */
 } BGContainer;
 
+/* Inscription, from #Copy */
+typedef struct {
+    const char *    claims;    /* text; saved, proposable, inspect, perceive(sight) */
+    int64_t         fidelity;    /* int, in quanta of 1; content, saved, proposable, inspect */
+    const char *    impression;    /* text; saved, proposable, inspect, perceive(sight) */
+    uint64_t        inscribed;    /* a referent; saved, proposable, inspect */
+    const char *    penned;    /* text; saved, proposable, inspect, perceive(sight) */
+    const char *    reads;    /* text; saved, proposable, inspect, perceive(sight) */
+} BGInscription;
+
 /* Door, from #Door */
 typedef struct {
     bool            ajar;    /* bool; content, saved, proposable, inspect, perceive(sight) */
@@ -170,6 +203,11 @@ typedef struct {
     const char *    unit;    /* text; content, saved, inspect, perceive(sight) */
     int64_t         unitMass;    /* mass, in quanta of 1g; content, saved, inspect */
 } BGStack;
+
+/* Stamp, from #Stamp */
+typedef struct {
+    const char *    presses;    /* text; saved, proposable, inspect, perceive(sight) */
+} BGStamp;
 
 /* Tap, from #Tap */
 typedef struct {
@@ -209,58 +247,58 @@ typedef struct {
 
 /* #ActivityStatus */
 enum {
-    BG_ACTIVITYSTATUS_ABORTED = 263,
-    BG_ACTIVITYSTATUS_COMPLETED = 264,
-    BG_ACTIVITYSTATUS_EXHAUSTED = 265,
-    BG_ACTIVITYSTATUS_FAILED = 266,
-    BG_ACTIVITYSTATUS_RUNNING = 267,
-    BG_ACTIVITYSTATUS_SUSPENDED = 268,
+    BG_ACTIVITYSTATUS_ABORTED = 270,
+    BG_ACTIVITYSTATUS_COMPLETED = 271,
+    BG_ACTIVITYSTATUS_EXHAUSTED = 272,
+    BG_ACTIVITYSTATUS_FAILED = 273,
+    BG_ACTIVITYSTATUS_RUNNING = 274,
+    BG_ACTIVITYSTATUS_SUSPENDED = 275,
 };
 
 /* #ClaimKind */
 enum {
-    BG_CLAIMKIND_CUSTODY = 270,
-    BG_CLAIMKIND_OWNERSHIP = 271,
-    BG_CLAIMKIND_RESERVATION = 272,
+    BG_CLAIMKIND_CUSTODY = 277,
+    BG_CLAIMKIND_OWNERSHIP = 278,
+    BG_CLAIMKIND_RESERVATION = 279,
 };
 
 /* #Material */
 enum {
-    BG_MATERIAL_CLOTH = 315,
-    BG_MATERIAL_FOOD = 316,
-    BG_MATERIAL_RUBBER = 317,
-    BG_MATERIAL_STONE = 318,
-    BG_MATERIAL_FLESH = 344,
-    BG_MATERIAL_BRASS = 346,
-    BG_MATERIAL_IRON = 347,
-    BG_MATERIAL_PAPER = 348,
-    BG_MATERIAL_STEEL = 349,
-    BG_MATERIAL_OAK = 351,
+    BG_MATERIAL_CLOTH = 323,
+    BG_MATERIAL_FOOD = 324,
+    BG_MATERIAL_RUBBER = 325,
+    BG_MATERIAL_STONE = 326,
+    BG_MATERIAL_FLESH = 352,
+    BG_MATERIAL_BRASS = 354,
+    BG_MATERIAL_IRON = 355,
+    BG_MATERIAL_PAPER = 356,
+    BG_MATERIAL_STEEL = 357,
+    BG_MATERIAL_OAK = 359,
 };
 
 /* "flesh" | "metal" | "natural" | "paper" | "wood" */
 enum {
-    BG_BODY_SURFACE_NATURAL = 217,
-    BG_BODY_SURFACE_FLESH = 344,
-    BG_BODY_SURFACE_BRASS = 346,
-    BG_BODY_SURFACE_IRON = 347,
-    BG_BODY_SURFACE_PAPER = 348,
-    BG_BODY_SURFACE_STEEL = 349,
-    BG_BODY_SURFACE_OAK = 351,
+    BG_BODY_SURFACE_NATURAL = 224,
+    BG_BODY_SURFACE_FLESH = 352,
+    BG_BODY_SURFACE_BRASS = 354,
+    BG_BODY_SURFACE_IRON = 355,
+    BG_BODY_SURFACE_PAPER = 356,
+    BG_BODY_SURFACE_STEEL = 357,
+    BG_BODY_SURFACE_OAK = 359,
 };
 
 /* #Colour */
 enum {
-    BG_COLOUR_BLUE = 275,
-    BG_COLOUR_BLACK = 277,
-    BG_COLOUR_BROWN = 278,
-    BG_COLOUR_GREEN = 279,
-    BG_COLOUR_GREY = 280,
-    BG_COLOUR_NAVY = 281,
-    BG_COLOUR_RED = 282,
-    BG_COLOUR_YELLOW = 283,
-    BG_COLOUR_BEIGE = 293,
-    BG_COLOUR_WHITE = 312,
+    BG_COLOUR_BLUE = 282,
+    BG_COLOUR_BLACK = 284,
+    BG_COLOUR_BROWN = 285,
+    BG_COLOUR_GREEN = 286,
+    BG_COLOUR_GREY = 287,
+    BG_COLOUR_NAVY = 288,
+    BG_COLOUR_RED = 289,
+    BG_COLOUR_YELLOW = 290,
+    BG_COLOUR_BEIGE = 301,
+    BG_COLOUR_WHITE = 320,
 };
 
 /* The field registry: what code needs to read and write any component
@@ -286,7 +324,7 @@ typedef struct {
     const BGFieldInfo *fields;
 } BGComponentInfo;
 
-#define BG_COMPONENT_COUNT 25
+#define BG_COMPONENT_COUNT 31
 
 #ifdef BG_COMPONENT_REGISTRY
 
@@ -327,6 +365,10 @@ static const BGFieldInfo BGRespirator_fields[] = {
     { "restsBelow", offsetof(BGRespirator, restsBelow), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
 };
 
+static const BGFieldInfo BGScribe_fields[] = {
+    { "handwriting", offsetof(BGScribe, handwriting), BG_VALUE_TEXT, "text", "saved, proposable, inspect" },
+};
+
 static const BGFieldInfo BGSized_fields[] = {
     { "size", offsetof(BGSized, size), BG_VALUE_QUANTITY, "length", "content, saved, inspect, perceive(sight)" },
 };
@@ -357,9 +399,24 @@ static const BGFieldInfo BGActivity_fields[] = {
     { "watchWarm", offsetof(BGActivity, watchWarm), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
 };
 
+static const BGFieldInfo BGAuthorization_fields[] = {
+    { "grantee", offsetof(BGAuthorization, grantee), BG_VALUE_REF, "ref", "saved, proposable, inspect" },
+    { "grants", offsetof(BGAuthorization, grants), BG_VALUE_TEXT, "text", "saved, proposable, inspect" },
+    { "over", offsetof(BGAuthorization, over), BG_VALUE_REF, "ref", "saved, proposable, inspect" },
+};
+
 static const BGFieldInfo BGClaim_fields[] = {
     { "kind", offsetof(BGClaim, kind), BG_VALUE_TYPE, "#ClaimKind", "content, saved, inspect" },
     { "quantity", offsetof(BGClaim, quantity), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
+};
+
+static const BGFieldInfo BGInformation_fields[] = {
+    { "issuer", offsetof(BGInformation, issuer), BG_VALUE_TEXT, "text", "saved, proposable, inspect" },
+    { "text", offsetof(BGInformation, text), BG_VALUE_TEXT, "text", "saved, proposable, inspect" },
+};
+
+static const BGFieldInfo BGOrganization_fields[] = {
+    { "orgName", offsetof(BGOrganization, orgName), BG_VALUE_TEXT, "text", "saved, proposable, inspect" },
 };
 
 static const BGFieldInfo BGBody_fields[] = {
@@ -405,6 +462,15 @@ static const BGFieldInfo BGContainer_fields[] = {
     { "capacity", offsetof(BGContainer, capacity), BG_VALUE_QUANTITY, "int", "content, saved, inspect, perceive(sight)" },
 };
 
+static const BGFieldInfo BGInscription_fields[] = {
+    { "claims", offsetof(BGInscription, claims), BG_VALUE_TEXT, "text", "saved, proposable, inspect, perceive(sight)" },
+    { "fidelity", offsetof(BGInscription, fidelity), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
+    { "impression", offsetof(BGInscription, impression), BG_VALUE_TEXT, "text", "saved, proposable, inspect, perceive(sight)" },
+    { "inscribed", offsetof(BGInscription, inscribed), BG_VALUE_REF, "ref", "saved, proposable, inspect" },
+    { "penned", offsetof(BGInscription, penned), BG_VALUE_TEXT, "text", "saved, proposable, inspect, perceive(sight)" },
+    { "reads", offsetof(BGInscription, reads), BG_VALUE_TEXT, "text", "saved, proposable, inspect, perceive(sight)" },
+};
+
 static const BGFieldInfo BGDoor_fields[] = {
     { "ajar", offsetof(BGDoor, ajar), BG_VALUE_BOOL, "bool", "content, saved, proposable, inspect, perceive(sight)" },
     { "wide", offsetof(BGDoor, wide), BG_VALUE_QUANTITY, "int", "content, saved, inspect" },
@@ -431,6 +497,10 @@ static const BGFieldInfo BGStack_fields[] = {
     { "count", offsetof(BGStack, count), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "unit", offsetof(BGStack, unit), BG_VALUE_TEXT, "text", "content, saved, inspect, perceive(sight)" },
     { "unitMass", offsetof(BGStack, unitMass), BG_VALUE_QUANTITY, "mass", "content, saved, inspect" },
+};
+
+static const BGFieldInfo BGStamp_fields[] = {
+    { "presses", offsetof(BGStamp, presses), BG_VALUE_TEXT, "text", "saved, proposable, inspect, perceive(sight)" },
 };
 
 static const BGFieldInfo BGTap_fields[] = {
@@ -470,21 +540,27 @@ static const BGComponentInfo BGComponents[BG_COMPONENT_COUNT + 1] = {
     { "GasStore", "#GasStore", sizeof(BGGasStore), 11, BGGasStore_fields },
     { "Lever", "#Lever", sizeof(BGLever), 3, BGLever_fields },
     { "Respirator", "#Respirator", sizeof(BGRespirator), 4, BGRespirator_fields },
+    { "Scribe", "#Scribe", sizeof(BGScribe), 1, BGScribe_fields },
     { "Sized", "#Sized", sizeof(BGSized), 1, BGSized_fields },
     { "ThermalBody", "#ThermalBody", sizeof(BGThermalBody), 5, BGThermalBody_fields },
     { "Activity", "#Activity", sizeof(BGActivity), 15, BGActivity_fields },
+    { "Authorization", "#Authorization", sizeof(BGAuthorization), 3, BGAuthorization_fields },
     { "Claim", "#Claim", sizeof(BGClaim), 2, BGClaim_fields },
+    { "Information", "#Content", sizeof(BGInformation), 2, BGInformation_fields },
+    { "Organization", "#Organization", sizeof(BGOrganization), 1, BGOrganization_fields },
     { "Body", "#Body", sizeof(BGBody), 5, BGBody_fields },
     { "Agent", "#Agent", sizeof(BGAgent), 19, BGAgent_fields },
     { "Assembly", "#Assembly", sizeof(BGAssembly), 1, BGAssembly_fields },
     { "Cock", "#Cock", sizeof(BGCock), 2, BGCock_fields },
     { "Container", "#Container", sizeof(BGContainer), 1, BGContainer_fields },
+    { "Inscription", "#Copy", sizeof(BGInscription), 6, BGInscription_fields },
     { "Door", "#Door", sizeof(BGDoor), 2, BGDoor_fields },
     { "Lamp", "#Lamp", sizeof(BGLamp), 2, BGLamp_fields },
     { "Log", "#Log", sizeof(BGLog), 1, BGLog_fields },
     { "Pump", "#Pump", sizeof(BGPump), 1, BGPump_fields },
     { "Record", "#Record", sizeof(BGRecord), 1, BGRecord_fields },
     { "Stack", "#Stack", sizeof(BGStack), 3, BGStack_fields },
+    { "Stamp", "#Stamp", sizeof(BGStamp), 1, BGStamp_fields },
     { "Tap", "#Tap", sizeof(BGTap), 2, BGTap_fields },
     { "Trace", "#Trace", sizeof(BGTrace), 8, BGTrace_fields },
     { "Valve", "#Valve", sizeof(BGValve), 3, BGValve_fields },

@@ -147,6 +147,10 @@ void               BGLeaveTraces( BGWorld *world, BGAction action, BGProposalGro
 
 /* The region of air (a GasStore) over the entity's tile, or 0. */
 BGEntityID         BGAirOver( BGWorld *world, BGEntityID e);
+/* Authority (COMPONENTS.md Scenario 2): the authorizations over an entity, as
+ * entity IDs in NSNumbers; and whether any authorization links to content. */
+NSArray            *BGAuthorizationsOver( BGWorld *world, BGEntityID entity);
+BOOL               BGContentAuthorizes( BGWorld *world, BGEntityID content);
 /* A trace of `kind` (traces.tri) on the bearer, or on the tile if none, at
  * `strength`, made in the group; `by` says what left it. */
 void               BGMakeTrace( BGWorld *world, BGProposalGroup *group, const char *kind, BGEntityID bearer,

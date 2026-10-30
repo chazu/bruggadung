@@ -2009,8 +2009,9 @@ The remaining scenario checks that aren't run, after the passes above:
   - latent assembly: DOMAIN_SIMULATION.md Scenario 2, COMPONENTS.md
     Scenario 3, and ACTIONS.md Scenario 3's steps 2 and 7. COMPONENTS.md:
     "The latent assembly document will specify materialization …"
-  - institutions: COMPONENTS.md Scenario 2, grievances, and reporting to
-    the miller. ARCHITECTURE.md: "Institutions (§6) … To be specified".
+  - institutions: grievances, reporting to the miller, and whether a guard
+    *believes* a permit. ARCHITECTURE.md: "Institutions (§6) … To be
+    specified". (COMPONENTS.md Scenario 2 needed none of it; see below.)
   - how considerations combine beyond adding (AGENCY.md's open question 1
     asks product, weighted sum, or a mix). The lab adds them, in dB.
   - perception or memory making feature hypotheses of their own: the docs
@@ -2235,3 +2236,41 @@ Not yet: habits by kind of thing (this one wrench, not any wrench), and
 the belief by habit weighing less than one seen.
 
 63 tests, 2157 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: content, copies, and the forged permit
+
+COMPONENTS.md §8 and its Scenario 2, all six checks. It needed no
+institutions: the office is an informational entity, and its authorization
+is a reified relation.
+
+- **Content** (`#Content`, component `Information`) holds text, and what
+  it says of its origin (`issuer`), which may be false. It has no
+  location. Its actual origin is its creation event.
+- **Copies** (`#Copy`, component `Inscription`) are physical. Each
+  references its content (`inscribed`) and carries what is seen of it:
+  what it `reads`, the issuer it `claims`, the hand it is `penned` in, the
+  seal's `impression`.
+- **`copy_out`**: a copy set down in the copier's hand (`#Scribe`), pressed
+  with the seal it holds. Copied as it is, it references the same content.
+  In other words, it is new content, `derivedFrom` the original, still
+  claiming the issuer, and its creation is the copier's.
+- **Authority**: `#Authorization` grants a grantee something over an
+  entity, linked (`authorizes`) to the content that states it.
+  `BGAuthorizationsOver` returns those, and content no authorization links
+  to confers nothing.
+- **New relations**: `derivedFrom`, `authorizes`, `lists`. A ref field set
+  to something the same group creates now resolves to its ID.
+
+The forger borrows C1 and makes C2, the name changed and pressed with a
+carved fake stamp. The guard sees what C2 says and how it looks: its hand,
+the crude anchor. It doesn't see the origin. P′ derives from P, its
+creation is the forger's, it still claims the office, and it confers no
+authority. The stamp's use is in history. A clerk's exact duplicate C3
+references P itself. C1 burns, leaving a tombstone, and P lives on, listed
+by the ledger's register and copied in C3. The save restores it all.
+
+Not yet: the guard deciding whether to believe it (§4 and institutions),
+and how long content lives once nothing references it (COMPONENTS.md: an
+open question).
+
+64 tests, 2181 checks, under both compilers, ASan and UBSan, and leak-free.

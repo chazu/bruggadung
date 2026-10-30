@@ -465,6 +465,7 @@ static NSString   *live_check( BGWorld *w, BGEntityID e, const char *role)
    const BGFieldInfo        *f;
    const BGEntityInfo       *info;
    NSUInteger               k;
+   int64_t                  value;
 
    kbody  = [_world kindNamed:"Body"];
    kstack = [_world kindNamed:"Stack"];
@@ -527,8 +528,11 @@ static NSString   *live_check( BGWorld *w, BGEntityID e, const char *role)
                        for:e])
          return( [NSString stringWithFormat:@"%llu has no %s component",
                                             (unsigned long long) e, [_world kindInfo:k]->name]);
+      /* a reference to something the group creates: its ID now */
+      value = f->value == BG_VALUE_REF && BGIsHandle( (BGEntityID) p->value) ? (int64_t) [g idFor:(BGEntityID) p->value]
+                                                                            : p->value;
       if( f->value == BG_VALUE_TEXT ? ! [_world setField:p->name of:e text:p->key]
-                                    : ! [_world setField:p->name of:e value:p->value])
+                                    : ! [_world setField:p->name of:e value:value])
          return( [NSString stringWithFormat:@"%s cannot be set", p->name]);
       [self emit:"changed" subject:e other:BGNoEntity amount:p->value detail:p->name location:BGLocationMakeNone() group:g];
       return( nil);

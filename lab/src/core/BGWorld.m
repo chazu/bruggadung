@@ -9,7 +9,10 @@ const char   *BGEdgeKindNames[ BGEdgeKindCount] =
 {
    "splitFrom",
    "claimant",
-   "claimSubject"
+   "claimSubject",
+   "derivedFrom",
+   "authorizes",
+   "lists"
 };
 
 

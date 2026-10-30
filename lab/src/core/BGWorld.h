@@ -35,6 +35,9 @@ typedef enum
    BGEdgeSplitFrom = 0,         /* new → source; many-to-one */
    BGEdgeClaimant,              /* claim → agent; many-to-one */
    BGEdgeClaimSubject,          /* claim → entity; many-to-many */
+   BGEdgeDerivedFrom,           /* content → the content it was altered from; many-to-one */
+   BGEdgeAuthorizes,            /* authorization → the content that states it */
+   BGEdgeLists,                 /* a register's content → content it lists */
    BGEdgeKindCount
 } BGEdgeKind;
 

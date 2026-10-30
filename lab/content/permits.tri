@@ -1,0 +1,79 @@
+// COMPONENTS.md §8, informational content and physical copies, and its
+// second scenario, "the forged permit".
+
+// Content: what a text says, as data, including what it says of its own
+// origin (`issuer`), which may be false. It has no location. Its actual
+// origin is its creation event, in history.
+#Content: #Thing & {
+    @component(Information)
+    text:   text                               @field(saved, proposable, inspect)
+    issuer: text                               @field(saved, proposable, inspect)
+}
+
+// An organization: informational, with no location, though a seal or a
+// ledger may stand for it.
+#Organization: #Thing & {
+    @component(Organization)
+    orgName: text                              @field(saved, proposable, inspect)
+}
+
+// A reified authorization: it `grants` its `grantee` something `over` an
+// entity. Only an organization's procedure creates one, linked
+// (`authorizes`) to the content that states it.
+#Authorization: #Thing & {
+    @component(Authorization)
+    grants:  text                              @field(saved, proposable, inspect)
+    over:    ref                               @field(saved, proposable, inspect)
+    grantee: ref                               @field(saved, proposable, inspect)
+}
+
+// A copy: a physical thing whose inscription references content
+// (`inscribed`, developer-side) and carries physical features: the hand, the
+// seal's impression, fidelity. What it `reads`, and the issuer it `claims`,
+// are what anyone looking at it sees; `penned`, the hand it is in.
+#Copy: #Body & {
+    @component(Inscription)
+    inscribed:  ref                            @field(saved, proposable, inspect)
+    reads:      text                           @field(saved, proposable, inspect, perceive(sight))
+    claims:     text                           @field(saved, proposable, inspect, perceive(sight))
+    penned:     text                           @field(saved, proposable, inspect, perceive(sight))
+    impression: text                           @field(saved, proposable, inspect, perceive(sight))
+    fidelity:   *100 | int & >=0 & <=100       @field(content, saved, proposable, inspect)
+}
+
+// A seal: what it presses.
+#Stamp: #Body & {
+    @component(Stamp)
+    presses: text                              @field(saved, proposable, inspect, perceive(sight))
+}
+
+// Who writes, and in what hand.
+#Scribe: {
+    @component(Scribe)
+    handwriting: text                          @field(saved, proposable, inspect)
+}
+
+clerk:  #Agent & #Scribe & { material: "flesh", mass: 65kg, hands: 2, coat: "black" }
+forger: #Agent & #Scribe & { material: "flesh", mass: 70kg, hands: 2, coat: "grey" }
+guard:  #Agent & { material: "flesh", mass: 85kg, hands: 2, coat: "navy" }
+alun:   #Agent & { material: "flesh", mass: 75kg, hands: 2, coat: "green" }
+
+harbour_office: #Organization & {}
+content:        #Content & {}
+authorization:  #Authorization & {}
+paper_copy:     #Copy & { material: "paper", mass: 5g }
+ledger:         #Copy & { material: "paper", mass: 2kg }
+stamp:          #Stamp & { material: "wood", mass: 150g }
+
+// Copy a text held in one hand, pressing what the other holds: the copier's
+// hand, the seal's impression. Copied as it is, the copy references the same
+// content; with other words (the command's), it is new content derived from
+// it, still claiming its issuer.
+copy_out: #Operation & {
+    effect: "copy"
+    uses:   ["hands"]
+    roles: {
+        actor: #Agent & { id: $a }
+        item:  #Copy & { place: #Held & { by: $a } }
+    }
+} @family(operations)

@@ -877,6 +877,103 @@ static NSString   *effect_shut( BGWorld *world, BGAction a, int64_t amount, BGPr
 }
 
 
+/* Copying (COMPONENTS.md §8): a new copy, set down on the copier's tile, in
+ * its hand, pressed with the seal it holds, if any. Copied as it is, it
+ * references the same content. In other words (the command's), it is new
+ * content, `derivedFrom` the original and claiming its issuer still; its
+ * actual origin is this group's creation, the copier's. */
+static NSString   *effect_copy( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
+{
+   const BGInscription   *source;
+   const BGScribe        *scribe;
+   BGStore               *stamps;
+   BGEntityID            seal;
+   BGLocation            at;
+   BGEntityID            content;
+   BGEntityID            copy;
+   NSUInteger            i;
+   const char            *reads;
+   const char            *issuer;
+   const char            *presses;
+
+   source = [world record:[world kindNamed:"Inscription"] for:a.roles[ BGRoleItem]];
+   if( ! source || ! source->inscribed)
+      return( @"there is nothing written there to copy");
+   content = (BGEntityID) source->inscribed;
+   reads   = [world textField:"Information.text" of:content];
+   issuer  = [world textField:"Information.issuer" of:content];
+   scribe  = [world record:[world kindNamed:"Scribe"] for:a.roles[ BGRoleActor]];
+   presses = "";
+   seal    = BGNoEntity;
+   stamps  = [world storeForKind:[world kindNamed:"Stamp"]];
+   for( i = 0; i < [stamps count] && ! seal; i++)
+   {
+      at = [world locationOf:[stamps entityAtIndex:i]];
+      if( at.form == BGLocationHeldBy && at.place == a.roles[ BGRoleActor])
+      {
+         seal    = [stamps entityAtIndex:i];
+         presses = [world textField:"Stamp.presses" of:seal];
+      }
+   }
+   if( a.content && *a.content && (! reads || strcmp( a.content, reads)))
+   {
+      /* altered: new content, derived from the original */
+      content = [g create:"content" key:"altered content" at:BGLocationMakeNone()];
+      [g set:"Information.text" of:BGWhole( content) toText:a.content];
+      [g set:"Information.issuer" of:BGWhole( content) toText:issuer ? issuer : ""];
+      [g relate:BGEdgeDerivedFrom from:BGWhole( content) to:BGWhole( (BGEntityID) source->inscribed)];
+      reads = a.content;
+   }
+   at   = [world locationOf:a.roles[ BGRoleActor]];
+   copy = [g create:"paper_copy" key:"a copy" at:at.form == BGLocationOnTile ? at : BGLocationMakeNone()];
+   [g set:"Inscription.inscribed" of:BGWhole( copy) to:(int64_t) content];
+   [g set:"Inscription.reads" of:BGWhole( copy) toText:reads ? reads : ""];
+   [g set:"Inscription.claims" of:BGWhole( copy) toText:issuer ? issuer : ""];
+   [g set:"Inscription.penned" of:BGWhole( copy)
+   toText:scribe && [world textField:"Scribe.handwriting" of:a.roles[ BGRoleActor]]
+          ? [world textField:"Scribe.handwriting" of:a.roles[ BGRoleActor]] : "an unknown hand"];
+   [g set:"Inscription.impression" of:BGWhole( copy) toText:presses ? presses : ""];
+   /* the seal pressed it: provenance, for whoever investigates */
+   if( seal)
+      [g emit:"stamped" subject:BGWhole( seal) other:BGWhole( copy)];
+   return( nil);
+}
+
+
+/* What authority there is over an entity (COMPONENTS.md Scenario 2): the
+ * reified authorizations over it, each linked to the content that states
+ * it. Content no authorization links to confers nothing. */
+NSArray   *BGAuthorizationsOver( BGWorld *world, BGEntityID entity)
+{
+   const BGAuthorization   *auth;
+   NSMutableArray          *found;
+   BGStore                 *store;
+   NSUInteger              i;
+
+   found = [NSMutableArray array];
+   store = [world storeForKind:[world kindNamed:"Authorization"]];
+   for( i = 0; i < [store count]; i++)
+   {
+      auth = [store recordAtIndex:i];
+      if( (BGEntityID) auth->over == entity)
+         [found addObject:[NSNumber numberWithUnsignedLongLong:[store entityAtIndex:i]]];
+   }
+   return( found);
+}
+
+
+/* Whether any authorization links to the content. */
+BOOL   BGContentAuthorizes( BGWorld *world, BGEntityID content)
+{
+   NSUInteger   i;
+
+   for( i = 0; i < [world edgeCount]; i++)
+      if( [world edgeAt:i]->kind == BGEdgeAuthorizes && [world edgeAt:i]->to == content)
+         return( YES);
+   return( NO);
+}
+
+
 /* Through a door: onto its tile. */
 static NSString   *effect_pass( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
 {
@@ -1004,6 +1101,7 @@ static const struct
    { "open_door", effect_open_door },
    { "saw",       effect_saw },
    { "pass",      effect_pass },
+   { "copy",      effect_copy },
    { "rest",      effect_rest },
    { "strike",    effect_strike },
 };

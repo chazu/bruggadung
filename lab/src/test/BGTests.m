@@ -68,7 +68,7 @@ static void   test_registry_and_construction( void)
 
    w = BGTestWorld( 1);
    c = BGTestCommitter( w);
-   BG_CHECK( [w kindCount] == 25);
+   BG_CHECK( [w kindCount] == 31);
    BG_CHECK( [w kindNamed:"Body"] != NSNotFound && [w kindNamed:"Nonesuch"] == NSNotFound);
    bin   = commit_create( c, "bin", BGOnTile( 0, 0, 0));
    nails = commit_create( c, "nails_30", BGIn( bin));
@@ -3167,6 +3167,205 @@ static void   test_door_in_the_dark( void)
 }
 
 
+/* COMPONENTS.md Scenario 2, "the forged permit". The harbour office's
+ * permit P lets Alun into the warehouse: an authorization the office made,
+ * linked to P; Alun holds a copy, C1, sealed with the office's seal; the
+ * office's ledger lists P. A forger borrows C1 and, with a carved fake
+ * stamp, makes C2 with the name changed; the guard sees it. A: a clerk makes
+ * an exact duplicate, C3. B: C1 burns. */
+static void   test_forged_permit( void)
+{
+   BGStage            st;
+   BGKnowledge        *knowledge;
+   BGKnowledgeStore   *store;
+   BGProposalGroup    *g;
+   BGEntityID         office;
+   BGEntityID         permit;
+   BGEntityID         auth;
+   BGEntityID         reg;
+   BGEntityID         ledger;
+   BGEntityID         c1;
+   BGEntityID         c2;
+   BGEntityID         c3;
+   BGEntityID         altered;
+   BGEntityID         seal;
+   BGEntityID         fake;
+   BGEntityID         alun;
+   BGEntityID         forger;
+   BGEntityID         clerk;
+   BGEntityID         guard;
+   BGEntityID         warehouse;
+   const BGEvent      *ev;
+   const BGEdge       *edge;
+   NSString           *error;
+   NSString           *seen;
+   NSArray            *authority;
+   BGAction           forge;
+   NSUInteger         i;
+   int64_t            v;
+   BOOL               derived;
+   BOOL               madeByForger;
+   BOOL               stamped;
+
+   st.w      = BGTestWorld( 151);
+   st.c      = BGTestCommitter( st.w);
+   knowledge = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+   st.s      = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [st.s setPerception:knowledge];
+   g         = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the harbour office's procedure"];
+   office    = [g create:"harbour_office" key:"the harbour office" at:BGLocationMakeNone()];
+   warehouse = [g create:"storeroom" key:"the warehouse" at:BGOnTile( 20, 4, 0)];
+   alun      = [g create:"alun" key:"Alun" at:BGOnTile( 3, 3, 0)];
+   forger    = [g create:"forger" key:"the forger" at:BGOnTile( 4, 3, 0)];
+   clerk     = [g create:"clerk" key:"the clerk" at:BGOnTile( 10, 10, 0)];
+   guard     = [g create:"guard" key:"the guard" at:BGOnTile( 19, 4, 0)];
+   permit    = [g create:"content" key:"permit P" at:BGLocationMakeNone()];
+   [g set:"Information.text" of:BGWhole( permit) toText:"Alun may enter the warehouse"];
+   [g set:"Information.issuer" of:BGWhole( permit) toText:"the harbour office"];
+   auth      = [g create:"authorization" key:"Alun's authorization" at:BGLocationMakeNone()];
+   [g set:"Authorization.grants" of:BGWhole( auth) toText:"enter"];
+   [g set:"Authorization.over" of:BGWhole( auth) to:(int64_t) warehouse];
+   [g set:"Authorization.grantee" of:BGWhole( auth) to:(int64_t) alun];
+   [g relate:BGEdgeAuthorizes from:BGWhole( auth) to:BGWhole( permit)];
+   reg       = [g create:"content" key:"the register" at:BGLocationMakeNone()];
+   [g set:"Information.text" of:BGWhole( reg) toText:"permits issued"];
+   [g relate:BGEdgeLists from:BGWhole( reg) to:BGWhole( permit)];
+   ledger    = [g create:"ledger" key:"the office's ledger" at:BGOnTile( 10, 11, 0)];
+   [g set:"Inscription.inscribed" of:BGWhole( ledger) to:(int64_t) reg];
+   seal      = [g create:"stamp" key:"the office seal" at:BGOnTile( 11, 10, 0)];
+   [g set:"Stamp.presses" of:BGWhole( seal) toText:"the harbour anchor"];
+   c1        = [g create:"paper_copy" key:"C1" at:BGHeldBy( alun, 0)];
+   [g set:"Inscription.inscribed" of:BGWhole( c1) to:(int64_t) permit];
+   [g set:"Inscription.reads" of:BGWhole( c1) toText:"Alun may enter the warehouse"];
+   [g set:"Inscription.claims" of:BGWhole( c1) toText:"the harbour office"];
+   [g set:"Inscription.penned" of:BGWhole( c1) toText:"a clerk's round hand"];
+   [g set:"Inscription.impression" of:BGWhole( c1) toText:"the harbour anchor"];
+   fake      = [g create:"stamp" key:"a carved fake stamp" at:BGHeldBy( forger, 1)];
+   [g set:"Stamp.presses" of:BGWhole( fake) toText:"an anchor, crudely cut"];
+   [g set:"Scribe.handwriting" of:BGWhole( forger) toText:"a careful, cramped hand"];
+   [g set:"Scribe.handwriting" of:BGWhole( clerk) toText:"a clerk's round hand"];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   office    = [g idFor:office];
+   warehouse = [g idFor:warehouse];
+   alun      = [g idFor:alun];
+   forger    = [g idFor:forger];
+   clerk     = [g idFor:clerk];
+   guard     = [g idFor:guard];
+   permit    = [g idFor:permit];
+   auth      = [g idFor:auth];
+   reg       = [g idFor:reg];
+   ledger    = [g idFor:ledger];
+   seal      = [g idFor:seal];
+   c1        = [g idFor:c1];
+   fake      = [g idFor:fake];
+   BG_CHECK( [st.w getField:"Inscription.inscribed" of:c1 value:&v] && v == (int64_t) permit);
+
+   /* 1: the forger borrows C1 and makes C2, the name changed, pressed with its fake stamp */
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: Alun lends C1"];
+   [g move:BGWhole( c1) to:BGHeldBy( forger, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 2)];
+   forge         = BGActionMake( "copy_out", forger, c1, BGNoEntity);
+   forge.content = [st.w intern:"Bran may enter the warehouse"];
+   error         = nil;
+   g = BGPerform( st.w, st.c, forge, 0, &error);
+   BG_CHECK( g != nil);
+   [st.s runUntil:BGTimeMake( 3)];
+   c2 = BGNoEntity;
+   for( i = 0; i < [g count]; i++)
+      if( [g proposals][ i].kind == BGProposeCreate && ! strcmp( [g proposals][ i].name, "paper_copy"))
+         c2 = [g idFor:[g proposals][ i].handle];
+   BG_CHECK( c2 && [st.w getField:"Inscription.inscribed" of:c2 value:&v]);
+   altered = (BGEntityID) v;
+   BG_CHECK( altered != permit && ! strcmp( [st.w textField:"Information.text" of:altered], "Bran may enter the warehouse"));
+
+   /* 2: the guard sees C2: what it says, and what can be seen of it */
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the forger shows C2 at the warehouse"];
+   [g move:BGWhole( forger) to:BGOnTile( 18, 4, 0)];
+   [g move:BGWhole( c2) to:BGOnTile( 18, 4, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 4)];
+   store = [knowledge storeOf:guard];
+   seen  = [store describeReferent:referent_of( store, c2)];
+   BG_CHECK( [seen rangeOfString:@"reads: \"Bran may enter the warehouse\""].location != NSNotFound);
+   BG_CHECK( [seen rangeOfString:@"claims: \"the harbour office\""].location != NSNotFound);
+   BG_CHECK( [seen rangeOfString:@"penned: \"a careful, cramped hand\""].location != NSNotFound);
+   BG_CHECK( [seen rangeOfString:@"impression: \"an anchor, crudely cut\""].location != NSNotFound);
+   /* 3: the player's view has only the claimed origin; the actual is in history */
+   BG_CHECK( [seen rangeOfString:@"inscribed"].location == NSNotFound);
+
+   /* 1 (checks): content, the office, the authorization have no location;
+    * copies, the ledger, the stamps have one */
+   BG_CHECK( [st.w locationOf:permit].form == BGLocationNone && [st.w locationOf:altered].form == BGLocationNone &&
+             [st.w locationOf:office].form == BGLocationNone && [st.w locationOf:auth].form == BGLocationNone);
+   BG_CHECK( [st.w locationOf:c1].form != BGLocationNone && [st.w locationOf:c2].form != BGLocationNone &&
+             [st.w locationOf:ledger].form != BGLocationNone && [st.w locationOf:fake].form != BGLocationNone);
+
+   /* 2: P′ derived from P; its actual creation is the forger's; 3: it claims the office */
+   derived = NO;
+   for( i = 0; i < [st.w edgeCount]; i++)
+   {
+      edge    = [st.w edgeAt:i];
+      derived = derived || (edge->kind == BGEdgeDerivedFrom && edge->from == altered && edge->to == permit);
+   }
+   madeByForger = NO;
+   stamped      = NO;
+   for( i = 0; i < [st.w eventCount]; i++)
+   {
+      ev           = [st.w eventAt:i];
+      madeByForger = madeByForger || (! strcmp( ev->kind, "created") && ev->subject == altered && ev->actor == forger);
+      stamped      = stamped || (! strcmp( ev->kind, "stamped") && ev->subject == fake && ev->other == c2);
+   }
+   BG_CHECK( derived && madeByForger);
+   BG_CHECK( ! strcmp( [st.w textField:"Information.issuer" of:altered], "the harbour office"));
+   /* 5: authority over the warehouse is the office's authorization alone; P′ confers nothing */
+   authority = BGAuthorizationsOver( st.w, warehouse);
+   BG_CHECK( [authority count] == 1 && [[authority objectAtIndex:0] unsignedLongLongValue] == auth);
+   BG_CHECK( BGContentAuthorizes( st.w, permit) && ! BGContentAuthorizes( st.w, altered));
+   /* 6: the fake stamp, P′, C2 and the forger's creation are found through provenance */
+   BG_CHECK( stamped);
+
+   /* A: the clerk makes an exact duplicate, C3: a new copy of P itself */
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: C1 to the clerk, at the office"];
+   [g move:BGWhole( c1) to:BGHeldBy( clerk, 0)];
+   [g move:BGWhole( seal) to:BGHeldBy( clerk, 1)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 5)];
+   g = BGPerform( st.w, st.c, BGActionMake( "copy_out", clerk, c1, BGNoEntity), 0, &error);
+   BG_CHECK( g != nil);
+   [st.s runUntil:BGTimeMake( 6)];
+   c3 = BGNoEntity;
+   for( i = 0; i < [g count]; i++)
+      if( [g proposals][ i].kind == BGProposeCreate)
+         c3 = [g idFor:[g proposals][ i].handle];
+   BG_CHECK( c3 && [st.w getField:"Inscription.inscribed" of:c3 value:&v] && v == (int64_t) permit);
+   BG_CHECK( ! strcmp( [st.w textField:"Inscription.impression" of:c3], "the harbour anchor"));
+
+   /* B: C1 burns; P persists, referenced by the ledger's register and by C3;
+    * what referred to C1 resolves to its tombstone; 4 */
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: C1 burns"];
+   [g destroy:BGWhole( c1) reason:"burnt"];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 7)];
+   BG_CHECK( ! [st.w isLive:c1] && [st.w tombstone:c1] != NULL);
+   BG_CHECK( [st.w isLive:permit] && [st.w isLive:reg] && [st.w isLive:c3]);
+   BG_CHECK( [authority count] == 1);
+
+   /* saved and restored: the content, its derivation, and the authority, the same */
+   {
+      BGWorld    *w2;
+      NSArray    *deferred;
+      uint64_t   position;
+
+      w2 = BGRestore( BGSave( st.w, st.c, [NSArray arrayWithObject:knowledge]), [st.w contentBuild], &deferred, &position,
+                      &error);
+      BG_CHECK( w2 && [w2 stateHash] == [st.w stateHash]);
+      BG_CHECK( w2 && [BGAuthorizationsOver( w2, warehouse) count] == 1 && ! BGContentAuthorizes( w2, altered));
+   }
+}
+
+
 /* --- the false alarm -------------------------------------------------------- */
 
 typedef enum
@@ -6116,6 +6315,7 @@ const BGTestCase   BGAllTests[] =
    { "tired_worker",                  test_tired_worker },
    { "pain",                          test_pain },
    { "habitual_belief",               test_habitual_belief },
+   { "forged_permit",                 test_forged_permit },
    { "door_in_the_dark",              test_door_in_the_dark },
    { "wrench_replaced",               test_wrench_replaced },
    { "rumour",                        test_rumour },
