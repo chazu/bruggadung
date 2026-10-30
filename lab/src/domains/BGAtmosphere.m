@@ -596,6 +596,35 @@ static void   across( const BGAirRegion *regions, int k, int q, int64_t *num, in
    }
    h.safeStep = BGTimeMake( burning ? 600000 : 3600000);
 
+   /* an agent's body, warmed or cooled by what this domain sends it (the
+    * exchange with the air, its breath's heat), crossing its next whole
+    * kelvin, which it feels as cold: predicted at twice the rate those give
+    * now, and again from closer in */
+   for( k = 0; k < _nsurfaces; k++)
+   {
+      const BGThermalBody   *body;
+      int64_t               kelvin;
+      int64_t               bound;
+      int64_t               rate;
+
+      body = [_world record:[_world kindNamed:"ThermalBody"] for:_surfaces[ k].entity];
+      if( ! body || _surfaces[ k].region < 0 || ! [_world record:[_world kindNamed:"Agent"] for:_surfaces[ k].entity])
+         continue;
+      kelvin = body->heat * 1000 / body->heatCapacity;
+      rate   = _surfaces[ k].conductance * (gasTemperature( &_regions[ _surfaces[ k].region]) - kelvin);   /* mW */
+      for( s = 0; s < _nbreathers; s++)
+         if( _breathers[ s].entity == _surfaces[ k].entity)
+            rate += [self breathOf:s] * BG_BREATH_HEAT;
+      if( ! rate)
+         continue;
+      bound = rate < 0 ? kelvin - kelvin % 1000 - (kelvin % 1000 ? 0 : 1000) : kelvin - kelvin % 1000 + 1000;
+      when  = t.ms + llabs( kelvin - bound) * body->heatCapacity * 1000 / (2 * llabs( rate));   /* mJ over mW */
+      if( when < t.ms + 1000)
+         when = t.ms + 1000;
+      if( when < h.nextEvent.ms)
+         h.nextEvent = BGTimeMake( when);
+   }
+
    /* a moving link is explicit: a step carries no more than an eighth of
     * the smaller side's air */
    for( k = 0; k < _nregions; k++)

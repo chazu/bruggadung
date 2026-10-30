@@ -1925,3 +1925,22 @@ None of it carries the breakaway torque.
 Not yet: the actor's exertion as a percept, and impact as a graded effect.
 
 57 tests, 2063 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: feeling cold when it happens
+
+The horizon "feeling cold" left open. A lodger rests in a cold room at
+307.1 K. At rest it breathes too little to keep warm, and cools. Before
+this, the first step ran half an hour, and the thermal domain received
+it in one lump: the body was 0.3 K past 307 K before it was felt. Now the
+crossing is felt at a boundary 2 mK past it.
+
+- **The atmosphere predicts an agent's body crossing its next whole
+  kelvin.** It computes what the body gains or loses: the exchange with
+  the air, and its breath's heat. It predicts the crossing at twice that
+  rate, and again from closer in, as it does a temperature watch. The
+  thermal domain applies that heat a step later, so the domain that knows
+  the flow is the one that bounds it. A first try put the prediction in
+  the thermal domain, from its last step's rate. It saw nothing until the
+  first lump had landed.
+
+57 tests, 2065 checks, under both compilers, ASan and UBSan, and leak-free.

@@ -4858,6 +4858,46 @@ static BGStoveRun   cold_lodger( int64_t kelvin, BGAgency **minds, BGKnowledge *
 }
 
 
+/* The lodger, resting by the cold stove, cools (it breathes at rest): its
+ * body crossing 307 K is felt as cold 30 at a boundary the thermal domain
+ * predicted, not hours after. Returns how far below 307 K the body was then,
+ * mK, or -1 if it never was. */
+static int64_t   cooling_lodger( void)
+{
+   BGStage            st;
+   BGActivities       *activities;
+   BGKnowledge        *knowledge;
+   BGThermal          *thermal;
+   BGProposalGroup    *g;
+   BGEntityID         lodger;
+   NSString           *error;
+
+   st.w       = BGTestWorld( 113);
+   st.c       = BGTestCommitter( st.w);
+   activities = [BGActivities activitiesWithWorld:st.w committer:st.c];
+   knowledge  = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+   thermal    = [[[BGThermal alloc] initWithWorld:st.w] autorelease];
+   st.s       = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [st.s setActivities:activities];
+   [st.s setPerception:knowledge];
+   [st.s addDomain:[[[BGAtmosphere alloc] initWithWorld:st.w] autorelease]];
+   [st.s addDomain:thermal];
+   g      = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: a cold room"];
+   [g create:"room_air" key:"the room's air" at:BGLocationMakeNone()];
+   lodger = [g create:"lodger" key:"lodger" at:BGOnTile( 3, 2, 0)];
+   [g set:"ThermalBody.heat" of:BGWhole( lodger) to:307100LL * 245000 / 1000];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   lodger = [g idFor:lodger];
+   error  = nil;
+   BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "while_away", lodger, BGNoEntity, BGNoEntity), 0, &error) != nil);
+   while( [st.w time].ms < 4 * 3600000LL && [st.s stepUntil:BGTimeMake( 4 * 3600000LL)])
+      if( [[knowledge storeOf:lodger] feels:"cold"] >= 30)
+         return( 307000 - [thermal temperatureOf:lodger]);
+   return( -1);
+}
+
+
 static void   test_cold_lodger( void)
 {
    BGStoveRun   cold;
@@ -4865,6 +4905,7 @@ static void   test_cold_lodger( void)
    BGAgency     *agency;
    BGKnowledge  *knowledge;
    int64_t      v;
+   int64_t      below;
 
    /* 305 K, five below: it feels cold 50, more than 30: it lights the stove */
    cold = cold_lodger( 305000, &agency, &knowledge);
@@ -4872,6 +4913,10 @@ static void   test_cold_lodger( void)
    BG_CHECK( logged_by( agency, cold.rest, @"[get warm] light the stove: light R"));
    BG_CHECK( [cold.world getField:"Combustor.lit" of:cold.stove value:&v] && v);
    BG_CHECK( logged_by( agency, cold.rest, @"[get warm] done"));
+
+   /* resting, it cools past 307 K, and feels it within a few mK */
+   below = cooling_lodger();
+   BG_CHECK( below >= 0 && below < 5);
 
    /* 308.5 K: cold 10, not pressing: the stove stays cold */
    cool = cold_lodger( 308500, &agency, &knowledge);
