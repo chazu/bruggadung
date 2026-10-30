@@ -4160,6 +4160,43 @@ static BGNutRun   doubtful_nut_run( int32_t doubt, int64_t *massSeen)
 }
 
 
+/* The menu, beside the nut, while it half remembers a 22 mm one at `doubt`
+ * in 1000: the tighten entry, described. */
+static NSString   *doubtful_menu( int32_t doubt)
+{
+   BGStage            st;
+   BGKnowledge        *knowledge;
+   BGProposalGroup    *g;
+   BGKnowledgeStore   *store;
+   BGMenu             *menu;
+   BGEntityID         worker;
+   BGEntityID         nut;
+   NSUInteger         i;
+
+   st.w      = BGTestWorld( 71);
+   st.c      = BGTestCommitter( st.w);
+   knowledge = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+   st.s      = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [st.s setPerception:knowledge];
+   g      = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the pump"];
+   worker = [g create:"worker" key:"Oskar" at:BGOnTile( 5, 2, 0)];
+   [g create:"spanner_19" key:"spanner" at:BGHeldBy( worker, 0)];
+   nut    = [g create:"gland_nut" key:"gland nut" at:BGOnTile( 6, 2, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   worker = [g idFor:worker];
+   nut    = [g idFor:nut];
+   store  = [knowledge storeOf:worker];
+   if( doubt)
+      [store suppose:@"size: 22mm" about:referent_of( store, nut) mass:doubt];
+   menu = [BGMenu menuFor:store world:st.w believed:YES];
+   for( i = 0; i < [menu count]; i++)
+      if( ! strcmp( [menu actionAt:i]->operation, "tighten"))
+         return( [menu describeAt:i]);
+   return( @"");
+}
+
+
 static BOOL   tightened( BGNutRun run)
 {
    int64_t   v;
@@ -4238,6 +4275,10 @@ static void   test_unknown_nut( void)
    BG_CHECK( logged_by( doubtful.agency, 1, @"tighten it: unknown at nut.size (700 in 1000 entails, under 900): look closer first"));
    BG_CHECK( tightened( doubtful));
    BG_CHECK( [[doubtful.knowledge dump:1] rangeOfString:@"or, 300 in 1000"].location == NSNotFound);
+   /* the menu shows how sure: doubted, it is unknown, with the mass that
+    * entails and what to find out; undoubted, entailed */
+   BG_CHECK( [doubtful_menu( 300) hasSuffix:@": unknown (700 in 1000 entails) (find out destination.size)"]);
+   BG_CHECK( [doubtful_menu( 0) hasSuffix:@": entailed"]);
    /* at 50 in 1000, 950 entails: sure enough, it tightens it without looking */
    sure = doubtful_nut_run( 50, &mass);
    BG_CHECK( ! logged_by( sure.agency, 1, @"look closer") && tightened( sure));

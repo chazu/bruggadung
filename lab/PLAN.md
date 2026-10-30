@@ -2071,8 +2071,17 @@ enough, and it tightens the nut without looking.
   Otherwise unknown, at the doubted slot's overridden feature, which
   `onUnknown` makes a goal.
 
-Not yet: more than one competing hypothesis per referent, perception and
-memory making hypotheses of their own (the test supposes it), and the
-menu showing masses.
+Not yet: more than one competing hypothesis per referent, and perception
+and memory making hypotheses of their own (the test supposes it).
 
 59 tests, 2093 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: the menu says how sure
+
+The knowledge view's menu (ACTIONS.md §3, CONTENT_LANGUAGE.md §9) matches
+per hypothesis too. Beside the nut, half remembering it 22 mm, the worker's
+menu offers *tighten* as "unknown (700 in 1000 entails) (find out
+destination.size)". It excludes an entry only when every hypothesis rules
+it out. Without the doubt it is entailed, as before.
+
+59 tests, 2095 checks, under both compilers, ASan and UBSan, and leak-free.

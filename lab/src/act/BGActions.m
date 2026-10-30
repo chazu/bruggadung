@@ -135,8 +135,10 @@ static BOOL   believed_kind_fits( BGWorld *world, const TriNode *pattern, BGRole
 }
 
 
-TriMatch   BGMatchBelieved( BGWorld *world, BGKnowledgeStore *store, BGAction action, TriMatchResult *result,
-                            NSString **reason)
+/* As believed, with `supposing`'s competing hypothesis in place of its
+ * belief (0: none). */
+static TriMatch   match_believed( BGWorld *world, BGKnowledgeStore *store, BGAction action, TriMatchResult *result,
+                                  NSString **reason, uint32_t supposing)
 {
    const TriNode      *pattern;
    const BGReferent   *me;
@@ -174,9 +176,38 @@ TriMatch   BGMatchBelieved( BGWorld *world, BGKnowledgeStore *store, BGAction ac
             *reason = [NSString stringWithFormat:@"R%u is not that kind of thing", ref->id];
          return( TRI_INCOMPATIBLE);
       }
-      descriptions[ r] = [store describeReferent:ref->id];
+      descriptions[ r] = ref->id == supposing ? [store describeSupposed:ref->id] : [store describeReferent:ref->id];
    }
    return( match_described( world, pattern, action, descriptions, result, reason));
+}
+
+
+TriMatch   BGMatchBelieved( BGWorld *world, BGKnowledgeStore *store, BGAction action, TriMatchResult *result,
+                            NSString **reason)
+{
+   return( match_believed( world, store, action, result, reason, 0));
+}
+
+
+/* The credence mass, in thousandths, of the hypotheses under which the
+ * action is entailed (CONTENT_LANGUAGE.md §9); `any` gets whether some
+ * hypothesis isn't incompatible. */
+static int32_t   entailed_mass( BGWorld *world, BGKnowledgeStore *store, BGAction action, TriMatch believed, BOOL *any)
+{
+   TriMatchResult   result;
+   TriMatch         supposed;
+   int32_t          mass;
+   int              r;
+
+   *any = believed != TRI_INCOMPATIBLE;
+   for( r = 0; r < BGRoleCount; r++)
+      if( action.roles[ r] && (mass = [store supposedMassOf:(uint32_t) action.roles[ r]]) > 0)
+      {
+         supposed = match_believed( world, store, action, &result, NULL, (uint32_t) action.roles[ r]);
+         *any     = *any || supposed != TRI_INCOMPATIBLE;
+         return( (believed == TRI_ENTAILED ? 1000 - mass : 0) + (supposed == TRI_ENTAILED ? mass : 0));
+      }
+   return( believed == TRI_ENTAILED ? 1000 : 0);
 }
 
 
@@ -241,6 +272,7 @@ static int   cmp_string( const void *a, const void *b)
 {
    free( _items);
    free( _matches);
+   free( _masses);
    [_residuals release];
    [super dealloc];
 }
@@ -258,9 +290,11 @@ static int   cmp_string( const void *a, const void *b)
       _capacity = _capacity ? _capacity * 2 : 16;
       _items    = realloc( _items, sizeof( BGAction) * _capacity);
       _matches  = realloc( _matches, sizeof( TriMatch) * _capacity);
+      _masses   = realloc( _masses, sizeof( int32_t) * _capacity);
    }
    _items[ _count]   = action;
    _matches[ _count] = match;
+   _masses[ _count]  = match == TRI_ENTAILED ? 1000 : 0;
    res = [NSMutableArray array];
    for( i = 0; i < result->nresidual; i++)
       [res addObject:[NSString stringWithUTF8String:result->residual[ i]]];
@@ -363,6 +397,9 @@ static int   cmp_string( const void *a, const void *b)
    size_t             o;
    BOOL               item;
    BOOL               destination;
+   BOOL               any;
+   int32_t            mass;
+   int                r;
 
    menu             = [[self new] autorelease];
    menu->_residuals = [NSMutableArray new];
@@ -403,10 +440,26 @@ static int   cmp_string( const void *a, const void *b)
             action = BGActionMake( [world intern:ops[ o]], actor, item ? reach[ i] : BGNoEntity,
                                    destination ? reach[ j] : BGNoEntity);
             match  = BGMatchBelieved( world, store, action, &result, NULL);
-            if( match != TRI_INCOMPATIBLE)
+            mass   = entailed_mass( world, store, action, match, &any);
+            /* excluded only when every hypothesis rules it out */
+            if( any)
+            {
                [menu add:action
-                   match:match
+                   match:mass == 1000 ? TRI_ENTAILED : TRI_UNKNOWN
                   result:&result];
+               menu->_masses[ menu->_count - 1] = mass;
+               /* what to find out: where the hypotheses part */
+               for( r = 0; mass < 1000 && r < BGRoleCount; r++)
+                  if( action.roles[ r] && [store supposedMassOf:(uint32_t) action.roles[ r]] > 0)
+                  {
+                     char   key[ 64];
+
+                     strncpy( key, [store referent:(uint32_t) action.roles[ r]]->supposed, sizeof( key) - 1);
+                     key[ sizeof( key) - 1]   = 0;
+                     key[ strcspn( key, ":")] = 0;
+                     [[menu->_residuals lastObject] addObject:[NSString stringWithFormat:@"%s.%s", BGRoleNames[ r], key]];
+                  }
+            }
          }
    }
    free( ops);
@@ -455,6 +508,8 @@ static int   cmp_string( const void *a, const void *b)
       if( _items[ i].roles[ r])
          [s appendFormat:_believed ? @" %s R%llu" : @" %s %llu", BGRoleNames[ r], (unsigned long long) _items[ i].roles[ r]];
    [s appendString:_matches[ i] == TRI_ENTAILED ? @": entailed" : @": unknown"];
+   if( _masses && _masses[ i] > 0 && _masses[ i] < 1000)
+      [s appendFormat:@" (%d in 1000 entails)", _masses[ i]];
    if( [[self residualsAt:i] count])
       [s appendFormat:@" (find out %@)", [[self residualsAt:i] componentsJoinedByString:@", "]];
    return( s);

@@ -48,6 +48,7 @@ static inline BGAction   BGActionMake( const char *operation, BGEntityID actor, 
 {
    BGAction         *_items;
    TriMatch         *_matches;
+   int32_t          *_masses;       /* the credence mass that entails, in thousandths */
    NSMutableArray   *_residuals;
    BOOL             _believed;
    NSUInteger       _count;
