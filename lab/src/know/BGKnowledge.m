@@ -343,6 +343,18 @@ static NSUInteger   feature_keys( const char *features, char (*keys)[ 32], NSUIn
 
 
 /* The trace of that kind at that site, updated, or added; YES if added. */
+- (BOOL) knowsTrace:(BGTraceSeen) t
+{
+   NSUInteger   i;
+
+   for( i = 0; i < _ntraces; i++)
+      if( _traces[ i].kind == t.kind && _traces[ i].bearer == t.bearer &&
+          (t.bearer || (_traces[ i].x == t.x && _traces[ i].y == t.y && _traces[ i].level == t.level)))
+         return( YES);
+   return( NO);
+}
+
+
 - (BOOL) noteTrace:(BGTraceSeen) t
 {
    NSUInteger   i;
@@ -2274,6 +2286,18 @@ static uint32_t   bound_to( BGEntityID e, BGEntityID agent, uint32_t me, const B
 /* Traces in reach of their sense: on what it sees, or on the floor; how
  * strong each seems now. One it perceived at a site it perceives again, and
  * doesn't find, is gone. */
+/* the strongest first; in the world's order among equals */
+static int   cmp_fresh( const void *a, const void *b)
+{
+   const BGTraceSeen   *x = a;
+   const BGTraceSeen   *y = b;
+
+   if( x->strength != y->strength)
+      return( x->strength > y->strength ? -1 : 1);
+   return( x->truth < y->truth ? -1 : x->truth > y->truth);
+}
+
+
 - (void) perceiveTraces:(BGKnowledgeStore *) store
                      at:(BGLocation) here
                     now:(int64_t) now
@@ -2281,6 +2305,7 @@ static uint32_t   bound_to( BGEntityID e, BGEntityID agent, uint32_t me, const B
                assigned:(const uint32_t *) assigned
                   count:(NSUInteger) nseen
                 closely:(BOOL) closely
+                 budget:(NSInteger *) budget
                    news:(NSMutableArray *) news
 {
    const BGTrace   *record;
@@ -2295,6 +2320,8 @@ static uint32_t   bound_to( BGEntityID e, BGEntityID agent, uint32_t me, const B
    uint8_t         *found;
    int64_t         strength;
    int32_t         range[ 3];
+   BGTraceSeen     fresh[ 64];
+   NSUInteger      nfresh;
    int             sensed;
    char            sense[ 16];
    const char      *kind;
@@ -2304,6 +2331,7 @@ static uint32_t   bound_to( BGEntityID e, BGEntityID agent, uint32_t me, const B
    range[ 0] = BG_SIGHT;
    range[ 1] = BG_SMELL + (closely ? 1 : 0);
    range[ 2] = BG_HEARING;
+   nfresh    = 0;
    for( i = 0; i < [traces count]; i++)
    {
       record   = [traces recordAtIndex:i];
@@ -2342,10 +2370,33 @@ static uint32_t   bound_to( BGEntityID e, BGEntityID agent, uint32_t me, const B
       t.seen     = now;
       t.present  = YES;
       t.truth    = [traces entityAtIndex:i];        /* developer-only */
-      if( [store noteTrace:t])
-         [news addObject:t.bearer ? [NSString stringWithFormat:@"R%u bears %s (%d)", t.bearer, t.kind, t.strength]
-                                  : [NSString stringWithFormat:@"%s at (%d, %d) (%d)", t.kind, t.x, t.y, t.strength]];
+      /* known already, it is seen as it is now; new, it waits for attention */
+      if( ! [store knowsTrace:t])
+      {
+         if( nfresh < 64)
+            fresh[ nfresh++] = t;
+         continue;
+      }
+      [store noteTrace:t];
    }
+
+   /* new to it: the strongest first get what attention is left (KNOWLEDGE.md
+    * §5); a close look, investigating, attends to all of them */
+   qsort( fresh, nfresh, sizeof( BGTraceSeen), cmp_fresh);
+   for( i = 0; i < nfresh; i++)
+   {
+      t = fresh[ i];
+      if( ! closely && (*budget)-- <= 0)
+      {
+         [news addObject:[NSString stringWithFormat:@"no attention left for the %s", t.kind]];
+         continue;
+      }
+      [store noteTrace:t];
+      [news addObject:t.bearer ? [NSString stringWithFormat:@"R%u bears %s (%d)", t.bearer, t.kind, t.strength]
+                               : [NSString stringWithFormat:@"%s at (%d, %d) (%d)", t.kind, t.x, t.y, t.strength]];
+   }
+   if( *budget < 0)
+      *budget = 0;
 
    /* gone: perceived before, where it would be perceived now, and not found */
    found = calloc( [store traceCount] + 1, 1);
@@ -3055,7 +3106,6 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
    for( i = first; i < last; i++)
       if( [_world eventAt:i]->actor == agent && ! strcmp( [_world eventAt:i]->kind, "investigated"))
          closely = YES;
-   [self perceiveTraces:store at:here now:now seen:seen assigned:assigned count:nseen closely:closely news:news];
 
    /* what it read: each entry, from the author, in the record */
    for( i = first; i < last; i++)
@@ -3396,10 +3446,13 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
    }
    memory = [_world record:[_world kindNamed:"Agent"] for:agent];
    [store keepAtMost:memory && memory->memory > 0 ? (NSUInteger) memory->memory : 64];
-   /* what the events attended to left of the budget */
+   /* what the events attended to left of the budget, for traces new to it,
+    * then for thinking it over */
    left = budget - (NSInteger) ncandidates;
    if( left < 0)
       left = 0;
+   [self perceiveTraces:store at:here now:now seen:seen assigned:assigned count:nseen closely:closely
+                 budget:&left news:news];
    [self interpret:store deliberately:closely budget:left news:news];
    free( seen);
    free( assigned);

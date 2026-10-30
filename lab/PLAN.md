@@ -2802,3 +2802,23 @@ next, quiet one, while it can still be heard, she does. With ten times the
 budget, the same scene's checks fail: the budget is what holds.
 
 76 tests, 2511 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: noticing a trace takes attention
+
+The budget slice's "Not yet": attention for trace perception.
+
+- **New traces wait for attention**: a trace the agent already knows is
+  seen as it is now, freely; one new to it is a candidate, and the
+  strongest get what the events left, one percept each ("no attention
+  left for the clatter"). A close look (investigating) attends to all.
+  Trace perception now runs after the events' share is settled, before
+  interpretation, which gets what is left after both.
+
+Checked: with twelve takes and a remark, Mira doesn't hear the clatter
+among them; with eight, she hears it but has nothing left to think it over
+with. At the next, quiet boundary she does both.
+
+Not yet: attention for state perception (what a referent looks like is
+taken in freely).
+
+76 tests, 2534 checks, under both compilers, ASan, and leak-free.

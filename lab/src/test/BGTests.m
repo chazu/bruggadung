@@ -7040,14 +7040,16 @@ static void   test_pain( void)
 
 /* KNOWLEDGE.md §5: "Each perceiver has an attention budget per boundary.
  * Salience decides what gets attention first." Mira, curious (she notices
- * anything), watches twelve workers take up a stone each at one boundary,
- * the last of them speaking to her as well. At rest she attends to ten: the
- * remark first (being addressed), then the first nine takes; the other
- * three go unnoticed. */
+ * anything), watches `takes` workers take up a stone each at one boundary,
+ * the last of them speaking to her as well, while something clatters among
+ * them. At rest she attends to ten events: the remark first (being
+ * addressed), then the first nine takes; the rest go unnoticed. What is
+ * left goes to the clatter, then to thinking it over. */
 static BOOL   disturbed( BGKnowledgeStore *store);
+static BOOL   heard_clatter( BGKnowledgeStore *store);
 
 
-static void   test_attention_budget( void)
+static void   attention_scene( NSUInteger takes)
 {
    BGStage            st;
    BGKnowledge        *knowledge;
@@ -7095,7 +7097,7 @@ static void   test_attention_budget( void)
    [st.s runUntil:BGTimeMake( 1000)];
 
    error = nil;
-   for( i = 0; i < 12; i++)
+   for( i = 12 - takes; i < 12; i++)
       BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "take", workers[ i], stones[ i], BGNoEntity), 0, &error) != nil);
    say         = BGActionMake( "say", workers[ 11], mira, BGNoEntity);
    say.content = [st.w intern:"#Here & { what: #Agent }"];
@@ -7119,7 +7121,7 @@ static void   test_attention_budget( void)
       if( ! strcmp( [store observationAt:i]->kind, "said"))
          said++;
    }
-   BG_CHECK( said == 1 && moves == 9);
+   BG_CHECK( said == 1 && moves == (takes < 9 ? takes : 9));
    /* the first nine takes, in the order they happened (committed) */
    n = 0;
    for( e = 0; e < [st.w eventCount]; e++)
@@ -7139,14 +7141,35 @@ static void   test_attention_budget( void)
       BG_CHECK( kept == (n < 9));
       n++;
    }
-   BG_CHECK( n == 12);
+   BG_CHECK( n == takes);
 
-   /* nothing left to think over the clatter with (KNOWLEDGE.md §9:
-    * immediate interpretation, within the budget); at the next, quiet
-    * boundary, while it can still be heard, she does */
+   /* the clatter, new to her: with twelve takes, no attention is left to
+    * hear it; with eight, she hears it, but none is left to think it over
+    * (KNOWLEDGE.md §9: immediate interpretation, within the budget). At
+    * the next, quiet boundary, while it can still be heard, she does both */
+   BG_CHECK( heard_clatter( store) == (takes < 9));
    BG_CHECK( ! disturbed( store));
    [st.s runUntil:BGTimeMake( 1500)];
-   BG_CHECK( disturbed( store));
+   BG_CHECK( heard_clatter( store) && disturbed( store));
+}
+
+
+static void   test_attention_budget( void)
+{
+   attention_scene( 12);
+   attention_scene( 8);
+}
+
+
+/* Whether the store has perceived a clatter. */
+static BOOL   heard_clatter( BGKnowledgeStore *store)
+{
+   NSUInteger   i;
+
+   for( i = 0; i < [store traceCount]; i++)
+      if( ! strcmp( [store traceAt:i]->kind, "clatter"))
+         return( YES);
+   return( NO);
 }
 
 
