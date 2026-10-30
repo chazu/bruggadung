@@ -62,6 +62,13 @@ These were made while writing this document and have not yet been reviewed.
    player's own out-of-character notes live in the UI only.
 10. **Memory decays analytically**, losing detail and strength, and is
     bounded per agent, with deterministic eviction by salience.
+11. **A conclusion is retracted only when its premise is contradicted**
+    (§9), never because a trace fades or vanishes: fresh paint dries, and
+    the wall was still touched up; a mark gone is itself evidence of a
+    cover-up. Contradicted means the agent learns the premise was wrong:
+    it sees again, closely, no trace where one should still be, or is
+    told a credible other cause. A premise over repetition is contradicted
+    when the repetition moves on (the lab's habit beliefs).
 
 ## Terms
 
