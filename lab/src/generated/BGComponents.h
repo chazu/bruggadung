@@ -1,4 +1,4 @@
-/* Generated from Triangle content 7ead8ec279986b8c: do not edit. Type IDs are valid
+/* Generated from Triangle content 92768a4002cae339: do not edit. Type IDs are valid
  * only for this content; regenerate when it changes. */
 #ifndef BG_COMPONENTS_H
 #define BG_COMPONENTS_H
@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BG_CONTENT_HASH 0x7ead8ec279986b8cULL
+#define BG_CONTENT_HASH 0x92768a4002cae339ULL
 
 typedef struct TriNode TriNode;
 
@@ -306,23 +306,23 @@ enum {
     BG_MATERIAL_LEATHER = 379,
     BG_MATERIAL_RUBBER = 380,
     BG_MATERIAL_STONE = 381,
-    BG_MATERIAL_FLESH = 408,
-    BG_MATERIAL_BRASS = 410,
-    BG_MATERIAL_IRON = 411,
-    BG_MATERIAL_PAPER = 412,
-    BG_MATERIAL_STEEL = 413,
-    BG_MATERIAL_OAK = 415,
+    BG_MATERIAL_FLESH = 409,
+    BG_MATERIAL_BRASS = 411,
+    BG_MATERIAL_IRON = 412,
+    BG_MATERIAL_PAPER = 413,
+    BG_MATERIAL_STEEL = 414,
+    BG_MATERIAL_OAK = 416,
 };
 
 /* "flesh" | "metal" | "natural" | "paper" | "wood" */
 enum {
     BG_BODY_SURFACE_NATURAL = 255,
-    BG_BODY_SURFACE_FLESH = 408,
-    BG_BODY_SURFACE_BRASS = 410,
-    BG_BODY_SURFACE_IRON = 411,
-    BG_BODY_SURFACE_PAPER = 412,
-    BG_BODY_SURFACE_STEEL = 413,
-    BG_BODY_SURFACE_OAK = 415,
+    BG_BODY_SURFACE_FLESH = 409,
+    BG_BODY_SURFACE_BRASS = 411,
+    BG_BODY_SURFACE_IRON = 412,
+    BG_BODY_SURFACE_PAPER = 413,
+    BG_BODY_SURFACE_STEEL = 414,
+    BG_BODY_SURFACE_OAK = 416,
 };
 
 /* #Colour */

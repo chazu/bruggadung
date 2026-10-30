@@ -1061,7 +1061,8 @@ typedef enum
    BGApprenticeSaw,
    BGApprenticeMissed,
    BGApprenticeSilent,
-   BGApprenticeSurly             /* it saw, and won't help */
+   BGApprenticeSurly,            /* it saw, and won't help */
+   BGStrangerGlimpsed            /* no apprentice; a stranger glimpsed nails in the sack, and says so */
 } BGApprentice;
 
 
@@ -1097,6 +1098,7 @@ static BGNailsRun   missing_nails( BOOL spares, BOOL omniscient, BGApprentice ap
    BGEntityID        chest;
    BGEntityID        helper;
    BGEntityID        sack;
+   BGEntityID        sacked;
    NSString          *error;
    NSString          *text;
    BGNailsRun        run;
@@ -1117,10 +1119,11 @@ static BGNailsRun   missing_nails( BOOL spares, BOOL omniscient, BGApprentice ap
    ch = [g create:"crate" key:"crate" at:BGOnTile( 8, 7, 0)];
    if( spares)
       [g create:"nails_4" key:"spare nails" at:BGIn( ch)];
+   sacked = BGNoEntity;
    if( curious >= 0)
    {
-      sack = [g create:"sack" key:"sack" at:BGOnTile( 13, 8, 0)];
-      [g create:"nails_4" key:"spare nails" at:BGIn( sack)];
+      sack   = [g create:"sack" key:"sack" at:BGOnTile( 13, 8, 0)];
+      sacked = [g create:"nails_4" key:"spare nails" at:BGIn( sack)];
       [g set:"Agent.curious" of:BGWhole( 4) to:curious];
    }
    if( shiftUntil > BG_EIGHT)
@@ -1131,7 +1134,9 @@ static BGNailsRun   missing_nails( BOOL spares, BOOL omniscient, BGApprentice ap
    }
    chest  = BGNoEntity;
    helper = BGNoEntity;
-   if( apprentice)
+   if( apprentice == BGStrangerGlimpsed)
+      helper = [g create:"stranger" key:"stranger" at:BGOnTile( 13, 9, 0)];
+   else if( apprentice)
    {
       chest  = [g create:"chest" key:"chest" at:BGOnTile( 2, 12, 0)];
       helper = [g create:"apprentice" key:"apprentice"
@@ -1144,8 +1149,9 @@ static BGNailsRun   missing_nails( BOOL spares, BOOL omniscient, BGApprentice ap
    crate  = [g idFor:ch];
    chest  = [g idFor:chest];
    helper = [g idFor:helper];
+   sacked = sacked ? [g idFor:sacked] : BGNoEntity;
    (void) crate;
-   if( apprentice && apprentice != BGApprenticeSilent)
+   if( apprentice && apprentice != BGApprenticeSilent && apprentice != BGStrangerGlimpsed)
       [agency control:helper];
 
    /* the worker looks into the bin, then walks off east */
@@ -1164,7 +1170,31 @@ static BGNailsRun   missing_nails( BOOL spares, BOOL omniscient, BGApprentice ap
       BGPerform( w, c, BGActionMake( "walk_south", 5, BGNoEntity, BGNoEntity), 0, &error);
       [s runUntil:BGTimeMake( [w time].ms + 1000)];
    }
-   if( apprentice)
+   if( apprentice == BGStrangerGlimpsed)
+   {
+      /* the stranger looks into the sack, comes over, and tells the worker
+       * nails are there; it only glimpsed them, and says so (sure: 5), so
+       * the worker doesn't believe it */
+      BGKnowledgeStore   *seen;
+      NSString           *claim;
+      BGAction           say;
+
+      BG_CHECK( BGPerform( w, c, BGActionMake( "look_in", helper, [g idFor:sack], BGNoEntity), 0, &error) != nil);
+      [s runUntil:BGTimeMake( [w time].ms + 1000)];
+      g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the stranger comes over"];
+      [g move:BGWhole( helper) to:BGOnTile( 11, 4, 0)];
+      [c submit:g];
+      [s runUntil:BGTimeMake( [w time].ms + 1000)];
+      seen  = [knowledge storeOf:helper];
+      claim = [seen claimAbout:referent_of( seen, sacked)];
+      claim = [claim stringByReplacingOccurrencesOfString:@"sure: 30" withString:@"sure: 5"];
+      BG_CHECK( claim != nil);
+      say         = BGActionMake( "say", helper, 4, BGNoEntity);
+      say.content = [w intern:[claim UTF8String]];
+      BG_CHECK( BGPerform( w, c, say, 0, &error) != nil);
+      [s runUntil:BGTimeMake( [w time].ms + 3000)];
+   }
+   else if( apprentice)
    {
       /* on into the chest, where the apprentice may see it */
       for( i = 0; i < 2; i++)
@@ -1283,6 +1313,9 @@ static uint32_t   tracks( BGNailsRun run, BGEntityID agent, BGEntityID truth)
 }
 
 
+static NSUInteger   log_index( BGAgency *agency, BGEntityID agent, NSString *text);
+
+
 static void   test_missing_nails( void)
 {
    BGNailsRun   base;
@@ -1292,6 +1325,7 @@ static void   test_missing_nails( void)
    BGNailsRun   resumed;
    BGNailsRun   incurious;
    BGNailsRun   curious;
+   BGNailsRun   glimpsed;
    BGEntityID   crate;
    NSArray      *full;
    NSArray      *rest;
@@ -1344,6 +1378,21 @@ static void   test_missing_nails( void)
    BG_CHECK( ! happened( incurious.world, "looked", 4, crate + 1));
    BG_CHECK( logged( incurious.agency, @"[have nails] nothing I know of will do: impossible for now"));
    BG_CHECK( ! wedged( incurious.world));
+   /* AGENCY.md §5, the places to look ordered by the belief that the thing
+    * is there: a stranger, barely sure, says nails are in the far sack; the
+    * worker doesn't believe it (it doesn't go to fetch them from there),
+    * but when the bin it believed held nails is empty, its search goes to
+    * the sack first, before the nearer crate, and finds them */
+   glimpsed = missing_nails( NO, NO, BGStrangerGlimpsed, 0, 0, 0);
+   BG_CHECK( log_index( glimpsed.agency, 4, @"search for nails: ") != NSNotFound &&
+             log_index( glimpsed.agency, 4, @"search for nails: ") ==
+             log_index( glimpsed.agency, 4, @"search for nails: walk_east, toward R7 at (13, 8)"));
+   BG_CHECK( log_index( glimpsed.agency, 4, @"fetch nails: walk_east, toward R7") == NSNotFound);
+   BG_CHECK( happened( glimpsed.world, "looked", 4, crate + 1));
+   BG_CHECK( ! happened( glimpsed.world, "looked", 4, crate) ||
+             first_at( glimpsed.world, "looked", 4, crate + 1) < first_at( glimpsed.world, "looked", 4, crate));
+   BG_CHECK( wedged( glimpsed.world));
+
    curious = missing_nails( NO, NO, BGNoApprentice, 0, 0, 50);
    BG_CHECK( happened( curious.world, "looked", 4, crate));
    BG_CHECK( happened( curious.world, "looked", 4, crate + 1));

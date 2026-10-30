@@ -188,6 +188,8 @@ typedef struct
    int64_t            threshold;                   /* the credence mass, in thousandths, that must entail */
    int64_t            since;                       /* searched means its inside was seen since */
    const char         *instance;                   /* the method or goal */
+   const TriNode      *seeks;                      /* what a search is for, or NULL */
+   TriContent         *tri;
    const char         *slot;                       /* the slot being bound */
    BGMotivation       *mind;                       /* whose habits order it, or nil */
    int64_t            now;
@@ -210,6 +212,42 @@ static int32_t   habit_strength( BGMotivation *m, const char *context, uint32_t 
          return( s > 0 ? s : 0);
       }
    return( 0);
+}
+
+
+/* How much the agent believes something like what the search seeks is in
+ * the place (dB): the most credible claim it holds of one there, believed
+ * or not; BG_PRIOR with none. */
+static int   likely_in( BGCondition *c, uint32_t place)
+{
+   const BGTestimony   *t;
+   const TriNode       *description;
+   TriMatchResult      result;
+   TriContent          *tri;
+   TriArena            *arena;
+   NSUInteger          i;
+   int32_t             credence;
+   int                 best;
+
+   best = BG_PRIOR;
+   if( ! c->seeks)
+      return( best);
+   tri   = c->tri;
+   arena = tri_arena_new();
+   for( i = 0; i < [c->store testimonyCount]; i++)
+   {
+      t = [c->store testimonyAt:i];
+      if( t->container != place || t->settled || t->attribution == BGPledged)
+         continue;
+      description = tri_value( tri, [[c->store describeReferent:t->thing] UTF8String], arena, NULL, 0);
+      if( ! description || tri_match( tri, c->seeks, description, &result) == TRI_INCOMPATIBLE)
+         continue;
+      credence = [c->store credenceThat:t->thing isIn:place];
+      if( credence > best)
+         best = credence;
+   }
+   tri_arena_free( arena);
+   return( best);
 }
 
 
@@ -238,6 +276,13 @@ static int   compare_candidates( BGCondition *c, const BGReferent *a, const BGRe
       }
       else if( ! strcmp( c->order[ k], "recent") && a->seen != b->seen)
          return( a->seen > b->seen ? -1 : 1);
+      else if( ! strcmp( c->order[ k], "likely"))
+      {
+         da = likely_in( c, a->id);
+         db = likely_in( c, b->id);
+         if( da != db)
+            return( da > db ? -1 : 1);
+      }
    return( a->id < b->id ? -1 : a->id > b->id);
 }
 
@@ -680,6 +725,8 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    snprintf( sub, sizeof( sub), "%s.find", path);
    c->nfind  = texts_at( tri, variants[ 0], sub, c->find, BG_MAX_SLOTS);
    c->norder = texts_at( tri, variants[ 0], "order", c->order, 4);
+   c->seeks  = tri_at( tri, variants[ 0], "seeks");
+   c->tri    = tri;
    if( ! text_at( tri, variants[ 0], "search", c->search, sizeof( c->search)))
       c->search[ 0] = 0;
    c->threshold = int_at( tri, variants[ 0], "threshold", 1000);

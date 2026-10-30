@@ -111,10 +111,12 @@
 #Reached: #Condition & { reached: text }
 
 // How a candidate's referents are ordered, for each slot as it is found:
-// nearest first, most recently seen first, or the one the agent has most
-// often chosen for the slot (its habit, AGENCY.md §8). Ties go to the lower
-// referent.
-#Order: "near" | "recent" | "habit"
+// nearest first, most recently seen first, the one the agent has most
+// often chosen for the slot (its habit, AGENCY.md §8), or the one it most
+// believes holds what the method `seeks` (AGENCY.md §5: "ordering the
+// places to look by the belief that the item is there"), told so if not
+// believing it. Ties go to the lower referent.
+#Order: "near" | "recent" | "habit" | "likely"
 
 // A method's steps, done in order and re-read at every decision: a subgoal
 // whose goal is already done is passed over, and its bindings join the
@@ -142,6 +144,7 @@
     rank:      int
     pre:       #Condition
     order:     [...#Order]
+    seeks:     #Thing
     search:    text
     places:    *0 | int & >=0 & <=100
     threshold: *1000 | int & >=0 & <=1000
@@ -227,14 +230,16 @@ fetch_nails: #Method & {
     steps: [#Do & { op: "take_some", object: "nails", units: 2 }]
 } @family(methods)
 
-// Look into the containers the agent knows of, the most recently seen first,
-// then the nearest: two of them, and more if it is curious.
+// Look into the containers the agent knows of, where it most believes nails
+// are first, then the most recently seen, then the nearest: two of them,
+// and more if it is curious.
 search_for_nails: #Method & {
     title:  "search for nails"
     goal:   "have_nails"
     rank:   2
     pre:    { find: ["box"], match: #HavingNails & { box: #Container } }
-    order:  ["recent", "near"]
+    order:  ["likely", "recent", "near"]
+    seeks:  #Stack & { unit: "iron_nail" }
     search: "box"
     places: 2
     steps:  [#Do & { op: "look_in", object: "box" }]

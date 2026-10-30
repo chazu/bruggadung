@@ -2956,3 +2956,24 @@ pump, and control returns; saved midway, the recipe is kept; handing it
 over to `borrow_money` is refused.
 
 80 tests, 2565 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: looking first where it is most believed
+
+AGENCY.md §5: "A method may include bounded local choice, such as
+ordering the places to look by the belief that the item is there." The
+curiosity slice's "Not yet": search ordered by credence that the thing is
+there.
+
+- **`likely`**, an order: the place where the agent holds the most
+  credible claim of something like what the method `seeks` (a new field of
+  a method), believed or not; the prior with none. `search_for_nails`
+  orders `likely`, then recent, then near.
+
+Checked: a stranger, beside the far sack, glimpses nails in it and tells
+the worker, barely sure (sure 5): not believed, so the worker doesn't go
+to fetch them there; but when the bin it believed held its nails is empty,
+its search goes to the sack first, before the nearer crate, and it wedges
+the lock. Without `likely`, the same scene searches the crate, gives up,
+and the lock stays unwedged.
+
+80 tests, 2574 checks, under both compilers, ASan, and leak-free.
