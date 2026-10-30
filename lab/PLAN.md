@@ -3182,3 +3182,26 @@ Checked: the worker, after four days of the crate, uses the bin from day
 belief is the bin; on the fourth (as many), still the crate.
 
 86 tests, 2658 checks, under both compilers, ASan, and leak-free.
+
+### Decided since: the open items, now buildable
+
+Each item "What stays open, and why" listed has been decided, in its
+design document:
+
+- institutions (organizations acting through members, rules as content,
+  grievances, sanctions as operations, knowing the rules):
+  INSTITUTIONS.md 1–8;
+- lying's gain, loyalty, harm and threats, how considerations combine
+  (a dB sum with vetoes), employment and posted deals, worth, going
+  without, loan terms: AGENCY.md decisions 11–18;
+- retraction only when a premise is contradicted, doubts from decay,
+  confusion, distraction, impairment and poor sight, merging referents
+  past a threshold, light and sound as domains, trust, detail fading as
+  strength: KNOWLEDGE.md decisions 11–16;
+- graded shortfall as curves, recipe knowledge, commit weights per
+  operation, talking by what is said: ACTIONS.md decisions 11–14;
+- content lifetime, installed parts' claims: COMPONENTS.md decisions
+  10–11;
+- latent assembly: LATENT_ASSEMBLY.md (the lab's rules adopted; culprits
+  by history and wear by use still to design);
+- Triangle packages: CONTENT_LANGUAGE.md decision 12.
