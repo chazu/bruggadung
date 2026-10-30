@@ -3039,7 +3039,7 @@ why" above, and):
   consequences, detail fading by salience*: no document says.
 - *Routes as habits, exploring around obstacles*: the lab has no walls.
 
-**Buildable, not yet done**: reading taking time (as talking does), traces
+**Buildable, not yet done**: traces
 left per stage rather than at completion (ACTIONS.md §2, costs "committed
 per stage"), a split reaching a running thermal domain's ledger, and
 hearing a promise's outcome from others.
@@ -3062,3 +3062,16 @@ a day on; saved between, it recurs; a window longer than its period is
 refused.
 
 82 tests, 2587 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: reading takes time
+
+The notebook slice's "Not yet": reading taking time. As talking does: a
+second (`read`'s duration), and what the record holds is taken in when it
+ends. It uses no provider: reading while walking is fine. `lab play`
+waits for it, as for a step. The scenarios that read (the repair's
+diagram, the notebook) had the time already.
+
+Checked: half a second into reading a diagram nothing is read; at the
+second, it is.
+
+83 tests, 2590 checks, under both compilers, ASan, and leak-free.

@@ -856,9 +856,16 @@ static char   glyph_of_kind( const char *kind)
    {
       if( ! [self referentNamed:[words count] > 1 ? [words objectAtIndex:1] : @""])
          [_out appendString:@"Read what? read <R>.\n"];
-      else
-         [self perform:BGActionMake( [_world intern:"read"], [[_knowledge storeOf:_actor] selfReferent],
-                                     [self referentNamed:[words objectAtIndex:1]], BGNoEntity) amount:0];
+      else if( (g = [self perform:BGActionMake( [_world intern:"read"], [[_knowledge storeOf:_actor] selfReferent],
+                                                [self referentNamed:[words objectAtIndex:1]], BGNoEntity) amount:0]))
+      {
+         /* reading takes a second: read before the next command */
+         step = [g idFor:[g proposals][ 0].handle];
+         while( [self isRunning:step] && [_scheduler stepUntil:BGTimeMake( [_world time].ms + 600000)])
+            ;
+         [self showTrace];
+         [self showNews];
+      }
    }
    else if( [verb isEqualToString:@"note"])
    {

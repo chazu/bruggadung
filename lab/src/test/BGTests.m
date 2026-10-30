@@ -5609,6 +5609,50 @@ static void   test_recipe_autopilot( void)
 }
 
 
+/* Reading takes time, as talking does: a second, and what the record holds
+ * is taken in when it ends. */
+static void   test_reading_takes_time( void)
+{
+   BGStage            st;
+   BGProposalGroup    *g;
+   BGEntityID         worker;
+   BGEntityID         diagram;
+   NSString           *error;
+   NSUInteger         i;
+   NSUInteger         read;
+   int64_t            when;
+
+   st.w    = BGTestWorld( 191);
+   st.c    = BGTestCommitter( st.w);
+   st.s    = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [st.s setActivities:[BGActivities activitiesWithWorld:st.w committer:st.c]];
+   g       = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: a diagram"];
+   worker  = [g create:"worker" key:"worker" at:BGOnTile( 5, 5, 0)];
+   diagram = [g create:"diagram" key:"diagram" at:BGHeldBy( worker, 0)];
+   [g set:"Record.writing" of:BGWhole( diagram)
+   toText:[st.w intern:"#Writing & { author: #Agent & { coat: \"white\" }, entries: [#Serves & { what: #Cock & "
+                       "{ place: #OnTile & { x: 9, y: 9, level: 0 } }, line: \"pump\", attribution: #Saw & { sure: 30 } }] }"]];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   worker  = [g idFor:worker];
+   diagram = [g idFor:diagram];
+
+   error = nil;
+   BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "read", worker, diagram, BGNoEntity), 0, &error) != nil);
+   when = [st.w time].ms;
+   [st.s runUntil:BGTimeMake( when + 500)];
+   for( read = 0, i = 0; i < [st.w eventCount]; i++)
+      if( ! strcmp( [st.w eventAt:i]->kind, "read"))
+         read++;
+   BG_CHECK( read == 0);
+   [st.s runUntil:BGTimeMake( when + 1001)];
+   for( read = 0, i = 0; i < [st.w eventCount]; i++)
+      if( ! strcmp( [st.w eventAt:i]->kind, "read") && [st.w eventAt:i]->actor == worker)
+         read++;
+   BG_CHECK( read == 1);
+}
+
+
 /* AGENCY.md §14, autopilot "auto-explore": the player hands a worker,
  * alone in the middle of the map, to agency to explore. It walks toward the
  * nearest tile it has never seen, a step at a time, until it has seen every
@@ -8264,6 +8308,7 @@ const BGTestCase   BGAllTests[] =
    { "routine_autopilot",             test_routine_autopilot },
    { "daily_commitment",              test_daily_commitment },
    { "talking_takes_time",            test_talking_takes_time },
+   { "reading_takes_time",            test_reading_takes_time },
    { "explore_autopilot",             test_explore_autopilot },
    { "recipe_autopilot",              test_recipe_autopilot },
    { "resume_recheck",                test_resume_recheck },

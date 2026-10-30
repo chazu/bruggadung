@@ -120,9 +120,11 @@ write_down: #Operation & {
     }
 } @family(operations)
 
-// Read a record within reach.
+// Read a record within reach: a second's reading, what it holds taken in
+// when it ends.
 read: #Operation & {
-    effect: "read"
+    effect:   "read"
+    duration: 1s
     roles: {
         actor: #Agent
         item:  #Record
