@@ -5788,6 +5788,52 @@ static BGValveRun   valve_run( const char *valve, const char *tools, int64_t ste
 }
 
 
+/* ACTIONS.md §5: each provider belongs to at most one activity at a time,
+ * counting those started for the same boundary and not yet committed:
+ * taking up two things at once, the second is refused; walking while
+ * taking one up is not; and once the first is done, the second can begin. */
+static void   test_providers_pending( void)
+{
+   BGStage            st;
+   BGActivities       *activities;
+   BGProposalGroup    *g;
+   BGEntityID         worker;
+   BGEntityID         seal;
+   BGEntityID         stone;
+   NSString           *error;
+
+   st.w       = BGTestWorld( 7);
+   st.c       = BGTestCommitter( st.w);
+   activities = [BGActivities activitiesWithWorld:st.w committer:st.c];
+   st.s       = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [st.s setActivities:activities];
+   g      = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the bench"];
+   worker = [g create:"worker" key:"worker" at:BGOnTile( 5, 5, 0)];
+   seal   = [g create:"seal" key:"seal" at:BGOnTile( 6, 5, 0)];
+   stone  = [g create:"stone" key:"stone" at:BGOnTile( 5, 6, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   worker = [g idFor:worker];
+   seal   = [g idFor:seal];
+   stone  = [g idFor:stone];
+
+   error = nil;
+   BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "take_up", worker, seal, BGNoEntity), 0, &error) != nil);
+   BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "take_up", worker, stone, BGNoEntity), 0, &error) == nil);
+   BG_CHECK( [error rangeOfString:@"its hands are taken by take_up"].location != NSNotFound);
+   error = nil;
+   BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "walk_east", worker, BGNoEntity, BGNoEntity), 0, &error) != nil);
+   [st.s runUntil:BGTimeMake( 2)];
+   /* committed now, it is busy as before */
+   BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "take_up", worker, stone, BGNoEntity), 0, &error) == nil);
+   BG_CHECK( [error rangeOfString:@"its hands are busy"].location != NSNotFound);
+   [st.s runUntil:BGTimeMake( 1500)];
+   BG_CHECK( [st.w locationOf:seal].place == worker);
+   error = nil;
+   BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "take_up", worker, stone, BGNoEntity), 0, &error) != nil);
+}
+
+
 /* Suspended while bringing wrench and pipe to bear, the stage owes, on
  * resuming, the rest of the stage and bringing them to bear as they lie
  * then: the pipe, put into a sack meanwhile, takes twice as long. */
@@ -7412,6 +7458,7 @@ const BGTestCase   BGAllTests[] =
    { "unknown_nut",                   test_unknown_nut },
    { "seized_valve",                  test_seized_valve },
    { "access_resume",                 test_access_resume },
+   { "providers_pending",             test_providers_pending },
    { "resume_recheck",                test_resume_recheck },
    { "interrupted_repair",            test_interrupted_repair },
    { "unattended_stove",              test_unattended_stove },

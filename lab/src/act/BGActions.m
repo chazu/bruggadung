@@ -2103,6 +2103,49 @@ NSString   *BGProvidersBusy( BGWorld *world, BGEntityID actor, const char *opera
 }
 
 
+/* The same, for activities started but not yet committed: an actor's
+ * providers are its own to allocate (ACTIONS.md §5), so two activities
+ * submitted for one boundary can't both have its hands. */
+static NSString   *providers_pending( BGWorld *world, BGCommitter *committer, BGEntityID actor, const char *operation)
+{
+   const BGProposal   *p;
+   BGProposalGroup    *group;
+   NSArray            *pending;
+   TriContent         *tri;
+   NSUInteger         nwanted;
+   NSUInteger         nused;
+   NSUInteger         i;
+   NSUInteger         j;
+   NSUInteger         k;
+   NSUInteger         q;
+   char               wanted[ 4][ 16];
+   char               used[ 4][ 16];
+
+   tri     = [world tri];
+   nwanted = providers_of( tri, operation, wanted, 4);
+   pending = nwanted ? [committer deferredGroups] : nil;
+   for( i = 0; i < [pending count]; i++)
+   {
+      group = [pending objectAtIndex:i];
+      if( [group actor] != actor)
+         continue;
+      for( q = 0; q < [group count]; q++)
+      {
+         p = &[group proposals][ q];
+         if( p->kind != BGProposeSetField || ! p->name || strcmp( p->name, "Activity.operation") ||
+             ! BGIsHandle( p->target.entity))
+            continue;
+         nused = providers_of( tri, p->key, used, 4);
+         for( j = 0; j < nwanted; j++)
+            for( k = 0; k < nused; k++)
+               if( ! strcmp( wanted[ j], used[ k]))
+                  return( [NSString stringWithFormat:@"its %s are taken by %s, starting", wanted[ j], p->key]);
+      }
+   }
+   return( nil);
+}
+
+
 BGProposalGroup   *BGPerform( BGWorld *world, BGCommitter *committer, BGAction action, int64_t amount,
                               NSString **error)
 {
@@ -2127,7 +2170,8 @@ BGProposalGroup   *BGPerform( BGWorld *world, BGCommitter *committer, BGAction a
    if( ! BGOperationStage( world, action.operation, 0, &duration, &stageEffect))
       duration = 0;
    if( (duration > 0 || [effect isEqualToString:@"fill"]) &&
-       (reason = BGProvidersBusy( world, action.roles[ BGRoleActor], action.operation, BGNoEntity)))
+       ((reason = BGProvidersBusy( world, action.roles[ BGRoleActor], action.operation, BGNoEntity)) ||
+        (reason = providers_pending( world, committer, action.roles[ BGRoleActor], action.operation))))
    {
       if( error)
          *error = reason;

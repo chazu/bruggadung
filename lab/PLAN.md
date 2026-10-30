@@ -2655,3 +2655,23 @@ Not yet: hearing of a promise's outcome from others, and the weight of
 one's word as a disposition.
 
 70 tests, 2443 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: providers taken before they commit
+
+ACTIONS.md §5: "Each capability provider belongs to at most one activity
+at a time ... This allocation is internal to the actor. It is separate
+from reservations and from commit validation." The "Not yet" of the
+walking slice: allocation counted only committed activities, so two
+submitted for the same boundary both started.
+
+- **Pending activities count**: starting a timed activity checks the
+  committer's waiting groups too: one by the same actor starting an
+  activity whose operation uses the same providers refuses it ("its hands
+  are taken by take_up, starting"). Not commit validation: the actor's own
+  allocation, at the start.
+
+Checked: taking up the seal and then the stone for the same boundary, the
+second is refused; walking at the same time is not (legs); committed, the
+stone is refused as busy; with the seal in hand, it can be taken up.
+
+71 tests, 2451 checks, under both compilers, ASan, and leak-free.
