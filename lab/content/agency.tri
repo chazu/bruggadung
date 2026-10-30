@@ -54,8 +54,12 @@
 #Intent: { title: text }
 
 // What a goal is worth (AGENCY.md §3): its considerations, added, in the
-// units of credence (dB).
-#Consideration: {}
+// units of credence (dB). A consideration over a value (a need's pressure,
+// a trait) may give a `curve` (AGENCY.md §3: "fixed-point curve … lookup
+// tables"): its points, the worth `output` at the value `input`, straight
+// between them and level beyond the ends. Without one, `per` scales the value.
+#Point:         { input: int, output: int }
+#Consideration: { curve: [...#Point] }
 // a fixed worth: a duty, a meal
 #Flat:      #Consideration & { value: int }
 // one that scales something of the agent's: `per` tenths of a point for
@@ -85,8 +89,11 @@
 // that holds it (AGENCY.md §10): something like one of them seen moved, or
 // talked of, is worth remembering. A goal with `arises` is weighed against
 // what the agent is doing whenever it arises.
+// A committed goal's `urgency` (AGENCY.md §7) is a curve over how much of
+// its window has passed (thousandths); without one, it rises straight to 20
+// by the deadline.
 #Goal: #Intent & { done: #Condition, concerns: [...#Body], worth: [...#Consideration], arises: #Arising,
-                   pressed: #Pressing }
+                   pressed: #Pressing, urgency: [...#Point] }
 
 // Conditions of what the agent did, not of how things are: it has looked
 // into the slot's referent since adopting the goal; an activity of the
@@ -341,13 +348,14 @@ eat_when_hungry: #Goal & {
     worth:   [#Need & { pressure: "hunger", per: 5 }]
 } @family(goals)
 
-// Cold raises getting warm, worth what the agent feels of it: done once a
-// stove it knows of is lit.
+// Cold raises getting warm, worth what the agent feels of it, and more the
+// colder it gets (a curve): done once a stove it knows of is lit.
 get_warm: #Goal & {
     title:   "get warm"
     done:    { find: ["stove"], match: #Warming & { stove: #Combustor & { lit: true } } }
     pressed: { need: "cold", above: 30 }
-    worth:   [#Need & { pressure: "cold", per: 5 }]
+    worth:   [#Need & { pressure: "cold", curve: [{ input: 30, output: 10 }, { input: 60, output: 40 },
+                                                  { input: 100, output: 60 }] }]
 } @family(goals)
 
 light_the_stove: #Method & {
@@ -488,8 +496,10 @@ take_the_seal: #Method & {
 
 // --- CONTENT_LANGUAGE.md Scenario 2, "the nut of unknown size" -------------------
 
+// Committed to, it is barely urgent until the last tenth of its window.
 tighten_nut: #Goal & {
-    title: "tighten the nut"
+    title:   "tighten the nut"
+    urgency: [{ input: 0, output: 0 }, { input: 900, output: 2 }, { input: 1000, output: 30 }]
     done:  { find: ["nut"], match: #Tightening & { nut: #Fastener & { tight: true } } }
 } @family(goals)
 

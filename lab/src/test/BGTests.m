@@ -4199,6 +4199,42 @@ static NSString   *doubtful_menu( int32_t doubt)
 }
 
 
+/* AGENCY.md §7's urgency curve: the worker, beside the nut, is committed
+ * to tightening it within [0, 100 s], and takes it up at 90 s: by the goal's
+ * curve, barely urgent yet. */
+static BGAgency   *urgent_nut( void)
+{
+   BGStage            st;
+   BGActivities       *activities;
+   BGKnowledge        *knowledge;
+   BGAgency           *agency;
+   BGProposalGroup    *g;
+   BGEntityID         worker;
+
+   st.w       = BGTestWorld( 71);
+   st.c       = BGTestCommitter( st.w);
+   activities = [BGActivities activitiesWithWorld:st.w committer:st.c];
+   knowledge  = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+   agency     = [[[BGAgency alloc] initWithWorld:st.w committer:st.c knowledge:knowledge] autorelease];
+   st.s       = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [agency setActivities:activities];
+   [st.s setActivities:activities];
+   [st.s setPerception:knowledge];
+   [st.s setDecision:agency];
+   g      = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the pump"];
+   worker = [g create:"worker" key:"Oskar" at:BGOnTile( 5, 2, 0)];
+   [g create:"spanner_19" key:"spanner" at:BGHeldBy( worker, 0)];
+   [g create:"gland_nut" key:"gland nut" at:BGOnTile( 6, 2, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 90000)];
+   worker = [g idFor:worker];
+   BG_CHECK( [agency undertake:worker goal:"tighten_nut" from:0 until:100000 source:"employment"]);
+   [agency control:worker];
+   [st.s runUntil:BGTimeMake( 95000)];
+   return( agency);
+}
+
+
 static BOOL   tightened( BGNutRun run)
 {
    int64_t   v;
@@ -4218,6 +4254,7 @@ static void   test_unknown_nut( void)
    BGNutRun   misfit;
    BGNutRun   doubtful;
    BGNutRun   sure;
+   BGAgency   *urgent;
    int64_t    mass;
 
    /* 1: four tiles off, the nut's size is only 16 to 22 mm: whether the 19
@@ -4263,6 +4300,11 @@ static void   test_unknown_nut( void)
    tag = nut_run( "gland_nut", "spanner_22", NO, NULL);
    BG_CHECK( logged_by( tag.agency, 1, @"look closer first"));
    BG_CHECK( logged_by( tag.agency, 1, @"impossible for now") && ! tightened( tag));
+
+   /* the urgency curve: at 90% of its window, +2, where a straight line
+    * would give +18 */
+   urgent = urgent_nut();
+   BG_CHECK( logged_by( urgent, 1, @"urgency +2"));
 
    /* 5: determinism */
    again = nut_run( "gland_nut", "spanner_19", NO, NULL);
@@ -5188,6 +5230,9 @@ static void   test_cold_lodger( void)
    cold = cold_lodger( 305000, &agency, &knowledge);
    BG_CHECK( [[knowledge storeOf:cold.rest] feels:"cold"] == 50);
    BG_CHECK( logged_by( agency, cold.rest, @"[get warm] light the stove: light R"));
+   /* the pressure, by its curve: cold 50 is worth 30 (a straight line by 5
+    * tenths would give 25) */
+   BG_CHECK( logged_by( agency, cold.rest, @"weighing get warm: +30 (cold +30)"));
    BG_CHECK( [cold.world getField:"Combustor.lit" of:cold.stove value:&v] && v);
    BG_CHECK( logged_by( agency, cold.rest, @"[get warm] done"));
 

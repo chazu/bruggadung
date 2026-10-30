@@ -73,6 +73,45 @@ static NSUInteger   texts_at( TriContent *tri, const TriNode *node, const char *
 
 
 /* An int at `path`, or `otherwise` when it is left open. */
+/* A curve's worth at `x` (AGENCY.md §3's lookup tables): straight between
+ * its points, level beyond its ends. NO if it has no points. */
+static BOOL   curve_at( TriContent *tri, const TriNode *curve, int64_t x, int32_t *worth)
+{
+   const TriNode   *p;
+   int64_t         at[ 16];
+   int64_t         w[ 16];
+   int64_t         lo;
+   int64_t         hi;
+   int             n;
+   int             k;
+
+   for( n = 0; curve && n < 16 && (p = tri_at( tri, curve, "first")); curve = tri_at( tri, curve, "rest"))
+   {
+      if( ! tri_node_interval( tri_at( tri, p, "input"), &lo, &hi) || lo != hi)
+         continue;
+      at[ n] = lo;
+      if( ! tri_node_interval( tri_at( tri, p, "output"), &lo, &hi) || lo != hi)
+         continue;
+      w[ n++] = lo;
+   }
+   if( ! n)
+      return( NO);
+   if( x <= at[ 0])
+   {
+      *worth = (int32_t) w[ 0];
+      return( YES);
+   }
+   for( k = 1; k < n; k++)
+      if( x <= at[ k])
+      {
+         *worth = (int32_t) (w[ k - 1] + (w[ k] - w[ k - 1]) * (x - at[ k - 1]) / (at[ k] - at[ k - 1]));
+         return( YES);
+      }
+   *worth = (int32_t) w[ n - 1];
+   return( YES);
+}
+
+
 static int64_t   int_at( TriContent *tri, const TriNode *node, const char *path, int64_t otherwise)
 {
    const TriNode   *v;
@@ -1632,6 +1671,22 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
 }
 
 
+/* How urgent a commitment is now: its goal's urgency curve over how much
+ * of its window has passed (thousandths), or straight up to BG_URGENCY. */
+- (int32_t) urgencyOf:(const BGCommitment *) c
+{
+   TriContent   *tri;
+   int64_t      passed;
+   int32_t      v;
+
+   tri    = [_world tri];
+   passed = ([_world time].ms - c->from) * 1000 / (c->until - c->from);
+   if( curve_at( tri, tri_at( tri, tri_pattern( tri, c->goal), "urgency"), passed, &v))
+      return( v);
+   return( (int32_t) (BG_URGENCY * ([_world time].ms - c->from) / (c->until - c->from)));
+}
+
+
 /* What the goal is worth with these bindings: its considerations, added. */
 - (int32_t) worthOf:(const char *) goal
            bindings:(const BGSlotBinding *) b
@@ -1687,7 +1742,8 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
       else if( text_at( tri, c, "pressure", slot, sizeof( slot)))
       {
          /* what it feels, not what its body is */
-         v = (int32_t) ([store feels:slot] * int_at( tri, c, "per", 0) / 10);
+         if( ! curve_at( tri, tri_at( tri, c, "curve"), [store feels:slot], &v))
+            v = (int32_t) ([store feels:slot] * int_at( tri, c, "per", 0) / 10);
          [parts addObject:[NSString stringWithFormat:@"%s %+d", slot, v]];
       }
       else if( text_at( tri, c, "reserved", slot, sizeof( slot)))
@@ -1707,7 +1763,8 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
          snprintf( field, sizeof( field), "Agent.%s", slot);
          trait = 0;
          [_world getField:field of:[store agent] value:&trait];
-         v = (int32_t) (trait * int_at( tri, c, "per", 0) / 10);
+         if( ! curve_at( tri, tri_at( tri, c, "curve"), trait, &v))
+            v = (int32_t) (trait * int_at( tri, c, "per", 0) / 10);
          [parts addObject:[NSString stringWithFormat:@"%s %+d", slot, v]];
       }
       else if( text_at( tri, c, "watched", slot, sizeof( slot)))
@@ -1872,7 +1929,7 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
          ;
       if( j2 < m->nintentions)
          continue;      /* kept already */
-      worth = BG_DUTY + (int32_t) (BG_URGENCY * ([_world time].ms - c->from) / (c->until - c->from));
+      worth = BG_DUTY + [self urgencyOf:c];
       if( ! best || worth > bestWorth)
       {
          best           = c->goal;
@@ -1936,7 +1993,7 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
             int32_t        urgency;
 
             c       = &m->commitments[ current->commitment - 1];
-            urgency = (int32_t) (BG_URGENCY * ([_world time].ms - c->from) / (c->until - c->from));
+            urgency = [self urgencyOf:c];
             against += BG_DUTY + urgency;
             [currentParts addObject:[NSString stringWithFormat:@"%s, duty %+d", c->source, BG_DUTY]];
             [currentParts addObject:[NSString stringWithFormat:@"urgency %+d", urgency]];

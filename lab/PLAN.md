@@ -2023,10 +2023,8 @@ The remaining scenario checks that aren't run, after the passes above:
     naming the lamp.
   - told, featureless referents in recognition: AGENCY.md Scenario 2's
     variant C by asking (see its section).
-  - urgency curves other than a line, and consideration curves in
-    general: AGENCY.md's open question 1, "Consideration curves. How are
-    they represented in content, and how are considerations combined
-    (product, weighted sum, or a mix)?"
+  - how considerations combine beyond adding (AGENCY.md's open question 1
+    asks product, weighted sum, or a mix). The lab adds them, in dB.
   - belief from one's own habit: AGENCY.md §8 has habits supplying method
     defaults (the lab's `habit` order) and others forming beliefs about
     habits (`usually_puts`). Scenario 1's setup states Oskar's belief, not
@@ -2106,3 +2104,23 @@ tightens the nut straight away. All of them are shown in the dump, saved,
 and settled together by a plain sighting.
 
 59 tests, 2104 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: consideration and urgency curves
+
+AGENCY.md §3: "each a fixed-point curve applied to a value from the
+knowledge view. The curves are lookup tables." In content, a consideration
+over a value (a need's pressure, a trait) may give a `curve`: its points,
+the `output` at an `input`, straight between them and level beyond the
+ends. Without one, `per` scales the value as before. A committed goal may
+give an `urgency` curve over how much of its window has passed, in
+thousandths (§7). Without one, urgency rises straight to 20.
+
+- *Get warm* rises the colder the lodger feels: cold 50 is worth 30 (the
+  straight line gave 25).
+- *Tighten the nut*, committed to, is barely urgent until its window's
+  last tenth. At 90% the curve gives +2, where the line gives +18.
+
+The open question that stays is how considerations combine. They still
+add, in dB.
+
+59 tests, 2107 checks, under both compilers, ASan and UBSan, and leak-free.
