@@ -22,6 +22,7 @@ src/core/BGWorld.m
 src/domains/BGAtmosphere.m
 src/domains/BGBodies.m
 src/domains/BGFluidDomain.m
+src/domains/BGThermal.m
 src/domains/BGTraces.m
 src/kinds/BGBodyKind.m
 src/kinds/BGValveKind.m
@@ -32,6 +33,7 @@ src/save/BGSave.m
 src/scenario/BGCistern.m
 src/scenario/BGMarkedNail.m
 src/scenario/BGWorlds.m
+src/sched/BGCoupling.m
 src/sched/BGScheduler.m
 src/test/BGTest.m
 src/test/BGTests.m

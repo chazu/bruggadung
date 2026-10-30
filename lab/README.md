@@ -31,13 +31,13 @@ CFLAGS`.
 
 | Path | Contents |
 | --- | --- |
-| `content/` | `components.tri`: the component kinds and their field registry, plus what descriptions say besides fields (ids, places, free hands); `water.tri`: water stores and taps; `activities.tri`: the Activity component; `operations.tri`: the operations; `agency.tri`: goals and methods; `talk.tri`: what agents say, and the say operation; `air.tri`: gas stores, stoves and their fuel; `workshop.tri`: the scenarios' blueprints |
+| `content/` | `components.tri`: the component kinds and their field registry, plus what descriptions say besides fields (ids, places, free hands); `water.tri`: water stores and taps; `activities.tri`: the Activity component; `operations.tri`: the operations; `agency.tri`: goals and methods; `talk.tri`: what agents say, and the say operation; `air.tri`: gas stores, stoves and their fuel, and the heat of solids; `workshop.tri`: the scenarios' blueprints |
 | `src/generated/BGComponents.h` | Generated from `content/` by `make gen`: one struct per component, enums, and the field registry. Committed; the lab refuses to run on content with another hash. |
 | `src/core/` | `BGTypes.h` (IDs, time, seeds, locations), `BGStore` (records of one kind, sorted by ID), `BGWorld` (all authoritative state, journaled for rollback) |
 | `src/commit/` | `BGProposalGroup` (proposals, handles, unit references), `BGCommitter` (ordering, individuation, apply, validation, events, reactions) |
 | `src/kinds/` | Component behaviour: `BGBodyKind`, the merge reaction |
-| `src/domains/` | `BGFluidDomain`: water through open taps, with checkout, exact allocation, and exhaustion as the horizon; `BGTraces` and `BGBodies`; `BGAtmosphere`: the air of a room and a stove's fire, conserved exactly, with fuel exhaustion and watch crossings as horizons |
-| `src/sched/` | `BGScheduler`, with the domain and input-source protocols |
+| `src/domains/` | `BGFluidDomain`: water through open taps, with checkout, exact allocation, and exhaustion as the horizon; `BGTraces` and `BGBodies`; `BGAtmosphere`: the air of a room and a stove's fire, conserved exactly, with fuel exhaustion and watch crossings as horizons; `BGThermal`: the heat of solids, coupled to the air by contributions |
+| `src/sched/` | `BGScheduler`, with the domain and input-source protocols; `BGCoupling`: the step-start snapshot and contributions between domains |
 | `src/act/` | `BGView` (reach and descriptions: the knowledge view's stub), `BGActions` (the menu, matching, effects, performing), `BGActivities` (activities under way: completion, watches, ending) |
 | `src/agency/` | `BGAgency`: agents that decide from their own knowledge, with intentions, a subgoal, and a decision log |
 | `src/know/` | `BGKnowledge`: agents' knowledge stores, the perception phase, recognition |

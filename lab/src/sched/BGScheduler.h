@@ -2,13 +2,16 @@
  * BGScheduler — the boundary loop of ARCHITECTURE.md ("The life of one
  * boundary") and DOMAIN_SIMULATION.md §9. Each step is bounded by the run
  * policy's stop time, the next input, and every active domain's horizon;
- * domains advance to the bound; inputs due then are delivered; change
+ * domains advance to the bound, the coupled ones reading each other from a
+ * snapshot taken at step start, their contributions held in transit for the
+ * next step (BGCoupling.h); inputs due then are delivered; change
  * commitment runs; the clock moves to the bound. A quiet world jumps.
  */
 #import "BGTypes.h"
 
 #import "BGWorld.h"
 #import "BGCommitter.h"
+#import "BGCoupling.h"
 
 
 /* How far a domain may advance: a safe step (a duration) and the time of its
@@ -47,6 +50,27 @@ typedef struct
 /* As a saved system: checkInAll writes every checked-out stock back to its
  * holder, and savedState keeps carries and transit, so a domain restored on
  * a restored world takes the same next step as one that never saved. */
+
+@end
+
+/* A domain coupled to others (DOMAIN_SIMULATION.md §7–8). Every one
+ * publishes its values at step start, active or not; an active one advances
+ * reading the others' from that snapshot, and puts what it gives them in the
+ * outbox. The scheduler then hands each contribution to the domain that
+ * takes it, which holds it for its next step: an arrival wakes it. */
+@protocol BGCoupledDomain <BGDomain>
+
+- (void) publishInto:(BGSnapshot *) snapshot;
+- (BOOL) takesContribution:(BGContribution) contribution;
+- (void) receiveContribution:(BGContribution) contribution;
+- (void) advanceFrom:(BGTime) t0
+                  to:(BGTime) t1
+               world:(BGWorld *) world
+           committer:(BGCommitter *) committer
+            snapshot:(BGSnapshot *) snapshot
+              outbox:(BGContributions *) outbox;
+
+/* What it holds in transit is its own state: saved with it. */
 
 @end
 
@@ -116,6 +140,8 @@ typedef struct
 - (id) initWithWorld:(BGWorld *) world
            committer:(BGCommitter *) committer;
 
+/* A contribution no domain takes is lost: a content error, which a ledger
+ * shows. */
 - (void) addDomain:(id <BGDomain>) domain;
 - (void) setInputs:(id <BGInputSource>) inputs;          /* not retained */
 - (void) setActivities:(id <BGActivityClock>) activities; /* not retained */

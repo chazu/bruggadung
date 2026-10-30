@@ -82,6 +82,7 @@ src/core/BGWorld.h
 src/domains/BGAtmosphere.h
 src/domains/BGBodies.h
 src/domains/BGFluidDomain.h
+src/domains/BGThermal.h
 src/domains/BGTraces.h
 src/generated/BGComponents.h
 src/kinds/BGBodyKind.h
@@ -93,6 +94,7 @@ src/save/BGSave.h
 src/scenario/BGCistern.h
 src/scenario/BGMarkedNail.h
 src/scenario/BGWorlds.h
+src/sched/BGCoupling.h
 src/sched/BGScheduler.h
 src/test/BGTest.h
 src/triangle/BGContent.h

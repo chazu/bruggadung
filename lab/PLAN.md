@@ -1590,3 +1590,57 @@ comfort band watch; order independence across domains (there is one); and
 local wake on opening the door.
 
 52 tests, 1954 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: the solids (coupling domains)
+
+The rest of DOMAIN_SIMULATION.md Scenario 1: a second domain, and coupling
+between domains by snapshot and contribution (§7–8). The stove's iron
+(45 kJ/K) takes three tenths of its fire's heat; the rest goes up the flue,
+or, damper closed, into the room. The iron warms the air (20 W/K), and the
+air the room's stone shell (100 W/K, 4 MJ/K), which loses heat to the
+outdoors (50 W/K). In A the iron peaks at 343 K; eight hours on, the room
+and its walls are near 278 K. The fire goes out exactly 12,000 s after it
+is lit.
+
+- **Coupling** (`BGCoupling`, `BGCoupledDomain`): every coupled domain
+  publishes its values into a snapshot at step start. An active one
+  advances reading the others from it, and puts what it gives them in an
+  outbox. The scheduler hands each contribution (typed, additive, tagged
+  with its source) to the domain that takes it, which holds it in transit
+  for its next step. An arrival wakes it, and transit is saved with it.
+- **BGThermal**: bodies' heat in whole joules (`ThermalBody`), the
+  outdoors' exchange, and contributions applied. It sleeps until they
+  arrive.
+- **The atmosphere computes the gas-to-solid exchange** from the
+  snapshot's solid temperatures. It takes the heat from the gas and sends it
+  to the solid; below half a kelvin the exchange rests. The lag bounds its
+  step to an eighth of the smaller capacity over the conductance.
+- **Ledgers between domains**: each balances exactly, and what the
+  atmosphere sent is what the thermal domain received plus what is in
+  transit.
+- **Acceptance checks run**:
+  - 1, exact conservation, in each domain and between them;
+  - 2, time jumps: about 300 steps for eight hours, and a step an hour
+    once the iron cools to the air;
+  - 3, A against C: both temperatures within a kelvin; determinism; and
+    both domains' state saved;
+  - 4, order independence: the domains added the other way round, bit for
+    bit;
+  - 5, the watch, within a second;
+  - 6, in part: the thermal domain sleeps until the fire's heat arrives.
+- **The prediction of fuel running out subtracts the milligram already
+  burning**, so it is never late.
+
+Open question 1, measured: gas heat owned by the atmosphere and the solids'
+heat by another domain holds, at a price. The gas's small capacity (58 kJ/K)
+against the shell's surface (100 W/K) caps steps at about 72 s while they
+exchange, which is 300 steps against 25 without the solids. That is
+acceptable at a room's scale. A room with more surface, or less air, would
+want the exchange inside one domain, or an analytic step for it.
+
+Not yet: respiration and the body's heat; the comfort band watch; per-tile
+regions, the corridor, and opening the door (the rest of check 6); and
+a domain's sleep once the room is near the outdoors but not at it (the
+atmosphere steps hourly until then).
+
+52 tests, 1963 checks, under both compilers, ASan and UBSan, and leak-free.

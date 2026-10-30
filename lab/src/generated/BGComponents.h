@@ -1,4 +1,4 @@
-/* Generated from Triangle content e2d3badf4f84918c: do not edit. Type IDs are valid
+/* Generated from Triangle content ad8fab5c88f72118: do not edit. Type IDs are valid
  * only for this content; regenerate when it changes. */
 #ifndef BG_COMPONENTS_H
 #define BG_COMPONENTS_H
@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BG_CONTENT_HASH 0xe2d3badf4f84918cULL
+#define BG_CONTENT_HASH 0xad8fab5c88f72118ULL
 
 /* Combustor, from #Combustor */
 typedef struct {
@@ -43,6 +43,15 @@ typedef struct {
 typedef struct {
     int64_t         size;    /* length, in quanta of 0.1mm; content, saved, inspect, perceive(sight) */
 } BGSized;
+
+/* ThermalBody, from #ThermalBody */
+typedef struct {
+    uint64_t        bounds;    /* a referent; saved, proposable, inspect */
+    int64_t         heat;    /* int, in quanta of 1; content, saved, proposable, inspect */
+    int64_t         heatCapacity;    /* int, in quanta of 1; content, saved, inspect */
+    int64_t         toAir;    /* int, in quanta of 1; content, saved, inspect */
+    int64_t         toOutdoors;    /* int, in quanta of 1; content, saved, inspect */
+} BGThermalBody;
 
 /* Activity, from #Activity */
 typedef struct {
@@ -165,57 +174,57 @@ typedef struct {
 
 /* #ActivityStatus */
 enum {
-    BG_ACTIVITYSTATUS_COMPLETED = 223,
-    BG_ACTIVITYSTATUS_EXHAUSTED = 224,
-    BG_ACTIVITYSTATUS_FAILED = 225,
-    BG_ACTIVITYSTATUS_RUNNING = 226,
-    BG_ACTIVITYSTATUS_SUSPENDED = 227,
+    BG_ACTIVITYSTATUS_COMPLETED = 225,
+    BG_ACTIVITYSTATUS_EXHAUSTED = 226,
+    BG_ACTIVITYSTATUS_FAILED = 227,
+    BG_ACTIVITYSTATUS_RUNNING = 228,
+    BG_ACTIVITYSTATUS_SUSPENDED = 229,
 };
 
 /* #ClaimKind */
 enum {
-    BG_CLAIMKIND_CUSTODY = 229,
-    BG_CLAIMKIND_OWNERSHIP = 230,
-    BG_CLAIMKIND_RESERVATION = 231,
+    BG_CLAIMKIND_CUSTODY = 231,
+    BG_CLAIMKIND_OWNERSHIP = 232,
+    BG_CLAIMKIND_RESERVATION = 233,
 };
 
 /* #Material */
 enum {
-    BG_MATERIAL_CLOTH = 271,
-    BG_MATERIAL_FOOD = 272,
-    BG_MATERIAL_RUBBER = 273,
-    BG_MATERIAL_STONE = 274,
-    BG_MATERIAL_FLESH = 299,
-    BG_MATERIAL_BRASS = 301,
-    BG_MATERIAL_IRON = 302,
-    BG_MATERIAL_PAPER = 303,
-    BG_MATERIAL_STEEL = 304,
-    BG_MATERIAL_OAK = 306,
+    BG_MATERIAL_CLOTH = 273,
+    BG_MATERIAL_FOOD = 274,
+    BG_MATERIAL_RUBBER = 275,
+    BG_MATERIAL_STONE = 276,
+    BG_MATERIAL_FLESH = 301,
+    BG_MATERIAL_BRASS = 303,
+    BG_MATERIAL_IRON = 304,
+    BG_MATERIAL_PAPER = 305,
+    BG_MATERIAL_STEEL = 306,
+    BG_MATERIAL_OAK = 308,
 };
 
 /* "flesh" | "metal" | "natural" | "paper" | "wood" */
 enum {
-    BG_BODY_SURFACE_NATURAL = 186,
-    BG_BODY_SURFACE_FLESH = 299,
-    BG_BODY_SURFACE_BRASS = 301,
-    BG_BODY_SURFACE_IRON = 302,
-    BG_BODY_SURFACE_PAPER = 303,
-    BG_BODY_SURFACE_STEEL = 304,
-    BG_BODY_SURFACE_OAK = 306,
+    BG_BODY_SURFACE_NATURAL = 188,
+    BG_BODY_SURFACE_FLESH = 301,
+    BG_BODY_SURFACE_BRASS = 303,
+    BG_BODY_SURFACE_IRON = 304,
+    BG_BODY_SURFACE_PAPER = 305,
+    BG_BODY_SURFACE_STEEL = 306,
+    BG_BODY_SURFACE_OAK = 308,
 };
 
 /* #Colour */
 enum {
-    BG_COLOUR_BLUE = 234,
-    BG_COLOUR_BLACK = 236,
-    BG_COLOUR_BROWN = 237,
-    BG_COLOUR_GREEN = 238,
-    BG_COLOUR_GREY = 239,
-    BG_COLOUR_NAVY = 240,
-    BG_COLOUR_RED = 241,
-    BG_COLOUR_YELLOW = 242,
-    BG_COLOUR_BEIGE = 252,
-    BG_COLOUR_WHITE = 268,
+    BG_COLOUR_BLUE = 236,
+    BG_COLOUR_BLACK = 238,
+    BG_COLOUR_BROWN = 239,
+    BG_COLOUR_GREEN = 240,
+    BG_COLOUR_GREY = 241,
+    BG_COLOUR_NAVY = 242,
+    BG_COLOUR_RED = 243,
+    BG_COLOUR_YELLOW = 244,
+    BG_COLOUR_BEIGE = 254,
+    BG_COLOUR_WHITE = 270,
 };
 
 /* The field registry: what code needs to read and write any component
@@ -241,7 +250,7 @@ typedef struct {
     const BGFieldInfo *fields;
 } BGComponentInfo;
 
-#define BG_COMPONENT_COUNT 20
+#define BG_COMPONENT_COUNT 21
 
 #ifdef BG_COMPONENT_REGISTRY
 
@@ -274,6 +283,14 @@ static const BGFieldInfo BGLever_fields[] = {
 
 static const BGFieldInfo BGSized_fields[] = {
     { "size", offsetof(BGSized, size), BG_VALUE_QUANTITY, "length", "content, saved, inspect, perceive(sight)" },
+};
+
+static const BGFieldInfo BGThermalBody_fields[] = {
+    { "bounds", offsetof(BGThermalBody, bounds), BG_VALUE_REF, "ref", "saved, proposable, inspect" },
+    { "heat", offsetof(BGThermalBody, heat), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
+    { "heatCapacity", offsetof(BGThermalBody, heatCapacity), BG_VALUE_QUANTITY, "int", "content, saved, inspect" },
+    { "toAir", offsetof(BGThermalBody, toAir), BG_VALUE_QUANTITY, "int", "content, saved, inspect" },
+    { "toOutdoors", offsetof(BGThermalBody, toOutdoors), BG_VALUE_QUANTITY, "int", "content, saved, inspect" },
 };
 
 static const BGFieldInfo BGActivity_fields[] = {
@@ -386,6 +403,7 @@ static const BGComponentInfo BGComponents[BG_COMPONENT_COUNT + 1] = {
     { "GasStore", "#GasStore", sizeof(BGGasStore), 8, BGGasStore_fields },
     { "Lever", "#Lever", sizeof(BGLever), 3, BGLever_fields },
     { "Sized", "#Sized", sizeof(BGSized), 1, BGSized_fields },
+    { "ThermalBody", "#ThermalBody", sizeof(BGThermalBody), 5, BGThermalBody_fields },
     { "Activity", "#Activity", sizeof(BGActivity), 13, BGActivity_fields },
     { "Claim", "#Claim", sizeof(BGClaim), 2, BGClaim_fields },
     { "Body", "#Body", sizeof(BGBody), 5, BGBody_fields },

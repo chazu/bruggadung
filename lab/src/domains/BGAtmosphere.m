@@ -14,6 +14,7 @@
 #define BG_BURN_OXYGEN      33          /* mmol consumed */
 #define BG_BURN_DIOXIDE     33          /* mmol produced */
 #define BG_BURN_HEAT        15          /* J per mg */
+#define BG_BURN_SHARE       3           /* tenths of it to the stove's iron */
 
 
 @implementation BGAtmosphere
@@ -46,6 +47,12 @@
 }
 
 
+- (int64_t) sent
+{
+   return( _ledger.exchanged + _ledger.toSolids);
+}
+
+
 /* --- reading the world ------------------------------------------------------------ */
 
 - (int) regionOf:(BGEntityID) entity
@@ -55,7 +62,7 @@
    for( i = 0; i < _nregions; i++)
       if( _regions[ i].entity == entity)
          return( i);
-   if( _nregions == BG_ATMOS_REGIONS)
+   if( _nregions == BG_ATMOS_REGIONS || ! [_world record:[_world kindNamed:"GasStore"] for:entity])
       return( -1);
    memset( &_regions[ _nregions], 0, sizeof( BGAirRegion));
    _regions[ _nregions].entity = entity;
@@ -79,13 +86,30 @@
 }
 
 
+- (int) surfaceOf:(BGEntityID) entity
+{
+   int   i;
+
+   for( i = 0; i < _nsurfaces; i++)
+      if( _surfaces[ i].entity == entity)
+         return( i);
+   if( _nsurfaces == BG_ATMOS_SURFACES)
+      return( -1);
+   memset( &_surfaces[ _nsurfaces], 0, sizeof( BGAirSurface));
+   _surfaces[ _nsurfaces].entity = entity;
+   return( _nsurfaces++);
+}
+
+
 /* The regions' and stoves' values from their records, which mirror ours;
- * a stove not burning takes its fuel from its record. */
+ * a stove not burning takes its fuel from its record. A solid's surface is
+ * to the air over it, or, with no place, the air it bounds. */
 - (void) load
 {
    const BGGasStore        *air;
    const BGCombustor       *combustor;
    const BGFuelContainer   *fuel;
+   const BGThermalBody     *body;
    BGStore                 *stores;
    NSUInteger              i;
    int                     k;
@@ -111,6 +135,16 @@
       if( ! combustor->lit || _stoves[ k].fuel < 0)
          _stoves[ k].fuel = fuel->fuel * 1000;
       _stoves[ k].region = [self regionOf:BGAirOver( _world, [stores entityAtIndex:i])];
+   }
+   stores = [_world storeForKind:[_world kindNamed:"ThermalBody"]];
+   for( i = 0; i < [stores count]; i++)
+   {
+      body = [stores recordAtIndex:i];
+      if( ! body->toAir || (k = [self surfaceOf:[stores entityAtIndex:i]]) < 0)
+         continue;
+      _surfaces[ k].conductance = body->toAir;
+      _surfaces[ k].region      = [self regionOf:body->bounds ? (BGEntityID) body->bounds
+                                                               : BGAirOver( _world, [stores entityAtIndex:i])];
    }
 }
 
@@ -144,6 +178,33 @@
    if( permille > 110)
       permille = 110;
    return( combustor->burnRate * permille / 110);
+}
+
+
+static int64_t   gasTemperature( const BGAirRegion *r)
+{
+   return( r->heat * 1000000 / (r->total * BG_GAS_CAPACITY));
+}
+
+
+/* How far a surface's air is above the solid, mK, from their records; 0
+ * below half a kelvin, where the exchange rests. */
+- (int64_t) surfaceDelta:(int) i
+                capacity:(int64_t *) capacity
+{
+   const BGThermalBody   *body;
+   const BGAirRegion     *r;
+   int64_t               d;
+
+   body = [_world record:[_world kindNamed:"ThermalBody"] for:_surfaces[ i].entity];
+   if( ! body || _surfaces[ i].region < 0)
+      return( 0);
+   r = &_regions[ _surfaces[ i].region];
+   d = gasTemperature( r) - body->heat * 1000 / body->heatCapacity;
+   if( capacity)
+      *capacity = r->total * BG_GAS_CAPACITY / 1000 < body->heatCapacity ? r->total * BG_GAS_CAPACITY / 1000
+                                                                           : body->heatCapacity;
+   return( llabs( d) < 500 ? 0 : d);
 }
 
 
@@ -181,7 +242,10 @@
       if( [self lit:i])
          return( YES);
    for( i = 0; i < _nregions; i++)
-      if( ! [self settled:&_regions[ i]])
+      if( ! [self settled:&_regions[ i]] || _regions[ i].pending)
+         return( YES);
+   for( i = 0; i < _nsurfaces; i++)
+      if( [self surfaceDelta:i capacity:NULL])
          return( YES);
    return( NO);
 }
@@ -230,10 +294,11 @@
       if( ! [self lit:s])
          continue;
       burning = YES;
-      /* the fuel runs out: at this rate, or later, as a smoulder slows */
+      /* the fuel runs out: at this rate, less the part of a milligram
+       * already burning, or later, as a smoulder slows */
       if( (rate = [self rateOf:s]) > 0)
       {
-         when = t.ms + (_stoves[ s].fuel * 1000 + rate - 1) / rate;
+         when = t.ms + (_stoves[ s].fuel * 1000 - _stoves[ s].carry + rate - 1) / rate;
          if( when > t.ms && when < h.nextEvent.ms)
             h.nextEvent = BGTimeMake( when);
       }
@@ -267,7 +332,66 @@
          h.nextEvent = BGTimeMake( when);
    }
    h.safeStep = BGTimeMake( burning ? 600000 : 3600000);
+
+   /* the exchange with the solids lags a step: no more than an eighth of
+    * the way to equal in one */
+   for( i = 0; i < (NSUInteger) _nsurfaces; i++)
+   {
+      int64_t   capacity;
+
+      if( ! [self surfaceDelta:(int) i capacity:&capacity])
+         continue;
+      when = capacity * 1000 / (8 * _surfaces[ i].conductance);
+      if( when < h.safeStep.ms)
+         h.safeStep = BGTimeMake( when < 1 ? 1 : when);
+   }
    return( h);
+}
+
+
+/* --- coupling ------------------------------------------------------------------- */
+
+- (void) publishInto:(BGSnapshot *) snapshot
+{
+   int   k;
+
+   [self load];
+   for( k = 0; k < _nregions; k++)
+      [snapshot setQuantity:BGQuantityTemperature
+                         of:_regions[ k].entity
+                         to:gasTemperature( &_regions[ k])];
+}
+
+
+- (BOOL) takesContribution:(BGContribution) contribution
+{
+   return( contribution.quantity == BGQuantityHeat &&
+           [_world record:[_world kindNamed:"GasStore"] for:contribution.target] != NULL);
+}
+
+
+- (void) receiveContribution:(BGContribution) contribution
+{
+   int   k;
+
+   [self load];
+   if( (k = [self regionOf:contribution.target]) >= 0)
+      _regions[ k].pending += contribution.amount;
+}
+
+
+- (void) send:(int64_t) heat
+           to:(BGEntityID) target
+         from:(BGEntityID) source
+       outbox:(BGContributions *) outbox
+{
+   BGContribution   c;
+
+   c.target   = target;
+   c.source   = source;
+   c.quantity = BGQuantityHeat;
+   c.amount   = heat;
+   [outbox addContribution:c];
 }
 
 
@@ -294,6 +418,24 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
                world:(BGWorld *) world
            committer:(BGCommitter *) committer
 {
+   [self advanceFrom:t0
+                  to:t1
+               world:world
+           committer:committer
+            snapshot:nil
+              outbox:nil];
+}
+
+
+/* With no outbox, nothing goes to the solids: the fire's share stays in
+ * the iron's flue gas, and there is no exchange. */
+- (void) advanceFrom:(BGTime) t0
+                  to:(BGTime) t1
+               world:(BGWorld *) world
+           committer:(BGCommitter *) committer
+            snapshot:(BGSnapshot *) snapshot
+              outbox:(BGContributions *) outbox
+{
    const BGActivity   *record;
    BGProposalGroup    *g;
    BGAirRegion        *r;
@@ -309,6 +451,10 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
    int64_t            used;
    int64_t            made;
    int64_t            heat;
+   int64_t            share;
+   int64_t            solid;
+   int64_t            delta;
+   int64_t            q;
    int64_t            rates[ BG_ATMOS_STOVES];
    int                k;
    int                s;
@@ -334,6 +480,35 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
    memcpy( before, _regions, sizeof( before));
    for( s = 0; s < _nstoves; s++)
       rates[ s] = [self rateOf:s];          /* from step-start values */
+
+   /* what was in transit to the gas */
+   for( k = 0; k < _nregions; k++)
+   {
+      _regions[ k].heat     += _regions[ k].pending;
+      _ledger.received      += _regions[ k].pending;
+      _regions[ k].pending   = 0;
+   }
+
+   /* the solids' surfaces, from the step-start snapshot: the gas gives what
+    * it gives now, and the solid receives it next step */
+   for( k = 0; outbox && k < _nsurfaces; k++)
+   {
+      if( _surfaces[ k].region < 0 ||
+          ! [snapshot quantity:BGQuantityTemperature of:_surfaces[ k].entity value:&solid])
+         continue;
+      delta = gasTemperature( &before[ _surfaces[ k].region]) - solid;
+      if( llabs( delta) < 500)
+         continue;
+      _surfaces[ k].carry += _surfaces[ k].conductance * delta * dt;
+      q                    = _surfaces[ k].carry / 1000000;
+      _surfaces[ k].carry %= 1000000;
+      _regions[ _surfaces[ k].region].heat -= q;
+      _ledger.exchanged                    += q;
+      [self send:q
+              to:_surfaces[ k].entity
+            from:_regions[ _surfaces[ k].region].entity
+          outbox:outbox];
+   }
 
    /* the door: each region mixes with the outdoors, from step-start values */
    for( k = 0; k < _nregions; k++)
@@ -368,17 +543,26 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
       _stoves[ s].fuel -= burned;
       _ledger.burned   += burned;
       open = ((const BGCombustor *) [_world record:[_world kindNamed:"Combustor"] for:_stoves[ s].entity])->damper;
+
+      /* its iron's share */
+      share = 0;
+      if( outbox && [_world record:[_world kindNamed:"ThermalBody"] for:_stoves[ s].entity])
+      {
+         _stoves[ s].carryShare += burned * BG_BURN_HEAT * BG_BURN_SHARE;
+         share                   = _stoves[ s].carryShare / 10;
+         _stoves[ s].carryShare %= 10;
+         _ledger.toSolids       += share;
+         [self send:share
+                 to:_stoves[ s].entity
+               from:_stoves[ s].entity
+             outbox:outbox];
+      }
       if( _stoves[ s].region >= 0)
       {
          r = &_regions[ _stoves[ s].region];
          if( open)
          {
-            /* drawn from outdoors and up the flue: a tenth of the heat stays */
-            r->carryBurn[ 2] += burned * BG_BURN_HEAT;
-            heat              = r->carryBurn[ 2] / 10;
-            r->carryBurn[ 2] %= 10;
-            r->heat          += heat;
-            _ledger.produced[ 2] += heat;
+            /* drawn from outdoors, and the rest of the heat up the flue */
          }
          else
          {
@@ -391,12 +575,13 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
             r->carryBurn[ 1] += burned * BG_BURN_DIOXIDE;
             made              = r->carryBurn[ 1] / 1000;
             r->carryBurn[ 1] %= 1000;
+            heat        = burned * BG_BURN_HEAT - share;
             r->oxygen  -= used;
             r->dioxide += made;
-            r->heat    += burned * BG_BURN_HEAT;
+            r->heat    += heat;
             _ledger.consumed[ 0] += used;
             _ledger.produced[ 1] += made;
-            _ledger.produced[ 2] += burned * BG_BURN_HEAT;
+            _ledger.produced[ 2] += heat;
          }
       }
       if( ! _stoves[ s].fuel)
@@ -469,7 +654,8 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
    for( fuel = 0, k = 0; k < _nstoves; k++)
       fuel += _stoves[ k].fuel;
    for( k = 0; k < 3; k++)
-      if( sum[ k] != _ledger.initial[ k] + _ledger.inflow[ k] + _ledger.produced[ k] - _ledger.consumed[ k])
+      if( sum[ k] != _ledger.initial[ k] + _ledger.inflow[ k] + _ledger.produced[ k] - _ledger.consumed[ k] +
+                     (k == 2 ? _ledger.received - _ledger.exchanged : 0))
          return( NO);
    return( ! _ledgered || fuel + _ledger.burned == _ledger.fuel);
 }
@@ -491,12 +677,14 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
    lines = [NSMutableArray array];
    [lines addObject:[NSString stringWithFormat:@"air %d %llu %lld", _ledgered ? 1 : 0, (unsigned long long) _steps,
                                                (long long) _rise]];
-   [lines addObject:[NSString stringWithFormat:@"ledger %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld",
+   [lines addObject:[NSString stringWithFormat:@"ledger %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld "
+                                               @"%lld %lld %lld",
                                                _ledger.initial[ 0], _ledger.initial[ 1], _ledger.initial[ 2],
                                                _ledger.inflow[ 0], _ledger.inflow[ 1], _ledger.inflow[ 2],
                                                _ledger.produced[ 0], _ledger.produced[ 1], _ledger.produced[ 2],
                                                _ledger.consumed[ 0], _ledger.consumed[ 1], _ledger.consumed[ 2],
-                                               _ledger.fuel, _ledger.burned]];
+                                               _ledger.fuel, _ledger.burned,
+                                               _ledger.exchanged, _ledger.toSolids, _ledger.received]];
    for( k = 0; k < _nregions; k++)
    {
       r = &_regions[ k];
@@ -505,11 +693,14 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
                                                   r->carryIn[ 0], r->carryIn[ 1], r->carryIn[ 2],
                                                   r->carryOut[ 0], r->carryOut[ 1], r->carryOut[ 2],
                                                   r->carryBurn[ 0], r->carryBurn[ 1], r->carryBurn[ 2],
-                                                  (long long) 0, (long long) 0]];
+                                                  r->pending, (long long) 0]];
    }
    for( k = 0; k < _nstoves; k++)
-      [lines addObject:[NSString stringWithFormat:@"stove %llu %lld %lld", (unsigned long long) _stoves[ k].entity,
-                                                  _stoves[ k].fuel, _stoves[ k].carry]];
+      [lines addObject:[NSString stringWithFormat:@"stove %llu %lld %lld %lld", (unsigned long long) _stoves[ k].entity,
+                                                  _stoves[ k].fuel, _stoves[ k].carry, _stoves[ k].carryShare]];
+   for( k = 0; k < _nsurfaces; k++)
+      [lines addObject:[NSString stringWithFormat:@"surface %llu %lld", (unsigned long long) _surfaces[ k].entity,
+                                                  _surfaces[ k].carry]];
    for( k = 0; k < _nfired; k++)
       [lines addObject:[NSString stringWithFormat:@"fired %llu", (unsigned long long) _fired[ k]]];
    return( lines);
@@ -520,7 +711,7 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
 {
    unsigned long long   e;
    unsigned long long   steps;
-   long long            v[ 14];
+   long long            v[ 17];
    NSUInteger           i;
    BGAirRegion          *r;
    const char           *text;
@@ -530,6 +721,7 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
    _nregions = 0;
    _nstoves  = 0;
    _nfired   = 0;
+   _nsurfaces = 0;
    for( i = 0; i < [lines count]; i++)
    {
       text = [[lines objectAtIndex:i] UTF8String];
@@ -539,9 +731,9 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
          _steps    = (NSUInteger) steps;
          _rise     = v[ 0];
       }
-      else if( sscanf( text, "ledger %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld", &v[ 0], &v[ 1],
-                       &v[ 2], &v[ 3], &v[ 4], &v[ 5], &v[ 6], &v[ 7], &v[ 8], &v[ 9], &v[ 10], &v[ 11], &v[ 12],
-                       &v[ 13]) == 14)
+      else if( sscanf( text, "ledger %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld",
+                       &v[ 0], &v[ 1], &v[ 2], &v[ 3], &v[ 4], &v[ 5], &v[ 6], &v[ 7], &v[ 8], &v[ 9], &v[ 10],
+                       &v[ 11], &v[ 12], &v[ 13], &v[ 14], &v[ 15], &v[ 16]) == 17)
       {
          for( k = 0; k < 3; k++)
          {
@@ -550,8 +742,11 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
             _ledger.produced[ k] = v[ 6 + k];
             _ledger.consumed[ k] = v[ 9 + k];
          }
-         _ledger.fuel   = v[ 12];
-         _ledger.burned = v[ 13];
+         _ledger.fuel      = v[ 12];
+         _ledger.burned    = v[ 13];
+         _ledger.exchanged = v[ 14];
+         _ledger.toSolids  = v[ 15];
+         _ledger.received  = v[ 16];
       }
       else if( sscanf( text, "region %llu %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld", &e, &v[ 0], &v[ 1],
                        &v[ 2], &v[ 3], &v[ 4], &v[ 5], &v[ 6], &v[ 7], &v[ 8], &v[ 9], &v[ 10], &v[ 11]) == 13)
@@ -569,13 +764,21 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
          r->carryBurn[ 0] = v[ 7];
          r->carryBurn[ 1] = v[ 8];
          r->carryBurn[ 2] = v[ 9];
+         r->pending       = v[ 10];
       }
-      else if( sscanf( text, "stove %llu %lld %lld", &e, &v[ 0], &v[ 1]) == 3)
+      else if( sscanf( text, "stove %llu %lld %lld %lld", &e, &v[ 0], &v[ 1], &v[ 2]) == 4)
       {
          if( (k = [self stoveOf:(BGEntityID) e]) < 0)
             continue;
-         _stoves[ k].fuel  = v[ 0];
-         _stoves[ k].carry = v[ 1];
+         _stoves[ k].fuel       = v[ 0];
+         _stoves[ k].carry      = v[ 1];
+         _stoves[ k].carryShare = v[ 2];
+      }
+      else if( sscanf( text, "surface %llu %lld", &e, &v[ 0]) == 2)
+      {
+         if( (k = [self surfaceOf:(BGEntityID) e]) < 0)
+            continue;
+         _surfaces[ k].carry = v[ 0];
       }
       else if( sscanf( text, "fired %llu", &e) == 1 && _nfired < 16)
          _fired[ _nfired++] = (BGEntityID) e;

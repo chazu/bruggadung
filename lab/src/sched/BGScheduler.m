@@ -109,22 +109,62 @@ static BGTime   earlier( BGTime a, BGTime b)
 /* One boundary at `bound`: domains advance to it, then commitment runs there. */
 - (void) boundaryAt:(BGTime) bound
 {
-   id <BGDomain>   d;
-   NSArray         *groups;
-   BGTime          t;
-   NSUInteger      i;
+   id <BGDomain>     d;
+   BGSnapshot        *snapshot;
+   BGContributions   *outbox;
+   BGContribution    c;
+   NSArray           *groups;
+   BGTime            t;
+   NSUInteger        i;
+   NSUInteger        k;
+   NSUInteger        j;
 
    t = [_world time];
+
+   /* the coupled domains' values at step start */
+   snapshot = [[BGSnapshot new] autorelease];
+   outbox   = [[BGContributions new] autorelease];
+   for( i = 0; i < [_domains count]; i++)
+   {
+      d = [_domains objectAtIndex:i];
+      if( [(id) d conformsToProtocol:@protocol( BGCoupledDomain)])
+         [(id <BGCoupledDomain>) d publishInto:snapshot];
+   }
 
    /* advance every active domain to the bound */
    for( i = 0; i < [_domains count]; i++)
    {
       d = [_domains objectAtIndex:i];
-      if( [d isActive])
+      if( ! [d isActive])
+         continue;
+      if( [(id) d conformsToProtocol:@protocol( BGCoupledDomain)])
+         [(id <BGCoupledDomain>) d advanceFrom:t
+                                            to:bound
+                                         world:_world
+                                     committer:_committer
+                                      snapshot:snapshot
+                                        outbox:outbox];
+      else
          [d advanceFrom:t
                      to:bound
                   world:_world
               committer:_committer];
+   }
+
+   /* contributions into transit, for their targets' next steps */
+   for( k = 0; k < [outbox count]; k++)
+   {
+      c = [outbox contributionAtIndex:k];
+      for( j = 0; j < [_domains count]; j++)
+      {
+         d = [_domains objectAtIndex:j];
+         if( [(id) d conformsToProtocol:@protocol( BGCoupledDomain)] &&
+             [(id <BGCoupledDomain>) d takesContribution:c])
+         {
+            [(id <BGCoupledDomain>) d receiveContribution:c];
+            break;
+         }
+      }
    }
 
    /* commit at the bound, with the inputs due then */
