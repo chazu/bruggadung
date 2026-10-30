@@ -2015,11 +2015,15 @@ The remaining scenario checks that aren't run, after the passes above:
     treated as claims. ARCHITECTURE.md: "Institutions (§6) … To be
     specified". (What COMPONENTS.md Scenario 2 and ACTIONS.md §3 fix runs;
     see below.)
-  - how considerations combine beyond adding (AGENCY.md's open question 1
-    asks product, weighted sum, or a mix). The lab adds them, in dB.
-  - perception or memory making feature hypotheses of their own: the docs
-    give "half-remembers" (CONTENT_LANGUAGE.md Scenario 2, C), not how
-    memory forms a doubt.
+  - how considerations combine (AGENCY.md's open question 1: product,
+    weighted sum, or a mix). The lab's answer, until the question is
+    settled: they are in "the units of credence (dB)" (agency.tri), and
+    adding dB multiplies odds. So the sum is a product of odds factors,
+    and a `#Flat` is a fixed factor. A mix (a veto, a ceiling) has no
+    content form yet.
+  - memory making feature hypotheses of its own: the docs give
+    "half-remembers" (CONTENT_LANGUAGE.md Scenario 2, C), not how memory
+    forms a doubt. (Testimony forms them: below.)
   - loyalty: no doc beyond AGENCY.md (searched every .md); "those it is
     loyal to" makes it a relation, with no word on its parties or on the
     *report* and *confront* goals it decides between.
@@ -2475,3 +2479,18 @@ Two parts of the forged permit that need no institution semantics:
   permits or forbids stays §6's.
 
 68 tests, 2377 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: told otherwise, two hypotheses
+
+KNOWLEDGE.md §11: "Conflicting beliefs coexist as competing hypotheses,
+each with its own credence." A new claim, `#IsLike` ("something like
+`what` is like `as`"), says what a thing is like. The hearer binds the
+thing by its looks. Where the claim's concrete features conflict with
+what it believes, they become a competing hypothesis. Its mass is the
+hearer's credence in the speaker, from dB to a probability. The worker has
+seen the nut at 19 mm. The smith, whom it trusts at +20 dB, says it is
+22 mm. The worker holds both: 19 mm, and "or, 990 in 1000: size: 22mm".
+Only 10 in 1000 entail tightening it, so the worker looks closer first.
+Seen plainly, the nut is 19 mm, and it tightens it.
+
+68 tests, 2383 checks, under both compilers, ASan and UBSan, and leak-free.

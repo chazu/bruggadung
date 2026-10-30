@@ -5332,6 +5332,56 @@ static BGAgency   *urgent_nut( void)
 }
 
 
+/* KNOWLEDGE.md §11: conflicting beliefs coexist as competing hypotheses.
+ * The worker has seen the nut plainly (19 mm) and stands four tiles off;
+ * the smith, beside it, says the nut is 22 mm. Its belief and the smith's
+ * claim coexist, the claim as credible as it finds the smith; less than
+ * sure, it looks closer before it tightens. */
+static BGNutRun   told_nut_run( void)
+{
+   BGStage            st;
+   BGActivities       *activities;
+   BGKnowledge        *knowledge;
+   BGAgency           *agency;
+   BGProposalGroup    *g;
+   BGEntityID         worker;
+   BGEntityID         smith;
+   BGNutRun           run;
+
+   memset( &run, 0, sizeof( run));
+   st.w       = BGTestWorld( 71);
+   st.c       = BGTestCommitter( st.w);
+   activities = [BGActivities activitiesWithWorld:st.w committer:st.c];
+   knowledge  = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+   agency     = [[[BGAgency alloc] initWithWorld:st.w committer:st.c knowledge:knowledge] autorelease];
+   st.s       = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [agency setActivities:activities];
+   [st.s setActivities:activities];
+   [st.s setPerception:knowledge];
+   [st.s setDecision:agency];
+   g       = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the pump"];
+   worker  = [g create:"worker" key:"Oskar" at:BGOnTile( 5, 2, 0)];
+   smith   = [g create:"smith" key:"a fitter" at:BGOnTile( 3, 3, 0)];
+   [g create:"spanner_19" key:"spanner" at:BGHeldBy( worker, 0)];
+   run.nut = [g create:"gland_nut" key:"gland nut" at:BGOnTile( 6, 2, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   worker  = [g idFor:worker];
+   smith   = [g idFor:smith];
+   run.nut = [g idFor:run.nut];
+   stage_move( &st, worker, 2, 2);
+   stage_say( &st, smith, worker, @"#IsLike & { what: #Fastener & { place: #OnTile & { x: 6, y: 2, level: 0 } }, "
+                                  @"as: #Fastener & { size: 22mm }, attribution: #Saw & { sure: 30 } }");
+   run.fromAfar = [knowledge dump:worker];
+   BG_CHECK( [agency commit:worker toGoal:"tighten_nut"]);
+   [st.s runUntil:BGTimeMake( 30000)];
+   run.world     = st.w;
+   run.knowledge = knowledge;
+   run.agency    = agency;
+   return( run);
+}
+
+
 static BOOL   tightened( BGNutRun run)
 {
    int64_t   v;
@@ -5351,6 +5401,7 @@ static void   test_unknown_nut( void)
    BGNutRun   misfit;
    BGNutRun   doubtful;
    BGNutRun   sure;
+   BGNutRun   told;
    BGAgency   *urgent;
    int64_t    mass;
 
@@ -5416,6 +5467,13 @@ static void   test_unknown_nut( void)
    BG_CHECK( logged_by( doubtful.agency, 1, @"tighten it: unknown at nut.size (700 in 1000 entails, under 900): look closer first"));
    BG_CHECK( tightened( doubtful));
    BG_CHECK( [[doubtful.knowledge dump:1] rangeOfString:@"or, 300 in 1000"].location == NSNotFound);
+   /* told otherwise: its belief and the claim coexist */
+   told = told_nut_run();
+   BG_CHECK( [told.fromAfar rangeOfString:@"size: 19mm"].location != NSNotFound);
+   BG_CHECK( [told.fromAfar rangeOfString:@"or, 990 in 1000: size: 22mm\n"].location != NSNotFound);
+   BG_CHECK( logged_by( told.agency, 1, @"tighten it: unknown at nut.size (10 in 1000 entails, under 900): look closer first"));
+   BG_CHECK( tightened( told));
+
    /* the menu shows how sure: doubted, it is unknown, with the mass that
     * entails and what to find out; undoubted, entailed */
    BG_CHECK( [doubtful_menu( 300) rangeOfString:@": unknown (700 in 1000 entails) (find out destination.size)"].location

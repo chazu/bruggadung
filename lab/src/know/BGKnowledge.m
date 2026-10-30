@@ -1747,6 +1747,97 @@ static char   *concrete_features( const char *printed)
 }
 
 
+/* Credence (dB, -30 to 30) as a probability, in thousandths. */
+static int32_t   permille_of( int32_t db)
+{
+   static const int32_t   table[ 61] =
+   {
+      1, 1, 2, 2, 3, 3, 4, 5, 6, 8, 10, 12, 16, 20, 25, 31, 38, 48, 59, 74, 91, 112, 137, 166, 201, 240, 285, 334,
+      387, 443, 500, 557, 613, 666, 715, 760, 799, 834, 863, 888, 909, 926, 941, 952, 962, 969, 975, 980, 984, 988,
+      990, 992, 994, 995, 996, 997, 997, 998, 998, 999, 999
+   };
+
+   db = db < -30 ? -30 : db > 30 ? 30 : db;
+   return( table[ db + 30]);
+}
+
+
+/* A claim of what something is like (#IsLike): the thing, by its looks;
+ * where the claim conflicts with what the agent believes of it, a competing
+ * hypothesis (KNOWLEDGE.md §11), as credible as the speaker is to it. */
+- (void) isLike:(const TriNode *) claim
+           from:(uint32_t) speaker
+          store:(BGKnowledgeStore *) store
+           news:(NSMutableArray *) news
+{
+   const TriNode      *what;
+   const TriNode      *as;
+   const BGReferent   *r;
+   NSMutableArray     *overrides;
+   NSArray            *pairs;
+   NSString           *kind;
+   NSString           *pair;
+   NSString           *key;
+   NSString           *mine;
+   NSUInteger         i;
+   NSUInteger         k;
+   uint32_t           thing;
+   char               printed[ 2048];
+   char               *features;
+
+   what = tri_at( [_world tri], claim, "what");
+   as   = tri_at( [_world tri], claim, "as");
+   if( ! what || ! as)
+      return;
+   kind = [NSString stringWithUTF8String:(char *) tri_type_name( [_world tri], tri_node_type( what))];
+   tri_print( [_world tri], what, printed, sizeof( printed));
+   features = concrete_features( printed);
+   thing    = 0;
+   for( i = 0; i < [store count] && ! thing; i++)
+   {
+      r = [store referentAt:i];
+      if( r->kind && ! strcmp( r->kind, [kind UTF8String]) && r->id != speaker &&
+          [self looksAlike:r in:store kind:kind features:[NSString stringWithUTF8String:features]])
+         thing = r->id;
+   }
+   free( features);
+   if( ! thing)
+      return;
+   /* the claimed features that differ from what it believes */
+   tri_print( [_world tri], as, printed, sizeof( printed));
+   features  = concrete_features( printed);
+   pairs     = BGSplitTopLevel( [NSString stringWithUTF8String:features]);
+   free( features);
+   overrides = [NSMutableArray array];
+   for( k = 0; k < [pairs count]; k++)
+   {
+      pair = [pairs objectAtIndex:k];
+      /* what it says: a feature with one value, not one the type leaves open */
+      if( [pair rangeOfString:@": "].location == NSNotFound || [pair rangeOfString:@"|"].location != NSNotFound ||
+          [pair rangeOfString:@">="].location != NSNotFound || [pair rangeOfString:@"<="].location != NSNotFound)
+         continue;
+      key  = [pair substringToIndex:[pair rangeOfString:@": "].location];
+      mine = nil;
+      {
+         NSArray      *believed;
+         NSUInteger   j;
+
+         believed = BGSplitTopLevel( [store recall:[store referent:thing]]);
+         for( j = 0; j < [believed count] && ! mine; j++)
+            if( [[believed objectAtIndex:j] rangeOfString:[key stringByAppendingString:@": "]].location == 0)
+               mine = [believed objectAtIndex:j];
+      }
+      if( mine && ! [mine isEqualToString:pair])
+         [overrides addObject:pair];
+   }
+   if( ! [overrides count])
+      return;
+   [store suppose:[overrides componentsJoinedByString:@", "] about:thing mass:permille_of( [store trustIn:speaker])];
+   [news addObject:[NSString stringWithFormat:@"R%u may be otherwise, R%u says: %@", thing, speaker,
+                                              [overrides componentsJoinedByString:@", "]]];
+}
+
+
 /* The referent of someone a claim names by how they look ("heard it from
  * ..."): one of that kind that looks alike, the lowest first, or a new one,
  * believed nowhere. 0 if the description says no more than its kind does. */
@@ -1853,6 +1944,12 @@ static char   *concrete_features( const char *printed)
    if( claim && tri_subtype( tri, tri_node_type( claim), tri_type_named( tri, "#Serves")))
    {
       [self serves:claim from:speaker store:store news:news];
+      tri_arena_free( arena);
+      return;
+   }
+   if( claim && tri_subtype( tri, tri_node_type( claim), tri_type_named( tri, "#IsLike")))
+   {
+      [self isLike:claim from:speaker store:store news:news];
       tri_arena_free( arena);
       return;
    }

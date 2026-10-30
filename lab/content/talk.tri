@@ -42,6 +42,12 @@
 // A claim: something like `what` is inside `within`.
 #IsIn: #Placing & #Telling & {}
 
+// A claim: something like `what` is like `as` (its features: "the nut is
+// 22 mm"). Where it conflicts with what the hearer believes of it, the two
+// coexist as competing hypotheses (KNOWLEDGE.md §11), the claim's as
+// credible as the hearer finds the speaker.
+#IsLike: #Telling & { as: #Body }
+
 // A claim naming someone like `holder`.
 #Naming: #Telling & { holder: #Agent }
 
