@@ -308,8 +308,9 @@ A rebuilt world produces the same next step as one that never saved.
    dithering (AGENCY.md's false alarm); and autopilot, which hands control
    back to the player when something worth it arises; and methods scored by
    dispositions, norms, and the belief about being watched (AGENCY.md's
-   tempting purse). Next, per [lab/PLAN.md](lab/PLAN.md): goal generators
-   for routines and commitments.
+   tempting purse); and commitments with windows and rising urgency, the
+   routine generator. Next, per [lab/PLAN.md](lab/PLAN.md): needs and
+   interoception.
 
 ## Cross-cutting open questions
 

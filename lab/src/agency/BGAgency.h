@@ -41,6 +41,14 @@
  * resumes the activity it suspended. A goal that arose about something is
  * settled with it, and doesn't arise about it again.
  *
+ * Commitments (AGENCY.md §7, §8): an agent undertakes a goal for a window,
+ * from a source (employment, a promise). While the window is open, the
+ * goal is a candidate (the routine generator), worth BG_DUTY plus an
+ * urgency that rises to BG_URGENCY by the deadline, weighed like any other;
+ * done, or impossible, it is settled for the window; when the window closes
+ * it is dropped. The scheduler wakes the agent when a window opens or
+ * closes.
+ *
  * Autopilot (AGENCY.md §14): the player hands their character to agency
  * with a goal and an interruption threshold. Agency decides for it from its
  * knowledge view, as for anyone, but takes up no goal of its own: when one
@@ -69,6 +77,9 @@
 #define BG_MARGIN          5      /* what another goal must beat the current one by */
 #define BG_INTERRUPT       5      /* and more, to interrupt an activity under way */
 #define BG_MAX_SETTLED     16
+#define BG_MAX_COMMITMENTS 8
+#define BG_DUTY            20     /* what a commitment is worth */
+#define BG_URGENCY         20     /* and more, rising toward its deadline */
 
 
 typedef struct
@@ -90,7 +101,19 @@ typedef struct
    BGSlotBinding   params[ BG_MAX_SLOTS];
    int             nparams;
    uint32_t        arose;        /* the referent it arose about, or 0 */
+   int             commitment;   /* the commitment it keeps, + 1, or 0 */
 } BGIntention;
+
+
+/* A goal undertaken for a window (AGENCY.md §7). */
+typedef struct
+{
+   const char      *goal;        /* interned */
+   int64_t         from;         /* ms */
+   int64_t         until;        /* ms: its deadline */
+   const char      *source;      /* interned: "employment", "promise", "self" */
+   BOOL            settled;      /* done, or given up, for this window */
+} BGCommitment;
 
 
 /* A goal that arose about something: settled, or last weighed. */
@@ -130,6 +153,8 @@ typedef struct
    int              nsettled;
    BGArisen         weighed[ BG_MAX_SETTLED];  /* the last verdict, so it is logged when it changes */
    int              nweighed;
+   BGCommitment     commitments[ BG_MAX_COMMITMENTS];
+   int              ncommitments;
    BOOL             autopilot;         /* the player's character, handed over */
    int32_t          threshold;         /* worth above which control returns */
    BOOL             handedBack;
@@ -161,6 +186,15 @@ typedef struct
  * NO if content has no such goal. */
 - (BOOL) commit:(BGEntityID) agent
          toGoal:(const char *) goal;
+
+/* Agency takes the agent over, if it hasn't, and the agent undertakes the
+ * goal for the window [from, until), from the source. NO if content has no
+ * such goal. */
+- (BOOL) undertake:(BGEntityID) agent
+              goal:(const char *) goal
+              from:(int64_t) from
+             until:(int64_t) until
+            source:(const char *) source;
 
 /* Agency lets the agent go, its mind with it: someone else controls it. */
 - (void) relinquish:(BGEntityID) agent;

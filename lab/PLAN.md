@@ -1159,7 +1159,40 @@ what it learns, and sanctions (§6, institutions).
 
 41 tests, 683 checks, under both compilers, ASan and UBSan, and leak-free.
 
-Next: goal generators for routines and commitments (AGENCY.md §4, §7,
-§8): a shift with its time window, and commitments with deadlines whose
-urgency rises toward them, so AGENCY.md Scenario 1 can begin, as written,
-with the routine generator scoring *work shift* highest.
+### After the slice: routines and commitments
+
+AGENCY.md Scenario 1 as written: the worker's shift, an employment
+commitment from 8:00, is what puts wedging the lock in its mind. The world
+is quiet from the night's events until 8:00, when the scheduler wakes the
+worker; the routine generator offers its commitment, worth its duty (20)
+and no urgency yet, and with nothing else to weigh it against the worker
+takes it up, and the missing nails play out as before. Done, or found
+impossible, the commitment is settled for the shift and not taken up
+again. A shift of five seconds closes mid-search, and the commitment is
+dropped with what it needed. Taken up three tenths of the way through its
+window, it is worth 6 more for urgency. Saved mid-shift, the run ends the
+same.
+
+- **Commitments** (AGENCY.md §7): an agent undertakes a goal for a window,
+  from a source (`undertake:goal:from:until:source:`), kept in its
+  motivation store and saved.
+- **The routine generator** (§8): while a commitment's window is open, its
+  goal is a candidate worth `BG_DUTY` plus an urgency rising evenly to
+  `BG_URGENCY` at the deadline, weighed with the reactive candidates
+  against what the agent is doing.
+- **Windows**: the decision phase tells the scheduler when one opens or
+  closes (`nextDecisionTime`), so a quiet world wakes for them. A window
+  that closes drops its commitment and what it needed.
+
+Not yet: habits (a context, a choice, a strength rising with repetition
+and decaying), daily windows (each commitment is one window), promises
+made by saying so, breaking a promise as a history event that lowers
+trust, urgency curves other than a straight line, and the decision
+re-weighing as urgency rises between boundaries.
+
+42 tests, 702 checks, under both compilers, ASan and UBSan, and leak-free.
+
+Next: needs and interoception (AGENCY.md §6): body stocks as world state,
+interoception as a sense with its own precision, and need pressure as a
+consideration over what the agent feels, not what its body is, so the
+needs generator, the last of AGENCY.md §4's table, can raise *eat*.
