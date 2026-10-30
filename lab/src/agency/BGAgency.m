@@ -476,6 +476,35 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
 }
 
 
+- (BOOL) autopilotRoutine:(BGEntityID) agent
+                threshold:(int32_t) threshold
+{
+   BGMotivation   *m;
+
+   [self control:agent];
+   m             = [self mindOf:agent];
+   m->autopilot  = YES;
+   m->routine    = YES;
+   m->threshold  = threshold;
+   m->handedBack = NO;
+   m->wake       = [_world time].ms + 1;
+   return( YES);
+}
+
+
+/* YES while a commitment of its is still to keep: not settled, its window
+ * not yet closed. */
+- (BOOL) hasRoutine:(BGMotivation *) m
+{
+   int   k;
+
+   for( k = 0; k < m->ncommitments; k++)
+      if( ! m->commitments[ k].settled && m->commitments[ k].until > [_world time].ms)
+         return( YES);
+   return( NO);
+}
+
+
 - (NSArray *) takeNotices
 {
    NSArray   *notices;
@@ -2050,10 +2079,11 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    if( busy)
       against += BG_INTERRUPT;
    verdict = bestWorth > against;
-   if( m->autopilot)
+   if( m->autopilot && ! (m->routine && bestCommitment >= 0))
    {
-      /* the player's character takes up nothing of its own: past the
-       * player's threshold, the player decides */
+      /* the player's character takes up nothing of its own, but its routine
+       * if it is to carry on with that: past the player's threshold, the
+       * player decides */
       if( bestWorth > m->threshold && ! m->handedBack)
       {
          goal_title( tri, best, title, sizeof( title));
@@ -2185,7 +2215,9 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
       return( NO);      /* something else won: decide again, for it */
    if( m->autopilot && ! m->nintentions)
    {
-      [self handBack:m why:@"there is nothing left to do"];
+      if( m->routine && [self hasRoutine:m])
+         return( YES);      /* waiting for its routine */
+      [self handBack:m why:m->routine ? @"its routine is done" : @"there is nothing left to do"];
       return( YES);
    }
    if( ! m->nintentions || busy)
@@ -2338,8 +2370,8 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    for( i = 0; i < [_minds count]; i++)
    {
       m = [_minds objectAtIndex:i];
-      if( m->autopilot && ! m->nintentions && ! m->handedBack)
-         [self handBack:m why:@"there is nothing left to do"];
+      if( m->autopilot && ! m->nintentions && ! m->handedBack && ! (m->routine && [self hasRoutine:m]))
+         [self handBack:m why:m->routine ? @"its routine is done" : @"there is nothing left to do"];
    }
    for( i = [_minds count]; i > 0; i--)
       if( ((BGMotivation *) [_minds objectAtIndex:i - 1])->handedBack)
@@ -2414,6 +2446,8 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
       [lines addObject:line];
       if( m->autopilot)
          [lines addObject:[NSString stringWithFormat:@"autopilot %llu %d", (unsigned long long) m->agent, m->threshold]];
+      if( m->routine)
+         [lines addObject:[NSString stringWithFormat:@"routine %llu", (unsigned long long) m->agent]];
       if( m->wake)
          [lines addObject:[NSString stringWithFormat:@"wake %llu %lld", (unsigned long long) m->agent, (long long) m->wake]];
       for( k = 0; k < m->nhabits; k++)
@@ -2505,6 +2539,11 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
       if( [words count] == 3 && [[words objectAtIndex:0] isEqualToString:@"wake"])
       {
          [self mindOf:(BGEntityID) [[words objectAtIndex:1] longLongValue]]->wake = [[words objectAtIndex:2] longLongValue];
+         continue;
+      }
+      if( [words count] == 2 && [[words objectAtIndex:0] isEqualToString:@"routine"])
+      {
+         [self mindOf:(BGEntityID) [[words objectAtIndex:1] longLongValue]]->routine = YES;
          continue;
       }
       if( [words count] == 3 && [[words objectAtIndex:0] isEqualToString:@"autopilot"])

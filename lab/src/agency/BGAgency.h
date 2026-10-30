@@ -194,6 +194,7 @@ typedef struct
    int              nhabits;
    int64_t          wake;              /* a decision is due then (ms), or 0 */
    BOOL             autopilot;         /* the player's character, handed over */
+   BOOL             routine;           /* to carry on with its commitments */
    int32_t          threshold;         /* worth above which control returns */
    BOOL             handedBack;
    NSMutableArray   *log;
@@ -259,6 +260,13 @@ typedef struct
 - (BOOL) autopilot:(BGEntityID) agent
             toGoal:(const char *) goal
          threshold:(int32_t) threshold;
+/* Autopilot, "continue my routine" (AGENCY.md §14): agency takes the
+ * player's character to keep its commitments as their windows open, worth
+ * what they are, and takes up nothing else of its own: past `threshold`,
+ * control returns. With nothing to do it waits for its routine; with no
+ * commitment left to keep, control returns. */
+- (BOOL) autopilotRoutine:(BGEntityID) agent
+                threshold:(int32_t) threshold;
 /* why control returned since last asked, one line each */
 - (NSArray *) takeNotices;
 

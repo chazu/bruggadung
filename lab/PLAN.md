@@ -2824,3 +2824,28 @@ remembered map are exactly this system"); attention limits what happens
 and what is new on the floor, not what is in view.
 
 76 tests, 2534 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: autopilot, "continue my routine"
+
+AGENCY.md §14's autopilot modes: "keep working until something happens,
+continue my routine, auto-explore, carry out this recipe. The player
+chooses the goal set and the interruption threshold." The autopilot
+slice's "Not yet": modes beyond "this goal".
+
+- **`autopilotRoutine:threshold:`**: the goal set is the character's
+  commitments. Agency takes them up as their windows open, worth what they
+  are, past the threshold too: that is what the player asked for.
+  Anything else worth more than the threshold returns control, as before.
+- **Waiting for it**: with nothing to do and a commitment still to keep,
+  the character waits (the window's opening wakes it); with none left,
+  control returns ("its routine is done"). Saved (`routine`).
+
+Checked: Oskar, handed over at the start with a threshold of 10 and a
+shift to tighten the nut between 60 s and 120 s, waits with control kept;
+at 60 s takes it up (worth 20); tightens it; and control returns, his
+routine done.
+
+Not yet: auto-explore (what exploring is isn't specified), and carrying
+out a recipe (recipes expand through knowledge, ACTIONS.md §6, not built).
+
+77 tests, 2541 checks, under both compilers, ASan, and leak-free.

@@ -5493,6 +5493,59 @@ static BGAgency   *urgent_nut( void)
 }
 
 
+/* AGENCY.md §14, autopilot "continue my routine": the player hands Oskar,
+ * beside the nut with a spanner, to agency from the start, past a
+ * threshold of 10; his shift has him tighten the nut between 60 s and
+ * 120 s. He waits for it, control not returning; at 60 s he takes it up,
+ * worth more than the threshold (it is his routine); done, his routine is
+ * done, and control returns. */
+static void   test_routine_autopilot( void)
+{
+   BGStage            st;
+   BGActivities       *activities;
+   BGKnowledge        *knowledge;
+   BGAgency           *agency;
+   BGProposalGroup    *g;
+   BGEntityID         worker;
+   BGEntityID         nut;
+   NSArray            *notices;
+   int64_t            v;
+
+   st.w       = BGTestWorld( 71);
+   st.c       = BGTestCommitter( st.w);
+   activities = [BGActivities activitiesWithWorld:st.w committer:st.c];
+   knowledge  = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+   agency     = [[[BGAgency alloc] initWithWorld:st.w committer:st.c knowledge:knowledge] autorelease];
+   st.s       = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [agency setActivities:activities];
+   [st.s setActivities:activities];
+   [st.s setPerception:knowledge];
+   [st.s setDecision:agency];
+   g      = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the pump"];
+   worker = [g create:"worker" key:"Oskar" at:BGOnTile( 5, 2, 0)];
+   [g create:"spanner_19" key:"spanner" at:BGHeldBy( worker, 0)];
+   nut    = [g create:"gland_nut" key:"gland nut" at:BGOnTile( 6, 2, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   worker = [g idFor:worker];
+   nut    = [g idFor:nut];
+   BG_CHECK( [agency undertake:worker goal:"tighten_nut" from:60000 until:120000 source:"employment"]);
+   BG_CHECK( [agency autopilotRoutine:worker threshold:10]);
+
+   /* waiting for its routine: control stays with agency */
+   [st.s runUntil:BGTimeMake( 30000)];
+   BG_CHECK( [[agency takeNotices] count] == 0 && [agency controls:worker]);
+   BG_CHECK( ! ([st.w getField:"Fastener.tight" of:nut value:&v] && v));
+
+   /* its shift: taken up, though worth more than the threshold */
+   [st.s runUntil:BGTimeMake( 90000)];
+   BG_CHECK( logged_by( agency, worker, @"t=60000ms [-] weighing tighten the nut"));
+   BG_CHECK( [st.w getField:"Fastener.tight" of:nut value:&v] && v);
+   notices = [agency takeNotices];
+   BG_CHECK( [notices count] == 1 && [[notices objectAtIndex:0] isEqualToString:@"Control returns to you: its routine is done."]);
+}
+
+
 /* KNOWLEDGE.md §11: conflicting beliefs coexist as competing hypotheses.
  * The worker has seen the nut plainly (19 mm) and stands four tiles off;
  * the smith, beside it, says the nut is 22 mm. Its belief and the smith's
@@ -7857,6 +7910,7 @@ const BGTestCase   BGAllTests[] =
    { "trodden",                       test_trodden },
    { "traced_units",                  test_traced_units },
    { "attention_budget",              test_attention_budget },
+   { "routine_autopilot",             test_routine_autopilot },
    { "resume_recheck",                test_resume_recheck },
    { "interrupted_repair",            test_interrupted_repair },
    { "unattended_stove",              test_unattended_stove },
