@@ -69,6 +69,20 @@ These were made while writing this document and have not yet been reviewed.
     it sees again, closely, no trace where one should still be, or is
     told a credible other cause. A premise over repetition is contradicted
     when the repetition moves on (the lab's habit beliefs).
+12. **Memory and perception form doubts of their own** ("it was X, or
+    maybe Y"; CONTENT_LANGUAGE.md Scenario 2's half-remembering), whenever
+    forming or recalling a memory goes worse than usual. The sources so
+    far, open to more:
+    - *decay*: as a feature generalizes ("19 mm" to "a spanner size"), the
+      specific value lingers as a competing hypothesis, fading with it;
+    - *confusion*: two similar things, or events, encoded or recalled
+      together;
+    - *distraction*: little attention left when it was taken in (§5, the
+      attention budget);
+    - *impairment*: the perceiver's state (exhaustion, injury, adrenaline,
+      intoxication) degrading what it takes in or recalls;
+    - *poor sight*: seen in poor conditions (dusk, distance), something
+      that could be either of two known things is held as both.
 
 ## Terms
 
