@@ -2303,6 +2303,124 @@ static void   test_appearance( void)
 }
 
 
+/* KNOWLEDGE.md Scenario 2's second half, interpretation: the smith wedges the
+ * lock at night, with the porter, who can't paint, watching; the porter goes
+ * home, and the smith touches up the paint. In the morning the foreman, a
+ * painter, the porter, and the carter, who neither paints nor saw the marks,
+ * come by the lock. */
+static void   test_interpretation( void)
+{
+   BGWorld            *w;
+   BGWorld            *w2;
+   BGCommitter        *c;
+   BGScheduler        *s;
+   BGActivities       *activities;
+   BGKnowledge        *knowledge;
+   BGKnowledge        *restored;
+   BGTraces           *traces;
+   BGKnowledgeStore   *store;
+   BGProposalGroup    *g;
+   const BGFinding    *f;
+   NSArray            *deferred;
+   NSString           *error;
+   NSString           *text;
+   BGEntityID         lock;
+   BGEntityID         smith;
+   BGEntityID         nails;
+   BGEntityID         foreman;
+   BGEntityID         porter;
+   BGEntityID         carter;
+   uint64_t           position;
+
+   w          = BGTestWorld( 31);
+   c          = BGTestCommitter( w);
+   activities = [BGActivities activitiesWithWorld:w committer:c];
+   knowledge  = [[[BGKnowledge alloc] initWithWorld:w] autorelease];
+   traces     = [[[BGTraces alloc] initWithWorld:w] autorelease];
+   s          = [[[BGScheduler alloc] initWithWorld:w committer:c] autorelease];
+   [s setActivities:activities];
+   [s setPerception:knowledge];
+   [s addDomain:traces];
+   g       = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the workshop at night"];
+   lock    = [g create:"lock" key:"lock" at:BGOnTile( 5, 4, 0)];
+   smith   = [g create:"smith" key:"smith" at:BGOnTile( 4, 4, 0)];
+   nails   = [g create:"nails_10" key:"nails" at:BGHeldBy( smith, 0)];
+   porter  = [g create:"porter" key:"porter" at:BGOnTile( 7, 6, 0)];
+   foreman = [g create:"foreman" key:"foreman" at:BGOnTile( 25, 25, 0)];
+   carter  = [g create:"carter" key:"carter" at:BGOnTile( 25, 2, 0)];
+   [c submit:g];
+   [s runUntil:BGTimeMake( 1)];
+   lock    = [g idFor:lock];
+   smith   = [g idFor:smith];
+   nails   = [g idFor:nails];
+   porter  = [g idFor:porter];
+   foreman = [g idFor:foreman];
+   carter  = [g idFor:carter];
+
+   /* the wedging, watched by the porter, who sees the tool marks */
+   BG_CHECK( BGPerform( w, c, BGActionMake( "drive", smith, nails, lock), 0, &error) != nil);
+   [s runUntil:BGTimeMake( 6000)];
+   store = [knowledge storeOf:porter];
+   BG_CHECK( traced( store, "tool_marks"));
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the porter goes home"];
+   [g move:BGWhole( porter) to:BGOnTile( 25, 12, 0)];
+   [c submit:g];
+   [s runUntil:BGTimeMake( 7000)];
+
+   /* the touch-up, unwatched */
+   BG_CHECK( BGPerform( w, c, BGActionMake( "touch_up", smith, lock, BGNoEntity), 0, &error) != nil);
+   [s runUntil:BGTimeMake( 28000)];
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the smith goes home"];
+   [g move:BGWhole( smith) to:BGOnTile( 30, 30, 0)];
+   [c submit:g];
+   [s runUntil:BGTimeMake( 8 * 3600000LL)];
+
+   /* the morning */
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: they come by the lock"];
+   [g move:BGWhole( foreman) to:BGOnTile( 4, 4, 0)];
+   [g move:BGWhole( porter) to:BGOnTile( 6, 4, 0)];
+   [g move:BGWhole( carter) to:BGOnTile( 5, 6, 0)];
+   [c submit:g];
+   [s runUntil:BGTimeMake( 8 * 3600000LL + 1000)];
+
+   /* everyone sees the fresh paint */
+   BG_CHECK( traced( [knowledge storeOf:foreman], "fresh_paint"));
+   BG_CHECK( traced( [knowledge storeOf:porter], "fresh_paint"));
+   BG_CHECK( traced( [knowledge storeOf:carter], "fresh_paint"));
+
+   /* 5: expertise gates interpretation: the painter concludes something
+    * happened to the lock; the others see only paint */
+   store = [knowledge storeOf:foreman];
+   f     = [store finding:"#Tampered" about:referent_of( store, lock)];
+   BG_CHECK( f && f->credence == 10 && ! strcmp( f->rule, "touched_up"));
+   BG_CHECK( ! [[knowledge storeOf:porter] finding:"#Tampered" about:referent_of( [knowledge storeOf:porter], lock)]);
+   BG_CHECK( ! [[knowledge storeOf:carter] findingCount]);
+
+   /* 4: prior beliefs gate interpretation: the porter, who saw the tool
+    * marks, and sees them gone under fresh paint, concludes they were painted
+    * over; the painter, who never saw them, doesn't */
+   store = [knowledge storeOf:porter];
+   BG_CHECK( ! traced( store, "tool_marks"));
+   f = [store finding:"#CoveredUp" about:referent_of( store, lock)];
+   BG_CHECK( f && f->credence == 20 && ! strcmp( f->rule, "covered_up"));
+   BG_CHECK( ! [[knowledge storeOf:foreman] finding:"#CoveredUp" about:referent_of( [knowledge storeOf:foreman], lock)]);
+   BG_CHECK( f && f->time >= 8 * 3600000LL);           /* drawn in the morning, when it saw the paint */
+
+   /* 6: no truth in what they conclude: a finding is about a referent of
+    * theirs, with the rule that drew it, never what made the traces */
+   BG_CHECK( [[knowledge dump:porter] rangeOfString:@"finding #CoveredUp about R"].location != NSNotFound);
+
+   /* saved and restored the same */
+   text = BGSave( w, c, [NSArray arrayWithObjects:knowledge, traces, nil]);
+   w2   = BGRestore( text, [w contentBuild], &deferred, &position, &error);
+   BG_CHECK( w2 != nil);
+   restored = [[[BGKnowledge alloc] initWithWorld:w2] autorelease];
+   [restored restoreSavedState:BGSavedDomainState( text, @"knowledge")];
+   BG_CHECK( [[restored dump:foreman] isEqualToString:[knowledge dump:foreman]]);
+   BG_CHECK( [[restored dump:porter] isEqualToString:[knowledge dump:porter]]);
+}
+
+
 /* --- the cistern ----------------------------------------------------------- */
 
 static BGCistern   *run_cistern( BGCisternVariant variant)
@@ -2619,6 +2737,7 @@ const BGTestCase   BGAllTests[] =
    { "salience",                      test_salience },
    { "traces",                        test_traces },
    { "appearance",                    test_appearance },
+   { "interpretation",                test_interpretation },
    { "cistern",                       test_cistern },
    { "cistern_b",                     test_cistern_b },
    { "cistern_d",                     test_cistern_d },

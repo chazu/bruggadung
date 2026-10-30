@@ -964,8 +964,39 @@ analysis operations beyond the scratch test (acid, comparing seals).
 
 35 tests, 526 checks, under both compilers, ASan and UBSan, and leak-free.
 
-Next: interpretation rules (KNOWLEDGE.md §9, Scenario 2's second half),
-content that derives beliefs from percepts and beliefs, gated by the
-interpreter's expertise ("touched-up paint means something happened to
-it" needs a painter's eye) and by prior beliefs ("the wrench was
-replaced" needs a belief that the old one was worn).
+### After the slice: interpretation rules
+
+KNOWLEDGE.md Scenario 2's second half. The smith wedges the lock at night,
+with the porter, who can't paint, watching; the porter goes home, and the
+smith touches up the paint. In the morning three come by the lock: the
+foreman, a painter; the porter; and the carter, who neither paints nor saw
+the marks. Everyone sees fresh paint. Only the foreman concludes that
+something was done to the lock (*touched up*, which needs a painter's
+eye). Only the porter, who saw the tool marks and finds them gone under
+fresh paint, concludes they were painted over (*covered up*, which needs
+that prior belief). The carter concludes nothing: paint is paint.
+
+- **Rules are content** (`content/interpret.tri`, `@family(rules)`):
+  premises over the thing a finding is about, a trace perceived on it now
+  (`#Sign`) or perceived before and gone now (`#Formerly`); the expertise
+  it needs (`skill`, `mastery`); the `#Finding` type it concludes; and the
+  credence it lends.
+- **Expertise is the agent's own**: skills are `#Agent` fields (`painting`
+  for now), read from the world as what the agent knows of itself.
+- **Immediate interpretation** runs after each perception phase, every
+  rule the agent has the expertise for over its referents; a rule whose
+  premises hold adds its finding, kept with the rule as its provenance,
+  dumped, and saved.
+
+Not yet: deliberate interpretation (investigating as an activity, with
+costlier rules), expertise grading a conclusion's precision rather than
+gating it, premises over beliefs other than traces (claims, features,
+findings), retracting a finding when a premise is retracted, findings
+feeding credence and agency, and attention budgets for interpretation.
+
+36 tests, 543 checks, under both compilers, ASan and UBSan, and leak-free.
+
+Next: the player's notebook (KNOWLEDGE.md Scenario 3): what the player's
+character knows, as the player sees it in `lab play`: the remembered map,
+claims heard with their sources and credences, open questions with their
+competing hypotheses, and findings.

@@ -60,6 +60,12 @@
  * strong it seems now (its age fades it), never what made it; a trace it
  * perceived at a site it perceives again, and no longer finds, is gone.
  *
+ * Interpretation (KNOWLEDGE.md §9), immediate: after each perception phase,
+ * the rules of content/interpret.tri run over the agent's referents, those
+ * whose expertise it has; a rule whose premises hold (traces perceived on
+ * the thing now, or perceived before and gone) adds its finding, with the
+ * rule as its provenance.
+ *
  * Salience (KNOWLEDGE.md §7, AGENCY.md §10): what an agent perceives happen
  * is kept as an observation only if it is salient enough: being addressed
  * most, its own deeds next, then what its goals concern (agency says what
@@ -164,6 +170,17 @@ typedef enum
 } BGAttribution;
 
 
+/* What a rule concluded (KNOWLEDGE.md §9): something about a referent. */
+typedef struct
+{
+   const char       *kind;         /* interned: a #Finding type, "#Tampered" */
+   uint32_t         about;         /* referent */
+   int32_t          credence;      /* dB */
+   const char       *rule;         /* interned: its provenance */
+   int64_t          time;          /* ms */
+} BGFinding;
+
+
 /* A claim heard (KNOWLEDGE.md §11's provenance item): `source` said that
  * `thing` is inside `container`, as of `when`. */
 typedef struct
@@ -214,6 +231,9 @@ typedef struct
    BGTraceSeen      *_traces;
    NSUInteger       _ntraces;
    NSUInteger       _trcapacity;
+   BGFinding        *_findings;
+   NSUInteger       _nfindings;
+   NSUInteger       _fcapacity;
 }
 
 - (BGEntityID) agent;
@@ -262,6 +282,13 @@ typedef struct
 /* the traces it has perceived, first perceived first */
 - (NSUInteger) traceCount;
 - (const BGTraceSeen *) traceAt:(NSUInteger) i;
+
+/* what it has concluded, first concluded first */
+- (NSUInteger) findingCount;
+- (const BGFinding *) findingAt:(NSUInteger) i;
+/* the finding of that kind about the referent, or NULL */
+- (const BGFinding *) finding:(const char *) kind
+                        about:(uint32_t) referentID;
 
 /* the claims it has heard, oldest first */
 - (NSUInteger) testimonyCount;

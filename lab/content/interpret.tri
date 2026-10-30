@@ -1,0 +1,49 @@
+// Interpretation (KNOWLEDGE.md §9): rules that derive findings from what an
+// agent perceives and believes, run on what it perceives, as it perceives
+// it. Each rule may need expertise: an agent less skilled than its `mastery`
+// doesn't draw it, and sees only the signs. Its premises can need prior
+// beliefs, too: something it saw before that is gone now.
+
+// What a rule concludes: something about a body.
+#Finding:   { about: #Body }
+// Something was done to it.
+#Tampered:  #Finding & {}
+// Something was done to it, and hidden.
+#CoveredUp: #Finding & {}
+
+// A rule's premises, over the body it is about.
+#Premise:  {}
+// a trace of this kind perceived on it now
+#Sign:     #Premise & { sign: text }
+// a trace of this kind perceived on it before, gone now
+#Formerly: #Premise & { formerly: text }
+
+#Skill: "painting"
+
+// `concludes` is a #Finding type; `weight` the credence it lends, in dB.
+#Rule: {
+    premises:  [...#Premise]
+    skill:     #Skill
+    mastery:   int & >=0 & <=100
+    concludes: text
+    weight:    int & >=0 & <=30
+}
+
+// Fresh paint, to a painter's eye, means something was touched up: something
+// happened to it.
+touched_up: #Rule & {
+    premises:  [#Sign & { sign: "fresh_paint" }]
+    skill:     "painting"
+    mastery:   30
+    concludes: "#Tampered"
+    weight:    10
+} @family(rules)
+
+// Fresh paint where there were tool marks: they were painted over. Anyone
+// sees it, who saw the marks.
+covered_up: #Rule & {
+    premises:  [#Sign & { sign: "fresh_paint" }, #Formerly & { formerly: "tool_marks" }]
+    mastery:   0
+    concludes: "#CoveredUp"
+    weight:    20
+} @family(rules)

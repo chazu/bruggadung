@@ -302,7 +302,8 @@ A rebuilt world produces the same next step as one that never saved.
    trust, disposition, and how busy the agent is; and traces that operations
    leave and remove, aging analytically, so a cover-up leaves its own; and
    appearance that differs from the truth until an analysis reaches beneath
-   it. Next, per [lab/PLAN.md](lab/PLAN.md): interpretation rules.
+   it; and interpretation rules gated by expertise and prior beliefs. Next,
+   per [lab/PLAN.md](lab/PLAN.md): the player's notebook.
 
 ## Cross-cutting open questions
 

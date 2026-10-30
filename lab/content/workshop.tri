@@ -39,7 +39,7 @@ apprentice: #Agent & { material: "flesh", mass: 55kg, hands: 2, coat: "navy" }
 carter:    #Agent & { material: "flesh", mass: 75kg, hands: 2, coat: "red" }
 porter:    #Agent & { material: "flesh", mass: 80kg, hands: 2, coat: "yellow" }
 neighbour: #Agent & { material: "flesh", mass: 60kg, hands: 2, coat: "grey" }
-foreman:   #Agent & { material: "flesh", mass: 90kg, hands: 2, coat: "black" }
+foreman:   #Agent & { material: "flesh", mass: 90kg, hands: 2, coat: "black", painting: 50 }
 
 // For salience and bounded stores: someone who keeps little in mind.
 gossip: #Agent & { material: "flesh", mass: 65kg, hands: 2, coat: "beige", memory: 4 }

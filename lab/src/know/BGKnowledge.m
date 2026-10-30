@@ -143,6 +143,7 @@ static NSUInteger   feature_keys( const char *features, char (*keys)[ 32], NSUIn
    free( _observations);
    free( _testimony);
    free( _traces);
+   free( _findings);
    [_news release];
    [super dealloc];
 }
@@ -348,6 +349,41 @@ static NSUInteger   feature_keys( const char *features, char (*keys)[ 32], NSUIn
    }
    _traces[ _ntraces++] = t;
    return( YES);
+}
+
+
+- (NSUInteger) findingCount
+{
+   return( _nfindings);
+}
+
+
+- (const BGFinding *) findingAt:(NSUInteger) i
+{
+   return( &_findings[ i]);
+}
+
+
+- (const BGFinding *) finding:(const char *) kind
+                        about:(uint32_t) referentID
+{
+   NSUInteger   i;
+
+   for( i = 0; i < _nfindings; i++)
+      if( _findings[ i].about == referentID && ! strcmp( _findings[ i].kind, kind))
+         return( &_findings[ i]);
+   return( NULL);
+}
+
+
+- (void) addFinding:(BGFinding) f
+{
+   if( _nfindings == _fcapacity)
+   {
+      _fcapacity = _fcapacity ? _fcapacity * 2 : 16;
+      _findings  = realloc( _findings, sizeof( BGFinding) * _fcapacity);
+   }
+   _findings[ _nfindings++] = f;
 }
 
 
@@ -1464,6 +1500,107 @@ static uint32_t   bound_to( BGEntityID e, BGEntityID agent, uint32_t me, const B
 }
 
 
+/* Whether the agent perceives a trace of the kind on the referent: there
+ * now, or (`gone`) there before and not any more. */
+static BOOL   bears( BGKnowledgeStore *store, uint32_t referent, const char *kind, BOOL gone)
+{
+   const BGTraceSeen   *t;
+   NSUInteger          i;
+
+   for( i = 0; i < [store traceCount]; i++)
+   {
+      t = [store traceAt:i];
+      if( t->bearer == referent && ! strcmp( t->kind, kind) && t->present == ! gone)
+         return( YES);
+   }
+   return( NO);
+}
+
+
+/* Immediate interpretation: each rule the agent has the expertise for, over
+ * each referent; a rule whose premises all hold adds its finding. */
+- (void) interpret:(BGKnowledgeStore *) store
+              news:(NSMutableArray *) news
+{
+   const TriNode      *rule;
+   const TriNode      *list;
+   const TriNode      *premise;
+   const TriNode      *v;
+   const BGReferent   *r;
+   TriContent         *tri;
+   TriIndex           *family;
+   BGFinding          f;
+   NSUInteger         i;
+   NSUInteger         j;
+   int64_t            lo;
+   int64_t            hi;
+   int64_t            skill;
+   int64_t            mastery;
+   char               text[ 64];
+   char               path[ 96];
+   char               concludes[ 64];
+   size_t             n;
+   BOOL               holds;
+
+   tri    = [_world tri];
+   family = tri_family_index( tri, "rules");
+   for( i = 0; family && i < tri_index_count( family); i++)
+   {
+      rule = tri_pattern( tri, tri_index_tag( family, i));
+      v    = tri_at( tri, rule, "concludes");
+      n    = v ? tri_print( tri, v, concludes, sizeof( concludes)) : 0;
+      if( n < 3)
+         continue;
+      memmove( concludes, concludes + 1, n - 2);
+      concludes[ n - 2] = 0;
+      /* expertise: the agent's own skill, which it knows */
+      v       = tri_at( tri, rule, "mastery");
+      mastery = v && tri_node_interval( v, &lo, &hi) && lo == hi ? lo : 0;
+      v       = tri_at( tri, rule, "skill");
+      if( v && tri_print( tri, v, text, sizeof( text)) > 2 && text[ 0] == '"')
+      {
+         text[ strlen( text) - 1] = 0;
+         snprintf( path, sizeof( path), "Agent.%s", text + 1);
+         skill = 0;
+         if( ! [_world getField:path of:[store agent] value:&skill] || skill < mastery)
+            continue;
+      }
+      for( j = 0; j < [store count]; j++)
+      {
+         r = [store referentAt:j];
+         if( r->id == [store selfReferent] || [store finding:concludes about:r->id])
+            continue;
+         holds = YES;
+         for( list = tri_at( tri, rule, "premises"); holds && list && (premise = tri_at( tri, list, "first"));
+              list = tri_at( tri, list, "rest"))
+         {
+            if( (v = tri_at( tri, premise, "sign")) && tri_print( tri, v, text, sizeof( text)) > 2)
+            {
+               text[ strlen( text) - 1] = 0;
+               holds = bears( store, r->id, text + 1, NO);
+            }
+            else if( (v = tri_at( tri, premise, "formerly")) && tri_print( tri, v, text, sizeof( text)) > 2)
+            {
+               text[ strlen( text) - 1] = 0;
+               holds = bears( store, r->id, text + 1, YES);
+            }
+         }
+         if( ! holds)
+            continue;
+         memset( &f, 0, sizeof( f));
+         f.kind  = [_world intern:concludes];
+         f.about = r->id;
+         v       = tri_at( tri, rule, "weight");
+         f.credence = v && tri_node_interval( v, &lo, &hi) && lo == hi ? (int32_t) lo : 0;
+         f.rule  = [_world intern:tri_index_tag( family, i)];
+         f.time  = [_world time].ms;
+         [store addFinding:f];
+         [news addObject:[NSString stringWithFormat:@"R%u: %s, by %s (%+d dB)", r->id, f.kind, f.rule, f.credence]];
+      }
+   }
+}
+
+
 - (void) perceive:(BGKnowledgeStore *) store
              from:(NSUInteger) first
                to:(NSUInteger) last
@@ -1784,6 +1921,7 @@ static uint32_t   bound_to( BGEntityID e, BGEntityID agent, uint32_t me, const B
    }
    memory = [_world record:[_world kindNamed:"Agent"] for:agent];
    [store keepAtMost:memory && memory->memory > 0 ? (NSUInteger) memory->memory : 64];
+   [self interpret:store news:news];
    free( seen);
    free( assigned);
    free( taken);
@@ -2025,6 +2163,14 @@ static NSString   *attribution_text( const BGTestimony *t)
                                 : [NSString stringWithFormat:@"at (%d, %d)", t->x, t->y],
                       t->strength, (long long) t->seen, t->present ? "" : ", gone", (unsigned long long) t->truth];
    }
+   for( i = 0; i < [store findingCount]; i++)
+   {
+      const BGFinding   *f;
+
+      f = [store findingAt:i];
+      [s appendFormat:@"  finding %s about R%u, %+d dB, by %s at %lldms\n", f->kind, f->about, f->credence, f->rule,
+                      (long long) f->time];
+   }
    [s appendString:[self dumpTestimony:store]];
    for( i = 0; i < [store observationCount]; i++)
    {
@@ -2140,6 +2286,14 @@ char   *BGDecodeWord( const char *s)
                                                      (unsigned long long) [store agent], tr->bearer, tr->x, tr->y,
                                                      tr->level, tr->strength, (long long) tr->seen, tr->present ? 1 : 0,
                                                      (unsigned long long) tr->truth, tr->kind]];
+      }
+      for( j = 0; j < [store findingCount]; j++)
+      {
+         const BGFinding   *f;
+
+         f = [store findingAt:j];
+         [lines addObject:[NSString stringWithFormat:@"finding %llu %u %d %lld %s %s", (unsigned long long) [store agent],
+                                                     f->about, f->credence, (long long) f->time, f->kind, f->rule]];
       }
       for( j = 0; j < [store testimonyCount]; j++)
       {
@@ -2259,6 +2413,18 @@ char   *BGDecodeWord( const char *s)
          tr.truth    = (BGEntityID) truth;
          tr.kind     = [_world intern:role];
          [[self storeOf:(BGEntityID) agent] noteTrace:tr];
+      }
+      else if( sscanf( text, "finding %llu %u %d %lld %63s %511s", &agent, &id, &trust, &seen, role, kind) == 6)
+      {
+         BGFinding   f;
+
+         memset( &f, 0, sizeof( f));
+         f.about    = id;
+         f.credence = trust;
+         f.time     = seen;
+         f.kind     = [_world intern:role];
+         f.rule     = [_world intern:kind];
+         [[self storeOf:(BGEntityID) agent] addFinding:f];
       }
       else if( sscanf( text, "ancestry %llu %llu %llu %llu %d %d", &truth, &agent, &origin, &parent, &form,
                        &present) == 6)

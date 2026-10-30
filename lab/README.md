@@ -99,7 +99,10 @@ with nothing to compute between. Agents perceive them by sight or smell,
 never what made them. A component field can declare another's appearance
 (`#Body.surface` for `material`): perception reports the appearance, and
 only an analysis (`test_scratch`) finds the truth beneath, which the
-analyser then keeps. Agents keep observations only if they are salient: being
+analyser then keeps. Interpretation rules in content draw findings from
+what an agent perceives (fresh paint means something was touched up),
+gated by its expertise and by what it saw before. Agents keep observations
+only if they are salient: being
 addressed, their own deeds, or what their goals concern, more than a busy
 agent's activity demands of its attention; and only as many as their
 `memory` holds, the least salient evicted first. The menu `lab play`
