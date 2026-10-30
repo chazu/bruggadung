@@ -126,6 +126,9 @@ BOOL               BGOperationStage( BGWorld *world, const char *operation, int6
  * checkpoints. NO if it declares none. */
 BOOL               BGOperationPartial( BGWorld *world, const char *operation, int64_t index,
                                        const char **field, int *role, int64_t *whole, int64_t *checkpoints);
+/* Whether stage `index` fails on a hard interruption, rather than being
+ * suspended. */
+BOOL               BGOperationFailsHard( BGWorld *world, const char *operation, int64_t index);
 
 /* Why the actor can't start (or resume) an activity of `operation` now: a
  * running activity of its, other than `except`, uses a provider this one

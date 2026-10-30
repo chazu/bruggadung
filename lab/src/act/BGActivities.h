@@ -8,7 +8,8 @@
  *     activity fails
  *   - a running timed activity whose bound entities are gone or out of the
  *     actor's reach, or whose operation's pattern no longer holds, is
- *     suspended (a hard interruption, ACTIONS.md §5)
+ *     suspended, or fails, as its stage declares (a hard interruption,
+ *     ACTIONS.md §5)
  *   - an activity with a watch completes when its domain reports the watch
  *     ("watched", from the fluid domain)
  *   - a fill ends, "exhausted", when its tap reports its source ran dry

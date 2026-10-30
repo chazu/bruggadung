@@ -1888,3 +1888,19 @@ partial effects other than setting a field (a trench's length as a split,
 an emptied stock), and the dismantling's stages showing progress.
 
 56 tests, 2051 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: failing hard, as the stage declares
+
+ACTIONS.md §5: "hard interruptions … force a suspension or failure, as the
+stage declares." A step declares `hard`: "suspend" (the default) or
+"fail". Taking something up (`take_up`) fails, since a thing snatched from
+where it lay leaves nothing to come back to. The smith snatches the saw
+from the bench half a second into the worker's take, and the take fails at
+that boundary: "what it needs no longer holds, at roles.item.place". The
+sawing, whose saw is taken from the hand, is suspended as before.
+
+- **The match frame copies a step's own declarations**: `partial`,
+  `checkpoints`, and `hard` join `duration` and the rest. Without that, an
+  operation declaring them matched as unknown on its own fields.
+
+57 tests, 2055 checks, under both compilers, ASan and UBSan, and leak-free.

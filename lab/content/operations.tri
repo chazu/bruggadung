@@ -18,13 +18,16 @@
 // reaches as the stage completes. It is set in proportion to the stage's
 // progress at each of its `checkpoints` (evenly spaced; each a step
 // boundary), and when the activity is interrupted: suspended, aborted, or
-// failed. Its effect proper commits on completion.
+// failed. Its effect proper commits on completion. A hard interruption
+// (what it binds gone or out of reach, or what it needs no longer holding)
+// suspends it, or fails it, as it declares (`hard`).
 #Partial: { field: text, showsOn: *"destination" | "item", whole: int }
 #Step: {
     duration:    time & >=0ms & <=1d
     effect:      #Effect
     partial:     #Partial
     checkpoints: *0 | int & >=0 & <=100
+    hard:        *"suspend" | "fail"
 }
 
 // A stage of an activity: it takes `duration`, and its effect commits when
@@ -243,11 +246,13 @@ watch_closely: #Operation & {
 } @family(operations)
 
 // Take something up, carefully: a second, then into a free hand. Two who
-// start together finish together, and only one gets it.
+// start together finish together, and only one gets it. Taken from where it
+// was meanwhile, the take fails: there is nothing to come back to.
 take_up: #Operation & {
     effect:   "take"
     duration: 1s
     uses:     ["hands"]
+    hard:     "fail"
     roles: {
         actor: #Agent & { freeHands: >=1 }
         item:  #Body & { place: #OnTile | #Inside }

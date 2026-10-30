@@ -5004,6 +5004,55 @@ static BOOL   saw_run( int stop, int64_t cut[ 12], const char **status)
 }
 
 
+/* A hard interruption, as the stage declares: a take whose item is snatched
+ * from where it lay fails at once, there being nothing to come back to;
+ * sawing whose saw is taken is suspended (below). */
+static void   test_hard_fail( void)
+{
+   BGStage           st;
+   BGActivities      *activities;
+   BGProposalGroup   *g;
+   BGProposalGroup   *take;
+   BGEntityID        worker;
+   BGEntityID        smith;
+   BGEntityID        saw;
+   BGEntityID        a;
+   NSString          *error;
+   NSString          *trace;
+   int64_t           start;
+
+   st.w       = BGTestWorld( 109);
+   st.c       = BGTestCommitter( st.w);
+   activities = [BGActivities activitiesWithWorld:st.w committer:st.c];
+   st.s       = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [st.s setActivities:activities];
+   g      = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: a saw on the bench"];
+   worker = [g create:"worker" key:"worker" at:BGOnTile( 3, 3, 0)];
+   smith  = [g create:"smith" key:"smith" at:BGOnTile( 3, 4, 0)];
+   saw    = [g create:"hand_saw" key:"saw" at:BGOnTile( 4, 3, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   worker = [g idFor:worker];
+   smith  = [g idFor:smith];
+   saw    = [g idFor:saw];
+   error  = nil;
+   g      = BGPerform( st.w, st.c, BGActionMake( "take_up", worker, saw, BGNoEntity), 0, &error);
+   BG_CHECK( g != nil);
+   [st.s runUntil:BGTimeMake( 2)];
+   a = [g idFor:[g proposals][ 0].handle];
+   [st.w getField:"Activity.started" of:a value:&start];
+   take = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the smith snatches the saw"];
+   [take move:BGWhole( saw) to:BGHeldBy( smith, 0)];
+   [st.c submit:take];
+   [st.s runUntil:BGTimeMake( start + 500)];
+   BG_CHECK( ! strcmp( status_of( st.w, a), "\"failed\""));
+   trace = [[st.c trace] componentsJoinedByString:@"\n"];
+   BG_CHECK( [trace rangeOfString:@": failed (what it needs no longer holds, at roles.item.place)"].location != NSNotFound);
+   [st.s runUntil:BGTimeMake( start + 2000)];
+   BG_CHECK( [st.w locationOf:saw].place == smith);
+}
+
+
 static void   test_partial_effects( void)
 {
    int64_t      cut[ 12];
@@ -5359,6 +5408,7 @@ const BGTestCase   BGAllTests[] =
    { "cold_lodger",                   test_cold_lodger },
    { "stuffy_lodger",                 test_stuffy_lodger },
    { "partial_effects",               test_partial_effects },
+   { "hard_fail",                     test_hard_fail },
    { "rumour",                        test_rumour },
    { "memory_decay",                  test_memory_decay },
    { "salience",                      test_salience },

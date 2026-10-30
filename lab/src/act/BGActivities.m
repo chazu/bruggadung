@@ -454,9 +454,15 @@ static int64_t   next_checkpoint( BGWorld *world, BGEntityID a, const BGActivity
                   ((why = [self obstacleTo:a record:record]) || (why = [self requirementsOf:a record:record])))
          {
             /* a hard interruption: what it binds is gone or out of reach, or
-             * what it needs no longer holds (the saw out of its hand) */
-            group = [self suspend:a because:why error:NULL];
-            [group setCause:ev->index];
+             * what it needs no longer holds (the saw out of its hand): it is
+             * suspended, or fails, as its stage declares */
+            if( BGOperationFailsHard( _world, [_world textField:"Activity.operation" of:a], record->stage))
+               [self end:a status:"failed" because:why cause:ev->index];
+            else
+            {
+               group = [self suspend:a because:why error:NULL];
+               [group setCause:ev->index];
+            }
             ended[ nended++ % 64] = a;
          }
       }
