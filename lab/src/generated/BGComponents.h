@@ -1,4 +1,4 @@
-/* Generated from Triangle content 9765f73a884e1e8d: do not edit. Type IDs are valid
+/* Generated from Triangle content 5c1ce825132b0960: do not edit. Type IDs are valid
  * only for this content; regenerate when it changes. */
 #ifndef BG_COMPONENTS_H
 #define BG_COMPONENTS_H
@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BG_CONTENT_HASH 0x9765f73a884e1e8dULL
+#define BG_CONTENT_HASH 0x5c1ce825132b0960ULL
 
 /* Activity, from #Activity */
 typedef struct {
@@ -40,7 +40,7 @@ typedef struct {
 
 /* Agent, from #Agent */
 typedef struct {
-    const char *    coat;    /* text; content, saved, inspect, perceive(sight) */
+    uint32_t        coat;    /* #Colour: a type ID; content, saved, inspect, perceive(sight) */
     int64_t         hands;    /* int, in quanta of 1; content, saved, inspect, perceive(sight) */
 } BGAgent;
 
@@ -75,26 +75,40 @@ typedef struct {
 
 /* #ActivityStatus */
 enum {
-    BG_ACTIVITYSTATUS_COMPLETED = 85,
-    BG_ACTIVITYSTATUS_EXHAUSTED = 86,
-    BG_ACTIVITYSTATUS_FAILED = 87,
-    BG_ACTIVITYSTATUS_RUNNING = 88,
-    BG_ACTIVITYSTATUS_SUSPENDED = 89,
+    BG_ACTIVITYSTATUS_COMPLETED = 77,
+    BG_ACTIVITYSTATUS_EXHAUSTED = 78,
+    BG_ACTIVITYSTATUS_FAILED = 79,
+    BG_ACTIVITYSTATUS_RUNNING = 80,
+    BG_ACTIVITYSTATUS_SUSPENDED = 81,
 };
 
 /* #ClaimKind */
 enum {
-    BG_CLAIMKIND_CUSTODY = 91,
-    BG_CLAIMKIND_OWNERSHIP = 92,
+    BG_CLAIMKIND_CUSTODY = 83,
+    BG_CLAIMKIND_OWNERSHIP = 84,
 };
 
 /* #Material */
 enum {
-    BG_MATERIAL_BRASS = 105,
-    BG_MATERIAL_FLESH = 106,
-    BG_MATERIAL_IRON = 107,
-    BG_MATERIAL_OAK = 108,
-    BG_MATERIAL_PAPER = 109,
+    BG_MATERIAL_FLESH = 111,
+    BG_MATERIAL_BRASS = 113,
+    BG_MATERIAL_IRON = 114,
+    BG_MATERIAL_PAPER = 115,
+    BG_MATERIAL_OAK = 117,
+};
+
+/* #Colour */
+enum {
+    BG_COLOUR_BLUE = 87,
+    BG_COLOUR_BLACK = 89,
+    BG_COLOUR_BROWN = 90,
+    BG_COLOUR_GREEN = 91,
+    BG_COLOUR_GREY = 92,
+    BG_COLOUR_BEIGE = 94,
+    BG_COLOUR_NAVY = 95,
+    BG_COLOUR_RED = 96,
+    BG_COLOUR_WHITE = 97,
+    BG_COLOUR_YELLOW = 98,
 };
 
 /* The field registry: what code needs to read and write any component
@@ -152,7 +166,7 @@ static const BGFieldInfo BGBody_fields[] = {
 };
 
 static const BGFieldInfo BGAgent_fields[] = {
-    { "coat", offsetof(BGAgent, coat), BG_VALUE_TEXT, "text", "content, saved, inspect, perceive(sight)" },
+    { "coat", offsetof(BGAgent, coat), BG_VALUE_TYPE, "#Colour", "content, saved, inspect, perceive(sight)" },
     { "hands", offsetof(BGAgent, hands), BG_VALUE_QUANTITY, "int", "content, saved, inspect, perceive(sight)" },
 };
 

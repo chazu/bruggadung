@@ -811,7 +811,7 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    if( best)
    {
       c           = [store referent:best->container];
-      attribution = @"#Saw";
+      attribution = [NSString stringWithFormat:@"#Saw & { sure: %d }", [store strengthOf:best->id]];
       if( best->toldBy)
       {
          t           = [store strongestThat:best->id isIn:c->id];
@@ -821,10 +821,10 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
       return( [NSString stringWithFormat:@"#IsIn & { what: %s%@, within: %s & { place: #OnTile & { x: %d, y: %d, level: %d }%@ }, "
                                          @"when: %lldms, attribution: %@ }",
                                          best->kind,
-                                         best->features && *best->features
-                                            ? [NSString stringWithFormat:@" & { %s }", best->features] : @"",
+                                         [[store recall:best] length]
+                                            ? [NSString stringWithFormat:@" & { %@ }", [store recall:best]] : @"",
                                          c->kind, c->x, c->y, c->level,
-                                         c->features && *c->features ? [NSString stringWithFormat:@", %s", c->features] : @"",
+                                         [[store recall:c] length] ? [NSString stringWithFormat:@", %@", [store recall:c]] : @"",
                                          (long long) best->seen, attribution]);
    }
    tri_print( tri, what, printed, sizeof( printed));

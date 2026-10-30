@@ -40,6 +40,16 @@
  * grows when the agent sees a claim confirmed, and falls more when it finds
  * one false.
  *
+ * Memory decays (KNOWLEDGE.md §12), computed from the world's time when it
+ * is read: for each BG_MEMORY_STEP since a referent was last seen, each
+ * feature it keeps generalizes one step along its primary parent ("oak"
+ * becomes "wood"), and one generalized as far as it goes is forgotten. The
+ * strength of a belief of where a thing is, BG_SEEN for one seen, its
+ * credence for one told, fades by BG_FADE a step, and below BG_BELIEVE the
+ * agent forgets where it is, at its next perception phase. Seeing it again
+ * restores both. A claim of what the speaker saw says how sure it is, its
+ * memory's strength, and weighs no more than that.
+ *
  * True ancestry is developer-only: each claim said is traced, through what
  * its speaker knew when it spoke, to whoever saw it first, or to the one who
  * made it up (a fabrication root). Speakers know their own lies: their
@@ -62,6 +72,11 @@
 #define BG_BELIEVE         0      /* credence at which a claim is believed */
 #define BG_CONFIRMED       5      /* trust gained when a claim is seen to be true */
 #define BG_REFUTED        15      /* trust lost when a claim is found false */
+#define BG_SEEN           30      /* the strength of a belief of where a thing is, seen just now */
+#define BG_FADE            2      /* strength lost each memory step */
+#define BG_UNSTATED       INT32_MAX   /* a claim that says nothing of how sure */
+
+#define BG_MEMORY_STEP    86400000LL  /* ms: a day */
 
 typedef struct
 {
@@ -117,6 +132,7 @@ typedef struct
    uint32_t         root;          /* who it says saw it, the perceived root; 0 if unknown */
    BGAttribution    attribution;
    int              settled;       /* 1 seen true, -1 found false, 0 open */
+   int32_t          sure;          /* dB: how sure "saw" says it is, or BG_UNSTATED */
    uint64_t         utterance;     /* developer-only: the said event, for its true ancestry */
 } BGTestimony;
 
@@ -135,6 +151,7 @@ typedef struct
 
 @interface BGKnowledgeStore : NSObject
 {
+   BGWorld          *_world;         /* not retained: for the time memory decays by */
    BGEntityID       _agent;
    uint32_t         _self;
    BGReferent       *_referents;
@@ -161,8 +178,15 @@ typedef struct
                       y:(int32_t) y;
 /* lines saying what the last perception phase changed */
 - (NSArray *) news;
-/* the referent as a Triangle description, for the knowledge view */
+/* the referent as a Triangle description, for the knowledge view, with the
+ * detail memory has kept */
 - (NSString *) describeReferent:(uint32_t) referentID;
+/* the features the referent keeps, as memory has them now */
+- (NSString *) recall:(const BGReferent *) r;
+/* memory steps since the time */
+- (int) stepsSince:(int64_t) t;
+/* how strongly it believes the referent is where it is believed, in dB */
+- (int32_t) strengthOf:(uint32_t) referentID;
 
 /* what it perceived happen, oldest first */
 - (NSUInteger) observationCount;

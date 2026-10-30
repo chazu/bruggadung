@@ -295,8 +295,9 @@ A rebuilt world produces the same next step as one that never saved.
    time; event perception and communication, so an agent can ask a
    coworker who saw where something went; and credence, trust, and
    attribution, so a rumour heard twice from one source is weighed once it
-   is traced, and a lie is recorded as a fabrication root. Next, per
-   [lab/PLAN.md](lab/PLAN.md): memory decay.
+   is traced, and a lie is recorded as a fabrication root; and memory
+   that decays along the content's hierarchies. Next, per
+   [lab/PLAN.md](lab/PLAN.md): salience and bounded knowledge stores.
 
 ## Cross-cutting open questions
 

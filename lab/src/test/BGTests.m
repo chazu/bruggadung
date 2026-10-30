@@ -1387,12 +1387,14 @@ static void   test_asking( void)
  * Questions are the test's; answers are agency's. Single: only the carter
  * tells the foreman. Lie (variant A): the smith keeps the nails, and the
  * apprentice, who saw nothing go in, says it did; the foreman looks in the
- * chest. */
+ * chest. Decay (variant B): the apprentice walks off, and the foreman asks
+ * it on day 10, and again on day 20. */
 typedef enum
 {
    BGRumourFull = 0,
    BGRumourSingle,
-   BGRumourLie
+   BGRumourLie,
+   BGRumourDecay
 } BGRumourVariant;
 
 
@@ -1412,6 +1414,8 @@ typedef struct
    int32_t       corroborated;   /* ... and the neighbour: step 7 */
    NSString      *rumouredDump;
    NSString      *questionedDump;
+   NSString      *freshDump;     /* decay: the apprentice's store, just after */
+   NSString      *dayOneDump;    /* ... and a day later */
    NSString      *text;          /* a save at the end */
 } BGRumour;
 
@@ -1536,6 +1540,23 @@ static BGRumour   rumour( BGRumourVariant variant)
                            &error) != nil);
    }
    [st.s runUntil:BGTimeMake( [st.w time].ms + 1000)];
+
+   if( variant == BGRumourDecay)
+   {
+      /* the apprentice goes off, out of sight of it all; asked on day 10, it
+       * remembers less, and less surely; on day 20, nothing */
+      run.freshDump = [knowledge dump:run.apprentice];
+      stage_move( &st, run.apprentice, 12, 12);
+      [st.s runUntil:BGTimeMake( BG_MEMORY_STEP + 3000)];
+      run.dayOneDump = [knowledge dump:run.apprentice];
+      [st.s runUntil:BGTimeMake( 10 * BG_MEMORY_STEP + 3000)];
+      stage_move( &st, run.foreman, 13, 12);
+      stage_say( &st, run.foreman, run.apprentice, where);
+      run.told = credence_of( knowledge, run.foreman);
+      [st.s runUntil:BGTimeMake( 20 * BG_MEMORY_STEP + 3000)];
+      stage_say( &st, run.foreman, run.apprentice, where);
+      goto done;
+   }
 
    /* day 1: the apprentice tells the carter, then the porter; lying, it says it saw */
    stage_move( &st, run.apprentice, 20, 5);
@@ -1698,6 +1719,72 @@ static void   test_rumour( void)
    BG_CHECK( [store trustIn:carter] == BG_TRUST - BG_REFUTED && [store trustIn:apprentice] == BG_TRUST - BG_REFUTED);
    /* what they say next weighs less than it did */
    BG_CHECK( [store weightOf:[store testimonyAt:0]] < BG_TRUST - BG_HEARSAY);
+}
+
+
+/* KNOWLEDGE.md Scenario 1's variant B, and §12: memory decays along the
+ * feature hierarchy, the strength of a belief fades, and what fades too far
+ * is forgotten; deterministic, and the same on replay. */
+static void   test_memory_decay( void)
+{
+   BGRumour           decay;
+   BGRumour           again;
+   BGKnowledgeStore   *store;
+   const BGEvent      *first;
+   const BGEvent      *second;
+   NSUInteger         i;
+   uint64_t           asked;
+
+   decay = rumour( BGRumourDecay);
+
+   /* just after, the apprentice remembers the oak chest, the smith's brown
+    * coat, and iron nails; a day later, a wooden chest, a dark coat, and
+    * nails of some metal it can't say */
+   BG_CHECK( [decay.freshDump rangeOfString:@"material: \"oak\""].location != NSNotFound);
+   BG_CHECK( [decay.freshDump rangeOfString:@"coat: \"brown\""].location != NSNotFound);
+   BG_CHECK( [decay.dayOneDump rangeOfString:@"material: \"oak\""].location == NSNotFound);
+   BG_CHECK( [decay.dayOneDump rangeOfString:@"material: \"wood\""].location != NSNotFound);
+   BG_CHECK( [decay.dayOneDump rangeOfString:@"material: \"metal\""].location != NSNotFound);
+   BG_CHECK( [decay.dayOneDump rangeOfString:@"coat: \"dark\""].location != NSNotFound);
+   BG_CHECK( [decay.dayOneDump rangeOfString:@"coat: \"brown\""].location == NSNotFound);
+   /* its own coat it sees */
+   BG_CHECK( [decay.dayOneDump rangeOfString:@"coat: \"navy\""].location != NSNotFound);
+
+   /* day 10: it still says where, though its description has lost its
+    * detail, and it says how sure it is: its memory's strength */
+   first  = NULL;
+   second = NULL;
+   for( i = 0; i < [decay.world eventCount]; i++)
+      if( ! strcmp( [decay.world eventAt:i]->kind, "said") && [decay.world eventAt:i]->actor == decay.apprentice)
+      {
+         if( ! first)
+            first = [decay.world eventAt:i];
+         else
+            second = [decay.world eventAt:i];
+      }
+   BG_CHECK( first && strstr( first->detail, "#IsIn") && strstr( first->detail, "sure: 10 "));
+   BG_CHECK( first && ! strstr( first->detail, "oak") && ! strstr( first->detail, "wood") &&
+             ! strstr( first->detail, "iron"));
+   /* the foreman believes it less than a fresh account: it weighs no more than the apprentice is sure */
+   BG_CHECK( decay.told == BG_PRIOR + BG_SEEN - 10 * BG_FADE);
+   BG_CHECK( decay.told < BG_PRIOR + BG_TRUST);
+   asked = first ? first->index : 0;
+   BG_CHECK( [decay.knowledge ancestryOf:asked] && [decay.knowledge ancestryOf:asked]->origin == decay.apprentice &&
+             ! [decay.knowledge ancestryOf:asked]->fabricated);
+
+   /* day 20: it has forgotten, and says so */
+   BG_CHECK( second && strstr( second->detail, "#DontKnow"));
+   store = [decay.knowledge storeOf:decay.apprentice];
+   for( i = 0; i < [store count]; i++)
+      if( [store referentAt:i]->truth == decay.smith)
+         BG_CHECK( ! [store referentAt:i]->present);
+   BG_CHECK( [[decay.knowledge dump:decay.apprentice] rangeOfString:@"not there any more"].location != NSNotFound);
+
+   /* the same on replay */
+   again = rumour( BGRumourDecay);
+   BG_CHECK( [again.world stateHash] == [decay.world stateHash]);
+   BG_CHECK( [again.text isEqualToString:decay.text]);
+   BG_CHECK( [again.dayOneDump isEqualToString:decay.dayOneDump]);
 }
 
 
@@ -2012,6 +2099,7 @@ const BGTestCase   BGAllTests[] =
    { "missing_nails",                 test_missing_nails },
    { "asking",                        test_asking },
    { "rumour",                        test_rumour },
+   { "memory_decay",                  test_memory_decay },
    { "cistern",                       test_cistern },
    { "cistern_b",                     test_cistern_b },
    { "cistern_d",                     test_cistern_d },

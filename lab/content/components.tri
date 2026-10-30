@@ -3,7 +3,17 @@
 // field registry flags. The structs and the registry the lab uses are
 // generated from this file (make gen).
 
-#Material: "iron" | "oak" | "brass" | "flesh" | "paper"
+// What things are made of, and the colours they come in: hierarchies, so a
+// memory loses detail along them (KNOWLEDGE.md §12): an oak chest is
+// remembered as wooden, then as made of something.
+#Material: "metal" | "wood" | "flesh" | "paper"
+"metal":   "iron" | "brass"
+"wood":    "oak"
+
+#Colour:  "dark" | "light" | "bright"
+"dark":   "black" | "grey" | "brown" | "navy"
+"light":  "white" | "beige"
+"bright": "red" | "yellow" | "blue" | "green"
 
 // --- what descriptions say besides component fields ----------------------
 //
@@ -52,7 +62,7 @@
 #Agent: #Body & #Handed & {
     @component(Agent)
     hands: int & >=0 & <=4 @field(content, saved, inspect, perceive(sight))
-    coat:  text            @field(content, saved, inspect, perceive(sight))
+    coat:  #Colour         @field(content, saved, inspect, perceive(sight))
 }
 
 // Something entities can be put in.

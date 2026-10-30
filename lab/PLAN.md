@@ -736,5 +736,55 @@ change while they hold things (`freeHands` is part of how an agent looks).
 
 30 tests, 387 checks, under both compilers, ASan and UBSan, and leak-free.
 
-Next: memory decay, KNOWLEDGE.md §12 and Scenario 1's variant B, so what
-an agent saw long ago is remembered less precisely and believed less.
+### After the slice: memory decay
+
+KNOWLEDGE.md Scenario 1's variant B runs. The apprentice sees the nails go
+into the chest, then goes off out of sight of it all. A day later it
+remembers a wooden chest, not an oak one, nails of some metal, and the
+smith in a dark coat rather than a brown one. On day 10 the foreman asks
+it where nails are: it still says the chest, with no material, mass, or
+unit left in its description, and says how sure it is (10 dB, down from
+30). The foreman weighs the claim no higher than that, so its credence is
+lower than a fresh account's. On day 20 the apprentice has forgotten, and
+says it doesn't know. The run is the same on replay.
+
+- **Hierarchies in content:** `#Material` is metal (iron, brass), wood
+  (oak), flesh, or paper; coats are `#Colour`: dark (black, grey, brown,
+  navy), light, or bright. Memory loses detail along them.
+- **Detail decays when read** (KNOWLEDGE.md §12): for each memory step (a
+  day) since a referent was last seen, every feature it keeps generalizes
+  a step along its primary parent with Triangle's `tri_generalize`.
+  Numbers without a declared `@widen`, and text, go in one step, and a
+  feature generalized as far as it goes is dropped. Nothing is stored:
+  descriptions, recognition, and answers all read memory through the
+  store's `recall:`, from the world's time, so decay is exact across
+  saves.
+- **Strength fades**: a belief of where a thing is starts at 30 dB if seen
+  (its credence if told), loses 2 dB a step, and below 0 dB the agent
+  forgets where it is, at its next perception phase. Seeing it again
+  restores detail and strength.
+- **A claim of what the speaker saw says how sure it is** (`#Saw & {
+  sure: ... }`), and the hearer weighs it no higher than that.
+
+What it settled:
+
+- **Recognition reads memory, not the last percept**, so a decayed
+  description can bind a percept it once conflicted with: KNOWLEDGE.md's
+  honest misidentification has a way in.
+- **The kind does not decay.** Agency's slots and recognition both compare
+  kinds exactly, and a stack forgotten as a body would no longer be the
+  stack its testimony is about. Only features decay.
+
+Not yet: forgetting at its own scheduled time (it happens at the next
+perception phase after the strength falls), decay rates by salience and
+repetition (every feature fades at one rate, a step a day), persistence
+by feature (a coat changes daily, height doesn't, CONTENT_LANGUAGE.md's
+recognition weighting), competing identity hypotheses, bounded stores
+with eviction, and generalizing the kind for things whose kind memory
+could lose.
+
+31 tests, 411 checks, under both compilers, ASan and UBSan, and leak-free.
+
+Next: salience and bounded stores (KNOWLEDGE.md §7 and §12), so agents
+keep the observations that matter to them, not every move and utterance in
+sight, within a capacity, evicting the least salient first.

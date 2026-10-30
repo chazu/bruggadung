@@ -88,7 +88,11 @@ rumour heard twice from one source is inflated until someone asks "who told
 you?". Once credence reaches 0 dB the claim is believed. Trust rises when a
 claim is seen true and falls when one is found false. For the developer,
 every claim said is traced to its true root, someone who saw it or someone
-who made it up, and the dump flags false corroboration. The menu `lab play`
+who made it up, and the dump flags false corroboration. Memory decays when
+read: each day since a thing was seen, each feature it keeps generalizes a
+step along the content's hierarchies (an oak chest becomes a wooden one,
+then just a chest), the belief of where it is fades, and too faint, it is
+forgotten. The menu `lab play`
 shows comes from this store, so it can
 offer what is no longer so: performing it, the world's side finds the thing
 gone, the attempt commits, and perception corrects the belief.

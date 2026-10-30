@@ -59,16 +59,63 @@ static void   append_quoted( NSMutableString *s, const char *text)
 }
 
 
+static char   *concrete_features( const char *printed);
+
+
+/* The top-level keys of a features text: "mass: 90g, unit: ..." */
+static NSUInteger   feature_keys( const char *features, char (*keys)[ 32], NSUInteger max)
+{
+   const char   *p;
+   const char   *field;
+   const char   *colon;
+   NSUInteger   n;
+   int          depth;
+   BOOL         quoted;
+
+   n      = 0;
+   depth  = 0;
+   quoted = NO;
+   for( field = p = features; n < max; p++)
+   {
+      if( *p == '"' && (p == features || p[ -1] != '\\'))
+         quoted = ! quoted;
+      if( quoted && *p)
+         continue;
+      if( *p == '{' || *p == '[' || *p == '(')
+         depth++;
+      else if( (*p == '}' || *p == ']' || *p == ')') && depth > 0)
+         depth--;
+      else if( (*p == ',' && ! depth) || ! *p)
+      {
+         while( *field == ' ')
+            field++;
+         colon = strstr( field, ": ");
+         if( colon && colon < p && colon - field < 32)
+         {
+            snprintf( keys[ n], 32, "%.*s", (int) (colon - field), field);
+            n++;
+         }
+         field = p + 1;
+      }
+      if( ! *p)
+         break;
+   }
+   return( n);
+}
+
+
 /* --- a store ------------------------------------------------------------------- */
 
 @implementation BGKnowledgeStore
 
 - (id) initWithAgent:(BGEntityID) agent
+               world:(BGWorld *) world
 {
    int   i;
 
    if( ! (self = [super init]))
       return( nil);
+   _world = world;
    _agent = agent;
    _next  = 1;
    _news  = [NSMutableArray new];
@@ -313,7 +360,7 @@ static void   append_quoted( NSMutableString *s, const char *text)
    case BGHeard :
       return( source - BG_RUMOUR);
    default :
-      return( source);
+      return( t->sure < source ? t->sure : source);
    }
 }
 
@@ -379,13 +426,94 @@ static BOOL   counts( const BGTestimony *t, uint32_t thing, uint32_t container)
 - (NSString *) describeLooks:(uint32_t) referentID
 {
    const BGReferent   *r;
+   NSString           *features;
 
    r = [self referent:referentID];
    if( ! r || ! r->kind)
       return( nil);
-   if( ! r->features || ! *r->features)
+   features = [self recall:r];
+   if( ! [features length])
       return( [NSString stringWithUTF8String:r->kind]);
-   return( [NSString stringWithFormat:@"%s & { %s }", r->kind, r->features]);
+   return( [NSString stringWithFormat:@"%s & { %@ }", r->kind, features]);
+}
+
+
+- (int) stepsSince:(int64_t) t
+{
+   int64_t   now;
+   int64_t   steps;
+
+   now = _world ? [_world time].ms : t;
+   if( now <= t)
+      return( 0);
+   steps = (now - t) / BG_MEMORY_STEP;
+   return( steps > 1000 ? 1000 : (int) steps);
+}
+
+
+/* Each feature generalized a step along its primary parent for each memory
+ * step since the referent was seen; one generalized as far as it goes is
+ * forgotten. */
+- (NSString *) recall:(const BGReferent *) r
+{
+   const TriNode     *node;
+   const TriNode     *part;
+   const TriNode     *full;
+   NSMutableString   *out;
+   TriContent        *tri;
+   TriArena          *arena;
+   NSUInteger        nkeys;
+   NSUInteger        k;
+   char              keys[ 32][ 32];
+   char              a[ 512];
+   char              b[ 512];
+   int               steps;
+
+   if( ! r->features)
+      return( @"");
+   steps = [self stepsSince:r->seen];
+   if( ! steps || ! *r->features || ! r->kind)
+      return( [NSString stringWithUTF8String:r->features]);
+   tri   = [_world tri];
+   arena = tri_arena_new();
+   node  = tri_value( tri, [[NSString stringWithFormat:@"%s & { %s }", r->kind, r->features] UTF8String], arena,
+                      NULL, 0);
+   if( ! node)
+   {
+      tri_arena_free( arena);
+      return( [NSString stringWithUTF8String:r->features]);
+   }
+   out   = [NSMutableString string];
+   nkeys = feature_keys( r->features, keys, 32);
+   for( k = 0; k < nkeys; k++)
+   {
+      part = tri_generalize( tri, node, keys[ k], steps, arena);
+      full = tri_generalize( tri, node, keys[ k], 1000, arena);
+      if( ! part || ! full || ! tri_at( tri, part, keys[ k]) || ! tri_at( tri, full, keys[ k]))
+         continue;
+      tri_print( tri, tri_at( tri, part, keys[ k]), a, sizeof( a));
+      tri_print( tri, tri_at( tri, full, keys[ k]), b, sizeof( b));
+      if( ! strcmp( a, b))
+         continue;      /* forgotten */
+      [out appendFormat:@"%s%s: %s", [out length] ? ", " : "", keys[ k], a];
+   }
+   tri_arena_free( arena);
+   return( out);
+}
+
+
+- (int32_t) strengthOf:(uint32_t) referentID
+{
+   const BGReferent   *r;
+   int32_t            base;
+
+   r = [self referent:referentID];
+   if( ! r)
+      return( BG_PRIOR);
+   base = BG_SEEN;
+   if( r->toldBy && r->form == BGLocationIn)
+      base = [self credenceThat:r->id isIn:r->container];
+   return( base - BG_FADE * [self stepsSince:r->seen]);
 }
 
 
@@ -435,8 +563,8 @@ static BOOL   counts( const BGTestimony *t, uint32_t thing, uint32_t container)
       [s appendFormat:@", place: #OnTile & { x: %d, y: %d, level: %d }", r->x, r->y, r->level];
       break;
    }
-   if( r->features && *r->features)
-      [s appendFormat:@", %s", r->features];
+   if( [[self recall:r] length])
+      [s appendFormat:@", %@", [self recall:r]];
    [s appendString:@" }"];
    return( s);
 }
@@ -493,7 +621,7 @@ static BOOL   counts( const BGTestimony *t, uint32_t thing, uint32_t container)
       if( [store agent] > agent)
          break;
    }
-   store = [[[BGKnowledgeStore alloc] initWithAgent:agent] autorelease];
+   store = [[[BGKnowledgeStore alloc] initWithAgent:agent world:_world] autorelease];
    [_stores insertObject:store atIndex:i];
    return( store);
 }
@@ -646,7 +774,7 @@ static char   *concrete_features( const char *printed)
    {
       r = [store referentAt:i];
       if( r->id != [store selfReferent] && r->kind && ! strcmp( r->kind, [kind UTF8String]) &&
-          [self looksAlike:r kind:kind features:features])
+          [self looksAlike:r in:store kind:kind features:features])
       {
          free( concrete);
          return( r->id);
@@ -693,6 +821,7 @@ static char   *concrete_features( const char *printed)
    int64_t            y;
    int64_t            level;
    int64_t            when;
+   int64_t            sure;
    int32_t            credence;
    uint32_t           cid;
    uint32_t           thing;
@@ -723,7 +852,10 @@ static char   *concrete_features( const char *printed)
    t.source      = speaker;
    t.root        = speaker;
    t.attribution = BGSaw;
+   t.sure        = BG_UNSTATED;
    attribution   = tri_at( tri, claim, "attribution");
+   if( attribution && node_int( tri, attribution, "sure", &sure))
+      t.sure = (int32_t) sure;
    if( attribution && tri_subtype( tri, tri_node_type( attribution), tri_type_named( tri, "#Heard")))
    {
       description   = tri_at( tri, attribution, "from");
@@ -828,9 +960,10 @@ static char   *concrete_features( const char *printed)
 }
 
 
-/* Whether a percept could be the referent by its looks: the features the
- * referent keeps unify with those perceived. */
+/* Whether a percept could be the referent by its looks: the features memory
+ * keeps of it unify with those perceived. */
 - (BOOL) looksAlike:(const BGReferent *) r
+                 in:(BGKnowledgeStore *) store
                kind:(NSString *) kind
            features:(NSString *) features
 {
@@ -838,7 +971,7 @@ static char   *concrete_features( const char *printed)
    TriArena        *arena;
    NSString        *expr;
 
-   expr  = [NSString stringWithFormat:@"%@ & { %s } & { %@ }", kind, r->features ? r->features : "", features];
+   expr  = [NSString stringWithFormat:@"%@ & { %@ } & { %@ }", kind, [store recall:r], features];
    arena = tri_arena_new();
    both  = tri_value( [_world tri], [expr UTF8String], arena, NULL, 0);
    tri_arena_free( arena);
@@ -1033,7 +1166,7 @@ static uint32_t   bound_to( BGEntityID e, BGEntityID agent, uint32_t me, const B
                if( pass == 0 && ! exact)
                   continue;
                /* elsewhere than believed, it must look the same: the crate isn't the chest */
-               if( ! exact && ! [self looksAlike:r kind:kind features:features])
+               if( ! exact && ! [self looksAlike:r in:store kind:kind features:features])
                   continue;
                if( d < bestd)
                {
@@ -1100,6 +1233,16 @@ static uint32_t   bound_to( BGEntityID e, BGEntityID agent, uint32_t me, const B
       }
       r->present = NO;
       [news addObject:[NSString stringWithFormat:@"R%u is not where it was", r->id]];
+   }
+
+   /* what has faded too far, forgotten */
+   for( j = 0; j < [store count]; j++)
+   {
+      r = (BGReferent *) [store referentAt:j];
+      if( ! r->present || r->id == [store selfReferent] || [store strengthOf:r->id] >= BG_BELIEVE)
+         continue;
+      r->present = NO;
+      [news addObject:[NSString stringWithFormat:@"R%u: forgotten where it was", r->id]];
    }
 
    /* what it was told is inside something it looked into: so it is, or it isn't */
@@ -1491,10 +1634,11 @@ static char   *decode( const char *s)
       for( j = 0; j < [store testimonyCount]; j++)
       {
          t = [store testimonyAt:j];
-         [lines addObject:[NSString stringWithFormat:@"told %llu %u %u %lld %lld %u %u %d %d %llu",
+         [lines addObject:[NSString stringWithFormat:@"told %llu %u %u %lld %lld %u %u %d %d %d %llu",
                                                      (unsigned long long) [store agent], t->thing, t->container,
                                                      (long long) t->when, (long long) t->heard, t->source, t->root,
-                                                     (int) t->attribution, t->settled, (unsigned long long) t->utterance]];
+                                                     (int) t->attribution, t->settled, t->sure,
+                                                     (unsigned long long) t->utterance]];
       }
    }
    for( j = 0; j < _nancestry; j++)
@@ -1567,8 +1711,8 @@ static char   *decode( const char *s)
          [[self storeOf:(BGEntityID) agent] addObservation:o];
          free( o.content);
       }
-      else if( sscanf( text, "told %llu %u %u %lld %lld %u %u %d %d %llu", &agent, &id, &container, &seen, &inside,
-                       &told, &me, &form, &present, &truth) == 10)
+      else if( sscanf( text, "told %llu %u %u %lld %lld %u %u %d %d %d %llu", &agent, &id, &container, &seen, &inside,
+                       &told, &me, &form, &present, &trust, &truth) == 11)
       {
          memset( &t, 0, sizeof( t));
          t.thing       = id;
@@ -1579,6 +1723,7 @@ static char   *decode( const char *s)
          t.root        = me;
          t.attribution = (BGAttribution) form;
          t.settled     = present;
+         t.sure        = trust;
          t.utterance   = truth;
          [[self storeOf:(BGEntityID) agent] appendTestimony:t];
       }

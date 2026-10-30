@@ -21,9 +21,10 @@
 #WhoToldYou: #Question & #Placing & {}
 
 // How the speaker says it knows (the attribution, KNOWLEDGE.md §10): it saw
-// it, or heard it, from someone it describes, or from no one it names.
+// it, as sure as its memory of it is strong (in dB), or heard it, from
+// someone it describes, or from no one it names.
 #Source: {}
-#Saw:    #Source & {}
+#Saw:    #Source & { sure: int }
 #Heard:  #Source & { from: #Agent }
 
 // A claim: something like `what` is inside `within`, as of `when`.

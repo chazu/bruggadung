@@ -31,7 +31,7 @@ nails_4: #Stack & { material: "iron", unit: "iron_nail", unitMass: 3g, count: 4 
 // For the missing nails' "ask a coworker": the chest the smith puts the nails
 // in, and the apprentice who may see it.
 chest:      #Container & { material: "oak", mass: 6kg, capacity: 40 }
-apprentice: #Agent & { material: "flesh", mass: 55kg, hands: 2, coat: "dark" }
+apprentice: #Agent & { material: "flesh", mass: 55kg, hands: 2, coat: "navy" }
 
 // For KNOWLEDGE.md's first scenario, as "the rumour of the nails": a carter
 // and a porter the apprentice tells, a neighbour who saw it too, and
