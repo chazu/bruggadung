@@ -3039,7 +3039,7 @@ why" above, and):
   consequences, detail fading by salience*: no document says.
 - *Routes as habits, exploring around obstacles*: the lab has no walls.
 
-**Buildable, not yet done**: hearing a promise's outcome from others.
+**Buildable, not yet done**: none, as of the slices below; each built since has its heading.
 
 ### After the slice: a commitment every day
 
@@ -3104,3 +3104,21 @@ an hour on, the pump cooler than the piston, which has no outdoors of its
 own.
 
 85 tests, 2604 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: learning a promise's outcome from others
+
+AGENCY.md §7: keeping or breaking a promise is a history event, "which
+hearers perceive when they learn the outcome." The promises slice's "Not
+yet": learning it other than by looking.
+
+- **Learned on someone's word**: a hearer that comes to believe, told,
+  where a promised thing is as of after the deadline (newly, or told
+  again what it believed) settles the promise: kept if it is where it was
+  promised, broken if elsewhere; trust moves as when it looks.
+
+Checked: the worker doesn't look after the deadline; a carter who looked
+into the crate tells it the nails are there, and the worker finds the
+smith's promise kept on the carter's word, trusting the smith more; it
+looked only the once, early.
+
+85 tests, 2613 checks, under both compilers, ASan, and leak-free.

@@ -4982,7 +4982,7 @@ static void   look_into( BGStage *st, BGEntityID agent, BGEntityID container, in
 }
 
 
-static BGPromiseRun   promise_run( int64_t deadline)
+static BGPromiseRun   promise_run( int64_t deadline, BOOL told)
 {
    BGStage            st;
    BGActivities       *activities;
@@ -4993,6 +4993,7 @@ static BGPromiseRun   promise_run( int64_t deadline)
    BGEntityID         h[ 8];
    NSString           *error;
    BGPromiseRun       run;
+   BGEntityID         carter;
 
    memset( &run, 0, sizeof( run));
    st.w       = BGTestWorld( 59);
@@ -5009,9 +5010,11 @@ static BGPromiseRun   promise_run( int64_t deadline)
    [st.s runUntil:BGTimeMake( 1)];
    g         = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the crate"];
    run.crate = [g create:"crate" key:"crate" at:BGOnTile( 6, 4, 0)];
+   carter    = told ? [g create:"carter" key:"carter" at:BGOnTile( 12, 12, 0)] : BGNoEntity;
    [st.c submit:g];
    [st.s runUntil:BGTimeMake( 2)];
    run.crate = [g idFor:run.crate];
+   carter    = carter ? [g idFor:carter] : BGNoEntity;
 
    /* the smith looks into the bin; the worker stands beside it */
    error = nil;
@@ -5030,9 +5033,23 @@ static BGPromiseRun   promise_run( int64_t deadline)
    run.earlySettled = [[knowledge storeOf:4] testimonyCount] ? [[knowledge storeOf:4] testimonyAt:0]->settled : 9;
    stage_move( &st, 4, 3, 7);
 
-   /* after the deadline, it looks again */
+   /* after the deadline, it looks again; or, told, a carter who looked
+    * tells it where the nails are, and it doesn't look itself */
    [st.s runUntil:BGTimeMake( [st.w time].ms + deadline + 5000)];
-   look_into( &st, 4, run.crate, 7, 5);
+   if( carter)
+   {
+      BGKnowledgeStore   *seen;
+      NSString           *claim;
+
+      look_into( &st, carter, run.crate, 7, 4);
+      stage_move( &st, carter, 3, 6);
+      seen  = [knowledge storeOf:carter];
+      claim = [seen claimAbout:referent_of( seen, 2)];
+      BG_CHECK( claim != nil);
+      stage_say( &st, carter, 4, claim);
+   }
+   else
+      look_into( &st, 4, run.crate, 7, 5);
    run.world     = st.w;
    run.knowledge = knowledge;
    run.agency    = agency;
@@ -5046,11 +5063,12 @@ static void   test_promises( void)
    BGPromiseRun        kept;
    BGPromiseRun        broken;
    BGPromiseRun        again;
+   BGPromiseRun        heard;
    BGKnowledgeStore    *store;
    const BGTestimony   *t;
 
    /* kept: the promise is the smith's commitment, and it delivers */
-   kept = promise_run( 60000);
+   kept = promise_run( 60000, NO);
    BG_CHECK( logged_by( kept.agency, 5, @"promising: say R"));
    BG_CHECK( logged_by( kept.agency, 5, @"weighing deliver it: +20 (promise, duty +20, urgency +0) against nothing: switching"));
    BG_CHECK( logged_by( kept.agency, 5, @"[hold it] pick it up: take R"));
@@ -5068,7 +5086,7 @@ static void   test_promises( void)
    /* broken: three seconds isn't enough; the window closes, the promise is
     * broken, and the worker, finding the crate empty after the deadline,
     * trusts the smith less */
-   broken = promise_run( 3000);
+   broken = promise_run( 3000, NO);
    BG_CHECK( logged_by( broken.agency, 5, @"deliver it is over: its window has closed; the promise is broken"));
    BG_CHECK( [broken.world locationOf:2].form != BGLocationIn || [broken.world locationOf:2].place != broken.crate);
    store = [broken.knowledge storeOf:4];
@@ -5077,8 +5095,37 @@ static void   test_promises( void)
    BG_CHECK( t && t->settled == -1 && [store trustIn:t->source] == BG_TRUST - BG_REFUTED);
 
    /* the same on replay */
-   again = promise_run( 60000);
+   again = promise_run( 60000, NO);
    BG_CHECK( [again.text isEqualToString:kept.text]);
+
+   /* learned without looking (§7: hearers perceive it "when they learn
+    * the outcome"): the worker doesn't look; a carter who did tells it the
+    * nails are in the crate, after the deadline, and it finds the promise
+    * kept on the carter's word, trusting the smith more */
+   heard = promise_run( 60000, YES);
+   store = [heard.knowledge storeOf:4];
+   t     = NULL;
+   {
+      NSUInteger   i;
+
+      for( i = 0; i < [store testimonyCount]; i++)
+         if( [store testimonyAt:i]->attribution == BGPledged)
+            t = [store testimonyAt:i];
+   }
+   BG_CHECK( t && t->source == referent_of( store, 5) && t->settled == 1);
+   BG_CHECK( [store trustIn:referent_of( store, 5)] == BG_TRUST + BG_CONFIRMED);
+   /* it looked only the once, early */
+   {
+      NSUInteger   i;
+      NSUInteger   looks;
+
+      looks = 0;
+      for( i = 0; i < [heard.world eventCount]; i++)
+         if( ! strcmp( [heard.world eventAt:i]->kind, "looked") && [heard.world eventAt:i]->actor == 4 &&
+             [heard.world eventAt:i]->other == heard.crate)
+            looks++;
+      BG_CHECK( looks == 1);
+   }
 }
 
 

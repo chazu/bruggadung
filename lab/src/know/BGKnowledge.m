@@ -2173,6 +2173,8 @@ static int32_t   permille_of( int32_t db)
    {
       [news addObject:[NSString stringWithFormat:@"R%u is in R%u, R%u says too (%+d dB)", thing, cid, speaker,
                                                  credence]];
+      if( credence >= BG_BELIEVE)
+         [self learnOutcomeOf:thing isIn:cid asOf:when now:now store:store news:news];
       tri_arena_free( arena);
       return;
    }
@@ -2197,7 +2199,32 @@ static int32_t   permille_of( int32_t db)
    m->present   = YES;
    m->toldBy    = speaker;
    [news addObject:[NSString stringWithFormat:@"R%u is in R%u, R%u says (%+d dB)", thing, cid, speaker, credence]];
+   [self learnOutcomeOf:thing isIn:cid asOf:when now:now store:store news:news];
    tri_arena_free( arena);
+}
+
+
+/* Believing, on someone's word, where a promised thing is as of after its
+ * deadline, the agent learns the promise's outcome (AGENCY.md §7: hearers
+ * perceive it "when they learn the outcome"): kept if it is where it was
+ * promised, broken if elsewhere. */
+- (void) learnOutcomeOf:(uint32_t) thing
+                   isIn:(uint32_t) container
+                   asOf:(int64_t) when
+                    now:(int64_t) now
+                  store:(BGKnowledgeStore *) store
+                   news:(NSMutableArray *) news
+{
+   const BGTestimony   *t;
+   NSUInteger          i;
+
+   for( i = 0; i < [store testimonyCount]; i++)
+   {
+      t = [store testimonyAt:i];
+      if( t->settled || t->attribution != BGPledged || t->thing != thing || when < t->when)
+         continue;
+      settle( store, thing, t->container, t->container == container, now, news);
+   }
 }
 
 
