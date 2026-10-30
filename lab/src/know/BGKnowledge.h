@@ -431,6 +431,9 @@ typedef struct
 /* the finding of that kind about the referent, or NULL */
 - (const BGFinding *) finding:(const char *) kind
                         about:(uint32_t) referentID;
+/* no longer concluded (KNOWLEDGE.md §9: retracted with a premise) */
+- (void) retractFinding:(const char *) kind
+                  about:(uint32_t) referentID;
 
 /* the claims it has heard, oldest first */
 - (NSUInteger) testimonyCount;

@@ -3021,10 +3021,10 @@ search ordered by belief.
 
 **Waiting on a decision** (the document text in "What stays open, and
 why" above, and):
-- *Retracting a finding when a premise is* (KNOWLEDGE.md §9): the
-  lab's premises are perceived traces, and a trace fading isn't a premise
-  found false (fresh paint dries; it was still touched up). Which is a
-  retraction isn't said.
+- *Retracting a finding when a trace premise is* (KNOWLEDGE.md §9): a
+  trace fading isn't a premise found false (fresh paint dries; it was
+  still touched up), and `covered_up` rests on a trace gone. Which is a
+  retraction isn't said. Repetition's premise runs, provisionally (below).
 - *Rates from capabilities and shortfall* (walking speed from the walker,
   impact as a graded effect): ACTIONS.md §5 "rate = f(capabilities,
   shortfall, actor modifiers)", f being open question 4. The modifiers'
@@ -3162,3 +3162,23 @@ saws at the hurt pace: a quarter through at 4.9 s, half at 5.1 s (not 4),
 three quarters at 11 s, through at 11.2 s (not 8).
 
 86 tests, 2636 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: a habit belief retracted as the habit moves
+
+KNOWLEDGE.md §9: "An interpretation's provenance records the rule and its
+premises, so interpretations can be retracted when a premise is." Of the
+lab's premises, repetition (`#Repeated`: seen to put things in the same
+place so often) is the one that can stop holding without merely fading:
+the usual place moves on. Provisionally, the other premises stay as they
+were (see "What stays open").
+
+- **Weighed again**: a rule over repetition re-checks a finding it drew,
+  each perception; if its premise no longer gives the same place, the
+  finding is retracted ("no longer #Habit") and, if it holds of another,
+  drawn again (`retractFinding:about:`).
+
+Checked: the worker, after four days of the crate, uses the bin from day
+45: on the fifth day of the bin (more than the crate), the apprentice's
+belief is the bin; on the fourth (as many), still the crate.
+
+86 tests, 2658 checks, under both compilers, ASan, and leak-free.

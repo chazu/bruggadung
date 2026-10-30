@@ -506,6 +506,21 @@ static NSUInteger   feature_keys( const char *features, char (*keys)[ 32], NSUIn
 }
 
 
+- (void) retractFinding:(const char *) kind
+                  about:(uint32_t) referentID
+{
+   NSUInteger   i;
+
+   for( i = 0; i < _nfindings; i++)
+      if( ! strcmp( _findings[ i].kind, kind) && _findings[ i].about == referentID)
+      {
+         memmove( &_findings[ i], &_findings[ i + 1], sizeof( BGFinding) * (_nfindings - i - 1));
+         _nfindings--;
+         return;
+      }
+}
+
+
 - (NSUInteger) testimonyCount
 {
    return( _ntestimony);
@@ -2678,6 +2693,8 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
    size_t             n;
    uint32_t           choice;
    BOOL               holds;
+   BOOL               repeated;
+   const BGFinding    *existing;
 
    tri    = [_world tri];
    family = tri_family_index( tri, "rules");
@@ -2705,10 +2722,21 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
          if( ! [_world getField:path of:[store agent] value:&skill] || skill < mastery)
             continue;
       }
+      /* a rule over repetition is weighed again as what it is seen to do
+       * changes (provisionally, the one kind of premise that can stop
+       * holding without merely fading: the usual place moves on) */
+      repeated = NO;
+      for( list = tri_at( tri, rule, "premises"); list && (premise = tri_at( tri, list, "first"));
+           list = tri_at( tri, list, "rest"))
+         if( tri_at( tri, premise, "repeated"))
+            repeated = YES;
       for( j = 0; j < [store count]; j++)
       {
          r = [store referentAt:j];
-         if( r->id == [store selfReferent] || [store finding:concludes about:r->id])
+         if( r->id == [store selfReferent])
+            continue;
+         existing = [store finding:concludes about:r->id];
+         if( existing && ! repeated)
             continue;
          holds  = YES;
          choice = 0;
@@ -2741,6 +2769,15 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
             }
             else
                holds = NO;      /* a premise it can't read never holds */
+         }
+         if( existing)
+         {
+            if( holds && choice == existing->choice)
+               continue;
+            /* its premise no longer holds as it did: retracted (KNOWLEDGE.md §9) */
+            [news addObject:[NSString stringWithFormat:@"R%u: no longer %s (R%u), by %s", r->id, existing->kind,
+                                                       existing->choice, existing->rule]];
+            [store retractFinding:concludes about:r->id];
          }
          if( ! holds)
             continue;

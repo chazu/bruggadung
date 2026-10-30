@@ -1794,7 +1794,7 @@ static void   hand_nails( BGWorld *w, BGCommitter *c, BGScheduler *s, BGAgency *
 }
 
 
-static BGHabitRun   habits_run( BOOL practised)
+static BGHabitRun   habits_run( BOOL practised, int binDays)
 {
    BGWorld           *w;
    BGCommitter       *c;
@@ -1848,6 +1848,9 @@ static BGHabitRun   habits_run( BOOL practised)
    hand_nails( w, c, s, agency, 4);
    if( practised)
       hand_nails( w, c, s, agency, 45);
+   /* and on, the bin every day now */
+   for( day = 46; day < 46 + binDays; day++)
+      hand_nails( w, c, s, agency, day);
 
    run.world     = w;
    run.knowledge = knowledge;
@@ -1878,11 +1881,12 @@ static void   test_habits( void)
    BGHabitRun         practised;
    BGHabitRun         fresh;
    BGHabitRun         again;
+   BGHabitRun         moved;
    BGKnowledgeStore   *store;
    const BGFinding    *f;
 
-   practised = habits_run( YES);
-   fresh     = habits_run( NO);
+   practised = habits_run( YES, 0);
+   fresh     = habits_run( NO, 0);
 
    /* a method default: three days of the crate, and on day 4 the worker
     * walks past the bin beside it to the crate; with no habit, the bin */
@@ -1902,8 +1906,23 @@ static void   test_habits( void)
    BG_CHECK( [[practised.knowledge dump:practised.apprentice] rangeOfString:@"salience 25"].location != NSNotFound);
 
    /* the same on replay */
-   again = habits_run( YES);
+   again = habits_run( YES, 0);
    BG_CHECK( [again.text isEqualToString:practised.text]);
+
+   /* KNOWLEDGE.md §9, retracted with its premise: the worker goes on using
+    * the bin, day after day, until it has used it more than the crate; the
+    * apprentice's belief about where it usually puts things is retracted
+    * and drawn again: the bin */
+   moved = habits_run( YES, 4);
+   BG_CHECK( nails_in( moved.world, moved.bin) == 50);
+   store = [moved.knowledge storeOf:moved.apprentice];
+   f     = [store finding:"#Habit" about:referent_of( store, 4)];
+   BG_CHECK( f && f->choice == referent_of( store, moved.bin));
+   /* three days on the bin, not yet more than the crate: still the crate */
+   moved = habits_run( YES, 3);
+   store = [moved.knowledge storeOf:moved.apprentice];
+   f     = [store finding:"#Habit" about:referent_of( store, 4)];
+   BG_CHECK( f && f->choice == referent_of( store, moved.crate));
 }
 
 
