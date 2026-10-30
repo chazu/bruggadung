@@ -24,6 +24,8 @@
 
 // Warming: a stove to light.
 #Warming: #Frame & { stove: #Body }
+// Airing: a door to open, the way out.
+#Airing: #Frame & { exit: #Body }
 // Tightening: the spanner, and the nut.
 #Tightening: #Frame & { spanner: #Body, nut: #Body }
 
@@ -351,6 +353,23 @@ light_the_stove: #Method & {
     pre:   { find: ["stove"], match: #Warming & { stove: #Combustor & #Body & { lit: false } } }
     order: ["near"]
     steps: [#Do & { op: "light", object: "stove" }]
+} @family(methods)
+
+// Stuffy air raises airing the room: done once a door it knows of is ajar.
+air_the_room: #Goal & {
+    title:   "air the room"
+    done:    { find: ["exit"], match: #Airing & { exit: #Door & { ajar: true } } }
+    pressed: { need: "stuffy", above: 30 }
+    worth:   [#Need & { pressure: "stuffy", per: 5 }]
+} @family(goals)
+
+open_a_door: #Method & {
+    title: "open a door"
+    goal:  "air_the_room"
+    rank:  1
+    pre:   { find: ["exit"], match: #Airing & { exit: #Door & { ajar: false } } }
+    order: ["near"]
+    steps: [#Do & { op: "open_door", object: "exit" }]
 } @family(methods)
 
 eat_what_i_have: #Method & {

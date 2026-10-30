@@ -1839,3 +1839,20 @@ Not yet:
 - other ways to get warm (a coat, a warmer room).
 
 54 tests, 2032 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: short of breath
+
+AGENCY.md §6's third need, air. A breathing lodger beside a shut door, in
+a room at 0.5% carbon dioxide, feels short of breath at 40: ten points for
+every 0.1% above 0.1%, in bands of ten. That is above 30, so the needs
+generator raises *air the room*, and the lodger opens the door to the
+corridor. At 0.12% it feels nothing, and the door stays shut.
+
+- **The air over the agent stands in for its blood gases.** §6 puts them
+  in the atmosphere domain from respiration. The lab reads the region's
+  carbon dioxide, which the atmosphere owns. Blood gases of the agent's
+  own wait on a body that holds a breath.
+- **`air_the_room`** is done once a door the agent knows of is ajar. The
+  slot is `exit`, since `door` is GasStore's field.
+
+55 tests, 2038 checks, under both compilers, ASan and UBSan, and leak-free.

@@ -288,6 +288,7 @@ typedef struct
    NSUInteger       _fcapacity;
    int32_t          _hunger;         /* as felt */
    int32_t          _cold;
+   int32_t          _stuffy;
    int64_t          _feltAt;         /* ms, or -1 */
    BGIdentity       *_identities;
    NSUInteger       _nidentities;
@@ -352,12 +353,13 @@ typedef struct
 - (const BGTraceSeen *) traceAt:(NSUInteger) i;
 
 /* how much it feels the need, 0 to 100, as of its last perception phase:
- * "hunger", "cold" */
+ * "hunger", "cold", "stuffy" */
 - (int32_t) feels:(const char *) need;
 /* YES if it feels differently now */
 - (BOOL) feelHunger:(int32_t) hunger
                  at:(int64_t) t;
 - (BOOL) feelCold:(int32_t) cold;
+- (BOOL) feelStuffy:(int32_t) stuffy;
 
 /* its identity hypotheses, first made first */
 - (NSUInteger) identityCount;

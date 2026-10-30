@@ -4864,6 +4864,79 @@ static void   test_cold_lodger( void)
 }
 
 
+/* AGENCY.md §6's air: a lodger in a room whose air holds `dioxide` mmol,
+ * beside its shut door to the corridor. Interoception feels the air's carbon
+ * dioxide as shortness of breath; enough, and it airs the room. */
+static BOOL   stuffy_lodger( int64_t dioxide, int32_t *felt, BGAgency **minds, BGEntityID *who)
+{
+   BGStage            st;
+   BGActivities       *activities;
+   BGKnowledge        *knowledge;
+   BGAgency           *agency;
+   BGAtmosphere       *air;
+   BGProposalGroup    *g;
+   BGEntityID         room;
+   BGEntityID         corridor;
+   BGEntityID         door;
+   BGEntityID         lodger;
+   int64_t            v;
+
+   st.w       = BGTestWorld( 103);
+   st.c       = BGTestCommitter( st.w);
+   activities = [BGActivities activitiesWithWorld:st.w committer:st.c];
+   knowledge  = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+   agency     = [[[BGAgency alloc] initWithWorld:st.w committer:st.c knowledge:knowledge] autorelease];
+   air        = [[[BGAtmosphere alloc] initWithWorld:st.w] autorelease];
+   st.s       = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [agency setActivities:activities];
+   [st.s setActivities:activities];
+   [st.s setPerception:knowledge];
+   [st.s setDecision:agency];
+   [st.s addDomain:air];
+   g        = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: a shut room"];
+   corridor = [g create:"corridor" key:"the corridor" at:BGLocationMakeNone()];
+   room     = [g create:"room_air" key:"the room's air" at:BGLocationMakeNone()];
+   door     = [g create:"room_door" key:"the room's door" at:BGOnTile( 4, 6, 0)];
+   lodger   = [g create:"lodger" key:"lodger" at:BGOnTile( 4, 5, 0)];
+   [g set:"GasStore.dioxide" of:BGWhole( room) to:dioxide];
+   [g set:"GasStore.gap" of:BGWhole( room) to:0];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   room     = [g idFor:room];
+   corridor = [g idFor:corridor];
+   door     = [g idFor:door];
+   lodger   = [g idFor:lodger];
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the door"];
+   [g set:"GasStore.opensTo" of:BGWhole( room) to:(int64_t) corridor];
+   [g set:"GasStore.door" of:BGWhole( room) to:(int64_t) door];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 2)];
+   *felt  = [[knowledge storeOf:lodger] feels:"stuffy"];
+   [agency control:lodger];
+   [st.s runUntil:BGTimeMake( 30000)];
+   *minds = agency;
+   *who   = lodger;
+   return( [st.w getField:"Door.ajar" of:door value:&v] && v);
+}
+
+
+static void   test_stuffy_lodger( void)
+{
+   BGAgency     *agency;
+   BGEntityID   lodger;
+   int32_t      felt;
+
+   /* 0.5% carbon dioxide: short of breath 40, more than 30: it opens the door */
+   BG_CHECK( stuffy_lodger( 10000, &felt, &agency, &lodger));
+   BG_CHECK( felt == 40);
+   BG_CHECK( logged_by( agency, lodger, @"[air the room] open a door: open_door R"));
+   BG_CHECK( logged_by( agency, lodger, @"[air the room] done"));
+   /* 0.12%: 0, and the door stays shut */
+   BG_CHECK( ! stuffy_lodger( 2400, &felt, &agency, &lodger));
+   BG_CHECK( felt == 0 && ! logged_by( agency, lodger, @"air the room"));
+}
+
+
 /* --- the cistern ----------------------------------------------------------- */
 
 static BGCistern   *run_cistern( BGCisternVariant variant)
@@ -5188,6 +5261,7 @@ const BGTestCase   BGAllTests[] =
    { "unattended_stove",              test_unattended_stove },
    { "local_wake",                    test_local_wake },
    { "cold_lodger",                   test_cold_lodger },
+   { "stuffy_lodger",                 test_stuffy_lodger },
    { "rumour",                        test_rumour },
    { "memory_decay",                  test_memory_decay },
    { "salience",                      test_salience },

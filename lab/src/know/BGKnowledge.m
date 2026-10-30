@@ -3,6 +3,7 @@
 #import "BGView.h"
 #import "BGTraces.h"
 #import "BGBodies.h"
+#import "BGActions.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -358,7 +359,7 @@ static NSUInteger   feature_keys( const char *features, char (*keys)[ 32], NSUIn
 
 - (int32_t) feels:(const char *) need
 {
-   return( ! strcmp( need, "hunger") ? _hunger : ! strcmp( need, "cold") ? _cold : 0);
+   return( ! strcmp( need, "hunger") ? _hunger : ! strcmp( need, "cold") ? _cold : ! strcmp( need, "stuffy") ? _stuffy : 0);
 }
 
 
@@ -387,6 +388,16 @@ static NSUInteger   feature_keys( const char *features, char (*keys)[ 32], NSUIn
 
    changed = cold != _cold;
    _cold   = cold;
+   return( changed);
+}
+
+
+- (BOOL) feelStuffy:(int32_t) stuffy
+{
+   BOOL   changed;
+
+   changed = stuffy != _stuffy;
+   _stuffy = stuffy;
    return( changed);
 }
 
@@ -2134,6 +2145,7 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
 {
    const BGEvent      *ev;
    const BGThermalBody *body;
+   const BGGasStore   *gas;
    BGReferent         *r;
    BGStore            *bodies;
    BGView             *view;
@@ -2528,6 +2540,20 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
       if( [store feelCold:(int32_t) cold])
          [news addObject:[NSString stringWithFormat:@"you feel cold (%d)", (int) cold]];
    }
+
+   /* and short of breath, for something that breathes: from the carbon
+    * dioxide in the air over it (the atmosphere's; the blood's gases stand
+    * in for by the air's), ten points for every 0.1% above 0.1%, to the band */
+   if( [_world record:[_world kindNamed:"Respirator"] for:agent] &&
+       (gas = [_world record:[_world kindNamed:"GasStore"] for:BGAirOver( _world, agent)]) && gas->total)
+   {
+      int64_t   stuffy;
+
+      stuffy = (gas->dioxide * 1000000 / gas->total - 1000) / 100;
+      stuffy = stuffy < 0 ? 0 : stuffy > 100 ? 100 : (stuffy / BG_HUNGER_BAND) * BG_HUNGER_BAND;
+      if( [store feelStuffy:(int32_t) stuffy])
+         [news addObject:[NSString stringWithFormat:@"you feel short of breath (%d)", (int) stuffy]];
+   }
    concerns = _concerns ? [_concerns concernsOf:agent] : nil;
    for( i = 0; i < nwitnessed; i++)
    {
@@ -2854,8 +2880,8 @@ static NSString   *attribution_text( const BGTestimony *t)
                       t->strength, (long long) t->seen, t->present ? "" : ", gone", (unsigned long long) t->truth];
    }
    if( [store feltAt] >= 0)
-      [s appendFormat:@"  feels hunger %d, cold %d, at %lldms\n", [store feels:"hunger"], [store feels:"cold"],
-                      (long long) [store feltAt]];
+      [s appendFormat:@"  feels hunger %d, cold %d, short of breath %d, at %lldms\n", [store feels:"hunger"],
+                      [store feels:"cold"], [store feels:"stuffy"], (long long) [store feltAt]];
    for( i = 0; i < [store findingCount]; i++)
    {
       const BGFinding   *f;
@@ -3067,9 +3093,9 @@ char   *BGDecodeWord( const char *s)
                                                      (unsigned long long) tr->truth, tr->kind]];
       }
       if( [store feltAt] >= 0)
-         [lines addObject:[NSString stringWithFormat:@"feels %llu %d %lld %d", (unsigned long long) [store agent],
+         [lines addObject:[NSString stringWithFormat:@"feels %llu %d %lld %d %d", (unsigned long long) [store agent],
                                                      [store feels:"hunger"], (long long) [store feltAt],
-                                                     [store feels:"cold"]]];
+                                                     [store feels:"cold"], [store feels:"stuffy"]]];
       for( j = 0; j < [store identityCount]; j++)
       {
          const BGIdentity   *h;
@@ -3119,6 +3145,7 @@ char   *BGDecodeWord( const char *s)
    unsigned long long   origin;
    unsigned long long   parent;
    int                  cold;
+   int                  stuffy;
    int                  trust;
    BGTestimony          t;
    BGAncestry           a;
@@ -3222,10 +3249,11 @@ char   *BGDecodeWord( const char *s)
          free( paths);
          [[self storeOf:(BGEntityID) agent] addIdentity:h];
       }
-      else if( sscanf( text, "feels %llu %d %lld %d", &agent, &trust, &seen, &cold) == 4)
+      else if( sscanf( text, "feels %llu %d %lld %d %d", &agent, &trust, &seen, &cold, &stuffy) == 5)
       {
          [[self storeOf:(BGEntityID) agent] feelHunger:trust at:seen];
          [[self storeOf:(BGEntityID) agent] feelCold:cold];
+         [[self storeOf:(BGEntityID) agent] feelStuffy:stuffy];
       }
       else if( sscanf( text, "finding %llu %u %d %lld %63s %511s %u", &agent, &id, &trust, &seen, role, kind, &next) == 7)
       {
