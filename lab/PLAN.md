@@ -1317,3 +1317,29 @@ lending as a debt the borrower owes back, the value of what is parted with
 (every thing costs the same), and asking for work.
 
 45 tests, 775 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: investigation
+
+KNOWLEDGE.md §9's deliberate mode, and Scenario 2's *investigate
+workshop*. In the cleaned workshop's morning, the foreman by the lock sees
+the fresh paint and smells it, but the smell of soap, a day old and faint,
+goes unnoticed in passing. It watches closely for half a minute: at the
+end it notices the soap on the floor beside the lock, and draws what takes
+thought, that someone cleaned up there.
+
+- **A perception floor**: a trace fainter than 30 goes unnoticed.
+- **Investigating is an activity** (`watch_closely`, 30 s, attention 20):
+  its effect commits an "investigated" event, and at that boundary the
+  investigator looks closely: the floor drops to 5, smell reaches a tile
+  further, and rules marked `deliberate` are drawn as well (`cleaned
+  nearby`, from a faint soap smell beside something).
+- **A glance can't miss what only a close look caught**: a faint trace
+  isn't marked gone by ordinary perception.
+
+Not yet: investigation choosing what to examine (it looks at everything in
+range), deliberate rules costlier than a premise check, expertise grading
+what a close look finds, examining a thing's history (trace perception of
+age), and agency choosing to investigate.
+
+45 tests, 778 checks, under both compilers, ASan and UBSan, and leak-free.
+

@@ -575,8 +575,8 @@ static void   test_menu( void)
                                    @"take item 3: entailed; take_some item 2: entailed; test_scratch item 1: entailed; "
                                    @"test_scratch item 3: entailed; touch_up item 3: entailed; "
                                    @"walk_east: entailed; walk_north: entailed; walk_south: entailed; walk_west: entailed; "
-                                   @"wash_floor: entailed"]);
-   if( [text rangeOfString:@"walk_west: entailed; wash_floor: entailed"].location == NSNotFound)
+                                   @"wash_floor: entailed; watch_closely: entailed"]);
+   if( [text rangeOfString:@"wash_floor: entailed; watch_closely: entailed"].location == NSNotFound)
       fprintf( stderr, "    menu: %s\n", [text UTF8String]);
 
    /* a description carries perceivable fields only: the stack's count is hidden */
@@ -2509,9 +2509,10 @@ static void   test_traces( void)
    BG_CHECK( dried == 16000 + 6 * 3600000LL);          /* washed from 6 s to 16 s */
    BG_CHECK( ! any_trace( w, "damp_floor") && any_trace( w, "soap_smell"));
 
-   /* the morning: the foreman by the lock perceives fresh paint and smells it,
-    * and a faint smell of soap; nothing of the tool marks, the scuffs, or the
-    * damp; and only what the traces are, never what made them */
+   /* the morning: the foreman by the lock perceives fresh paint and smells
+    * it; nothing of the tool marks, the scuffs, or the damp; the smell of
+    * soap is too faint to notice in passing; and only what the traces are,
+    * never what made them */
    g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the foreman comes by"];
    [g move:BGWhole( foreman) to:BGOnTile( 4, 5, 0)];
    [c submit:g];
@@ -2519,16 +2520,27 @@ static void   test_traces( void)
    store = [knowledge storeOf:foreman];
    paint = traced( store, "fresh_paint");
    smell = traced( store, "paint_smell");
-   soap  = traced( store, "soap_smell");
-   BG_CHECK( paint && smell && soap);
+   BG_CHECK( paint && smell && ! traced( store, "soap_smell"));
    BG_CHECK( ! traced( store, "tool_marks") && ! traced( store, "scuffs") && ! traced( store, "damp_floor"));
    BG_CHECK( paint && paint->bearer && [store referent:paint->bearer]->truth == lock);
-   BG_CHECK( soap && ! soap->bearer && soap->x == 4 && soap->y == 4);
-   /* aged analytically, from when each was made (the touch-up done at 37 s,
-    * the wash at 16 s): fresh paint lasts 3 days, the soap smell 2 */
+   /* aged analytically, from when it was made (the touch-up done at 37 s):
+    * fresh paint lasts 3 days */
    BG_CHECK( paint && paint->strength == 80 * (37000 + 3 * 86400000LL - [w time].ms) / (3 * 86400000LL));
-   BG_CHECK( soap && soap->strength == 50 * (16000 + 2 * 86400000LL - [w time].ms) / (2 * 86400000LL));
-   BG_CHECK( soap && smell && soap->strength < smell->strength);
+   BG_CHECK( ! [store finding:"#Cleaned" about:referent_of( store, lock)]);
+
+   /* it investigates (KNOWLEDGE.md §9, deliberate): half a minute watching
+    * closely, and it notices the faint smell of soap (the wash at 16 s; it
+    * lasts a day), and draws what takes thought: someone cleaned up by the
+    * lock */
+   BG_CHECK( BGPerform( w, c, BGActionMake( "watch_closely", foreman, BGNoEntity, BGNoEntity), 0, &error) != nil);
+   [s runUntil:BGTimeMake( 12 * 3600000LL + 32000)];
+   soap  = traced( store, "soap_smell");
+   smell = traced( store, "paint_smell");
+   BG_CHECK( soap && ! soap->bearer && soap->x == 4 && soap->y == 4);
+   BG_CHECK( soap && soap->strength == 50 * (16000 + 86400000LL - soap->seen) / 86400000LL);
+   BG_CHECK( soap && soap->strength < BG_TRACE_FLOOR && smell && soap->strength < smell->strength);
+   BG_CHECK( [store finding:"#Cleaned" about:referent_of( store, lock)] &&
+             ! strcmp( [store finding:"#Cleaned" about:referent_of( store, lock)]->rule, "cleaned_nearby"));
    /* the developer sees where each came from: its creation, in the touch-up's completion */
    for( i = 0; i < [w eventCount]; i++)
    {

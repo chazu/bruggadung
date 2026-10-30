@@ -312,7 +312,8 @@ A rebuilt world produces the same next step as one that never saved.
    routine generator; and needs felt through interoception, the needs
    generator; and habits, an agent's own and those others believe it has.
    And promises, a speaker's commitment and a hearer's claim about a time
-   to come; and requests, granted or refused.
+   to come; requests, granted or refused; and investigation, a close look
+   that notices faint traces and draws the rules that take thought.
 
 ## Cross-cutting open questions
 

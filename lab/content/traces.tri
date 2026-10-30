@@ -36,7 +36,7 @@ trace: #Trace & { tileX: 0, tileY: 0, tileLevel: 0, magnitude: 0, created: 0ms, 
 tool_marks:  #TraceKind & { sense: "sight", lasts: 365d } @family(traces)
 scuffs:      #TraceKind & { sense: "sight", lasts: 30d }  @family(traces)
 damp_floor:  #TraceKind & { sense: "sight", lasts: 6h }   @family(traces)
-soap_smell:  #TraceKind & { sense: "smell", lasts: 2d }   @family(traces)
+soap_smell:  #TraceKind & { sense: "smell", lasts: 1d }   @family(traces)
 fresh_paint: #TraceKind & { sense: "sight", lasts: 3d }   @family(traces)
 paint_smell: #TraceKind & { sense: "smell", lasts: 4d }   @family(traces)
 scratch:     #TraceKind & { sense: "sight", lasts: 365d } @family(traces)

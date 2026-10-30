@@ -58,7 +58,10 @@
  * what the agent sees, or on the floor in sight; by smell within
  * BG_SMELL tiles; by hearing within BG_HEARING, out of sight too. What it perceives is the trace's kind, where, and how
  * strong it seems now (its age fades it), never what made it; a trace it
- * perceived at a site it perceives again, and no longer finds, is gone.
+ * perceived at a site it perceives again, and no longer finds, is gone. A
+ * trace fainter than BG_TRACE_FLOOR goes unnoticed, except at the close
+ * look an investigation ends in (KNOWLEDGE.md §9, deliberate), which also
+ * smells a tile further, and draws the rules that take thought.
  *
  * Interpretation (KNOWLEDGE.md §9), immediate: after each perception phase,
  * the rules of content/interpret.tri run over the agent's referents, those
@@ -109,6 +112,9 @@
 #define BG_SIGHT   4
 #define BG_SMELL   1
 #define BG_HEARING 10
+
+#define BG_TRACE_FLOOR        30   /* a trace fainter than this goes unnoticed */
+#define BG_TRACE_FLOOR_CLOSE   5   /* ... unless the agent is looking closely: investigating */
 
 /* credence and trust, in dB */
 #define BG_PRIOR         -10      /* a claim of where something is, before any testimony */

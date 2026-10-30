@@ -12,6 +12,8 @@
 #CoveredUp: #Finding & {}
 // Something stirred there.
 #Disturbance: #Finding & {}
+// Someone cleaned up beside it.
+#Cleaned: #Finding & {}
 // Someone does something the same way, again and again (AGENCY.md §8): the
 // finding's choice is the way.
 #Habit: #Finding & {}
@@ -29,13 +31,16 @@
 
 #Skill: "painting"
 
-// `concludes` is a #Finding type; `weight` the credence it lends, in dB.
+// `concludes` is a #Finding type; `weight` the credence it lends, in dB. A
+// `deliberate` rule takes thought: it is drawn only when the agent
+// investigates (KNOWLEDGE.md §9).
 #Rule: {
-    premises:  [...#Premise]
-    skill:     #Skill
-    mastery:   int & >=0 & <=100
-    concludes: text
-    weight:    int & >=0 & <=30
+    premises:   [...#Premise]
+    skill:      #Skill
+    mastery:    int & >=0 & <=100
+    concludes:  text
+    weight:     int & >=0 & <=30
+    deliberate: *false | true
 }
 
 // Fresh paint, to a painter's eye, means something was touched up: something
@@ -71,4 +76,14 @@ usually_puts: #Rule & {
     mastery:   0
     concludes: "#Habit"
     weight:    10
+} @family(rules)
+
+// A faint smell of soap on the floor beside something: someone cleaned up
+// there. It takes thought.
+cleaned_nearby: #Rule & {
+    premises:   [#Near & { near: "soap_smell" }]
+    mastery:    0
+    concludes:  "#Cleaned"
+    weight:     10
+    deliberate: true
 } @family(rules)

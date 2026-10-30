@@ -101,7 +101,9 @@ never what made them. A component field can declare another's appearance
 only an analysis (`test_scratch`) finds the truth beneath, which the
 analyser then keeps. Interpretation rules in content draw findings from
 what an agent perceives (fresh paint means something was touched up),
-gated by its expertise and by what it saw before. A notebook is a record: writing
+gated by its expertise and by what it saw before. Faint traces go
+unnoticed in passing; investigating, a close look, notices them and draws
+the rules that take thought. A notebook is a record: writing
 in it copies a claim the character believes, and whoever reads it, a thief
 included, takes the claim from its author; `lab play`'s `notebook` shows
 what the character knows, and `note` keeps the player's own notes apart.

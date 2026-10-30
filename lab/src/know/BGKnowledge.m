@@ -1512,6 +1512,7 @@ static uint32_t   bound_to( BGEntityID e, BGEntityID agent, uint32_t me, const B
                    seen:(const BGSeen *) seen
                assigned:(const uint32_t *) assigned
                   count:(NSUInteger) nseen
+                closely:(BOOL) closely
                    news:(NSMutableArray *) news
 {
    const BGTrace   *record;
@@ -1533,15 +1534,15 @@ static uint32_t   bound_to( BGEntityID e, BGEntityID agent, uint32_t me, const B
    tri      = [_world tri];
    traces   = [_world storeForKind:[_world kindNamed:"Trace"]];
    range[ 0] = BG_SIGHT;
-   range[ 1] = BG_SMELL;
+   range[ 1] = BG_SMELL + (closely ? 1 : 0);
    range[ 2] = BG_HEARING;
    for( i = 0; i < [traces count]; i++)
    {
       record   = [traces recordAtIndex:i];
       kind     = [_world textField:"Trace.traceKind" of:[traces entityAtIndex:i]];
       strength = BGTraceStrength( record, now);
-      if( ! kind || strength <= 0)
-         continue;
+      if( ! kind || strength <= 0 || strength < (closely ? BG_TRACE_FLOOR_CLOSE : BG_TRACE_FLOOR))
+         continue;      /* too faint to notice */
       v = tri_at( tri, tri_pattern( tri, kind), "sense");
       sense[ 0] = 0;
       if( v)
@@ -1587,6 +1588,8 @@ static uint32_t   bound_to( BGEntityID e, BGEntityID agent, uint32_t me, const B
       old = [store mutableTraceAt:i];
       if( found[ i] || ! old->present)
          continue;
+      if( ! closely && old->strength < BG_TRACE_FLOOR)
+         continue;      /* caught only on a close look: a glance can't miss it */
       v = tri_at( tri, tri_pattern( tri, old->kind), "sense");
       sense[ 0] = 0;
       if( v)
@@ -1689,6 +1692,7 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
 /* Immediate interpretation: each rule the agent has the expertise for, over
  * each referent; a rule whose premises all hold adds its finding. */
 - (void) interpret:(BGKnowledgeStore *) store
+      deliberately:(BOOL) deliberately
               news:(NSMutableArray *) news
 {
    const TriNode      *rule;
@@ -1717,6 +1721,9 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
    for( i = 0; family && i < tri_index_count( family); i++)
    {
       rule = tri_pattern( tri, tri_index_tag( family, i));
+      v    = tri_at( tri, rule, "deliberate");
+      if( v && ! deliberately && tri_node_type( v) == tri_type_named( tri, "true"))
+         continue;      /* it takes thought: only when investigating */
       v    = tri_at( tri, rule, "concludes");
       n    = v ? tri_print( tri, v, concludes, sizeof( concludes)) : 0;
       if( n < 3)
@@ -1805,6 +1812,7 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
    uint32_t           *assigned;      /* per visible entity: its referent */
    uint8_t            *taken;         /* per referent index: matched this phase */
    uint32_t           container;
+   BOOL               closely;
    const BGAgent      *hider;
    const BGAgent      *memory;
    NSArray            *concerns;
@@ -1986,7 +1994,12 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
                taken[ j] = 1;
       }
 
-   [self perceiveTraces:store at:here now:now seen:seen assigned:assigned count:nseen news:news];
+   /* a close look: what its investigation ends in */
+   closely = NO;
+   for( i = first; i < last; i++)
+      if( [_world eventAt:i]->actor == agent && ! strcmp( [_world eventAt:i]->kind, "investigated"))
+         closely = YES;
+   [self perceiveTraces:store at:here now:now seen:seen assigned:assigned count:nseen closely:closely news:news];
 
    /* what it read: each entry, from the author, in the record */
    for( i = first; i < last; i++)
@@ -2163,7 +2176,7 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
    }
    memory = [_world record:[_world kindNamed:"Agent"] for:agent];
    [store keepAtMost:memory && memory->memory > 0 ? (NSUInteger) memory->memory : 64];
-   [self interpret:store news:news];
+   [self interpret:store deliberately:closely news:news];
    free( seen);
    free( assigned);
    free( taken);

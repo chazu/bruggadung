@@ -4,7 +4,7 @@
 // bindings between roles. `effect` names the code that builds the proposal
 // group when the action is performed.
 
-#Effect: "take" | "take_some" | "put_in" | "drive" | "open_tap" | "fill" | "walk" | "loosen" | "look" | "say" | "tend" | "analyse" | "write" | "read" | "eat" | "give"
+#Effect: "take" | "take_some" | "put_in" | "drive" | "open_tap" | "fill" | "walk" | "loosen" | "look" | "say" | "tend" | "analyse" | "write" | "read" | "eat" | "give" | "investigate"
 
 // Which roles an operation has is its roles' type: a structure's type is the
 // most general one with all its features.
@@ -191,7 +191,7 @@ test_scratch: #Operation & {
         actor: #Agent
         item:  #Body & { place: #OnTile | #Installed }
     }
-    leaves:    [{ trace: "scratch", on: "item", strength: 30 }]
+    leaves:    [{ trace: "scratch", on: "item", strength: 40 }]
 } @family(operations)
 
 // Eat what the actor holds: a while, with the hands, easily put down. It
@@ -222,4 +222,14 @@ give: #Operation & {
         item:        #Body & { place: #Held & { by: $a } }
         destination: #Agent & { freeHands: >=1 }
     }
+} @family(operations)
+
+// Investigate where the actor is (KNOWLEDGE.md §9, deliberate): half a
+// minute watching closely, which ends with the actor noticing fainter traces
+// and drawing the rules that take thought.
+watch_closely: #Operation & {
+    effect:    "investigate"
+    duration:  30s
+    attention: 20
+    roles:     { actor: #Agent & { place: #OnTile } }
 } @family(operations)

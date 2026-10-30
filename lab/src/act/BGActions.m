@@ -671,6 +671,15 @@ static NSString   *effect_give( BGWorld *world, BGAction a, int64_t amount, BGPr
 }
 
 
+/* Investigating changes nothing: it ends in an event the investigator
+ * perceives, a close look. */
+static NSString   *effect_investigate( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
+{
+   [g emit:"investigated" subject:BGWhole( a.roles[ BGRoleActor]) other:BGWhole( a.roles[ BGRoleActor])];
+   return( nil);
+}
+
+
 /* Tending changes nothing but traces, which the operation declares. */
 static NSString   *effect_tend( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
 {
@@ -707,6 +716,7 @@ static const struct
    { "read",      effect_read },
    { "eat",       effect_eat },
    { "give",      effect_give },
+   { "investigate", effect_investigate },
 };
 
 
