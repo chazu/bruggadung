@@ -3194,6 +3194,7 @@ static void   test_forged_permit( void)
    BGEntityID         forger;
    BGEntityID         clerk;
    BGEntityID         guard;
+   BGEntityID         veteran;
    BGEntityID         warehouse;
    const BGEvent      *ev;
    const BGEdge       *edge;
@@ -3234,6 +3235,8 @@ static void   test_forged_permit( void)
    [g set:"Inscription.inscribed" of:BGWhole( ledger) to:(int64_t) reg];
    seal      = [g create:"stamp" key:"the office seal" at:BGOnTile( 11, 10, 0)];
    [g set:"Stamp.presses" of:BGWhole( seal) toText:"the harbour anchor"];
+   [g set:"Stamp.sealOf" of:BGWhole( seal) toText:"the harbour office"];
+   veteran   = [g create:"guard" key:"a veteran guard, at the office" at:BGOnTile( 11, 11, 0)];
    c1        = [g create:"paper_copy" key:"C1" at:BGHeldBy( alun, 0)];
    [g set:"Inscription.inscribed" of:BGWhole( c1) to:(int64_t) permit];
    [g set:"Inscription.reads" of:BGWhole( c1) toText:"Alun may enter the warehouse"];
@@ -3252,6 +3255,7 @@ static void   test_forged_permit( void)
    forger    = [g idFor:forger];
    clerk     = [g idFor:clerk];
    guard     = [g idFor:guard];
+   veteran   = [g idFor:veteran];
    permit    = [g idFor:permit];
    auth      = [g idFor:auth];
    reg       = [g idFor:reg];
@@ -3284,6 +3288,7 @@ static void   test_forged_permit( void)
    g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the forger shows C2 at the warehouse"];
    [g move:BGWhole( forger) to:BGOnTile( 18, 4, 0)];
    [g move:BGWhole( c2) to:BGOnTile( 18, 4, 0)];
+   [g move:BGWhole( veteran) to:BGOnTile( 18, 5, 0)];
    [st.c submit:g];
    [st.s runUntil:BGTimeMake( 4)];
    store = [knowledge storeOf:guard];
@@ -3294,6 +3299,13 @@ static void   test_forged_permit( void)
    BG_CHECK( [seen rangeOfString:@"impression: \"an anchor, crudely cut\""].location != NSNotFound);
    /* 3: the player's view has only the claimed origin; the actual is in history */
    BG_CHECK( [seen rangeOfString:@"inscribed"].location == NSNotFound);
+   /* whether it is believed (KNOWLEDGE.md §4): the guard, who has never seen
+    * the office's seal, can't tell; the veteran, who has, sees the crude
+    * anchor isn't it, and finds C2 forged */
+   BG_CHECK( [[knowledge dump:guard] rangeOfString:@"#Forged"].location == NSNotFound);
+   store = [knowledge storeOf:veteran];
+   BG_CHECK( [store finding:"#Forged" about:referent_of( store, c2)] != NULL);
+   BG_CHECK( referent_of( store, c1) && [store finding:"#Forged" about:referent_of( store, c1)] == NULL);
 
    /* 1 (checks): content, the office, the authorization have no location;
     * copies, the ledger, the stamps have one */
@@ -3323,6 +3335,10 @@ static void   test_forged_permit( void)
    authority = BGAuthorizationsOver( st.w, warehouse);
    BG_CHECK( [authority count] == 1 && [[authority objectAtIndex:0] unsignedLongLongValue] == auth);
    BG_CHECK( BGContentAuthorizes( st.w, permit) && ! BGContentAuthorizes( st.w, altered));
+   /* authorize(action): Alun's going into the warehouse has the office's
+    * authorization; the forger's, none; neither is blocked by it */
+   BG_CHECK( [BGAuthorize( st.w, BGActionMake( "look_in", alun, warehouse, BGNoEntity)) count] == 1);
+   BG_CHECK( [BGAuthorize( st.w, BGActionMake( "look_in", forger, warehouse, BGNoEntity)) count] == 0);
    /* 6: the fake stamp, P′, C2 and the forger's creation are found through provenance */
    BG_CHECK( stamped);
 

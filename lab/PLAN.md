@@ -2010,9 +2010,11 @@ The remaining scenario checks that aren't run, after the passes above:
     history, culprit attribution. COMPONENTS.md: "The latent assembly
     document will specify materialization …" The lab's are provisional
     (below), and so are the scenarios built on them.
-  - institutions: grievances, reporting to the miller, and whether a guard
-    *believes* a permit. ARCHITECTURE.md: "Institutions (§6) … To be
-    specified". (COMPONENTS.md Scenario 2 needed none of it; see below.)
+  - institutions' own semantics: whether an institution permits or forbids,
+    sanctions, grievances, office holders' capabilities, reservations
+    treated as claims. ARCHITECTURE.md: "Institutions (§6) … To be
+    specified". (What COMPONENTS.md Scenario 2 and ACTIONS.md §3 fix runs;
+    see below.)
   - how considerations combine beyond adding (AGENCY.md's open question 1
     asks product, weighted sum, or a mix). The lab adds them, in dB.
   - perception or memory making feature hypotheses of their own: the docs
@@ -2453,3 +2455,23 @@ minute on, both runs' saves are the same to the byte. With checks 1, 2,
 Scenario 2's checks now run, on the provisional latent assembly.
 
 68 tests, 2372 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: the guard's doubt, and authorize(action)
+
+Two parts of the forged permit that need no institution semantics:
+
+- **Whether a guard believes it** (COMPONENTS.md Scenario 2: "Whether the
+  guard believes it is §4's business"; "They may know what the office's
+  seal should look like"). A stamp shows whose seal it is (`sealOf`). A
+  rule (`forged_seal`, premise `#Misprinted`) concludes `#Forged` of a
+  copy claiming an issuer whose seal the agent has seen, pressed with
+  something else. The warehouse guard, who has never seen the office's
+  seal, can't tell. A veteran who has seen it at the office finds C2
+  forged, and C1, genuine, not.
+- **`authorize(action)`** (ACTIONS.md §3), past its empty stub: the
+  authorizations granting the actor something over what the action binds.
+  Alun's going into the warehouse has the office's authorization, the
+  forger's has none. It never blocks an attempt. Whether an institution
+  permits or forbids stays §6's.
+
+68 tests, 2377 checks, under both compilers, ASan and UBSan, and leak-free.

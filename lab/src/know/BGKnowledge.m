@@ -2219,6 +2219,52 @@ static uint32_t   bound_to( BGEntityID e, BGEntityID agent, uint32_t me, const B
 
 /* Whether the agent perceives a trace of the kind on the referent: there
  * now, or (`gone`) there before and not any more. */
+/* A quoted text feature of a description ("claims: \"the harbour office\""),
+ * or nil. */
+static NSString   *quoted_feature( NSString *description, NSString *name)
+{
+   NSRange    at;
+   NSRange    end;
+   NSString   *key;
+
+   key = [NSString stringWithFormat:@"%@: \"", name];
+   at  = [description rangeOfString:key];
+   if( at.location == NSNotFound)
+      return( nil);
+   end = [description rangeOfString:@"\"" options:0
+                              range:NSMakeRange( at.location + at.length, [description length] - at.location - at.length)];
+   if( end.location == NSNotFound)
+      return( nil);
+   return( [description substringWithRange:NSMakeRange( at.location + at.length, end.location - at.location - at.length)]);
+}
+
+
+/* Whether the referent is a copy claiming an issuer whose seal the agent has
+ * seen, with an impression not that seal's. */
+static BOOL   misprinted( BGKnowledgeStore *store, uint32_t referent)
+{
+   NSString     *copy;
+   NSString     *claims;
+   NSString     *impression;
+   NSString     *seal;
+   NSUInteger   i;
+
+   copy       = [store describeReferent:referent];
+   claims     = quoted_feature( copy, @"claims");
+   impression = quoted_feature( copy, @"impression");
+   if( ! [claims length] || ! impression)
+      return( NO);
+   for( i = 0; i < [store count]; i++)
+   {
+      seal = [store describeReferent:[store referentAt:i]->id];
+      if( [quoted_feature( seal, @"sealOf") isEqualToString:claims] && quoted_feature( seal, @"presses") &&
+          ! [quoted_feature( seal, @"presses") isEqualToString:impression])
+         return( YES);
+   }
+   return( NO);
+}
+
+
 /* Whether it noticed the referent lose some of `field`, wear that comes and
  * never goes. */
 static BOOL   unworn( BGKnowledgeStore *store, uint32_t referent, const char *field)
@@ -2429,6 +2475,8 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
                text[ strlen( text) - 1] = 0;
                holds = bears( store, r->id, text + 1, YES);
             }
+            else if( (v = tri_at( tri, premise, "misprinted")))
+               holds = misprinted( store, r->id);
             else if( (v = tri_at( tri, premise, "unworn")) && tri_print( tri, v, text, sizeof( text)) > 2)
             {
                text[ strlen( text) - 1] = 0;

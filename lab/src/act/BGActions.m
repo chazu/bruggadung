@@ -1270,6 +1270,35 @@ NSArray   *BGAuthorizationsOver( BGWorld *world, BGEntityID entity)
 }
 
 
+/* ACTIONS.md §3's authorize(action), past its stub: the authorizations
+ * granting the actor something over what the action binds. It never blocks
+ * an attempt: whether an institution permits or forbids is §6's. */
+NSArray   *BGAuthorize( BGWorld *world, BGAction action)
+{
+   const BGAuthorization   *auth;
+   NSMutableArray          *found;
+   BGStore                 *store;
+   NSUInteger              i;
+   int                     r;
+
+   found = [NSMutableArray array];
+   store = [world storeForKind:[world kindNamed:"Authorization"]];
+   for( i = 0; i < [store count]; i++)
+   {
+      auth = [store recordAtIndex:i];
+      if( (BGEntityID) auth->grantee != action.roles[ BGRoleActor])
+         continue;
+      for( r = BGRoleItem; r < BGRoleCount; r++)
+         if( action.roles[ r] && (BGEntityID) auth->over == action.roles[ r])
+         {
+            [found addObject:[NSNumber numberWithUnsignedLongLong:[store entityAtIndex:i]]];
+            break;
+         }
+   }
+   return( found);
+}
+
+
 /* Whether any authorization links to the content. */
 BOOL   BGContentAuthorizes( BGWorld *world, BGEntityID content)
 {

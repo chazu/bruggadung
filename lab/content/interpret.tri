@@ -22,6 +22,8 @@
 #Habit: #Finding & {}
 // It was swapped for another like it.
 #Replaced: #Finding & {}
+// It is a forgery.
+#Forged: #Finding & {}
 
 // A rule's premises, over the body it is about.
 #Premise:  {}
@@ -36,6 +38,9 @@
 // it was seen with more of this before, which wears on and never off, than
 // it is seen with now
 #Unworn:   #Premise & { unworn: text }
+// a copy whose impression is not that of the seal the agent has seen of the
+// issuer it claims
+#Misprinted: #Premise & { misprinted: *true | false }
 
 #Skill: "painting"
 
@@ -86,6 +91,16 @@ replaced: #Rule & {
     mastery:   0
     concludes: "#Replaced"
     weight:    15
+} @family(rules)
+
+// A copy claiming an issuer whose seal the agent has seen, pressed with
+// another: it is forged (COMPONENTS.md Scenario 2: the guard "may know what
+// the office's seal should look like").
+forged_seal: #Rule & {
+    premises:  [#Misprinted & { misprinted: true }]
+    mastery:   0
+    concludes: "#Forged"
+    weight:    20
 } @family(rules)
 
 // Seen putting things in the same place three times: they usually do.

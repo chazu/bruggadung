@@ -41,10 +41,11 @@
     fidelity:   *100 | int & >=0 & <=100       @field(content, saved, proposable, inspect)
 }
 
-// A seal: what it presses.
+// A seal: what it presses, and whose seal it is.
 #Stamp: #Body & {
     @component(Stamp)
     presses: text                              @field(saved, proposable, inspect, perceive(sight))
+    sealOf:  text                              @field(saved, proposable, inspect, perceive(sight))
 }
 
 // Who writes, and in what hand.

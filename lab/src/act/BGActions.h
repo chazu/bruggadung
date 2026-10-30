@@ -155,6 +155,9 @@ NSArray            *BGAuthorizationsOver( BGWorld *world, BGEntityID entity);
 NSArray            *BGClaimsCovering( BGWorld *world, BGEntityID entity);
 BOOL               BGOwnershipOpen( BGWorld *world, BGEntityID entity);
 BOOL               BGContentAuthorizes( BGWorld *world, BGEntityID content);
+/* ACTIONS.md §3's authorize(action): the authorizations granting the actor
+ * something over what the action binds. Never blocks an attempt. */
+NSArray            *BGAuthorize( BGWorld *world, BGAction action);
 /* A trace of `kind` (traces.tri) on the bearer, or on the tile if none, at
  * `strength`, made in the group; `by` says what left it. */
 void               BGMakeTrace( BGWorld *world, BGProposalGroup *group, const char *kind, BGEntityID bearer,

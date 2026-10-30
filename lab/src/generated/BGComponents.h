@@ -1,4 +1,4 @@
-/* Generated from Triangle content 5714a273f9b8a1d7: do not edit. Type IDs are valid
+/* Generated from Triangle content c5b636aafcc2cf6e: do not edit. Type IDs are valid
  * only for this content; regenerate when it changes. */
 #ifndef BG_COMPONENTS_H
 #define BG_COMPONENTS_H
@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BG_CONTENT_HASH 0x5714a273f9b8a1d7ULL
+#define BG_CONTENT_HASH 0xc5b636aafcc2cf6eULL
 
 typedef struct TriNode TriNode;
 
@@ -232,6 +232,7 @@ typedef struct {
 /* Stamp, from #Stamp */
 typedef struct {
     const char *    presses;    /* text; saved, proposable, inspect, perceive(sight) */
+    const char *    sealOf;    /* text; saved, proposable, inspect, perceive(sight) */
 } BGStamp;
 
 /* Tap, from #Tap */
@@ -272,59 +273,59 @@ typedef struct {
 
 /* #ActivityStatus */
 enum {
-    BG_ACTIVITYSTATUS_ABORTED = 307,
-    BG_ACTIVITYSTATUS_COMPLETED = 308,
-    BG_ACTIVITYSTATUS_EXHAUSTED = 309,
-    BG_ACTIVITYSTATUS_FAILED = 310,
-    BG_ACTIVITYSTATUS_RUNNING = 311,
-    BG_ACTIVITYSTATUS_SUSPENDED = 312,
+    BG_ACTIVITYSTATUS_ABORTED = 310,
+    BG_ACTIVITYSTATUS_COMPLETED = 311,
+    BG_ACTIVITYSTATUS_EXHAUSTED = 312,
+    BG_ACTIVITYSTATUS_FAILED = 313,
+    BG_ACTIVITYSTATUS_RUNNING = 314,
+    BG_ACTIVITYSTATUS_SUSPENDED = 315,
 };
 
 /* #ClaimKind */
 enum {
-    BG_CLAIMKIND_CUSTODY = 314,
-    BG_CLAIMKIND_OWNERSHIP = 315,
-    BG_CLAIMKIND_RESERVATION = 316,
+    BG_CLAIMKIND_CUSTODY = 317,
+    BG_CLAIMKIND_OWNERSHIP = 318,
+    BG_CLAIMKIND_RESERVATION = 319,
 };
 
 /* #Material */
 enum {
-    BG_MATERIAL_CLOTH = 365,
-    BG_MATERIAL_FOOD = 366,
-    BG_MATERIAL_LEATHER = 367,
-    BG_MATERIAL_RUBBER = 368,
-    BG_MATERIAL_STONE = 369,
-    BG_MATERIAL_FLESH = 395,
-    BG_MATERIAL_BRASS = 397,
-    BG_MATERIAL_IRON = 398,
-    BG_MATERIAL_PAPER = 399,
-    BG_MATERIAL_STEEL = 400,
-    BG_MATERIAL_OAK = 402,
+    BG_MATERIAL_CLOTH = 368,
+    BG_MATERIAL_FOOD = 369,
+    BG_MATERIAL_LEATHER = 370,
+    BG_MATERIAL_RUBBER = 371,
+    BG_MATERIAL_STONE = 372,
+    BG_MATERIAL_FLESH = 398,
+    BG_MATERIAL_BRASS = 400,
+    BG_MATERIAL_IRON = 401,
+    BG_MATERIAL_PAPER = 402,
+    BG_MATERIAL_STEEL = 403,
+    BG_MATERIAL_OAK = 405,
 };
 
 /* "flesh" | "metal" | "natural" | "paper" | "wood" */
 enum {
-    BG_BODY_SURFACE_NATURAL = 246,
-    BG_BODY_SURFACE_FLESH = 395,
-    BG_BODY_SURFACE_BRASS = 397,
-    BG_BODY_SURFACE_IRON = 398,
-    BG_BODY_SURFACE_PAPER = 399,
-    BG_BODY_SURFACE_STEEL = 400,
-    BG_BODY_SURFACE_OAK = 402,
+    BG_BODY_SURFACE_NATURAL = 249,
+    BG_BODY_SURFACE_FLESH = 398,
+    BG_BODY_SURFACE_BRASS = 400,
+    BG_BODY_SURFACE_IRON = 401,
+    BG_BODY_SURFACE_PAPER = 402,
+    BG_BODY_SURFACE_STEEL = 403,
+    BG_BODY_SURFACE_OAK = 405,
 };
 
 /* #Colour */
 enum {
-    BG_COLOUR_BLUE = 319,
-    BG_COLOUR_BLACK = 321,
-    BG_COLOUR_BROWN = 322,
-    BG_COLOUR_GREEN = 323,
-    BG_COLOUR_GREY = 324,
-    BG_COLOUR_NAVY = 325,
-    BG_COLOUR_RED = 326,
-    BG_COLOUR_YELLOW = 327,
-    BG_COLOUR_BEIGE = 340,
-    BG_COLOUR_WHITE = 362,
+    BG_COLOUR_BLUE = 322,
+    BG_COLOUR_BLACK = 324,
+    BG_COLOUR_BROWN = 325,
+    BG_COLOUR_GREEN = 326,
+    BG_COLOUR_GREY = 327,
+    BG_COLOUR_NAVY = 328,
+    BG_COLOUR_RED = 329,
+    BG_COLOUR_YELLOW = 330,
+    BG_COLOUR_BEIGE = 343,
+    BG_COLOUR_WHITE = 365,
 };
 
 /* The field registry: what code needs to read and write any component
@@ -548,6 +549,7 @@ static const BGFieldInfo BGStack_fields[] = {
 
 static const BGFieldInfo BGStamp_fields[] = {
     { "presses", offsetof(BGStamp, presses), BG_VALUE_TEXT, "text", "saved, proposable, inspect, perceive(sight)" },
+    { "sealOf", offsetof(BGStamp, sealOf), BG_VALUE_TEXT, "text", "saved, proposable, inspect, perceive(sight)" },
 };
 
 static const BGFieldInfo BGTap_fields[] = {
@@ -609,7 +611,7 @@ static const BGComponentInfo BGComponents[BG_COMPONENT_COUNT + 1] = {
     { "Pump", "#Pump", sizeof(BGPump), 2, BGPump_fields },
     { "Record", "#Record", sizeof(BGRecord), 1, BGRecord_fields },
     { "Stack", "#Stack", sizeof(BGStack), 3, BGStack_fields },
-    { "Stamp", "#Stamp", sizeof(BGStamp), 1, BGStamp_fields },
+    { "Stamp", "#Stamp", sizeof(BGStamp), 2, BGStamp_fields },
     { "Tap", "#Tap", sizeof(BGTap), 2, BGTap_fields },
     { "Trace", "#Trace", sizeof(BGTrace), 8, BGTrace_fields },
     { "Valve", "#Valve", sizeof(BGValve), 3, BGValve_fields },
