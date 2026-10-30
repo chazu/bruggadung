@@ -19,6 +19,9 @@
 // to ask.
 #HavingNails: #WithNails & { box: #Container, someone: #Agent }
 
+// Tightening: the spanner, and the nut.
+#Tightening: #Frame & { spanner: #Body, nut: #Body }
+
 // Fetching: a part.
 #Fetching: #Frame & { part: #Body }
 
@@ -83,6 +86,8 @@
 // operation it started since has completed.
 #Looked: #Condition & { looked: text }
 #Did:    #Condition & { did: text }
+// ... it is within reach of the slot's referent.
+#Reached: #Condition & { reached: text }
 
 // How a candidate's referents are ordered, for each slot as it is found:
 // nearest first, most recently seen first, or the one the agent has most
@@ -107,14 +112,19 @@
 // method's `pre` holds, the goal is impossible for now: it is dropped with
 // the reason, and the method that needed it has failed.
 #Method: #Intent & {
-    goal:   text
-    rank:   int
-    pre:    #Condition
-    order:  [...#Order]
-    search: text
-    steps:  [...#MethodStep]
-    score:  [...#Consideration]
+    goal:      text
+    rank:      int
+    pre:       #Condition
+    order:     [...#Order]
+    search:    text
+    steps:     [...#MethodStep]
+    score:     [...#Consideration]
+    onUnknown: text
 }
+
+// `onUnknown` (AGENCY.md §5): when the precondition is unknown, rather than
+// false, the goal to adopt first, with the unknown match's bindings: finding
+// out what is unknown.
 
 // A method's score (AGENCY.md §5): its considerations, added. Methods are
 // tried best first, then by rank; one that scores below nothing is
@@ -418,4 +428,42 @@ take_the_seal: #Method & {
     pre:   { find: ["part"], match: #Fetching & { part: #Body & { material: "rubber", place: #OnTile } } }
     steps: [#Do & { op: "take_up", object: "part" }]
     score: [#Flat & { value: 10 }, #Respect & { reserved: "part", per: -8 }]
+} @family(methods)
+
+
+// --- CONTENT_LANGUAGE.md Scenario 2, "the nut of unknown size" -------------------
+
+tighten_nut: #Goal & {
+    title: "tighten the nut"
+    done:  { find: ["nut"], match: #Tightening & { nut: #Fastener & { tight: true } } }
+} @family(goals)
+
+// With a spanner that fits: if whether it fits is unknown, look closer.
+tighten_it: #Method & {
+    title: "tighten it"
+    goal:  "tighten_nut"
+    rank:  1
+    pre: {
+        find:  ["spanner", "nut"]
+        match: #Tightening & {
+            me:      #Agent & { id: $me }
+            spanner: #Spanner & { size: $s, place: #Held & { by: $me } }
+            nut:     #Fastener & { size: $s, tight: false }
+        }
+    }
+    onUnknown: "look_closer"
+    steps:     [#Do & { op: "tighten", object: "spanner", target: "nut" }]
+} @family(methods)
+
+look_closer: #Goal & {
+    title: "look closer"
+    done:  #Reached & { reached: "nut" }
+} @family(goals)
+
+go_and_peer: #Method & {
+    title: "go and peer at it"
+    goal:  "look_closer"
+    rank:  1
+    pre:   { find: ["nut"], match: #Tightening & { nut: #Fastener } }
+    steps: [#Do & { op: "peer_at", object: "nut" }]
 } @family(methods)

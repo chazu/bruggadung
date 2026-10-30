@@ -4,7 +4,7 @@
 // bindings between roles. `effect` names the code that builds the proposal
 // group when the action is performed.
 
-#Effect: "take" | "take_some" | "put_in" | "drive" | "open_tap" | "fill" | "walk" | "loosen" | "look" | "say" | "tend" | "analyse" | "write" | "read" | "eat" | "give" | "investigate"
+#Effect: "take" | "take_some" | "put_in" | "drive" | "open_tap" | "fill" | "walk" | "loosen" | "look" | "say" | "tend" | "analyse" | "write" | "read" | "eat" | "give" | "investigate" | "tighten"
 
 // Which roles an operation has is its roles' type: a structure's type is the
 // most general one with all its features.
@@ -243,5 +243,25 @@ take_up: #Operation & {
     roles: {
         actor: #Agent & { freeHands: >=1 }
         item:  #Body & { place: #OnTile | #Inside }
+    }
+} @family(operations)
+
+// Tighten a nut with a spanner the actor holds that fits it: the same size.
+tighten: #Operation & {
+    effect: "tighten"
+    uses:   ["hands"]
+    roles: {
+        actor:       #Agent & { id: $a }
+        item:        #Spanner & { size: $s, place: #Held & { by: $a } }
+        destination: #Fastener & { size: $s, tight: false }
+    }
+} @family(operations)
+
+// Peer at a nut in reach: up close, its size is plain.
+peer_at: #Operation & {
+    effect: "look"
+    roles: {
+        actor: #Agent
+        item:  #Fastener
     }
 } @family(operations)

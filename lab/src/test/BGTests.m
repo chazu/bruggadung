@@ -66,7 +66,7 @@ static void   test_registry_and_construction( void)
 
    w = BGTestWorld( 1);
    c = BGTestCommitter( w);
-   BG_CHECK( [w kindCount] == 11);
+   BG_CHECK( [w kindCount] == 13);
    BG_CHECK( [w kindNamed:"Body"] != NSNotFound && [w kindNamed:"Nonesuch"] == NSNotFound);
    bin   = commit_create( c, "bin", BGOnTile( 0, 0, 0));
    nails = commit_create( c, "nails_30", BGIn( bin));
@@ -3831,6 +3831,114 @@ static void   test_coat_at_dusk( void)
 }
 
 
+/* --- the nut of unknown size ------------------------------------------------- */
+
+typedef struct
+{
+   BGWorld       *world;
+   BGKnowledge   *knowledge;
+   BGAgency      *agency;
+   BGEntityID    nut;
+   NSString      *fromAfar;      /* the worker's referent of the nut, before it looks closer */
+   NSString      *text;
+} BGNutRun;
+
+
+/* CONTENT_LANGUAGE.md Scenario 2, "the nut of unknown size": the worker,
+ * holding a spanner, is to tighten the pump's gland nut, four tiles off,
+ * whose size it sees only roughly from there. */
+static BGNutRun   nut_run( const char *nut, const char *spanner, BOOL omniscient)
+{
+   BGStage            st;
+   BGActivities       *activities;
+   BGKnowledge        *knowledge;
+   BGAgency           *agency;
+   BGProposalGroup    *g;
+   BGEntityID         worker;
+   BGNutRun           run;
+
+   memset( &run, 0, sizeof( run));
+   st.w       = BGTestWorld( 71);
+   st.c       = BGTestCommitter( st.w);
+   activities = [BGActivities activitiesWithWorld:st.w committer:st.c];
+   knowledge  = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+   agency     = [[[BGAgency alloc] initWithWorld:st.w committer:st.c knowledge:knowledge] autorelease];
+   st.s       = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [knowledge setOmniscient:omniscient];
+   [agency setActivities:activities];
+   [st.s setActivities:activities];
+   [st.s setPerception:knowledge];
+   [st.s setDecision:agency];
+   g       = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the pump"];
+   worker  = [g create:"worker" key:"Oskar" at:BGOnTile( 2, 2, 0)];
+   [g create:spanner key:"spanner" at:BGHeldBy( worker, 0)];
+   run.nut = [g create:nut key:"gland nut" at:BGOnTile( 6, 2, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   worker   = [g idFor:worker];
+   run.nut  = [g idFor:run.nut];
+   run.fromAfar = [[knowledge storeOf:worker] describeReferent:referent_of( [knowledge storeOf:worker], run.nut)];
+   BG_CHECK( [agency commit:worker toGoal:"tighten_nut"]);
+   [st.s runUntil:BGTimeMake( 30000)];
+   run.world     = st.w;
+   run.knowledge = knowledge;
+   run.agency    = agency;
+   run.text      = BGSave( st.w, st.c, [NSArray arrayWithObjects:knowledge, agency, nil]);
+   return( run);
+}
+
+
+static BOOL   tightened( BGNutRun run)
+{
+   int64_t   v;
+
+   return( [run.world getField:"Fastener.tight" of:run.nut value:&v] && v);
+}
+
+
+static void   test_unknown_nut( void)
+{
+   BGNutRun   base;
+   BGNutRun   wrong;
+   BGNutRun   seer;
+   BGNutRun   tag;
+   BGNutRun   again;
+
+   /* 1: four tiles off, the nut's size is only 16 to 22 mm: whether the 19
+    * mm spanner fits is unknown, with the residual nut.size and nothing else */
+   base = nut_run( "gland_nut", "spanner_19", NO);
+   BG_CHECK( [base.fromAfar rangeOfString:@"size: >=16mm & <=22mm"].location != NSNotFound);
+   /* 2: the residual becomes a goal: it looks closer, and then tightens it */
+   BG_CHECK( logged_by( base.agency, 1, @"[tighten the nut] tighten it: unknown at nut.size: look closer first"));
+   BG_CHECK( logged_by( base.agency, 1, @"[look closer] go and peer at it: walk_east"));
+   BG_CHECK( [[[base.knowledge storeOf:1] describeReferent:referent_of( [base.knowledge storeOf:1], base.nut)]
+              rangeOfString:@"size: 19mm"].location != NSNotFound);     /* within reach, it sees it plainly */
+   BG_CHECK( logged_by( base.agency, 1, @"[tighten the nut] back to it: look closer is done"));
+   BG_CHECK( logged_by( base.agency, 1, @"[tighten the nut] tighten it: tighten R"));
+   BG_CHECK( tightened( base));
+
+   /* A: the nut is truly 22 mm: up close it is incompatible, and the method fails */
+   wrong = nut_run( "gland_nut_22", "spanner_19", NO);
+   BG_CHECK( logged_by( wrong.agency, 1, @"look closer first"));
+   BG_CHECK( logged_by( wrong.agency, 1, @"[tighten the nut] nothing I know of will do: impossible for now"));
+   BG_CHECK( ! tightened( wrong));
+
+   /* 3, B: the omniscient stub knows the size from afar: it never looks closer */
+   seer = nut_run( "gland_nut", "spanner_19", YES);
+   BG_CHECK( ! logged_by( seer.agency, 1, @"look closer") && ! logged_by( seer.agency, 1, @"peer_at"));
+   BG_CHECK( tightened( seer));
+
+   /* 4: tags: with a 22 mm spanner instead, the same closer look finds it incompatible */
+   tag = nut_run( "gland_nut", "spanner_22", NO);
+   BG_CHECK( logged_by( tag.agency, 1, @"look closer first"));
+   BG_CHECK( logged_by( tag.agency, 1, @"impossible for now") && ! tightened( tag));
+
+   /* 5: determinism */
+   again = nut_run( "gland_nut", "spanner_19", NO);
+   BG_CHECK( [again.text isEqualToString:base.text]);
+}
+
+
 /* --- the cistern ----------------------------------------------------------- */
 
 static BGCistern   *run_cistern( BGCisternVariant variant)
@@ -4148,6 +4256,7 @@ const BGTestCase   BGAllTests[] =
    { "promises",                      test_promises },
    { "two_hands",                     test_two_hands },
    { "coat_at_dusk",                  test_coat_at_dusk },
+   { "unknown_nut",                   test_unknown_nut },
    { "rumour",                        test_rumour },
    { "memory_decay",                  test_memory_decay },
    { "salience",                      test_salience },

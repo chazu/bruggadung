@@ -112,3 +112,20 @@
     kind:     #ClaimKind       @field(content, saved, inspect)
     quantity: int & >=0 & <=100000 @field(content, saved, proposable, inspect)
 }
+
+// Something with a size that matters: a nut, a spanner's jaw. Seen from
+// afar, the size is known only roughly: it widens a millimetre a step.
+#Sized: {
+    @component(Sized)
+    size: length & >=1mm & <=200mm @widen(1mm) @field(content, saved, inspect, perceive(sight))
+}
+
+// A nut, loose or tight. (Sized first: its size widens as #Sized says.)
+#Fastener: #Sized & #Body & {
+    @component(Fastener)
+    tight: *false | true @field(content, saved, proposable, inspect, perceive(sight))
+}
+
+// A spanner: its size is the nut it fits.
+#Spanner: #Sized & #Body & {}
+

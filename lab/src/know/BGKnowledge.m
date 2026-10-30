@@ -1121,6 +1121,65 @@ static NSString   *known_features( const BGReferent *r)
 }
 
 
+/* The percept's features as seen from `distance` tiles: each feature with
+ * an acuity (content/persistence.tri) blurred `blur` steps for each tile
+ * beyond arm's reach. *blurred is set if any was. */
+- (NSString *) blur:(NSString *) features
+               kind:(const char *) kind
+           distance:(int) distance
+            blurred:(BOOL *) blurred
+{
+   const TriNode     *node;
+   const TriNode     *p;
+   const TriNode     *wide;
+   TriContent        *tri;
+   TriIndex          *family;
+   TriArena          *arena;
+   NSMutableString   *out;
+   NSArray           *pairs;
+   NSString          *pair;
+   NSUInteger        k;
+   size_t            i;
+   int64_t           lo;
+   int64_t           hi;
+   char              name[ 64];
+   char              printed[ 256];
+
+   tri    = [_world tri];
+   family = tri_family_index( tri, "acuity");
+   if( distance <= 1 || ! family || ! tri_index_count( family))
+      return( features);
+   arena = tri_arena_new();
+   node  = tri_value( tri, [[NSString stringWithFormat:@"%s & { %@ }", kind, features] UTF8String], arena, NULL, 0);
+   pairs = BGSplitTopLevel( features);
+   out   = [NSMutableString string];
+   for( k = 0; k < [pairs count]; k++)
+   {
+      pair = [pairs objectAtIndex:k];
+      for( i = 0; node && i < tri_index_count( family); i++)
+      {
+         p = tri_pattern( tri, tri_index_tag( family, i));
+         if( ! tri_at( tri, p, "feature") || tri_print( tri, tri_at( tri, p, "feature"), name, sizeof( name)) < 3)
+            continue;
+         name[ strlen( name) - 1] = 0;
+         if( ! [pair hasPrefix:[NSString stringWithFormat:@"%s: ", name + 1]] ||
+             ! tri_node_interval( tri_at( tri, p, "blur"), &lo, &hi))
+            continue;
+         wide = tri_generalize( tri, node, name + 1, (int) lo * (distance - 1), arena);
+         if( wide && tri_at( tri, wide, name + 1))
+         {
+            tri_print( tri, tri_at( tri, wide, name + 1), printed, sizeof( printed));
+            pair     = [NSString stringWithFormat:@"%s: %s", name + 1, printed];
+            *blurred = YES;
+         }
+      }
+      [out appendFormat:@"%@%@", [out length] ? @", " : @"", pair];
+   }
+   tri_arena_free( arena);
+   return( out);
+}
+
+
 - (void) setConcerns:(id <BGConcerns>) concerns
 {
    _concerns = concerns;
@@ -2158,6 +2217,10 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
                     (abs( tile.x - here.x) > 1 || abs( tile.y - here.y) > 1);
          if( degraded)
             features = [store generalize:features kind:[kind UTF8String] steps:1];
+         /* from afar, sizes only roughly */
+         if( ! _omniscient && seen[ i].entity != agent)
+            features = [self blur:features kind:[kind UTF8String]
+                         distance:(int) max64( abs( tile.x - here.x), abs( tile.y - here.y)) blurred:&degraded];
          container = 0;
          for( j = 0; j < i; j++)
             if( seen[ j].entity == at.place)

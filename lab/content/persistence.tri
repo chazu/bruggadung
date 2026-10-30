@@ -2,6 +2,15 @@
 // recognition): a coat changes daily, the rest of how someone looks hardly
 // at all. Recognition weighs a conflict on a short-lived feature lightly: it
 // may be the same one, changed.
-#Persistence: { feature: text, persists: time }
+// Something said of a feature of how things look.
+#OfFeature: { feature: text }
+
+#Persistence: #OfFeature & { persists: time }
 
 coat_persists: #Persistence & { feature: "coat", persists: 1d } @family(persistence)
+
+// How a feature blurs with distance (KNOWLEDGE.md §5, perception's
+// precision): `blur` steps for each tile beyond arm's reach.
+#Acuity: #OfFeature & { blur: int }
+
+size_blurs: #Acuity & { feature: "size", blur: 1 } @family(acuity)

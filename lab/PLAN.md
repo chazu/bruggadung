@@ -1414,3 +1414,37 @@ from a domain rather than a flag, and compacting knowledge arenas.
 
 47 tests, 1811 checks, under both compilers, ASan and UBSan, and leak-free.
 
+### After the slice: the nut of unknown size
+
+CONTENT_LANGUAGE.md Scenario 2. The worker, holding a 19 mm spanner, is to
+tighten the pump's gland nut four tiles off. From there it sees the nut's
+size only as 16 to 22 mm, so whether the spanner fits is unknown, with the
+residual `nut.size`. The method's `onUnknown` makes that a goal: it walks
+over, sees the nut plainly (19 mm), and tightens it. A: the nut is truly
+22 mm, and up close the match is incompatible: the method fails. B: the
+omniscient stub sees the size from afar and never looks closer. With a 22
+mm spanner, the same closer look finds it incompatible. The run is the same
+on replay.
+
+- **Sizes** (`#Sized`, widening a millimetre a step), **fasteners** (loose
+  or tight) and **spanners**, with a `tighten` operation whose roles share
+  the size tag `$s`, and `peer_at`.
+- **Acuity** is content (`#Acuity`, beside persistence): a feature blurs
+  `blur` steps for each tile beyond arm's reach, by `tri_generalize`, so a
+  number becomes an interval. A blurred percept keeps memory's more
+  specific value.
+- **`onUnknown`** (AGENCY.md §5): when a method's precondition is unknown
+  rather than false, the first unknown full binding, and the path its match
+  left unknown, are kept; a method that declares `onUnknown` adopts that
+  goal first, with those bindings, and is followed again when it is done.
+- **`#Reached`**: a goal done when the agent is within reach of a slot's
+  referent.
+- **What it settled**: Triangle finds `@widen` along primary parents only,
+  so a type that mixes in `#Sized` lists it first.
+
+Not yet: credence thresholds deciding whether to look first (variant C,
+two hypotheses of the nut's size), residuals other than a feature to see
+closer (asking, measuring), and the lamp (light as a condition).
+
+48 tests, 1831 checks, under both compilers, ASan and UBSan, and leak-free.
+

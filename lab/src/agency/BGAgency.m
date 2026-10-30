@@ -573,6 +573,12 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
       match = tri_match( tri, c->match[ v], description, &result);
       if( match != TRI_INCOMPATIBLE)
          best = match;
+      if( match == TRI_UNKNOWN)
+      {
+         _lastResidual[ 0] = 0;
+         if( result.nresidual)
+            strncpy( _lastResidual, result.residual[ 0], sizeof( _lastResidual) - 1);
+      }
    }
    tri_arena_free( arena);
    return( best);
@@ -624,7 +630,18 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    int                before;
 
    if( k == c->nfind)
-      return( [self match:c bindings:b count:*n] == TRI_ENTAILED);
+   {
+      TriMatch   m;
+
+      m = [self match:c bindings:b count:*n];
+      if( m == TRI_UNKNOWN && ! _nunknown)
+      {
+         memcpy( _unknown, b, sizeof( BGSlotBinding) * (size_t) *n);
+         _nunknown = *n;
+         memcpy( _residual, _lastResidual, sizeof( _residual));
+      }
+      return( m == TRI_ENTAILED);
+   }
    slot = c->find[ k];
    if( bound( b, *n, slot))
       return( [self bind:c slot:k + 1 bindings:b count:n]);
@@ -692,6 +709,8 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    if( done && text_at( [_world tri], done, "looked", text, sizeof( text)))
       return( bound( b, *n, text) && [store referent:bound( b, *n, text)] &&
               [store referent:bound( b, *n, text)]->insideSeen >= since);
+   if( done && text_at( [_world tri], done, "reached", text, sizeof( text)))
+      return( bound( b, *n, text) && in_reach( [store referent:[store selfReferent]], [store referent:bound( b, *n, text)]));
    if( done && text_at( [_world tri], done, "did", text, sizeof( text)))
       return( [self activity:text of:[store agent] status:"completed" since:since] != BGNoEntity);
 
@@ -1832,6 +1851,11 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    int32_t            score;
    int32_t            best;
    int                chosen;
+   int                unknownMethod;
+   int                unknownN;
+   BGSlotBinding      unknownB[ BG_MAX_SLOTS];
+   char               unknownPath[ 128];
+   char               subgoal[ 64];
    int                chosenN;
    BOOL               busy;
    int                n;
@@ -1906,14 +1930,28 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
     * unthinkable */
    nmethods = [self methodsFor:top->goal into:methods max:BG_MAX_METHODS];
    chosen   = -1;
+   unknownMethod = -1;
    for( i = 0; i < nmethods; i++)
    {
       if( top->failed & (1u << i))
          continue;
       n = top->nparams;
       memcpy( b, top->params, sizeof( BGSlotBinding) * n);
+      _nunknown    = 0;
+      _residual[ 0] = 0;
       if( ! [self holds:methods[ i] path:"pre" since:top->adopted bindings:b count:&n store:store])
+      {
+         /* unknown, not false: a method may find out first (AGENCY.md §5, onUnknown) */
+         if( _nunknown && unknownMethod < 0 &&
+             text_at( [_world tri], tri_pattern( [_world tri], methods[ i]), "onUnknown", subgoal, sizeof( subgoal)))
+         {
+            unknownMethod = (int) i;
+            unknownN      = _nunknown;
+            memcpy( unknownB, _unknown, sizeof( BGSlotBinding) * (size_t) _nunknown);
+            strncpy( unknownPath, _residual, sizeof( unknownPath) - 1);
+         }
          continue;
+      }
       parts = [NSMutableArray array];
       score = [self sum:methods[ i] path:"score" bindings:b count:n store:store parts:parts];
       {
@@ -1948,6 +1986,17 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
          [self note:m line:[NSString stringWithFormat:@"%@ no longer holds", passed]];
       top->following = chosen;
       return( [self follow:m method:methods[ chosen] index:chosen bindings:chosenB count:chosenN store:store]);
+   }
+   if( unknownMethod >= 0 && m->nintentions < BG_MAX_INTENTIONS)
+   {
+      [self note:m line:[NSString stringWithFormat:@"%s: unknown at %s: %s first",
+                                                    text_at( [_world tri], tri_pattern( [_world tri], methods[ unknownMethod]),
+                                                             "title", method, sizeof( method)) ? method : methods[ unknownMethod],
+                                                    unknownPath, goal_title( [_world tri], subgoal, title, sizeof( title))]];
+      top->pending   = unknownMethod;
+      top->following = unknownMethod;
+      [self adopt:[_world intern:subgoal] mind:m params:unknownB count:unknownN];
+      return( NO);
    }
    if( [scores count])
       [self note:m line:[NSString stringWithFormat:@"scoring %@: unthinkable", [scores componentsJoinedByString:@"; "]]];

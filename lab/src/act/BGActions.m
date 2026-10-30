@@ -682,6 +682,14 @@ static NSString   *effect_investigate( BGWorld *world, BGAction a, int64_t amoun
 }
 
 
+/* Tightening: the nut is tight. */
+static NSString   *effect_tighten( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
+{
+   [g set:"Fastener.tight" of:BGWhole( a.roles[ BGRoleDestination]) to:1];
+   return( nil);
+}
+
+
 /* Tending changes nothing but traces, which the operation declares. */
 static NSString   *effect_tend( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
 {
@@ -719,6 +727,7 @@ static const struct
    { "eat",       effect_eat },
    { "give",      effect_give },
    { "investigate", effect_investigate },
+   { "tighten",   effect_tighten },
 };
 
 

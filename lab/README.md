@@ -96,7 +96,9 @@ forgotten. Operations leave traces (tool marks, scuffs) and remove them,
 and each removal leaves its own (a damp floor, a smell of soap); traces
 fade with age, computed when read, and are removed when they run out,
 with nothing to compute between. Agents perceive them by sight or smell,
-never what made them. Recognition is unification: a percept that differs from someone only in
+never what made them. Perception has precision: from afar a size is an interval, and a match on
+it is unknown, which a method can turn into a goal of looking closer.
+Recognition is unification: a percept that differs from someone only in
 what changes daily (a coat) may still be them, and the agent keeps an
 identity hypothesis, which a later percept fitting both raises; at dusk
 less is seen, and memory keeps the more specific. A component field can

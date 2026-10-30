@@ -208,6 +208,10 @@ typedef struct
    NSMutableArray   *_notices;         /* control returned, for the player */
    NSMutableArray   *_former;          /* pairs: an agent let go, its log */
    BGMotivation     *_deciding;        /* whose decision this is, for its habits */
+   BGSlotBinding    _unknown[ BG_MAX_SLOTS];   /* the last condition's first unknown match: its bindings */
+   int              _nunknown;
+   char             _residual[ 128];   /* and the first path left unknown */
+   char             _lastResidual[ 128];   /* the last match's */
 }
 
 - (id) initWithWorld:(BGWorld *) world
