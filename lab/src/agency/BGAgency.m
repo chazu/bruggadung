@@ -973,10 +973,13 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    for( i = 0; what && i < [store count]; i++)
    {
       r = [store referentAt:i];
-      if( ! r->present || r->form != BGLocationIn || r->id == [store selfReferent] || ! r->kind)
+      if( ! r->present || (r->form != BGLocationIn && r->form != BGLocationHeldBy) || r->id == [store selfReferent] ||
+          ! r->kind)
          continue;
       c = [store referent:r->container];
-      if( ! c || c->form != BGLocationOnTile)
+      if( ! c || (r->form == BGLocationIn ? c->form != BGLocationOnTile : ! c->kind || strcmp( c->kind, "#Agent")))
+         continue;
+      if( within && r->form != BGLocationIn)
          continue;
       kind        = tri_value( tri, r->kind, arena, NULL, 0);
       description = tri_value( tri, [[store describeReferent:r->id] UTF8String], arena, NULL, 0);
@@ -1212,6 +1215,27 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
 }
 
 
+/* Whether the agent believes someone, not itself, is where they could see
+ * the referent. */
+- (BOOL) watched:(uint32_t) referent
+           store:(BGKnowledgeStore *) store
+{
+   const BGReferent   *r;
+   const BGReferent   *o;
+   NSUInteger         i;
+
+   r = [store referent:referent];
+   for( i = 0; r && i < [store count]; i++)
+   {
+      o = [store referentAt:i];
+      if( o->present && o->id != [store selfReferent] && o->kind && ! strcmp( o->kind, "#Agent") &&
+          o->level == r->level && abs( o->x - r->x) <= BG_SIGHT && abs( o->y - r->y) <= BG_SIGHT)
+         return( YES);
+   }
+   return( NO);
+}
+
+
 /* What the goal is worth with these bindings: its considerations, added. */
 - (int32_t) worthOf:(const char *) goal
            bindings:(const BGSlotBinding *) b
@@ -1219,16 +1243,30 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
               store:(BGKnowledgeStore *) store
               parts:(NSMutableArray *) parts
 {
+   return( [self sum:goal path:"worth" bindings:b count:n store:store parts:parts]);
+}
+
+
+/* An instance's considerations at `path` ("worth", "score"), added. */
+- (int32_t) sum:(const char *) instance
+           path:(const char *) path
+       bindings:(const BGSlotBinding *) b
+          count:(int) n
+          store:(BGKnowledgeStore *) store
+          parts:(NSMutableArray *) parts
+{
    const TriNode   *list;
    const TriNode   *c;
    TriContent      *tri;
+   int64_t         trait;
    int32_t         worth;
    int32_t         v;
    char            slot[ 32];
+   char            field[ 64];
 
    tri   = [_world tri];
    worth = 0;
-   for( list = tri_at( tri, tri_pattern( tri, goal), "worth"); list && (c = tri_at( tri, list, "first"));
+   for( list = tri_at( tri, tri_pattern( tri, instance), path); list && (c = tri_at( tri, list, "first"));
         list = tri_at( tri, list, "rest"))
    {
       if( tri_at( tri, c, "value"))
@@ -1245,6 +1283,20 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
       {
          v = [self suspicion:c of:bound( b, n, slot) store:store];
          [parts addObject:[NSString stringWithFormat:@"credence %+d", v]];
+      }
+      else if( text_at( tri, c, "trait", slot, sizeof( slot)))
+      {
+         /* its own disposition or norm, which it knows */
+         snprintf( field, sizeof( field), "Agent.%s", slot);
+         trait = 0;
+         [_world getField:field of:[store agent] value:&trait];
+         v = (int32_t) (trait * int_at( tri, c, "per", 0) / 10);
+         [parts addObject:[NSString stringWithFormat:@"%s %+d", slot, v]];
+      }
+      else if( text_at( tri, c, "watched", slot, sizeof( slot)))
+      {
+         v = [self watched:bound( b, n, slot) store:store] ? - (int32_t) int_at( tri, c, "penalty", 0) : 0;
+         [parts addObject:[NSString stringWithFormat:@"%s %+d", v ? "watched" : "unwatched", v]];
       }
       else
          continue;
@@ -1461,6 +1513,13 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    char               title[ 64];
    char               method[ 64];
    NSString           *passed;
+   NSMutableArray     *parts;
+   NSMutableArray     *scores;
+   BGSlotBinding      chosenB[ BG_MAX_SLOTS];
+   int32_t            score;
+   int32_t            best;
+   int                chosen;
+   int                chosenN;
    BOOL               busy;
    int                n;
 
@@ -1486,7 +1545,10 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
       return( YES);
    m->waiting = NO;
    m->decisions++;
-   top = &m->intentions[ m->nintentions - 1];
+   top    = &m->intentions[ m->nintentions - 1];
+   scores = [NSMutableArray array];
+   best   = 0;
+   chosenN = 0;
 
    n = top->nparams;
    memcpy( b, top->params, sizeof( BGSlotBinding) * n);
@@ -1504,22 +1566,44 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
       return( YES);
    }
 
-   /* the first method, by rank, that hasn't failed and whose precondition holds */
+   /* the method that scores best (AGENCY.md §5), then by rank, that hasn't
+    * failed and whose precondition holds; one that scores below nothing is
+    * unthinkable */
    nmethods = [self methodsFor:top->goal into:methods max:BG_MAX_METHODS];
+   chosen   = -1;
    for( i = 0; i < nmethods; i++)
    {
       if( top->failed & (1u << i))
          continue;
       n = top->nparams;
       memcpy( b, top->params, sizeof( BGSlotBinding) * n);
-      if( [self holds:methods[ i] path:"pre" since:top->adopted bindings:b count:&n store:store])
-      {
-         if( top->following != (int) i && (passed = [self passedOver:methods count:i failed:top->failed]))
-            [self note:m line:[NSString stringWithFormat:@"%@ no longer holds", passed]];
-         top->following = (int) i;
-         return( [self follow:m method:methods[ i] index:(int) i bindings:b count:n store:store]);
-      }
+      if( ! [self holds:methods[ i] path:"pre" since:top->adopted bindings:b count:&n store:store])
+         continue;
+      parts = [NSMutableArray array];
+      score = [self sum:methods[ i] path:"score" bindings:b count:n store:store parts:parts];
+      if( [parts count])
+         [scores addObject:[NSString stringWithFormat:@"%s %+d (%@)",
+                                                      text_at( [_world tri], tri_pattern( [_world tri], methods[ i]), "title",
+                                                               method, sizeof( method)) ? method : methods[ i],
+                                                      score, [parts componentsJoinedByString:@", "]]];
+      if( score < 0 || (chosen >= 0 && score <= best))
+         continue;
+      chosen = (int) i;
+      best   = score;
+      chosenN = n;
+      memcpy( chosenB, b, sizeof( BGSlotBinding) * n);
    }
+   if( chosen >= 0)
+   {
+      if( top->following != chosen && [scores count])
+         [self note:m line:[NSString stringWithFormat:@"scoring %@", [scores componentsJoinedByString:@"; "]]];
+      if( top->following != chosen && (passed = [self passedOver:methods count:(NSUInteger) chosen failed:top->failed]))
+         [self note:m line:[NSString stringWithFormat:@"%@ no longer holds", passed]];
+      top->following = chosen;
+      return( [self follow:m method:methods[ chosen] index:chosen bindings:chosenB count:chosenN store:store]);
+   }
+   if( [scores count])
+      [self note:m line:[NSString stringWithFormat:@"scoring %@: unthinkable", [scores componentsJoinedByString:@"; "]]];
 
    /* no way left: impossible for now, and the method that needed it has failed */
    [self note:m line:@"nothing I know of will do: impossible for now"];

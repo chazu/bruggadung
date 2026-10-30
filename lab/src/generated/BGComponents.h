@@ -1,4 +1,4 @@
-/* Generated from Triangle content e5cd5f6bbbe2229c: do not edit. Type IDs are valid
+/* Generated from Triangle content d43722116a1f3584: do not edit. Type IDs are valid
  * only for this content; regenerate when it changes. */
 #ifndef BG_COMPONENTS_H
 #define BG_COMPONENTS_H
@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BG_CONTENT_HASH 0xe5cd5f6bbbe2229cULL
+#define BG_CONTENT_HASH 0xd43722116a1f3584ULL
 
 /* Activity, from #Activity */
 typedef struct {
@@ -42,10 +42,14 @@ typedef struct {
 /* Agent, from #Agent */
 typedef struct {
     uint32_t        coat;    /* #Colour: a type ID; content, saved, inspect, perceive(sight) */
+    int64_t         curious;    /* int, in quanta of 1; content, saved, proposable, inspect */
     int64_t         hands;    /* int, in quanta of 1; content, saved, inspect, perceive(sight) */
     int64_t         helpful;    /* int, in quanta of 1; content, saved, proposable, inspect */
+    bool            hiding;    /* bool; content, saved, proposable, inspect */
+    int64_t         honesty;    /* int, in quanta of 1; content, saved, proposable, inspect */
     int64_t         memory;    /* int, in quanta of 1; content, saved, inspect */
     int64_t         painting;    /* int, in quanta of 1; content, saved, inspect */
+    int64_t         scruples;    /* int, in quanta of 1; content, saved, proposable, inspect */
 } BGAgent;
 
 /* Assembly, from #Assembly */
@@ -96,53 +100,54 @@ typedef struct {
 
 /* #ActivityStatus */
 enum {
-    BG_ACTIVITYSTATUS_COMPLETED = 135,
-    BG_ACTIVITYSTATUS_EXHAUSTED = 136,
-    BG_ACTIVITYSTATUS_FAILED = 137,
-    BG_ACTIVITYSTATUS_RUNNING = 138,
-    BG_ACTIVITYSTATUS_SUSPENDED = 139,
+    BG_ACTIVITYSTATUS_COMPLETED = 149,
+    BG_ACTIVITYSTATUS_EXHAUSTED = 150,
+    BG_ACTIVITYSTATUS_FAILED = 151,
+    BG_ACTIVITYSTATUS_RUNNING = 152,
+    BG_ACTIVITYSTATUS_SUSPENDED = 153,
 };
 
 /* #ClaimKind */
 enum {
-    BG_CLAIMKIND_CUSTODY = 141,
-    BG_CLAIMKIND_OWNERSHIP = 142,
+    BG_CLAIMKIND_CUSTODY = 155,
+    BG_CLAIMKIND_OWNERSHIP = 156,
 };
 
 /* #Material */
 enum {
-    BG_MATERIAL_FOOD = 173,
-    BG_MATERIAL_FLESH = 197,
-    BG_MATERIAL_BRASS = 199,
-    BG_MATERIAL_IRON = 200,
-    BG_MATERIAL_PAPER = 201,
-    BG_MATERIAL_STEEL = 202,
-    BG_MATERIAL_OAK = 204,
+    BG_MATERIAL_CLOTH = 187,
+    BG_MATERIAL_FOOD = 188,
+    BG_MATERIAL_FLESH = 212,
+    BG_MATERIAL_BRASS = 214,
+    BG_MATERIAL_IRON = 215,
+    BG_MATERIAL_PAPER = 216,
+    BG_MATERIAL_STEEL = 217,
+    BG_MATERIAL_OAK = 219,
 };
 
 /* "flesh" | "metal" | "natural" | "paper" | "wood" */
 enum {
-    BG_BODY_SURFACE_NATURAL = 122,
-    BG_BODY_SURFACE_FLESH = 197,
-    BG_BODY_SURFACE_BRASS = 199,
-    BG_BODY_SURFACE_IRON = 200,
-    BG_BODY_SURFACE_PAPER = 201,
-    BG_BODY_SURFACE_STEEL = 202,
-    BG_BODY_SURFACE_OAK = 204,
+    BG_BODY_SURFACE_NATURAL = 134,
+    BG_BODY_SURFACE_FLESH = 212,
+    BG_BODY_SURFACE_BRASS = 214,
+    BG_BODY_SURFACE_IRON = 215,
+    BG_BODY_SURFACE_PAPER = 216,
+    BG_BODY_SURFACE_STEEL = 217,
+    BG_BODY_SURFACE_OAK = 219,
 };
 
 /* #Colour */
 enum {
-    BG_COLOUR_BLUE = 145,
-    BG_COLOUR_BLACK = 147,
-    BG_COLOUR_BROWN = 148,
-    BG_COLOUR_GREEN = 149,
-    BG_COLOUR_GREY = 150,
-    BG_COLOUR_BEIGE = 152,
-    BG_COLOUR_NAVY = 153,
-    BG_COLOUR_RED = 154,
-    BG_COLOUR_WHITE = 155,
-    BG_COLOUR_YELLOW = 156,
+    BG_COLOUR_BLUE = 159,
+    BG_COLOUR_BLACK = 161,
+    BG_COLOUR_BROWN = 162,
+    BG_COLOUR_GREEN = 163,
+    BG_COLOUR_GREY = 164,
+    BG_COLOUR_BEIGE = 166,
+    BG_COLOUR_NAVY = 167,
+    BG_COLOUR_RED = 168,
+    BG_COLOUR_WHITE = 169,
+    BG_COLOUR_YELLOW = 170,
 };
 
 /* The field registry: what code needs to read and write any component
@@ -202,10 +207,14 @@ static const BGFieldInfo BGBody_fields[] = {
 
 static const BGFieldInfo BGAgent_fields[] = {
     { "coat", offsetof(BGAgent, coat), BG_VALUE_TYPE, "#Colour", "content, saved, inspect, perceive(sight)" },
+    { "curious", offsetof(BGAgent, curious), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "hands", offsetof(BGAgent, hands), BG_VALUE_QUANTITY, "int", "content, saved, inspect, perceive(sight)" },
     { "helpful", offsetof(BGAgent, helpful), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
+    { "hiding", offsetof(BGAgent, hiding), BG_VALUE_BOOL, "bool", "content, saved, proposable, inspect" },
+    { "honesty", offsetof(BGAgent, honesty), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "memory", offsetof(BGAgent, memory), BG_VALUE_QUANTITY, "int", "content, saved, inspect" },
     { "painting", offsetof(BGAgent, painting), BG_VALUE_QUANTITY, "int", "content, saved, inspect" },
+    { "scruples", offsetof(BGAgent, scruples), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
 };
 
 static const BGFieldInfo BGAssembly_fields[] = {
@@ -251,7 +260,7 @@ static const BGComponentInfo BGComponents[BG_COMPONENT_COUNT + 1] = {
     { "Activity", "#Activity", sizeof(BGActivity), 12, BGActivity_fields },
     { "Claim", "#Claim", sizeof(BGClaim), 2, BGClaim_fields },
     { "Body", "#Body", sizeof(BGBody), 5, BGBody_fields },
-    { "Agent", "#Agent", sizeof(BGAgent), 5, BGAgent_fields },
+    { "Agent", "#Agent", sizeof(BGAgent), 9, BGAgent_fields },
     { "Assembly", "#Assembly", sizeof(BGAssembly), 1, BGAssembly_fields },
     { "Container", "#Container", sizeof(BGContainer), 1, BGContainer_fields },
     { "Record", "#Record", sizeof(BGRecord), 1, BGRecord_fields },

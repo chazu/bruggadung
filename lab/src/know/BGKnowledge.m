@@ -602,6 +602,11 @@ static BOOL   counts( const BGTestimony *t, uint32_t thing, uint32_t container)
    const BGReferent   *c;
 
    r = [self referent:thing];
+   c = r && r->present && r->form == BGLocationHeldBy ? [self referent:r->container] : NULL;
+   if( c && c->kind && ! strcmp( c->kind, "#Agent") && r->kind)
+      return( [NSString stringWithFormat:@"#IsHeld & { what: %@, holder: %@, when: %lldms, attribution: %@ }",
+                                         [self describeLooks:r->id], [self describeLooks:c->id], (long long) r->seen,
+                                         [self attributionOf:r]]);
    c = r && r->present && r->form == BGLocationIn ? [self referent:r->container] : NULL;
    if( ! c || c->form != BGLocationOnTile || ! r->kind || ! c->kind)
       return( nil);
@@ -1202,6 +1207,8 @@ static char   *concrete_features( const char *printed)
    int64_t            when;
    int64_t            sure;
    int32_t            credence;
+   BGLocationForm     form;
+   BOOL               held;
    uint32_t           cid;
    uint32_t           thing;
    NSUInteger         i;
@@ -1212,17 +1219,19 @@ static char   *concrete_features( const char *printed)
    tri   = [_world tri];
    arena = tri_arena_new();
    claim = tri_value( tri, content, arena, NULL, 0);
-   if( ! claim || ! tri_subtype( tri, tri_node_type( claim), tri_type_named( tri, "#IsIn")) ||
-       ! node_int( tri, claim, "within.place.x", &x) || ! node_int( tri, claim, "within.place.y", &y) ||
-       ! node_int( tri, claim, "within.place.level", &level))
+   held  = claim && tri_subtype( tri, tri_node_type( claim), tri_type_named( tri, "#IsHeld"));
+   if( ! claim || (! held && (! tri_subtype( tri, tri_node_type( claim), tri_type_named( tri, "#IsIn")) ||
+                              ! node_int( tri, claim, "within.place.x", &x) || ! node_int( tri, claim, "within.place.y", &y) ||
+                              ! node_int( tri, claim, "within.place.level", &level))))
    {
       tri_arena_free( arena);
       return;
    }
    if( ! node_int( tri, claim, "when", &when))
       when = now;
+   form   = held ? BGLocationHeldBy : BGLocationIn;
    what   = tri_at( tri, claim, "what");
-   within = tri_at( tri, claim, "within");
+   within = held ? tri_at( tri, claim, "holder") : tri_at( tri, claim, "within");
    kind   = tri_type_name( tri, tri_node_type( what));
    ckind  = tri_type_name( tri, tri_node_type( within));
 
@@ -1242,8 +1251,13 @@ static char   *concrete_features( const char *printed)
       t.attribution = t.root ? BGHeardFrom : BGHeard;
    }
 
-   /* the container */
-   cid = 0;
+   /* the container, or who holds it */
+   cid = held ? [self person:within store:store news:news] : 0;
+   if( held && ! cid)
+   {
+      tri_arena_free( arena);
+      return;
+   }
    for( i = 0; i < [store count] && ! cid; i++)
    {
       r = [store referentAt:i];
@@ -1277,7 +1291,7 @@ static char   *concrete_features( const char *printed)
          r = [store referentAt:i];
          if( ! r->kind || strcmp( r->kind, kind) || r->id == cid || r->id == [store selfReferent])
             continue;
-         if( pass == 0 && r->present && r->form == BGLocationIn && r->container == cid)
+         if( pass == 0 && r->present && r->form == form && r->container == cid)
             thing = r->id;
          for( j = 0; pass == 0 && ! thing && j < [store testimonyCount]; j++)
             if( [store testimonyAt:j]->thing == r->id && [store testimonyAt:j]->container == cid)
@@ -1308,7 +1322,7 @@ static char   *concrete_features( const char *printed)
    credence = [store credenceThat:thing isIn:cid];
 
    m = [store mutableReferent:thing];
-   if( m->present && ! m->toldBy && m->seen >= when && ! (m->form == BGLocationIn && m->container == cid))
+   if( m->present && ! m->toldBy && m->seen >= when && ! (m->form == form && m->container == cid))
    {
       /* seen elsewhere since: sight outranks it, and seen elsewhere as it was said, it is false */
       if( m->seen == when)
@@ -1319,7 +1333,7 @@ static char   *concrete_features( const char *printed)
       tri_arena_free( arena);
       return;
    }
-   if( m->present && m->form == BGLocationIn && m->container == cid)
+   if( m->present && m->form == form && m->container == cid)
    {
       [news addObject:[NSString stringWithFormat:@"R%u is in R%u, R%u says too (%+d dB)", thing, cid, speaker,
                                                  credence]];
@@ -1327,7 +1341,7 @@ static char   *concrete_features( const char *printed)
       return;
    }
    if( credence < BG_BELIEVE ||
-       (m->present && m->toldBy && m->form == BGLocationIn &&
+       (m->present && m->toldBy && (m->form == BGLocationIn || m->form == BGLocationHeldBy) &&
         [store credenceThat:thing isIn:m->container] > credence))
    {
       [news addObject:[NSString stringWithFormat:@"R%u says R%u is in R%u: not believed (%+d dB)", speaker, thing,
@@ -1336,7 +1350,7 @@ static char   *concrete_features( const char *printed)
       return;
    }
    c            = [store referent:cid];
-   m->form      = BGLocationIn;
+   m->form      = form;
    m->container = cid;
    m->x         = c->x;
    m->y         = c->y;
@@ -1673,6 +1687,7 @@ static BOOL   near( BGKnowledgeStore *store, const BGReferent *r, const char *ki
    uint32_t           *assigned;      /* per visible entity: its referent */
    uint8_t            *taken;         /* per referent index: matched this phase */
    uint32_t           container;
+   const BGAgent      *hider;
    const BGAgent      *memory;
    NSArray            *concerns;
    int                notice;
@@ -1752,6 +1767,10 @@ static BOOL   near( BGKnowledgeStore *store, const BGReferent *r, const char *ki
       if( at.form == BGLocationIn && ! _omniscient && ! contains( lookedIn, nlooked, at.place) &&
           ! contains( glimpsed, nglimpsed, e))
          continue;          /* inside, unseen */
+      hider = [_world record:[_world kindNamed:"Agent"] for:e];
+      if( hider && hider->hiding && e != agent && ! _omniscient &&
+          (abs( tile.x - here.x) > 1 || abs( tile.y - here.y) > 1))
+         continue;          /* half hidden: seen only from close by */
       seen[ nseen].entity = e;
       seen[ nseen].depth  = depth_of( _world, e);
       nseen++;
@@ -1841,7 +1860,7 @@ static BOOL   near( BGKnowledgeStore *store, const BGReferent *r, const char *ki
          r->toldBy    = 0;
          if( _omniscient || contains( lookedIn, nlooked, seen[ i].entity))
             r->insideSeen = now;
-         if( r->form == BGLocationIn)
+         if( r->form == BGLocationIn || r->form == BGLocationHeldBy)
             settle( store, r->id, r->container, YES, news);
          assigned[ i] = r->id;
          for( j = 0; j < [store count]; j++)
@@ -1938,7 +1957,8 @@ static BOOL   near( BGKnowledgeStore *store, const BGReferent *r, const char *ki
 
    /* what it saw happen, in its referents, kept if salient; what it heard
     * said, if it noticed, believed */
-   notice   = BG_NOTICE + [self attentionOf:agent];
+   memory   = [_world record:[_world kindNamed:"Agent"] for:agent];
+   notice   = BG_NOTICE + [self attentionOf:agent] - (memory ? (int) memory->curious / 10 : 0);
    concerns = _concerns ? [_concerns concernsOf:agent] : nil;
    for( i = 0; i < nwitnessed; i++)
    {

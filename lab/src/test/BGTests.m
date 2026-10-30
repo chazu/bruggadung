@@ -2842,6 +2842,177 @@ static void   test_play_autopilot( void)
 }
 
 
+/* --- the tempting purse ----------------------------------------------------- */
+
+typedef enum
+{
+   BGPurseBase = 0,
+   BGPurseNoticed,               /* A: Mira isn't hiding, and Kasimir sees her */
+   BGPurseHonest,                /* B: an honest Kasimir, the same debt */
+   BGPurseNoWitness              /* C: Mira isn't there */
+} BGPurse;
+
+
+typedef struct
+{
+   BGWorld       *world;
+   BGKnowledge   *knowledge;
+   BGAgency      *agency;
+   BGEntityID    purse;
+   BGEntityID    kasimir;
+   BGEntityID    mira;
+   BGEntityID    merchant;
+   NSString      *text;
+} BGPurseRun;
+
+
+/* AGENCY.md Scenario 3, "the tempting purse": a purse on the counter, the
+ * merchant's; Kasimir, who owes, beside it; the carter across the room, a
+ * friend to borrow from; and Mira, half hidden in a doorway, who sees
+ * Kasimir, unseen. The merchant turns away to serve someone out of sight,
+ * and Kasimir's debt falls due. Later the merchant comes back and asks Mira
+ * where the purse is. */
+static BGPurseRun   tempting_purse( BGPurse variant)
+{
+   BGStage           st;
+   BGActivities      *activities;
+   BGKnowledge       *knowledge;
+   BGAgency          *agency;
+   BGProposalGroup   *g;
+   BGEntityID        h[ 6];
+   BGPurseRun        run;
+
+   memset( &run, 0, sizeof( run));
+   st.w       = BGTestWorld( 43);
+   st.c       = BGTestCommitter( st.w);
+   activities = [BGActivities activitiesWithWorld:st.w committer:st.c];
+   knowledge  = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+   agency     = [[[BGAgency alloc] initWithWorld:st.w committer:st.c knowledge:knowledge] autorelease];
+   st.s       = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [agency setActivities:activities];
+   [st.s setActivities:activities];
+   [st.s setPerception:knowledge];
+   [st.s setDecision:agency];
+
+   g     = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the market stall"];
+   h[ 0] = [g create:"purse" key:"purse" at:BGOnTile( 10, 10, 0)];
+   h[ 1] = [g create:"merchant" key:"merchant" at:BGOnTile( 11, 10, 0)];
+   h[ 2] = [g create:"kasimir" key:"kasimir" at:BGOnTile( 9, 10, 0)];
+   h[ 3] = [g create:"carter" key:"carter" at:BGOnTile( 5, 10, 0)];
+   h[ 4] = BGNoEntity;
+   if( variant != BGPurseNoWitness)
+   {
+      h[ 4] = [g create:"mira" key:"mira" at:BGOnTile( 12, 12, 0)];
+      if( variant == BGPurseNoticed)
+         [g set:"Agent.hiding" of:BGWhole( h[ 4]) to:0];
+   }
+   if( variant == BGPurseHonest)
+      [g set:"Agent.honesty" of:BGWhole( h[ 2]) to:90];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   run.world     = st.w;
+   run.knowledge = knowledge;
+   run.agency    = agency;
+   run.purse     = [g idFor:h[ 0]];
+   run.merchant  = [g idFor:h[ 1]];
+   run.kasimir   = [g idFor:h[ 2]];
+   run.mira      = h[ 4] ? [g idFor:h[ 4]] : BGNoEntity;
+   if( run.mira)
+      [agency control:run.mira];
+
+   /* the merchant turns away, out of sight */
+   stage_move( &st, run.merchant, 25, 10);
+
+   /* the debt falls due */
+   BG_CHECK( [agency commit:run.kasimir toGoal:"get_money"]);
+   [st.s runUntil:BGTimeMake( 30000)];
+
+   /* the merchant comes back, by Mira, and asks her where the purse is */
+   if( run.mira)
+   {
+      stage_move( &st, run.merchant, 12, 13);
+      stage_say( &st, run.merchant, run.mira, @"#WhereIs & { what: #Body & { material: \"cloth\" } }");
+   }
+   [st.s runUntil:BGTimeMake( 90000)];
+   run.text = BGSave( st.w, st.c, [NSArray arrayWithObjects:knowledge, agency, nil]);
+   return( run);
+}
+
+
+static void   test_tempting_purse( void)
+{
+   BGPurseRun         base;
+   BGPurseRun         noticed;
+   BGPurseRun         honest;
+   BGPurseRun         alone;
+   BGPurseRun         again;
+   BGKnowledgeStore   *store;
+   const BGReferent   *purse;
+   const BGTestimony  *t;
+   NSUInteger         i;
+   BOOL               saw;
+
+   base = tempting_purse( BGPurseBase);
+
+   /* 1, 4: the debt drives the goal; Kasimir believes no one is watching
+    * (the merchant is gone, Mira unseen), so taking the purse scores best,
+    * though a witness is truly there */
+   BG_CHECK( logged_by( base.agency, base.kasimir, @"take the purse +20 (+30, honesty -5, scruples -5, unwatched +0)"));
+   BG_CHECK( logged_by( base.agency, base.kasimir, @"borrow from a friend +10 (+10)"));
+   BG_CHECK( logged_by( base.agency, base.kasimir, @"[get money] take the purse: take R"));
+   BG_CHECK( [base.world locationOf:base.purse].form == BGLocationHeldBy &&
+             [base.world locationOf:base.purse].place == base.kasimir);
+   BG_CHECK( ! referent_of( [base.knowledge storeOf:base.kasimir], base.mira));
+
+   /* 5: Mira saw it, and keeps it: curious, she notices what is routine to others */
+   store = [base.knowledge storeOf:base.mira];
+   saw   = NO;
+   for( i = 0; i < [store observationCount]; i++)
+      if( ! strcmp( [store observationAt:i]->kind, "moved") &&
+          [store observationAt:i]->actor == referent_of( store, base.kasimir) &&
+          [store observationAt:i]->subject == referent_of( store, base.purse))
+         saw = YES;
+   BG_CHECK( saw);
+   /* asked, she tells the merchant that Kasimir has it, and the merchant believes her */
+   BG_CHECK( logged_by( base.agency, base.mira, @"answering: say R"));
+   store = [base.knowledge storeOf:base.merchant];
+   purse = [store referent:referent_of( store, base.purse)];
+   BG_CHECK( purse && purse->present && purse->form == BGLocationHeldBy &&
+             purse->container == referent_of( store, base.kasimir));
+   t = [store testimonyCount] ? [store testimonyAt:0] : NULL;
+   BG_CHECK( t && t->source == referent_of( store, base.mira) && t->attribution == BGSaw &&
+             t->thing == purse->id && t->container == referent_of( store, base.kasimir));
+   /* and when it sees Kasimir with it, so it is: it trusts Mira more */
+   BG_CHECK( t && t->settled == 1 && [store trustIn:t->source] == BG_TRUST + BG_CONFIRMED);
+
+   /* 2: A: Kasimir sees Mira, believes himself watched, and taking scores
+    * below nothing: unthinkable. He tries to borrow from everyone he knows
+    * of, and, unanswered, gives up */
+   noticed = tempting_purse( BGPurseNoticed);
+
+   BG_CHECK( referent_of( [noticed.knowledge storeOf:noticed.kasimir], noticed.mira));
+   BG_CHECK( logged_by( noticed.agency, noticed.kasimir, @"take the purse -20 (+30, honesty -5, scruples -5, watched -40)"));
+   BG_CHECK( logged_by( noticed.agency, noticed.kasimir, @"borrow from a friend: say R"));
+   BG_CHECK( logged_by( noticed.agency, noticed.kasimir, @"[get money] nothing I know of will do: impossible for now"));
+   BG_CHECK( [noticed.world locationOf:noticed.purse].form == BGLocationOnTile);
+
+   /* 3: B: an honest Kasimir, unwatched, never takes it */
+   honest = tempting_purse( BGPurseHonest);
+   BG_CHECK( logged_by( honest.agency, honest.kasimir, @"take the purse -20 (+30, honesty -45, scruples -5, unwatched +0)"));
+   BG_CHECK( ! logged_by( honest.agency, honest.kasimir, @"take R"));
+   BG_CHECK( [honest.world locationOf:honest.purse].form == BGLocationOnTile);
+
+   /* 1: C: no one is there, and Kasimir decides just the same */
+   alone = tempting_purse( BGPurseNoWitness);
+   BG_CHECK( [[alone.agency logOf:alone.kasimir] isEqualToArray:[base.agency logOf:base.kasimir]]);
+
+   /* 6: determinism */
+   again = tempting_purse( BGPurseBase);
+   BG_CHECK( [again.world stateHash] == [base.world stateHash]);
+   BG_CHECK( [again.text isEqualToString:base.text]);
+}
+
+
 /* --- the cistern ----------------------------------------------------------- */
 
 static BGCistern   *run_cistern( BGCisternVariant variant)
@@ -3163,6 +3334,7 @@ const BGTestCase   BGAllTests[] =
    { "play_notebook",                 test_play_notebook },
    { "false_alarm",                   test_false_alarm },
    { "play_autopilot",                test_play_autopilot },
+   { "tempting_purse",                test_tempting_purse },
    { "cistern",                       test_cistern },
    { "cistern_b",                     test_cistern_b },
    { "cistern_d",                     test_cistern_d },

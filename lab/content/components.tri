@@ -6,7 +6,7 @@
 // What things are made of, and the colours they come in: hierarchies, so a
 // memory loses detail along them (KNOWLEDGE.md §12): an oak chest is
 // remembered as wooden, then as made of something.
-#Material: "metal" | "wood" | "flesh" | "paper" | "food"
+#Material: "metal" | "wood" | "flesh" | "paper" | "food" | "cloth"
 "metal":   "iron" | "brass" | "steel"
 "wood":    "oak"
 
@@ -73,6 +73,13 @@
     helpful: *0 | int & >=-30 & <=30         @field(content, saved, proposable, inspect)
     // expertise (KNOWLEDGE.md §9): what interpretation rules it can draw
     painting: *0 | int & >=0 & <=100         @field(content, saved, inspect)
+    // dispositions and an internal norm (AGENCY.md §9), 0 to 100: how honest
+    // it is, how curious (it notices more), and how much it minds stealing
+    honesty:  *50 | int & >=0 & <=100        @field(content, saved, proposable, inspect)
+    curious:  *0 | int & >=0 & <=100         @field(content, saved, proposable, inspect)
+    scruples: *20 | int & >=0 & <=100        @field(content, saved, proposable, inspect)
+    // half hidden: seen only from close by, though it sees as well as anyone
+    hiding:   *false | true                  @field(content, saved, proposable, inspect)
 }
 
 // Something entities can be put in.

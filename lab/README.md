@@ -141,7 +141,9 @@ from considerations in content (credence among them), and a goal that
 arises from a finding (a noise heard near the storeroom) is weighed
 against what the agent is doing, mid-activity too: it wins only by a margin
 and the cost of interrupting, then the agent suspends what it was doing
-and comes back to it after. The player can hand their character to agency
+and comes back to it after. Methods are scored too, by dispositions and
+norms (`honesty`, `scruples`) and by whether the agent believes itself
+watched; one that scores below nothing is unthinkable. The player can hand their character to agency
 on autopilot, and control comes back when something arises worth more
 than the player said, or the goal is done. Being asked is a choice for agents agency
 controls: answering is worth their trust in the

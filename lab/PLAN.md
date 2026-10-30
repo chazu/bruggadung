@@ -1116,7 +1116,50 @@ isn't a goal arising (a question asked of the character, say).
 
 40 tests, 653 checks, under both compilers, ASan and UBSan, and leak-free.
 
-Next: AGENCY.md Scenario 3, *the tempting purse*: dispositions and norms
-scoring method alternatives, the belief about being observed versus who
-truly sees, a commitment (a debt) as motivation, and what a witness saw
-flowing on through knowledge.
+### After the slice: the tempting purse
+
+AGENCY.md Scenario 3. A purse on the merchant's counter; Kasimir, who owes,
+beside it; the carter across the room; and Mira, a child, half hidden in a
+doorway, who sees Kasimir unseen. The merchant turns away, and Kasimir's
+debt falls due (*get money*, a commitment, no body's need). Taking the
+purse scores 20 (30, less 5 for his low honesty and 5 for his weak
+scruples, and no one he knows of watching), borrowing from a friend 10:
+he takes it, though a witness is truly there. Mira, curious, keeps what
+she saw. When the merchant comes back and asks her, she says Kasimir has
+it, having seen it; the merchant believes her, and trusts her more when it
+sees Kasimir with the purse.
+- **A** (Kasimir sees Mira): he believes himself watched, and taking
+  scores -20, unthinkable. He tries to borrow from everyone he knows of,
+  and gives up.
+- **B** (an honest Kasimir): taking scores -20 unwatched, too.
+- **C** (no Mira): his decisions are the base case's, line for line.
+
+- **Dispositions and a norm** (AGENCY.md §9) are `#Agent` fields:
+  `honesty`, `curious`, and `scruples` (don't steal). Others can't
+  perceive them.
+- **Methods are scored** (§5): `score` considerations in content, `#Flat`,
+  `#Trait` (tenths of a point per point of a disposition or norm), and
+  `#Watched` (a penalty if the agent believes someone else is in sight of
+  the slot's referent). Methods are tried best first, then by rank, and
+  one that scores below nothing is unthinkable. Unscored methods keep rank
+  order.
+- **Hiding**: a hiding agent is seen only from a tile away, though it
+  sees as well as anyone, so the believed and the true observers differ.
+- **Curiosity** lowers the notice threshold: a curious agent keeps routine
+  observations.
+- **Claims about who holds something**: `#IsHeld` (a claim with a
+  `holder`, beside `#IsIn` under a common `#Telling`), composed, believed,
+  and answered.
+- **Requests** (`#Request`) are questions; nobody grants them yet.
+
+Not yet: commitments with deadlines and urgency curves (the debt is a
+plain commitment), granting requests (lending, hiring), risk tolerance,
+believing oneself observed from what one hears, the merchant acting on
+what it learns, and sanctions (§6, institutions).
+
+41 tests, 683 checks, under both compilers, ASan and UBSan, and leak-free.
+
+Next: goal generators for routines and commitments (AGENCY.md §4, §7,
+§8): a shift with its time window, and commitments with deadlines whose
+urgency rises toward them, so AGENCY.md Scenario 1 can begin, as written,
+with the routine generator scoring *work shift* highest.

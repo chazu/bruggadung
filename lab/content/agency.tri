@@ -19,6 +19,9 @@
 // to ask.
 #HavingNails: #WithNails & { box: #Container, someone: #Agent }
 
+// Getting money: the money, and a friend or someone to work for.
+#Getting:  #Frame & { money: #Body, friend: #Agent, boss: #Agent }
+
 // Eating: the food. Watching: the spot where something stirred.
 #Supper:   #Frame & { food: #Body }
 #Watching: #Frame & { spot: #Container }
@@ -87,7 +90,18 @@
     order:  [...#Order]
     search: text
     steps:  [...#MethodStep]
+    score:  [...#Consideration]
 }
+
+// A method's score (AGENCY.md §5): its considerations, added. Methods are
+// tried best first, then by rank; one that scores below nothing is
+// unthinkable, and not tried at all.
+// what a disposition or a norm of the agent's adds: `per` tenths of a point
+// for each point of it
+#Trait:   #Consideration & { trait: text, per: int }
+// a penalty if the agent believes someone, not itself, could see the slot's
+// referent
+#Watched: #Consideration & { watched: text, penalty: int }
 
 
 // --- AGENCY.md Scenario 1, as "the missing nails" -----------------------------
@@ -211,4 +225,50 @@ look_into_it: #Method & {
     rank:  1
     pre:   { find: ["spot"], match: #Watching & { spot: #Container } }
     steps: [#Do & { op: "look_in", object: "spot" }]
+} @family(methods)
+
+
+// --- AGENCY.md Scenario 3, "the tempting purse" -------------------------------
+
+// A debt due: get money. A commitment, not a body's need.
+get_money: #Goal & {
+    title: "get money"
+    done: {
+        find:  ["money"]
+        match: #Getting & {
+            me:    #Agent & { id: $me }
+            money: #Body & { material: "cloth", place: #Held & { by: $me } }
+        }
+    }
+} @family(goals)
+
+// Ask a friend to lend it: awkward, but no harm.
+borrow_money: #Method & {
+    title:  "borrow from a friend"
+    goal:   "get_money"
+    rank:   1
+    pre:    { find: ["friend"], match: #Getting & { friend: #Agent } }
+    order:  ["near"]
+    search: "friend"
+    steps:  [#Do & { op: "say", object: "friend", says: #Request & { what: #Body & { material: "cloth" } } }]
+    score:  [#Flat & { value: 10 }]
+} @family(methods)
+
+// Take the purse: worth more than borrowing, to the dishonest, unwatched.
+take_the_purse: #Method & {
+    title: "take the purse"
+    goal:  "get_money"
+    rank:  1
+    pre: {
+        find:  ["money"]
+        match: #Getting & { money: #Body & { material: "cloth", place: #OnTile | #Inside } }
+    }
+    order: ["near"]
+    steps: [#Do & { op: "take", object: "money" }]
+    score: [
+        #Flat & { value: 30 },
+        #Trait & { trait: "honesty", per: -5 },
+        #Trait & { trait: "scruples", per: -10 },
+        #Watched & { watched: "money", penalty: 40 },
+    ]
 } @family(methods)

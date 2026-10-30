@@ -306,8 +306,10 @@ A rebuilt world produces the same next step as one that never saved.
    notebook that can be written, stolen, and read; and goals weighed by
    credence against what the agent is doing, with a margin against
    dithering (AGENCY.md's false alarm); and autopilot, which hands control
-   back to the player when something worth it arises. Next, per
-   [lab/PLAN.md](lab/PLAN.md): AGENCY.md's tempting purse.
+   back to the player when something worth it arises; and methods scored by
+   dispositions, norms, and the belief about being watched (AGENCY.md's
+   tempting purse). Next, per [lab/PLAN.md](lab/PLAN.md): goal generators
+   for routines and commitments.
 
 ## Cross-cutting open questions
 

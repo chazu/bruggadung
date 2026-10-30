@@ -57,3 +57,10 @@ watchman:  #Agent & { material: "flesh", mass: 80kg, hands: 2, coat: "grey" }
 cat:       #Agent & { material: "flesh", mass: 4kg, hands: 0, coat: "black" }
 storeroom: #Container & { material: "oak", mass: 200kg, capacity: 1000 }
 supper:    #Body & { material: "food", mass: 300g }
+
+// For AGENCY.md's tempting purse: the merchant's purse, the merchant,
+// Kasimir, who owes, and Mira, a child, half hidden in a doorway.
+purse:    #Body & { material: "cloth", mass: 150g }
+merchant: #Agent & { material: "flesh", mass: 85kg, hands: 2, coat: "white" }
+kasimir:  #Agent & { material: "flesh", mass: 70kg, hands: 2, coat: "beige", honesty: 10, scruples: 5 }
+mira:     #Agent & { material: "flesh", mass: 25kg, hands: 2, coat: "red", curious: 100, hiding: true }

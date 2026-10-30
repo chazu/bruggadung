@@ -27,8 +27,18 @@
 #Saw:    #Source & { sure: int }
 #Heard:  #Source & { from: #Agent }
 
-// A claim: something like `what` is inside `within`, as of `when`.
-#IsIn: #Placing & { when: time, attribution: #Source }
+// A claim, as of `when`, with how the speaker says it knows.
+#Telling: #Utterance & { when: time, attribution: #Source }
+
+// A claim: something like `what` is inside `within`.
+#IsIn: #Placing & #Telling & {}
+
+// A claim: something like `what` is held by someone like `holder`.
+#IsHeld: #Telling & { holder: #Agent }
+
+// Give me something like `what`? A request is a question: the asker waits
+// for the answer.
+#Request: #Question & {}
 
 // The speaker knows of nothing like `what` that it could say where it is.
 #DontKnow: #Utterance & {}
