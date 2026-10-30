@@ -2975,6 +2975,7 @@ typedef struct
    BGEntityID    carter;
    BGEntityID    porter;
    BGEntityID    storeroom;
+   BGEntityID    cat;
    NSArray       *notices;
    NSString      *text;
 } BGAlarmRun;
@@ -3029,6 +3030,7 @@ static BGAlarmRun   false_alarm( BGAlarm variant, int64_t saveAt, int tolerance)
    run.knowledge = knowledge;
    run.agency    = agency;
    run.storeroom = [g idFor:h[ 0]];
+   run.cat       = [g idFor:h[ 1]];
    run.watchman  = [g idFor:h[ 2]];
    run.carter    = [g idFor:h[ 4]];
    run.porter    = [g idFor:h[ 5]];
@@ -3211,6 +3213,26 @@ static void   test_false_alarm( void)
    BG_CHECK( ! [e.agency controls:e.watchman]);
    BG_CHECK( ! logged_by( e.agency, e.watchman, @"switching") && ! logged_by( e.agency, e.watchman, @"suspending"));
    BG_CHECK( ! happened( e.world, "looked", e.watchman, e.storeroom));
+   /* 5: autopilot uses nothing Bela lacks: what it weighed is Bela's
+    * belief, from the rumours and the clatter it heard, that someone is in
+    * the storeroom (R2), a someone with no truth behind it at all */
+   store = [e.knowledge storeOf:e.watchman];
+   BG_CHECK( referent_of( store, e.storeroom) == 2);
+   BG_CHECK( [store finding:"#Disturbance" about:2] != NULL);
+   {
+      const BGReferent   *r;
+      NSUInteger         i;
+      BOOL               intruder;
+
+      intruder = NO;
+      for( i = 0; i < [store count]; i++)
+      {
+         r = [store referentAt:i];
+         intruder = intruder || (r->form == BGLocationIn && r->container == 2 && r->truth == 0 &&
+                                 ! strcmp( r->kind, "#Agent"));
+      }
+      BG_CHECK( intruder);
+   }
    /* in A's, it eats on, and hands back when supper is done */
    quiet = false_alarm( BGAlarmAutopilotQuiet, 0, 50);
    BG_CHECK( [quiet.notices count] == 1 &&

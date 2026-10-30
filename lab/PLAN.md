@@ -1944,3 +1944,16 @@ crossing is felt at a boundary 2 mK past it.
   first lump had landed.
 
 57 tests, 2065 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: autopilot on Bela's beliefs, checked
+
+AGENCY.md Scenario 2's check 5, asserted in variant E. When control
+returns to the player, what autopilot weighed is in Bela's store, and it
+isn't true:
+
+- the storeroom as Bela knows it (R2);
+- the disturbance its rule drew from the clatter it heard;
+- an intruder inside that two rumours made up, a referent with no truth
+  behind it.
+
+57 tests, 2068 checks, under both compilers, ASan and UBSan, and leak-free.
