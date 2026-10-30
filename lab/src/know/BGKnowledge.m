@@ -127,7 +127,56 @@ static NSUInteger   feature_keys( const char *features, char (*keys)[ 32], NSUIn
    _news  = [NSMutableArray new];
    for( i = 0; i < 32 * 32; i++)
       _seenAt[ i] = -1;
+   [self learnCommonLaws];
    return( self);
+}
+
+
+/* Its society's common laws (INSTITUTIONS.md decision 8): known from the
+ * start, by what they say. */
+- (void) learnCommonLaws
+{
+   const BGLaw   *law;
+   BGStore       *laws;
+   BGKnownLaw    k;
+   NSUInteger    i;
+
+   laws = _world ? [_world storeForKind:[_world kindNamed:"Law"]] : nil;
+   for( i = 0; i < [laws count]; i++)
+   {
+      law = [laws recordAtIndex:i];
+      if( ! law->common || ! law->forbids)
+         continue;
+      k.forbids = [_world intern:law->forbids];
+      k.wrong   = [_world intern:tri_type_name( [_world tri], law->wrong)];
+      k.brings  = [_world intern:tri_type_name( [_world tri], law->brings)];
+      k.weighs  = (int32_t) law->weighs;
+      [self learnLaw:k];
+   }
+}
+
+
+- (NSUInteger) lawCount
+{
+   return( _nlaws);
+}
+
+
+- (const BGKnownLaw *) lawAt:(NSUInteger) i
+{
+   return( i < _nlaws ? &_laws[ i] : NULL);
+}
+
+
+- (void) learnLaw:(BGKnownLaw) law
+{
+   NSUInteger   i;
+
+   for( i = 0; i < _nlaws; i++)
+      if( _laws[ i].forbids == law.forbids && _laws[ i].wrong == law.wrong)
+         return;
+   _laws = realloc( _laws, sizeof( BGKnownLaw) * (_nlaws + 1));
+   _laws[ _nlaws++] = law;
 }
 
 
@@ -151,6 +200,7 @@ static NSUInteger   feature_keys( const char *features, char (*keys)[ 32], NSUIn
    free( _testimony);
    free( _traces);
    free( _findings);
+   free( _laws);
    free( _identities);
    if( _arena)
       tri_arena_free( _arena);
@@ -776,6 +826,17 @@ static BOOL   counts( const BGTestimony *t, uint32_t thing, uint32_t container)
    if( ! claim || ! [self describeLooks:_self])
       return( nil);
    return( [NSString stringWithFormat:@"#Writing & { author: %@, entries: [%@] }", [self describeLooks:_self], claim]);
+}
+
+
+- (NSString *) ownershipOf:(uint32_t) thing
+                        by:(uint32_t) owner
+{
+   if( ! [self describeLooks:thing] || ! [self describeLooks:owner])
+      return( nil);
+   return( [NSString stringWithFormat:@"#OwnedBy & { what: %@, holder: %@, when: %lldms, attribution: #Saw & { sure: %d } }",
+                                      [self describeLooks:thing], [self describeLooks:owner],
+                                      (long long) (_world ? [_world time].ms : 0), BG_SEEN]);
 }
 
 
@@ -1806,6 +1867,31 @@ static char   *concrete_features( const char *printed)
             store:(BGKnowledgeStore *) store
              news:(NSMutableArray *) news
 {
+   [self named:claim finding:"#Reserved" saying:"reserved for" from:speaker store:store news:news];
+}
+
+
+/* Told something is someone's own (INSTITUTIONS.md): an #Owned finding,
+ * its choice the owner, as for a reservation. */
+- (void) owned:(const TriNode *) claim
+          from:(uint32_t) speaker
+         store:(BGKnowledgeStore *) store
+          news:(NSMutableArray *) news
+{
+   [self named:claim finding:"#Owned" saying:"owned by" from:speaker store:store news:news];
+}
+
+
+/* A claim naming a holder of something (#ReservedFor, #OwnedBy): a finding
+ * of the kind about the thing, recognized among the referents of its kind
+ * that look alike, its choice the holder. */
+- (void) named:(const TriNode *) claim
+       finding:(const char *) kind_
+        saying:(const char *) saying
+          from:(uint32_t) speaker
+         store:(BGKnowledgeStore *) store
+          news:(NSMutableArray *) news
+{
    const TriNode      *what;
    const BGReferent   *r;
    BGFinding          f;
@@ -1832,17 +1918,17 @@ static char   *concrete_features( const char *printed)
          thing = r->id;
    }
    free( features);
-   if( ! thing || [store finding:"#Reserved" about:thing])
+   if( ! thing || [store finding:kind_ about:thing])
       return;
    memset( &f, 0, sizeof( f));
-   f.kind     = [_world intern:"#Reserved"];
+   f.kind     = [_world intern:kind_];
    f.about    = thing;
    f.choice   = holder;
    f.credence = [store trustIn:speaker];
    f.rule     = [_world intern:"told"];
    f.time     = [_world time].ms;
    [store addFinding:f];
-   [news addObject:[NSString stringWithFormat:@"R%u is reserved for R%u, R%u says", thing, holder, speaker]];
+   [news addObject:[NSString stringWithFormat:@"R%u is %s R%u, R%u says", thing, saying, holder, speaker]];
 }
 
 
@@ -2055,6 +2141,12 @@ static int32_t   permille_of( int32_t db)
    if( claim && tri_subtype( tri, tri_node_type( claim), tri_type_named( tri, "#ReservedFor")))
    {
       [self reserved:claim from:speaker store:store news:news];
+      tri_arena_free( arena);
+      return;
+   }
+   if( claim && tri_subtype( tri, tri_node_type( claim), tri_type_named( tri, "#OwnedBy")))
+   {
+      [self owned:claim from:speaker store:store news:news];
       tri_arena_free( arena);
       return;
    }

@@ -1994,6 +1994,7 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
    int32_t         v;
    char            slot[ 32];
    char            field[ 64];
+   char            act[ 32];
 
    tri   = [_world tri];
    worth = 0;
@@ -2051,6 +2052,34 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
       {
          v = [self watched:bound( b, n, slot) store:store] ? - (int32_t) int_at( tri, c, "penalty", 0) : 0;
          [parts addObject:[NSString stringWithFormat:@"%s %+d", v ? "watched" : "unwatched", v]];
+      }
+      else if( text_at( tri, c, "unlawful", slot, sizeof( slot)) && text_at( tri, c, "act", act, sizeof( act)))
+      {
+         /* a law it knows against the act, on what it believes is another's
+          * (INSTITUTIONS.md decision 5): what the law weighs, if it believes
+          * itself seen; unseen, nothing */
+         const BGFinding    *owned;
+         const BGKnownLaw   *law;
+         uint32_t           thing;
+         int32_t            weighs;
+         NSUInteger         k;
+         BOOL               known;
+
+         thing  = bound( b, n, slot);
+         owned  = thing ? [store finding:"#Owned" about:thing] : NULL;
+         known  = NO;
+         weighs = 0;
+         for( k = 0; owned && owned->choice != [store selfReferent] && k < [store lawCount]; k++)
+         {
+            law = [store lawAt:k];
+            if( strcmp( law->forbids, act) || strcmp( law->wrong, "\"anothers\""))
+               continue;
+            known  = YES;
+            weighs = law->weighs > weighs ? law->weighs : weighs;
+         }
+         v = known && [self watched:thing store:store] ? - weighs : 0;
+         [parts addObject:[NSString stringWithFormat:@"%s %+d", ! known ? "lawful" : v ? "unlawful, watched" : "unlawful, unwatched",
+                                                    v]];
       }
       else
          continue;

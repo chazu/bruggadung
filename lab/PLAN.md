@@ -3232,3 +3232,28 @@ authorization over it, or taking a seal only reserved for the merchant,
 breaks none.
 
 87 tests, 2666 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: knowing the law, and weighing it
+
+INSTITUTIONS.md decisions 5 and 8: people keep the rules because they
+believe breaking them brings consequences, weighed against whether they
+believe themselves seen; everyone knows its society's common rules from
+the start.
+
+- **Known laws**: a knowledge store knows its society's common laws from
+  the start (`learnCommonLaws`), by what they say (`BGKnownLaw`: forbids,
+  wrong, brings, weighs), never by entity.
+- **Believed another's**: `#OwnedBy`, a claim like `#ReservedFor`, makes an
+  `#Owned` finding about the thing, its choice the owner.
+- **`#Unlawful`**, a consideration: if the agent knows a law against the
+  act on the slot's referent as it believes it to be (another's), what the
+  law `weighs`, when it believes itself seen; unseen, nothing. The purse's
+  flat `#Watched` penalty becomes it: the same numbers, grounded in a law.
+
+Checked: the merchant tells Kasimir the purse is its own and turns away;
+Kasimir knows the town's law against theft from the start. Unseen, he
+takes it ("unlawful, unwatched +0"); seeing Mira, he doesn't ("unlawful,
+watched -40"); honest, he doesn't. Untold whose it is, seeing Mira watch,
+he knows the law but not that it applies ("lawful +0"), and takes it.
+
+87 tests, 2679 checks, under both compilers, ASan, and leak-free.

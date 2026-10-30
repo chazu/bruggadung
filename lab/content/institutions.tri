@@ -13,16 +13,18 @@
 // A law: content an organization issues (`lawOf`), forbidding an
 // operation's effect (`forbids`, as operations.tri names effects) when it
 // is a wrong of its kind. A common law is one everyone in its society
-// knows from the start (decision 8).
+// knows from the start (decision 8). What breaking it brings `weighs` that
+// much (dB) with someone who knows it and believes itself seen (decision 5).
 #Law: #Content & {
     @component(Law)
     forbids: text                              @field(content, saved, proposable, inspect)
     wrong:   #Wrong                            @field(content, saved, inspect)
     brings:  #Penalty                          @field(content, saved, inspect)
+    weighs:  int & >=0 & <=100                 @field(content, saved, inspect)
     lawOf:   ref                               @field(saved, proposable, inspect)
     common:  bool                              @field(content, saved, inspect)
 }
 
 // The town and its watch; the law against theft.
 town:      #Organization & {}
-theft_law: #Law & { forbids: "take", wrong: "anothers", brings: "arrest", common: true }
+theft_law: #Law & { forbids: "take", wrong: "anothers", brings: "arrest", weighs: 40, common: true }

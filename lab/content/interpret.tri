@@ -17,6 +17,8 @@
 // It is reserved for someone (ACTIONS.md §7), the finding's choice: what
 // the agent was told.
 #Reserved: #Finding & {}
+// It is someone's own, the finding's choice: as the agent was told.
+#Owned: #Finding & {}
 // Someone does something the same way, again and again (AGENCY.md §8): the
 // finding's choice is the way.
 #Habit: #Finding & {}

@@ -4743,6 +4743,7 @@ typedef enum
    BGPurseNoticed,               /* A: Mira isn't hiding, and Kasimir sees her */
    BGPurseHonest,                /* B: an honest Kasimir, the same debt */
    BGPurseNoWitness,             /* C: Mira isn't there */
+   BGPurseUntold,                /* A, but no one told Kasimir whose the purse is */
    BGPurseRepaid,                /* B, and on until the loan's term is out */
    BGPurseLost                   /* that, but the wages are lost on the third day */
 } BGPurse;
@@ -4794,7 +4795,11 @@ static BGPurseRun   tempting_purse( BGPurse variant)
 
    g     = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the market stall"];
    h[ 0] = [g create:"purse" key:"purse" at:BGOnTile( 10, 10, 0)];
-   h[ 1] = [g create:"merchant" key:"merchant" at:BGOnTile( 11, 10, 0)];
+   h[ 1] = [g create:"merchant" key:"merchant" at:BGOnTile( 10, 11, 0)];
+   /* the town, and its law against theft, which everyone knows */
+   h[ 6] = [g create:"town" key:"the town" at:BGLocationMakeNone()];
+   h[ 7] = [g create:"theft_law" key:"the law against theft" at:BGLocationMakeNone()];
+   [g set:"Law.lawOf" of:BGWhole( h[ 7]) to:(int64_t) h[ 6]];
    h[ 2] = [g create:"kasimir" key:"kasimir" at:BGOnTile( 9, 10, 0)];
    h[ 3] = [g create:"carter" key:"carter" at:BGOnTile( 5, 10, 0)];
    h[ 5] = [g create:"purse" key:"the carter's wages" at:BGHeldBy( h[ 3], 0)];
@@ -4802,7 +4807,7 @@ static BGPurseRun   tempting_purse( BGPurse variant)
    if( variant != BGPurseNoWitness)
    {
       h[ 4] = [g create:"mira" key:"mira" at:BGOnTile( 12, 12, 0)];
-      if( variant == BGPurseNoticed)
+      if( variant == BGPurseNoticed || variant == BGPurseUntold)
          [g set:"Agent.hiding" of:BGWhole( h[ 4]) to:0];
    }
    if( variant == BGPurseHonest || variant == BGPurseRepaid || variant == BGPurseLost)
@@ -4822,7 +4827,16 @@ static BGPurseRun   tempting_purse( BGPurse variant)
    if( run.mira)
       [agency control:run.mira];
 
-   /* the merchant turns away, out of sight */
+   /* the merchant, beside Kasimir, says the purse is its own; then turns
+    * away, out of sight */
+   if( variant != BGPurseUntold)
+   {
+      BGKnowledgeStore   *own;
+
+      own = [knowledge storeOf:run.merchant];
+      stage_say( &st, run.merchant, run.kasimir,
+                 [own ownershipOf:referent_of( own, run.purse) by:[own selfReferent]]);
+   }
    stage_move( &st, run.merchant, 25, 10);
 
    /* the debt falls due */
@@ -4876,6 +4890,7 @@ static void   test_tempting_purse( void)
    BGPurseRun         again;
    BGPurseRun         repaid;
    BGPurseRun         lost;
+   BGPurseRun         untold;
    BGKnowledgeStore   *store;
    const BGReferent   *purse;
    const BGTestimony  *t;
@@ -4887,7 +4902,7 @@ static void   test_tempting_purse( void)
    /* 1, 4: the debt drives the goal; Kasimir believes no one is watching
     * (the merchant is gone, Mira unseen), so taking the purse scores best,
     * though a witness is truly there */
-   BG_CHECK( logged_by( base.agency, base.kasimir, @"take the purse +20 (+30, honesty -5, scruples -5, unwatched +0)"));
+   BG_CHECK( logged_by( base.agency, base.kasimir, @"take the purse +20 (+30, honesty -5, scruples -5, unlawful, unwatched +0)"));
    BG_CHECK( logged_by( base.agency, base.kasimir, @"borrow from a friend +10 (+10)"));
    BG_CHECK( logged_by( base.agency, base.kasimir, @"[get money] take the purse: take R"));
    BG_CHECK( [base.world locationOf:base.purse].form == BGLocationHeldBy &&
@@ -4920,7 +4935,7 @@ static void   test_tempting_purse( void)
     * lend, and the carter lends him his wages */
    noticed = tempting_purse( BGPurseNoticed);
    BG_CHECK( referent_of( [noticed.knowledge storeOf:noticed.kasimir], noticed.mira));
-   BG_CHECK( logged_by( noticed.agency, noticed.kasimir, @"take the purse -20 (+30, honesty -5, scruples -5, watched -40)"));
+   BG_CHECK( logged_by( noticed.agency, noticed.kasimir, @"take the purse -20 (+30, honesty -5, scruples -5, unlawful, watched -40)"));
    BG_CHECK( logged_by( noticed.agency, noticed.kasimir, @"borrow from a friend: say R"));
    BG_CHECK( logged_by( noticed.agency, noticed.kasimir, @"answered: #HaveNone"));
    BG_CHECK( logged_by( noticed.agency, noticed.kasimir, @"answered: #Granted"));
@@ -4932,7 +4947,7 @@ static void   test_tempting_purse( void)
    /* 3: B: an honest Kasimir, unwatched, never takes it; asked, the carter
     * weighs lending at its trust in him less the parting, and lends */
    honest = tempting_purse( BGPurseHonest);
-   BG_CHECK( logged_by( honest.agency, honest.kasimir, @"take the purse -20 (+30, honesty -45, scruples -5, unwatched +0)"));
+   BG_CHECK( logged_by( honest.agency, honest.kasimir, @"take the purse -20 (+30, honesty -45, scruples -5, unlawful, unwatched +0)"));
    BG_CHECK( ! logged_by( honest.agency, honest.kasimir, @"take R"));
    BG_CHECK( [honest.world locationOf:honest.purse].form == BGLocationOnTile);
    BG_CHECK( logged_by( honest.agency, honest.carter, @"worth +5, granting"));
@@ -4965,6 +4980,18 @@ static void   test_tempting_purse( void)
    t     = pledge_from( store, referent_of( store, lost.kasimir));
    BG_CHECK( t && t->settled == -1);
    BG_CHECK( [store trustIn:referent_of( store, lost.kasimir)] == BG_TRUST - BG_REFUTED);
+
+   /* INSTITUTIONS.md decisions 5 and 8: everyone knows the town's law
+    * against theft from the start; Kasimir weighs it because he believes
+    * the purse is the merchant's, told so. Untold, seeing Mira watch, he
+    * knows the law but not that it applies, and takes it: belief, not
+    * truth (the law is truly broken all the same) */
+   store = [base.knowledge storeOf:base.kasimir];
+   BG_CHECK( [store lawCount] == 1 && ! strcmp( [store lawAt:0]->forbids, "take") && [store lawAt:0]->weighs == 40);
+   BG_CHECK( [store finding:"#Owned" about:referent_of( store, base.purse)] != NULL);
+   untold = tempting_purse( BGPurseUntold);
+   BG_CHECK( logged_by( untold.agency, untold.kasimir, @"take the purse +20 (+30, honesty -5, scruples -5, lawful +0)"));
+   BG_CHECK( [untold.world locationOf:untold.purse].place == untold.kasimir);
 
    /* 1: C: no one is there, and Kasimir decides just the same */
    alone = tempting_purse( BGPurseNoWitness);

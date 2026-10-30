@@ -231,6 +231,18 @@ typedef struct
 } BGIdentity;
 
 
+/* A law the agent knows (INSTITUTIONS.md decision 8): what it forbids,
+ * what makes that a wrong, what breaking it brings and weighs. Known as
+ * what it says, never by entity. */
+typedef struct
+{
+   const char       *forbids;      /* interned: an operation's effect */
+   const char       *wrong;        /* interned: "\"anothers\"" */
+   const char       *brings;       /* interned: "\"arrest\"" */
+   int32_t          weighs;        /* dB */
+} BGKnownLaw;
+
+
 /* What a rule concluded (KNOWLEDGE.md §9): something about a referent. */
 typedef struct
 {
@@ -297,6 +309,8 @@ typedef struct
    BGFinding        *_findings;
    NSUInteger       _nfindings;
    NSUInteger       _fcapacity;
+   BGKnownLaw       *_laws;
+   NSUInteger       _nlaws;
    int32_t          _hunger;         /* as felt */
    int32_t          _cold;
    int32_t          _stuffy;
@@ -342,6 +356,9 @@ typedef struct
  * not believed on the ground. */
 - (NSString *) claimThat:(uint32_t) thing
                     isIn:(uint32_t) container;
+/* That the thing is someone's own (INSTITUTIONS.md). */
+- (NSString *) ownershipOf:(uint32_t) thing
+                        by:(uint32_t) owner;
 /* That the thing is reserved for someone (ACTIONS.md §7). */
 - (NSString *) reservationOf:(uint32_t) thing
                          for:(uint32_t) holder;
@@ -431,6 +448,11 @@ typedef struct
 /* the finding of that kind about the referent, or NULL */
 - (const BGFinding *) finding:(const char *) kind
                         about:(uint32_t) referentID;
+/* the laws it knows: its society's common laws from the start, others
+ * as it learns them */
+- (NSUInteger) lawCount;
+- (const BGKnownLaw *) lawAt:(NSUInteger) i;
+- (void) learnLaw:(BGKnownLaw) law;
 /* no longer concluded (KNOWLEDGE.md §9: retracted with a premise) */
 - (void) retractFinding:(const char *) kind
                   about:(uint32_t) referentID;

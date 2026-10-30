@@ -65,6 +65,10 @@
 // (ACTIONS.md §7): a soft claim, which never blocks anyone taking it.
 #ReservedFor: #Naming & {}
 
+// A claim: something like `what` is someone like `holder`'s own
+// (INSTITUTIONS.md: what makes taking it a wrong).
+#OwnedBy: #Naming & {}
+
 // The speaker won't say where something like `what` is, or give it
 // (AGENCY.md §11).
 #WontSay: #Utterance & {}

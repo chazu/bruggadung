@@ -175,6 +175,10 @@
 // a penalty if the agent believes someone, not itself, could see the slot's
 // referent
 #Watched: #Consideration & { watched: text, penalty: int }
+// what the law weighs (INSTITUTIONS.md decision 5): if the agent knows a law
+// forbidding `act` on the slot's referent as it believes it to be (another's),
+// and believes itself seen, what the law weighs; unseen, nothing
+#Unlawful: #Consideration & { unlawful: text, act: text }
 
 
 // --- AGENCY.md Scenario 1, as "the missing nails" -----------------------------
@@ -369,7 +373,7 @@ take_the_purse: #Method & {
         #Flat & { value: 30 },
         #Trait & { trait: "honesty", per: -5 },
         #Trait & { trait: "scruples", per: -10 },
-        #Watched & { watched: "money", penalty: 40 },
+        #Unlawful & { unlawful: "money", act: "take" },
     ]
 } @family(methods)
 
