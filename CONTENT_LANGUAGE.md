@@ -94,6 +94,13 @@ Out of scope here:
     structure nodes are C structs in arenas, never Objective-C objects. An
     optional TDL front end shares the internal tree, so the English Resource
     Grammar can serve as a large benchmark.
+12. **Packages scope names, not features.** A package (a file, or a
+    directory of them) scopes type, component, and blueprint names, and
+    prefixes the C and Objective-C identifiers generated from them, so a
+    component can't clash with an engine class. Feature names stay global:
+    every feature is still introduced by exactly one type, so where two
+    meanings truly coincide they share a supertype. This revises "Not
+    adopted from CUE: ... packages" (§2).
 
 ## Terms
 
