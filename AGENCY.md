@@ -59,6 +59,12 @@ Out of scope here, except where they touch agency:
     and advancing one of its goals (sending a rival to the wrong place).
     Each is scored like any other consideration, against honesty and the
     risk of being found out.
+12. **Loyalty is a weighted relation**, from an agent to another agent or
+    an organization (Oskar to the miller who employs him; a clerk to the
+    licensing office). Its strength raises the worth of goals that serve
+    them (reporting to the miller, protecting their things) and makes harm
+    to them salient (§10). It is formed by employment, kinship, or
+    authored in content.
 
 ## Terms
 
