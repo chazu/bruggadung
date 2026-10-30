@@ -82,6 +82,11 @@ Out of scope here, except where they touch agency:
     **Deals can also be posted in the world**: a flyer or a classified ad
     is a record offering one, and an agent who reads it can take it up,
     going to the employer or answering as it says.
+16. **What a thing is worth is believed, and to the agent.** Each agent
+    holds a worth for kinds of things (authored base values by kind),
+    raised for what serves its goals or needs now (food when hungry, its
+    tools while it works). Giving a thing away costs its worth; lending
+    it costs less, by the agent's trust that it comes back.
 
 ## Terms
 
