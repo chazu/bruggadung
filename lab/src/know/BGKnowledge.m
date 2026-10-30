@@ -1972,6 +1972,41 @@ static uint32_t   bound_to( BGEntityID e, BGEntityID agent, uint32_t me, const B
 
 /* Whether the agent perceives a trace of the kind on the referent: there
  * now, or (`gone`) there before and not any more. */
+/* Whether it noticed the referent lose some of `field`, wear that comes and
+ * never goes. */
+static BOOL   unworn( BGKnowledgeStore *store, uint32_t referent, const char *field)
+{
+   const BGObservation   *o;
+   NSUInteger            i;
+
+   for( i = 0; i < [store observationCount]; i++)
+   {
+      o = [store observationAt:i];
+      if( ! strcmp( o->kind, "unworn") && o->subject == referent && o->content && ! strcmp( o->content, field))
+         return( YES);
+   }
+   return( NO);
+}
+
+
+/* A whole-number feature of a description's features ("toolMarks: 40"). */
+static BOOL   int_feature( const char *features, const char *field, int64_t *value)
+{
+   const char   *p;
+   size_t       n;
+
+   n = strlen( field);
+   for( p = features; p && (p = strstr( p, field)); p += n)
+      if( (p == features || p[ -1] == ' ' || p[ -1] == '{') && ! strncmp( p + n, ": ", 2) &&
+          (p[ n + 2] == '-' || (p[ n + 2] >= '0' && p[ n + 2] <= '9')))
+      {
+         *value = atoll( p + n + 2);
+         return( YES);
+      }
+   return( NO);
+}
+
+
 static BOOL   bears( BGKnowledgeStore *store, uint32_t referent, const char *kind, BOOL gone)
 {
    const BGTraceSeen   *t;
@@ -2112,6 +2147,11 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
                text[ strlen( text) - 1] = 0;
                holds = bears( store, r->id, text + 1, YES);
             }
+            else if( (v = tri_at( tri, premise, "unworn")) && tri_print( tri, v, text, sizeof( text)) > 2)
+            {
+               text[ strlen( text) - 1] = 0;
+               holds = unworn( store, r->id, text + 1);
+            }
             else if( (v = tri_at( tri, premise, "repeated")) && tri_node_interval( v, &lo, &hi) && lo == hi)
                holds = (choice = usual_place( store, r->id, lo)) != 0;
             else if( (v = tri_at( tri, premise, "near")) && tri_print( tri, v, text, sizeof( text)) > 2)
@@ -2134,6 +2174,54 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
          f.time  = [_world time].ms;
          [store addFinding:f];
          [news addObject:[NSString stringWithFormat:@"R%u: %s, by %s (%+d dB)", r->id, f.kind, f.rule, f.credence]];
+      }
+   }
+}
+
+
+/* Seen again with less of a wear the rules watch for (#Unworn) than it had
+ * when last seen: noticed, an anomaly, kept as an observation for them. */
+- (void) noticeWearLost:(const BGReferent *) r
+               features:(NSString *) features
+                  store:(BGKnowledgeStore *) store
+                    now:(int64_t) now
+                   news:(NSMutableArray *) news
+{
+   const TriNode   *rule;
+   const TriNode   *list;
+   const TriNode   *v;
+   TriContent      *tri;
+   TriIndex        *family;
+   BGObservation   o;
+   NSUInteger      i;
+   int64_t         before;
+   int64_t         after;
+   char            field[ 64];
+
+   if( ! r->features || r->id == [store selfReferent])
+      return;
+   tri    = [_world tri];
+   family = tri_family_index( tri, "rules");
+   for( i = 0; family && i < tri_index_count( family); i++)
+   {
+      rule = tri_pattern( tri, tri_index_tag( family, i));
+      for( list = tri_at( tri, rule, "premises"); list && tri_at( tri, list, "first"); list = tri_at( tri, list, "rest"))
+      {
+         v = tri_at( tri, tri_at( tri, list, "first"), "unworn");
+         if( ! v || tri_print( tri, v, field, sizeof( field)) < 3)
+            continue;
+         field[ strlen( field) - 1] = 0;
+         if( ! int_feature( r->features, field + 1, &before) || ! int_feature( [features UTF8String], field + 1, &after) ||
+             after >= before || unworn( store, r->id, field + 1))
+            continue;
+         memset( &o, 0, sizeof( o));
+         o.time     = now;
+         o.kind     = [_world intern:"unworn"];
+         o.subject  = r->id;
+         o.content  = (char *) [_world intern:field + 1];
+         o.salience = BG_ANOMALY;
+         [store addObservation:o restored:NO];
+         [news addObject:[NSString stringWithFormat:@"R%u looks new: its %s is gone", r->id, field + 1]];
       }
    }
 }
@@ -2396,6 +2484,7 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
           * memory was, when it was seen less well */
          if( r->features && r->id != [store selfReferent] && degraded)
             features = [self unified:r in:store kind:kind features:features];
+         [self noticeWearLost:r features:features store:store now:now news:news];
          free( r->kind);
          free( r->features);
          r->kind      = strdup( [kind UTF8String]);

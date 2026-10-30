@@ -20,6 +20,8 @@
 // Someone does something the same way, again and again (AGENCY.md §8): the
 // finding's choice is the way.
 #Habit: #Finding & {}
+// It was swapped for another like it.
+#Replaced: #Finding & {}
 
 // A rule's premises, over the body it is about.
 #Premise:  {}
@@ -31,6 +33,9 @@
 #Near:     #Premise & { near: text }
 // it was seen to put things into the same container at least this often
 #Repeated: #Premise & { repeated: int }
+// it was seen with more of this before, which wears on and never off, than
+// it is seen with now
+#Unworn:   #Premise & { unworn: text }
 
 #Skill: "painting"
 
@@ -71,6 +76,16 @@ stirring: #Rule & {
     mastery:   0
     concludes: "#Disturbance"
     weight:    10
+} @family(rules)
+
+// A thing seen worn, and seen again where it was as good as new: it was
+// swapped for another. Only one who saw it worn can tell (KNOWLEDGE.md
+// Scenario 2: "the wrench was replaced").
+replaced: #Rule & {
+    premises:  [#Unworn & { unworn: "toolMarks" }]
+    mastery:   0
+    concludes: "#Replaced"
+    weight:    15
 } @family(rules)
 
 // Seen putting things in the same place three times: they usually do.

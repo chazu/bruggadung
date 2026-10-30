@@ -3013,6 +3013,71 @@ static void   test_marked_nail_found( void)
 }
 
 
+/* KNOWLEDGE.md Scenario 2's swap: the worker sees the workshop's worn wrench
+ * on the bench (`saw`, or not), goes off, and meanwhile the wrench is swapped
+ * for a new one; back, it sees the new one. Its knowledge, dumped. */
+static NSString   *swap_run( BOOL saw)
+{
+   BGStage            st;
+   BGKnowledge        *knowledge;
+   BGProposalGroup    *g;
+   BGEntityID         worker;
+   BGEntityID         old;
+
+   st.w      = BGTestWorld( 127);
+   st.c      = BGTestCommitter( st.w);
+   knowledge = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+   st.s      = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [st.s setPerception:knowledge];
+   g      = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the bench"];
+   worker = [g create:"worker" key:"worker" at:saw ? BGOnTile( 5, 6, 0) : BGOnTile( 20, 20, 0)];
+   old    = [g create:"wrench_250" key:"the old wrench" at:BGOnTile( 6, 6, 0)];
+   [g set:"Body.toolMarks" of:BGWhole( old) to:40];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   worker = [g idFor:worker];
+   old    = [g idFor:old];
+   stage_move( &st, worker, 20, 20);
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the swap"];
+   [g move:BGWhole( old) to:BGOnTile( 25, 2, 0)];
+   [g create:"wrench_250" key:"the new wrench" at:BGOnTile( 6, 6, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( [st.w time].ms + 1000)];
+   stage_move( &st, worker, 5, 6);
+   [st.s runUntil:BGTimeMake( [st.w time].ms + 1000)];
+   {
+      BGKnowledge   *restored;
+      NSString      *text;
+
+      /* what it noticed is saved */
+      text     = BGSave( st.w, st.c, [NSArray arrayWithObject:knowledge]);
+      restored = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+      [restored restoreSavedState:BGSavedDomainState( text, @"knowledge")];
+      BG_CHECK( [[restored dump:worker] isEqualToString:[knowledge dump:worker]]);
+   }
+   return( [knowledge dump:worker]);
+}
+
+
+/* 4: prior beliefs gate interpretation. Recognition takes the new wrench
+ * for the old (same kind, same place); one who saw the old one worn sees it
+ * lose its tool marks, which don't wear off, and concludes it was replaced.
+ * One who never saw the old one sees a new-looking wrench: nothing. */
+static void   test_wrench_replaced( void)
+{
+   NSString   *saw;
+   NSString   *never;
+
+   saw   = swap_run( YES);
+   never = swap_run( NO);
+   BG_CHECK( [saw rangeOfString:@"toolMarks: 0"].location != NSNotFound);
+   BG_CHECK( [saw rangeOfString:@"finding #Replaced about R2, +15 dB, by replaced"].location != NSNotFound);
+   BG_CHECK( [never rangeOfString:@"#Wrench"].location != NSNotFound);
+   BG_CHECK( [never rangeOfString:@"#Replaced"].location == NSNotFound);
+   BG_CHECK( [swap_run( YES) isEqualToString:saw]);
+}
+
+
 /* --- the false alarm -------------------------------------------------------- */
 
 typedef enum
@@ -5554,6 +5619,7 @@ const BGTestCase   BGAllTests[] =
    { "stuffy_lodger",                 test_stuffy_lodger },
    { "partial_effects",               test_partial_effects },
    { "hard_fail",                     test_hard_fail },
+   { "wrench_replaced",               test_wrench_replaced },
    { "rumour",                        test_rumour },
    { "memory_decay",                  test_memory_decay },
    { "salience",                      test_salience },

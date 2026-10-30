@@ -2017,11 +2017,29 @@ The remaining scenario checks that aren't run, after the passes above:
   - institutions: COMPONENTS.md Scenario 2, grievances, and reporting to
     the miller;
   - closed doors and failed moves: KNOWLEDGE.md Scenario 3's check 2;
-  - premises over remembered features, and recognizing a swapped look-alike:
-    KNOWLEDGE.md Scenario 2's wrench;
   - told, featureless referents in recognition: AGENCY.md Scenario 2's
     variant C by asking;
   - competing feature hypotheses with masses: CONTENT_LANGUAGE.md
     Scenario 2's variant C;
   - light as a domain: the lamp;
   - urgency curves, belief from habit, loyalty.
+
+### After the slice: the wrench was replaced
+
+KNOWLEDGE.md Scenario 2's check 4, "wrench replaced". The worker sees the
+workshop's worn wrench on the bench (tool marks 40) and goes off. The
+wrench is swapped for a new one. Back, recognition takes the new one for
+the old: same kind, same place. Its tool marks are gone, and they never
+wear off, so the worker notices it as an anomaly and concludes it was
+replaced (`replaced`, +15 dB). One who never saw the old wrench sees a new
+one, and concludes nothing. The prior belief gates it.
+
+- **`#Unworn` premises**: a field that wears on and never off. When a
+  sighting refreshes a referent with less of it than before, perception
+  keeps an `unworn` observation. It is salient as an anomaly, and saved.
+  The rule's premise holds on it.
+- **Recognizing the swap isn't needed**: the referent stays one thing in
+  the agent's mind. What it learns is that the thing changed in a way
+  things don't, which the rule reads as a swap.
+
+59 tests, 2083 checks, under both compilers, ASan and UBSan, and leak-free.
