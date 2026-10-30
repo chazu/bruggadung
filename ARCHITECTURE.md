@@ -292,9 +292,11 @@ A rebuilt world produces the same next step as one that never saved.
    menu and map built from them, and a first slice of agency: agents that
    decide from what they know, with a subgoal when a belief fails them,
    following goals and methods written as content; walking that takes
-   time; and event perception and communication, so an agent can ask a
-   coworker who saw where something went. Next, per
-   [lab/PLAN.md](lab/PLAN.md): credence, trust, and attribution for claims.
+   time; event perception and communication, so an agent can ask a
+   coworker who saw where something went; and credence, trust, and
+   attribution, so a rumour heard twice from one source is weighed once it
+   is traced, and a lie is recorded as a fabrication root. Next, per
+   [lab/PLAN.md](lab/PLAN.md): memory decay.
 
 ## Cross-cutting open questions
 

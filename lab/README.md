@@ -78,11 +78,18 @@ somewhere is perceived there, inside a container too, though nothing else in
 it is. What they see happen, and hear said, they keep as observations, in
 their referents. What is said is a Triangle structure (`content/talk.tri`)
 carried by the "said" event; it describes things by kind, features, and
-place, never by referents. A claim heard (`#IsIn`: something like this is in
-that, as of then, seen or heard) becomes a belief: its things bound to the
-hearer's referents by recognition, or new ones, believed where the claim
-puts them and marked as told by the speaker. Every claim is believed, for
-now. The menu `lab play` shows comes from this store, so it can
+place, never by referents; people are described by how they look (their
+coat). A claim heard (`#IsIn`: something like this is in that, as of then,
+seen, heard from someone, or heard) is kept as testimony: its things bound
+to the hearer's referents by recognition, or new ones, with its source and
+the one it says saw it. Credence is integer log-odds (decibans), from the
+hearer's trust in its sources, counting each perceived root once, so a
+rumour heard twice from one source is inflated until someone asks "who told
+you?". Once credence reaches 0 dB the claim is believed. Trust rises when a
+claim is seen true and falls when one is found false. For the developer,
+every claim said is traced to its true root, someone who saw it or someone
+who made it up, and the dump flags false corroboration. The menu `lab play`
+shows comes from this store, so it can
 offer what is no longer so: performing it, the world's side finds the thing
 gone, the attempt commits, and perception corrects the belief.
 

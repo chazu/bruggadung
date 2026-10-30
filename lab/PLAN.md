@@ -663,6 +663,78 @@ yet).
 
 29 tests, 317 checks, under both compilers, ASan and UBSan, and leak-free.
 
-Next: the rest of AGENCY.md's Scenario 1 and KNOWLEDGE.md's Scenario 1 share
-what is missing: credence from claims, trust in sources, and attribution
-chains, so a coworker's word can be weighed rather than taken.
+### After the slice: credence, trust, and attribution
+
+KNOWLEDGE.md Scenario 1, "the witness and the rumour", runs in the
+workshop as *the rumour of the nails*. The apprentice (Marius) and a
+neighbour (Nadia) see the smith put the nails in a chest. A carter (Teodor)
+and a porter (Ulla) ask the apprentice where nails are; then the foreman
+(Ines) hears from the carter, who names the apprentice, and from the
+porter, who names no one. The foreman's credence is inflated, and the
+inspector flags the false corroboration. Asked "who told you?", the porter
+names the apprentice, the two claims merge into one group, and credence
+falls to exactly the single-source run's. The neighbour, who saw for
+themself, is an independent root, and credence rises. Variant A: the smith
+keeps the nails, and the apprentice says it saw them go in. History records
+a fabrication root, the apprentice's store marks its own utterance as not
+believed, and the carter relays the claim in good faith. The foreman then
+looks into the empty chest, finds the claim false, and trusts the carter
+and the apprentice less. Questions are the test's; every answer is
+agency's.
+
+- **Agents have coats** (`#Agent.coat`, perceived by sight), so a claim can
+  name a person by how they look ("I heard it from the one in the dark
+  coat"), and the hearer recognizes them, or keeps a referent for someone
+  only heard of.
+- **Attribution is structure** (`content/talk.tri`): `#Saw`, `#Heard & {
+  from: ... }`, or `#Heard` with no one named; `#WhoToldYou` asks for it,
+  and the answer is the claim again with its source.
+- **Testimony** (KNOWLEDGE.md §11's provenance items): a claim heard is
+  kept with its source, its perceived root (the speaker for "saw", the one
+  named for "heard from", unknown otherwise), its attribution, and, for
+  the developer, the utterance it came in. A source repeating itself
+  replaces what it said; it doesn't add to it.
+- **Credence** is integer log-odds in decibans: a prior of -10 dB, plus,
+  per group of testimony with the same perceived root, the strongest
+  item's weight. That weight is the agent's trust in the source (20 dB
+  untested), less 5 dB for hearsay (the lower of the trusts in source and
+  root), or less 10 dB for a claim with no source named. Testimony with an
+  unknown root is a group of its own. A claim is believed, and the thing
+  placed, once its credence reaches 0 dB and no other claim of where the
+  thing is weighs more.
+- **Trust** is kept on each referent, and changes when a claim is settled:
+  +5 dB when the agent sees it true, -15 dB when it looks into the
+  container and the claim is false, for the source and for the root.
+- **True ancestry** (developer-only) is traced when a claim is said, before
+  the boundary's perception, from what the speaker knew when it spoke:
+  seen (the speaker is the root), told (the claim relays the testimony
+  that weighs most, and inherits its root), or believed nowhere (a
+  fabrication root). The inspector shows each item's group, weight, and
+  true root, and flags groups counted apart that share a true root.
+- **Answers carry their source**: an agent that was told answers "heard
+  from" whoever its strongest testimony names, by their looks.
+
+What it settled:
+
+- **Seeing a thing clears who told of it.** `toldBy` was kept after the
+  agent saw the thing for itself, so a seen thing still answered as
+  "heard". Now it is 0 once seen, as the field always said.
+- **A description that says no more than its type names no one.** An open
+  `#Agent` prints its defaults (`bent: false`, ...), which matched the
+  hearer itself. Now a `from` whose concrete features are the bare type's
+  is "no one named".
+- **Looking in settles every claim about what is inside**, whether the
+  thing is gone or seen elsewhere. That is naive: a claim true when it was
+  made, about a thing moved since, is found false too.
+
+Not yet: memory decay (variant B of the scenario), lying and questioning
+as agency's choices (here the test speaks for the liar and the
+questioner), trust beyond confirmation and refutation (relationships,
+dispositions), claims other than where a thing is, credence for things
+seen (sight is certain), and recognizing people by looks that don't
+change while they hold things (`freeHands` is part of how an agent looks).
+
+30 tests, 387 checks, under both compilers, ASan and UBSan, and leak-free.
+
+Next: memory decay, KNOWLEDGE.md §12 and Scenario 1's variant B, so what
+an agent saw long ago is remembered less precisely and believed less.

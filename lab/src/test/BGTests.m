@@ -1309,6 +1309,7 @@ static void   test_asking( void)
    BGNailsRun         seer;
    const BGReferent   *nails;
    const BGReferent   *chest;
+   BGKnowledgeStore   *store;
    NSArray            *full;
    NSArray            *rest;
    BGEntityID         c;
@@ -1328,9 +1329,15 @@ static void   test_asking( void)
    nails = believed( saw, saw.apprentice, 2);
    chest = believed( saw, saw.apprentice, c);
    BG_CHECK( nails && chest && nails->form == BGLocationIn && nails->container == chest->id && ! nails->toldBy);
-   /* the worker was told of the chest, then saw it */
+   /* the worker was told of the chest, then saw it: what it was told is seen
+    * true, and it trusts the apprentice more */
    chest = believed( saw, 4, c);
-   BG_CHECK( chest && chest->toldBy);
+   store = [saw.knowledge storeOf:4];
+   BG_CHECK( chest && ! chest->toldBy && [store testimonyCount] == 1);
+   BG_CHECK( [store testimonyAt:0]->container == chest->id && [store testimonyAt:0]->settled == 1 &&
+             [store testimonyAt:0]->attribution == BGSaw);
+   BG_CHECK( [store trustIn:[store testimonyAt:0]->source] == BG_TRUST + BG_CONFIRMED);
+   BG_CHECK( [[saw.knowledge dump:4] rangeOfString:@"seen true; truly seen by"].location != NSNotFound);
    BG_CHECK( [[saw.knowledge dump:4] rangeOfString:@"said R"].location != NSNotFound);
 
    again = missing_nails( NO, NO, BGApprenticeSaw, 0);
@@ -1365,6 +1372,332 @@ static void   test_asking( void)
    seer = missing_nails( NO, YES, BGApprenticeSaw, 0);
    BG_CHECK( ! happened( seer.world, "said", 4, seer.apprentice));
    BG_CHECK( ! happened( seer.world, "attempted", 4, 1) && wedged( seer.world));
+}
+
+
+/* --- the rumour ------------------------------------------------------------ */
+
+/* KNOWLEDGE.md Scenario 1, "the witness and the rumour", in the workshop: the
+ * apprentice (Marius) and the neighbour (Nadia) see the smith put the nails
+ * in the chest. Day 1: the apprentice tells the carter (Teodor) and the
+ * porter (Ulla). Day 2: the carter tells the foreman (Ines), naming the
+ * apprentice; the porter tells the foreman, naming no one; the foreman asks
+ * the porter who told it. Day 3: the neighbour tells the foreman what it saw.
+ * Days are seconds here, and people are brought together by system moves.
+ * Questions are the test's; answers are agency's. Single: only the carter
+ * tells the foreman. Lie (variant A): the smith keeps the nails, and the
+ * apprentice, who saw nothing go in, says it did; the foreman looks in the
+ * chest. */
+typedef enum
+{
+   BGRumourFull = 0,
+   BGRumourSingle,
+   BGRumourLie
+} BGRumourVariant;
+
+
+typedef struct
+{
+   BGWorld       *world;
+   BGKnowledge   *knowledge;
+   BGEntityID    smith;
+   BGEntityID    apprentice;
+   BGEntityID    carter;
+   BGEntityID    porter;
+   BGEntityID    neighbour;
+   BGEntityID    foreman;
+   int32_t       told;           /* the foreman's credence after the carter */
+   int32_t       rumoured;       /* ... and the porter: step 5 */
+   int32_t       questioned;     /* ... and the porter's answer: step 6 */
+   int32_t       corroborated;   /* ... and the neighbour: step 7 */
+   NSString      *rumouredDump;
+   NSString      *questionedDump;
+   NSString      *text;          /* a save at the end */
+} BGRumour;
+
+
+typedef struct
+{
+   BGWorld       *w;
+   BGCommitter   *c;
+   BGScheduler   *s;
+} BGStage;
+
+
+static void   stage_move( BGStage *st, BGEntityID e, int32_t x, int32_t y)
+{
+   BGProposalGroup   *g;
+
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: someone comes over"];
+   [g move:BGWhole( e) to:BGOnTile( x, y, 0)];
+   [st->c submit:g];
+   [st->s runUntil:BGTimeMake( [st->w time].ms + 1000)];
+}
+
+
+static void   stage_say( BGStage *st, BGEntityID speaker, BGEntityID hearer, NSString *content)
+{
+   NSString   *error;
+   BGAction   action;
+
+   error          = nil;
+   action         = BGActionMake( "say", speaker, hearer, BGNoEntity);
+   action.content = [st->w intern:[content UTF8String]];
+   BG_CHECK( BGPerform( st->w, st->c, action, 0, &error) != nil);
+   [st->s runUntil:BGTimeMake( [st->w time].ms + 1000)];
+}
+
+
+static uint64_t   last_said( BGWorld *w, BGEntityID actor, BGEntityID other)
+{
+   const BGEvent   *ev;
+   NSUInteger      i;
+
+   for( i = [w eventCount]; i > 0; i--)
+   {
+      ev = [w eventAt:i - 1];
+      if( ! strcmp( ev->kind, "said") && ev->actor == actor && ev->other == other)
+         return( ev->index);
+   }
+   return( 0);
+}
+
+
+/* the foreman's credence in the first claim it heard */
+static int32_t   credence_of( BGKnowledge *knowledge, BGEntityID agent)
+{
+   BGKnowledgeStore   *store;
+
+   store = [knowledge storeOf:agent];
+   if( ! [store testimonyCount])
+      return( BG_PRIOR);
+   return( [store credenceThat:[store testimonyAt:0]->thing isIn:[store testimonyAt:0]->container]);
+}
+
+
+static NSString   *const nails_in_chest = @"#IsIn & { what: #Stack & { unit: \"iron_nail\" }, "
+                                          @"within: #Container & { material: \"oak\", capacity: 40, "
+                                          @"place: #OnTile & { x: 2, y: 20, level: 0 } }, attribution: %@ }";
+
+
+static BGRumour   rumour( BGRumourVariant variant)
+{
+   BGStage           st;
+   BGActivities      *activities;
+   BGKnowledge       *knowledge;
+   BGAgency          *agency;
+   BGProposalGroup   *g;
+   BGEntityID        h[ 8];
+   NSString          *error;
+   NSString          *where;
+   BGRumour          run;
+
+   memset( &run, 0, sizeof( run));
+   st.w       = BGTestWorld( 17);
+   st.c       = BGTestCommitter( st.w);
+   activities = [BGActivities activitiesWithWorld:st.w committer:st.c];
+   knowledge  = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+   agency     = [[[BGAgency alloc] initWithWorld:st.w committer:st.c knowledge:knowledge] autorelease];
+   st.s       = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [st.s setActivities:activities];
+   [st.s setPerception:knowledge];
+   [st.s setDecision:agency];
+
+   g     = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the rumour of the nails"];
+   h[ 0] = [g create:"chest" key:"chest" at:BGOnTile( 2, 20, 0)];
+   h[ 1] = [g create:"smith" key:"smith" at:BGOnTile( 3, 20, 0)];
+   h[ 2] = [g create:"nails_30" key:"nails" at:BGHeldBy( h[ 1], 0)];
+   h[ 3] = [g create:"apprentice" key:"apprentice" at:BGOnTile( 5, 21, 0)];
+   h[ 4] = [g create:"neighbour" key:"neighbour" at:BGOnTile( 4, 23, 0)];
+   h[ 5] = [g create:"carter" key:"carter" at:BGOnTile( 20, 4, 0)];
+   h[ 6] = [g create:"porter" key:"porter" at:BGOnTile( 26, 4, 0)];
+   h[ 7] = [g create:"foreman" key:"foreman" at:BGOnTile( 20, 28, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   run.world      = st.w;
+   run.knowledge  = knowledge;
+   run.smith      = [g idFor:h[ 1]];
+   run.apprentice = [g idFor:h[ 3]];
+   run.neighbour  = [g idFor:h[ 4]];
+   run.carter     = [g idFor:h[ 5]];
+   run.porter     = [g idFor:h[ 6]];
+   run.foreman    = [g idFor:h[ 7]];
+   [agency control:run.apprentice];
+   [agency control:run.neighbour];
+   [agency control:run.carter];
+   [agency control:run.porter];
+   where = @"#WhereIs & { what: #Stack & { unit: \"iron_nail\" } }";
+
+   /* night: the smith puts the nails in the chest, in sight of the apprentice and the neighbour */
+   if( variant != BGRumourLie)
+   {
+      error = nil;
+      BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "put_in", run.smith, [g idFor:h[ 2]], [g idFor:h[ 0]]), 0,
+                           &error) != nil);
+   }
+   [st.s runUntil:BGTimeMake( [st.w time].ms + 1000)];
+
+   /* day 1: the apprentice tells the carter, then the porter; lying, it says it saw */
+   stage_move( &st, run.apprentice, 20, 5);
+   if( variant == BGRumourLie)
+      stage_say( &st, run.apprentice, run.carter, [NSString stringWithFormat:nails_in_chest, @"#Saw"]);
+   else
+      stage_say( &st, run.carter, run.apprentice, where);
+   stage_move( &st, run.apprentice, 26, 5);
+   if( variant == BGRumourLie)
+      stage_say( &st, run.apprentice, run.porter, [NSString stringWithFormat:nails_in_chest, @"#Saw"]);
+   else
+      stage_say( &st, run.porter, run.apprentice, where);
+   stage_move( &st, run.apprentice, 5, 21);
+
+   /* day 2: the carter tells the foreman, naming the apprentice */
+   stage_move( &st, run.carter, 20, 27);
+   stage_say( &st, run.foreman, run.carter, where);
+   stage_move( &st, run.carter, 20, 4);
+   run.told = credence_of( knowledge, run.foreman);
+   if( variant == BGRumourSingle)
+      goto done;
+   if( variant == BGRumourLie)
+   {
+      /* the foreman goes to look for itself, and finds the chest empty */
+      stage_move( &st, run.foreman, 3, 21);
+      error = nil;
+      BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "look_in", run.foreman, [g idFor:h[ 0]], BGNoEntity), 0,
+                           &error) != nil);
+      [st.s runUntil:BGTimeMake( [st.w time].ms + 1000)];
+      goto done;
+   }
+
+   /* the porter tells the foreman, naming no one: step 5 */
+   stage_move( &st, run.porter, 21, 27);
+   stage_say( &st, run.porter, run.foreman, [NSString stringWithFormat:nails_in_chest, @"#Heard"]);
+   run.rumoured     = credence_of( knowledge, run.foreman);
+   run.rumouredDump = [knowledge dump:run.foreman];
+
+   /* the foreman asks the porter who told it: step 6 */
+   stage_say( &st, run.foreman, run.porter,
+              @"#WhoToldYou & { what: #Stack & { unit: \"iron_nail\" }, "
+              @"within: #Container & { place: #OnTile & { x: 2, y: 20, level: 0 } } }");
+   stage_move( &st, run.porter, 26, 4);
+   run.questioned     = credence_of( knowledge, run.foreman);
+   run.questionedDump = [knowledge dump:run.foreman];
+
+   /* day 3: the neighbour tells the foreman what it saw: step 7 */
+   stage_move( &st, run.neighbour, 19, 27);
+   stage_say( &st, run.foreman, run.neighbour, where);
+   run.corroborated = credence_of( knowledge, run.foreman);
+
+done:
+   run.text = BGSave( st.w, st.c, [NSArray arrayWithObjects:knowledge, agency, nil]);
+   return( run);
+}
+
+
+static void   test_rumour( void)
+{
+   BGRumour           full;
+   BGRumour           again;
+   BGRumour           single;
+   BGRumour           lie;
+   BGKnowledgeStore   *store;
+   BGKnowledge        *restored;
+   const BGAncestry   *a;
+   const BGEvent      *ev;
+   BGWorld            *w2;
+   NSArray            *deferred;
+   NSString           *error;
+   uint64_t           position;
+   uint32_t           apprentice;
+   uint32_t           carter;
+   NSUInteger         i;
+
+   full   = rumour( BGRumourFull);
+   single = rumour( BGRumourSingle);
+
+   /* the claims were said, and answered, as the scenario has it */
+   BG_CHECK( last_said( full.world, full.apprentice, full.carter) && last_said( full.world, full.apprentice, full.porter));
+   BG_CHECK( last_said( full.world, full.carter, full.foreman) && last_said( full.world, full.neighbour, full.foreman));
+
+   /* 1: no IDs in what agents say: content describes, it never names */
+   for( i = 0; i < [full.world eventCount]; i++)
+   {
+      ev = [full.world eventAt:i];
+      if( ! strcmp( ev->kind, "said"))
+         BG_CHECK( ev->detail && ! strstr( ev->detail, "ref(") && ! strstr( ev->detail, "id:"));
+   }
+
+   /* the carter names the apprentice; the foreman knows the apprentice only by that */
+   store = [full.knowledge storeOf:full.foreman];
+   BG_CHECK( [store testimonyCount] == 3);
+   BG_CHECK( [store testimonyAt:0]->attribution == BGHeardFrom);
+   apprentice = [store testimonyAt:0]->root;
+   BG_CHECK( apprentice && ! [store referent:apprentice]->present && ! [store referent:apprentice]->truth);
+
+   /* 2: credence follows perceived ancestry: the porter's rumour, its root
+    * unknown, counts again (step 5); asked, the porter names the apprentice,
+    * the groups merge, and credence is the single source's (step 6) */
+   BG_CHECK( full.told == BG_PRIOR + BG_TRUST - BG_HEARSAY);
+   BG_CHECK( full.rumoured == full.told + BG_TRUST - BG_RUMOUR);
+   BG_CHECK( full.rumoured > full.questioned);
+   BG_CHECK( full.questioned == single.told);
+   BG_CHECK( [store testimonyAt:1]->attribution == BGHeardFrom && [store testimonyAt:1]->root == apprentice);
+
+   /* 3: the neighbour saw it: an independent root, and credence rises above the single source's */
+   BG_CHECK( full.corroborated > full.questioned);
+   BG_CHECK( full.corroborated == full.questioned + BG_TRUST);
+   BG_CHECK( [store testimonyAt:2]->attribution == BGSaw);
+
+   /* 4: true ancestry: the carter's word comes from the apprentice's, which
+    * the apprentice saw; the neighbour's is its own; the inspector flags step
+    * 5's false corroboration, and not step 6's merged group */
+   a = [full.knowledge ancestryOf:last_said( full.world, full.carter, full.foreman)];
+   BG_CHECK( a && a->relayed && a->parent == last_said( full.world, full.apprentice, full.carter));
+   a = [full.knowledge rootOf:last_said( full.world, full.carter, full.foreman)];
+   BG_CHECK( a && ! a->relayed && ! a->fabricated && a->speaker == full.apprentice && a->origin == full.apprentice);
+   a = [full.knowledge ancestryOf:last_said( full.world, full.porter, full.foreman)];
+   BG_CHECK( a && a->relayed && a->origin == full.apprentice);
+   a = [full.knowledge ancestryOf:last_said( full.world, full.neighbour, full.foreman)];
+   BG_CHECK( a && ! a->relayed && ! a->fabricated && a->origin == full.neighbour);
+   BG_CHECK( [full.rumouredDump rangeOfString:@"false corroboration"].location != NSNotFound);
+   BG_CHECK( [full.questionedDump rangeOfString:@"false corroboration"].location == NSNotFound);
+
+   /* the same run is the same */
+   again = rumour( BGRumourFull);
+   BG_CHECK( [again.world stateHash] == [full.world stateHash]);
+   BG_CHECK( [again.text isEqualToString:full.text]);
+
+   /* knowledge, testimony, and ancestry are saved, and restored the same */
+   w2 = BGRestore( full.text, [full.world contentBuild], &deferred, &position, &error);
+   BG_CHECK( w2 != nil);
+   restored = [[[BGKnowledge alloc] initWithWorld:w2] autorelease];
+   [restored restoreSavedState:BGSavedDomainState( full.text, @"knowledge")];
+   BG_CHECK( [[restored dump:full.foreman] isEqualToString:[full.knowledge dump:full.foreman]]);
+   BG_CHECK( [[restored dump:full.porter] isEqualToString:[full.knowledge dump:full.porter]]);
+   BG_CHECK( [restored rootOf:last_said( full.world, full.carter, full.foreman)]->origin == full.apprentice);
+
+   /* 5: variant A: the apprentice made it up. History records a fabrication
+    * root, and the apprentice's store marks it as not believed; the carter
+    * relays it in good faith */
+   lie = rumour( BGRumourLie);
+   a   = [lie.knowledge ancestryOf:last_said( lie.world, lie.apprentice, lie.carter)];
+   BG_CHECK( a && a->fabricated && ! a->relayed && a->origin == lie.apprentice);
+   a = [lie.knowledge ancestryOf:last_said( lie.world, lie.carter, lie.foreman)];
+   BG_CHECK( a && a->fabricated && a->relayed && a->origin == lie.apprentice);
+   BG_CHECK( [[lie.knowledge dump:lie.apprentice] rangeOfString:@"(not believed)"].location != NSNotFound);
+   BG_CHECK( [[lie.knowledge dump:lie.carter] rangeOfString:@"(not believed)"].location == NSNotFound);
+   BG_CHECK( [[lie.knowledge dump:lie.foreman] rangeOfString:@"truly made up by"].location != NSNotFound);
+
+   /* the foreman looks, finds the chest empty, and sees the nails in the
+    * smith's hand: the claim is found false, and it trusts the carter and the
+    * apprentice less */
+   store      = [lie.knowledge storeOf:lie.foreman];
+   carter     = [store testimonyAt:0]->source;
+   apprentice = [store testimonyAt:0]->root;
+   BG_CHECK( [store testimonyAt:0]->settled == -1);
+   BG_CHECK( [store referent:[store testimonyAt:0]->thing]->form == BGLocationHeldBy);
+   BG_CHECK( [store trustIn:carter] == BG_TRUST - BG_REFUTED && [store trustIn:apprentice] == BG_TRUST - BG_REFUTED);
+   /* what they say next weighs less than it did */
+   BG_CHECK( [store weightOf:[store testimonyAt:0]] < BG_TRUST - BG_HEARSAY);
 }
 
 
@@ -1678,6 +2011,7 @@ const BGTestCase   BGAllTests[] =
    { "stale_belief",                  test_stale_belief },
    { "missing_nails",                 test_missing_nails },
    { "asking",                        test_asking },
+   { "rumour",                        test_rumour },
    { "cistern",                       test_cistern },
    { "cistern_b",                     test_cistern_b },
    { "cistern_d",                     test_cistern_d },

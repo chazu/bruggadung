@@ -20,7 +20,9 @@
  * for the one it asked to answer, a while at most, and a search slot passes
  * over whoever it has asked since adopting the goal. Agents agency controls
  * answer when asked, from what they know: where they believe something like
- * it is, and whether they saw it or were told, or that they don't know.
+ * it is, and whether they saw it or were told, and by whom, or that they
+ * don't know. Asked who told them, they say the claim again, with its
+ * source.
  *
  * Each agent's motivation store (its intentions, with their bindings and
  * failed methods, what it waits for, and the decision count) is private and

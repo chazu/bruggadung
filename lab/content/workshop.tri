@@ -13,15 +13,15 @@ bin: #Container & { material: "oak", mass: 4kg, capacity: 50 }
 // The lock that gets wedged shut.
 lock: #Assembly & { material: "brass", mass: 600g, slots: 4 }
 
-worker: #Agent & { material: "flesh", mass: 70kg, hands: 2 }
-smith:  #Agent & { material: "flesh", mass: 85kg, hands: 2 }
+worker: #Agent & { material: "flesh", mass: 70kg, hands: 2, coat: "blue" }
+smith:  #Agent & { material: "flesh", mass: 85kg, hands: 2, coat: "brown" }
 
 ownership: #Claim & { kind: "ownership" }
 
 // The cistern room of "Two draws on a dwindling stock": two agents, each
 // with a tap and a bucket.
-agent_a: #Agent & { material: "flesh", mass: 60kg, hands: 2 }
-agent_b: #Agent & { material: "flesh", mass: 65kg, hands: 2 }
+agent_a: #Agent & { material: "flesh", mass: 60kg, hands: 2, coat: "grey" }
+agent_b: #Agent & { material: "flesh", mass: 65kg, hands: 2, coat: "green" }
 
 // For AGENCY.md's first scenario, as "the missing nails": a crate across the
 // workshop, and the spare nails that may be in it.
@@ -31,4 +31,12 @@ nails_4: #Stack & { material: "iron", unit: "iron_nail", unitMass: 3g, count: 4 
 // For the missing nails' "ask a coworker": the chest the smith puts the nails
 // in, and the apprentice who may see it.
 chest:      #Container & { material: "oak", mass: 6kg, capacity: 40 }
-apprentice: #Agent & { material: "flesh", mass: 55kg, hands: 2 }
+apprentice: #Agent & { material: "flesh", mass: 55kg, hands: 2, coat: "dark" }
+
+// For KNOWLEDGE.md's first scenario, as "the rumour of the nails": a carter
+// and a porter the apprentice tells, a neighbour who saw it too, and
+// the foreman who hears it from them all.
+carter:    #Agent & { material: "flesh", mass: 75kg, hands: 2, coat: "red" }
+porter:    #Agent & { material: "flesh", mass: 80kg, hands: 2, coat: "yellow" }
+neighbour: #Agent & { material: "flesh", mass: 60kg, hands: 2, coat: "grey" }
+foreman:   #Agent & { material: "flesh", mass: 90kg, hands: 2, coat: "black" }

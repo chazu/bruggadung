@@ -7,17 +7,27 @@
 // Every utterance is about something like `what`.
 #Utterance: { what: #Body }
 
+// An utterance about something like `what` inside `within`.
+#Placing: #Utterance & { within: #Body }
+
 // A question expects an answer from the one it is put to.
 #Question: #Utterance & {}
 
 // Where is something like `what`?
 #WhereIs: #Question & {}
 
-#Attribution: "saw" | "heard"
+// Who told you something like `what` is inside `within`? (questioning a
+// source, KNOWLEDGE.md §10). The answer is the claim again, with its source.
+#WhoToldYou: #Question & #Placing & {}
 
-// A claim: something like `what` is inside `within`, as of `when`, and the
-// speaker saw it or heard it.
-#IsIn: #Utterance & { within: #Body, when: time, attribution: #Attribution }
+// How the speaker says it knows (the attribution, KNOWLEDGE.md §10): it saw
+// it, or heard it, from someone it describes, or from no one it names.
+#Source: {}
+#Saw:    #Source & {}
+#Heard:  #Source & { from: #Agent }
+
+// A claim: something like `what` is inside `within`, as of `when`.
+#IsIn: #Placing & { when: time, attribution: #Source }
 
 // The speaker knows of nothing like `what` that it could say where it is.
 #DontKnow: #Utterance & {}

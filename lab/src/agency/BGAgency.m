@@ -755,27 +755,36 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
 
 
 /* An answer to a #WhereIs, from what the agent knows: where it believes the
- * thing like `what` it saw last is, inside something on the ground, and
- * whether it saw it or was told; or that it doesn't know. */
+ * thing like `what` it saw last is, inside something on the ground, and how
+ * it knows: it saw it, or heard it, from whoever its strongest testimony
+ * says saw it, or from no one it can name; or that it doesn't know. A
+ * #WhoToldYou asks the same of the container like `within`: the answer is
+ * the claim again, with its source. */
 - (NSString *) answerTo:(const TriNode *) question
                   store:(BGKnowledgeStore *) store
 {
    const TriNode      *what;
+   const TriNode      *within;
    const TriNode      *kind;
    const TriNode      *description;
    const BGReferent   *r;
    const BGReferent   *c;
    const BGReferent   *best;
+   const BGTestimony  *t;
    TriMatchResult     result;
    TriContent         *tri;
    TriArena           *arena;
+   NSString           *attribution;
+   NSString           *from;
    NSUInteger         i;
    char               printed[ 2048];
 
-   tri   = [_world tri];
-   what  = tri_at( tri, question, "what");
-   arena = tri_arena_new();
-   best  = NULL;
+   tri    = [_world tri];
+   what   = tri_at( tri, question, "what");
+   within = tri_subtype( tri, tri_node_type( question), tri_type_named( tri, "#Placing"))
+               ? tri_at( tri, question, "within") : NULL;
+   arena  = tri_arena_new();
+   best   = NULL;
    for( i = 0; what && i < [store count]; i++)
    {
       r = [store referentAt:i];
@@ -789,21 +798,34 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
       if( ! kind || ! tri_subtype( tri, tri_node_type( kind), tri_node_type( what)) ||
           ! description || tri_match( tri, what, description, &result) == TRI_INCOMPATIBLE)
          continue;
+      if( within)
+      {
+         description = tri_value( tri, [[store describeReferent:c->id] UTF8String], arena, NULL, 0);
+         if( ! description || tri_match( tri, within, description, &result) == TRI_INCOMPATIBLE)
+            continue;
+      }
       if( ! best || r->seen > best->seen)
          best = r;
    }
    tri_arena_free( arena);
    if( best)
    {
-      c = [store referent:best->container];
+      c           = [store referent:best->container];
+      attribution = @"#Saw";
+      if( best->toldBy)
+      {
+         t           = [store strongestThat:best->id isIn:c->id];
+         from        = t && t->root ? [store describeLooks:t->root] : nil;
+         attribution = from ? [NSString stringWithFormat:@"#Heard & { from: %@ }", from] : @"#Heard";
+      }
       return( [NSString stringWithFormat:@"#IsIn & { what: %s%@, within: %s & { place: #OnTile & { x: %d, y: %d, level: %d }%@ }, "
-                                         @"when: %lldms, attribution: \"%s\" }",
+                                         @"when: %lldms, attribution: %@ }",
                                          best->kind,
                                          best->features && *best->features
                                             ? [NSString stringWithFormat:@" & { %s }", best->features] : @"",
                                          c->kind, c->x, c->y, c->level,
                                          c->features && *c->features ? [NSString stringWithFormat:@", %s", c->features] : @"",
-                                         (long long) best->seen, best->toldBy ? "heard" : "saw"]);
+                                         (long long) best->seen, attribution]);
    }
    tri_print( tri, what, printed, sizeof( printed));
    return( [NSString stringWithFormat:@"#DontKnow & { what: %s }", printed]);
@@ -834,7 +856,8 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
       arena    = tri_arena_new();
       question = tri_value( tri, o->content, arena, NULL, 0);
       answer   = nil;
-      if( question && tri_subtype( tri, tri_node_type( question), tri_type_named( tri, "#WhereIs")))
+      if( question && (tri_subtype( tri, tri_node_type( question), tri_type_named( tri, "#WhereIs")) ||
+                       tri_subtype( tri, tri_node_type( question), tri_type_named( tri, "#WhoToldYou"))))
          answer = [self answerTo:question store:store];
       tri_arena_free( arena);
       if( answer)

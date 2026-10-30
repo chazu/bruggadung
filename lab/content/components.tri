@@ -47,10 +47,12 @@
     mass:     $u * $n
 }
 
-// Something that acts, with hands to hold things in.
+// Something that acts, with hands to hold things in, and a coat to know it
+// by at a glance.
 #Agent: #Body & #Handed & {
     @component(Agent)
     hands: int & >=0 & <=4 @field(content, saved, inspect, perceive(sight))
+    coat:  text            @field(content, saved, inspect, perceive(sight))
 }
 
 // Something entities can be put in.

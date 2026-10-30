@@ -91,6 +91,7 @@ static void   append_quoted( NSMutableString *s, const char *text)
    for( i = 0; i < _nobservations; i++)
       free( _observations[ i].content);
    free( _observations);
+   free( _testimony);
    [_news release];
    [super dealloc];
 }
@@ -180,6 +181,7 @@ static void   append_quoted( NSMutableString *s, const char *text)
    r = &_referents[ _count++];
    memset( r, 0, sizeof( *r));
    r->insideSeen = -1;
+   r->trust      = BG_TRUST;
    r->id = referentID ? referentID : _next;
    if( r->id >= _next)
       _next = r->id + 1;
@@ -224,6 +226,166 @@ static void   append_quoted( NSMutableString *s, const char *text)
          return( o->time);
    }
    return( -1);
+}
+
+
+- (NSUInteger) testimonyCount
+{
+   return( _ntestimony);
+}
+
+
+- (const BGTestimony *) testimonyAt:(NSUInteger) i
+{
+   return( &_testimony[ i]);
+}
+
+
+- (BGTestimony *) mutableTestimonyAt:(NSUInteger) i
+{
+   return( &_testimony[ i]);
+}
+
+
+- (void) appendTestimony:(BGTestimony) t
+{
+   if( _ntestimony == _tcapacity)
+   {
+      _tcapacity = _tcapacity ? _tcapacity * 2 : 16;
+      _testimony = realloc( _testimony, sizeof( BGTestimony) * _tcapacity);
+   }
+   _testimony[ _ntestimony++] = t;
+}
+
+
+/* A source saying the same again replaces what it said before, open: one
+ * source is one item, however often it repeats itself. */
+- (void) addTestimony:(BGTestimony) t
+{
+   NSUInteger   i;
+
+   for( i = 0; i < _ntestimony; i++)
+      if( _testimony[ i].thing == t.thing && _testimony[ i].container == t.container &&
+          _testimony[ i].source == t.source && ! _testimony[ i].settled)
+      {
+         _testimony[ i] = t;
+         return;
+      }
+   [self appendTestimony:t];
+}
+
+
+- (int32_t) trustIn:(uint32_t) referentID
+{
+   const BGReferent   *r;
+
+   r = [self referent:referentID];
+   return( r ? r->trust : BG_TRUST);
+}
+
+
+- (void) adjustTrustIn:(uint32_t) referentID
+                    by:(int32_t) delta
+{
+   BGReferent   *r;
+
+   if( ! (r = [self mutableReferent:referentID]))
+      return;
+   r->trust += delta;
+   if( r->trust > BG_TRUST_LIMIT)
+      r->trust = BG_TRUST_LIMIT;
+   if( r->trust < -BG_TRUST_LIMIT)
+      r->trust = -BG_TRUST_LIMIT;
+}
+
+
+- (int32_t) weightOf:(const BGTestimony *) t
+{
+   int32_t   source;
+   int32_t   root;
+
+   source = [self trustIn:t->source];
+   switch( t->attribution)
+   {
+   case BGHeardFrom :
+      root = [self trustIn:t->root];
+      return( (source < root ? source : root) - BG_HEARSAY);
+   case BGHeard :
+      return( source - BG_RUMOUR);
+   default :
+      return( source);
+   }
+}
+
+
+static BOOL   counts( const BGTestimony *t, uint32_t thing, uint32_t container)
+{
+   return( t->thing == thing && t->container == container && t->settled >= 0);
+}
+
+
+/* Grouped by perceived root, the strongest of each group counts; testimony
+ * whose root is unknown is a group of its own. */
+- (int32_t) credenceThat:(uint32_t) thing
+                    isIn:(uint32_t) container
+{
+   const BGTestimony   *t;
+   NSUInteger          i;
+   NSUInteger          j;
+   int32_t             credence;
+   int32_t             best;
+   int32_t             w;
+
+   credence = BG_PRIOR;
+   for( i = 0; i < _ntestimony; i++)
+   {
+      t = &_testimony[ i];
+      if( ! counts( t, thing, container))
+         continue;
+      if( t->root)
+      {
+         for( j = 0; j < i; j++)
+            if( counts( &_testimony[ j], thing, container) && _testimony[ j].root == t->root)
+               break;
+         if( j < i)
+            continue;      /* its group is counted already */
+      }
+      best = [self weightOf:t];
+      for( j = i + 1; t->root && j < _ntestimony; j++)
+         if( counts( &_testimony[ j], thing, container) && _testimony[ j].root == t->root &&
+             (w = [self weightOf:&_testimony[ j]]) > best)
+            best = w;
+      credence += best;
+   }
+   return( credence);
+}
+
+
+- (const BGTestimony *) strongestThat:(uint32_t) thing
+                                 isIn:(uint32_t) container
+{
+   const BGTestimony   *best;
+   NSUInteger          i;
+
+   best = NULL;
+   for( i = 0; i < _ntestimony; i++)
+      if( counts( &_testimony[ i], thing, container) &&
+          (! best || [self weightOf:&_testimony[ i]] > [self weightOf:best]))
+         best = &_testimony[ i];
+   return( best);
+}
+
+
+- (NSString *) describeLooks:(uint32_t) referentID
+{
+   const BGReferent   *r;
+
+   r = [self referent:referentID];
+   if( ! r || ! r->kind)
+      return( nil);
+   if( ! r->features || ! *r->features)
+      return( [NSString stringWithUTF8String:r->kind]);
+   return( [NSString stringWithFormat:@"%s & { %s }", r->kind, r->features]);
 }
 
 
@@ -301,6 +463,7 @@ static void   append_quoted( NSMutableString *s, const char *text)
 {
    [_world release];
    [_stores release];
+   free( _ancestry);
    [super dealloc];
 }
 
@@ -441,14 +604,73 @@ static char   *concrete_features( const char *printed)
 }
 
 
-/* A claim heard becomes a belief (KNOWLEDGE.md §10). For #IsIn: the
+/* The referent of someone a claim names by how they look ("heard it from
+ * ..."): one of that kind that looks alike, the lowest first, or a new one,
+ * believed nowhere. 0 if the description says no more than its kind does. */
+- (uint32_t) person:(const TriNode *) description
+              store:(BGKnowledgeStore *) store
+               news:(NSMutableArray *) news
+{
+   const BGReferent   *r;
+   const TriNode      *bare;
+   BGReferent         *m;
+   TriContent         *tri;
+   TriArena           *arena;
+   NSString           *kind;
+   NSString           *features;
+   NSUInteger         i;
+   char               printed[ 2048];
+   char               *concrete;
+   char               *defaults;
+
+   tri  = [_world tri];
+   kind = [NSString stringWithUTF8String:(char *) tri_type_name( tri, tri_node_type( description))];
+   tri_print( tri, description, printed, sizeof( printed));
+   concrete = concrete_features( printed);
+   arena    = tri_arena_new();
+   bare     = tri_value( tri, [kind UTF8String], arena, NULL, 0);
+   printed[ 0] = 0;
+   if( bare)
+      tri_print( tri, bare, printed, sizeof( printed));
+   tri_arena_free( arena);
+   defaults = concrete_features( printed);
+   if( ! strcmp( concrete, defaults))
+   {
+      free( concrete);
+      free( defaults);
+      return( 0);
+   }
+   free( defaults);
+   features = [NSString stringWithUTF8String:concrete];
+   for( i = 0; i < [store count]; i++)
+   {
+      r = [store referentAt:i];
+      if( r->id != [store selfReferent] && r->kind && ! strcmp( r->kind, [kind UTF8String]) &&
+          [self looksAlike:r kind:kind features:features])
+      {
+         free( concrete);
+         return( r->id);
+      }
+   }
+   m           = [store addReferent:0];
+   m->kind     = strdup( [kind UTF8String]);
+   m->features = concrete;
+   [news addObject:[NSString stringWithFormat:@"R%u: %@, heard of", m->id, kind]];
+   return( m->id);
+}
+
+
+/* A claim heard is testimony (KNOWLEDGE.md §10, §11). For #IsIn: the
  * container, recognized by its kind on the tile the claim gives, or a new
- * referent there; the thing, recognized as one of its kind believed in it,
- * else as one not where it was believed that the claim's description fits,
- * else a new referent; believed in the container, as of the claim's `when`,
- * told by the speaker. */
+ * referent there; the thing, recognized as one of its kind believed in it or
+ * claimed to be, else as one not where it was believed that the claim's
+ * description fits, else a new referent; and its source and perceived root
+ * from the attribution. Once its credence reaches BG_BELIEVE, and no other
+ * claim of where it is weighs more, the thing is believed in the container,
+ * as of the claim's `when`, told by the speaker. */
 - (void) believe:(const char *) content
             from:(uint32_t) speaker
+       utterance:(uint64_t) utterance
               at:(int64_t) now
            store:(BGKnowledgeStore *) store
             news:(NSMutableArray *) news
@@ -456,9 +678,11 @@ static char   *concrete_features( const char *printed)
    const TriNode      *claim;
    const TriNode      *what;
    const TriNode      *within;
+   const TriNode      *attribution;
    const TriNode      *description;
    const BGReferent   *r;
    BGReferent         *m;
+   BGTestimony        t;
    TriContent         *tri;
    TriArena           *arena;
    TriMatchResult     result;
@@ -469,9 +693,11 @@ static char   *concrete_features( const char *printed)
    int64_t            y;
    int64_t            level;
    int64_t            when;
+   int32_t            credence;
    uint32_t           cid;
    uint32_t           thing;
    NSUInteger         i;
+   NSUInteger         j;
    int                pass;
    char               printed[ 2048];
 
@@ -491,6 +717,19 @@ static char   *concrete_features( const char *printed)
    within = tri_at( tri, claim, "within");
    kind   = tri_type_name( tri, tri_node_type( what));
    ckind  = tri_type_name( tri, tri_node_type( within));
+
+   /* who it says saw it */
+   memset( &t, 0, sizeof( t));
+   t.source      = speaker;
+   t.root        = speaker;
+   t.attribution = BGSaw;
+   attribution   = tri_at( tri, claim, "attribution");
+   if( attribution && tri_subtype( tri, tri_node_type( attribution), tri_type_named( tri, "#Heard")))
+   {
+      description   = tri_at( tri, attribution, "from");
+      t.root        = description ? [self person:description store:store news:news] : 0;
+      t.attribution = t.root ? BGHeardFrom : BGHeard;
+   }
 
    /* the container */
    cid = 0;
@@ -529,6 +768,9 @@ static char   *concrete_features( const char *printed)
             continue;
          if( pass == 0 && r->present && r->form == BGLocationIn && r->container == cid)
             thing = r->id;
+         for( j = 0; pass == 0 && ! thing && j < [store testimonyCount]; j++)
+            if( [store testimonyAt:j]->thing == r->id && [store testimonyAt:j]->container == cid)
+               thing = r->id;
          if( pass == 1 && ! r->present)
          {
             description = tri_value( tri, [[store describeReferent:r->id] UTF8String], arena, NULL, 0);
@@ -544,8 +786,33 @@ static char   *concrete_features( const char *printed)
       m->features = concrete_features( printed);
       thing       = m->id;
    }
+
+   t.thing     = thing;
+   t.container = cid;
+   t.when      = when;
+   t.heard     = now;
+   t.utterance = utterance;
+   [store addTestimony:t];
+   credence = [store credenceThat:thing isIn:cid];
+
+   m = [store mutableReferent:thing];
+   if( m->present && m->form == BGLocationIn && m->container == cid)
+   {
+      [news addObject:[NSString stringWithFormat:@"R%u is in R%u, R%u says too (%+d dB)", thing, cid, speaker,
+                                                 credence]];
+      tri_arena_free( arena);
+      return;
+   }
+   if( credence < BG_BELIEVE ||
+       (m->present && m->toldBy && m->form == BGLocationIn &&
+        [store credenceThat:thing isIn:m->container] > credence))
+   {
+      [news addObject:[NSString stringWithFormat:@"R%u says R%u is in R%u: not believed (%+d dB)", speaker, thing,
+                                                 cid, credence]];
+      tri_arena_free( arena);
+      return;
+   }
    c            = [store referent:cid];
-   m            = [store mutableReferent:thing];
    m->form      = BGLocationIn;
    m->container = cid;
    m->x         = c->x;
@@ -556,7 +823,7 @@ static char   *concrete_features( const char *printed)
    m->seen      = when;
    m->present   = YES;
    m->toldBy    = speaker;
-   [news addObject:[NSString stringWithFormat:@"R%u is in R%u, R%u says", thing, cid, speaker]];
+   [news addObject:[NSString stringWithFormat:@"R%u is in R%u, R%u says (%+d dB)", thing, cid, speaker, credence]];
    tri_arena_free( arena);
 }
 
@@ -576,6 +843,31 @@ static char   *concrete_features( const char *printed)
    both  = tri_value( [_world tri], [expr UTF8String], arena, NULL, 0);
    tri_arena_free( arena);
    return( both != NULL);
+}
+
+
+/* Testimony that the thing is inside the container is settled: seen true,
+ * and its source and root are trusted more, or found false, and they are
+ * trusted less. */
+static void   settle( BGKnowledgeStore *store, uint32_t thing, uint32_t container, BOOL true_, NSMutableArray *news)
+{
+   BGTestimony   *t;
+   NSUInteger    i;
+   int32_t       delta;
+
+   delta = true_ ? BG_CONFIRMED : -BG_REFUTED;
+   for( i = 0; i < [store testimonyCount]; i++)
+   {
+      t = [store mutableTestimonyAt:i];
+      if( t->settled || t->thing != thing || t->container != container)
+         continue;
+      t->settled = true_ ? 1 : -1;
+      [store adjustTrustIn:t->source by:delta];
+      if( t->root && t->root != t->source)
+         [store adjustTrustIn:t->root by:delta];
+      [news addObject:[NSString stringWithFormat:@"R%u said R%u was in R%u: %s", t->source, thing, container,
+                                                 true_ ? "so it is" : "it isn't"]];
+   }
 }
 
 
@@ -779,8 +1071,11 @@ static uint32_t   bound_to( BGEntityID e, BGEntityID agent, uint32_t me, const B
          r->seen      = now;
          r->present   = YES;
          r->truth     = seen[ i].entity;                /* developer-only */
+         r->toldBy    = 0;
          if( _omniscient || contains( lookedIn, nlooked, seen[ i].entity))
             r->insideSeen = now;
+         if( r->form == BGLocationIn)
+            settle( store, r->id, r->container, YES, news);
          assigned[ i] = r->id;
          for( j = 0; j < [store count]; j++)
             if( [store referentAt:j]->id == r->id)
@@ -807,6 +1102,21 @@ static uint32_t   bound_to( BGEntityID e, BGEntityID agent, uint32_t me, const B
       [news addObject:[NSString stringWithFormat:@"R%u is not where it was", r->id]];
    }
 
+   /* what it was told is inside something it looked into: so it is, or it isn't */
+   for( j = 0; j < [store testimonyCount]; j++)
+   {
+      const BGTestimony   *t;
+      const BGReferent    *holder;
+
+      t      = [store testimonyAt:j];
+      holder = [store referent:t->container];
+      if( t->settled || ! holder || ! holder->truth || ! contains( lookedIn, nlooked, holder->truth))
+         continue;
+      r = [store mutableReferent:t->thing];
+      settle( store, t->thing, t->container, r && r->present && r->form == BGLocationIn && r->container == t->container,
+              news);
+   }
+
    /* what it saw happen, in its referents; what it heard said, believed */
    for( i = 0; i < nwitnessed; i++)
    {
@@ -830,15 +1140,20 @@ static uint32_t   bound_to( BGEntityID e, BGEntityID agent, uint32_t me, const B
       }
       else
       {
+         const BGAncestry   *ancestry;
+
          o.other   = bound_to( ev->other, agent, [store selfReferent], seen, assigned, nseen);
          o.content = (char *) ev->detail;
+         ancestry  = [self ancestryOf:ev->index];
+         if( ev->actor == agent && ancestry && ancestry->fabricated && ! ancestry->relayed)
+            o.unbelieved = YES;      /* it knows it didn't see that */
          if( o.actor != [store selfReferent])
             [news addObject:[NSString stringWithFormat:@"R%u says to R%u: %s", o.actor, o.other,
                                                        ev->detail ? ev->detail : ""]];
       }
       [store addObservation:o];
       if( ! strcmp( ev->kind, "said") && ev->detail && o.actor && o.actor != [store selfReferent])
-         [self believe:ev->detail from:o.actor at:now store:store news:news];
+         [self believe:ev->detail from:o.actor utterance:ev->index at:now store:store news:news];
    }
    free( seen);
    free( assigned);
@@ -846,13 +1161,127 @@ static uint32_t   bound_to( BGEntityID e, BGEntityID agent, uint32_t me, const B
 }
 
 
+/* --- true ancestry (developer-only) ------------------------------------------------ */
+
+- (const BGAncestry *) ancestryOf:(uint64_t) utterance
+{
+   NSUInteger   i;
+
+   for( i = 0; i < _nancestry; i++)
+      if( _ancestry[ i].utterance == utterance)
+         return( &_ancestry[ i]);
+   return( NULL);
+}
+
+
+- (const BGAncestry *) rootOf:(uint64_t) utterance
+{
+   const BGAncestry   *a;
+   NSUInteger         guard;
+
+   a = [self ancestryOf:utterance];
+   for( guard = 0; a && a->relayed && guard < 64; guard++)
+   {
+      if( ! [self ancestryOf:a->parent])
+         break;
+      a = [self ancestryOf:a->parent];
+   }
+   return( a);
+}
+
+
+- (void) addAncestry:(BGAncestry) a
+{
+   if( _nancestry == _acapacity)
+   {
+      _acapacity = _acapacity ? _acapacity * 2 : 16;
+      _ancestry  = realloc( _ancestry, sizeof( BGAncestry) * _acapacity);
+   }
+   _ancestry[ _nancestry++] = a;
+}
+
+
+/* Where a claim said came from, by what its speaker knew when it spoke:
+ * something like `what` it believed inside a container of the kind on that
+ * tile. Seen, the speaker is the root; told, it relays the testimony that
+ * weighs most; believed nowhere, it made the claim up. */
+- (void) trace:(const BGEvent *) ev
+{
+   const TriNode      *claim;
+   const BGReferent   *r;
+   const BGReferent   *c;
+   const BGTestimony  *t;
+   const BGAncestry   *parent;
+   BGKnowledgeStore   *store;
+   BGAncestry         a;
+   TriContent         *tri;
+   TriArena           *arena;
+   const char         *kind;
+   const char         *ckind;
+   int64_t            x;
+   int64_t            y;
+   int64_t            level;
+   NSUInteger         i;
+
+   tri   = [_world tri];
+   arena = tri_arena_new();
+   claim = tri_value( tri, ev->detail, arena, NULL, 0);
+   if( ! claim || ! tri_subtype( tri, tri_node_type( claim), tri_type_named( tri, "#IsIn")) ||
+       ! node_int( tri, claim, "within.place.x", &x) || ! node_int( tri, claim, "within.place.y", &y) ||
+       ! node_int( tri, claim, "within.place.level", &level))
+   {
+      tri_arena_free( arena);
+      return;
+   }
+   kind  = tri_type_name( tri, tri_node_type( tri_at( tri, claim, "what")));
+   ckind = tri_type_name( tri, tri_node_type( tri_at( tri, claim, "within")));
+   tri_arena_free( arena);
+
+   memset( &a, 0, sizeof( a));
+   a.utterance  = ev->index;
+   a.speaker    = ev->actor;
+   a.origin     = ev->actor;
+   a.fabricated = YES;
+   store        = [self storeOf:ev->actor];
+   for( i = 0; i < [store count]; i++)
+   {
+      r = [store referentAt:i];
+      c = r->form == BGLocationIn ? [store referent:r->container] : NULL;
+      if( ! r->present || ! r->kind || strcmp( r->kind, kind) || ! c || ! c->kind || strcmp( c->kind, ckind) ||
+          c->form != BGLocationOnTile || c->x != x || c->y != y || c->level != level)
+         continue;
+      a.fabricated = NO;
+      if( r->toldBy && (t = [store strongestThat:r->id isIn:c->id]))
+      {
+         a.relayed = YES;
+         a.parent  = t->utterance;
+         if( (parent = [self ancestryOf:t->utterance]))
+         {
+            a.origin     = parent->origin;
+            a.fabricated = parent->fabricated;
+         }
+      }
+      break;
+   }
+   [self addAncestry:a];
+}
+
+
 - (void) perceiveBoundary:(uint64_t) boundary
 {
-   BGStore      *agents;
-   NSUInteger   i;
-   NSUInteger   last;
+   const BGEvent   *ev;
+   BGStore         *agents;
+   NSUInteger      i;
+   NSUInteger      last;
 
    last   = [_world eventCount];
+   /* claims said, traced first, by what their speakers knew when they spoke */
+   for( i = _eventsSeen; i < last; i++)
+   {
+      ev = [_world eventAt:i];
+      if( ! strcmp( ev->kind, "said") && ev->actor && ev->detail)
+         [self trace:ev];
+   }
    agents = [_world storeForKind:[_world kindNamed:"Agent"]];
    /* in stable ID order; each depends only on the world and its own store */
    for( i = 0; i < [agents count]; i++)
@@ -864,6 +1293,75 @@ static uint32_t   bound_to( BGEntityID e, BGEntityID agent, uint32_t me, const B
 
 
 /* --- the developer's view ---------------------------------------------------------- */
+
+static NSString   *attribution_text( const BGTestimony *t)
+{
+   switch( t->attribution)
+   {
+   case BGHeardFrom : return( [NSString stringWithFormat:@"heard from R%u", t->root]);
+   case BGHeard     : return( @"heard");
+   default          : return( @"saw");
+   }
+}
+
+
+/* What it was told, claim by claim: credence, each item's group and weight,
+ * and, for the developer, where each truly came from; groups the agent
+ * counts apart that share a true root are false corroboration. */
+- (NSString *) dumpTestimony:(BGKnowledgeStore *) store
+{
+   const BGTestimony   *t;
+   const BGTestimony   *u;
+   const BGAncestry    *a;
+   const BGAncestry    *b;
+   NSMutableString     *s;
+   NSUInteger          i;
+   NSUInteger          j;
+   NSUInteger          k;
+
+   s = [NSMutableString string];
+   for( i = 0; i < [store testimonyCount]; i++)
+   {
+      t = [store testimonyAt:i];
+      for( j = 0; j < i; j++)
+         if( [store testimonyAt:j]->thing == t->thing && [store testimonyAt:j]->container == t->container)
+            break;
+      if( j < i)
+         continue;      /* the claim is shown already */
+      [s appendFormat:@"  claim R%u in R%u: credence %+d dB\n", t->thing, t->container,
+                      [store credenceThat:t->thing isIn:t->container]];
+      for( j = i; j < [store testimonyCount]; j++)
+      {
+         u = [store testimonyAt:j];
+         if( u->thing != t->thing || u->container != t->container)
+            continue;
+         a = [self rootOf:u->utterance];
+         [s appendFormat:@"    R%u said so at %lldms, as of %lldms: %@, %@, weight %+d dB%s; truly %@\n", u->source,
+                         (long long) u->heard, (long long) u->when, attribution_text( u),
+                         u->root ? [NSString stringWithFormat:@"root R%u", u->root] : @"root unknown",
+                         [store weightOf:u], u->settled > 0 ? ", seen true" : u->settled < 0 ? ", found false" : "",
+                         ! a ? @"untraced"
+                             : [NSString stringWithFormat:@"%s by %llu", a->fabricated ? "made up" : "seen",
+                                                          (unsigned long long) a->origin]];
+         /* false corroboration: a later item counted apart, from the same true root */
+         for( k = j + 1; k < [store testimonyCount]; k++)
+         {
+            const BGTestimony   *v;
+
+            v = [store testimonyAt:k];
+            if( v->thing != t->thing || v->container != t->container || u->settled < 0 || v->settled < 0 ||
+                (u->root && u->root == v->root))
+               continue;
+            b = [self rootOf:v->utterance];
+            if( a && b && a->origin == b->origin && a->fabricated == b->fabricated)
+               [s appendFormat:@"    false corroboration: R%u and R%u are counted apart, and both come from %llu\n",
+                               u->source, v->source, (unsigned long long) a->origin];
+         }
+      }
+   }
+   return( s);
+}
+
 
 - (NSString *) dump:(BGEntityID) agent
 {
@@ -879,20 +1377,24 @@ static uint32_t   bound_to( BGEntityID e, BGEntityID agent, uint32_t me, const B
    for( i = 0; i < [store count]; i++)
    {
       r = [store referentAt:i];
-      [s appendFormat:@"  R%u %s, seen at %lldms%s, truth %llu%@%@: %@\n", r->id, r->kind, (long long) r->seen,
+      [s appendFormat:@"  R%u %s, seen at %lldms%s, truth %llu%@%@%@: %@\n", r->id, r->kind, (long long) r->seen,
                       r->present ? "" : ", not there any more", (unsigned long long) r->truth,
                       r->insideSeen >= 0 ? [NSString stringWithFormat:@", inside seen at %lldms", (long long) r->insideSeen]
                                          : @"",
                       r->toldBy ? [NSString stringWithFormat:@", told by R%u", r->toldBy] : @"",
+                      r->kind && ! strcmp( r->kind, "#Agent") && r->id != [store selfReferent]
+                         ? [NSString stringWithFormat:@", trust %+d dB", r->trust] : @"",
                       [store describeReferent:r->id]];
    }
+   [s appendString:[self dumpTestimony:store]];
    for( i = 0; i < [store observationCount]; i++)
    {
       o = [store observationAt:i];
-      [s appendFormat:@"  at %lldms: R%u %s R%u%@%@\n", (long long) o->time, o->actor, o->kind,
+      [s appendFormat:@"  at %lldms: R%u %s R%u%@%@%s\n", (long long) o->time, o->actor, o->kind,
                       ! strcmp( o->kind, "said") ? o->other : o->subject,
                       ! strcmp( o->kind, "moved") && o->other ? [NSString stringWithFormat:@" to R%u", o->other] : @"",
-                      o->content ? [NSString stringWithFormat:@": %s", o->content] : @""];
+                      o->content ? [NSString stringWithFormat:@": %s", o->content] : @"",
+                      o->unbelieved ? " (not believed)" : ""];
    }
    return( s);
 }
@@ -951,6 +1453,7 @@ static char   *decode( const char *s)
    BGKnowledgeStore      *store;
    const BGObservation   *o;
    const BGReferent      *r;
+   const BGTestimony     *t;
    NSMutableArray     *lines;
    NSUInteger         i;
    NSUInteger         j;
@@ -971,20 +1474,36 @@ static char   *decode( const char *s)
       for( j = 0; j < [store count]; j++)
       {
          r = [store referentAt:j];
-         [lines addObject:[NSString stringWithFormat:@"ref %llu %u %d %u %d %d %d %d %lld %lld %u %d %llu %@ %@ %@",
+         [lines addObject:[NSString stringWithFormat:@"ref %llu %u %d %u %d %d %d %d %lld %lld %u %d %d %llu %@ %@ %@",
                                                      (unsigned long long) [store agent], r->id, (int) r->form,
                                                      r->container, r->x, r->y, r->level, r->slot, (long long) r->seen,
-                                                     (long long) r->insideSeen, r->toldBy, r->present ? 1 : 0, (unsigned long long) r->truth,
+                                                     (long long) r->insideSeen, r->toldBy, r->trust, r->present ? 1 : 0,
+                                                     (unsigned long long) r->truth,
                                                      encode( r->role), encode( r->kind), encode( r->features)]];
       }
       for( j = 0; j < [store observationCount]; j++)
       {
          o = [store observationAt:j];
-         [lines addObject:[NSString stringWithFormat:@"obs %llu %lld %s %u %u %u %@", (unsigned long long) [store agent],
+         [lines addObject:[NSString stringWithFormat:@"obs %llu %lld %s %u %u %u %d %@", (unsigned long long) [store agent],
                                                      (long long) o->time, o->kind, o->actor, o->subject, o->other,
-                                                     encode( o->content)]];
+                                                     o->unbelieved ? 1 : 0, encode( o->content)]];
+      }
+      for( j = 0; j < [store testimonyCount]; j++)
+      {
+         t = [store testimonyAt:j];
+         [lines addObject:[NSString stringWithFormat:@"told %llu %u %u %lld %lld %u %u %d %d %llu",
+                                                     (unsigned long long) [store agent], t->thing, t->container,
+                                                     (long long) t->when, (long long) t->heard, t->source, t->root,
+                                                     (int) t->attribution, t->settled, (unsigned long long) t->utterance]];
       }
    }
+   for( j = 0; j < _nancestry; j++)
+      [lines addObject:[NSString stringWithFormat:@"ancestry %llu %llu %llu %llu %d %d",
+                                                  (unsigned long long) _ancestry[ j].utterance,
+                                                  (unsigned long long) _ancestry[ j].speaker,
+                                                  (unsigned long long) _ancestry[ j].origin,
+                                                  (unsigned long long) _ancestry[ j].parent,
+                                                  _ancestry[ j].relayed ? 1 : 0, _ancestry[ j].fabricated ? 1 : 0]];
    return( lines);
 }
 
@@ -998,6 +1517,11 @@ static char   *decode( const char *s)
    long long            seen;
    long long            inside;
    unsigned             told;
+   unsigned long long   origin;
+   unsigned long long   parent;
+   int                  trust;
+   BGTestimony          t;
+   BGAncestry           a;
    BGObservation        o;
    unsigned             id;
    unsigned             next;
@@ -1016,6 +1540,7 @@ static char   *decode( const char *s)
    NSUInteger           i;
 
    [_stores removeAllObjects];
+   _nancestry = 0;
    for( i = 0; i < [lines count]; i++)
    {
       text = (char *) [[lines objectAtIndex:i] UTF8String];
@@ -1023,16 +1548,17 @@ static char   *decode( const char *s)
          [[self storeOf:(BGEntityID) agent] setNextID:next self:me];
       else if( sscanf( text, "seen %llu %d %d %lld", &agent, &x, &y, &seen) == 4)
          [[self storeOf:(BGEntityID) agent] setTileSeen:seen x:x y:y];
-      else if( sscanf( text, "obs %llu %lld %15s %u %u %u %4095s", &agent, &seen, role, &id, &container, &told,
-                       features) == 7)
+      else if( sscanf( text, "obs %llu %lld %15s %u %u %u %d %4095s", &agent, &seen, role, &id, &container, &told,
+                       &present, features) == 8)
       {
          memset( &o, 0, sizeof( o));
-         o.time    = seen;
-         o.kind    = [_world intern:role];
-         o.actor   = id;
-         o.subject = container;
-         o.other   = told;
-         o.content = decode( features);
+         o.time       = seen;
+         o.kind       = [_world intern:role];
+         o.actor      = id;
+         o.subject    = container;
+         o.other      = told;
+         o.unbelieved = present != 0;
+         o.content    = decode( features);
          if( ! *o.content)
          {
             free( o.content);
@@ -1041,9 +1567,36 @@ static char   *decode( const char *s)
          [[self storeOf:(BGEntityID) agent] addObservation:o];
          free( o.content);
       }
-      else if( sscanf( text, "ref %llu %u %d %u %d %d %d %d %lld %lld %u %d %llu %63s %511s %4095s", &agent, &id,
-                       &form, &container, &x, &y, &level, &slot, &seen, &inside, &told, &present, &truth, role, kind,
-                       features) == 16)
+      else if( sscanf( text, "told %llu %u %u %lld %lld %u %u %d %d %llu", &agent, &id, &container, &seen, &inside,
+                       &told, &me, &form, &present, &truth) == 10)
+      {
+         memset( &t, 0, sizeof( t));
+         t.thing       = id;
+         t.container   = container;
+         t.when        = seen;
+         t.heard       = inside;
+         t.source      = told;
+         t.root        = me;
+         t.attribution = (BGAttribution) form;
+         t.settled     = present;
+         t.utterance   = truth;
+         [[self storeOf:(BGEntityID) agent] appendTestimony:t];
+      }
+      else if( sscanf( text, "ancestry %llu %llu %llu %llu %d %d", &truth, &agent, &origin, &parent, &form,
+                       &present) == 6)
+      {
+         memset( &a, 0, sizeof( a));
+         a.utterance  = truth;
+         a.speaker    = (BGEntityID) agent;
+         a.origin     = (BGEntityID) origin;
+         a.parent     = parent;
+         a.relayed    = form != 0;
+         a.fabricated = present != 0;
+         [self addAncestry:a];
+      }
+      else if( sscanf( text, "ref %llu %u %d %u %d %d %d %d %lld %lld %u %d %d %llu %63s %511s %4095s", &agent, &id,
+                       &form, &container, &x, &y, &level, &slot, &seen, &inside, &told, &trust, &present, &truth, role,
+                       kind, features) == 17)
       {
          store        = [self storeOf:(BGEntityID) agent];
          next         = [store nextID];
@@ -1057,6 +1610,7 @@ static char   *decode( const char *s)
          r->seen       = seen;
          r->insideSeen = inside;
          r->toldBy     = told;
+         r->trust      = trust;
          r->present    = present != 0;
          r->truth     = (BGEntityID) truth;
          text         = decode( role);
