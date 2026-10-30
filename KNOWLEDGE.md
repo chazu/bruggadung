@@ -93,6 +93,12 @@ These were made while writing this document and have not yet been reviewed.
     down, daylight follows the clock, rooms and doors shade it. Sound:
     it propagates through rooms and doors, walls muffle it, and noise
     masks what is quieter.
+15. **Trust comes from relationships, disposition, and conduct.** Starting
+    trust in someone comes from the relationship (kin, coworker, employer,
+    stranger) and a trusting or suspicious disposition; loyalty
+    (AGENCY.md decision 12) raises it; being harmed or wronged by them
+    lowers it, as does seeing them lie or break a rule. Claims confirmed
+    and refuted, and promises kept and broken, still move it (§10).
 
 ## Terms
 
