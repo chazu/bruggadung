@@ -2582,7 +2582,11 @@ Checked: wrench and pipe beside it add 2 s, and the valve hasn't turned a
 millisecond before the stage and the delay are done; a held wrench and a
 pipe from a sack, 2 s too; both in hand, none.
 
-Not yet: other operations searching for instruments.
+Other operations don't search: they bind their instruments as roles
+(`tighten`'s spanner, `drive`'s nail, held), and agency's methods get them
+in hand first. ACTIONS.md §2: "When the player or an agent binds an
+instrument explicitly, there is no search." Turning a valve is the one
+that chooses its chain.
 
 69 tests, 2421 checks, under both compilers, ASan, and leak-free.
 
@@ -2849,3 +2853,33 @@ Not yet: auto-explore (what exploring is isn't specified), and carrying
 out a recipe (recipes expand through knowledge, ACTIONS.md §6, not built).
 
 77 tests, 2541 checks, under both compilers, ASan, and leak-free.
+
+### What stays open, and why (as of the attention and routine slices)
+
+Each item below waits on something the documents leave to be decided; the
+text they give is quoted.
+
+- **Institutions' own rules** (permit or forbid, sanctions, reservations as
+  claims, offices' other capabilities): ARCHITECTURE.md, "Institutions (§6)
+  ... To be specified". What ACTIONS.md §3 and COMPONENTS.md Scenario 2 fix
+  runs.
+- **Grievances**: ACTIONS.md Scenario 2, B: "This is a hook for grievances
+  in §4 and §6", the only mention of them in any document.
+- **Protecting a possession**: AGENCY.md §4, "a threat to something
+  believed owned"; nothing says how an agent comes to believe it owns
+  something (ownership claims are institutions').
+- **Lying as agency's choice**: AGENCY.md §11, "weighted by the honesty
+  disposition and the believed gain"; the gain is defined nowhere.
+- **Asking for work**: named once, AGENCY.md Scenario 3 ("*ask for
+  work*"); no word on who employs, what the work is, or how it pays.
+- **Merging referents when an identity hypothesis is believed**:
+  KNOWLEDGE.md open question 4, "How often should merge and split errors
+  happen".
+- **Graded shortfall (effort rates from capabilities)**: ACTIONS.md open
+  question 4, "How should graded shortfall functions be represented in
+  content, and with what units?"
+- **Recipes, and the "carry out this recipe" autopilot**: ACTIONS.md open
+  question 7, "How is recipe knowledge represented".
+- **Auto-explore**: AGENCY.md §14 names it; what exploring is, isn't said.
+- **Latent assembly's own rules, how considerations combine, memory making
+  hypotheses of its own, loyalty**: as listed above.
