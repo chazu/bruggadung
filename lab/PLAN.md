@@ -1970,3 +1970,27 @@ isn't true:
   bit, and the claim made says nothing of the loft.
 
 58 tests, 2075 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### Needs design: told referents and recognition
+
+Found trying AGENCY.md Scenario 2's variant C the long way. In B's
+conditions, Bela asks the carter and the porter where the rumour came
+from. Both heard it from the neighbour, out of Bela's earshot. The
+answers would merge the groups and deflate it.
+
+They answer "don't know". The carter's store keeps the told "someone in
+the storeroom" as a vague `#Agent` referent. When the porter came back
+into sight, recognition bound that referent to the porter, nearest and of
+the same kind, its vague features unifying. So the carter's claim now
+places the porter on a tile, and nothing matches the question.
+
+Recognition needs a rule for told, featureless referents before this can
+run:
+
+- should seeing anyone of the kind ever resolve "someone"?
+- should "someone" be a referent at all, or only a claim's content?
+- should an identity hypothesis wait for evidence that ties them (the
+  place, a description)?
+
+The test drops the variant; C stays as it was, with the source named from
+the start.
