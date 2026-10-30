@@ -118,6 +118,12 @@ NSString           *BGApplyEffect( BGWorld *world, BGAction action, int64_t amou
 NSString           *BGOperationEffect( BGWorld *world, const char *operation);
 int64_t            BGOperationDuration( BGWorld *world, const char *operation);
 
+/* What it costs in time to bring the instruments the action will use to
+ * bear (ACTIONS.md §2's access cost): take_up's duration for each one
+ * on a tile in reach, twice that from a container; added to the first
+ * stage. 0 for an action that searches for none. */
+int64_t            BGAccessDelay( BGWorld *world, BGAction action);
+
 /* Stage `index` of an operation: its duration and effect. An operation with
  * a duration and no stages has one stage. NO past the last stage. */
 BOOL               BGOperationStage( BGWorld *world, const char *operation, int64_t index,

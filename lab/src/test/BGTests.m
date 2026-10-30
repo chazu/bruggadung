@@ -5612,6 +5612,8 @@ typedef struct
    BGEntityID    worker;
    BGEntityID    wrench;
    BGEntityID    pipe;
+   int64_t       delay;         /* bringing them to bear, ms */
+   BOOL          early;         /* turned before the stage and the delay were done */
    NSString      *menu;          /* the worker's, before it acts */
    NSString      *trace;
    BOOL          turned;
@@ -5714,7 +5716,10 @@ static BGValveRun   valve_run( const char *valve, const char *tools, int64_t ste
       [st.s runUntil:BGTimeMake( 2000)];
       run.wrench = [g idFor:run.wrench];
    }
+   run.delay = BGAccessDelay( st.w, BGActionMake( "rotate_valve", worker, run.valve, BGNoEntity));
    BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "rotate_valve", worker, run.valve, BGNoEntity), steady, &error) != nil);
+   [st.s runUntil:BGTimeMake( [st.w time].ms + 2000 + run.delay - 1)];
+   run.early = [st.w getField:"Valve.turned" of:run.valve value:&v] && v;
    [st.s runUntil:BGTimeMake( [st.w time].ms + 3000)];
    run.world     = st.w;
    run.committer = st.c;
@@ -5789,10 +5794,16 @@ static void   test_seized_valve( void)
    BG_CHECK( [steady.world locationOf:steady.wrench].form == BGLocationHeldBy &&
              [steady.world locationOf:steady.wrench].place == steady.worker);
    BG_CHECK( [steady.world locationOf:steady.pipe].place == steady.worker);
-   /* a pipe in a sack standing on its tile: further to reach, still in reach */
+   /* which takes time: a take_up's second for each, added to the stage */
+   BG_CHECK( steady.delay == 2000 && ! steady.early);
+   /* a pipe in a sack standing on its tile: further to reach, still in
+    * reach, and twice as long to bring out */
    steady = valve_run( "seized_valve", "wrench pipe sacked", 75, 5);
-   BG_CHECK( steady.turned);
+   BG_CHECK( steady.turned && steady.delay == 2000 && ! steady.early);
    BG_CHECK( [steady.world locationOf:steady.pipe].place == steady.worker);
+   /* in hand already, none */
+   steady = valve_run( "seized_valve", "wrench pipe", 75, 5);
+   BG_CHECK( steady.turned && steady.delay == 0);
    /* not a pipe in another's hand, nor one out of reach: the wrench alone */
    wrench = valve_run( "seized_valve", "wrench pipe theirs", 0, 73);
    BG_CHECK( ! wrench.turned && [wrench.trace rangeOfString:@": 50 Nm against 70 Nm: holds"].location != NSNotFound);

@@ -284,7 +284,8 @@ peer_at: #Operation & {
 } @family(operations)
 
 // Turn a valve (ACTIONS.md Scenario 1): with the best chain of what the
-// actor holds, hand, wrench, pipe over the wrench; the command's amount, if
+// actor can reach (taking up what it doesn't hold, a take_up's time each,
+// twice from a container), hand, wrench, pipe over the wrench; the command's amount, if
 // any, holds the torque steady there (Nm). The stage commits the torque
 // applied; the valve's reaction decides what happens.
 rotate_valve: #Operation & {

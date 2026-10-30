@@ -2566,3 +2566,23 @@ only from on it says nothing a step away, and B takes the seal
 Not yet: grievances, and reservations as claims (institutions, open).
 
 69 tests, 2420 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: bringing them to bear takes time
+
+The reach slice's "Not yet": ACTIONS.md §2's access cost as time, not
+only a preference.
+
+- **`BGAccessDelay`**: the time to bring an action's instruments to bear,
+  added to its first stage when it starts: take_up's duration for each
+  part on a tile in reach, twice that from a container. The chain search
+  is one function (`turning_chain`), so the delay and the effect find the
+  same chain.
+
+Checked: wrench and pipe beside it add 2 s, and the valve hasn't turned a
+millisecond before the stage and the delay are done; a held wrench and a
+pipe from a sack, 2 s too; both in hand, none.
+
+Not yet: the delay on resuming (a resumed stage owes only its remaining
+time), and other operations searching for instruments.
+
+69 tests, 2421 checks, under both compilers, ASan, and leak-free.
