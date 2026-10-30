@@ -3234,11 +3234,16 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
    NSMutableArray     *news;
    NSString           *kind;
    NSString           *features;
+   NSString           *specific;
    uint32_t           *assigned;      /* per visible entity: its referent */
    uint8_t            *taken;         /* per referent index: matched this phase */
    uint32_t           container;
    BOOL               closely;
    BOOL               degraded;
+   BOOL               impaired;
+   BOOL               distracted;
+   BOOL               doubted;
+   BOOL               blurred;
    NSUInteger         maybe;
    int                maybeN;
    int                maybeD;
@@ -3353,6 +3358,10 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
    view     = [BGView viewOf:agent inWorld:_world];
    assigned = calloc( nseen + 1, sizeof( uint32_t));
    taken    = calloc( [store count] + nseen + 1, 1);
+   /* the perceiver's state, and its attention (KNOWLEDGE.md decision 12) */
+   memory     = [_world record:[_world kindNamed:"Agent"] for:agent];
+   impaired   = memory && (memory->fatigue + memory->injury >= BG_IMPAIRED || memory->adrenaline >= BG_IMPAIRED / 2);
+   distracted = [self attentionOf:agent] >= BG_ATTENTION / 2;
    for( pass = 0; pass < 2; pass++)
       for( i = 0; i < nseen; i++)
       {
@@ -3363,16 +3372,25 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
          at       = [_world locationOf:seen[ i].entity];
          ground_tile( _world, seen[ i].entity, &tile);
          /* by the light: at dusk, beyond arm's reach, a step less precisely;
-          * at night, within it, unless just handled */
+          * at night, within it, unless just handled; and so too impaired
+          * (worn out, hurt, or full of adrenaline), or distracted (half its
+          * attention or more on what it is doing): KNOWLEDGE.md decision 12 */
          degraded = ! _omniscient && seen[ i].entity != agent &&
                     (([self lightAt:tile] == 1 && (abs( tile.x - here.x) > 1 || abs( tile.y - here.y) > 1)) ||
-                     ([self lightAt:tile] == 0 && ! contains( lookedIn, nlooked, seen[ i].entity)));
+                     ([self lightAt:tile] == 0 && ! contains( lookedIn, nlooked, seen[ i].entity)) ||
+                     impaired || distracted);
+         specific = features;
+         doubted  = degraded;
          if( degraded)
             features = [store generalize:features kind:[kind UTF8String] steps:1];
-         /* from afar, sizes only roughly */
+         /* from afar, sizes only roughly: what it half took in too */
          if( ! _omniscient && seen[ i].entity != agent)
+         {
             features = [self blur:features kind:[kind UTF8String]
                          distance:(int) max64( abs( tile.x - here.x), abs( tile.y - here.y)) blurred:&degraded];
+            specific = [self blur:specific kind:[kind UTF8String]
+                         distance:(int) max64( abs( tile.x - here.x), abs( tile.y - here.y)) blurred:&blurred];
+         }
          container = 0;
          for( j = 0; j < i; j++)
             if( seen[ j].entity == at.place)
@@ -3492,6 +3510,14 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
          {
             [news addObject:[NSString stringWithFormat:@"R%u is plainly as it seems: no doubt about it now", r->id]];
             [store dropSupposed:r->id];
+         }
+         /* seen less well than usual, what it half took in lingers: a doubt
+          * (KNOWLEDGE.md decision 12), "it was this, or maybe that" */
+         if( doubted && r->id != [store selfReferent] && ! [specific isEqualToString:features] &&
+             ! [store hypothesesOf:r->id])
+         {
+            [store suppose:specific about:r->id mass:BG_DOUBT];
+            [news addObject:[NSString stringWithFormat:@"R%u: seen poorly, maybe %@", r->id, specific]];
          }
          free( r->kind);
          free( r->features);

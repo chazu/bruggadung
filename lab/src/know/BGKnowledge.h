@@ -155,6 +155,8 @@
 #define BG_PERCEPT_COST   10      /* what attending to one event takes of it */
 
 #define BG_HYPOTHESES     3       /* competing hypotheses a referent holds at most */
+#define BG_DOUBT          300     /* the mass, in thousandths, of what was half taken in (KNOWLEDGE.md decision 12) */
+#define BG_IMPAIRED       100     /* fatigue and injury that impair perceiving; half as much adrenaline does */
 
 typedef struct
 {

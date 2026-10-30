@@ -3673,3 +3673,30 @@ Checked: a stone seen once has lost its details a day later; sighted three
 times, it still has them a day later, and loses them the next.
 
 89 tests, 2810 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: doubts of perception's own
+
+KNOWLEDGE.md decision 12: memory and perception form doubts of their own
+whenever forming a memory goes worse than usual: decay, confusion,
+distraction, impairment, poor sight.
+
+- **Impairment and distraction** degrade perception as poor light already
+  did (each feature a step less precise): fatigue and injury together 100
+  or more (`BG_IMPAIRED`), or adrenaline 50; or a running activity
+  demanding half the agent's attention.
+- **A doubt**: seen degraded so, what it half took in lingers as a
+  competing hypothesis on the referent (`BG_DOUBT`, 300 in 1000), blurred
+  by distance as the percept is. Seen plainly again, the doubt is settled,
+  as other hypotheses already were.
+- **Confusion** and **poor sight** between two known things were already
+  in place as identity hypotheses ("R5 may be R2: it fits both").
+
+Checked: worn out, the worker sees the smith's coat as dark, maybe brown
+(a doubt at 300); rested, it sees it plainly, brown, and no doubt remains.
+The nut of unknown size, blurred by distance only, forms no doubt.
+
+Not yet: decay's doubt (the specific value lingering as a memory
+generalizes, fading with it); distraction checked end to end (no
+operation yet demands half the attention); intoxication.
+
+90 tests, 2813 checks, under both compilers, ASan, and leak-free.

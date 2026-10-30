@@ -8815,6 +8815,46 @@ static void   test_scheduled_forgetting( void)
 }
 
 
+/* KNOWLEDGE.md decision 12: perception forms doubts of its own when it
+ * goes worse than usual. Worn out (fatigue 100), the worker sees the smith's
+ * coat only as dark, and maybe brown, a doubt; rested and seeing it again
+ * plainly, it has no doubt about it. */
+static void   test_doubts( void)
+{
+   BGStage            st;
+   BGKnowledge        *knowledge;
+   BGKnowledgeStore   *store;
+   BGProposalGroup    *g;
+   BGEntityID         worker;
+   BGEntityID         smith;
+   uint32_t           r;
+
+   st.w      = BGTestWorld( 157);
+   st.c      = BGTestCommitter( st.w);
+   knowledge = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+   st.s      = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [st.s setPerception:knowledge];
+   g      = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: a worn-out worker"];
+   worker = [g create:"worker" key:"worker" at:BGOnTile( 5, 5, 0)];
+   smith  = [g create:"smith" key:"smith" at:BGOnTile( 7, 5, 0)];
+   [g set:"Agent.fatigue" of:BGWhole( worker) to:100];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1000)];
+   worker = [g idFor:worker];
+   smith  = [g idFor:smith];
+   store  = [knowledge storeOf:worker];
+   r      = referent_of( store, smith);
+   BG_CHECK( r && [[store describeReferent:r] rangeOfString:@"coat: \"dark\""].location != NSNotFound);
+   BG_CHECK( [store hypothesesOf:r] == 1 && [store massOf:r hypothesis:0] == BG_DOUBT &&
+             [[store describeSupposed:r hypothesis:0] rangeOfString:@"coat: \"brown\""].location != NSNotFound);
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: rested"];
+   [g set:"Agent.fatigue" of:BGWhole( worker) to:0];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 2000)];
+   BG_CHECK( [store hypothesesOf:r] == 0 && [[store describeReferent:r] rangeOfString:@"coat: \"brown\""].location != NSNotFound);
+}
+
+
 static void   test_memory_rates( void)
 {
    /* seen once: BG_FADE a day */
@@ -9302,6 +9342,7 @@ const BGTestCase   BGAllTests[] =
    { "memory_decay",                  test_memory_decay },
    { "salience",                      test_salience },
    { "going_without",                 test_going_without },
+   { "doubts",                        test_doubts },
    { "traces",                        test_traces },
    { "appearance",                    test_appearance },
    { "interpretation",                test_interpretation },
