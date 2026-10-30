@@ -1,4 +1,4 @@
-/* Generated from Triangle content a226dae83429c48a: do not edit. Type IDs are valid
+/* Generated from Triangle content 94af51007c991f59: do not edit. Type IDs are valid
  * only for this content; regenerate when it changes. */
 #ifndef BG_COMPONENTS_H
 #define BG_COMPONENTS_H
@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BG_CONTENT_HASH 0xa226dae83429c48aULL
+#define BG_CONTENT_HASH 0x94af51007c991f59ULL
 
 typedef struct TriNode TriNode;
 
@@ -86,8 +86,12 @@ typedef struct {
     int64_t         watchAtLeast;    /* volume, in quanta of 1mL; content, saved, proposable, inspect */
     int64_t         watchCool;    /* int, in quanta of 1; content, saved, proposable, inspect */
     int64_t         watchDioxide;    /* int, in quanta of 1; content, saved, proposable, inspect */
+    int64_t         watchFloor;    /* int, in quanta of 1; content, saved, proposable, inspect */
     uint64_t        watchHolder;    /* a referent; saved, proposable, inspect */
+    int64_t         watchLevel;    /* int, in quanta of 1; content, saved, proposable, inspect */
     int64_t         watchWarm;    /* int, in quanta of 1; content, saved, proposable, inspect */
+    int64_t         watchX;    /* int, in quanta of 1; content, saved, proposable, inspect */
+    int64_t         watchY;    /* int, in quanta of 1; content, saved, proposable, inspect */
 } BGActivity;
 
 /* Authorization, from #Authorization */
@@ -417,8 +421,12 @@ static const BGFieldInfo BGActivity_fields[] = {
     { "watchAtLeast", offsetof(BGActivity, watchAtLeast), BG_VALUE_QUANTITY, "volume", "content, saved, proposable, inspect" },
     { "watchCool", offsetof(BGActivity, watchCool), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "watchDioxide", offsetof(BGActivity, watchDioxide), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
+    { "watchFloor", offsetof(BGActivity, watchFloor), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "watchHolder", offsetof(BGActivity, watchHolder), BG_VALUE_REF, "ref", "saved, proposable, inspect" },
+    { "watchLevel", offsetof(BGActivity, watchLevel), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "watchWarm", offsetof(BGActivity, watchWarm), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
+    { "watchX", offsetof(BGActivity, watchX), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
+    { "watchY", offsetof(BGActivity, watchY), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
 };
 
 static const BGFieldInfo BGAuthorization_fields[] = {
@@ -582,7 +590,7 @@ static const BGComponentInfo BGComponents[BG_COMPONENT_COUNT + 1] = {
     { "Scribe", "#Scribe", sizeof(BGScribe), 1, BGScribe_fields },
     { "Sized", "#Sized", sizeof(BGSized), 1, BGSized_fields },
     { "ThermalBody", "#ThermalBody", sizeof(BGThermalBody), 5, BGThermalBody_fields },
-    { "Activity", "#Activity", sizeof(BGActivity), 15, BGActivity_fields },
+    { "Activity", "#Activity", sizeof(BGActivity), 19, BGActivity_fields },
     { "Authorization", "#Authorization", sizeof(BGAuthorization), 3, BGAuthorization_fields },
     { "Claim", "#Claim", sizeof(BGClaim), 2, BGClaim_fields },
     { "Information", "#Content", sizeof(BGInformation), 2, BGInformation_fields },

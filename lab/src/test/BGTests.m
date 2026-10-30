@@ -3822,6 +3822,78 @@ static void   test_component_pump( void)
 }
 
 
+/* ACTIONS.md Scenario 3's step 6 and check 7: the piston out of the pump
+ * `key`, the worker sets to clean out its cylinder, watching the floor. With
+ * the outlet valve leaking, the water rises at its feet: the watch fires
+ * within the domain's tolerance (a spreading step, 10 s) of the crossing, and
+ * the activity is interrupted, its watch removed. Returns the status. */
+static const char   *flood_run( const char *key, int64_t *crossed, int64_t *interrupted, int64_t *watch)
+{
+   BGStage            st;
+   BGFluidDomain      *fluid;
+   BGProposalGroup    *g;
+   BGEntityID         pump;
+   BGEntityID         tank;
+   BGEntityID         worker;
+   BGEntityID         wrench;
+   BGEntityID         piston;
+   BGEntityID         a;
+   BGStore            *parts;
+   NSString           *error;
+   NSUInteger         i;
+
+   st.w   = BGTestWorld( 163);
+   st.c   = BGTestCommitter( st.w);
+   fluid  = [[[BGFluidDomain alloc] initWithWorld:st.w] autorelease];
+   st.s   = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [st.s setActivities:[BGActivities activitiesWithWorld:st.w committer:st.c]];
+   [st.s addDomain:fluid];
+   g      = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the pump house"];
+   pump   = [g create:"crank_pump" key:key at:BGOnTile( 5, 5, 0)];
+   tank   = [g create:"header_tank" key:"the header tank" at:BGOnTile( 5, 5, 0)];
+   worker = [g create:"worker" key:"worker" at:BGOnTile( 4, 5, 0)];
+   wrench = [g create:"wrench_250" key:"wrench" at:BGHeldBy( worker, 0)];
+   [g set:"Latent.riser" of:BGWhole( pump) to:(int64_t) tank];
+   [g set:"Latent.failure" of:BGWhole( pump) toText:"flow_loss"];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   pump   = [g idFor:pump];
+   worker = [g idFor:worker];
+   wrench = [g idFor:wrench];
+   error  = nil;
+   BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "open_up", worker, wrench, pump), 0, &error) != nil);
+   [st.s runUntil:BGTimeMake( 1000)];
+   BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "open_up", worker, wrench, pump), 0, &error) != nil);
+   [st.s runUntil:BGTimeMake( 2000)];
+   piston = BGNoEntity;
+   parts  = [st.w storeForKind:[st.w kindNamed:"Part"]];
+   for( i = 0; i < [parts count]; i++)
+      if( ! strcmp( [st.w info:[parts entityAtIndex:i]]->blueprint, "piston"))
+         piston = [parts entityAtIndex:i];
+   BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "take", worker, piston, BGNoEntity), 0, &error) != nil);
+   [st.s runUntil:BGTimeMake( 3000)];
+   g = BGPerform( st.w, st.c, BGActionMake( "clean_out", worker, wrench, pump), 0, &error);
+   BG_CHECK( g != nil);
+   [st.s runUntil:BGTimeMake( 4000)];
+   a      = [g idFor:[g proposals][ 0].handle];
+   *watch = -1;
+   [st.w getField:"Activity.watchFloor" of:a value:watch];
+   *crossed     = 0;
+   *interrupted = 0;
+   while( [st.w time].ms < 20 * 60000)
+   {
+      if( ! [st.s stepUntil:BGTimeMake( 20 * 60000)])
+         [st.s runUntil:BGTimeMake( 20 * 60000)];
+      if( ! *crossed && [st.w waterAtX:4 y:5 level:0] >= 500)
+         *crossed = [st.w time].ms;
+      if( ! *interrupted && strcmp( status_of( st.w, a), "\"running\""))
+         *interrupted = [st.w time].ms;
+   }
+   [st.w getField:"Activity.watchFloor" of:a value:watch];
+   return( status_of( st.w, a));
+}
+
+
 static void   test_latent_pump( void)
 {
    BGPumpRun   early;
@@ -3916,6 +3988,30 @@ static void   test_latent_pump( void)
       BG_CHECK( ! logged_by( agency, 2, @"replace_part"));
       BG_CHECK( logged_by( agency, 2, @"there is nothing further to open"));
       BG_CHECK( [w locationOf:spare].form == BGLocationHeldBy);
+   }
+
+   /* check 7: the watch on rising water */
+   {
+      const char   *status;
+      int64_t      crossed;
+      int64_t      interrupted;
+      int64_t      watch;
+
+      for( k = 0; k < 24; k++)
+      {
+         snprintf( key, sizeof( key), "pump %d", k);
+         if( [pump_open( key, "flow_loss", 300 * 3600000LL, 0).culprit isEqualToString:@"outlet_valve"])
+            break;
+      }
+      /* the outlet valve leaking: the water at its feet reaches 500 mL, and
+       * the work is interrupted at that boundary (the tolerance, a spreading
+       * step of 10 s), its watch removed */
+      status = flood_run( key, &crossed, &interrupted, &watch);
+      BG_CHECK( ! strcmp( status, "\"suspended\"") && watch == 0);
+      BG_CHECK( crossed > 0 && interrupted >= crossed && interrupted <= crossed + 10000);
+      /* the seal at fault: no water; the work runs its ten minutes, its watch removed as it ends */
+      status = flood_run( "pump 1", &crossed, &interrupted, &watch);
+      BG_CHECK( ! strcmp( status, "\"completed\"") && crossed == 0 && watch == 0);
    }
 
    /* a failure with no candidates: nothing marked */

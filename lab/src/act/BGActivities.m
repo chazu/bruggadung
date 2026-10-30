@@ -211,6 +211,11 @@ static int64_t   next_checkpoint( BGWorld *world, BGEntityID a, const BGActivity
       {
          BGLeaveTraces( _world, action_of( _world, a, record), group);
          [group set:"Activity.status" of:BGWhole( a) to:tri_type_named( [_world tri], "\"completed\"")];
+         /* ended: its watches with it */
+         if( record->watchHolder)
+            [group set:"Activity.watchHolder" of:BGWhole( a) to:0];
+         if( record->watchFloor)
+            [group set:"Activity.watchFloor" of:BGWhole( a) to:0];
       }
       [_committer submit:group];
       [_completions addObject:group];
@@ -261,6 +266,8 @@ static int64_t   next_checkpoint( BGWorld *world, BGEntityID a, const BGActivity
    [group set:"Activity.status" of:BGWhole( a) to:tri_type_named( [_world tri], atom)];
    if( record->watchHolder)
       [group set:"Activity.watchHolder" of:BGWhole( a) to:0];
+   if( record->watchFloor)
+      [group set:"Activity.watchFloor" of:BGWhole( a) to:0];
    /* stopped short: what its progress shows stays in the world */
    if( strcmp( status, "completed"))
       [self partialOf:a record:record progress:progress_at( record, [_world time].ms) into:group];
@@ -448,7 +455,15 @@ static int64_t   next_checkpoint( BGWorld *world, BGEntityID a, const BGActivity
          if( done)
             continue;
          effect = BGOperationEffect( _world, [_world textField:"Activity.operation" of:a]);
-         if( ! strcmp( ev->kind, "watched") && ev->subject == a)
+         if( ! strcmp( ev->kind, "watched") && ev->subject == a && record->watchFloor)
+         {
+            /* water rising at its feet: an interruption, its watch removed */
+            group = [self suspend:a because:@"water is rising at its feet" error:NULL];
+            [group set:"Activity.watchFloor" of:BGWhole( a) to:0];
+            [group setCause:ev->index];
+            ended[ nended++ % 64] = a;
+         }
+         else if( ! strcmp( ev->kind, "watched") && ev->subject == a)
          {
             [self end:a status:"completed" because:@"its watch fired" cause:ev->index];
             ended[ nended++ % 64] = a;

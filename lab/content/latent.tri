@@ -168,6 +168,20 @@ replace_part: #Operation & {
     }
 } @family(operations)
 
+// Clean out an open assembly's cylinder, with a wrench in hand, for ten
+// minutes: watching the floor, as water may come (ACTIONS.md Scenario 3).
+clean_out: #Operation & {
+    effect:     "tend"
+    duration:   10min
+    uses:       ["hands"]
+    floodWatch: 500
+    roles: {
+        actor:       #Agent & { id: $a }
+        item:        #Wrench & { place: #Held & { by: $a } }
+        destination: #Latent
+    }
+} @family(operations)
+
 // Open an assembly in reach a level further, with a wrench in hand.
 open_up: #Operation & {
     effect: "reveal"

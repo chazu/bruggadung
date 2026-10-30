@@ -2407,3 +2407,24 @@ recorded, not settled.
   failure on, and a part's loss is 80 points of flow at wear 60.
 
 67 tests, 2346 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: the watch on rising water
+
+ACTIONS.md Scenario 3's step 6 and check 7. An operation may declare a
+`floodWatch`, an amount of water on the actor's tile. Its activity records
+the watch where the actor stands (`watchFloor`, `watchX/Y/Level`). The
+fluid domain reports it like a store's watch, at the boundary the tile
+reaches it. Water reaches a neighbouring tile by spreading, in steps of at
+most 10 s, which is the event tolerance.
+
+Rising water is an interruption: the activity is suspended, "water is
+rising at its feet", and its watch removed. The piston out of a pump with
+a leaky outlet valve, the worker sets to clean out its cylinder
+(`clean_out`, ten minutes, watching for 500 mL). The water at its feet
+crosses 500 mL at 314 s, and the work is suspended at that boundary. With
+the seal at fault nothing comes, and the work runs its ten minutes.
+
+- **Found: a completed activity kept its watches.** They are removed now
+  when it completes, as when it ends otherwise.
+
+67 tests, 2359 checks, under both compilers, ASan and UBSan, and leak-free.

@@ -30,7 +30,15 @@
     watchDioxide:   int & >=0 & <=100000000    @field(content, saved, proposable, inspect)
     watchCool:      int & >=0 & <=400000       @field(content, saved, proposable, inspect)
     watchWarm:      int & >=0 & <=400000       @field(content, saved, proposable, inspect)
+    // a watch on the floor (ACTIONS.md Scenario 3): water on the tile at
+    // (watchX, watchY, watchLevel) reaching watchFloor (mL) interrupts it; 0,
+    // no watch
+    watchFloor:     int & >=0 & <=1000000      @field(content, saved, proposable, inspect)
+    watchX:         int & >=0 & <=1000         @field(content, saved, proposable, inspect)
+    watchY:         int & >=0 & <=1000         @field(content, saved, proposable, inspect)
+    watchLevel:     int & >=0 & <=64           @field(content, saved, proposable, inspect)
 }
 
 activity: #Activity & { amount: 0, stage: 0, progress: 0ms, started: 0ms, due: 0ms, status: "running", watchAtLeast: 0mL,
-                        watchDioxide: 0, watchCool: 0, watchWarm: 0 }
+                        watchDioxide: 0, watchCool: 0, watchWarm: 0, watchFloor: 0, watchX: 0, watchY: 0,
+                        watchLevel: 0 }

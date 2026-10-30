@@ -19,7 +19,8 @@
 // progress at each of its `checkpoints` (evenly spaced; each a step
 // boundary), and when the activity is interrupted: suspended, aborted, or
 // failed. Its effect proper commits on completion, with its `exertion`: the
-// fatigue it adds to the actor (AGENCY.md §6). A hard interruption
+// fatigue it adds to the actor (AGENCY.md §6). With a `floodWatch`, water
+// rising to that many millilitres on the actor's tile interrupts it. A hard interruption
 // (what it binds gone or out of reach, or what it needs no longer holding)
 // suspends it, or fails it, as it declares (`hard`).
 #Partial: { field: text, showsOn: *"destination" | "item", whole: int }
@@ -30,6 +31,7 @@
     checkpoints: *0 | int & >=0 & <=100
     hard:        *"suspend" | "fail"
     exertion:    *0 | int & >=0 & <=100
+    floodWatch:  *0 | int & >=0 & <=1000000
 }
 
 // A stage of an activity: it takes `duration`, and its effect commits when

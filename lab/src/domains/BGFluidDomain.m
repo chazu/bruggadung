@@ -498,14 +498,17 @@ typedef struct
    for( i = 0; i < [store count] && n < BG_FLUID_MAX; i++)
    {
       record = [store recordAtIndex:i];
-      if( ! record->watchHolder || record->status != (uint32_t) running)
+      if( (! record->watchHolder && ! record->watchFloor) || record->status != (uint32_t) running)
          continue;
+      /* a watch on a holder, or on a tile of the floor */
       for( h = 0; h < _nholders; h++)
-         if( _holders[ h].entity == (BGEntityID) record->watchHolder)
+         if( record->watchFloor ? _holders[ h].entity == BGNoEntity && _holders[ h].x == record->watchX &&
+                                  _holders[ h].y == record->watchY && _holders[ h].level == record->watchLevel
+                                : _holders[ h].entity == (BGEntityID) record->watchHolder)
          {
             out[ n].activity = [store entityAtIndex:i];
             out[ n].holder   = h;
-            out[ n].atLeast  = record->watchAtLeast;
+            out[ n].atLeast  = record->watchFloor ? record->watchFloor : record->watchAtLeast;
             n++;
             break;
          }

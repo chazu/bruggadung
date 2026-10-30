@@ -64,7 +64,7 @@ static TriMatch   match_described( BGWorld *world, const TriNode *pattern, BGAct
    TriArena          *arena;
    TriMatch          match;
    static const char *copied[] = { "duration", "stages", "uses", "attention", "leaves", "removes", "partial",
-                                   "checkpoints", "hard", "exertion", NULL };
+                                   "checkpoints", "hard", "exertion", "floodWatch", NULL };
    char              value[ 1024];
    char              effect[ 64];
    char              err[ 256];
@@ -1919,6 +1919,26 @@ BGProposalGroup   *BGPerform( BGWorld *world, BGCommitter *committer, BGAction a
       activity = start_activity( world, action, amount, group);
       [group set:"Activity.started" of:BGWhole( activity) to:[world time].ms];
       [group set:"Activity.due" of:BGWhole( activity) to:[world time].ms + duration];
+      /* a watch on the floor at the actor's feet */
+      {
+         const TriNode   *v;
+         BGLocation      floor;
+         BGEntityID      e;
+         int64_t         lo;
+         int64_t         hi;
+         int             k;
+
+         v = tri_at( [world tri], tri_pattern( [world tri], action.operation), "floodWatch");
+         for( e = action.roles[ BGRoleActor], k = 0; k < 16 && (floor = [world locationOf:e]).form != BGLocationOnTile; k++)
+            e = floor.place;
+         if( v && tri_node_interval( v, &lo, &hi) && lo == hi && lo > 0 && floor.form == BGLocationOnTile)
+         {
+            [group set:"Activity.watchFloor" of:BGWhole( activity) to:lo];
+            [group set:"Activity.watchX" of:BGWhole( activity) to:floor.x];
+            [group set:"Activity.watchY" of:BGWhole( activity) to:floor.y];
+            [group set:"Activity.watchLevel" of:BGWhole( activity) to:floor.level];
+         }
+      }
       if( [effect isEqualToString:@"rest"] && BGAirOver( world, action.roles[ BGRoleActor]))
       {
          const BGRespirator   *breather;
