@@ -5579,7 +5579,9 @@ typedef struct
    BGCommitter   *committer;
    BGKnowledge   *knowledge;
    BGEntityID    valve;
+   BGEntityID    worker;
    BGEntityID    wrench;
+   BGEntityID    pipe;
    NSString      *menu;          /* the worker's, before it acts */
    NSString      *trace;
    BOOL          turned;
@@ -5590,7 +5592,10 @@ typedef struct
 /* ACTIONS.md Scenario 1: the worker beside a valve (`valve`, seized or
  * not), holding what `tools` names ("", "wrench", "wrench pipe", "stone
  * wrench"), turns it; `steady`, if not 0, holds the torque there (Nm). With
- * a stone, it strikes the valve first and then holds the wrench alone. */
+ * a stone, it strikes the valve first and then holds the wrench alone.
+ * "wrench near" and "pipe near" lie on tiles beside it, "pipe sacked" in a
+ * sack on its tile, "pipe theirs" in a bystander's hand, "pipe far" out of
+ * reach; "spare" lays a second wrench beside it. */
 static BGValveRun   valve_run( const char *valve, const char *tools, int64_t steady, uint64_t seed)
 {
    BGStage            st;
@@ -5600,6 +5605,8 @@ static BGValveRun   valve_run( const char *valve, const char *tools, int64_t ste
    BGEntityID         worker;
    BGEntityID         pipe;
    BGEntityID         stone;
+   BGEntityID         sack;
+   BGEntityID         other;
    BGKnowledgeStore   *store;
    BGMenu             *menu;
    NSMutableArray     *entries;
@@ -5625,15 +5632,35 @@ static BGValveRun   valve_run( const char *valve, const char *tools, int64_t ste
    stone      = BGNoEntity;
    if( strstr( tools, "stone"))
       stone = [g create:"stone" key:"stone" at:BGHeldBy( worker, 0)];
+   else if( strstr( tools, "wrench near"))
+      run.wrench = [g create:"wrench_250" key:"wrench" at:BGOnTile( 4, 5, 0)];
    else if( strstr( tools, "wrench"))
       run.wrench = [g create:"wrench_250" key:"wrench" at:BGHeldBy( worker, 0)];
-   if( strstr( tools, "pipe"))
+   if( strstr( tools, "pipe near"))
+      pipe = [g create:"pipe_600" key:"pipe" at:BGOnTile( 4, 6, 0)];
+   else if( strstr( tools, "pipe sacked"))
+   {
+      sack = [g create:"sack" key:"sack" at:BGOnTile( 5, 5, 0)];
+      pipe = [g create:"pipe_600" key:"pipe" at:BGIn( sack)];
+   }
+   else if( strstr( tools, "pipe theirs"))
+   {
+      other = [g create:"worker" key:"bystander" at:BGOnTile( 5, 6, 0)];
+      pipe  = [g create:"pipe_600" key:"pipe" at:BGHeldBy( other, 0)];
+   }
+   else if( strstr( tools, "pipe far"))
+      pipe = [g create:"pipe_600" key:"pipe" at:BGOnTile( 8, 5, 0)];
+   else if( strstr( tools, "pipe"))
       pipe = [g create:"pipe_600" key:"pipe" at:BGHeldBy( worker, 1)];
+   if( strstr( tools, "spare"))
+      [g create:"wrench_250" key:"a spare wrench" at:BGOnTile( 5, 4, 0)];
    [st.c submit:g];
    [st.s runUntil:BGTimeMake( 1)];
    worker     = [g idFor:worker];
    run.valve  = [g idFor:run.valve];
    run.wrench = run.wrench ? [g idFor:run.wrench] : BGNoEntity;
+   run.pipe   = pipe ? [g idFor:pipe] : BGNoEntity;
+   run.worker = worker;
    stone      = stone ? [g idFor:stone] : BGNoEntity;
 
    /* the menu, as the worker knows it */
@@ -5665,7 +5692,6 @@ static BGValveRun   valve_run( const char *valve, const char *tools, int64_t ste
    run.trace     = [[st.c trace] componentsJoinedByString:@"\n"];
    run.turned    = [st.w getField:"Valve.turned" of:run.valve value:&v] && v;
    run.bent      = run.wrench && [st.w getField:"Body.bent" of:run.wrench value:&v] && v;
-   (void) pipe;
    return( run);
 }
 
@@ -5724,6 +5750,32 @@ static void   test_seized_valve( void)
    steady = valve_run( "seized_valve", "wrench pipe", 75, 5);
    BG_CHECK( steady.turned && ! steady.bent);
    BG_CHECK( [steady.trace rangeOfString:@": 75 Nm against 70 Nm: turns"].location != NSNotFound);
+
+   /* the chain is searched in reach (ACTIONS.md §2), not only in hand:
+    * wrench and pipe lying beside it are taken up, into both hands */
+   steady = valve_run( "seized_valve", "wrench near pipe near", 75, 5);
+   BG_CHECK( steady.turned && ! steady.bent);
+   BG_CHECK( [steady.trace rangeOfString:@"takes up one in reach; takes up one in reach"].location != NSNotFound);
+   BG_CHECK( [steady.world locationOf:steady.wrench].form == BGLocationHeldBy &&
+             [steady.world locationOf:steady.wrench].place == steady.worker);
+   BG_CHECK( [steady.world locationOf:steady.pipe].place == steady.worker);
+   /* a pipe in a sack standing on its tile: further to reach, still in reach */
+   steady = valve_run( "seized_valve", "wrench pipe sacked", 75, 5);
+   BG_CHECK( steady.turned);
+   BG_CHECK( [steady.world locationOf:steady.pipe].place == steady.worker);
+   /* not a pipe in another's hand, nor one out of reach: the wrench alone */
+   wrench = valve_run( "seized_valve", "wrench pipe theirs", 0, 73);
+   BG_CHECK( ! wrench.turned && [wrench.trace rangeOfString:@": 50 Nm against 70 Nm: holds"].location != NSNotFound);
+   BG_CHECK( [wrench.world locationOf:wrench.pipe].place != wrench.worker);
+   wrench = valve_run( "seized_valve", "wrench pipe far", 0, 73);
+   BG_CHECK( [wrench.trace rangeOfString:@": 50 Nm against 70 Nm: holds"].location != NSNotFound);
+   /* the same reach: the one held, not a spare beside it */
+   wrench = valve_run( "seized_valve", "wrench spare", 0, 73);
+   BG_CHECK( [wrench.trace rangeOfString:@"takes up"].location == NSNotFound);
+   /* the search is the same on every replay */
+   full  = valve_run( "seized_valve", "wrench near pipe near", 0, 5);
+   again = valve_run( "seized_valve", "wrench near pipe near", 0, 5);
+   BG_CHECK( [full.trace isEqualToString:again.trace]);
 
    /* 5: a blow with the stone loosens the bond, and the wrench alone turns it */
    struck = valve_run( "seized_valve", "stone", 0, 73);

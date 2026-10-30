@@ -2516,3 +2516,29 @@ worker who holds no office can't issue one. The clerk, who can, has no
 authorization of its own to go in.
 
 69 tests, 2393 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: the chain searched in reach
+
+ACTIONS.md §2: "Reach includes the actor's body, what it holds and wears,
+carried containers (with an access cost), adjacent tiles". The seized
+valve's chain search looked only in hand (the "Not yet" of the instrument
+chains above).
+
+- **Searched in reach**: `rotate` searches the levers the actor's view can
+  reach, to the same depth 3, furthest reach first; at the same reach, the
+  cheaper to bring to bear (held 0, on a tile 1, in a container 2), then
+  ID order. Nothing in another's hand, or part of something, is a
+  candidate.
+- **Taken up in the stage's group**: a part not held moves into a free hand,
+  expecting where it was, so if someone takes it first the stage fails. A
+  chain needing more hands than are free isn't one. The torque's detail
+  says "takes up one in reach" for each.
+
+Checked: wrench and pipe beside it, taken up into both hands (75 Nm, it
+turns); a pipe in a sack on its tile; not a bystander's pipe, nor one out
+of reach; a held wrench before a spare beside it; the same on every replay.
+
+Not yet: the access cost as time (it is a preference only), and agency
+choosing instruments.
+
+69 tests, 2411 checks, under both compilers, ASan, and leak-free.

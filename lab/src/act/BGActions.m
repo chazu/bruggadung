@@ -770,15 +770,52 @@ static void   wear( BGWorld *world, BGProposalGroup *g, BGEntityID on, int64_t s
 }
 
 
-/* Turning a valve (ACTIONS.md Scenario 1). The chain is what the actor
- * holds, searched the same way every time to depth 3: the bare hand on the
- * handle (75 mm), a lever, or a lever with a sleeve over its handle; the one
- * that reaches furthest, the lower entity first. Torque is grip times reach,
- * held at the command's amount (Nm) if any. Past the lever's limit there is
- * risk, not refusal: a seeded draw, in proportion to the excess, bends it,
- * giving way before the valve does (the valve feels half its limit). The stage commits the
- * torque applied, with what the turner expected from the valve's rating;
- * the valve decides. Using a lever wears it. */
+/* What it costs the actor to bring a lever in reach to bear (ACTIONS.md
+ * §2): 0 held, 1 on a tile in reach, 2 in a container (one it carries, or
+ * one standing there); -1 if it isn't the actor's to take up: in another's
+ * hand, or part of something. */
+static int   access_cost( BGWorld *world, BGEntityID actor, BGEntityID e)
+{
+   BGLocation   at;
+   int          cost;
+   int          depth;
+
+   cost = 0;
+   for( depth = 0; depth < 8; depth++)
+   {
+      at = [world locationOf:e];
+      switch( at.form)
+      {
+      case BGLocationHeldBy :
+         return( at.place == actor ? cost : -1);
+      case BGLocationOnTile :
+         return( cost ? cost : 1);
+      case BGLocationIn :
+         cost = 2;
+         e    = at.place;
+         continue;
+      default :
+         return( -1);
+      }
+   }
+   return( -1);
+}
+
+
+/* Turning a valve (ACTIONS.md Scenario 1). The chain is searched in what
+ * the actor can reach (§2), the same way every time to depth 3: the bare
+ * hand on the handle (75 mm), a lever, or a lever with a sleeve over its
+ * handle. The one that reaches furthest wins; at the same reach, the one
+ * cheaper to bring to bear (held, then on a tile, then in a container),
+ * then the lower entities. A part not held is taken up into a free hand in
+ * the stage's group, from where it is (if someone else gets it first, the
+ * stage fails); a chain needing more hands than are free isn't one. Torque
+ * is grip times reach, held at the command's amount (Nm) if any. Past the
+ * lever's limit there is risk, not refusal: a seeded draw, in proportion to
+ * the excess, bends it, giving way before the valve does (the valve feels
+ * half its limit). The stage commits the torque applied, with what the
+ * turner expected from the valve's rating; the valve decides. Using a lever
+ * wears it. */
 static NSString   *effect_rotate( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
 {
    const BGAgent   *agent;
@@ -786,55 +823,116 @@ static NSString   *effect_rotate( BGWorld *world, BGAction a, int64_t amount, BG
    const BGLever   *s;
    const BGLever   *inner;
    const BGValve   *valve;
-   BGEntityID      held[ 4];
+   BGEntityID      actor;
+   BGEntityID      held[ 8];
+   BGEntityID      reach[ 256];
+   BGEntityID      cand[ 64];
+   int             cost[ 64];
+   BGEntityID      chain[ 2];
    BGEntityID      lever;
    NSUInteger      n;
+   NSUInteger      nreach;
+   NSUInteger      nc;
    NSUInteger      i;
    NSUInteger      j;
+   NSUInteger      k;
    NSUInteger      lk;
-   int64_t         reach;
+   int32_t         hands;
+   int32_t         hand;
+   int32_t         need;
+   int             c;
+   int             bestCost;
    int64_t         best;
    int64_t         applied;
    int64_t         limit;
    uint64_t        state;
-   char            detail[ 96];
+   BOOL            taken;
+   char            detail[ 160];
 
-   agent = [world record:[world kindNamed:"Agent"] for:a.roles[ BGRoleActor]];
+   actor = a.roles[ BGRoleActor];
+   agent = [world record:[world kindNamed:"Agent"] for:actor];
    valve = [world record:[world kindNamed:"Valve"] for:a.roles[ BGRoleItem]];
    if( ! agent || ! valve)
       return( @"there is nothing to turn");
-   lk    = [world kindNamed:"Lever"];
-   n     = [world entitiesAt:a.roles[ BGRoleActor] form:BGLocationHeldBy into:held max:4];
-   best  = 750;                  /* the bare hand on the handle: 75 mm */
-   lever = BGNoEntity;
-   inner = NULL;
-   for( i = 0; i < n; i++)
+   lk = [world kindNamed:"Lever"];
+
+   /* the levers in reach, in ID order, with what each costs to bring to bear */
+   nreach = [[BGView viewOf:actor inWorld:world] reachable:reach max:256];
+   if( nreach > 256)
+      nreach = 256;
+   nc = 0;
+   for( i = 0; i < nreach && nc < 64; i++)
    {
-      l = [world record:lk for:held[ i]];
-      if( ! l || l->sleeve)
+      if( ! [world record:lk for:reach[ i]] || (c = access_cost( world, actor, reach[ i])) < 0)
          continue;
-      reach = l->leverage;
-      if( reach > best)
+      cand[ nc]   = reach[ i];
+      cost[ nc++] = c;
+   }
+   hands = BGFreeHands( world, actor);
+
+   best     = 750;               /* the bare hand on the handle: 75 mm */
+   bestCost = 0;
+   chain[ 0] = chain[ 1] = BGNoEntity;
+   inner    = NULL;
+   for( i = 0; i < nc; i++)
+   {
+      l = [world record:lk for:cand[ i]];
+      if( l->sleeve)
+         continue;
+      if( (cost[ i] ? 1 : 0) <= hands &&
+          (l->leverage > best || (l->leverage == best && chain[ 0] && cost[ i] < bestCost)))
       {
-         best  = reach;
-         lever = held[ i];
-         inner = l;
+         best      = l->leverage;
+         bestCost  = cost[ i];
+         chain[ 0] = cand[ i];
+         chain[ 1] = BGNoEntity;
+         inner     = l;
       }
-      for( j = 0; j < n; j++)
+      for( j = 0; j < nc; j++)
       {
-         s = [world record:lk for:held[ j]];
-         if( j == i || ! s || ! s->sleeve || s->leverage <= best)
+         s = [world record:lk for:cand[ j]];
+         if( j == i || ! s->sleeve)
             continue;
-         best  = s->leverage;
-         lever = held[ i];
-         inner = l;
+         need = (cost[ i] ? 1 : 0) + (cost[ j] ? 1 : 0);
+         if( need > hands)
+            continue;
+         if( s->leverage > best || (s->leverage == best && cost[ i] + cost[ j] < bestCost))
+         {
+            best      = s->leverage;
+            bestCost  = cost[ i] + cost[ j];
+            chain[ 0] = cand[ i];
+            chain[ 1] = cand[ j];
+            inner     = l;
+         }
       }
    }
+   lever = chain[ 0];
+
    applied = agent->grip * best / 10000;
    if( amount > 0 && amount * 1000 < applied)
       applied = amount * 1000;
    snprintf( detail, sizeof( detail), "expected to %s: rated %lld Nm",
              applied >= valve->rating ? "turn" : "hold", (long long) valve->rating / 1000);
+
+   /* what isn't held is taken up, into the free hands in order */
+   n    = [world entitiesAt:actor form:BGLocationHeldBy into:held max:8];
+   hand = 0;
+   for( k = 0; k < 2; k++)
+   {
+      if( ! chain[ k] || [world locationOf:chain[ k]].form == BGLocationHeldBy)
+         continue;
+      for( ; hand < (int32_t) agent->hands; hand++)
+      {
+         taken = NO;
+         for( i = 0; i < n && i < 8 && ! taken; i++)
+            taken = [world locationOf:held[ i]].slot == hand;
+         if( ! taken)
+            break;
+      }
+      [g move:BGWhole( chain[ k]) to:BGHeldBy( actor, hand++) expecting:[world locationOf:chain[ k]]];
+      strncat( detail, "; takes up one in reach", sizeof( detail) - strlen( detail) - 1);
+   }
+
    if( inner)
    {
       limit = inner->limit;
@@ -854,7 +952,7 @@ static NSString   *effect_rotate( BGWorld *world, BGAction a, int64_t amount, BG
       }
       wear( world, g, lever, 10);
    }
-   [g emit:"torqued" subject:BGWhole( a.roles[ BGRoleItem]) other:BGWhole( a.roles[ BGRoleActor]) amount:applied
+   [g emit:"torqued" subject:BGWhole( a.roles[ BGRoleItem]) other:BGWhole( actor) amount:applied
     detail:[world intern:detail]];
    return( nil);
 }
