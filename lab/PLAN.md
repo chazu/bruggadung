@@ -3039,9 +3039,7 @@ why" above, and):
   consequences, detail fading by salience*: no document says.
 - *Routes as habits, exploring around obstacles*: the lab has no walls.
 
-**Buildable, not yet done**: traces
-left per stage rather than at completion (ACTIONS.md §2, costs "committed
-per stage"), a split reaching a running thermal domain's ledger, and
+**Buildable, not yet done**: a split reaching a running thermal domain's ledger, and
 hearing a promise's outcome from others.
 
 ### After the slice: a commitment every day
@@ -3075,3 +3073,19 @@ Checked: half a second into reading a diagram nothing is read; at the
 second, it is.
 
 83 tests, 2590 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: traces left per stage
+
+ACTIONS.md §2: "Costs are committed per stage as proposals: wear and
+traces on tools". An activity left its traces when it completed.
+
+- **`leaves` and `removes` belong to a step** now (`#Step`, of which an
+  operation is one): a stage of a staged operation leaves its own traces
+  in the group that commits its effect; the operation's, when it
+  completes, as before. Prying a nail out scratches it as it loosens.
+
+Checked: prying a nail from the lock, no scratch two seconds in; at three
+and a half, the loosening done and the pulling under way, the nail bears
+a scratch; at six, the activity has completed, the nail in hand.
+
+84 tests, 2594 checks, under both compilers, ASan, and leak-free.

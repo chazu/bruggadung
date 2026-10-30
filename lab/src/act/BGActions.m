@@ -1956,6 +1956,45 @@ static BOOL   text_of( TriContent *tri, const TriNode *node, const char *path, c
 }
 
 
+void   BGLeaveStageTraces( BGWorld *world, BGAction action, int64_t index, BGProposalGroup *group)
+{
+   const TriNode     *pattern;
+   const TriNode     *stage;
+   const TriNode     *list;
+   const TriNode     *v;
+   NSMutableString   *path;
+   TriContent        *tri;
+   BGEntityID        bearer;
+   BGLocation        tile;
+   int64_t           lo;
+   int64_t           hi;
+   int64_t           k;
+   char              kind[ 64];
+   char              site[ 32];
+
+   tri     = [world tri];
+   pattern = action.operation ? tri_pattern( tri, action.operation) : NULL;
+   if( ! pattern || ! tri_at( tri, pattern, "stages.first"))
+      return;      /* one stage: the operation's own, left when it completes */
+   path = [NSMutableString stringWithString:@"stages"];
+   for( k = 0; k < index; k++)
+      [path appendString:@".rest"];
+   [path appendString:@".first"];
+   stage = tri_at( tri, pattern, [path UTF8String]);
+   for( list = stage ? tri_at( tri, stage, "leaves") : NULL; list && tri_at( tri, list, "first");
+        list = tri_at( tri, list, "rest"))
+   {
+      if( ! text_of( tri, tri_at( tri, list, "first"), "trace", kind, sizeof( kind)) ||
+          ! text_of( tri, tri_at( tri, list, "first"), "on", site, sizeof( site)) ||
+          ! trace_site( world, action, site, &bearer, &tile))
+         continue;
+      v = tri_at( tri, tri_at( tri, list, "first"), "strength");
+      BGMakeTrace( world, group, kind, bearer, tile, v && tri_node_interval( v, &lo, &hi) && lo == hi ? lo : 0,
+                   action.operation);
+   }
+}
+
+
 void   BGLeaveTraces( BGWorld *world, BGAction action, BGProposalGroup *group)
 {
    const TriNode      *pattern;

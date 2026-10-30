@@ -32,6 +32,8 @@
     hard:        *"suspend" | "fail"
     exertion:    *0 | int & >=0 & <=100
     floodWatch:  *0 | int & >=0 & <=1000000
+    leaves:      [...#Leaves]
+    removes:     [...#Removes]
 }
 
 // A stage of an activity: it takes `duration`, and its effect commits when
@@ -52,14 +54,14 @@
 // §10): it raises what the actor must find salient to notice it. `leaves`
 // and `removes` are its traces (KNOWLEDGE.md §3, traces.tri), made and
 // removed with its effect, when it completes: an operation that removes
-// traces leaves some of its own, so a cover-up can be found out.
+// traces leaves some of its own, so a cover-up can be found out. A stage
+// may leave its own, with its own effect (ACTIONS.md §2: costs are
+// committed per stage).
 #Operation: #Step & {
     roles:     #Roles
     stages:    [...#Stage]
     uses:      [...#Provider]
     attention: *0 | int & >=0 & <=100
-    leaves:    [...#Leaves]
-    removes:   [...#Removes]
 }
 
 // Pick something up into a free hand: from a container, the ground, or an
@@ -148,7 +150,8 @@ walk_west:  #Walk @family(operations)
 // free hand. Walking away suspends it; coming back, it can be resumed.
 pry_out: #Operation & {
     effect: "take"
-    stages:    [{ duration: 3s, effect: "loosen" }, { duration: 2s, effect: "take" }]
+    stages:    [{ duration: 3s, effect: "loosen", leaves: [{ trace: "scratch", on: "item", strength: 30 }] },
+                { duration: 2s, effect: "take" }]
     uses:      ["hands"]
     attention: 10
     roles: {

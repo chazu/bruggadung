@@ -730,6 +730,60 @@ static void   test_activity_fails( void)
 
 /* Two stages, walked away from and come back to: progress is kept across a
  * suspension, and resuming runs only what is left. */
+/* ACTIONS.md §2: costs, wear and traces among them, are "committed per
+ * stage". Prying a nail out of the lock: its loosening stage (3 s) leaves a
+ * scratch on the nail with its own effect, two seconds before the pulling
+ * stage completes the activity. */
+static BOOL   bears_kind( BGWorld *w, BGEntityID bearer, const char *kind)
+{
+   BGStore      *traces;
+   NSUInteger   i;
+   const char   *text;
+
+   traces = [w storeForKind:[w kindNamed:"Trace"]];
+   for( i = 0; i < [traces count]; i++)
+   {
+      text = [w textField:"Trace.traceKind" of:[traces entityAtIndex:i]];
+      if( text && ! strcmp( text, kind) &&
+          (BGEntityID) ((const BGTrace *) [traces recordAtIndex:i])->bearer == bearer)
+         return( YES);
+   }
+   return( NO);
+}
+
+
+static void   test_stage_traces( void)
+{
+   BGWorld           *w;
+   BGCommitter       *c;
+   BGScheduler       *s;
+   BGProposalGroup   *g;
+   BGEntityID        lock;
+   BGEntityID        worker;
+   BGEntityID        nail;
+   BGEntityID        a;
+   NSString          *error;
+
+   w      = BGTestWorld( 5);
+   c      = BGTestCommitter( w);
+   s      = [[[BGScheduler alloc] initWithWorld:w committer:c] autorelease];
+   [s setActivities:[BGActivities activitiesWithWorld:w committer:c]];
+   lock   = commit_create( c, "lock", BGOnTile( 2, 0, 0));
+   worker = commit_create( c, "worker", BGOnTile( 1, 0, 0));
+   nail   = commit_create( c, "iron_nail", BGPartOf( lock, "wedge", 0));
+   error  = nil;
+   g      = BGPerform( w, c, BGActionMake( "pry_out", worker, nail, BGNoEntity), 0, &error);
+   BG_CHECK( g != nil);
+   [s runUntil:BGTimeMake( 2000)];
+   a = [g idFor:[g proposals][ 0].handle];
+   BG_CHECK( ! bears_kind( w, nail, "scratch"));
+   [s runUntil:BGTimeMake( 3500)];
+   BG_CHECK( ! strcmp( status_of( w, a), "\"running\"") && bears_kind( w, nail, "scratch"));
+   [s runUntil:BGTimeMake( 6000)];
+   BG_CHECK( ! strcmp( status_of( w, a), "\"completed\"") && [w locationOf:nail].place == worker);
+}
+
+
 static void   test_stages_and_suspension( void)
 {
    BGWorld           *w;
@@ -8284,6 +8338,7 @@ const BGTestCase   BGAllTests[] =
    { "activity_interrupted",          test_activity_interrupted },
    { "activity_fails",                test_activity_fails },
    { "stages_and_suspension",         test_stages_and_suspension },
+   { "stage_traces",                  test_stage_traces },
    { "play",                          test_play },
    { "play_talk",                     test_play_talk },
    { "stale_belief",                  test_stale_belief },

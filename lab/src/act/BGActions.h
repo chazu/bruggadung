@@ -150,6 +150,8 @@ NSString           *BGProvidersBusy( BGWorld *world, BGEntityID actor, const cha
  * created, made now and running out after their kind's `lasts`. Called with
  * its effect, when an instant action is performed or an activity completes. */
 void               BGLeaveTraces( BGWorld *world, BGAction action, BGProposalGroup *group);
+/* The traces stage `index` of a staged operation declares, in its group. */
+void               BGLeaveStageTraces( BGWorld *world, BGAction action, int64_t index, BGProposalGroup *group);
 
 /* The region of air (a GasStore) over the entity's tile, or 0. */
 BGEntityID         BGAirOver( BGWorld *world, BGEntityID e);

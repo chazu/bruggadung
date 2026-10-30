@@ -206,6 +206,8 @@ static int64_t   next_checkpoint( BGWorld *world, BGEntityID a, const BGActivity
          [self end:a status:"failed" because:reason cause:[self startOf:a]];
          continue;
       }
+      /* the stage's own traces, with its effect */
+      BGLeaveStageTraces( _world, action_of( _world, a, record), record->stage, group);
       if( BGOperationStage( _world, operation, record->stage + 1, &duration, &effect))
       {
          /* the next stage starts now */
