@@ -4,7 +4,7 @@
 // bindings between roles. `effect` names the code that builds the proposal
 // group when the action is performed.
 
-#Effect: "take" | "take_some" | "put_in" | "drive" | "open_tap" | "fill" | "walk" | "loosen" | "look" | "say" | "tend" | "analyse" | "write" | "read" | "eat" | "give" | "investigate" | "tighten" | "rotate" | "strike" | "shut" | "dismantle" | "light" | "rest" | "open_door" | "saw" | "pass" | "copy" | "reveal" | "replace" | "cut" | "shape" | "install"
+#Effect: "take" | "take_some" | "put_in" | "drive" | "open_tap" | "fill" | "walk" | "loosen" | "look" | "say" | "tend" | "analyse" | "write" | "read" | "eat" | "give" | "investigate" | "tighten" | "rotate" | "strike" | "shut" | "dismantle" | "light" | "rest" | "open_door" | "saw" | "pass" | "copy" | "reveal" | "replace" | "cut" | "shape" | "install" | "issue"
 
 // Which roles an operation has is its roles' type: a structure's type is the
 // most general one with all its features.

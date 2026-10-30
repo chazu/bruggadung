@@ -59,12 +59,35 @@ forger: #Agent & #Scribe & { material: "flesh", mass: 70kg, hands: 2, coat: "gre
 guard:  #Agent & { material: "flesh", mass: 85kg, hands: 2, coat: "navy" }
 alun:   #Agent & { material: "flesh", mass: 75kg, hands: 2, coat: "green" }
 
+// An office holder (ACTIONS.md §2): the organization it holds an office
+// in, which gives it that office's capabilities, issuing permits among
+// them. Holding the capability to issue is not permission to act.
+#OfficeHolder: {
+    @component(OfficeHolder)
+    office: ref                                @field(saved, proposable, inspect)
+}
+office_clerk: #Agent & #Scribe & #OfficeHolder & { material: "flesh", mass: 65kg, hands: 2, coat: "black" }
+
 harbour_office: #Organization & {}
 content:        #Content & {}
 authorization:  #Authorization & {}
 paper_copy:     #Copy & { material: "paper", mass: 5g }
 ledger:         #Copy & { material: "paper", mass: 2kg }
 stamp:          #Stamp & { material: "wood", mass: 150g }
+
+// Issue a permit (the office's procedure, COMPONENTS.md Scenario 2): an
+// office holder, its office's seal in hand, grants someone in reach entry
+// to a place, which the command's words describe (it needn't be in reach).
+// It makes the permit's content, claiming the office as issuer; the
+// office's authorization, linked to it; and a copy, sealed, in the
+// grantee's hand.
+issue_permit: #Operation & {
+    effect: "issue"
+    roles: {
+        actor: #OfficeHolder & #Scribe & #Agent
+        item:  #Agent
+    }
+} @family(operations)
 
 // Copy a text held in one hand, pressing what the other holds: the copier's
 // hand, the seal's impression. Copied as it is, the copy references the same

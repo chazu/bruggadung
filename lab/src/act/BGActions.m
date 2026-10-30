@@ -1133,6 +1133,90 @@ static NSString   *effect_cut( BGWorld *world, BGAction a, int64_t amount, BGPro
 }
 
 
+/* Issuing a permit (ACTIONS.md §2, an office holder's capability): the
+ * place from the command's description; the content, the office's
+ * authorization linked to it, and a sealed copy in the grantee's hand. */
+static NSString   *effect_issue( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
+{
+   const BGOfficeHolder   *holder;
+   const TriNode          *place;
+   TriArena               *arena;
+   BGStore                *store;
+   BGLocation             at;
+   BGEntityID             office;
+   BGEntityID             where;
+   BGEntityID             content;
+   BGEntityID             auth;
+   BGEntityID             copy;
+   NSUInteger             i;
+   int64_t                x;
+   int64_t                y;
+   int64_t                level;
+   int64_t                lo;
+   int64_t                hi;
+   int32_t                hand;
+   const char             *issuer;
+   const char             *presses;
+   char                   text[ 256];
+
+   holder = [world record:[world kindNamed:"OfficeHolder"] for:a.roles[ BGRoleActor]];
+   office = holder ? (BGEntityID) holder->office : BGNoEntity;
+   if( ! office || ! [world record:[world kindNamed:"Organization"] for:office])
+      return( @"it holds no office that issues permits");
+   if( ! a.content || ! *a.content)
+      return( @"a permit for where?");
+   arena = tri_arena_new();
+   place = tri_value( [world tri], a.content, arena, NULL, 0);
+   where = BGNoEntity;
+   if( place && tri_node_interval( tri_at( [world tri], place, "place.x"), &x, &hi) &&
+       tri_node_interval( tri_at( [world tri], place, "place.y"), &y, &hi) &&
+       tri_node_interval( tri_at( [world tri], place, "place.level"), &level, &hi))
+   {
+      store = [world storeForKind:[world kindNamed:"Container"]];
+      for( i = 0; i < [store count] && ! where; i++)
+      {
+         at = [world locationOf:[store entityAtIndex:i]];
+         if( at.form == BGLocationOnTile && at.x == x && at.y == y && at.level == level)
+            where = [store entityAtIndex:i];
+      }
+   }
+   tri_arena_free( arena);
+   (void) lo;
+   if( ! where)
+      return( @"there is no such place");
+   if( (hand = BGFreeHand( world, a.roles[ BGRoleItem])) < 0)
+      return( @"they have no hand free to take it");
+   issuer  = [world textField:"Organization.orgName" of:office];
+   presses = "";
+   store   = [world storeForKind:[world kindNamed:"Stamp"]];
+   for( i = 0; i < [store count]; i++)
+   {
+      at = [world locationOf:[store entityAtIndex:i]];
+      if( at.form == BGLocationHeldBy && at.place == a.roles[ BGRoleActor])
+         presses = [world textField:"Stamp.presses" of:[store entityAtIndex:i]];
+   }
+   snprintf( text, sizeof( text), "the bearer may enter the place at (%lld, %lld)", (long long) x, (long long) y);
+   content = [g create:"content" key:"an issued permit" at:BGLocationMakeNone()];
+   [g set:"Information.text" of:BGWhole( content) toText:[world intern:text]];
+   [g set:"Information.issuer" of:BGWhole( content) toText:issuer ? issuer : ""];
+   auth = [g create:"authorization" key:"an issued authorization" at:BGLocationMakeNone()];
+   [g set:"Authorization.grants" of:BGWhole( auth) toText:"enter"];
+   [g set:"Authorization.over" of:BGWhole( auth) to:(int64_t) where];
+   [g set:"Authorization.grantee" of:BGWhole( auth) to:(int64_t) a.roles[ BGRoleItem]];
+   [g relate:BGEdgeAuthorizes from:BGWhole( auth) to:BGWhole( content)];
+   copy = [g create:"paper_copy" key:"the issued copy" at:BGHeldBy( a.roles[ BGRoleItem], hand)];
+   [g set:"Inscription.inscribed" of:BGWhole( copy) to:(int64_t) content];
+   [g set:"Inscription.reads" of:BGWhole( copy) toText:[world intern:text]];
+   [g set:"Inscription.claims" of:BGWhole( copy) toText:issuer ? issuer : ""];
+   [g set:"Inscription.penned" of:BGWhole( copy)
+   toText:[world textField:"Scribe.handwriting" of:a.roles[ BGRoleActor]]
+          ? [world textField:"Scribe.handwriting" of:a.roles[ BGRoleActor]] : "an unknown hand"];
+   [g set:"Inscription.impression" of:BGWhole( copy) toText:presses ? presses : ""];
+   [g emit:"issued" subject:BGWhole( a.roles[ BGRoleActor]) other:BGWhole( a.roles[ BGRoleItem])];
+   return( nil);
+}
+
+
 /* Shaping a strip into a seal: it fits a seal's role. */
 static NSString   *effect_shape( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
 {
@@ -1444,6 +1528,7 @@ static const struct
    { "cut",       effect_cut },
    { "shape",     effect_shape },
    { "install",   effect_install },
+   { "issue",     effect_issue },
    { "rest",      effect_rest },
    { "strike",    effect_strike },
 };

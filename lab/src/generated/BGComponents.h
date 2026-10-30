@@ -1,4 +1,4 @@
-/* Generated from Triangle content 0eb1b4bb61fa810a: do not edit. Type IDs are valid
+/* Generated from Triangle content 7d3fb486dfba02be: do not edit. Type IDs are valid
  * only for this content; regenerate when it changes. */
 #ifndef BG_COMPONENTS_H
 #define BG_COMPONENTS_H
@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BG_CONTENT_HASH 0x0eb1b4bb61fa810aULL
+#define BG_CONTENT_HASH 0x7d3fb486dfba02beULL
 
 typedef struct TriNode TriNode;
 
@@ -43,6 +43,11 @@ typedef struct {
     int64_t         limit;    /* torque, in quanta of 0.001Nm; content, saved, proposable, inspect */
     bool            sleeve;    /* bool; content, saved, inspect, perceive(sight) */
 } BGLever;
+
+/* OfficeHolder, from #OfficeHolder */
+typedef struct {
+    uint64_t        office;    /* a referent; saved, proposable, inspect */
+} BGOfficeHolder;
 
 /* Respirator, from #Respirator */
 typedef struct {
@@ -290,28 +295,28 @@ enum {
 
 /* #Material */
 enum {
-    BG_MATERIAL_CLOTH = 369,
-    BG_MATERIAL_FOOD = 370,
-    BG_MATERIAL_LEATHER = 371,
-    BG_MATERIAL_RUBBER = 372,
-    BG_MATERIAL_STONE = 373,
-    BG_MATERIAL_FLESH = 399,
-    BG_MATERIAL_BRASS = 401,
-    BG_MATERIAL_IRON = 402,
-    BG_MATERIAL_PAPER = 403,
-    BG_MATERIAL_STEEL = 404,
-    BG_MATERIAL_OAK = 406,
+    BG_MATERIAL_CLOTH = 370,
+    BG_MATERIAL_FOOD = 371,
+    BG_MATERIAL_LEATHER = 372,
+    BG_MATERIAL_RUBBER = 373,
+    BG_MATERIAL_STONE = 374,
+    BG_MATERIAL_FLESH = 400,
+    BG_MATERIAL_BRASS = 402,
+    BG_MATERIAL_IRON = 403,
+    BG_MATERIAL_PAPER = 404,
+    BG_MATERIAL_STEEL = 405,
+    BG_MATERIAL_OAK = 407,
 };
 
 /* "flesh" | "metal" | "natural" | "paper" | "wood" */
 enum {
     BG_BODY_SURFACE_NATURAL = 250,
-    BG_BODY_SURFACE_FLESH = 399,
-    BG_BODY_SURFACE_BRASS = 401,
-    BG_BODY_SURFACE_IRON = 402,
-    BG_BODY_SURFACE_PAPER = 403,
-    BG_BODY_SURFACE_STEEL = 404,
-    BG_BODY_SURFACE_OAK = 406,
+    BG_BODY_SURFACE_FLESH = 400,
+    BG_BODY_SURFACE_BRASS = 402,
+    BG_BODY_SURFACE_IRON = 403,
+    BG_BODY_SURFACE_PAPER = 404,
+    BG_BODY_SURFACE_STEEL = 405,
+    BG_BODY_SURFACE_OAK = 407,
 };
 
 /* #Colour */
@@ -324,8 +329,8 @@ enum {
     BG_COLOUR_NAVY = 329,
     BG_COLOUR_RED = 330,
     BG_COLOUR_YELLOW = 331,
-    BG_COLOUR_BEIGE = 344,
-    BG_COLOUR_WHITE = 366,
+    BG_COLOUR_BEIGE = 345,
+    BG_COLOUR_WHITE = 367,
 };
 
 /* The field registry: what code needs to read and write any component
@@ -351,7 +356,7 @@ typedef struct {
     const BGFieldInfo *fields;
 } BGComponentInfo;
 
-#define BG_COMPONENT_COUNT 33
+#define BG_COMPONENT_COUNT 34
 
 #ifdef BG_COMPONENT_REGISTRY
 
@@ -383,6 +388,10 @@ static const BGFieldInfo BGLever_fields[] = {
     { "leverage", offsetof(BGLever, leverage), BG_VALUE_QUANTITY, "length", "content, saved, inspect, perceive(sight)" },
     { "limit", offsetof(BGLever, limit), BG_VALUE_QUANTITY, "torque", "content, saved, proposable, inspect" },
     { "sleeve", offsetof(BGLever, sleeve), BG_VALUE_BOOL, "bool", "content, saved, inspect, perceive(sight)" },
+};
+
+static const BGFieldInfo BGOfficeHolder_fields[] = {
+    { "office", offsetof(BGOfficeHolder, office), BG_VALUE_REF, "ref", "saved, proposable, inspect" },
 };
 
 static const BGFieldInfo BGRespirator_fields[] = {
@@ -588,6 +597,7 @@ static const BGComponentInfo BGComponents[BG_COMPONENT_COUNT + 1] = {
     { "FuelContainer", "#FuelContainer", sizeof(BGFuelContainer), 1, BGFuelContainer_fields },
     { "GasStore", "#GasStore", sizeof(BGGasStore), 11, BGGasStore_fields },
     { "Lever", "#Lever", sizeof(BGLever), 3, BGLever_fields },
+    { "OfficeHolder", "#OfficeHolder", sizeof(BGOfficeHolder), 1, BGOfficeHolder_fields },
     { "Respirator", "#Respirator", sizeof(BGRespirator), 4, BGRespirator_fields },
     { "Scribe", "#Scribe", sizeof(BGScribe), 1, BGScribe_fields },
     { "Sized", "#Sized", sizeof(BGSized), 1, BGSized_fields },

@@ -68,7 +68,7 @@ static void   test_registry_and_construction( void)
 
    w = BGTestWorld( 1);
    c = BGTestCommitter( w);
-   BG_CHECK( [w kindCount] == 33);
+   BG_CHECK( [w kindCount] == 34);
    BG_CHECK( [w kindNamed:"Body"] != NSNotFound && [w kindNamed:"Nonesuch"] == NSNotFound);
    bin   = commit_create( c, "bin", BGOnTile( 0, 0, 0));
    nails = commit_create( c, "nails_30", BGIn( bin));
@@ -4123,6 +4123,80 @@ static void   test_latent_pump( void)
 }
 
 
+/* ACTIONS.md §2: an office holder's capability, issuing a permit. The
+ * harbour office's clerk, its seal in hand, issues Alun a permit for the
+ * warehouse, across the town: the permit's content claims the office, the
+ * office's authorization is linked to it, and a sealed copy is in Alun's
+ * hand. A worker who holds no office can't; and the clerk, who can issue,
+ * isn't itself permitted. */
+static void   test_issue_permit( void)
+{
+   BGStage            st;
+   BGProposalGroup    *g;
+   BGEntityID         office;
+   BGEntityID         clerk;
+   BGEntityID         worker;
+   BGEntityID         alun;
+   BGEntityID         seal;
+   BGEntityID         warehouse;
+   BGEntityID         copy;
+   BGEntityID         content;
+   BGEntityID         held[ 2];
+   NSArray            *auth;
+   NSString           *error;
+   BGAction           issue;
+   int64_t            v;
+
+   st.w      = BGTestWorld( 191);
+   st.c      = BGTestCommitter( st.w);
+   st.s      = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   g         = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the harbour office"];
+   office    = [g create:"harbour_office" key:"the harbour office" at:BGLocationMakeNone()];
+   [g set:"Organization.orgName" of:BGWhole( office) toText:"the harbour office"];
+   warehouse = [g create:"storeroom" key:"the warehouse" at:BGOnTile( 20, 4, 0)];
+   clerk     = [g create:"office_clerk" key:"the clerk" at:BGOnTile( 10, 10, 0)];
+   [g set:"OfficeHolder.office" of:BGWhole( clerk) to:(int64_t) office];
+   [g set:"Scribe.handwriting" of:BGWhole( clerk) toText:"a clerk's round hand"];
+   seal      = [g create:"stamp" key:"the office seal" at:BGHeldBy( clerk, 0)];
+   [g set:"Stamp.presses" of:BGWhole( seal) toText:"the harbour anchor"];
+   [g set:"Stamp.sealOf" of:BGWhole( seal) toText:"the harbour office"];
+   alun      = [g create:"alun" key:"Alun" at:BGOnTile( 11, 10, 0)];
+   worker    = [g create:"worker" key:"a worker" at:BGOnTile( 10, 11, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   office    = [g idFor:office];
+   warehouse = [g idFor:warehouse];
+   clerk     = [g idFor:clerk];
+   alun      = [g idFor:alun];
+   worker    = [g idFor:worker];
+
+   /* a worker holds no office: it can't issue one */
+   error         = nil;
+   issue         = BGActionMake( "issue_permit", worker, alun, BGNoEntity);
+   issue.content = [st.w intern:"#Container & { place: #OnTile & { x: 20, y: 4, level: 0 } }"];
+   BG_CHECK( BGPerform( st.w, st.c, issue, 0, &error) == nil);
+
+   issue.roles[ BGRoleActor] = clerk;
+   BG_CHECK( BGPerform( st.w, st.c, issue, 0, &error) != nil);
+   [st.s runUntil:BGTimeMake( 2)];
+
+   /* the authorization: the office's, over the warehouse, to Alun */
+   auth = BGAuthorize( st.w, BGActionMake( "look_in", alun, warehouse, BGNoEntity));
+   BG_CHECK( [auth count] == 1);
+   /* the clerk can issue; that is no permission of its own */
+   BG_CHECK( [BGAuthorize( st.w, BGActionMake( "look_in", clerk, warehouse, BGNoEntity)) count] == 0);
+   /* a sealed copy in Alun's hand, its content claiming the office, and stating the authorization */
+   BG_CHECK( [st.w entitiesAt:alun form:BGLocationHeldBy into:held max:2] == 1);
+   copy = held[ 0];
+   BG_CHECK( [st.w getField:"Inscription.inscribed" of:copy value:&v]);
+   content = (BGEntityID) v;
+   BG_CHECK( ! strcmp( [st.w textField:"Inscription.impression" of:copy], "the harbour anchor"));
+   BG_CHECK( ! strcmp( [st.w textField:"Information.issuer" of:content], "the harbour office"));
+   BG_CHECK( BGContentAuthorizes( st.w, content));
+   BG_CHECK( [st.w locationOf:content].form == BGLocationNone);
+}
+
+
 /* --- the false alarm -------------------------------------------------------- */
 
 typedef enum
@@ -7131,6 +7205,7 @@ const BGTestCase   BGAllTests[] =
    { "pain",                          test_pain },
    { "habitual_belief",               test_habitual_belief },
    { "forged_permit",                 test_forged_permit },
+   { "issue_permit",                  test_issue_permit },
    { "latent_pump",                   test_latent_pump },
    { "pump_heat",                     test_pump_heat },
    { "component_pump",                test_component_pump },

@@ -2011,8 +2011,8 @@ The remaining scenario checks that aren't run, after the passes above:
     document will specify materialization …" The lab's are provisional
     (below), and so are the scenarios built on them.
   - institutions' own semantics: whether an institution permits or forbids,
-    sanctions, grievances, office holders' capabilities, reservations
-    treated as claims. ARCHITECTURE.md: "Institutions (§6) … To be
+    sanctions, grievances, reservations treated as claims, and offices'
+    other capabilities. ARCHITECTURE.md: "Institutions (§6) … To be
     specified". (What COMPONENTS.md Scenario 2 and ACTIONS.md §3 fix runs;
     see below.)
   - how considerations combine (AGENCY.md's open question 1: product,
@@ -2494,3 +2494,25 @@ Only 10 in 1000 entail tightening it, so the worker looks closer first.
 Seen plainly, the nut is 19 mm, and it tightens it.
 
 68 tests, 2383 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: an office holder issues a permit
+
+ACTIONS.md §2: "Office holders provide institutional capabilities, such as
+issuing a permit … matched in the same way. Holding the capability to
+issue is different from permission to act." An `#OfficeHolder` names the
+organization it holds an office in. `issue_permit` is an operation like
+any other, its actor an office holder. The harbour office's clerk, its
+seal in hand, issues Alun a permit for the warehouse across the town, the
+place given in the command's words. The issue makes:
+
+- the permit's content, claiming the office as its issuer, with no
+  location;
+- the office's authorization over the warehouse, to Alun, linked to the
+  content;
+- a sealed copy, in the clerk's hand, in Alun's.
+
+`authorize` then finds Alun's going into the warehouse authorized. A
+worker who holds no office can't issue one. The clerk, who can, has no
+authorization of its own to go in.
+
+69 tests, 2393 checks, under both compilers, ASan and UBSan, and leak-free.
