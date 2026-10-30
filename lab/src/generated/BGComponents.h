@@ -1,4 +1,4 @@
-/* Generated from Triangle content 15e78bc8998edd9e: do not edit. Type IDs are valid
+/* Generated from Triangle content 7ead8ec279986b8c: do not edit. Type IDs are valid
  * only for this content; regenerate when it changes. */
 #ifndef BG_COMPONENTS_H
 #define BG_COMPONENTS_H
@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BG_CONTENT_HASH 0x15e78bc8998edd9eULL
+#define BG_CONTENT_HASH 0x7ead8ec279986b8cULL
 
 typedef struct TriNode TriNode;
 
@@ -97,6 +97,7 @@ typedef struct {
     int64_t         watchWarm;    /* int, in quanta of 1; content, saved, proposable, inspect */
     int64_t         watchX;    /* int, in quanta of 1; content, saved, proposable, inspect */
     int64_t         watchY;    /* int, in quanta of 1; content, saved, proposable, inspect */
+    const char *    words;    /* text; saved, proposable, inspect */
 } BGActivity;
 
 /* Authorization, from #Authorization */
@@ -305,23 +306,23 @@ enum {
     BG_MATERIAL_LEATHER = 379,
     BG_MATERIAL_RUBBER = 380,
     BG_MATERIAL_STONE = 381,
-    BG_MATERIAL_FLESH = 407,
-    BG_MATERIAL_BRASS = 409,
-    BG_MATERIAL_IRON = 410,
-    BG_MATERIAL_PAPER = 411,
-    BG_MATERIAL_STEEL = 412,
-    BG_MATERIAL_OAK = 414,
+    BG_MATERIAL_FLESH = 408,
+    BG_MATERIAL_BRASS = 410,
+    BG_MATERIAL_IRON = 411,
+    BG_MATERIAL_PAPER = 412,
+    BG_MATERIAL_STEEL = 413,
+    BG_MATERIAL_OAK = 415,
 };
 
 /* "flesh" | "metal" | "natural" | "paper" | "wood" */
 enum {
     BG_BODY_SURFACE_NATURAL = 255,
-    BG_BODY_SURFACE_FLESH = 407,
-    BG_BODY_SURFACE_BRASS = 409,
-    BG_BODY_SURFACE_IRON = 410,
-    BG_BODY_SURFACE_PAPER = 411,
-    BG_BODY_SURFACE_STEEL = 412,
-    BG_BODY_SURFACE_OAK = 414,
+    BG_BODY_SURFACE_FLESH = 408,
+    BG_BODY_SURFACE_BRASS = 410,
+    BG_BODY_SURFACE_IRON = 411,
+    BG_BODY_SURFACE_PAPER = 412,
+    BG_BODY_SURFACE_STEEL = 413,
+    BG_BODY_SURFACE_OAK = 415,
 };
 
 /* #Colour */
@@ -442,6 +443,7 @@ static const BGFieldInfo BGActivity_fields[] = {
     { "watchWarm", offsetof(BGActivity, watchWarm), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "watchX", offsetof(BGActivity, watchX), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "watchY", offsetof(BGActivity, watchY), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
+    { "words", offsetof(BGActivity, words), BG_VALUE_TEXT, "text", "saved, proposable, inspect" },
 };
 
 static const BGFieldInfo BGAuthorization_fields[] = {
@@ -611,7 +613,7 @@ static const BGComponentInfo BGComponents[BG_COMPONENT_COUNT + 1] = {
     { "Scribe", "#Scribe", sizeof(BGScribe), 1, BGScribe_fields },
     { "Sized", "#Sized", sizeof(BGSized), 1, BGSized_fields },
     { "ThermalBody", "#ThermalBody", sizeof(BGThermalBody), 5, BGThermalBody_fields },
-    { "Activity", "#Activity", sizeof(BGActivity), 19, BGActivity_fields },
+    { "Activity", "#Activity", sizeof(BGActivity), 20, BGActivity_fields },
     { "Authorization", "#Authorization", sizeof(BGAuthorization), 3, BGAuthorization_fields },
     { "Claim", "#Claim", sizeof(BGClaim), 2, BGClaim_fields },
     { "Information", "#Content", sizeof(BGInformation), 2, BGInformation_fields },

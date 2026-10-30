@@ -42,7 +42,7 @@
 // provider allocation): an actor runs two activities at once only if they
 // use different providers. Walking while driving a nail is two activities;
 // two walks are not.
-#Provider: "hands" | "legs"
+#Provider: "hands" | "legs" | "voice"
 
 // An operation with stages, or with a duration (one stage), is a timed
 // activity, which can be suspended and resumed, keeping its progress. One

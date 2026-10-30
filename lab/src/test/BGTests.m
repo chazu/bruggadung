@@ -1877,7 +1877,8 @@ static void   stage_say( BGStage *st, BGEntityID speaker, BGEntityID hearer, NSS
    action         = BGActionMake( "say", speaker, hearer, BGNoEntity);
    action.content = [st->w intern:[content UTF8String]];
    BG_CHECK( BGPerform( st->w, st->c, action, 0, &error) != nil);
-   [st->s runUntil:BGTimeMake( [st->w time].ms + 1000)];
+   /* a second to say it, and time for a second's answer */
+   [st->s runUntil:BGTimeMake( [st->w time].ms + 3000)];
 }
 
 
@@ -5493,6 +5494,66 @@ static BGAgency   *urgent_nut( void)
 }
 
 
+/* Talking takes time (ACTIONS.md §5, AGENCY.md §11: conversations are
+ * communicate activities): a remark is a second on the voice, the words
+ * said when it ends. Walking while talking works; a second remark at once
+ * doesn't, its voice taken; once said, it can speak again. */
+static void   test_talking_takes_time( void)
+{
+   BGStage            st;
+   BGProposalGroup    *g;
+   BGEntityID         worker;
+   BGEntityID         smith;
+   BGAction           say;
+   NSString           *error;
+   NSUInteger         i;
+   NSUInteger         said;
+   int64_t            when;
+
+   st.w   = BGTestWorld( 173);
+   st.c   = BGTestCommitter( st.w);
+   st.s   = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [st.s setActivities:[BGActivities activitiesWithWorld:st.w committer:st.c]];
+   g      = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: two in the yard"];
+   worker = [g create:"worker" key:"worker" at:BGOnTile( 5, 5, 0)];
+   smith  = [g create:"smith" key:"smith" at:BGOnTile( 6, 5, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   worker = [g idFor:worker];
+   smith  = [g idFor:smith];
+
+   error       = nil;
+   say         = BGActionMake( "say", worker, smith, BGNoEntity);
+   say.content = [st.w intern:"#Here & {}"];
+   BG_CHECK( BGPerform( st.w, st.c, say, 0, &error) != nil);
+   when = [st.w time].ms;
+   BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "walk_south", worker, BGNoEntity, BGNoEntity), 0, &error) != nil);
+   BG_CHECK( BGPerform( st.w, st.c, say, 0, &error) == nil);
+   BG_CHECK( [error isEqualToString:@"its voice is taken by say, starting"]);
+
+   /* not said yet half a second in; said, with its words, at the second */
+   [st.s runUntil:BGTimeMake( when + 500)];
+   said = 0;
+   for( i = 0; i < [st.w eventCount]; i++)
+      if( ! strcmp( [st.w eventAt:i]->kind, "said"))
+         said++;
+   BG_CHECK( said == 0);
+   [st.s runUntil:BGTimeMake( when + 1001)];
+   for( i = 0; i < [st.w eventCount]; i++)
+      if( ! strcmp( [st.w eventAt:i]->kind, "said"))
+      {
+         said++;
+         BG_CHECK( ! strcmp( [st.w eventAt:i]->detail, "#Here & {}") && [st.w eventAt:i]->actor == worker &&
+                   [st.w eventAt:i]->other == smith);
+      }
+   BG_CHECK( said == 1);
+   /* and it walked meanwhile */
+   BG_CHECK( [st.w locationOf:worker].y == 6);
+   error = nil;
+   BG_CHECK( BGPerform( st.w, st.c, say, 0, &error) != nil);
+}
+
+
 /* AGENCY.md §14, autopilot "continue my routine": the player hands Oskar,
  * beside the nut with a spanner, to agency from the start, past a
  * threshold of 10; his shift has him tighten the nut between 60 s and
@@ -6251,22 +6312,23 @@ static BGRepairRun   repair_run( BOOL omniscient, BOOL shout)
    }
 
    /* stage 3 is 60% done: called away, it puts the work down; the smith takes the wrench */
-   [st.s runUntil:BGTimeMake( start + 3000 + 3000 + 3000)];
    if( shout)
    {
-      /* the smith shouts its name: agency decides */
+      /* the smith shouts its name, a second's shout ending then: agency decides */
       BGAction   call;
 
+      [st.s runUntil:BGTimeMake( start + 3000 + 3000 + 2000)];
       call         = BGActionMake( "say", smith, run.worker, BGNoEntity);
       call.content = [st.w intern:"#Call & { what: #Agent & { coat: \"blue\" } }"];
       BG_CHECK( BGPerform( st.w, st.c, call, 0, &error) != nil);
-      [st.s runUntil:BGTimeMake( [st.w time].ms + 2)];
+      [st.s runUntil:BGTimeMake( [st.w time].ms + 1000 + 2)];
       [st.w getField:"Activity.progress" of:a value:&run.progress];
       [st.s runUntil:BGTimeMake( [st.w time].ms + 10000)];
       run.world  = st.w;
       run.agency = agency;
       return( run);
    }
+   [st.s runUntil:BGTimeMake( start + 3000 + 3000 + 3000)];
    BG_CHECK( [activities suspend:a because:@"someone shouts its name" error:&error] != nil);
    g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the smith takes the wrench"];
    [g move:BGWhole( wrench) to:BGHeldBy( smith, 0)];
@@ -6362,7 +6424,7 @@ static void   test_interrupted_repair( void)
    BG_CHECK( logged_by( shout.agency, shout.worker, @": worth +15: putting dismantle down"));
    BG_CHECK( logged_by( shout.agency, shout.worker, @"answering: say R"));
    BG_CHECK( logged_by( shout.agency, shout.worker, @"follow the recipe: resuming dismantle"));
-   BG_CHECK( shout.progress == 3001);            /* put down a millisecond after the shout */
+   BG_CHECK( shout.progress == 3000);            /* put down as the shout is heard, 60% of the way */
    BG_CHECK( [shout.world getField:"Pump.opened" of:shout.pump value:&v] && v);
 }
 
@@ -7125,6 +7187,7 @@ static void   attention_scene( NSUInteger takes)
    knowledge = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
    st.s      = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
    [st.s setPerception:knowledge];
+   [st.s setActivities:[BGActivities activitiesWithWorld:st.w committer:st.c]];
    g    = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: a yard"];
    /* two rows of six, in sight of her; the last beside her */
    mira = [g create:"mira" key:"mira" at:BGOnTile( 8, 8, 0)];
@@ -7147,14 +7210,16 @@ static void   attention_scene( NSUInteger takes)
       workers[ i] = [g idFor:workers[ i]];
       stones[ i]  = [g idFor:stones[ i]];
    }
-   [st.s runUntil:BGTimeMake( 1000)];
-
-   error = nil;
-   for( i = 12 - takes; i < 12; i++)
-      BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "take", workers[ i], stones[ i], BGNoEntity), 0, &error) != nil);
+   /* the last worker starts speaking to her, a second's remark */
+   error       = nil;
    say         = BGActionMake( "say", workers[ 11], mira, BGNoEntity);
    say.content = [st.w intern:"#Here & { what: #Agent }"];
    BG_CHECK( BGPerform( st.w, st.c, say, 0, &error) != nil);
+   [st.s runUntil:BGTimeMake( 1000)];
+
+   /* and as it ends, they all take up their stones */
+   for( i = 12 - takes; i < 12; i++)
+      BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "take", workers[ i], stones[ i], BGNoEntity), 0, &error) != nil);
    /* and a clatter on the floor among them */
    g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: something falls"];
    BGMakeTrace( st.w, g, "clatter", BGNoEntity, BGOnTile( 8, 9, 0), 60, "a falling tin");
@@ -7911,6 +7976,7 @@ const BGTestCase   BGAllTests[] =
    { "traced_units",                  test_traced_units },
    { "attention_budget",              test_attention_budget },
    { "routine_autopilot",             test_routine_autopilot },
+   { "talking_takes_time",            test_talking_takes_time },
    { "resume_recheck",                test_resume_recheck },
    { "interrupted_repair",            test_interrupted_repair },
    { "unattended_stove",              test_unattended_stove },

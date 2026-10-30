@@ -37,8 +37,15 @@ static BOOL   running( BGWorld *world, BGEntityID a, const BGActivity *record)
 
 static BGAction   action_of( BGWorld *world, BGEntityID a, const BGActivity *record)
 {
-   return( BGActionMake( [world textField:"Activity.operation" of:a], (BGEntityID) record->actorRef,
-                         (BGEntityID) record->itemRef, (BGEntityID) record->destinationRef));
+   BGAction     action;
+   const char   *words;
+
+   action = BGActionMake( [world textField:"Activity.operation" of:a], (BGEntityID) record->actorRef,
+                          (BGEntityID) record->itemRef, (BGEntityID) record->destinationRef);
+   words  = [world textField:"Activity.words" of:a];
+   if( words && *words)
+      action.content = words;
+   return( action);
 }
 
 

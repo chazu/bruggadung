@@ -2075,6 +2075,8 @@ static BGEntityID   start_activity( BGWorld *world, BGAction action, int64_t amo
    [g set:"Activity.itemRef" of:BGWhole( a) to:(int64_t) action.roles[ BGRoleItem]];
    [g set:"Activity.destinationRef" of:BGWhole( a) to:(int64_t) action.roles[ BGRoleDestination]];
    [g set:"Activity.amount" of:BGWhole( a) to:amount];
+   if( action.content && *action.content)
+      [g set:"Activity.words" of:BGWhole( a) toText:action.content];
    return( a);
 }
 
@@ -2130,7 +2132,8 @@ NSString   *BGProvidersBusy( BGWorld *world, BGEntityID actor, const char *opera
       for( j = 0; j < nwanted; j++)
          for( k = 0; k < nused; k++)
             if( ! strcmp( wanted[ j], used[ k]))
-               return( [NSString stringWithFormat:@"its %s are busy with activity %llu (%s)", wanted[ j],
+               return( [NSString stringWithFormat:@"its %s %s busy with activity %llu (%s)", wanted[ j],
+                                                  strcmp( wanted[ j], "voice") ? "are" : "is",
                                                   (unsigned long long) [store entityAtIndex:i], other]);
    }
    return( nil);
@@ -2173,7 +2176,8 @@ static NSString   *providers_pending( BGWorld *world, BGCommitter *committer, BG
          for( j = 0; j < nwanted; j++)
             for( k = 0; k < nused; k++)
                if( ! strcmp( wanted[ j], used[ k]))
-                  return( [NSString stringWithFormat:@"its %s are taken by %s, starting", wanted[ j], p->key]);
+                  return( [NSString stringWithFormat:@"its %s %s taken by %s, starting", wanted[ j],
+                                                     strcmp( wanted[ j], "voice") ? "are" : "is", p->key]);
       }
    }
    return( nil);

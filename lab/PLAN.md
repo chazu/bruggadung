@@ -2883,3 +2883,36 @@ text they give is quoted.
 - **Auto-explore**: AGENCY.md §14 names it; what exploring is, isn't said.
 - **Latent assembly's own rules, how considerations combine, memory making
   hypotheses of its own, loyalty**: as listed above.
+
+### After the slice: talking takes time
+
+ACTIONS.md §5: "An actor may run several activities if their providers
+don't overlap: walking while talking works"; AGENCY.md §11:
+"Conversations are alternating communicate activities". Until now `say`
+was instant. The "Not yet"s: talking taking time, talking while working
+as a voice provider.
+
+- **`say` is a second on the voice** (a new provider): an activity whose
+  words (`Activity.words`, saved) are said when it ends. Walking or
+  working meanwhile is fine; a second remark at once isn't ("its voice is
+  taken by say, starting").
+- **Talking occupies the voice, not the mind**: agency's `busy:` leaves
+  out activities that use the voice alone, so an agent decides, and starts
+  work, while it speaks.
+- **`lab play`** waits for what the player's character says to be said,
+  as for a step, and for a question, a little longer for the answer.
+- **Tests**: a scripted remark (`stage_say`) waits three seconds, to say
+  it and hear a second's answer; the attention scene's remark starts a
+  second before the takes so they land together, and it has an activity
+  system now (speech needs one); the repair's shout starts a second early
+  and is heard at 60% of the last stage, as before.
+
+Checked: a remark isn't said half a second in, and is at the second, with
+its words; the speaker walked meanwhile; a second remark at once is
+refused; once said, it can speak again. Every conversation scenario
+(promises, the rumour, decay, asking, the purse, play) runs as before.
+
+Not yet: how long a remark takes by what is said (every one is a
+second).
+
+78 tests, 2550 checks, under both compilers, ASan, and leak-free.

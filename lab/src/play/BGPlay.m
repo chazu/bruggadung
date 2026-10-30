@@ -501,16 +501,22 @@ static char   glyph_of_kind( const char *kind)
     question:(BOOL) question
 {
    BGKnowledgeStore   *store;
+   BGProposalGroup    *g;
    BGAction           action;
+   BGEntityID         said;
    int                k;
 
    store          = [_knowledge storeOf:_actor];
    action         = BGActionMake( [_world intern:"say"], [store selfReferent], hearer, BGNoEntity);
    action.content = [_world intern:[content UTF8String]];
-   if( ! [self perform:action amount:0] || ! question)
+   if( ! (g = [self perform:action amount:0]))
       return;
-   /* the answer comes at the next boundaries, if it comes */
-   for( k = 0; k < 4; k++)
+   /* saying it takes a second: said before the next command */
+   said = [g idFor:[g proposals][ 0].handle];
+   while( [self isRunning:said] && [_scheduler stepUntil:BGTimeMake( [_world time].ms + 600000)])
+      ;
+   /* the answer comes at the next boundaries, if it comes, as long again to say */
+   for( k = 0; question && k < 4; k++)
       if( ! [_scheduler stepUntil:BGTimeMake( [_world time].ms + 1000)])
          break;
    [self showTrace];

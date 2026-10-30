@@ -11,6 +11,8 @@
     itemRef:        ref                        @field(saved, proposable, inspect)
     destinationRef: ref                        @field(saved, proposable, inspect)
     amount:         int & >=0 & <=1000000      @field(content, saved, proposable, inspect)
+    // what is being said, for an utterance under way
+    words:          text                       @field(saved, proposable, inspect)
     // the stage under way, the work done in it, and when it last started
     // running; due is when the stage completes (0ms while suspended, or for an
     // activity that ends by a watch or an event)

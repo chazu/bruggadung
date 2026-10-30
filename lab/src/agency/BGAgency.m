@@ -1038,6 +1038,27 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
 }
 
 
+/* Whether the operation uses the voice and nothing else. */
+static BOOL   voice_only( TriContent *tri, const char *operation)
+{
+   const TriNode   *list;
+   char            text[ 32];
+   BOOL            voice;
+
+   voice = NO;
+   for( list = operation ? tri_at( tri, tri_pattern( tri, operation), "uses") : NULL;
+        list && tri_at( tri, list, "first");
+        list = tri_at( tri, list, "rest"))
+   {
+      tri_print( tri, tri_at( tri, list, "first"), text, sizeof( text));
+      if( strcmp( text, "\"voice\""))
+         return( NO);
+      voice = YES;
+   }
+   return( voice);
+}
+
+
 - (BOOL) busy:(BGEntityID) agent
 {
    const BGActivity   *record;
@@ -1050,7 +1071,10 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    for( i = 0; i < [store count]; i++)
    {
       record = [store recordAtIndex:i];
-      if( record->actorRef == agent && record->status == (uint32_t) running)
+      /* talking occupies the voice, not the mind (ACTIONS.md §5: walking
+       * while talking works) */
+      if( record->actorRef == agent && record->status == (uint32_t) running &&
+          ! voice_only( [_world tri], record->operation))
          return( YES);
    }
    return( NO);

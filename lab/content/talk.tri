@@ -76,7 +76,9 @@
 
 // Say something to an agent in reach. What is said is the command's.
 say: #Operation & {
-    effect: "say"
+    effect:   "say"
+    duration: 1s
+    uses:     ["voice"]
     roles: {
         actor: #Agent
         item:  #Agent
