@@ -1677,3 +1677,33 @@ coupling needs an analytic or implicit step (open question 2), or to live
 inside one domain.
 
 52 tests, 1968 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: local wake (regions, links, and a door)
+
+DOMAIN_SIMULATION.md Scenario 1's check 6, and §5's per-region sleep. A
+room of stale air (1,600 mmol of carbon dioxide) sits behind a tight door,
+off a corridor ten times its size that opens to the outdoors; a back room
+opens to the corridor through a gap. Everything else is fresh and at 275 K,
+so both domains sleep, and an hour passes in a step. A worker opens the
+door (`open_door`): the room and the corridor wake, and the room airs out
+in 19 steps. The corridor settles with the outdoors over the next hours,
+and everything sleeps again by 35 steps. The back room and the thermal
+domain never step.
+
+- **Links**: a region opens to another (`opensTo`) or to the outdoors,
+  through its `gap`, or through its `door`'s `wide` while the door is ajar.
+  Between regions, what one gains the other loses, so only the outdoors
+  enters the ledger.
+- **Per-region sleep**: a link rests while what it would carry is within
+  the settle tolerances. A region is awake while a link to it moves, or a
+  fire, a breather, a solid's surface, a contribution, or a crossed watch is
+  in it. A door's change wakes the regions it joins. Each region counts the
+  steps it was awake for.
+- **A moving link bounds the step** to an eighth of the smaller side's air
+  through it: an open door makes the room's steps 50 s, where the
+  outdoors' gap allowed 3,600.
+
+Not yet: per-tile regions inside a room, and resting a link inside the
+settle tolerance changes the physics by at most that tolerance.
+
+53 tests, 1980 checks, under both compilers, ASan and UBSan, and leak-free.

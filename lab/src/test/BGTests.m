@@ -68,7 +68,7 @@ static void   test_registry_and_construction( void)
 
    w = BGTestWorld( 1);
    c = BGTestCommitter( w);
-   BG_CHECK( [w kindCount] == 22);
+   BG_CHECK( [w kindCount] == 23);
    BG_CHECK( [w kindNamed:"Body"] != NSNotFound && [w kindNamed:"Nonesuch"] == NSNotFound);
    bin   = commit_create( c, "bin", BGOnTile( 0, 0, 0));
    nails = commit_create( c, "nails_30", BGIn( bin));
@@ -4555,6 +4555,106 @@ static void   test_unattended_stove( void)
 }
 
 
+/* DOMAIN_SIMULATION.md Scenario 1's check 6, local wake. A room of stale air
+ * behind a tight door (no gap), off a corridor ten times its size that opens
+ * to the outdoors; a second room off the corridor, through a gap; the room's
+ * walls bound it. Everything else is fresh and at 275 K, so nothing moves:
+ * both domains sleep, and an hour passes in a step. A worker opens the door:
+ * the room and the corridor wake, and the room airs out; the back room, and
+ * the thermal domain, sleep through it. Once the corridor has settled with
+ * the outdoors, everything sleeps again. */
+static void   test_local_wake( void)
+{
+   BGWorld           *w;
+   BGCommitter       *c;
+   BGScheduler       *s;
+   BGAtmosphere      *air;
+   BGThermal         *thermal;
+   BGProposalGroup   *g;
+   BGEntityID        room;
+   BGEntityID        corridor;
+   BGEntityID        back;
+   BGEntityID        door;
+   BGEntityID        shell;
+   BGEntityID        worker;
+   NSString          *error;
+   NSUInteger        n;
+   NSUInteger        before;
+   BOOL              balanced;
+   int64_t           v;
+   int64_t           u;
+
+   w       = BGTestWorld( 97);
+   c       = BGTestCommitter( w);
+   air     = [[[BGAtmosphere alloc] initWithWorld:w] autorelease];
+   thermal = [[[BGThermal alloc] initWithWorld:w] autorelease];
+   s       = [[[BGScheduler alloc] initWithWorld:w committer:c] autorelease];
+   [s addDomain:air];
+   [s addDomain:thermal];
+   g        = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the rooms"];
+   corridor = [g create:"corridor" key:"the corridor" at:BGLocationMakeNone()];
+   room     = [g create:"room_air" key:"the room's air" at:BGLocationMakeNone()];
+   back     = [g create:"back_room" key:"the back room's air" at:BGLocationMakeNone()];
+   shell    = [g create:"room_shell" key:"the room's walls" at:BGLocationMakeNone()];
+   door     = [g create:"room_door" key:"the room's door" at:BGOnTile( 4, 6, 0)];
+   worker   = [g create:"worker" key:"worker" at:BGOnTile( 4, 5, 0)];
+   [c submit:g];
+   [s runUntil:BGTimeMake( 1)];
+   corridor = [g idFor:corridor];
+   room     = [g idFor:room];
+   back     = [g idFor:back];
+   shell    = [g idFor:shell];
+   door     = [g idFor:door];
+   worker   = [g idFor:worker];
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the doors, and a night's stale air"];
+   [g set:"GasStore.opensTo" of:BGWhole( room) to:(int64_t) corridor];
+   [g set:"GasStore.door" of:BGWhole( room) to:(int64_t) door];
+   [g set:"GasStore.gap" of:BGWhole( room) to:0];
+   [g set:"GasStore.dioxide" of:BGWhole( room) to:1600];
+   [g set:"GasStore.opensTo" of:BGWhole( back) to:(int64_t) corridor];
+   [g set:"ThermalBody.bounds" of:BGWhole( shell) to:(int64_t) room];
+   [c submit:g];
+   [s runUntil:BGTimeMake( 2)];
+
+   /* asleep: an hour in a step */
+   BG_CHECK( ! [air isActive] && ! [thermal isActive]);
+   n = [s runUntil:BGTimeMake( 3600000)];
+   BG_CHECK( n == 1 && [air steps] == 0 && [thermal steps] == 0);
+
+   /* the door opens: the room and the corridor wake, not the back room */
+   error = nil;
+   BG_CHECK( BGPerform( w, c, BGActionMake( "open_door", worker, door, BGNoEntity), 0, &error) != nil);
+   [s runUntil:BGTimeMake( 3600001)];
+   BG_CHECK( [w getField:"Door.ajar" of:door value:&v] && v == 1);
+   BG_CHECK( [air isActive]);
+   balanced = YES;
+   while( [w time].ms < 2 * 3600000)
+   {
+      if( ! [s stepUntil:BGTimeMake( 2 * 3600000)])
+         [s runUntil:BGTimeMake( 2 * 3600000)];
+      balanced = balanced && [air balanced];
+   }
+   BG_CHECK( [air stepsOf:room] > 0 && [air stepsOf:corridor] > 0);
+   BG_CHECK( [air stepsOf:back] == 0 && [thermal steps] == 0);
+   /* aired: within the settle tolerance of the corridor, scaled */
+   BG_CHECK( [w getField:"GasStore.dioxide" of:room value:&v] && [w getField:"GasStore.dioxide" of:corridor value:&u] &&
+             llabs( v - u / 10) <= 100);
+
+   /* then everything settles and sleeps, in a few dozen steps */
+   before = [air steps];
+   while( [w time].ms < 24 * 3600000)
+   {
+      if( ! [s stepUntil:BGTimeMake( 24 * 3600000)])
+         [s runUntil:BGTimeMake( 24 * 3600000)];
+      balanced = balanced && [air balanced];
+   }
+   BG_CHECK( balanced);
+   BG_CHECK( ! [air isActive] && ! [thermal isActive]);
+   BG_CHECK( [air steps] - before < 40);
+   BG_CHECK( [air stepsOf:back] == 0 && [thermal steps] == 0);
+}
+
+
 /* --- the cistern ----------------------------------------------------------- */
 
 static BGCistern   *run_cistern( BGCisternVariant variant)
@@ -4877,6 +4977,7 @@ const BGTestCase   BGAllTests[] =
    { "resume_recheck",                test_resume_recheck },
    { "interrupted_repair",            test_interrupted_repair },
    { "unattended_stove",              test_unattended_stove },
+   { "local_wake",                    test_local_wake },
    { "rumour",                        test_rumour },
    { "memory_decay",                  test_memory_decay },
    { "salience",                      test_salience },

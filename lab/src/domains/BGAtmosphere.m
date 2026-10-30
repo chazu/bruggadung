@@ -69,7 +69,9 @@
    if( _nregions == BG_ATMOS_REGIONS || ! [_world record:[_world kindNamed:"GasStore"] for:entity])
       return( -1);
    memset( &_regions[ _nregions], 0, sizeof( BGAirRegion));
-   _regions[ _nregions].entity = entity;
+   _regions[ _nregions].entity   = entity;
+   _regions[ _nregions].link     = -1;
+   _regions[ _nregions].doorSeen = -1;
    return( _nregions++);
 }
 
@@ -129,6 +131,7 @@
    const BGCombustor       *combustor;
    const BGFuelContainer   *fuel;
    const BGThermalBody     *body;
+   const BGDoor            *door;
    BGStore                 *stores;
    NSUInteger              i;
    int                     k;
@@ -143,6 +146,20 @@
       _regions[ k].dioxide = air->dioxide;
       _regions[ k].heat    = air->gasHeat;
       _regions[ k].total   = air->total;
+   }
+   /* the links: a gap, or a door's width while it is ajar */
+   for( i = 0; i < [stores count]; i++)
+   {
+      air = [stores recordAtIndex:i];
+      if( (k = [self regionOf:[stores entityAtIndex:i]]) < 0)
+         continue;
+      _regions[ k].link = air->opensTo ? [self regionOf:(BGEntityID) air->opensTo] : -1;
+      _regions[ k].flow = air->gap;
+      door              = air->door ? [_world record:[_world kindNamed:"Door"] for:(BGEntityID) air->door] : NULL;
+      if( door && door->ajar)
+         _regions[ k].flow = door->wide;
+      if( _regions[ k].doorSeen < 0)
+         _regions[ k].doorSeen = door ? door->ajar : 0;
    }
    stores = [_world storeForKind:[_world kindNamed:"Combustor"]];
    for( i = 0; i < [stores count]; i++)
@@ -257,14 +274,127 @@ static int64_t   gasTemperature( const BGAirRegion *r)
 }
 
 
-- (BOOL) settled:(const BGAirRegion *) r
+static int64_t   quantity( const BGAirRegion *r, int q)
 {
-   int64_t   t;
+   return( q == 0 ? r->oxygen : q == 1 ? r->dioxide : r->heat);
+}
 
-   t = r->heat * 1000000 / (r->total * BG_GAS_CAPACITY);
-   return( llabs( r->oxygen - r->total * BG_OUT_OXYGEN / 1000) <= r->total / 1000 &&
-           llabs( r->dioxide - r->total * BG_OUT_DIOXIDE / 10000) <= 100 &&
-           llabs( t - 275000) <= 500);
+
+/* What a mmol of air across a region's link carries, as a fraction: the
+ * outdoors' fixed air, or the other region's. */
+static void   across( const BGAirRegion *regions, int k, int q, int64_t *num, int64_t *den)
+{
+   static const int64_t   outNum[ 3] = { BG_OUT_OXYGEN, BG_OUT_DIOXIDE, BG_OUT_HEAT };
+   static const int64_t   outDen[ 3] = { 1000, 10000, 1000 };
+
+   if( regions[ k].link < 0)
+   {
+      *num = outNum[ q];
+      *den = outDen[ q];
+      return;
+   }
+   *num = quantity( &regions[ regions[ k].link], q);
+   *den = regions[ regions[ k].link].total;
+}
+
+
+/* Whether a region's link rests: nothing flows, or what it would carry is
+ * within the settle tolerances, and its door is as it was. */
+- (BOOL) linkQuiet:(int) k
+            values:(const BGAirRegion *) v
+{
+   const BGGasStore   *air;
+   const BGDoor       *door;
+   int64_t            num;
+   int64_t            den;
+   int64_t            tolerance[ 3];
+   int                q;
+
+   air  = [_world record:[_world kindNamed:"GasStore"] for:v[ k].entity];
+   door = air && air->door ? [_world record:[_world kindNamed:"Door"] for:(BGEntityID) air->door] : NULL;
+   if( door && door->ajar != v[ k].doorSeen)
+      return( NO);
+   if( ! v[ k].flow)
+      return( YES);
+   tolerance[ 0] = v[ k].total / 1000;
+   tolerance[ 1] = 100;
+   tolerance[ 2] = v[ k].total * BG_GAS_CAPACITY / 2000;
+   for( q = 0; q < 3; q++)
+   {
+      across( v, k, q, &num, &den);
+      if( llabs( quantity( &v[ k], q) - v[ k].total * num / den) > tolerance[ q])
+         return( NO);
+   }
+   return( YES);
+}
+
+
+/* Whether a region is awake: a link to it moving, or something in it. */
+- (BOOL) awake:(int) k
+        values:(const BGAirRegion *) v
+{
+   BGEntityID   watched[ 16];
+   NSUInteger   n;
+   NSUInteger   i;
+   int          j;
+
+   if( v[ k].pending || ! [self linkQuiet:k values:v])
+      return( YES);
+   for( j = 0; j < _nregions; j++)
+      if( v[ j].link == k && ! [self linkQuiet:j values:v])
+         return( YES);
+   for( j = 0; j < _nstoves; j++)
+      if( _stoves[ j].region == k && [self lit:j])
+         return( YES);
+   for( j = 0; j < _nbreathers; j++)
+      if( _breathers[ j].region == k && [self breathOf:j])
+         return( YES);
+   for( j = 0; j < _nsurfaces; j++)
+      if( _surfaces[ j].region == k && [self surfaceDelta:j capacity:NULL])
+         return( YES);
+   n = [self watches:watched max:16];
+   for( i = 0; i < n; i++)
+      if( [self crossedWatch] == watched[ i] &&
+          [self regionWatchedBy:[_world record:[_world kindNamed:"Activity"] for:watched[ i]]] == k)
+         return( YES);
+   return( NO);
+}
+
+
+/* What the links into a region carry now, per second, in units of `unit`
+ * a mmol of whatever `q` is: each moving link's flow times the difference. */
+- (int64_t) linkFlowInto:(int) k
+                quantity:(int) q
+                    unit:(int64_t) unit
+{
+   int64_t   num;
+   int64_t   den;
+   int64_t   sum;
+   int       j;
+
+   sum = 0;
+   for( j = 0; j < _nregions; j++)
+   {
+      if( (j != k && _regions[ j].link != k) || [self linkQuiet:j values:_regions])
+         continue;
+      across( _regions, j, q, &num, &den);
+      if( j == k)
+         sum += _regions[ k].flow * (num * unit / den - quantity( &_regions[ k], q) * unit / _regions[ k].total);
+      else
+         sum += _regions[ j].flow * (quantity( &_regions[ j], q) * unit / _regions[ j].total - num * unit / den);
+   }
+   return( sum);
+}
+
+
+- (NSUInteger) stepsOf:(BGEntityID) region
+{
+   int   i;
+
+   for( i = 0; i < _nregions; i++)
+      if( _regions[ i].entity == region)
+         return( _regions[ i].steps);
+   return( 0);
 }
 
 
@@ -287,19 +417,10 @@ static int64_t   gasTemperature( const BGAirRegion *r)
    int   i;
 
    [self load];
-   for( i = 0; i < _nstoves; i++)
-      if( [self lit:i])
-         return( YES);
    for( i = 0; i < _nregions; i++)
-      if( ! [self settled:&_regions[ i]] || _regions[ i].pending)
+      if( [self awake:i values:_regions])
          return( YES);
-   for( i = 0; i < _nsurfaces; i++)
-      if( [self surfaceDelta:i capacity:NULL])
-         return( YES);
-   for( i = 0; i < _nbreathers; i++)
-      if( [self breathOf:i])
-         return( YES);
-   return( [self crossedWatch] != BGNoEntity);
+   return( NO);
 }
 
 
@@ -379,12 +500,10 @@ static int64_t   gasTemperature( const BGAirRegion *r)
  * surfaces, and a fire venting into it. */
 - (int64_t) heatFlowInto:(int) k
 {
-   const BGAirRegion   *r;
    int64_t             flow;
    int                 i;
 
-   r    = &_regions[ k];
-   flow = BG_DOOR_FLOW * (BG_OUT_HEAT - r->heat * 1000 / r->total);
+   flow = [self linkFlowInto:k quantity:2 unit:1000];
    for( i = 0; i < _nsurfaces; i++)
       if( _surfaces[ i].region == k)
          flow -= _surfaces[ i].conductance * [self surfaceDelta:i capacity:NULL];
@@ -448,8 +567,7 @@ static int64_t   gasTemperature( const BGAirRegion *r)
       when = BGTimeNever.ms;
       if( record->watchDioxide)
       {
-         rise = BG_DOOR_FLOW * (BG_OUT_DIOXIDE * _regions[ k].total / 10000 - _regions[ k].dioxide) * 1000 /
-                _regions[ k].total;
+         rise = [self linkFlowInto:k quantity:1 unit:1000];
          for( s = 0; s < _nstoves; s++)
             if( _stoves[ s].region == k && [self lit:s] &&
                 ! ((const BGCombustor *) [_world record:[_world kindNamed:"Combustor"] for:_stoves[ s].entity])->damper)
@@ -477,6 +595,22 @@ static int64_t   gasTemperature( const BGAirRegion *r)
          h.nextEvent = BGTimeMake( when);
    }
    h.safeStep = BGTimeMake( burning ? 600000 : 3600000);
+
+   /* a moving link is explicit: a step carries no more than an eighth of
+    * the smaller side's air */
+   for( k = 0; k < _nregions; k++)
+   {
+      int64_t   total;
+
+      if( ! _regions[ k].flow || [self linkQuiet:k values:_regions])
+         continue;
+      total = _regions[ k].total;
+      if( _regions[ k].link >= 0 && _regions[ _regions[ k].link].total < total)
+         total = _regions[ _regions[ k].link].total;
+      when = total * 1000 / (8 * _regions[ k].flow);
+      if( when < h.safeStep.ms)
+         h.safeStep = BGTimeMake( when < 1 ? 1 : when);
+   }
 
    /* the exchange with the solids lags a step: no more than an eighth of
     * the way to equal in one */
@@ -600,6 +734,12 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
    int64_t            solid;
    int64_t            delta;
    int64_t            breath;
+   int64_t            num;
+   int64_t            den;
+   const BGGasStore   *store;
+   const BGDoor       *door;
+   BOOL               quiet[ BG_ATMOS_REGIONS];
+   int                c;
    NSString           *why;
    int64_t            q;
    int64_t            rates[ BG_ATMOS_STOVES];
@@ -627,6 +767,12 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
    memcpy( before, _regions, sizeof( before));
    for( s = 0; s < _nstoves; s++)
       rates[ s] = [self rateOf:s];          /* from step-start values */
+   for( k = 0; k < _nregions; k++)
+   {
+      quiet[ k] = [self linkQuiet:k values:before];
+      if( [self awake:k values:before])
+         _regions[ k].steps++;
+   }
 
    /* what was in transit to the gas */
    for( k = 0; k < _nregions; k++)
@@ -657,22 +803,37 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
           outbox:outbox];
    }
 
-   /* the door: each region mixes with the outdoors, from step-start values */
+   /* the links: each moving one mixes its region with what it opens to,
+    * from step-start values; between regions, what one gains the other
+    * loses */
    for( k = 0; k < _nregions; k++)
    {
+      if( quiet[ k])
+         continue;
       r            = &_regions[ k];
-      r->carryAir += BG_DOOR_FLOW * dt;
+      r->carryAir += before[ k].flow * dt;
       air          = r->carryAir / 1000;
       r->carryAir %= 1000;
-      d[ 0] = exchange( air, before[ k].oxygen, r->total, BG_OUT_OXYGEN, 1000, &r->carryIn[ 0], &r->carryOut[ 0]);
-      d[ 1] = exchange( air, before[ k].dioxide, r->total, BG_OUT_DIOXIDE, 10000, &r->carryIn[ 1], &r->carryOut[ 1]);
-      d[ 2] = exchange( air, before[ k].heat, r->total, BG_OUT_HEAT, 1000, &r->carryIn[ 2], &r->carryOut[ 2]);
+      for( c = 0; c < 3; c++)
+      {
+         across( before, k, c, &num, &den);
+         d[ c] = exchange( air, quantity( &before[ k], c), r->total, num, den, &r->carryIn[ c], &r->carryOut[ c]);
+      }
       r->oxygen  += d[ 0];
       r->dioxide += d[ 1];
       r->heat    += d[ 2];
-      _ledger.inflow[ 0] += d[ 0];
-      _ledger.inflow[ 1] += d[ 1];
-      _ledger.inflow[ 2] += d[ 2];
+      if( r->link < 0)
+      {
+         _ledger.inflow[ 0] += d[ 0];
+         _ledger.inflow[ 1] += d[ 1];
+         _ledger.inflow[ 2] += d[ 2];
+      }
+      else
+      {
+         _regions[ r->link].oxygen  -= d[ 0];
+         _regions[ r->link].dioxide -= d[ 1];
+         _regions[ r->link].heat    -= d[ 2];
+      }
    }
 
    /* the stoves: from step-start values */
@@ -767,6 +928,14 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
          r->heat              += heat;
          _ledger.produced[ 2] += heat;
       }
+   }
+
+   /* the doors as they are now */
+   for( k = 0; k < _nregions; k++)
+   {
+      store = [_world record:[_world kindNamed:"GasStore"] for:_regions[ k].entity];
+      door  = store && store->door ? [_world record:[_world kindNamed:"Door"] for:(BGEntityID) store->door] : NULL;
+      _regions[ k].doorSeen = door ? door->ajar : 0;
    }
 
    /* the records mirror the domain */
@@ -866,12 +1035,12 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
    for( k = 0; k < _nregions; k++)
    {
       r = &_regions[ k];
-      [lines addObject:[NSString stringWithFormat:@"region %llu %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld",
+      [lines addObject:[NSString stringWithFormat:@"region %llu %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld",
                                                   (unsigned long long) r->entity, r->carryAir,
                                                   r->carryIn[ 0], r->carryIn[ 1], r->carryIn[ 2],
                                                   r->carryOut[ 0], r->carryOut[ 1], r->carryOut[ 2],
                                                   r->carryBurn[ 0], r->carryBurn[ 1], r->carryBurn[ 2],
-                                                  r->pending, (long long) 0]];
+                                                  r->pending, (long long) r->doorSeen, (long long) r->steps]];
    }
    for( k = 0; k < _nstoves; k++)
       [lines addObject:[NSString stringWithFormat:@"stove %llu %lld %lld %lld", (unsigned long long) _stoves[ k].entity,
@@ -930,8 +1099,8 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
          _ledger.toSolids  = v[ 15];
          _ledger.received  = v[ 16];
       }
-      else if( sscanf( text, "region %llu %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld", &e, &v[ 0], &v[ 1],
-                       &v[ 2], &v[ 3], &v[ 4], &v[ 5], &v[ 6], &v[ 7], &v[ 8], &v[ 9], &v[ 10], &v[ 11]) == 13)
+      else if( sscanf( text, "region %llu %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld", &e, &v[ 0], &v[ 1],
+                       &v[ 2], &v[ 3], &v[ 4], &v[ 5], &v[ 6], &v[ 7], &v[ 8], &v[ 9], &v[ 10], &v[ 11], &v[ 12]) == 14)
       {
          if( (k = [self regionOf:(BGEntityID) e]) < 0)
             continue;
@@ -947,6 +1116,8 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
          r->carryBurn[ 1] = v[ 8];
          r->carryBurn[ 2] = v[ 9];
          r->pending       = v[ 10];
+         r->doorSeen      = (int) v[ 11];
+         r->steps         = (NSUInteger) v[ 12];
       }
       else if( sscanf( text, "stove %llu %lld %lld %lld", &e, &v[ 0], &v[ 1], &v[ 2]) == 4)
       {

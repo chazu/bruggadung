@@ -8,9 +8,10 @@
  *
  * Per step, in whole quanta, with carries for what is fractional:
  *
- *   - the door gap mixes each region with the outdoors, a reservoir at
- *     275 K of fixed composition: BG_DOOR_FLOW mmol of air each way a
- *     second, carrying gas and heat in proportion;
+ *   - each region's link mixes it with the region it opens to, or with the
+ *     outdoors, a reservoir at 275 K of fixed composition: its gap's flow
+ *     of air each way a second, or its door's while ajar, carrying gas and
+ *     heat in proportion;
  *   - a lit stove burns up to its rate (mg a second) of wood; each gram
  *     consumes 33 mmol of oxygen, produces 33 of carbon dioxide and 15 kJ of
  *     heat. Damper open, the firebox draws from the outdoors and vents up
@@ -31,6 +32,15 @@
  * smaller side's capacity over the conductance, so a step moves no more than
  * an eighth of the way to equal.
  *
+ * Regions sleep and wake one by one (§5). A link rests while what it
+ * carries is within the settle tolerances (a thousandth of the region in
+ * oxygen, 100 mmol of carbon dioxide, half a kelvin); a region is awake while
+ * a link to it is moving, or a fire, a breather, a solid's surface, a
+ * contribution, or a crossed watch is in it. A door opening or shutting
+ * wakes the two regions it joins. A moving link is explicit, and bounds the
+ * step: no more than an eighth of the smaller side's air through it. The domain sleeps when every region
+ * does.
+ *
  * The firebox is quasi-steady: it holds nothing. Every quantity balances
  * exactly: the region's gas plus what combustion consumed less what it
  * produced, less what came in from outdoors, plus what it sent the solids,
@@ -49,7 +59,6 @@
 #define BG_ATMOS_STOVES    8
 #define BG_ATMOS_SURFACES  16
 #define BG_ATMOS_BREATHERS 8
-#define BG_DOOR_FLOW       200        /* mmol of air a second, each way */
 
 
 typedef struct
@@ -64,6 +73,10 @@ typedef struct
    int64_t      carryOut[ 3];    /* what goes out, numerators over the total */
    int64_t      carryBurn[ 3];   /* combustion into the region, in mmol·mg, J·mg */
    int64_t      pending;         /* heat in transit to it, J */
+   int          link;            /* the region it opens to, or -1, the outdoors */
+   int64_t      flow;            /* mmol of air a second, each way */
+   int          doorSeen;        /* its door, ajar or not, at the last step; -1 not yet seen */
+   NSUInteger   steps;           /* steps it was awake for */
 } BGAirRegion;
 
 
@@ -143,5 +156,7 @@ typedef struct
 - (NSUInteger) steps;
 /* A region's temperature now, in millikelvin. */
 - (int64_t) temperatureOf:(BGEntityID) region;
+/* The steps a region was awake for. */
+- (NSUInteger) stepsOf:(BGEntityID) region;
 
 @end

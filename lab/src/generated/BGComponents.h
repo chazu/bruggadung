@@ -1,4 +1,4 @@
-/* Generated from Triangle content ac6af9d2384902a1: do not edit. Type IDs are valid
+/* Generated from Triangle content ba55d05bcc67eb1b: do not edit. Type IDs are valid
  * only for this content; regenerate when it changes. */
 #ifndef BG_COMPONENTS_H
 #define BG_COMPONENTS_H
@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BG_CONTENT_HASH 0xac6af9d2384902a1ULL
+#define BG_CONTENT_HASH 0xba55d05bcc67eb1bULL
 
 /* Combustor, from #Combustor */
 typedef struct {
@@ -23,9 +23,12 @@ typedef struct {
 /* GasStore, from #GasStore */
 typedef struct {
     int64_t         dioxide;    /* int, in quanta of 1; content, saved, proposable, inspect */
+    uint64_t        door;    /* a referent; saved, proposable, inspect */
     int64_t         east;    /* int, in quanta of 1; content, saved, inspect */
+    int64_t         gap;    /* int, in quanta of 1; content, saved, proposable, inspect */
     int64_t         gasHeat;    /* int, in quanta of 1; content, saved, proposable, inspect */
     int64_t         north;    /* int, in quanta of 1; content, saved, inspect */
+    uint64_t        opensTo;    /* a referent; saved, proposable, inspect */
     int64_t         oxygen;    /* int, in quanta of 1; content, saved, proposable, inspect */
     int64_t         south;    /* int, in quanta of 1; content, saved, inspect */
     int64_t         total;    /* int, in quanta of 1; content, saved, inspect */
@@ -129,6 +132,12 @@ typedef struct {
     int64_t         capacity;    /* int, in quanta of 1; content, saved, inspect, perceive(sight) */
 } BGContainer;
 
+/* Door, from #Door */
+typedef struct {
+    bool            ajar;    /* bool; content, saved, proposable, inspect, perceive(sight) */
+    int64_t         wide;    /* int, in quanta of 1; content, saved, inspect */
+} BGDoor;
+
 /* Pump, from #Pump */
 typedef struct {
     bool            opened;    /* bool; content, saved, proposable, inspect, perceive(sight) */
@@ -184,57 +193,57 @@ typedef struct {
 
 /* #ActivityStatus */
 enum {
-    BG_ACTIVITYSTATUS_COMPLETED = 226,
-    BG_ACTIVITYSTATUS_EXHAUSTED = 227,
-    BG_ACTIVITYSTATUS_FAILED = 228,
-    BG_ACTIVITYSTATUS_RUNNING = 229,
-    BG_ACTIVITYSTATUS_SUSPENDED = 230,
+    BG_ACTIVITYSTATUS_COMPLETED = 227,
+    BG_ACTIVITYSTATUS_EXHAUSTED = 228,
+    BG_ACTIVITYSTATUS_FAILED = 229,
+    BG_ACTIVITYSTATUS_RUNNING = 230,
+    BG_ACTIVITYSTATUS_SUSPENDED = 231,
 };
 
 /* #ClaimKind */
 enum {
-    BG_CLAIMKIND_CUSTODY = 232,
-    BG_CLAIMKIND_OWNERSHIP = 233,
-    BG_CLAIMKIND_RESERVATION = 234,
+    BG_CLAIMKIND_CUSTODY = 233,
+    BG_CLAIMKIND_OWNERSHIP = 234,
+    BG_CLAIMKIND_RESERVATION = 235,
 };
 
 /* #Material */
 enum {
-    BG_MATERIAL_CLOTH = 274,
-    BG_MATERIAL_FOOD = 275,
-    BG_MATERIAL_RUBBER = 276,
-    BG_MATERIAL_STONE = 277,
-    BG_MATERIAL_FLESH = 302,
-    BG_MATERIAL_BRASS = 304,
-    BG_MATERIAL_IRON = 305,
-    BG_MATERIAL_PAPER = 306,
-    BG_MATERIAL_STEEL = 307,
-    BG_MATERIAL_OAK = 309,
+    BG_MATERIAL_CLOTH = 276,
+    BG_MATERIAL_FOOD = 277,
+    BG_MATERIAL_RUBBER = 278,
+    BG_MATERIAL_STONE = 279,
+    BG_MATERIAL_FLESH = 304,
+    BG_MATERIAL_BRASS = 306,
+    BG_MATERIAL_IRON = 307,
+    BG_MATERIAL_PAPER = 308,
+    BG_MATERIAL_STEEL = 309,
+    BG_MATERIAL_OAK = 311,
 };
 
 /* "flesh" | "metal" | "natural" | "paper" | "wood" */
 enum {
-    BG_BODY_SURFACE_NATURAL = 189,
-    BG_BODY_SURFACE_FLESH = 302,
-    BG_BODY_SURFACE_BRASS = 304,
-    BG_BODY_SURFACE_IRON = 305,
-    BG_BODY_SURFACE_PAPER = 306,
-    BG_BODY_SURFACE_STEEL = 307,
-    BG_BODY_SURFACE_OAK = 309,
+    BG_BODY_SURFACE_NATURAL = 190,
+    BG_BODY_SURFACE_FLESH = 304,
+    BG_BODY_SURFACE_BRASS = 306,
+    BG_BODY_SURFACE_IRON = 307,
+    BG_BODY_SURFACE_PAPER = 308,
+    BG_BODY_SURFACE_STEEL = 309,
+    BG_BODY_SURFACE_OAK = 311,
 };
 
 /* #Colour */
 enum {
-    BG_COLOUR_BLUE = 237,
-    BG_COLOUR_BLACK = 239,
-    BG_COLOUR_BROWN = 240,
-    BG_COLOUR_GREEN = 241,
-    BG_COLOUR_GREY = 242,
-    BG_COLOUR_NAVY = 243,
-    BG_COLOUR_RED = 244,
-    BG_COLOUR_YELLOW = 245,
-    BG_COLOUR_BEIGE = 255,
-    BG_COLOUR_WHITE = 271,
+    BG_COLOUR_BLUE = 238,
+    BG_COLOUR_BLACK = 240,
+    BG_COLOUR_BROWN = 241,
+    BG_COLOUR_GREEN = 242,
+    BG_COLOUR_GREY = 243,
+    BG_COLOUR_NAVY = 244,
+    BG_COLOUR_RED = 245,
+    BG_COLOUR_YELLOW = 246,
+    BG_COLOUR_BEIGE = 256,
+    BG_COLOUR_WHITE = 273,
 };
 
 /* The field registry: what code needs to read and write any component
@@ -260,7 +269,7 @@ typedef struct {
     const BGFieldInfo *fields;
 } BGComponentInfo;
 
-#define BG_COMPONENT_COUNT 22
+#define BG_COMPONENT_COUNT 23
 
 #ifdef BG_COMPONENT_REGISTRY
 
@@ -276,9 +285,12 @@ static const BGFieldInfo BGFuelContainer_fields[] = {
 
 static const BGFieldInfo BGGasStore_fields[] = {
     { "dioxide", offsetof(BGGasStore, dioxide), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
+    { "door", offsetof(BGGasStore, door), BG_VALUE_REF, "ref", "saved, proposable, inspect" },
     { "east", offsetof(BGGasStore, east), BG_VALUE_QUANTITY, "int", "content, saved, inspect" },
+    { "gap", offsetof(BGGasStore, gap), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "gasHeat", offsetof(BGGasStore, gasHeat), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "north", offsetof(BGGasStore, north), BG_VALUE_QUANTITY, "int", "content, saved, inspect" },
+    { "opensTo", offsetof(BGGasStore, opensTo), BG_VALUE_REF, "ref", "saved, proposable, inspect" },
     { "oxygen", offsetof(BGGasStore, oxygen), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "south", offsetof(BGGasStore, south), BG_VALUE_QUANTITY, "int", "content, saved, inspect" },
     { "total", offsetof(BGGasStore, total), BG_VALUE_QUANTITY, "int", "content, saved, inspect" },
@@ -371,6 +383,11 @@ static const BGFieldInfo BGContainer_fields[] = {
     { "capacity", offsetof(BGContainer, capacity), BG_VALUE_QUANTITY, "int", "content, saved, inspect, perceive(sight)" },
 };
 
+static const BGFieldInfo BGDoor_fields[] = {
+    { "ajar", offsetof(BGDoor, ajar), BG_VALUE_BOOL, "bool", "content, saved, proposable, inspect, perceive(sight)" },
+    { "wide", offsetof(BGDoor, wide), BG_VALUE_QUANTITY, "int", "content, saved, inspect" },
+};
+
 static const BGFieldInfo BGPump_fields[] = {
     { "opened", offsetof(BGPump, opened), BG_VALUE_BOOL, "bool", "content, saved, proposable, inspect, perceive(sight)" },
 };
@@ -419,7 +436,7 @@ static const BGFieldInfo BGFastener_fields[] = {
 static const BGComponentInfo BGComponents[BG_COMPONENT_COUNT + 1] = {
     { "Combustor", "#Combustor", sizeof(BGCombustor), 3, BGCombustor_fields },
     { "FuelContainer", "#FuelContainer", sizeof(BGFuelContainer), 1, BGFuelContainer_fields },
-    { "GasStore", "#GasStore", sizeof(BGGasStore), 8, BGGasStore_fields },
+    { "GasStore", "#GasStore", sizeof(BGGasStore), 11, BGGasStore_fields },
     { "Lever", "#Lever", sizeof(BGLever), 3, BGLever_fields },
     { "Respirator", "#Respirator", sizeof(BGRespirator), 4, BGRespirator_fields },
     { "Sized", "#Sized", sizeof(BGSized), 1, BGSized_fields },
@@ -431,6 +448,7 @@ static const BGComponentInfo BGComponents[BG_COMPONENT_COUNT + 1] = {
     { "Assembly", "#Assembly", sizeof(BGAssembly), 1, BGAssembly_fields },
     { "Cock", "#Cock", sizeof(BGCock), 2, BGCock_fields },
     { "Container", "#Container", sizeof(BGContainer), 1, BGContainer_fields },
+    { "Door", "#Door", sizeof(BGDoor), 2, BGDoor_fields },
     { "Pump", "#Pump", sizeof(BGPump), 1, BGPump_fields },
     { "Record", "#Record", sizeof(BGRecord), 1, BGRecord_fields },
     { "Stack", "#Stack", sizeof(BGStack), 3, BGStack_fields },

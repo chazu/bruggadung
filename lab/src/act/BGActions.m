@@ -810,6 +810,13 @@ static NSString   *effect_shut( BGWorld *world, BGAction a, int64_t amount, BGPr
 }
 
 
+static NSString   *effect_open_door( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
+{
+   [g set:"Door.ajar" of:BGWhole( a.roles[ BGRoleItem]) to:1];
+   return( nil);
+}
+
+
 /* Dismantling's last stage: the pump is open. */
 static NSString   *effect_dismantle( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
 {
@@ -902,6 +909,7 @@ static const struct
    { "shut",      effect_shut },
    { "dismantle", effect_dismantle },
    { "light",     effect_light },
+   { "open_door", effect_open_door },
    { "rest",      effect_tend },
    { "strike",    effect_strike },
 };

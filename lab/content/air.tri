@@ -5,7 +5,10 @@
 // of the air (nitrogen) is the region's fixed total, less those two. Solids
 // hold heat too, in the thermal domain: a stove's iron, a room's walls.
 
-// A region of air over tiles from (west, north) to (east, south).
+// A region of air over tiles from (west, north) to (east, south). It opens
+// to another region (`opensTo`), or to the outdoors, at 275 K and of fixed
+// composition: through a gap that passes `gap` mmol of air a second each
+// way, or, while its door is ajar, the door's `wide`.
 #GasStore: {
     @component(GasStore)
     oxygen:  int & >=0 & <=100000000           @field(content, saved, proposable, inspect)
@@ -16,6 +19,16 @@
     north:   int & >=0 & <=1000                @field(content, saved, inspect)
     east:    int & >=0 & <=1000                @field(content, saved, inspect)
     south:   int & >=0 & <=1000                @field(content, saved, inspect)
+    opensTo: ref                               @field(saved, proposable, inspect)
+    door:    ref                               @field(saved, proposable, inspect)
+    gap:     *200 | int & >=0 & <=1000000      @field(content, saved, proposable, inspect)
+}
+
+// A door between two regions of air.
+#Door: #Body & {
+    @component(Door)
+    ajar: *false | true                        @field(content, saved, proposable, inspect, perceive(sight))
+    wide: int & >=0 & <=1000000                @field(content, saved, inspect)
 }
 
 // A stove's firebox: lit or not, its damper open to the flue or not, and how
@@ -72,6 +85,14 @@
 // per kelvin.
 room_air:   #GasStore & { oxygen: 420000, dioxide: 800, gasHeat: 15950000, total: 2000000,
                           west: 1, north: 1, east: 4, south: 5 }
+// another room like it, across the corridor
+back_room:  #GasStore & { oxygen: 420000, dioxide: 800, gasHeat: 15950000, total: 2000000,
+                          west: 6, north: 1, east: 9, south: 5 }
+// a corridor ten times the room, open to the outdoors along its length
+corridor:   #GasStore & { oxygen: 4200000, dioxide: 8000, gasHeat: 159500000, total: 20000000,
+                          west: 0, north: 6, east: 20, south: 7, gap: 2000 }
+// a room's door, open: a cubic metre a minute or so
+room_door:  #Door & { material: "oak", mass: 30kg, wide: 5000 }
 stove:      #Stove & { material: "iron", mass: 120kg, burnRate: 250, fuel: 3kg,
                        heat: 12375000, heatCapacity: 45000, toAir: 20, toOutdoors: 0 }
 // at 275 K
