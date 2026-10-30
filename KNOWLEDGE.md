@@ -83,6 +83,11 @@ These were made while writing this document and have not yet been reviewed.
       intoxication) degrading what it takes in or recalls;
     - *poor sight*: seen in poor conditions (dusk, distance), something
       that could be either of two known things is held as both.
+13. **Believed the same, two referents merge.** Past a credence threshold
+    (content declares it), an identity hypothesis ("R5 may be R2") merges
+    them into one: features unified, beliefs and testimony pooled. A wrong
+    merge is the "two people taken for one" error (§6), and stands until
+    evidence splits them again (both seen at once).
 
 ## Terms
 
