@@ -187,6 +187,7 @@ static int64_t   next_checkpoint( BGWorld *world, BGEntityID a, const BGActivity
                                                                                   : @"completes"]];
       [group setCause:[self startOf:a]];
       [group setActor:(BGEntityID) record->actorRef];
+      [group setWeight:BGContestWeight( _world, (BGEntityID) record->actorRef, operation)];
       if( ! BGOperationStage( _world, operation, record->stage, &duration, &effect))
          effect = nil;
       /* what it needs must still hold when its effect commits: taken from

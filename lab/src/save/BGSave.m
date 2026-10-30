@@ -199,7 +199,7 @@ NSString   *BGSave( BGWorld *world, BGCommitter *committer, NSArray *domains)
       [out appendFormat:@"group %d %llu %llu", (int) [group phase], (unsigned long long) [group cause],
                         (unsigned long long) [group handleCount]];
       put_string( out, [[group source] UTF8String]);
-      [out appendFormat:@" %llu\n", (unsigned long long) [group actor]];
+      [out appendFormat:@" %llu %llu\n", (unsigned long long) [group actor], (unsigned long long) [group weight]];
       for( j = 0; j < [group count]; j++)
       {
          p = &[group proposals][ j];
@@ -543,6 +543,7 @@ BGWorld   *BGRestore( NSString *text,
          [group setCause:token_u64( &line, 2)];
          [group setHandleCount:token_u64( &line, 3)];
          [group setActor:token_u64( &line, 5)];
+         [group setWeight:token_u64( &line, 6)];
          [groups addObject:group];
       }
       else if( ! strcmp( s, "proposal"))

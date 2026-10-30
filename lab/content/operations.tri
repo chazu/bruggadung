@@ -62,12 +62,18 @@
     stages:    [...#Stage]
     uses:      [...#Provider]
     attention: *0 | int & >=0 & <=100
+    contest:   text
 }
+
+// `contest` (ACTIONS.md decision 13): the actor's field that weights its
+// groups when they conflict with others in the action phase; taking is a
+// matter of quickness. Without one, who goes first is an even draw.
 
 // Pick something up into a free hand: from a container, the ground, or an
 // assembly it is installed in.
 take: #Operation & {
     effect: "take"
+    contest:  "quickness"
     roles: {
         actor: #Agent & { freeHands: >=1 }
         item:  #Body & { place: #Inside | #OnTile | #Installed }
@@ -78,6 +84,7 @@ take: #Operation & {
 // or the actor's other hand. How many is the command's.
 take_some: #Operation & {
     effect: "take_some"
+    contest:  "quickness"
     roles: {
         actor: #Agent & { id: $a, freeHands: >=1 }
         item:  #Stack & { place: #Inside | #OnTile | #Held & { by: $a } }
@@ -257,6 +264,7 @@ watch_closely: #Operation & {
 // was meanwhile, the take fails: there is nothing to come back to.
 take_up: #Operation & {
     effect:   "take"
+    contest:  "quickness"
     duration: 1s
     uses:     ["hands"]
     hard:     "fail"

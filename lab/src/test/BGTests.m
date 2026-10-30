@@ -5674,7 +5674,7 @@ static void   test_promises( void)
  * bench, reserved for A (the worker); A and B (the smith) take it at the same
  * boundary. 1 if A gets it, 2 if B does. `swap` creates B first, so their
  * IDs swap. */
-static int   seal_race( uint64_t seed, int64_t quickA, int64_t quickB, BOOL swap)
+static int   seal_race( uint64_t seed, int64_t quickA, int64_t quickB, BOOL swap, const char *operation)
 {
    BGWorld           *w;
    BGCommitter       *c;
@@ -5707,9 +5707,11 @@ static int   seal_race( uint64_t seed, int64_t quickA, int64_t quickB, BOOL swap
    [w setBoundary:7];
    ga = [BGProposalGroup groupWithPhase:BGPhaseAction source:@"A takes the seal"];
    [ga setActor:a];
+   [ga setWeight:BGContestWeight( w, a, operation)];
    [ga move:BGWhole( seal) to:BGHeldBy( a, 0) expecting:BGOnTile( 6, 6, 0)];
    gb = [BGProposalGroup groupWithPhase:BGPhaseAction source:@"B takes the seal"];
    [gb setActor:b];
+   [gb setWeight:BGContestWeight( w, b, operation)];
    [gb move:BGWhole( seal) to:BGHeldBy( b, 0) expecting:BGOnTile( 6, 6, 0)];
    [c submit:ga];
    [c submit:gb];
@@ -5831,6 +5833,7 @@ static void   test_two_hands( void)
    int                a;
    int                swapped;
    int                weighted;
+   int                even;
    int                w;
 
    /* 1, 2: exactly one take applies; the other is rejected whole, and its
@@ -5853,22 +5856,28 @@ static void   test_two_hands( void)
    a        = 0;
    swapped  = 0;
    weighted = 0;
+   even     = 0;
    for( seed = 1; seed <= 1000; seed++)
    {
-      w = seal_race( seed, 10, 10, NO);
+      w = seal_race( seed, 10, 10, NO, "take_up");
       BG_CHECK( w != 0);
       if( w == 1)
          a++;
-      if( seal_race( seed, 10, 10, YES) == 1)
+      if( seal_race( seed, 10, 10, YES, "take_up") == 1)
          swapped++;
       /* 4: weighted 1 to 3, B wins about three times in four */
-      if( seal_race( seed, 10, 30, NO) == 2)
+      if( seal_race( seed, 10, 30, NO, "take_up") == 2)
          weighted++;
+      /* ACTIONS.md decision 13: an operation that declares nothing to weigh
+       * its contests draws evenly, however quick */
+      if( seal_race( seed, 10, 30, NO, "look_in") == 2)
+         even++;
    }
    BG_CHECK( a > 430 && a < 570);
    BG_CHECK( swapped > 430 && swapped < 570);
    BG_CHECK( weighted > 700 && weighted < 800);
-   BG_CHECK( seal_race( 77, 10, 10, NO) == seal_race( 77, 10, 10, NO));
+   BG_CHECK( even > 430 && even < 570);
+   BG_CHECK( seal_race( 77, 10, 10, NO, "take_up") == seal_race( 77, 10, 10, NO, "take_up"));
 
    /* A: B, told the seal is A's and disposed to respect that, never starts:
     * taking it scores below nothing; A takes it */

@@ -184,14 +184,14 @@ static void   declare( BGTally *t, const char *unit, int64_t units, int64_t mass
 
 /* --- ordering -------------------------------------------------------------- */
 
-/* What weights a group in the permutation (ACTIONS.md §8): its actor's
- * quickness, a derived reaction speed; 10 for a group with no agent. */
+/* What weights a group in the permutation (ACTIONS.md §8, decision 13): in
+ * the action phase, what its operation declares weights its contests (its
+ * actor's quickness, for taking); 10 for one that declares nothing. Process
+ * and system phases are never weighted. */
 - (uint64_t) orderWeightOf:(BGProposalGroup *) g
 {
-   int64_t   v;
-
-   if( [g actor] && [_world getField:"Agent.quickness" of:[g actor] value:&v] && v > 0)
-      return( (uint64_t) v);
+   if( [g phase] == BGPhaseAction && [g weight] > 0)
+      return( [g weight]);
    return( 10);
 }
 

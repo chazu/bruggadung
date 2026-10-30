@@ -76,6 +76,18 @@ const char   *BGPhaseNames[ BGPhaseCount] =
 }
 
 
+- (uint64_t) weight
+{
+   return( _weight);
+}
+
+
+- (void) setWeight:(uint64_t) weight
+{
+   _weight = weight;
+}
+
+
 - (NSUInteger) count
 {
    return( _count);

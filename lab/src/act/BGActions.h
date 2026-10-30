@@ -140,6 +140,11 @@ static inline int64_t   BGAtRate( int64_t effort, int64_t rate)
  * 14), added the same way. */
 int64_t            BGAccessDelay( BGWorld *world, BGAction action);
 
+/* What weights the actor's groups for the operation when they conflict
+ * (ACTIONS.md decision 13): its value of the field the operation declares
+ * (`contest`, an Agent field: "quickness"); 0 if it declares none. */
+uint64_t           BGContestWeight( BGWorld *world, BGEntityID actor, const char *operation);
+
 /* Stage `index` of an operation: its duration and effect. An operation with
  * a duration and no stages has one stage. NO past the last stage. */
 BOOL               BGOperationStage( BGWorld *world, const char *operation, int64_t index,

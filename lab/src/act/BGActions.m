@@ -64,7 +64,7 @@ static TriMatch   match_described( BGWorld *world, const TriNode *pattern, BGAct
    TriArena          *arena;
    TriMatch          match;
    static const char *copied[] = { "duration", "stages", "uses", "attention", "leaves", "removes", "partial",
-                                   "checkpoints", "hard", "exertion", "floodWatch", NULL };
+                                   "checkpoints", "hard", "exertion", "floodWatch", "contest", NULL };
    char              value[ 1024];
    char              effect[ 64];
    char              err[ 256];
@@ -927,6 +927,29 @@ int64_t   BGWorkRate( BGWorld *world, BGEntityID actor, const char *operation, i
       return( 100);
    worn = (int64_t) agent->fatigue + (int64_t) agent->injury;
    return( 100 * 200 / (200 + (worn > 0 ? worn : 0)));
+}
+
+
+uint64_t   BGContestWeight( BGWorld *world, BGEntityID actor, const char *operation)
+{
+   const TriNode   *pattern;
+   const TriNode   *v;
+   char            field[ 96];
+   char            printed[ 64];
+   int64_t         value;
+   size_t          n;
+
+   pattern = operation ? tri_pattern( [world tri], operation) : NULL;
+   v       = pattern ? tri_at( [world tri], pattern, "contest") : NULL;
+   n       = v ? tri_print( [world tri], v, printed, sizeof( printed)) : 0;
+   if( n < 3 || printed[ 0] != '"')
+      return( 0);
+   printed[ n - 1] = 0;
+   snprintf( field, sizeof( field), "Agent.%s", printed + 1);
+   value = 0;
+   if( ! [world getField:field of:actor value:&value] || value <= 0)
+      return( 0);
+   return( (uint64_t) value);
 }
 
 
@@ -2455,6 +2478,7 @@ BGProposalGroup   *BGPerform( BGWorld *world, BGCommitter *committer, BGAction a
    group = [BGProposalGroup groupWithPhase:BGPhaseAction
                                     source:source];
    [group setActor:action.roles[ BGRoleActor]];
+   [group setWeight:BGContestWeight( world, action.roles[ BGRoleActor], action.operation)];
    if( [effect isEqualToString:@"fill"])
    {
       /* an activity that ends by its watch on the bucket, or by the tap running dry */

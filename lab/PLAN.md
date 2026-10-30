@@ -3748,3 +3748,26 @@ is said within the second.
 Not yet: agents composing accounts themselves (they answer with one claim).
 
 91 tests, 2826 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: what weights a contest, declared
+
+ACTIONS.md decision 13: an operation declares the derived value that
+weights the commit permutation when its groups conflict, in the action
+phase only; without one, the draw is unweighted; process and system phases
+never are.
+
+- **`#Operation.contest`**: the actor's field that weights its groups;
+  `take`, `take_some` and `take_up` declare `"quickness"`.
+- **The group carries its weight** (`BGContestWeight`, set by `BGPerform`
+  and by an activity's stage completion), and it is saved with deferred
+  groups. The committer weighs only action-phase groups, by that weight;
+  every other group counts 10 (an even draw among equals).
+
+Checked: two taking the seal at quickness 10 and 30, the quicker wins
+about three in four of 1,000 seeds; the same pair in an operation that
+declares nothing wins about half each.
+
+Not yet: shoving (strength) and talking over someone (voice), as there are
+no such operations.
+
+91 tests, 2827 checks, under both compilers, ASan, and leak-free.

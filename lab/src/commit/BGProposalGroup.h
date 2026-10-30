@@ -81,6 +81,7 @@ extern const char   *BGPhaseNames[ BGPhaseCount];
    BGPhase      _phase;
    NSString     *_source;
    BGEntityID   _actor;
+   uint64_t     _weight;
    uint64_t     _cause;
    BGProposal   *_proposals;
    NSUInteger   _count;
@@ -107,6 +108,10 @@ extern const char   *BGPhaseNames[ BGPhaseCount];
 /* the agent whose action this is; its events record it */
 - (BGEntityID) actor;
 - (void) setActor:(BGEntityID) actor;
+/* what weights it when it conflicts (ACTIONS.md decision 13): its actor's
+ * value of what its operation declares; 0, unweighted */
+- (uint64_t) weight;
+- (void) setWeight:(uint64_t) weight;
 - (NSUInteger) count;
 - (const BGProposal *) proposals;
 - (BGEntityID) newHandle;
