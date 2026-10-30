@@ -136,32 +136,37 @@ method that needed it has failed, so the goal beneath tries its next.
 A step can say something: *ask where nails are* puts a `#WhereIs` to the
 nearest agent the worker knows of, then waits up to five seconds for the
 answer (the scheduler wakes it then if nothing else does), and a search slot
-passes over whoever it has asked since adopting the goal. Goals have worth,
-from considerations in content (credence among them), and a goal that
-arises from a finding (a noise heard near the storeroom) is weighed
-against what the agent is doing, mid-activity too: it wins only by a margin
-and the cost of interrupting, then the agent suspends what it was doing
-and comes back to it after. Methods are scored too, by dispositions and
-norms (`honesty`, `scruples`) and by whether the agent believes itself
-watched; one that scores below nothing is unthinkable. An agent's commitments (a shift from 8:00 to 16:00) are its routine:
-while a window is open its goal is a candidate, worth its duty and an
-urgency that rises toward the deadline. Agents feel their hunger, a body stock that falls as time passes, through
-interoception, dulled while they concentrate; the needs generator raises
-eating, worth what they feel. Habits grow with repetition and fade: a habitual method wins ties, a slot
-can prefer the habitual referent, and an observer who saw someone do the
-same thing three times believes they usually do, and finds it salient
-when they don't. A promise is a communicate act: the promiser commits to it, and hearers
-hold it as a claim about a time to come, kept or broken as they find. The
-player can hand their character to agency
-on autopilot, and control comes back when something arises worth more
-than the player said, or the goal is done. Being asked is a choice for agents agency
-controls: answering is worth their trust in the
+passes over whoever it has asked since adopting the goal. Being asked is a
+choice for agents agency controls: answering is worth their trust in the
 asker plus their `helpful` disposition, less what their running activity
 demands of their attention and a little for a goal of their own. Worth
 something, they answer from what they know: where they believe something
 like it is, and how they know, or that they don't know. Busy, they answer
 once they're done, if the asker can still be waiting; otherwise they say
-they won't.
+they won't. Asked for something, they weigh complying the same way, less
+the cost of parting with it, and give it or refuse.
+
+Goals have worth, from considerations in content (credence among them),
+and are raised by generators. A goal that arises from a finding (a noise
+heard near the storeroom) is weighed against what the agent is doing,
+mid-activity too: it wins only by a margin and the cost of interrupting,
+then the agent suspends what it was doing and comes back to it after. An
+agent's commitments (a shift from 8:00 to 16:00) are its routine: while a
+window is open its goal is a candidate, worth its duty and an urgency that
+rises toward the deadline. A promise is a communicate act: the promiser
+commits to it, and hearers hold it as a claim about a time to come, kept or
+broken as they find. Agents feel their hunger, a body stock that falls as
+time passes, through interoception, dulled while they concentrate; the
+needs generator raises eating, worth what they feel.
+
+Methods are scored, by dispositions and norms (`honesty`, `scruples`) and
+by whether the agent believes itself watched; one that scores below nothing
+is unthinkable. Habits grow with repetition and fade: a habitual method
+wins ties, a slot can prefer the habitual referent, and an observer who
+saw someone do the same thing three times believes they usually do, and
+finds it salient when they don't. The player can hand their character to
+agency on autopilot, and control comes back when something arises worth
+more than the player said, or the goal is done.
 
 The missing nails runs on this content: *wedge the lock*
 (drive a nail in, after *have nails*), and *have nails* (fetch them, else
