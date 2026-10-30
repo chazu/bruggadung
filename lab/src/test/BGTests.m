@@ -7038,6 +7038,72 @@ static void   test_pain( void)
 }
 
 
+/* KNOWLEDGE.md §3: "Traces on stacks trigger automatic individuation ...
+ * marked units never merge." Ten nails on the floor; a scratch and a creak
+ * put on the stack in one group mark one nail, split off first, and it
+ * won't merge back. A nail with only a creak merges back once the creak
+ * has run out. */
+static void   test_traced_units( void)
+{
+   BGWorld           *w;
+   BGCommitter       *c;
+   BGScheduler       *s;
+   BGProposalGroup   *g;
+   BGEntityID        nails;
+   BGEntityID        marked;
+   BGEntityID        bearers[ 2];
+   BGStore           *traces;
+   NSUInteger        i;
+   NSUInteger        n;
+
+   w     = BGTestWorld( 163);
+   c     = BGTestCommitter( w);
+   nails = commit_create( c, "nails_10", BGOnTile( 3, 3, 0));
+   g     = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"a scratch and a creak, on the stack"];
+   BGMakeTrace( w, g, "scratch", nails, BGLocationMakeNone(), 40, "a file");
+   BGMakeTrace( w, g, "creak", nails, BGLocationMakeNone(), 40, "a file");
+   [c submit:g];
+   [c commitBoundary];
+   BG_CHECK( [g applied]);
+   BG_CHECK( [w unitsOf:nails] == 9);
+   traces = [w storeForKind:[w kindNamed:"Trace"]];
+   n      = 0;
+   for( i = 0; i < [traces count] && n < 2; i++)
+      bearers[ n++] = (BGEntityID) ((const BGTrace *) [traces recordAtIndex:i])->bearer;
+   BG_CHECK( n == 2 && bearers[ 0] == bearers[ 1] && bearers[ 0] != nails);
+   marked = bearers[ 0];
+   BG_CHECK( [w isLive:marked] && [w unitsOf:marked] == 1 && [w hasEdge:BGEdgeSplitFrom from:marked to:nails]);
+
+   /* marked, it won't merge back */
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"put the marked nail back"];
+   [g merge:BGWhole( marked) into:BGWhole( nails)];
+   [c submit:g];
+   [c commitBoundary];
+   BG_CHECK( ! [g applied] && [[g rejection] rangeOfString:@"one bears a trace"].location != NSNotFound);
+
+   /* a nail with only a creak on it: once the creak has run out, it does */
+   s = [[[BGScheduler alloc] initWithWorld:w committer:c] autorelease];
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"a creak alone, on the stack"];
+   BGMakeTrace( w, g, "creak", nails, BGLocationMakeNone(), 40, "a file");
+   [c submit:g];
+   [s runUntil:BGTimeMake( [w time].ms + 1)];
+   BG_CHECK( [g applied] && [w unitsOf:nails] == 8);
+   marked = [g idFor:[g proposals][ 0].handle];
+   marked = (BGEntityID) ((const BGTrace *) [traces recordFor:marked])->bearer;
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"put it back, creaking"];
+   [g merge:BGWhole( marked) into:BGWhole( nails)];
+   [c submit:g];
+   [s runUntil:BGTimeMake( [w time].ms + 1)];
+   BG_CHECK( ! [g applied]);
+   [s runUntil:BGTimeMake( [w time].ms + 5000)];
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"put it back, quiet now"];
+   [g merge:BGWhole( marked) into:BGWhole( nails)];
+   [c submit:g];
+   [s runUntil:BGTimeMake( [w time].ms + 1)];
+   BG_CHECK( [g applied] && [w unitsOf:nails] == 9);
+}
+
+
 /* KNOWLEDGE.md §3: foot traffic speeds a trace's decay, as its kind
  * declares. A damp floor and scuffs on one tile, a damp floor on the next;
  * a worker steps onto the first, off, and on again. Each step takes a
@@ -7642,6 +7708,7 @@ const BGTestCase   BGAllTests[] =
    { "memory_rates",                  test_memory_rates },
    { "scheduled_forgetting",          test_scheduled_forgetting },
    { "trodden",                       test_trodden },
+   { "traced_units",                  test_traced_units },
    { "resume_recheck",                test_resume_recheck },
    { "interrupted_repair",            test_interrupted_repair },
    { "unattended_stove",              test_unattended_stove },

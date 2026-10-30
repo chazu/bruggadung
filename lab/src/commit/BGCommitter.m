@@ -279,6 +279,9 @@ static void   rewrite_ref( BGRef *r, BGUnitPair *pairs, NSUInteger n)
 }
 
 
+#define BG_TRACED_UNIT   0xffffffffU      /* the unit a trace on a stack marks */
+
+
 /* Proposals that address one unit of a stack get that unit split off first,
  * whether or not the proposer asked: the group's copy is rewritten so that
  * every proposal naming {stack, n} names the split-off unit. */
@@ -300,8 +303,8 @@ static void   rewrite_ref( BGRef *r, BGUnitPair *pairs, NSUInteger n)
 
    in     = [group proposals];
    n      = [group count];
-   out    = malloc( sizeof( BGProposal) * (3 * n + 1));
-   pairs  = malloc( sizeof( BGUnitPair) * (2 * n + 1));
+   out    = malloc( sizeof( BGProposal) * (4 * n + 1));
+   pairs  = malloc( sizeof( BGUnitPair) * (3 * n + 1));
    npairs = 0;
    k      = 0;
    for( i = 0; i < n; i++)
@@ -338,6 +341,32 @@ static void   rewrite_ref( BGRef *r, BGUnitPair *pairs, NSUInteger n)
          npairs++;
       }
    }
+   /* a trace put on a stack of several marks one unit (KNOWLEDGE.md §3): it
+    * is split off, the same one for every trace the group puts on that stack */
+   for( i = 0; i < n; i++)
+   {
+      if( in[ i].kind != BGProposeSetField || ! in[ i].name || strcmp( in[ i].name, "Trace.bearer") ||
+          BGIsHandle( (BGEntityID) in[ i].value) || ! [_world isStack:(BGEntityID) in[ i].value] ||
+          [_world unitsOf:(BGEntityID) in[ i].value] < 2)
+         continue;
+      found = NO;
+      for( q = 0; q < npairs && ! found; q++)
+         found = pairs[ q].entity == (BGEntityID) in[ i].value && pairs[ q].unit == BG_TRACED_UNIT;
+      if( found)
+         continue;
+      memset( &split, 0, sizeof( split));
+      split.kind            = BGProposeSplit;
+      split.target          = BGWhole( (BGEntityID) in[ i].value);
+      split.value           = 1;
+      split.handle          = [group newHandle];
+      pairs[ npairs].entity = (BGEntityID) in[ i].value;
+      pairs[ npairs].unit   = BG_TRACED_UNIT;
+      pairs[ npairs].handle = split.handle;
+      npairs++;
+      out[ k++] = split;
+      [self note:[NSString stringWithFormat:@"    individuate: a unit of %llu, traced, is split off first",
+                                            (unsigned long long) in[ i].value]];
+   }
    for( i = 0; i < n; i++)
    {
       out[ k] = in[ i];
@@ -345,6 +374,10 @@ static void   rewrite_ref( BGRef *r, BGUnitPair *pairs, NSUInteger n)
       refs[ 1] = &out[ k].other;
       rewrite_ref( refs[ 0], pairs, npairs);
       rewrite_ref( refs[ 1], pairs, npairs);
+      if( out[ k].kind == BGProposeSetField && out[ k].name && ! strcmp( out[ k].name, "Trace.bearer"))
+         for( q = 0; q < npairs; q++)
+            if( pairs[ q].unit == BG_TRACED_UNIT && pairs[ q].entity == (BGEntityID) out[ k].value)
+               out[ k].value = (int64_t) pairs[ q].handle;
       k++;
    }
    free( pairs);
@@ -407,6 +440,24 @@ static NSString   *live_check( BGWorld *w, BGEntityID e, const char *role)
 }
 
 
+/* Whether a trace that hasn't run out is on the entity. */
+static BOOL   bears_trace( BGWorld *world, BGEntityID e)
+{
+   const BGTrace   *trace;
+   BGStore         *traces;
+   NSUInteger      i;
+
+   traces = [world storeForKind:[world kindNamed:"Trace"]];
+   for( i = 0; i < [traces count]; i++)
+   {
+      trace = [traces recordAtIndex:i];
+      if( trace->bearer == e && trace->expires > [world time].ms)
+         return( YES);
+   }
+   return( NO);
+}
+
+
 /* Why `a` cannot merge into `b`, or nil. */
 - (NSString *) mergeObstacle:(BGEntityID) a
                         into:(BGEntityID) b
@@ -438,6 +489,8 @@ static NSString   *live_check( BGWorld *w, BGEntityID e, const char *role)
       return( @"units differ physically: one is bent");
    if( ba->toolMarks || bb->toolMarks)
       return( @"units differ physically: one has tool marks");
+   if( bears_trace( _world, a) || bears_trace( _world, b))
+      return( @"units differ physically: one bears a trace");
    if( ! BGLocationEqual( [_world locationOf:a], [_world locationOf:b]))
       return( @"they are not in the same place");
    /* a quantity claim over several entities follows the units; a claim on this one unit alone pins it */

@@ -2739,3 +2739,24 @@ off changes nothing; on again, another quarter of what is left.
 Not yet: rain and heat.
 
 74 tests, 2474 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: a trace on a stack marks one unit
+
+KNOWLEDGE.md §3: "Traces on stacks trigger automatic individuation
+(COMPONENTS.md §9). Traces are physical distinctions, so marked units
+never merge." The traces slice's "Not yet": traces on stacks
+individuating the units they're on.
+
+- **Individuated by commitment**: a group that puts a trace on a stack of
+  more than one unit (its `Trace.bearer`) gets a unit split off first, and
+  the trace goes on it; every trace the group puts on that stack goes on
+  the same unit. Proposers don't have to remember, as for any unit.
+- **No merging a traced unit**: a unit bearing a trace that hasn't run out
+  won't merge ("units differ physically: one bears a trace"); once its
+  traces have run out, it may.
+
+Checked: a scratch and a creak on ten nails split one off, `splitFrom`
+the stack, which bears both; it won't merge back. A nail with a creak
+alone merges back once the creak has run out.
+
+75 tests, 2482 checks, under both compilers, ASan, and leak-free.
