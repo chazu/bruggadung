@@ -1796,3 +1796,23 @@ B's hand. That is the hook for grievances, which wait on institutions.
   roles.item.place").
 
 53 tests, 2023 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: the map's ages, checked
+
+KNOWLEDGE.md Scenario 3's check 1, asserted. In a `lab play` session the
+worker looks into the bin, then walks off. Its map still shows the nails in
+the bin, "as you saw it 11s ago", from its store ("seen at 0ms"), and the
+nails it took since aren't refreshed into it.
+
+Needs design first: check 2's bump into a closed door. The lab has
+`#Door` (the air's), but not yet:
+
+- doors that make a tile impassable;
+- whether a door's state can be seen from afar (if it can, the stale
+  belief never reaches the menu);
+- how a failed move leaves the actor where it can perceive what stopped it.
+
+The last is ACTIONS.md §5's partial effects on failure, which are also
+undesigned.
+
+53 tests, 2025 checks, under both compilers, ASan and UBSan, and leak-free.

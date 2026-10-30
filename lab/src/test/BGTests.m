@@ -838,7 +838,7 @@ static void   test_play( void)
 
    commands = [NSArray arrayWithObjects:@"look", @"menu", @"do 1", @"menu", @"do 5 5", @"walk w", @"walk e", @"menu",
                                         @"do 1", @"idle", @"inspect 11", @"why 11", @"knows", @"walk n", @"walk n",
-                                        @"walk n", @"walk n", @"walk n", @"hash", nil];
+                                        @"walk n", @"walk n", @"walk n", @"look", @"knows", @"hash", nil];
    out   = session( @"workshop", commands, &h1);
    again = session( @"workshop", commands, &h2);
    BG_CHECK( h1 == h2);
@@ -862,6 +862,11 @@ static void   test_play( void)
              != NSNotFound);
    /* walks are activities of a second each: two of them, so the drive is activity 10, and done at 6 s */
    BG_CHECK( [out rangeOfString:@"activity 9: walk_east completes"].location != NSNotFound);
+   /* KNOWLEDGE.md Scenario 3's check 1: the map renders from the knowledge
+    * store, and what is remembered carries its age, never refreshed: the
+    * nails in the bin, last seen when it looked in, at the start */
+   BG_CHECK( [out rangeOfString:@"R5 #Stack in R2, as you saw it 11s ago"].location != NSNotFound);
+   BG_CHECK( [out rangeOfString:@"R5 #Stack, seen at 0ms, truth 2"].location != NSNotFound);
    /* the map's edge: the step off it fails when it would arrive */
    BG_CHECK( [out rangeOfString:@"is off the map"].location != NSNotFound);
    if( [out rangeOfString:@"is off the map"].location == NSNotFound)
