@@ -3861,3 +3861,47 @@ Not yet: lamps lit and put out by operations; daylight by season; sound
 masking speech (what is said is heard by earshot, not by loudness).
 
 95 tests, 2901 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: wear from use, after dewdrop
+
+LATENT_ASSEMBLY.md's provisional rules, designed (decisions 4-6, after
+dewdrop's latent anatomy); and COMPONENTS.md decision 10 revised:
+unreferenced content is kept, and saving never changes the world.
+
+- **Use and abuse** (`Latent.used`, `abused`, new): working a pump
+  (`work_pump`, an hour; effect "work") lifts water from the store it
+  `draws` from into its riser, at its `lift` times its flow; what the
+  store can't supply, it is worked dry, abused for. Seized, it can't be
+  worked.
+- **Wear shared out**: a role `wears` points per hundred hours of use,
+  `strain` times as fast abused (the leather cup 5, three times dry; the
+  valves 3; iron 1; the cover 0), faster the poorer it is. Revealing a part
+  gives it that wear, no longer from the seed alone; the culprit is worn at
+  least 60. An assembly within takes on its parent's use.
+- **Hidden quality**: 50, give or take 20 by the unit's seed, plus the
+  schema's `biases` for a kind of part (`cheap_pump`: leather -30).
+- **Failure from use**: each hour risks each failure its `chance` in a
+  thousand per hundred hours, four times that with its most worn candidate
+  worn through, drawn from the seed and the use so far. Failing, the
+  culprit is drawn then, weighted by wear, and kept (`Latent.blamed`); a
+  flow loss costs the pump 80 points of flow if the culprit is a part. A
+  failure a scenario sets gets its culprit when first opened. Replacing
+  the culprit clears both.
+- `text_feature` returns NO for a missing feature instead of crashing.
+- `pump_drain` and `flood_run` build world 157, as `pump_open` and
+  `mend_run` do, so a key is the same unit throughout; "pump 2" is now the
+  seal's unit.
+
+Checked: an hour lifts the tank full from the well; dry, the hour is
+abuse; half the lift in the well, half; seized, no work. After 400 hours
+the cup is worn most, then the valves, iron least, the cover not at all;
+dry, the cup three times as worn; the cheap make's cup more. Among 24
+units worked dry a thousand hours, the cup is blamed more often than among
+new ones, not always. The rickety pump with 2000 hours behind it fails
+within a hundred hours' work, the same hour and culprit again and after a
+save; of 12 units, more worn ones fail in 20 hours than new ones.
+
+Not yet: maintenance, and replacement, resetting a role's wear; age
+wearing parts; agents working pumps of their own accord.
+
+96 tests, 3079 checks, under both compilers, ASan, and leak-free.

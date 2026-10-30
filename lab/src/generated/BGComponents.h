@@ -1,4 +1,4 @@
-/* Generated from Triangle content 6d2aa42b5a0a4d2c: do not edit. Type IDs are valid
+/* Generated from Triangle content 0a80e37ab2e53298: do not edit. Type IDs are valid
  * only for this content; regenerate when it changes. */
 #ifndef BG_COMPONENTS_H
 #define BG_COMPONENTS_H
@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BG_CONTENT_HASH 0x6d2aa42b5a0a4d2cULL
+#define BG_CONTENT_HASH 0x0a80e37ab2e53298ULL
 
 typedef struct TriNode TriNode;
 
@@ -229,12 +229,15 @@ typedef struct {
 
 /* Latent, from #Latent */
 typedef struct {
+    int64_t         abused;    /* time, in quanta of 1ms; content, saved, proposable, inspect */
+    const char *    blamed;    /* text; saved, proposable, inspect */
     int64_t         failedAt;    /* time, in quanta of 1ms; content, saved, proposable, inspect */
     const char *    failure;    /* text; saved, proposable, inspect */
     const TriNode * latent;    /* #LatentSchema: a structure */
     bool            leaking;    /* bool; content, saved, proposable, inspect */
     int64_t         revealed;    /* int, in quanta of 1; content, saved, proposable, inspect */
     uint64_t        riser;    /* a referent; saved, proposable, inspect */
+    int64_t         used;    /* time, in quanta of 1ms; content, saved, proposable, inspect */
 } BGLatent;
 
 /* Log, from #Log */
@@ -254,7 +257,9 @@ typedef struct {
 
 /* Pump, from #Pump */
 typedef struct {
+    uint64_t        draws;    /* a referent; saved, proposable, inspect */
     int64_t         flow;    /* int, in quanta of 1; content, saved, proposable, inspect */
+    int64_t         lift;    /* int, in quanta of 1; content, saved, proposable, inspect */
     bool            opened;    /* bool; content, saved, proposable, inspect, perceive(sight) */
 } BGPump;
 
@@ -319,80 +324,80 @@ typedef struct {
 
 /* #ActivityStatus */
 enum {
-    BG_ACTIVITYSTATUS_ABORTED = 396,
-    BG_ACTIVITYSTATUS_COMPLETED = 397,
-    BG_ACTIVITYSTATUS_EXHAUSTED = 398,
-    BG_ACTIVITYSTATUS_FAILED = 399,
-    BG_ACTIVITYSTATUS_RUNNING = 400,
-    BG_ACTIVITYSTATUS_SUSPENDED = 401,
+    BG_ACTIVITYSTATUS_ABORTED = 400,
+    BG_ACTIVITYSTATUS_COMPLETED = 401,
+    BG_ACTIVITYSTATUS_EXHAUSTED = 402,
+    BG_ACTIVITYSTATUS_FAILED = 403,
+    BG_ACTIVITYSTATUS_RUNNING = 404,
+    BG_ACTIVITYSTATUS_SUSPENDED = 405,
 };
 
 /* #Tie */
 enum {
-    BG_TIE_EMPLOY = 483,
-    BG_TIE_FRIEND = 484,
-    BG_TIE_KIN = 485,
-    BG_TIE_SWORN = 486,
+    BG_TIE_EMPLOY = 488,
+    BG_TIE_FRIEND = 489,
+    BG_TIE_KIN = 490,
+    BG_TIE_SWORN = 491,
 };
 
 /* #ClaimKind */
 enum {
-    BG_CLAIMKIND_CUSTODY = 403,
-    BG_CLAIMKIND_OWNERSHIP = 404,
-    BG_CLAIMKIND_RESERVATION = 405,
+    BG_CLAIMKIND_CUSTODY = 407,
+    BG_CLAIMKIND_OWNERSHIP = 408,
+    BG_CLAIMKIND_RESERVATION = 409,
 };
 
 /* #Penalty */
 enum {
-    BG_PENALTY_FINE = 471,
-    BG_PENALTY_ARREST = 502,
-    BG_PENALTY_CONFISCATE = 503,
+    BG_PENALTY_FINE = 476,
+    BG_PENALTY_ARREST = 507,
+    BG_PENALTY_CONFISCATE = 508,
 };
 
 /* #Wrong */
 enum {
-    BG_WRONG_ANOTHERS = 494,
-    BG_WRONG_UNAUTHORIZED = 495,
+    BG_WRONG_ANOTHERS = 499,
+    BG_WRONG_UNAUTHORIZED = 500,
 };
 
 /* #Material */
 enum {
-    BG_MATERIAL_CLOTH = 458,
-    BG_MATERIAL_FOOD = 459,
-    BG_MATERIAL_LEATHER = 460,
-    BG_MATERIAL_RUBBER = 461,
-    BG_MATERIAL_STONE = 462,
-    BG_MATERIAL_FLESH = 505,
-    BG_MATERIAL_BRASS = 507,
-    BG_MATERIAL_IRON = 508,
-    BG_MATERIAL_PAPER = 509,
-    BG_MATERIAL_STEEL = 510,
-    BG_MATERIAL_OAK = 512,
+    BG_MATERIAL_CLOTH = 463,
+    BG_MATERIAL_FOOD = 464,
+    BG_MATERIAL_LEATHER = 465,
+    BG_MATERIAL_RUBBER = 466,
+    BG_MATERIAL_STONE = 467,
+    BG_MATERIAL_FLESH = 510,
+    BG_MATERIAL_BRASS = 512,
+    BG_MATERIAL_IRON = 513,
+    BG_MATERIAL_PAPER = 514,
+    BG_MATERIAL_STEEL = 515,
+    BG_MATERIAL_OAK = 517,
 };
 
 /* "flesh" | "metal" | "natural" | "paper" | "wood" */
 enum {
-    BG_BODY_SURFACE_NATURAL = 310,
-    BG_BODY_SURFACE_FLESH = 505,
-    BG_BODY_SURFACE_BRASS = 507,
-    BG_BODY_SURFACE_IRON = 508,
-    BG_BODY_SURFACE_PAPER = 509,
-    BG_BODY_SURFACE_STEEL = 510,
-    BG_BODY_SURFACE_OAK = 512,
+    BG_BODY_SURFACE_NATURAL = 314,
+    BG_BODY_SURFACE_FLESH = 510,
+    BG_BODY_SURFACE_BRASS = 512,
+    BG_BODY_SURFACE_IRON = 513,
+    BG_BODY_SURFACE_PAPER = 514,
+    BG_BODY_SURFACE_STEEL = 515,
+    BG_BODY_SURFACE_OAK = 517,
 };
 
 /* #Colour */
 enum {
-    BG_COLOUR_BLUE = 408,
-    BG_COLOUR_BLACK = 410,
-    BG_COLOUR_BROWN = 411,
-    BG_COLOUR_GREEN = 412,
-    BG_COLOUR_GREY = 413,
-    BG_COLOUR_NAVY = 414,
-    BG_COLOUR_RED = 415,
-    BG_COLOUR_YELLOW = 416,
-    BG_COLOUR_BEIGE = 433,
-    BG_COLOUR_WHITE = 455,
+    BG_COLOUR_BLUE = 412,
+    BG_COLOUR_BLACK = 414,
+    BG_COLOUR_BROWN = 415,
+    BG_COLOUR_GREEN = 416,
+    BG_COLOUR_GREY = 417,
+    BG_COLOUR_NAVY = 418,
+    BG_COLOUR_RED = 419,
+    BG_COLOUR_YELLOW = 420,
+    BG_COLOUR_BEIGE = 437,
+    BG_COLOUR_WHITE = 459,
 };
 
 /* The field registry: what code needs to read and write any component
@@ -615,12 +620,15 @@ static const BGFieldInfo BGLamp_fields[] = {
 };
 
 static const BGFieldInfo BGLatent_fields[] = {
+    { "abused", offsetof(BGLatent, abused), BG_VALUE_QUANTITY, "time", "content, saved, proposable, inspect" },
+    { "blamed", offsetof(BGLatent, blamed), BG_VALUE_TEXT, "text", "saved, proposable, inspect" },
     { "failedAt", offsetof(BGLatent, failedAt), BG_VALUE_QUANTITY, "time", "content, saved, proposable, inspect" },
     { "failure", offsetof(BGLatent, failure), BG_VALUE_TEXT, "text", "saved, proposable, inspect" },
     { "latent", offsetof(BGLatent, latent), BG_VALUE_NODE, "#LatentSchema", "" },
     { "leaking", offsetof(BGLatent, leaking), BG_VALUE_BOOL, "bool", "content, saved, proposable, inspect" },
     { "revealed", offsetof(BGLatent, revealed), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "riser", offsetof(BGLatent, riser), BG_VALUE_REF, "ref", "saved, proposable, inspect" },
+    { "used", offsetof(BGLatent, used), BG_VALUE_QUANTITY, "time", "content, saved, proposable, inspect" },
 };
 
 static const BGFieldInfo BGLog_fields[] = {
@@ -637,7 +645,9 @@ static const BGFieldInfo BGPart_fields[] = {
 };
 
 static const BGFieldInfo BGPump_fields[] = {
+    { "draws", offsetof(BGPump, draws), BG_VALUE_REF, "ref", "saved, proposable, inspect" },
     { "flow", offsetof(BGPump, flow), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
+    { "lift", offsetof(BGPump, lift), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "opened", offsetof(BGPump, opened), BG_VALUE_BOOL, "bool", "content, saved, proposable, inspect, perceive(sight)" },
 };
 
@@ -717,10 +727,10 @@ static const BGComponentInfo BGComponents[BG_COMPONENT_COUNT + 1] = {
     { "Door", "#Door", sizeof(BGDoor), 2, BGDoor_fields },
     { "HandSaw", "#HandSaw", sizeof(BGHandSaw), 1, BGHandSaw_fields },
     { "Lamp", "#Lamp", sizeof(BGLamp), 4, BGLamp_fields },
-    { "Latent", "#Latent", sizeof(BGLatent), 6, BGLatent_fields },
+    { "Latent", "#Latent", sizeof(BGLatent), 9, BGLatent_fields },
     { "Log", "#Log", sizeof(BGLog), 3, BGLog_fields },
     { "Part", "#Part", sizeof(BGPart), 4, BGPart_fields },
-    { "Pump", "#Pump", sizeof(BGPump), 2, BGPump_fields },
+    { "Pump", "#Pump", sizeof(BGPump), 4, BGPump_fields },
     { "Record", "#Record", sizeof(BGRecord), 1, BGRecord_fields },
     { "Label", "#Label", sizeof(BGLabel), 1, BGLabel_fields },
     { "Stack", "#Stack", sizeof(BGStack), 3, BGStack_fields },

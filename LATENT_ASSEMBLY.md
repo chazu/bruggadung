@@ -29,10 +29,36 @@ designed.
 3. **A culprit is marked only if it has been revealed**: a cause among
    parts not yet reached stays unresolved, and none is invented.
 
-## Provisional, to be designed
+4. **An assembly's use is shared out as its parts' wear** (after dewdrop's
+   latent anatomy). The assembly as a whole keeps how long it has been used,
+   and how long of that it was abused (a pump worked dry). Its parts are
+   never simulated one by one. Each role says how fast it wears (points per
+   hundred hours of use) and how many times as fast under abuse. A revealed
+   part's wear is that rate times the use, so opening early or late shows
+   the same part worn by the same history.
+5. **Use risks failure, and the culprit is weighted by wear.** Every hour of
+   use risks each failure the descriptor names: its chance when new, up to
+   four times that when its most worn candidate is worn through. The draw
+   comes from the unit's seed and its use so far, so runs are reproducible.
+   The culprit is drawn among the failure's candidates by the unit's seed,
+   each weighted by its wear (plus a hundred hours' worth, so that a unit
+   new to use is weighted by how fast each wears). It is decided once, at
+   the failure, or, for a failure a scenario sets, when first opened. A
+   culprit is worn at least 60, as a failure leaves it.
+6. **A part's quality is hidden, from the unit's seed and its kind.** Each
+   role's quality is 50, give or take 20 by the unit's seed, plus the
+   blueprint's bias for that kind of part (a cheap pump whose leather is
+   poor). Poor parts wear faster, half again as fast at 0, half as fast at
+   100, and so are more often to blame.
 
-- **Culprit attribution** draws the culprit from the unit's seed and the
-  failure alone. It is to be weighted by the unit's history: use, abuse,
-  and maintenance.
-- **A culprit's wear** is 60, plus a point for every ten hours since the
-  failure. It is to come from the part's actual age and use.
+## Provisional
+
+- A part wears with use only: age alone (leather perishing on the shelf)
+  doesn't wear it yet.
+- A culprit's floor of 60, and a flow loss costing a pump 80 points of
+  flow, are the lab's numbers, not derived.
+- A candidate that is no part (the housing) wears at the default rate, two
+  points per hundred hours, with a quality like any other.
+- Neither maintenance nor replacing a part resets a role's wear yet: the
+  failure chance and the culprit's weighting count the assembly's whole
+  use, even past a new spare. A revealed part wears no further with use.

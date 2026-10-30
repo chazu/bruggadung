@@ -195,5 +195,9 @@
     // what it delivers of its rated flow, percent: an aggregate parameter
     // (COMPONENTS.md §7), changed by repairs as a delta
     flow:   *100 | int & >=0 & <=100 @field(content, saved, proposable, inspect)
+    // the store it draws from, and what it lifts out of it a minute, mL, at
+    // full flow
+    draws:  ref                          @field(saved, proposable, inspect)
+    lift:   *0 | int & >=0 & <=100000    @field(content, saved, proposable, inspect)
 }
 

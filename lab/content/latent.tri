@@ -1,26 +1,33 @@
 // Latent physical assembly (COMPONENTS.md §7, DOMAIN_SIMULATION.md Scenario
-// 2). PROVISIONAL: the latent assembly document is to specify materialization,
-// consistency with history, and culprit attribution; until it does, this is
-// the least that meets §7 and the scenario's checks.
+// 2, LATENT_ASSEMBLY.md).
 //
 // An assembly's descriptor (`latent`, in content with its blueprint) lists its
 // roles: each a part blueprint, at a depth (the level opening reveals it at);
 // and, per failure, the roles that could be its culprit. The assembly keeps
-// what is revealed, and the failures committed against it (its history).
-// Opening a level makes its parts entities, `partOf` the assembly, their mass
-// carved out of the aggregate's. A part's wear derives from the assembly's
-// seed and its role, never its ID. The culprit is drawn from the seed and the
-// failure alone, so it is the same whenever it is opened; only its wear, grown
-// since the failure, differs. Not among the level's parts, it isn't marked:
-// none is invented.
+// what is revealed, the failures committed against it, and how long it has
+// been used and abused (its history). Opening a level makes its parts
+// entities, `partOf` the assembly, their mass carved out of the aggregate's.
+//
+// Wear is the assembly's use, shared out (LATENT_ASSEMBLY.md decisions 4-6,
+// after dewdrop's latent anatomy): a role `wears` that many points in a
+// hundred hours of use, `strain` times as fast while the assembly is abused,
+// and faster the poorer it is. Its quality is hidden, decided when the unit
+// was made: 50, give or take 20 by the unit's seed, and the blueprint's
+// `bias` for its kind of part. Every hour of use risks each failure: its
+// `chance` in a thousand, per hundred hours, when new, four times that when
+// its most worn candidate is worn through. The culprit is drawn among the
+// candidates by the unit's seed, weighted by their wear, and decided once.
+// Not among the level's parts, it isn't marked: none is invented.
 
-#LatentRole:   { roleName: text, partKind: text, depth: int }
-#Culprit:      { failing: text, candidates: [...text] }
+#LatentRole:   { roleName: text, partKind: text, depth: int, wears: int & >=0 & <=100, strain: int & >=1 & <=10 }
+#Culprit:      { failing: text, candidates: [...text], chance: int & >=0 & <=1000 }
+// A kind of part a blueprint makes better (positive) or worse than usual.
+#Bias:         { biased: text, bias: int & >=-50 & <=50 }
 // `pathWhenOut`: the role whose extraction opens a path from the store the
 // assembly holds back (its `riser`) to its floor, through `pathThrough`,
 // which passes in proportion to its wear past half (DOMAIN_SIMULATION.md
 // Scenario 2: the open cylinder, through the outlet check valve).
-#LatentSchema: { parts: [...#LatentRole], culprits: [...#Culprit], pathWhenOut: text, pathThrough: text }
+#LatentSchema: { parts: [...#LatentRole], culprits: [...#Culprit], biases: [...#Bias], pathWhenOut: text, pathThrough: text }
 
 #Latent: #Body & {
     @component(Latent)
@@ -29,6 +36,12 @@
     failedAt: *0ms | time & >=0ms & <=10000d   @field(content, saved, proposable, inspect)
     riser:    ref                              @field(saved, proposable, inspect)
     leaking:  *false | true                    @field(content, saved, proposable, inspect)
+    // how long it has been worked, and how long of that abused
+    used:     *0ms | time & >=0ms & <=100000d  @field(content, saved, proposable, inspect)
+    abused:   *0ms | time & >=0ms & <=100000d  @field(content, saved, proposable, inspect)
+    // the role its failure is due to, decided at the failure (or, for a
+    // failure a scenario set, when first opened); hidden
+    blamed:   text                             @field(saved, proposable, inspect)
     latent:   #LatentSchema
 }
 
@@ -49,36 +62,51 @@ leather_cup:  #Part & { material: "rubber", mass: 200g }
 inlet_valve:  #Part & { material: "brass", mass: 500g }
 outlet_valve: #Part & { material: "brass", mass: 500g }
 
+// The crank-driven piston pump's insides. The leather cup wears fastest, and
+// three times as fast run dry; the valves next; iron, slowly. It loses flow
+// about once in five hundred hours of use when new; seizing isn't from use.
+#CrankPumpParts: #LatentSchema & {
+    parts: [{ roleName: "handle", partKind: "pump_handle", depth: 1, wears: 1 },
+            { roleName: "cover", partKind: "pump_cover", depth: 1, wears: 0 },
+            { roleName: "piston", partKind: "piston", depth: 2, wears: 1 },
+            { roleName: "piston_seal", partKind: "leather_cup", depth: 2, wears: 5, strain: 3 },
+            { roleName: "inlet_valve", partKind: "inlet_valve", depth: 2, wears: 3 },
+            { roleName: "outlet_valve", partKind: "outlet_valve", depth: 2, wears: 3 }]
+    culprits: [{ failing: "flow_loss", candidates: ["piston_seal", "inlet_valve", "outlet_valve", "housing"], chance: 2 },
+               { failing: "seized", candidates: [], chance: 0 }]
+    pathWhenOut: "piston"
+    pathThrough: "outlet_valve"
+}
+
 // The crank-driven piston pump: 40 kg in all, its parts inside until opened.
 // `warm_pump`: the same with its heat (iron, 18 kJ/K), which a part leaving
 // it takes its share of, by heat capacity (Scenario 2's check 3).
 crank_pump: #Pump & #Latent & {
-    material: "iron", mass: 40kg, slots: 8
-    latent: {
-        parts: [{ roleName: "handle", partKind: "pump_handle", depth: 1 },
-                { roleName: "cover", partKind: "pump_cover", depth: 1 },
-                { roleName: "piston", partKind: "piston", depth: 2 },
-                { roleName: "piston_seal", partKind: "leather_cup", depth: 2 },
-                { roleName: "inlet_valve", partKind: "inlet_valve", depth: 2 },
-                { roleName: "outlet_valve", partKind: "outlet_valve", depth: 2 }]
-        culprits: [{ failing: "flow_loss", candidates: ["piston_seal", "inlet_valve", "outlet_valve", "housing"] },
-                   { failing: "seized", candidates: [] }]
-        pathWhenOut: "piston"
-        pathThrough: "outlet_valve"
-    }
+    material: "iron", mass: 40kg, slots: 8, lift: 20000
+    latent: #CrankPumpParts
 }
 
 warm_pump: #Pump & #Latent & #ThermalBody & {
     material: "iron", mass: 40kg, slots: 8, heat: 5490000, heatCapacity: 18000, toAir: 0, toOutdoors: 0
+    latent: #CrankPumpParts
+}
+
+// A cheap make of the same pump, whose leather is poor; and a rickety one,
+// that fails five hundred times as often, for trying failure out.
+cheap_pump: #Pump & #Latent & {
+    material: "iron", mass: 40kg, slots: 8, lift: 20000
+    latent: #CrankPumpParts & { biases: [{ biased: "leather_cup", bias: -30 }] }
+}
+rickety_pump: #Pump & #Latent & {
+    material: "iron", mass: 40kg, slots: 8, lift: 20000
     latent: {
-        parts: [{ roleName: "handle", partKind: "pump_handle", depth: 1 },
-                { roleName: "cover", partKind: "pump_cover", depth: 1 },
-                { roleName: "piston", partKind: "piston", depth: 2 },
-                { roleName: "piston_seal", partKind: "leather_cup", depth: 2 },
-                { roleName: "inlet_valve", partKind: "inlet_valve", depth: 2 },
-                { roleName: "outlet_valve", partKind: "outlet_valve", depth: 2 }]
-        culprits: [{ failing: "flow_loss", candidates: ["piston_seal", "inlet_valve", "outlet_valve", "housing"] },
-                   { failing: "seized", candidates: [] }]
+        parts: [{ roleName: "handle", partKind: "pump_handle", depth: 1, wears: 1 },
+                { roleName: "cover", partKind: "pump_cover", depth: 1, wears: 0 },
+                { roleName: "piston", partKind: "piston", depth: 2, wears: 1 },
+                { roleName: "piston_seal", partKind: "leather_cup", depth: 2, wears: 5, strain: 3 },
+                { roleName: "inlet_valve", partKind: "inlet_valve", depth: 2, wears: 3 },
+                { roleName: "outlet_valve", partKind: "outlet_valve", depth: 2, wears: 3 }]
+        culprits: [{ failing: "flow_loss", candidates: ["piston_seal", "inlet_valve", "outlet_valve", "housing"], chance: 1000 }]
         pathWhenOut: "piston"
         pathThrough: "outlet_valve"
     }
@@ -87,18 +115,7 @@ warm_pump: #Pump & #Latent & #ThermalBody & {
 // The same pump out in the yard: it gives its heat to the outdoors.
 yard_pump: #Pump & #Latent & #ThermalBody & {
     material: "iron", mass: 40kg, slots: 8, heat: 5490000, heatCapacity: 18000, toAir: 0, toOutdoors: 50
-    latent: {
-        parts: [{ roleName: "handle", partKind: "pump_handle", depth: 1 },
-                { roleName: "cover", partKind: "pump_cover", depth: 1 },
-                { roleName: "piston", partKind: "piston", depth: 2 },
-                { roleName: "piston_seal", partKind: "leather_cup", depth: 2 },
-                { roleName: "inlet_valve", partKind: "inlet_valve", depth: 2 },
-                { roleName: "outlet_valve", partKind: "outlet_valve", depth: 2 }]
-        culprits: [{ failing: "flow_loss", candidates: ["piston_seal", "inlet_valve", "outlet_valve", "housing"] },
-                   { failing: "seized", candidates: [] }]
-        pathWhenOut: "piston"
-        pathThrough: "outlet_valve"
-    }
+    latent: #CrankPumpParts
 }
 
 // COMPONENTS.md Scenario 3's hand pump: its piston is itself an assembly,
@@ -109,8 +126,8 @@ yard_pump: #Pump & #Latent & #ThermalBody & {
 nested_piston: #Part & #Assembly & #Latent & #ThermalBody & {
     material: "iron", mass: 4kg, slots: 2, heat: 0, heatCapacity: 1800, toAir: 0, toOutdoors: 0
     latent: {
-        parts:       [{ roleName: "seal", partKind: "leather_cup", depth: 1 }]
-        culprits:    [{ failing: "flow_loss", candidates: ["seal"] }]
+        parts:       [{ roleName: "seal", partKind: "leather_cup", depth: 1, wears: 5, strain: 3 }]
+        culprits:    [{ failing: "flow_loss", candidates: ["seal"], chance: 0 }]
         pathWhenOut: ""
         pathThrough: ""
     }
@@ -118,12 +135,12 @@ nested_piston: #Part & #Assembly & #Latent & #ThermalBody & {
 hand_pump: #Pump & #Latent & {
     material: "iron", mass: 40kg, slots: 8
     latent: {
-        parts: [{ roleName: "handle", partKind: "pump_handle", depth: 1 },
-                { roleName: "cover", partKind: "pump_cover", depth: 1 },
-                { roleName: "piston", partKind: "nested_piston", depth: 1 },
-                { roleName: "inlet_valve", partKind: "inlet_valve", depth: 1 },
-                { roleName: "outlet_valve", partKind: "outlet_valve", depth: 1 }]
-        culprits:    [{ failing: "flow_loss", candidates: ["piston"] }]
+        parts: [{ roleName: "handle", partKind: "pump_handle", depth: 1, wears: 1 },
+                { roleName: "cover", partKind: "pump_cover", depth: 1, wears: 0 },
+                { roleName: "piston", partKind: "nested_piston", depth: 1, wears: 1 },
+                { roleName: "inlet_valve", partKind: "inlet_valve", depth: 1, wears: 3 },
+                { roleName: "outlet_valve", partKind: "outlet_valve", depth: 1, wears: 3 }]
+        culprits:    [{ failing: "flow_loss", candidates: ["piston"], chance: 2 }]
         pathWhenOut: ""
         pathThrough: ""
     }
@@ -169,11 +186,13 @@ ownership_covers: #Coverage & { claimKind: "ownership", viaPartOf: true } @famil
 // The raised header tank the riser fills, and a leak: a tap installed in a
 // store, open, at the rate the path allows.
 header_tank: #Assembly & #WaterStore & { material: "oak", mass: 30kg, slots: 2, water: 100L, waterCapacity: 100L }
+// A well a pump draws from.
+well:        #Assembly & #WaterStore & { material: "stone", mass: 500kg, slots: 1, water: 10m3, waterCapacity: 10m3 }
 leak:        #Tap & { material: "brass", mass: 0g, capacity: 1, rate: 0, open: true }
 
 // Replace a worn part in an assembly with a spare that fits its role, held:
 // the worn one out onto the floor, the spare in its place. A part worn by a
-// failure, replaced, repairs it (provisional, as the rest).
+// failure, replaced, repairs it (provisional: LATENT_ASSEMBLY.md).
 replace_part: #Operation & {
     effect:   "replace"
     duration: 5s
@@ -196,6 +215,19 @@ clean_out: #Operation & {
         actor:       #Agent & { id: $a }
         item:        #Wrench & { place: #Held & { by: $a } }
         destination: #Latent
+    }
+} @family(operations)
+
+// Work a pump in reach for an hour: it lifts water from the store it draws
+// from into its riser, at its flow, and is used an hour. What it can't draw,
+// the store run dry, it is abused for: worked dry.
+work_pump: #Operation & {
+    effect:   "work"
+    duration: 1h
+    uses:     ["hands"]
+    roles: {
+        actor: #Agent
+        item:  #Pump & #Latent
     }
 } @family(operations)
 

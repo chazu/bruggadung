@@ -3616,7 +3616,8 @@ typedef struct
 } BGPumpRun;
 
 
-static BGPumpRun   pump_open( const char *key, const char *failure, int64_t openAt, int64_t saveAt)
+static BGPumpRun   pump_opened( const char *blueprint, const char *key, const char *failure, int64_t openAt,
+                                 int64_t saveAt, int64_t used, int64_t abused)
 {
    BGStage            st;
    BGProposalGroup    *g;
@@ -3638,7 +3639,7 @@ static BGPumpRun   pump_open( const char *key, const char *failure, int64_t open
    st.c   = BGTestCommitter( st.w);
    st.s   = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
    g      = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the pump house"];
-   pump   = [g create:"crank_pump" key:key at:BGOnTile( 5, 5, 0)];
+   pump   = [g create:blueprint key:key at:BGOnTile( 5, 5, 0)];
    worker = [g create:"worker" key:"worker" at:BGOnTile( 4, 5, 0)];
    wrench = [g create:"wrench_250" key:"wrench" at:BGHeldBy( worker, 0)];
    [st.c submit:g];
@@ -3646,7 +3647,9 @@ static BGPumpRun   pump_open( const char *key, const char *failure, int64_t open
    pump   = [g idFor:pump];
    worker = [g idFor:worker];
    wrench = [g idFor:wrench];
-   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"history: a failure"];
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"history: use, and a failure"];
+   [g set:"Latent.used" of:BGWhole( pump) to:used];
+   [g set:"Latent.abused" of:BGWhole( pump) to:abused];
    [g set:"Latent.failure" of:BGWhole( pump) toText:failure];
    [g set:"Latent.failedAt" of:BGWhole( pump) to:300 * 3600000LL];
    [st.c submit:g];
@@ -3700,6 +3703,243 @@ static BGPumpRun   pump_open( const char *key, const char *failure, int64_t open
 }
 
 
+static BGPumpRun   pump_open( const char *key, const char *failure, int64_t openAt, int64_t saveAt)
+{
+   return( pump_opened( "crank_pump", key, failure, openAt, saveAt, 0, 0));
+}
+
+
+/* A revealed role's wear in a run's parts, or -1. */
+static int64_t   wear_in( BGPumpRun run, NSString *role)
+{
+   NSArray      *fields;
+   NSString     *entry;
+   NSUInteger   i;
+
+   for( i = 0; i < [[run.parts componentsSeparatedByString:@"; "] count]; i++)
+   {
+      entry  = [[run.parts componentsSeparatedByString:@"; "] objectAtIndex:i];
+      fields = [entry componentsSeparatedByString:@" "];
+      if( [fields count] == 3 && [[fields objectAtIndex:0] isEqualToString:role])
+         return( [[fields objectAtIndex:2] longLongValue]);
+   }
+   return( -1);
+}
+
+
+/* LATENT_ASSEMBLY.md decisions 4-6: the pump `blueprint` `key`, `usedHours`
+ * of use behind it, drawing from a well of `water` mL into its empty header
+ * tank, worked an hour at a time for `hours` hours by a worker; saved and
+ * restored after hour `saveAfter`, if not 0; then opened two levels. */
+typedef struct
+{
+   int64_t    used;
+   int64_t    abused;
+   int64_t    well;
+   int64_t    tank;
+   int64_t    flow;
+   int64_t    failedAt;
+   int64_t    blamedWear;      /* the blamed part's, opened; -1 if none */
+   NSString   *failure;
+   NSString   *blamed;
+   int        failedIn;        /* the hour it failed in, from 1; 0 if it didn't */
+} BGPumpWork;
+
+
+static BGPumpWork   pump_work( const char *blueprint, const char *key, const char *failure, int64_t water,
+                               int64_t usedHours, int hours, int saveAfter)
+{
+   BGStage            st;
+   BGProposalGroup    *g;
+   BGEntityID         pump;
+   BGEntityID         well;
+   BGEntityID         tank;
+   BGEntityID         worker;
+   BGEntityID         wrench;
+   BGStore            *parts;
+   BGPumpWork         run;
+   NSString           *error;
+   const char         *text;
+   NSUInteger         i;
+   int64_t            t;
+   int                h;
+
+   memset( &run, 0, sizeof( run));
+   st.w   = BGTestWorld( 157);
+   st.c   = BGTestCommitter( st.w);
+   st.s   = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [st.s setActivities:[BGActivities activitiesWithWorld:st.w committer:st.c]];
+   g      = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the pump on its well"];
+   pump   = [g create:blueprint key:key at:BGOnTile( 5, 5, 0)];
+   well   = [g create:"well" key:"the well" at:BGOnTile( 5, 6, 0)];
+   tank   = [g create:"header_tank" key:"the header tank" at:BGOnTile( 5, 4, 0)];
+   worker = [g create:"worker" key:"worker" at:BGOnTile( 4, 5, 0)];
+   wrench = [g create:"wrench_250" key:"wrench" at:BGHeldBy( worker, 0)];
+   [g set:"Pump.draws" of:BGWhole( pump) to:(int64_t) well];
+   [g set:"Latent.riser" of:BGWhole( pump) to:(int64_t) tank];
+   [g set:"Latent.used" of:BGWhole( pump) to:usedHours * 3600000LL];
+   if( failure)
+      [g set:"Latent.failure" of:BGWhole( pump) toText:failure];
+   [g set:"WaterStore.water" of:BGWhole( well) to:water];
+   [g set:"WaterStore.water" of:BGWhole( tank) to:0];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   pump   = [g idFor:pump];
+   well   = [g idFor:well];
+   tank   = [g idFor:tank];
+   worker = [g idFor:worker];
+   wrench = [g idFor:wrench];
+
+   for( h = 1; h <= hours; h++)
+   {
+      /* a worker rested and fed for every hour: its pace is not the point */
+      t = [st.w time].ms;
+      g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the worker rested and fed"];
+      [g set:"Agent.fatigue" of:BGWhole( worker) to:0];
+      [g set:"Agent.injury" of:BGWhole( worker) to:0];
+      [g set:"Agent.fed" of:BGWhole( worker) to:80];
+      [g set:"Agent.fedAt" of:BGWhole( worker) to:t];
+      [st.c submit:g];
+      error = nil;
+      BGPerform( st.w, st.c, BGActionMake( "work_pump", worker, pump, BGNoEntity), 0, &error);
+      [st.s runUntil:BGTimeMake( t + 3600000LL + 1000)];
+      text = [st.w textField:"Latent.failure" of:pump];
+      if( ! run.failedIn && text && *text && ! failure)
+         run.failedIn = h;
+      if( h == saveAfter)
+      {
+         NSString   *text;
+
+         text = BGSave( st.w, st.c, [NSArray array]);
+         st.w = restore( text, [st.w contentBuild], &st.c, &error);
+         st.s = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+         [st.s setActivities:[BGActivities activitiesWithWorld:st.w committer:st.c]];
+      }
+   }
+   [st.w getField:"Latent.used" of:pump value:&run.used];
+   [st.w getField:"Latent.abused" of:pump value:&run.abused];
+   [st.w getField:"Latent.failedAt" of:pump value:&run.failedAt];
+   [st.w getField:"WaterStore.water" of:well value:&run.well];
+   [st.w getField:"WaterStore.water" of:tank value:&run.tank];
+   [st.w getField:"Pump.flow" of:pump value:&run.flow];
+   text        = [st.w textField:"Latent.failure" of:pump];
+   run.failure = [NSString stringWithUTF8String:text ? text : ""];
+   text        = [st.w textField:"Latent.blamed" of:pump];
+   run.blamed  = [NSString stringWithUTF8String:text ? text : ""];
+
+   /* opened: the blamed part, if it is one, is as worn as a failure leaves it */
+   BGPerform( st.w, st.c, BGActionMake( "open_up", worker, wrench, pump), 0, &error);
+   [st.s runUntil:BGTimeMake( [st.w time].ms + 1000)];
+   BGPerform( st.w, st.c, BGActionMake( "open_up", worker, wrench, pump), 0, &error);
+   [st.s runUntil:BGTimeMake( [st.w time].ms + 1000)];
+   run.blamedWear = -1;
+   parts          = [st.w storeForKind:[st.w kindNamed:"Part"]];
+   for( i = 0; i < [parts count]; i++)
+      if( [run.blamed length] && (text = [st.w textField:"Part.fits" of:[parts entityAtIndex:i]]) &&
+          ! strcmp( text, [run.blamed UTF8String]))
+         [st.w getField:"Part.wear" of:[parts entityAtIndex:i] value:&run.blamedWear];
+   return( run);
+}
+
+
+static void   test_pump_wear( void)
+{
+   BGPumpWork   wet;
+   BGPumpWork   dry;
+   BGPumpWork   half;
+   BGPumpWork   seized;
+   BGPumpWork   failed;
+   BGPumpWork   again;
+   BGPumpWork   saved;
+   BGPumpRun    worn;
+   BGPumpRun    harsh;
+   BGPumpRun    cheap;
+   BGPumpRun    run;
+   int64_t      seal;
+   char         key[ 32];
+   int          fresh;
+   int          beaten;
+   int          k;
+
+   /* an hour's work lifts what its flow does (20 L a minute) from the well
+    * into the tank, until the tank is full: water moved, none made */
+   wet = pump_work( "crank_pump", "pump 2", NULL, 10000000, 0, 1, 0);
+   BG_CHECK( wet.used == 3600000 && wet.abused == 0);
+   BG_CHECK( wet.tank == 100000 && wet.well == 10000000 - 100000);
+   /* the well dry, the hour is abuse; half an hour's lift in it, half */
+   dry = pump_work( "crank_pump", "pump 2", NULL, 0, 0, 1, 0);
+   BG_CHECK( dry.used == 3600000 && dry.abused == 3600000 && dry.tank == 0);
+   half = pump_work( "crank_pump", "pump 2", NULL, 600000, 0, 1, 0);
+   BG_CHECK( half.abused == 1800000 && half.tank == 100000 && half.well == 500000);
+   /* seized, it can't be worked */
+   seized = pump_work( "crank_pump", "pump 2", "seized", 10000000, 0, 1, 0);
+   BG_CHECK( seized.used == 0 && seized.tank == 0);
+
+   /* decision 4: 400 hours' use, shared out: the leather cup wears fastest,
+    * then the valves, the iron slowly, the cover not at all */
+   worn = pump_opened( "crank_pump", "pump 2", "", 300 * 3600000LL, 0, 400 * 3600000LL, 0);
+   seal = wear_in( worn, @"piston_seal");
+   BG_CHECK( seal > wear_in( worn, @"inlet_valve") && seal > wear_in( worn, @"outlet_valve"));
+   BG_CHECK( wear_in( worn, @"inlet_valve") > wear_in( worn, @"piston") && wear_in( worn, @"piston") > 0);
+   BG_CHECK( wear_in( worn, @"handle") > 0 && wear_in( worn, @"cover") == 0);
+   /* worked dry all that time, the cup wears three times as fast; the rest
+    * as before */
+   harsh = pump_opened( "crank_pump", "pump 2", "", 300 * 3600000LL, 0, 400 * 3600000LL, 400 * 3600000LL);
+   BG_CHECK( wear_in( harsh, @"piston_seal") >= 3 * seal - 2 && wear_in( harsh, @"piston_seal") <= 3 * seal + 2);
+   BG_CHECK( wear_in( harsh, @"inlet_valve") == wear_in( worn, @"inlet_valve"));
+   /* decision 6: the cheap make's leather is poorer: the same unit's cup
+    * wears faster, its valves no differently */
+   cheap = pump_opened( "cheap_pump", "pump 2", "", 300 * 3600000LL, 0, 400 * 3600000LL, 0);
+   BG_CHECK( wear_in( cheap, @"piston_seal") > seal);
+   BG_CHECK( wear_in( cheap, @"outlet_valve") == wear_in( worn, @"outlet_valve"));
+
+   /* decision 5: the culprit is drawn weighted by wear: among 24 pumps worked
+    * dry a thousand hours, the cup is to blame more often than among new
+    * ones, but not always */
+   fresh = beaten = 0;
+   for( k = 0; k < 24; k++)
+   {
+      snprintf( key, sizeof( key), "pump %d", k);
+      fresh  += [pump_open( key, "flow_loss", 300 * 3600000LL, 0).culprit isEqualToString:@"piston_seal"];
+      run     = pump_opened( "crank_pump", key, "flow_loss", 300 * 3600000LL, 0, 1000 * 3600000LL, 1000 * 3600000LL);
+      beaten += [run.culprit isEqualToString:@"piston_seal"];
+      /* the blamed part is worn at least as a failure leaves it */
+      BG_CHECK( ! [run.culprit length] || wear_in( run, run.culprit) >= 60);
+   }
+   BG_CHECK( beaten > fresh && beaten < 24);
+
+   /* decision 5: use risks failure, more the more worn: the rickety pump,
+    * 2000 hours behind it, fails within a hundred hours' work. Its culprit is
+    * decided then; a flow loss costs it 80 points of flow if the culprit is
+    * a part; opened, the culprit is worn as a failure leaves it */
+   failed = pump_work( "rickety_pump", "pump 2", NULL, 10000000, 2000, 100, 0);
+   BG_CHECK( failed.failedIn > 0 && [failed.failure isEqualToString:@"flow_loss"]);
+   BG_CHECK( failed.failedAt > (failed.failedIn - 1) * (3600000LL + 1000) &&
+             failed.failedAt <= failed.failedIn * (3600000LL + 1000) + 1);
+   BG_CHECK( [failed.blamed length] > 0);
+   BG_CHECK( [failed.blamed isEqualToString:@"housing"] ? failed.flow == 100 && failed.blamedWear == -1
+                                                        : failed.flow == 20 && failed.blamedWear >= 60);
+   /* worked on after, its use still counts, and it fails no further */
+   BG_CHECK( failed.used == (2000 + 100) * 3600000LL);
+   /* the same unit, the same work: the same hour, the same culprit; saved
+    * and restored before it failed, too */
+   again = pump_work( "rickety_pump", "pump 2", NULL, 10000000, 2000, 100, 0);
+   BG_CHECK( again.failedIn == failed.failedIn && [again.blamed isEqualToString:failed.blamed]);
+   saved = pump_work( "rickety_pump", "pump 2", NULL, 10000000, 2000, 100, failed.failedIn > 1 ? failed.failedIn - 1 : 1);
+   BG_CHECK( saved.failedIn == failed.failedIn && [saved.blamed isEqualToString:failed.blamed]);
+   /* worn, more fail: of 12 units worked 20 hours, more with 2000 hours
+    * behind them fail than new ones (4% an hour against 1%) */
+   fresh = beaten = 0;
+   for( k = 0; k < 12; k++)
+   {
+      snprintf( key, sizeof( key), "pump %d", k);
+      fresh  += pump_work( "rickety_pump", key, NULL, 10000000, 0, 20, 0).failedIn > 0;
+      beaten += pump_work( "rickety_pump", key, NULL, 10000000, 2000, 20, 0).failedIn > 0;
+   }
+   BG_CHECK( beaten > fresh);
+}
+
+
 /* DOMAIN_SIMULATION.md Scenario 2's drain: the pump `key` under its header
  * tank (100 L), opened, and its piston taken out: through a leaky outlet
  * valve the tank drains onto the floor; an hour on, how much left the tank,
@@ -3721,7 +3961,7 @@ static int64_t   pump_drain( const char *key, BOOL *conserved, BOOL *leaking)
    int64_t            total;
    int64_t            sum;
 
-   st.w   = BGTestWorld( 163);
+   st.w   = BGTestWorld( 157);       /* as pump_open: the same units, the same culprits */
    st.c   = BGTestCommitter( st.w);
    fluid  = [[[BGFluidDomain alloc] initWithWorld:st.w] autorelease];
    st.s   = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
@@ -4138,7 +4378,7 @@ static const char   *flood_run( const char *key, int64_t *crossed, int64_t *inte
    NSString           *error;
    NSUInteger         i;
 
-   st.w   = BGTestWorld( 163);
+   st.w   = BGTestWorld( 157);       /* as pump_open: the same units, the same culprits */
    st.c   = BGTestCommitter( st.w);
    fluid  = [[[BGFluidDomain alloc] initWithWorld:st.w] autorelease];
    st.s   = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
@@ -4291,20 +4531,20 @@ static void   test_latent_pump( void)
    int         k;
 
    /* opened two levels: six parts, part of it; 3: its mass carved, not duplicated */
-   early = pump_open( "pump 1", "flow_loss", 300 * 3600000LL, 0);
+   early = pump_open( "pump 2", "flow_loss", 300 * 3600000LL, 0);
    BG_CHECK( early.inside && [[early.parts componentsSeparatedByString:@"; "] count] == 6);
    BG_CHECK( early.total == 40000 && early.pumpMass < 40000);
 
-   /* 2: deterministic reveal: at hour 400, the same parts and culprit; only
-    * the culprit's wear, grown since the failure, differs */
-   late = pump_open( "pump 1", "flow_loss", 400 * 3600000LL, 0);
-   BG_CHECK( [early.parts isEqualToString:@"handle pump_handle 9; cover pump_cover 8; piston piston 12; "
-                                          @"piston_seal leather_cup 60; inlet_valve inlet_valve 0; outlet_valve outlet_valve 2"]);
+   /* 2: deterministic reveal: at hour 400, the same parts and culprit. Never
+    * worked, nothing is worn but the culprit, worn as a failure leaves it,
+    * and it wears no further unused (LATENT_ASSEMBLY.md decision 5) */
+   late = pump_open( "pump 2", "flow_loss", 400 * 3600000LL, 0);
+   BG_CHECK( [early.parts isEqualToString:@"handle pump_handle 0; cover pump_cover 0; piston piston 0; "
+                                          @"piston_seal leather_cup 60; inlet_valve inlet_valve 0; outlet_valve outlet_valve 0"]);
    BG_CHECK( [late.culprit isEqualToString:early.culprit] && [early.culprit isEqualToString:@"piston_seal"]);
-   BG_CHECK( [late.parts isEqualToString:[early.parts stringByReplacingOccurrencesOfString:@"leather_cup 60"
-                                                                                withString:@"leather_cup 70"]]);
+   BG_CHECK( [late.parts isEqualToString:early.parts]);
    /* reloading a save made before opening gives the same */
-   saved = pump_open( "pump 1", "flow_loss", 300 * 3600000LL, 200 * 3600000LL);
+   saved = pump_open( "pump 2", "flow_loss", 300 * 3600000LL, 200 * 3600000LL);
    BG_CHECK( [saved.parts isEqualToString:early.parts]);
 
    /* the culprit varies with the unit's seed, among the candidates; the
@@ -4338,7 +4578,7 @@ static void   test_latent_pump( void)
 
       floor = pump_drain( key, &conserved, &leaking);
       BG_CHECK( leaking && conserved && floor > 10000);
-      floor = pump_drain( "pump 1", &conserved, &leaking);
+      floor = pump_drain( "pump 2", &conserved, &leaking);
       BG_CHECK( leaking && conserved && floor == 0);
    }
 
@@ -4349,16 +4589,17 @@ static void   test_latent_pump( void)
       BGEntityID   spare;
       BGLocation   at;
 
-      /* "pump 1": the seal. It opens the pump, a level at a time, with
+      /* "pump 2": the seal. It opens the pump, a level at a time, with
        * nothing bound to the worn part; seen worn, the seal is replaced
        * with the spare, and the failure is mended */
-      agency = mend_run( "pump 1", &w, &spare);
+      agency = mend_run( "pump 2", &w, &spare);
       BG_CHECK( log_index( agency, 2, @"open it further: open_up") < log_index( agency, 2, @"replace the worn part: replace_part"));
       BG_CHECK( logged_by( agency, 2, @"[mend the pump] replace the worn part: replace_part R4 into R8"));
       BG_CHECK( logged_by( agency, 2, @"[mend the pump] done"));
       at = [w locationOf:spare];
       BG_CHECK( at.form == BGLocationPartOf && ! strcmp( at.role, "piston_seal"));
       BG_CHECK( ! strcmp( [w textField:"Latent.failure" of:1], ""));
+      BG_CHECK( ! strcmp( [w textField:"Latent.blamed" of:1], ""));
       /* the housing the culprit: no part is worn, nothing to bind; opened
        * through, it finds none, and none is invented */
       for( k = 0; k < 24; k++)
@@ -4393,12 +4634,12 @@ static void   test_latent_pump( void)
       BG_CHECK( ! strcmp( status, "\"suspended\"") && watch == 0);
       BG_CHECK( crossed > 0 && interrupted >= crossed && interrupted <= crossed + 10000);
       /* the seal at fault: no water; the work runs its ten minutes, its watch removed as it ends */
-      status = flood_run( "pump 1", &crossed, &interrupted, &watch);
+      status = flood_run( "pump 2", &crossed, &interrupted, &watch);
       BG_CHECK( ! strcmp( status, "\"completed\"") && crossed == 0 && watch == 0);
    }
 
    /* a failure with no candidates: nothing marked */
-   seized = pump_open( "pump 1", "seized", 300 * 3600000LL, 0);
+   seized = pump_open( "pump 2", "seized", 300 * 3600000LL, 0);
    BG_CHECK( [seized.culprit isEqualToString:@""]);
 }
 
@@ -9760,6 +10001,7 @@ const BGTestCase   BGAllTests[] =
    { "forged_permit",                 test_forged_permit },
    { "issue_permit",                  test_issue_permit },
    { "latent_pump",                   test_latent_pump },
+   { "pump_wear",                     test_pump_wear },
    { "pump_heat",                     test_pump_heat },
    { "pump_heat_running",             test_pump_heat_running },
    { "component_pump",                test_component_pump },
