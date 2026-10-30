@@ -74,6 +74,14 @@ Out of scope here, except where they touch agency:
     considerations in dB (a product of odds factors); a consideration
     content declares a veto rules the option out when it applies, whatever
     else scores (a deeply held norm: never harm a child).
+15. **Employment is a deal.** An employer (an agent, or an organization's
+    office holder) weighs a request for work like any request; granting
+    it, it gives the worker a commitment (a task or a shift, a window,
+    perhaps recurring) and promises pay on completion, a promise it can
+    keep or break. Loyalty to the employer forms with it (decision 12).
+    **Deals can also be posted in the world**: a flyer or a classified ad
+    is a record offering one, and an agent who reads it can take it up,
+    going to the employer or answering as it says.
 
 ## Terms
 
