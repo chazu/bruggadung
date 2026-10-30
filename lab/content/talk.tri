@@ -69,6 +69,11 @@
 // (INSTITUTIONS.md: what makes taking it a wrong).
 #OwnedBy: #Naming & {}
 
+// A grievance (INSTITUTIONS.md decision 6): something like `what`, someone
+// like `holder`'s own, was taken by someone like `taker`. Told to an office
+// holder, it is ordinary knowledge, weighed by who says it.
+#Grievance: #Naming & { taker: #Agent }
+
 // The speaker won't say where something like `what` is, or give it
 // (AGENCY.md §11).
 #WontSay: #Utterance & {}

@@ -19,6 +19,8 @@
 #Reserved: #Finding & {}
 // It is someone's own, the finding's choice: as the agent was told.
 #Owned: #Finding & {}
+// Someone, the finding's choice, took it from its owner: seen, or told.
+#Taken: #Finding & {}
 // Someone does something the same way, again and again (AGENCY.md §8): the
 // finding's choice is the way.
 #Habit: #Finding & {}

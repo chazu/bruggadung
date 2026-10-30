@@ -840,6 +840,22 @@ static BOOL   counts( const BGTestimony *t, uint32_t thing, uint32_t container)
 }
 
 
+- (NSString *) grievanceAbout:(uint32_t) thing
+{
+   const BGFinding   *owned;
+   const BGFinding   *taken;
+
+   owned = [self finding:"#Owned" about:thing];
+   taken = [self finding:"#Taken" about:thing];
+   if( ! owned || ! taken || ! [self describeLooks:thing] || ! [self describeLooks:owned->choice] ||
+       ! [self describeLooks:taken->choice])
+      return( nil);
+   return( [NSString stringWithFormat:@"#Grievance & { what: %@, holder: %@, taker: %@, when: %lldms, attribution: #Saw & { sure: %d } }",
+                                      [self describeLooks:thing], [self describeLooks:owned->choice],
+                                      [self describeLooks:taken->choice], (long long) taken->time, BG_SEEN]);
+}
+
+
 - (NSString *) reservationOf:(uint32_t) thing
                          for:(uint32_t) holder
 {
@@ -1882,15 +1898,45 @@ static char   *concrete_features( const char *printed)
 }
 
 
+/* Told of a wrong (INSTITUTIONS.md decision 6): that the thing is its
+ * holder's own, if it didn't know, and taken by the taker, on the
+ * speaker's word (its trust in the speaker, the finding's credence). */
+- (void) grieved:(const TriNode *) claim
+            from:(uint32_t) speaker
+           store:(BGKnowledgeStore *) store
+            news:(NSMutableArray *) news
+{
+   const TriNode   *who;
+   BGFinding       f;
+   uint32_t        taker;
+   uint32_t        thing;
+
+   thing = [self named:claim finding:"#Owned" saying:"owned by" from:speaker store:store news:news];
+   who   = tri_at( [_world tri], claim, "taker");
+   taker = who ? [self person:who store:store news:news] : 0;
+   if( ! taker || ! thing || [store finding:"#Taken" about:thing])
+      return;
+   memset( &f, 0, sizeof( f));
+   f.kind     = [_world intern:"#Taken"];
+   f.about    = thing;
+   f.choice   = taker;
+   f.credence = [store trustIn:speaker];
+   f.rule     = [_world intern:"told"];
+   f.time     = [_world time].ms;
+   [store addFinding:f];
+   [news addObject:[NSString stringWithFormat:@"R%u took R%u, R%u says", taker, thing, speaker]];
+}
+
+
 /* A claim naming a holder of something (#ReservedFor, #OwnedBy): a finding
  * of the kind about the thing, recognized among the referents of its kind
  * that look alike, its choice the holder. */
-- (void) named:(const TriNode *) claim
-       finding:(const char *) kind_
-        saying:(const char *) saying
-          from:(uint32_t) speaker
-         store:(BGKnowledgeStore *) store
-          news:(NSMutableArray *) news
+- (uint32_t) named:(const TriNode *) claim
+           finding:(const char *) kind_
+            saying:(const char *) saying
+              from:(uint32_t) speaker
+             store:(BGKnowledgeStore *) store
+              news:(NSMutableArray *) news
 {
    const TriNode      *what;
    const BGReferent   *r;
@@ -1905,7 +1951,7 @@ static char   *concrete_features( const char *printed)
    holder = [self person:tri_at( [_world tri], claim, "holder") store:store news:news];
    what   = tri_at( [_world tri], claim, "what");
    if( ! holder || ! what)
-      return;
+      return( 0);
    kind = [NSString stringWithUTF8String:(char *) tri_type_name( [_world tri], tri_node_type( what))];
    tri_print( [_world tri], what, printed, sizeof( printed));
    features = concrete_features( printed);
@@ -1917,9 +1963,20 @@ static char   *concrete_features( const char *printed)
           [self looksAlike:r in:store kind:kind features:[NSString stringWithUTF8String:features]])
          thing = r->id;
    }
+   /* never seen: something like it, as said */
+   if( ! thing)
+   {
+      BGReferent   *m;
+
+      m           = [store addReferent:0];
+      m->kind     = strdup( [kind UTF8String]);
+      m->features = strdup( features);
+      m->toldBy   = speaker;
+      thing       = m->id;
+   }
    free( features);
-   if( ! thing || [store finding:kind_ about:thing])
-      return;
+   if( [store finding:kind_ about:thing])
+      return( thing);
    memset( &f, 0, sizeof( f));
    f.kind     = [_world intern:kind_];
    f.about    = thing;
@@ -1929,6 +1986,7 @@ static char   *concrete_features( const char *printed)
    f.time     = [_world time].ms;
    [store addFinding:f];
    [news addObject:[NSString stringWithFormat:@"R%u is %s R%u, R%u says", thing, saying, holder, speaker]];
+   return( thing);
 }
 
 
@@ -2141,6 +2199,12 @@ static int32_t   permille_of( int32_t db)
    if( claim && tri_subtype( tri, tri_node_type( claim), tri_type_named( tri, "#ReservedFor")))
    {
       [self reserved:claim from:speaker store:store news:news];
+      tri_arena_free( arena);
+      return;
+   }
+   if( claim && tri_subtype( tri, tri_node_type( claim), tri_type_named( tri, "#Grievance")))
+   {
+      [self grieved:claim from:speaker store:store news:news];
       tri_arena_free( arena);
       return;
    }
@@ -3599,6 +3663,28 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
       }
       if( ! strcmp( ev->kind, "said") && ev->detail && o.actor && o.actor != [store selfReferent])
          [self believe:ev->detail from:o.actor via:0 utterance:ev->index at:now store:store news:news];
+      /* seen taken into someone's hand who isn't its owner, as the agent
+       * believes it: taken (INSTITUTIONS.md decision 6, a wrong witnessed) */
+      if( ! strcmp( ev->kind, "moved") && o.actor && o.subject && o.actor != [store selfReferent] &&
+          ev->location.form == BGLocationHeldBy && ev->location.place == ev->actor)
+      {
+         const BGFinding   *owned;
+         BGFinding         f;
+
+         owned = [store finding:"#Owned" about:o.subject];
+         if( owned && owned->choice != o.actor && ! [store finding:"#Taken" about:o.subject])
+         {
+            memset( &f, 0, sizeof( f));
+            f.kind     = [_world intern:"#Taken"];
+            f.about    = o.subject;
+            f.choice   = o.actor;
+            f.credence = BG_SEEN;
+            f.rule     = [_world intern:"seen"];
+            f.time     = now;
+            [store addFinding:f];
+            [news addObject:[NSString stringWithFormat:@"R%u took R%u, R%u's", o.actor, o.subject, owned->choice]];
+         }
+      }
    }
    memory = [_world record:[_world kindNamed:"Agent"] for:agent];
    [store keepAtMost:memory && memory->memory > 0 ? (NSUInteger) memory->memory : 64];

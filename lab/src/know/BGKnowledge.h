@@ -356,6 +356,9 @@ typedef struct
  * not believed on the ground. */
 - (NSString *) claimThat:(uint32_t) thing
                     isIn:(uint32_t) container;
+/* A grievance about the thing (INSTITUTIONS.md decision 6): whose own it
+ * is and who took it, as the agent believes; nil if it doesn't. */
+- (NSString *) grievanceAbout:(uint32_t) thing;
 /* That the thing is someone's own (INSTITUTIONS.md). */
 - (NSString *) ownershipOf:(uint32_t) thing
                         by:(uint32_t) owner;

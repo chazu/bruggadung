@@ -1,4 +1,4 @@
-/* Generated from Triangle content 2da2ce8eeb7119cc: do not edit. Type IDs are valid
+/* Generated from Triangle content d0ac0d8e0456e38a: do not edit. Type IDs are valid
  * only for this content; regenerate when it changes. */
 #ifndef BG_COMPONENTS_H
 #define BG_COMPONENTS_H
@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BG_CONTENT_HASH 0x2da2ce8eeb7119ccULL
+#define BG_CONTENT_HASH 0xd0ac0d8e0456e38aULL
 
 typedef struct TriNode TriNode;
 
@@ -46,6 +46,7 @@ typedef struct {
 
 /* OfficeHolder, from #OfficeHolder */
 typedef struct {
+    const char *    badge;    /* text; content, saved, proposable, inspect, perceive(sight) */
     uint64_t        office;    /* a referent; saved, proposable, inspect */
 } BGOfficeHolder;
 
@@ -295,72 +296,72 @@ typedef struct {
 
 /* #ActivityStatus */
 enum {
-    BG_ACTIVITYSTATUS_ABORTED = 322,
-    BG_ACTIVITYSTATUS_COMPLETED = 323,
-    BG_ACTIVITYSTATUS_EXHAUSTED = 324,
-    BG_ACTIVITYSTATUS_FAILED = 325,
-    BG_ACTIVITYSTATUS_RUNNING = 326,
-    BG_ACTIVITYSTATUS_SUSPENDED = 327,
+    BG_ACTIVITYSTATUS_ABORTED = 333,
+    BG_ACTIVITYSTATUS_COMPLETED = 334,
+    BG_ACTIVITYSTATUS_EXHAUSTED = 335,
+    BG_ACTIVITYSTATUS_FAILED = 336,
+    BG_ACTIVITYSTATUS_RUNNING = 337,
+    BG_ACTIVITYSTATUS_SUSPENDED = 338,
 };
 
 /* #ClaimKind */
 enum {
-    BG_CLAIMKIND_CUSTODY = 329,
-    BG_CLAIMKIND_OWNERSHIP = 330,
-    BG_CLAIMKIND_RESERVATION = 331,
+    BG_CLAIMKIND_CUSTODY = 340,
+    BG_CLAIMKIND_OWNERSHIP = 341,
+    BG_CLAIMKIND_RESERVATION = 342,
 };
 
 /* #Penalty */
 enum {
-    BG_PENALTY_ARREST = 392,
-    BG_PENALTY_CONFISCATE = 393,
-    BG_PENALTY_FINE = 394,
+    BG_PENALTY_ARREST = 403,
+    BG_PENALTY_CONFISCATE = 404,
+    BG_PENALTY_FINE = 405,
 };
 
 /* #Wrong */
 enum {
-    BG_WRONG_ANOTHERS = 412,
-    BG_WRONG_UNAUTHORIZED = 413,
+    BG_WRONG_ANOTHERS = 423,
+    BG_WRONG_UNAUTHORIZED = 424,
 };
 
 /* #Material */
 enum {
-    BG_MATERIAL_CLOTH = 381,
-    BG_MATERIAL_FOOD = 382,
-    BG_MATERIAL_LEATHER = 383,
-    BG_MATERIAL_RUBBER = 384,
-    BG_MATERIAL_STONE = 385,
-    BG_MATERIAL_FLESH = 420,
-    BG_MATERIAL_BRASS = 422,
-    BG_MATERIAL_IRON = 423,
-    BG_MATERIAL_PAPER = 424,
-    BG_MATERIAL_STEEL = 425,
-    BG_MATERIAL_OAK = 427,
+    BG_MATERIAL_CLOTH = 392,
+    BG_MATERIAL_FOOD = 393,
+    BG_MATERIAL_LEATHER = 394,
+    BG_MATERIAL_RUBBER = 395,
+    BG_MATERIAL_STONE = 396,
+    BG_MATERIAL_FLESH = 431,
+    BG_MATERIAL_BRASS = 433,
+    BG_MATERIAL_IRON = 434,
+    BG_MATERIAL_PAPER = 435,
+    BG_MATERIAL_STEEL = 436,
+    BG_MATERIAL_OAK = 438,
 };
 
 /* "flesh" | "metal" | "natural" | "paper" | "wood" */
 enum {
-    BG_BODY_SURFACE_NATURAL = 259,
-    BG_BODY_SURFACE_FLESH = 420,
-    BG_BODY_SURFACE_BRASS = 422,
-    BG_BODY_SURFACE_IRON = 423,
-    BG_BODY_SURFACE_PAPER = 424,
-    BG_BODY_SURFACE_STEEL = 425,
-    BG_BODY_SURFACE_OAK = 427,
+    BG_BODY_SURFACE_NATURAL = 264,
+    BG_BODY_SURFACE_FLESH = 431,
+    BG_BODY_SURFACE_BRASS = 433,
+    BG_BODY_SURFACE_IRON = 434,
+    BG_BODY_SURFACE_PAPER = 435,
+    BG_BODY_SURFACE_STEEL = 436,
+    BG_BODY_SURFACE_OAK = 438,
 };
 
 /* #Colour */
 enum {
-    BG_COLOUR_BLUE = 334,
-    BG_COLOUR_BLACK = 336,
-    BG_COLOUR_BROWN = 337,
-    BG_COLOUR_GREEN = 338,
-    BG_COLOUR_GREY = 339,
-    BG_COLOUR_NAVY = 340,
-    BG_COLOUR_RED = 341,
-    BG_COLOUR_YELLOW = 342,
-    BG_COLOUR_BEIGE = 356,
-    BG_COLOUR_WHITE = 378,
+    BG_COLOUR_BLUE = 345,
+    BG_COLOUR_BLACK = 347,
+    BG_COLOUR_BROWN = 348,
+    BG_COLOUR_GREEN = 349,
+    BG_COLOUR_GREY = 350,
+    BG_COLOUR_NAVY = 351,
+    BG_COLOUR_RED = 352,
+    BG_COLOUR_YELLOW = 353,
+    BG_COLOUR_BEIGE = 367,
+    BG_COLOUR_WHITE = 389,
 };
 
 /* The field registry: what code needs to read and write any component
@@ -421,6 +422,7 @@ static const BGFieldInfo BGLever_fields[] = {
 };
 
 static const BGFieldInfo BGOfficeHolder_fields[] = {
+    { "badge", offsetof(BGOfficeHolder, badge), BG_VALUE_TEXT, "text", "content, saved, proposable, inspect, perceive(sight)" },
     { "office", offsetof(BGOfficeHolder, office), BG_VALUE_REF, "ref", "saved, proposable, inspect" },
 };
 
@@ -642,7 +644,7 @@ static const BGComponentInfo BGComponents[BG_COMPONENT_COUNT + 1] = {
     { "FuelContainer", "#FuelContainer", sizeof(BGFuelContainer), 1, BGFuelContainer_fields },
     { "GasStore", "#GasStore", sizeof(BGGasStore), 11, BGGasStore_fields },
     { "Lever", "#Lever", sizeof(BGLever), 3, BGLever_fields },
-    { "OfficeHolder", "#OfficeHolder", sizeof(BGOfficeHolder), 1, BGOfficeHolder_fields },
+    { "OfficeHolder", "#OfficeHolder", sizeof(BGOfficeHolder), 2, BGOfficeHolder_fields },
     { "Respirator", "#Respirator", sizeof(BGRespirator), 4, BGRespirator_fields },
     { "Scribe", "#Scribe", sizeof(BGScribe), 1, BGScribe_fields },
     { "Sized", "#Sized", sizeof(BGSized), 1, BGSized_fields },

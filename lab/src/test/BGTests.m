@@ -4744,6 +4744,7 @@ typedef enum
    BGPurseHonest,                /* B: an honest Kasimir, the same debt */
    BGPurseNoWitness,             /* C: Mira isn't there */
    BGPurseUntold,                /* A, but no one told Kasimir whose the purse is */
+   BGPurseWatch,                 /* the base case, and an officer of the town's watch by Mira */
    BGPurseRepaid,                /* B, and on until the loan's term is out */
    BGPurseLost                   /* that, but the wages are lost on the third day */
 } BGPurse;
@@ -4760,6 +4761,7 @@ typedef struct
    BGEntityID    merchant;
    BGEntityID    carter;
    BGEntityID    wages;
+   BGEntityID    officer;
    BOOL          owedLate;      /* the wages still Kasimir's on the sixth day */
    NSString      *text;
 } BGPurseRun;
@@ -4810,6 +4812,8 @@ static BGPurseRun   tempting_purse( BGPurse variant)
       if( variant == BGPurseNoticed || variant == BGPurseUntold)
          [g set:"Agent.hiding" of:BGWhole( h[ 4]) to:0];
    }
+   if( variant == BGPurseWatch)
+      run.officer = [g create:"watch_officer" key:"an officer of the watch" at:BGOnTile( 13, 12, 0)];
    if( variant == BGPurseHonest || variant == BGPurseRepaid || variant == BGPurseLost)
       [g set:"Agent.honesty" of:BGWhole( h[ 2]) to:90];
    [st.c submit:g];
@@ -4822,6 +4826,7 @@ static BGPurseRun   tempting_purse( BGPurse variant)
    run.kasimir   = [g idFor:h[ 2]];
    run.carter    = [g idFor:h[ 3]];
    run.wages     = [g idFor:h[ 5]];
+   run.officer   = run.officer ? [g idFor:run.officer] : BGNoEntity;
    [agency control:run.carter];
    run.mira      = h[ 4] ? [g idFor:h[ 4]] : BGNoEntity;
    if( run.mira)
@@ -4891,6 +4896,7 @@ static void   test_tempting_purse( void)
    BGPurseRun         repaid;
    BGPurseRun         lost;
    BGPurseRun         untold;
+   BGPurseRun         watch;
    BGKnowledgeStore   *store;
    const BGReferent   *purse;
    const BGTestimony  *t;
@@ -4992,6 +4998,35 @@ static void   test_tempting_purse( void)
    untold = tempting_purse( BGPurseUntold);
    BG_CHECK( logged_by( untold.agency, untold.kasimir, @"take the purse +20 (+30, honesty -5, scruples -5, lawful +0)"));
    BG_CHECK( [untold.world locationOf:untold.purse].place == untold.kasimir);
+
+   /* INSTITUTIONS.md decision 6: a wrong reaches an institution through
+    * people. Mira overheard the merchant say the purse is its own, and saw
+    * Kasimir take it: taken. She tells the officer of the watch beside her
+    * what was taken, whose, and by whom; the officer, who saw nothing of
+    * it, believes it on her word */
+   watch = tempting_purse( BGPurseWatch);
+   store = [watch.knowledge storeOf:watch.mira];
+   BG_CHECK( [store finding:"#Taken" about:referent_of( store, watch.purse)] &&
+             [store finding:"#Taken" about:referent_of( store, watch.purse)]->choice == referent_of( store, watch.kasimir));
+   BG_CHECK( logged_by( watch.agency, watch.mira, @"[report the theft] tell the watch: say R"));
+   store = [watch.knowledge storeOf:watch.officer];
+   {
+      const BGFinding   *taken;
+      const BGFinding   *owned;
+      NSUInteger        i;
+
+      taken = NULL;
+      owned = NULL;
+      for( i = 0; i < [store findingCount]; i++)
+      {
+         if( ! strcmp( [store findingAt:i]->kind, "#Taken"))
+            taken = [store findingAt:i];
+         if( ! strcmp( [store findingAt:i]->kind, "#Owned"))
+            owned = [store findingAt:i];
+      }
+      BG_CHECK( taken && taken->choice == referent_of( store, watch.kasimir) && ! strcmp( taken->rule, "told"));
+      BG_CHECK( owned && owned->about == taken->about && owned->choice == referent_of( store, watch.merchant));
+   }
 
    /* 1: C: no one is there, and Kasimir decides just the same */
    alone = tempting_purse( BGPurseNoWitness);

@@ -65,8 +65,14 @@ alun:   #Agent & { material: "flesh", mass: 75kg, hands: 2, coat: "green" }
 #OfficeHolder: {
     @component(OfficeHolder)
     office: ref                                @field(saved, proposable, inspect)
+    // what shows it: a badge, a uniform, anyone can see
+    badge:  text                               @field(content, saved, proposable, inspect, perceive(sight))
 }
-office_clerk: #Agent & #Scribe & #OfficeHolder & { material: "flesh", mass: 65kg, hands: 2, coat: "black" }
+office_clerk: #Agent & #Scribe & #OfficeHolder & { material: "flesh", mass: 65kg, hands: 2, coat: "black",
+                                                   badge: "office" }
+// The town's watch (INSTITUTIONS.md decision 4): it acts for the town only
+// as its members do.
+watch_officer: #Agent & #OfficeHolder & { material: "flesh", mass: 80kg, hands: 2, coat: "navy", badge: "watch" }
 
 harbour_office: #Organization & {}
 content:        #Content & {}

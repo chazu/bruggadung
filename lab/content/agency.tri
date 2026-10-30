@@ -48,6 +48,9 @@
 // and who lent it.
 #Repaying: #Frame & { loan: #Body, lender: #Agent }
 
+// Reporting a wrong: what was taken, and someone of the watch to tell.
+#Reporting: #Frame & { loot: #Body, officer: #Agent }
+
 // Eating: the food. Watching: the spot where something stirred.
 #Supper:   #Frame & { food: #Body }
 #Watching: #Frame & { spot: #Container }
@@ -125,7 +128,7 @@
 // (talk.tri): after a question, the agent waits a while for the answer.
 #MethodStep: {}
 #Achieve:    #MethodStep & { subgoal: text }
-#Do:         #MethodStep & { op: text, object: text, target: text, units: int, says: #Utterance }
+#Do:         #MethodStep & { op: text, object: text, target: text, units: int, says: #Utterance, regarding: text }
 
 // A way to achieve a goal. Its alternatives are tried by `rank`, lowest first,
 // skipping those that have failed since the goal was adopted; the first whose
@@ -305,6 +308,33 @@ look_into_it: #Method & {
     rank:  1
     pre:   { find: ["spot"], match: #Watching & { spot: #Container } }
     steps: [#Do & { op: "look_in", object: "spot" }]
+} @family(methods)
+
+
+// --- INSTITUTIONS.md decision 6: a wrong reported ---------------------------------
+
+// Seen something taken from its owner (a #Taken finding): tell the watch. A
+// grievance is a claim told to an office holder; whether it acts is its own
+// decision.
+report_wrong: #Goal & {
+    title:  "report the theft"
+    done:   #Did & { did: "say" }
+    arises: { finding: "#Taken", slot: "loot", lapse: 1h, of: #Body }
+    worth:  [#Flat & { value: 15 }]
+} @family(goals)
+
+// Go to someone wearing the watch's badge, the nearest first, and say what
+// was taken, whose it was, and who took it (`regarding` the loot).
+tell_the_watch: #Method & {
+    title: "tell the watch"
+    goal:  "report_wrong"
+    rank:  1
+    pre: {
+        find:  ["loot", "officer"]
+        match: #Reporting & { officer: #Agent & #OfficeHolder & { badge: "watch" } }
+    }
+    order: ["near"]
+    steps: [#Do & { op: "say", object: "officer", says: #Grievance, regarding: "loot" }]
 } @family(methods)
 
 

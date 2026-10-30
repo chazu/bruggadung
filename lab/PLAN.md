@@ -3257,3 +3257,30 @@ watched -40"); honest, he doesn't. Untold whose it is, seeing Mira watch,
 he knows the law but not that it applies ("lawful +0"), and takes it.
 
 87 tests, 2679 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: a grievance, told to the watch
+
+INSTITUTIONS.md decision 6: wrongs reach an institution through people; a
+grievance is a claim told to an office holder, ordinary knowledge, weighed
+by who says it.
+
+- **Taken, seen**: an agent who sees someone take into their hand a thing
+  it believes is another's (`#Owned`, not theirs) draws `#Taken` about it,
+  its choice the taker.
+- **`report_wrong`**: a goal arising from `#Taken`; its method,
+  `tell_the_watch`, goes to the nearest agent it sees wearing the watch's
+  badge (`OfficeHolder.badge`, perceivable) and says a `#Grievance`: what,
+  whose, taken by whom, built from what it believes (`grievanceAbout:`).
+- **Heard**: a grievance makes the hearer's `#Owned` (if new) and `#Taken`
+  findings, at its trust in the speaker. A thing it never saw gets a
+  referent, as said (and likewise for any naming claim).
+
+Checked: Mira overhears the merchant tell Kasimir the purse is its own,
+sees him take it, and tells the officer of the watch beside her; the
+officer, who saw none of it, now holds that the purse is the merchant's
+and that Kasimir took it, on her word.
+
+Not yet: the officer acting on it (sanctions, next), and grievances by
+the wronged themselves when they find their things gone.
+
+87 tests, 2686 checks, under both compilers, ASan, and leak-free.

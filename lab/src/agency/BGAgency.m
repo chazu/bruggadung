@@ -1461,7 +1461,22 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
       /* what it says, if anything: after a question, it waits for the answer */
       says    = tri_at( tri, step, "says");
       content = NULL;
-      if( says && tri_node_type( says) != utterance)
+      if( says && tri_subtype( tri, tri_node_type( says), tri_type_named( tri, "#Grievance")) &&
+          text_at( tri, step, "regarding", slot, sizeof( slot)))
+      {
+         /* a grievance: what it believes of the thing, whose it is, who took it */
+         NSString   *grievance;
+
+         grievance = [store grievanceAbout:bound( b, n, slot)];
+         if( ! grievance)
+         {
+            [self fail:m method:index why:[NSString stringWithFormat:@"%s: it can't say what was taken", title]];
+            return( NO);
+         }
+         snprintf( text, sizeof( text), "%s", [grievance UTF8String]);
+         content = text;
+      }
+      else if( says && tri_node_type( says) != utterance)
       {
          tri_print( tri, says, text, sizeof( text));
          content = text;
