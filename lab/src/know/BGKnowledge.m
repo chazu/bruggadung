@@ -2877,6 +2877,55 @@ static BOOL   bears( BGKnowledgeStore *store, uint32_t referent, const char *kin
 }
 
 
+/* Whether, of the rule's signs on the referent, the agent remembers one it
+ * no longer finds that should still be there (KNOWLEDGE.md decision 11):
+ * as strong as it seemed, less what fading evenly over its kind's `lasts`
+ * takes since, still above its kind's floor and faint (10). */
+- (BOOL) contradicted:(const TriNode *) rule
+                   on:(const BGReferent *) r
+                store:(BGKnowledgeStore *) store
+                   at:(int64_t) now
+{
+   const BGTraceSeen   *t;
+   const TriNode       *list;
+   const TriNode       *premise;
+   const TriNode       *v;
+   const TriNode       *kind;
+   TriContent          *tri;
+   NSUInteger          i;
+   int64_t             lasts;
+   int64_t             floor;
+   int64_t             lo;
+   int64_t             hi;
+   int64_t             left;
+   char                text[ 64];
+
+   tri = [_world tri];
+   for( list = tri_at( tri, rule, "premises"); list && (premise = tri_at( tri, list, "first"));
+        list = tri_at( tri, list, "rest"))
+   {
+      if( ! (v = tri_at( tri, premise, "sign")) || tri_print( tri, v, text, sizeof( text)) <= 2)
+         continue;
+      text[ strlen( text) - 1] = 0;
+      kind  = tri_pattern( tri, text + 1);
+      v     = kind ? tri_at( tri, kind, "lasts") : NULL;
+      lasts = v && tri_node_interval( v, &lo, &hi) && lo == hi ? lo : 0;
+      v     = kind ? tri_at( tri, kind, "floor") : NULL;
+      floor = v && tri_node_interval( v, &lo, &hi) && lo == hi ? lo : 0;
+      for( i = 0; lasts > 0 && i < [store traceCount]; i++)
+      {
+         t = [store traceAt:i];
+         if( t->bearer != r->id || t->present || strcmp( t->kind, text + 1))
+            continue;
+         left = t->strength - (now - t->seen) * 100 / lasts;
+         if( left > floor && left > 10)
+            return( YES);
+      }
+   }
+   return( NO);
+}
+
+
 /* Whether the agent perceives a trace of the kind on the floor at the
  * referent's tile or beside it. */
 static BOOL   near( BGKnowledgeStore *store, const BGReferent *r, const char *kind)
@@ -3034,6 +3083,15 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
          if( r->id == [store selfReferent])
             continue;
          existing = [store finding:concludes about:r->id];
+         /* contradicted (KNOWLEDGE.md decision 11): looking closely, no trace
+          * where one should still be; a trace merely faded, it stands */
+         if( existing && ! repeated && deliberately && [self contradicted:rule on:r store:store at:[_world time].ms])
+         {
+            [news addObject:[NSString stringWithFormat:@"R%u: no longer %s: the signs should still be there, and aren't",
+                                                       r->id, existing->kind]];
+            [store retractFinding:concludes about:r->id];
+            continue;
+         }
          if( existing && ! repeated)
             continue;
          holds  = YES;

@@ -2993,6 +2993,32 @@ static void   test_interpretation( void)
    [restored restoreSavedState:BGSavedDomainState( text, @"knowledge")];
    BG_CHECK( [[restored dump:foreman] isEqualToString:[knowledge dump:foreman]]);
    BG_CHECK( [[restored dump:porter] isEqualToString:[knowledge dump:porter]]);
+
+   /* KNOWLEDGE.md decision 11: a conclusion is retracted only when its
+    * premise is contradicted. The paint is scrubbed off, under their eyes,
+    * days before it would have dried. The porter, glancing, sees it gone,
+    * and the lock was still covered up; the painter looks closely, finds no
+    * paint where there should still be some, and no longer concludes the
+    * lock was touched up */
+   {
+      BGStore      *all;
+      NSUInteger   i;
+
+      all = [w storeForKind:[w kindNamed:"Trace"]];
+      g   = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the paint scrubbed off"];
+      for( i = 0; i < [all count]; i++)
+         if( ! strcmp( [w textField:"Trace.traceKind" of:[all entityAtIndex:i]], "fresh_paint"))
+            [g destroy:BGWhole( [all entityAtIndex:i]) reason:"scrubbed"];
+      [c submit:g];
+   }
+   [s runUntil:BGTimeMake( 8 * 3600000LL + 2000)];
+   BG_CHECK( ! any_trace( w, "fresh_paint"));
+   BG_CHECK( BGPerform( w, c, BGActionMake( "watch_closely", foreman, BGNoEntity, BGNoEntity), 0, &error) != nil);
+   [s runUntil:BGTimeMake( 8 * 3600000LL + 40000)];
+   store = [knowledge storeOf:porter];
+   BG_CHECK( [store finding:"#CoveredUp" about:referent_of( store, lock)]);
+   store = [knowledge storeOf:foreman];
+   BG_CHECK( ! [store finding:"#Tampered" about:referent_of( store, lock)]);
 }
 
 

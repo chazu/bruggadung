@@ -3619,3 +3619,26 @@ rival to the wrong place); a lie naming a false place rather than denying;
 being found out (the asker seeing it in his hand and believing him less).
 
 89 tests, 2802 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: retracted only when contradicted
+
+KNOWLEDGE.md decision 11: a conclusion is retracted only when its premise
+is contradicted, never because a trace fades: contradicted, the agent sees
+again, closely, no trace where one should still be. (A conclusion over
+repetition was already retracted as the repetition moves on, and others
+were already kept when their traces faded.)
+
+- **Contradiction**: on a close look (an investigation), for each sign
+  premise, a trace the agent remembers on the thing and no longer finds,
+  that should still be there: as strong as it seemed, less what fading
+  evenly over its kind's `lasts` takes since, above its kind's floor and
+  10. Then the conclusion is retracted, with news saying why.
+
+Checked: the paint on the lock is scrubbed off hours after it was put on.
+The porter, glancing, sees it gone and still concludes the tool marks were
+covered up; the painter looks closely, finds no paint where there should
+still be some, and no longer concludes the lock was touched up.
+
+Not yet: being told a credible other cause.
+
+89 tests, 2806 checks, under both compilers, ASan, and leak-free.
