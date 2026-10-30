@@ -1685,6 +1685,65 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
 }
 
 
+/* What a thing is worth to the agent (AGENCY.md decision 16): the most of
+ * the authored values (`values`) whose `valued` what it believes of the
+ * thing entails, BG_WORTH if none; raised by what it feels of the need a
+ * value names, `per` tenths of a point a point. */
+- (int32_t) worth:(uint32_t) thing
+            store:(BGKnowledgeStore *) store
+{
+   const TriNode   *description;
+   const TriNode   *pattern;
+   const TriNode   *of;
+   TriMatchResult  result;
+   TriContent      *tri;
+   TriIndex        *family;
+   TriArena        *arena;
+   size_t          i;
+   int32_t         best;
+   int32_t         v;
+   char            need[ 32];
+
+   tri         = [_world tri];
+   family      = tri_family_index( tri, "values");
+   arena       = tri_arena_new();
+   description = [store referent:thing] ? tri_value( tri, [[store describeReferent:thing] UTF8String], arena, NULL, 0)
+                                        : NULL;
+   best        = -1;
+   for( i = 0; description && family && i < tri_index_count( family); i++)
+   {
+      pattern = tri_pattern( tri, tri_index_tag( family, i));
+      of      = pattern ? tri_at( tri, pattern, "valued") : NULL;
+      if( ! of || tri_match( tri, of, description, &result) != TRI_ENTAILED)
+         continue;
+      v = (int32_t) int_at( tri, pattern, "value", 0);
+      if( text_at( tri, pattern, "pressure", need, sizeof( need)))
+         v += (int32_t) ([store feels:need] * int_at( tri, pattern, "per", 0) / 10);
+      best = v > best ? v : best;
+   }
+   tri_arena_free( arena);
+   return( best < 0 ? BG_WORTH : best);
+}
+
+
+- (int32_t) worthOf:(uint32_t) thing
+                 to:(BGEntityID) agent
+{
+   return( [self worth:thing store:[_knowledge storeOf:agent]]);
+}
+
+
+/* What lending a thing costs (AGENCY.md decision 16): its worth, less by
+ * the agent's trust that it comes back: all of it at the least trust,
+ * nothing at the most. */
+- (int32_t) lending:(uint32_t) thing
+                 to:(uint32_t) borrower
+              store:(BGKnowledgeStore *) store
+{
+   return( [self worth:thing store:store] * (BG_TRUST_LIMIT - [store trustIn:borrower]) / (2 * BG_TRUST_LIMIT));
+}
+
+
 /* Each question asked, weighed (AGENCY.md §11): answered, put off while the
  * agent is busy, refused, or, waited on too long, let go. */
 - (void) considerQuestions:(BGMotivation *) m
@@ -1721,9 +1780,10 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
       question = tri_value( tri, q->content, arena, NULL, 0);
       request  = question && tri_subtype( tri, tri_node_type( question), tri_type_named( tri, "#Request"));
       call     = question && tri_subtype( tri, tri_node_type( question), tri_type_named( tri, "#Call"));
+      given    = request ? [self heldLike:tri_at( tri, question, "what") store:store] : 0;
       tri_arena_free( arena);
       worth = [store trustIn:q->asker] + (agent ? (int32_t) agent->helpful : 0) - busy -
-              (m->nintentions ? BG_COMMITTED : 0) - (request ? BG_PARTING : 0);
+              (m->nintentions ? BG_COMMITTED : 0) - (given ? [self lending:given to:q->asker store:store] : 0);
       if( call)
       {
          /* a soft interruption: worth putting down what it is doing, if more
@@ -1757,7 +1817,6 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
       if( question && request)
       {
          /* comply or refuse: give what it holds like it */
-         given = [self heldLike:tri_at( tri, question, "what") store:store];
          what  = tri_at( tri, question, "what");
          printed[ 0] = 0;
          if( what)
@@ -1770,12 +1829,18 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
          }
          else if( worth > 0)
          {
+            [self note:m line:[NSString stringWithFormat:@"asked by R%u for R%u, worth %d to it: lending it costs %d",
+                                                         q->asker, given, [self worth:given store:store],
+                                                         [self lending:given to:q->asker store:store]]];
             [self note:m line:[NSString stringWithFormat:@"asked by R%u: worth %+d, granting", q->asker, worth]];
             if( [self act:m why:"granting" store:store operation:"give" object:given target:q->asker units:0 content:NULL])
                answer = [NSString stringWithFormat:@"#Granted & { what: %@ }", [store describeLooks:given]];
          }
          else
          {
+            [self note:m line:[NSString stringWithFormat:@"asked by R%u for R%u, worth %d to it: lending it costs %d",
+                                                         q->asker, given, [self worth:given store:store],
+                                                         [self lending:given to:q->asker store:store]]];
             [self note:m line:[NSString stringWithFormat:@"asked by R%u: worth %+d, refusing", q->asker, worth]];
             answer = [NSString stringWithFormat:@"#WontSay & { what: %s }", *printed ? printed : "#Body"];
          }

@@ -29,9 +29,10 @@
  * it doesn't know; asked who told it, the claim again, with its source.
  * Worth nothing only because it is busy, it answers once it isn't, if the
  * asker can still be waiting. Otherwise it says it won't. A request for
- * something (comply or refuse) costs BG_PARTING more: granted, the agent
- * gives what it holds like it, and says so; with nothing like it in hand,
- * it says it has none.
+ * something it holds (comply or refuse) costs what lending it costs: its
+ * worth to the agent (AGENCY.md decision 16), less by the agent's trust in
+ * the asker. Granted, the agent gives what it holds like it, and says so;
+ * with nothing like it in hand, it says it has none.
  *
  * Goals have worth (AGENCY.md §3): their considerations, added in dB, among
  * them the credence that something is so. A goal that `arises` from a kind
@@ -89,7 +90,7 @@
 
 #define BG_BUSY_COST       3      /* per point of attention the running activity demands */
 #define BG_COMMITTED       5      /* for holding a goal of its own */
-#define BG_PARTING         15     /* what giving something away costs */
+#define BG_WORTH           10     /* what a thing is worth, with no value authored for it */
 #define BG_MARGIN          5      /* what another goal must beat the current one by */
 #define BG_INTERRUPT       5      /* and more, to interrupt an activity under way */
 #define BG_MAX_SETTLED     16
@@ -301,6 +302,9 @@ typedef struct
 - (void) setActivities:(BGActivities *) activities;
 
 - (BGMotivation *) mindOf:(BGEntityID) agent;
+/* what a referent of the agent's is worth to it (AGENCY.md decision 16) */
+- (int32_t) worthOf:(uint32_t) thing
+                 to:(BGEntityID) agent;
 /* the agent's decision log, for the developer; kept when agency lets it go */
 - (NSArray *) logOf:(BGEntityID) agent;
 

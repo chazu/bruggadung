@@ -595,6 +595,19 @@ eat_what_i_have: #Method & {
 } @family(methods)
 
 
+// --- AGENCY.md decision 16, what things are worth ---------------------------------
+
+// What something like `valued` is worth to an agent, in dB: its `value`,
+// the most of those whose `valued` it believes the thing to be; raised by
+// what it feels of a need the thing serves (`pressure`), `per` tenths of a
+// point a point. With none, 10. Lending a thing costs its worth, less by
+// the trust that it comes back.
+#Valuing: #Flat & #Need & { valued: #Body }
+
+money_value: #Valuing & { valued: #Body & { material: "cloth" }, value: 30 } @family(values)
+food_value:  #Valuing & { valued: #Body & { material: "food" }, value: 10, pressure: "hunger", per: 5 } @family(values)
+
+
 // --- AGENCY.md §8, habits -------------------------------------------------------
 
 // Put away the nails in hand: done when both hands are free.

@@ -3429,3 +3429,27 @@ recognized: it needs a referent of its own); employment forming a bond
 (decision 15, next); a bond known before the other is first seen.
 
 88 tests, 2726 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: what a thing is worth, and what lending it costs
+
+AGENCY.md decision 16: worth is believed and to the agent, authored by
+kind, raised for what serves its needs now; giving costs the worth, and
+lending less, by the trust that it comes back.
+
+- **`#Valuing`** (`values` family): a `value` for things believed like
+  `valued`, raised by a `pressure` the agent feels, `per` tenths a point.
+  Money (cloth) is 30; food 10, plus half the hunger felt. Unvalued, 10
+  (`BG_WORTH`).
+- **Lending** costs the thing's worth times (30 − trust) / 60: all of it
+  at the least trust, none at the most. It replaces the flat
+  `BG_PARTING` (15) in weighing a request.
+
+Checked: the carter, asked for its wages (30) by Kasimir, whom it trusts
+at 20, finds lending costs 5 and grants at +15 (it was +5). Disposed to
+trust no one (−20), it trusts him at 0, lending costs 15, and it refuses
+at −15. The worker's supper is worth 10 plus half the hunger it feels.
+
+Not yet: gifts as opposed to loans (every request is a loan now); the
+raise for tools in use; worth in trade (no trade yet).
+
+88 tests, 2737 checks, under both compilers, ASan, and leak-free.

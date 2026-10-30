@@ -1729,6 +1729,21 @@ static void   test_needs( void)
    BG_CHECK( logged_by( hungry.agency, 4, @"[eat something] eat what I have: eat R"));
    BG_CHECK( logged_by( hungry.agency, 4, @"[eat something] done"));
    BG_CHECK( ! [hungry.world isLive:hungry.supper]);
+   /* AGENCY.md decision 16: its supper is worth 10 to it, and more the
+    * hungrier it is, half a point a point of hunger it feels */
+   {
+      BGHungerRun        early;
+      BGKnowledgeStore   *store;
+      int32_t            felt;
+
+      early = hunger_run( 30, YES, 2500);
+      store = [early.knowledge storeOf:4];
+      felt  = [store feels:"hunger"];
+      BG_CHECK( felt > 0 && [early.agency worthOf:referent_of( store, early.supper) to:4] == 10 + felt / 2);
+      early = hunger_run( 100, YES, 2500);
+      store = [early.knowledge storeOf:4];
+      BG_CHECK( [store feels:"hunger"] == 0 && [early.agency worthOf:referent_of( store, early.supper) to:4] == 10);
+   }
    agent = [hungry.world record:[hungry.world kindNamed:"Agent"] for:4];
    BG_CHECK( agent && agent->fed == 80);
    BG_CHECK( [[hungry.knowledge storeOf:4] feels:"hunger"] == 20);
@@ -4748,6 +4763,7 @@ typedef enum
    BGPurseFlight,                /* that, and Kasimir doesn't abide by the rules */
    BGPurseResist,                /* that, and he has a temper */
    BGPurseKin,                   /* the watch case, and Mira is the merchant's daughter */
+   BGPurseWary,                  /* B, and the carter trusts no one */
    BGPurseRepaid,                /* B, and on until the loan's term is out */
    BGPurseLost                   /* that, but the wages are lost on the third day */
 } BGPurse;
@@ -4838,8 +4854,10 @@ static BGPurseRun   tempting_purse( BGPurse variant)
       [g set:"Bond.toward" of:BGWhole( bond) to:(int64_t) h[ 1]];
       [g set:"Agent.trusting" of:BGWhole( h[ 4]) to:3];
    }
-   if( variant == BGPurseHonest || variant == BGPurseRepaid || variant == BGPurseLost)
+   if( variant == BGPurseHonest || variant == BGPurseRepaid || variant == BGPurseLost || variant == BGPurseWary)
       [g set:"Agent.honesty" of:BGWhole( h[ 2]) to:90];
+   if( variant == BGPurseWary)
+      [g set:"Agent.trusting" of:BGWhole( h[ 3]) to:-20];
    [st.c submit:g];
    [st.s runUntil:BGTimeMake( 1)];
    run.world     = st.w;
@@ -4926,6 +4944,7 @@ static void   test_tempting_purse( void)
    BGPurseRun         flight;
    BGPurseRun         resist;
    BGPurseRun         kin;
+   BGPurseRun         wary;
    BGKnowledgeStore   *store;
    const BGReferent   *purse;
    const BGTestimony  *t;
@@ -4980,15 +4999,24 @@ static void   test_tempting_purse( void)
              [noticed.world locationOf:noticed.wages].place == noticed.kasimir);
 
    /* 3: B: an honest Kasimir, unwatched, never takes it; asked, the carter
-    * weighs lending at its trust in him less the parting, and lends */
+    * weighs lending at its trust in him less what lending costs it
+    * (AGENCY.md decision 16): the wages' worth to it, 30, a sixth of it at
+    * its trust in him, 20 */
    honest = tempting_purse( BGPurseHonest);
    BG_CHECK( logged_by( honest.agency, honest.kasimir, @"take the purse -20 (+30, honesty -45, scruples -5, unlawful, unwatched +0)"));
    BG_CHECK( ! logged_by( honest.agency, honest.kasimir, @"take R"));
    BG_CHECK( [honest.world locationOf:honest.purse].form == BGLocationOnTile);
-   BG_CHECK( logged_by( honest.agency, honest.carter, @"worth +5, granting"));
+   BG_CHECK( logged_by( honest.agency, honest.carter, @"worth 30 to it: lending it costs 5"));
+   BG_CHECK( logged_by( honest.agency, honest.carter, @"worth +15, granting"));
    BG_CHECK( logged_by( honest.agency, honest.carter, @"granting: give R"));
    BG_CHECK( [honest.world locationOf:honest.wages].place == honest.kasimir);
    BG_CHECK( logged_by( noticed.agency, noticed.mira, @"for something it hasn't"));
+   /* a wary carter, disposed to trust no one (-20), trusts him at 0: lending
+    * costs half the wages' worth, and it refuses */
+   wary = tempting_purse( BGPurseWary);
+   BG_CHECK( logged_by( wary.agency, wary.carter, @"worth 30 to it: lending it costs 15"));
+   BG_CHECK( logged_by( wary.agency, wary.carter, @"worth -15, refusing"));
+   BG_CHECK( [wary.world locationOf:wary.wages].place == wary.carter);
    /* a loan is a debt (AGENCY.md §7): Kasimir owes the carter its wages
     * back within the week, a commitment, saved like any other */
    BG_CHECK( logged_by( honest.agency, honest.kasimir, @"owes R"));
