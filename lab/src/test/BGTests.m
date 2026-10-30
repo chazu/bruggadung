@@ -3537,6 +3537,63 @@ static int64_t   pump_drain( const char *key, BOOL *conserved, BOOL *leaking)
 }
 
 
+/* Check 3's heat: the warm pump (305 K, 18 kJ/K) opened and its piston
+ * (1.8 kJ/K) taken out: the piston leaves with its share of the heat, by
+ * heat capacity; the total is the same, and both are at 305 K. */
+static void   test_pump_heat( void)
+{
+   BGStage            st;
+   BGProposalGroup    *g;
+   BGEntityID         pump;
+   BGEntityID         worker;
+   BGEntityID         wrench;
+   BGEntityID         piston;
+   BGStore            *parts;
+   NSString           *error;
+   NSUInteger         i;
+   int64_t            pumpHeat;
+   int64_t            pumpCap;
+   int64_t            pistonHeat;
+   int64_t            pistonCap;
+   int64_t            v;
+
+   st.w   = BGTestWorld( 167);
+   st.c   = BGTestCommitter( st.w);
+   st.s   = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   g      = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: a warm pump"];
+   pump   = [g create:"warm_pump" key:"pump 1" at:BGOnTile( 5, 5, 0)];
+   worker = [g create:"worker" key:"worker" at:BGOnTile( 4, 5, 0)];
+   wrench = [g create:"wrench_250" key:"wrench" at:BGHeldBy( worker, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   pump   = [g idFor:pump];
+   worker = [g idFor:worker];
+   wrench = [g idFor:wrench];
+   error  = nil;
+   BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "open_up", worker, wrench, pump), 0, &error) != nil);
+   [st.s runUntil:BGTimeMake( 1000)];
+   BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "open_up", worker, wrench, pump), 0, &error) != nil);
+   [st.s runUntil:BGTimeMake( 2000)];
+   piston = BGNoEntity;
+   parts  = [st.w storeForKind:[st.w kindNamed:"Part"]];
+   for( i = 0; i < [parts count]; i++)
+      if( ! strcmp( [st.w info:[parts entityAtIndex:i]]->blueprint, "piston"))
+         piston = [parts entityAtIndex:i];
+   /* inside, it has none of its own: its heat is the pump's */
+   BG_CHECK( piston && [st.w getField:"ThermalBody.heat" of:piston value:&v] && v == 0);
+   BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "take", worker, piston, BGNoEntity), 0, &error) != nil);
+   [st.s runUntil:BGTimeMake( 3000)];
+   [st.w getField:"ThermalBody.heat" of:pump value:&pumpHeat];
+   [st.w getField:"ThermalBody.heatCapacity" of:pump value:&pumpCap];
+   [st.w getField:"ThermalBody.heat" of:piston value:&pistonHeat];
+   [st.w getField:"ThermalBody.heatCapacity" of:piston value:&pistonCap];
+   BG_CHECK( pumpHeat + pistonHeat == 5490000);
+   BG_CHECK( pumpCap == 16200 && pistonCap == 1800);
+   BG_CHECK( pumpHeat * 1000 / pumpCap == 305000 && pistonHeat * 1000 / pistonCap == 305000);
+   BG_CHECK( [st.w getField:"Part.detached" of:piston value:&v] && v == 1);
+}
+
+
 static void   test_latent_pump( void)
 {
    BGPumpRun   early;
@@ -6559,6 +6616,7 @@ const BGTestCase   BGAllTests[] =
    { "habitual_belief",               test_habitual_belief },
    { "forged_permit",                 test_forged_permit },
    { "latent_pump",                   test_latent_pump },
+   { "pump_heat",                     test_pump_heat },
    { "door_in_the_dark",              test_door_in_the_dark },
    { "wrench_replaced",               test_wrench_replaced },
    { "rumour",                        test_rumour },

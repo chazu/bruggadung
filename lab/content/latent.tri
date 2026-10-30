@@ -32,22 +32,43 @@
     latent:   #LatentSchema
 }
 
-// A revealed part: how worn it is (0 to 100), which can be seen.
+// A revealed part: how worn it is (0 to 100), which can be seen; the
+// assembly it came from; whether it has left it.
 #Part: #Body & {
     @component(Part)
-    wear: *0 | int & >=0 & <=100               @field(content, saved, proposable, inspect, perceive(sight))
+    wear:     *0 | int & >=0 & <=100           @field(content, saved, proposable, inspect, perceive(sight))
+    cameFrom: ref                              @field(saved, proposable, inspect)
+    detached: *false | true                    @field(content, saved, proposable, inspect)
 }
 
 pump_handle:  #Part & { material: "iron", mass: 2kg }
 pump_cover:   #Part & { material: "iron", mass: 3kg }
-piston:       #Part & { material: "iron", mass: 4kg }
+piston:       #Part & #ThermalBody & { material: "iron", mass: 4kg, heat: 0, heatCapacity: 1800, toAir: 0, toOutdoors: 0 }
 leather_cup:  #Part & { material: "rubber", mass: 200g }
 inlet_valve:  #Part & { material: "brass", mass: 500g }
 outlet_valve: #Part & { material: "brass", mass: 500g }
 
 // The crank-driven piston pump: 40 kg in all, its parts inside until opened.
+// `warm_pump`: the same with its heat (iron, 18 kJ/K), which a part leaving
+// it takes its share of, by heat capacity (Scenario 2's check 3).
 crank_pump: #Pump & #Latent & {
     material: "iron", mass: 40kg, slots: 8
+    latent: {
+        parts: [{ roleName: "handle", partKind: "pump_handle", depth: 1 },
+                { roleName: "cover", partKind: "pump_cover", depth: 1 },
+                { roleName: "piston", partKind: "piston", depth: 2 },
+                { roleName: "piston_seal", partKind: "leather_cup", depth: 2 },
+                { roleName: "inlet_valve", partKind: "inlet_valve", depth: 2 },
+                { roleName: "outlet_valve", partKind: "outlet_valve", depth: 2 }]
+        culprits: [{ failing: "flow_loss", candidates: ["piston_seal", "inlet_valve", "outlet_valve", "housing"] },
+                   { failing: "seized", candidates: [] }]
+        pathWhenOut: "piston"
+        pathThrough: "outlet_valve"
+    }
+}
+
+warm_pump: #Pump & #Latent & #ThermalBody & {
+    material: "iron", mass: 40kg, slots: 8, heat: 5490000, heatCapacity: 18000, toAir: 0, toOutdoors: 0
     latent: {
         parts: [{ roleName: "handle", partKind: "pump_handle", depth: 1 },
                 { roleName: "cover", partKind: "pump_cover", depth: 1 },

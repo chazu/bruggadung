@@ -1035,6 +1035,7 @@ static NSString   *effect_reveal( BGWorld *world, BGAction a, int64_t amount, BG
          wear = wear > 100 ? 100 : wear;
       }
       [g set:"Part.wear" of:BGWhole( part) to:wear];
+      [g set:"Part.cameFrom" of:BGWhole( part) to:(int64_t) assembly];
       [g emit:"revealed" subject:BGWhole( part) other:BGWhole( assembly)];
       carved += mass;
    }

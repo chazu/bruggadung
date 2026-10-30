@@ -54,7 +54,7 @@
 #ThermalBody: {
     @component(ThermalBody)
     heat:         int & >=0 & <=1000000000000  @field(content, saved, proposable, inspect)
-    heatCapacity: int & >=1 & <=1000000000     @field(content, saved, inspect)
+    heatCapacity: int & >=1 & <=1000000000     @field(content, saved, proposable, inspect)
     toAir:        int & >=0 & <=100000         @field(content, saved, inspect)
     toOutdoors:   int & >=0 & <=100000         @field(content, saved, inspect)
     bounds:       ref                          @field(saved, proposable, inspect)

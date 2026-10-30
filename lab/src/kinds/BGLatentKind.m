@@ -36,6 +36,47 @@ static BGEntityID   part_in( BGWorld *world, BGEntityID assembly, const char *ro
 
 @implementation BGLatentKind
 
+/* A part out of its assembly for the first time takes its share of the
+ * assembly's heat, by heat capacity (DOMAIN_SIMULATION.md Scenario 2, check
+ * 3): the heat and the capacity both move, so neither the total nor either
+ * one's temperature changes. */
+- (void) splitHeatOf:(BGEntityID) part
+           committer:(BGCommitter *) committer
+               world:(BGWorld *) world
+               cause:(uint64_t) cause
+{
+   const BGPart          *p;
+   const BGThermalBody   *mine;
+   const BGThermalBody   *whole;
+   BGProposalGroup       *g;
+   BGLocation            at;
+   BGEntityID            assembly;
+   int64_t               share;
+
+   p = [world record:[world kindNamed:"Part"] for:part];
+   if( ! p || p->detached || ! p->cameFrom)
+      return;
+   assembly = (BGEntityID) p->cameFrom;
+   at       = [world locationOf:part];
+   if( at.form == BGLocationPartOf && at.place == assembly)
+      return;
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem
+                                source:[NSString stringWithFormat:@"part %llu leaves assembly %llu",
+                                                                  (unsigned long long) part, (unsigned long long) assembly]];
+   [g setCause:cause];
+   [g set:"Part.detached" of:BGWhole( part) to:1];
+   mine  = [world record:[world kindNamed:"ThermalBody"] for:part];
+   whole = [world record:[world kindNamed:"ThermalBody"] for:assembly];
+   if( mine && whole && whole->heatCapacity > mine->heatCapacity)
+   {
+      share = whole->heat * mine->heatCapacity / whole->heatCapacity;
+      [g set:"ThermalBody.heat" of:BGWhole( part) to:mine->heat + share];
+      [g set:"ThermalBody.heat" of:BGWhole( assembly) to:whole->heat - share];
+      [g set:"ThermalBody.heatCapacity" of:BGWhole( assembly) to:whole->heatCapacity - mine->heatCapacity];
+   }
+   [committer submit:g];
+}
+
 - (void) committer:(BGCommitter *) committer
      reactToEvent:(const BGEvent *) event
             world:(BGWorld *) world
@@ -56,6 +97,7 @@ static BGEntityID   part_in( BGWorld *world, BGEntityID assembly, const char *ro
 
    if( strcmp( event->kind, "moved"))
       return;
+   [self splitHeatOf:event->subject committer:committer world:world cause:event->index];
    tri        = [world tri];
    assemblies = [world storeForKind:[world kindNamed:"Latent"]];
    for( i = 0; i < [assemblies count]; i++)

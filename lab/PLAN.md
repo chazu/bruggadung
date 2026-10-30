@@ -2313,9 +2313,8 @@ a wrench (`open_up`):
   declare no new mass: its mass is carved, and the ledger checks the
   assembly lost as much.
 
-Not yet: the piston leaving with its share of heat (check 3's thermal
-half), and the interrupted repair's inspection binding the culprit.
-Check 1 follows.
+Not yet: the interrupted repair's inspection binding the culprit. Checks
+1 and 3's heat follow.
 
 65 tests, 2269 checks, under both compilers, ASan and UBSan, and leak-free.
 
@@ -2337,3 +2336,17 @@ checks in, forms again, and drains the tank onto the floor.
 - **Seal the culprit**: the valve (wear 2) holds, and nothing drains.
 
 65 tests, 2281 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: the piston takes its heat with it
+
+DOMAIN_SIMULATION.md Scenario 2's check 3, the thermal half. A revealed
+part records the assembly it came from. The first time it is out of it,
+the reaction moves its share of the assembly's heat, and its heat
+capacity, to it. The warm pump (305 K, 18 kJ/K) gives its extracted piston
+(1.8 kJ/K) 549 kJ. The total is the same, and both are at 305 K. Inside,
+the piston has none of its own, and its heat is the pump's.
+
+Not yet: the split reaching a running thermal domain's ledger as a
+transfer (the test runs without one).
+
+66 tests, 2289 checks, under both compilers, ASan and UBSan, and leak-free.
