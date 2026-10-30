@@ -52,11 +52,11 @@ Out of scope here, except where they touch components:
    conflicts are errors. The language is specified in
    [CONTENT_LANGUAGE.md](CONTENT_LANGUAGE.md): TDL semantics with CUE-style
    syntax.
-10. **Unreferenced content is collected; history keeps it.** Content no
-    copy, memory, derivation, or claim references is collected at the next
-    save, and history keeps a summary (who made it, when), so the developer
-    can still trace it. Tombstones compact into history summaries after a
-    retention period that content declares.
+10. **Unreferenced content is kept, for now.** Content that no copy,
+    memory, derivation, or claim references stays in the world and in the
+    save. Saving never changes the world. If saves or memory grow too large,
+    collection can come later, with history keeping a summary (who made it,
+    when). Tombstones are kept the same way.
 11. **An installed part keeps its own claim.** Installing transfers
     nothing: the assembly's claim covers, through `partOf`, only parts
     with no claim of their own. Whether installing it was a gift, a sale,
@@ -280,7 +280,7 @@ Rules:
   `derivedFrom` relation to the original, so provenance forms a chain.
 - **Destroying a copy** does not destroy its content. Content persists while
   anything references it: a copy, a memory, or a derivation. Unreferenced,
-  it is collected, and history keeps a summary (decision 10).
+  it is kept for now (decision 10).
 - Organizations and claims are informational entities too. They have no
   location, although they may be represented by physical things: a seal, a
   ledger, a building.
