@@ -7995,6 +7995,81 @@ static BOOL   disturbed( BGKnowledgeStore *store)
 }
 
 
+/* INSTITUTIONS.md decision 8: particular rules are learned like anything
+ * else. The town's firewood ordinance, posted on a notice by the commons:
+ * the worker beside it reads it at a glance and knows it; the smith, out
+ * of range, knows only the common law against theft; told it by the
+ * worker, it knows it too. */
+static void   test_learning_laws( void)
+{
+   BGStage            st;
+   BGKnowledge        *knowledge;
+   BGKnowledgeStore   *store;
+   BGProposalGroup    *g;
+   BGEntityID         worker;
+   BGEntityID         smith;
+   BGEntityID         notice;
+   BGAction           say;
+   NSString           *error;
+   NSUInteger         i;
+   NSUInteger         ordinance;
+
+   st.w      = BGTestWorld( 199);
+   st.c      = BGTestCommitter( st.w);
+   knowledge = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+   st.s      = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [st.s setPerception:knowledge];
+   [st.s setActivities:[BGActivities activitiesWithWorld:st.w committer:st.c]];
+   g      = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the commons"];
+   [g create:"town" key:"the town" at:BGLocationMakeNone()];
+   [g create:"theft_law" key:"the law against theft" at:BGLocationMakeNone()];
+   [g create:"wood_law" key:"the firewood ordinance" at:BGLocationMakeNone()];
+   worker = [g create:"worker" key:"worker" at:BGOnTile( 5, 5, 0)];
+   smith  = [g create:"smith" key:"smith" at:BGOnTile( 14, 5, 0)];
+   notice = [g create:"seal_tag" key:"the notice" at:BGOnTile( 6, 5, 0)];
+   [g set:"Record.writing" of:BGWhole( notice)
+   toText:[st.w intern:"#Writing & { author: #Agent & { coat: \"black\" }, entries: [#LawSays & { law: #Law & "
+                       "{ forbids: \"take\", wrong: \"unauthorized\", brings: \"fine\", weighs: 15 } }] }"]];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1000)];
+   worker = [g idFor:worker];
+   smith  = [g idFor:smith];
+
+   /* everyone knows the common law; the worker read the ordinance too */
+   store = [knowledge storeOf:smith];
+   BG_CHECK( [store lawCount] == 1 && ! strcmp( [store lawAt:0]->wrong, "\"anothers\""));
+   store     = [knowledge storeOf:worker];
+   ordinance = NSNotFound;
+   for( i = 0; i < [store lawCount]; i++)
+      if( ! strcmp( [store lawAt:i]->wrong, "\"unauthorized\""))
+         ordinance = i;
+   BG_CHECK( [store lawCount] == 2 && ordinance != NSNotFound && ! strcmp( [store lawAt:ordinance]->brings, "\"fine\"") &&
+             [store lawAt:ordinance]->weighs == 15);
+
+   /* told it, the smith knows it */
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the smith comes over"];
+   [g move:BGWhole( smith) to:BGOnTile( 5, 6, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 2000)];
+   error       = nil;
+   say         = BGActionMake( "say", worker, smith, BGNoEntity);
+   say.content = [st.w intern:[[store statementOfLaw:ordinance] UTF8String]];
+   BG_CHECK( BGPerform( st.w, st.c, say, 0, &error) != nil);
+   [st.s runUntil:BGTimeMake( 5000)];
+   BG_CHECK( [[knowledge storeOf:smith] lawCount] == 2);
+   /* saved and restored, it still knows it */
+   {
+      BGKnowledge   *restored;
+      NSString      *text;
+
+      text     = BGSave( st.w, st.c, [NSArray arrayWithObject:knowledge]);
+      restored = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+      [restored restoreSavedState:BGSavedDomainState( text, @"knowledge")];
+      BG_CHECK( [[restored storeOf:smith] lawCount] == 2 && [[restored storeOf:worker] lawCount] == 2);
+   }
+}
+
+
 /* INSTITUTIONS.md decisions 2 and 3: a law is content an organization
  * issues, and whether an act breaks it is true (for the inspector); nothing
  * blocks it. The town's law against theft: Kasimir taking the merchant's
@@ -8786,6 +8861,7 @@ const BGTestCase   BGAllTests[] =
    { "traced_units",                  test_traced_units },
    { "attention_budget",              test_attention_budget },
    { "laws",                          test_laws },
+   { "learning_laws",                 test_learning_laws },
    { "routine_autopilot",             test_routine_autopilot },
    { "daily_commitment",              test_daily_commitment },
    { "talking_takes_time",            test_talking_takes_time },

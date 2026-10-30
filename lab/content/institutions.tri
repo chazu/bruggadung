@@ -25,9 +25,16 @@
     common:  bool                              @field(content, saved, inspect)
 }
 
-// The town and its watch; the law against theft.
+// A claim stating a law (decision 8): read on a posted notice, or told,
+// it teaches the law it states.
+#LawSays: #Telling & { law: #Law }
+
+// The town and its watch; the law against theft, which everyone knows; and
+// an ordinance, known only to whoever reads or is told it: no taking
+// firewood from the commons without leave, a fine.
 town:      #Organization & {}
 theft_law: #Law & { forbids: "take", wrong: "anothers", brings: "arrest", weighs: 40, common: true }
+wood_law:  #Law & { forbids: "take", wrong: "unauthorized", brings: "fine", weighs: 15, common: false }
 
 // Custody (decision 7): a claim the watch takes on what it confiscates, and
 // on whom it arrests.

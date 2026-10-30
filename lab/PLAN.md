@@ -3338,3 +3338,27 @@ officer pursuing one who flees, and what custody leads to (a court, a
 fine, release: INSTITUTIONS.md's procedures, as decided only so far).
 
 87 tests, 2700 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: a law learned
+
+INSTITUTIONS.md decision 8: particular rules are learned like anything
+else, "by reading a posted notice, being told".
+
+- **`#LawSays`**: a claim stating a law (the law as a nested `#Law`
+  description). Heard, or read (a record's entry, or a label at a
+  glance), it teaches the law (`learnLaw`); `statementOfLaw:` states one
+  the agent knows, to tell or write.
+- **Saved**: the laws a store knows (`law` lines); common ones are known
+  again anyway.
+- **The firewood ordinance** (`wood_law`): not common, "unauthorized", a
+  fine.
+
+Checked: the worker beside a notice reads the ordinance and knows two
+laws; the smith, out of range, knows the common one only; told it by the
+worker, two; saved and restored, both still know them.
+
+Not yet: `#Unlawful` weighing "unauthorized" laws (an agent's belief about
+its own permits); seeing someone sanctioned as a way to learn a law; fines
+and revoking a permit as operations.
+
+88 tests, 2705 checks, under both compilers, ASan, and leak-free.

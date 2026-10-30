@@ -840,6 +840,18 @@ static BOOL   counts( const BGTestimony *t, uint32_t thing, uint32_t container)
 }
 
 
+- (NSString *) statementOfLaw:(NSUInteger) i
+{
+   const BGKnownLaw   *law;
+
+   law = [self lawAt:i];
+   if( ! law)
+      return( nil);
+   return( [NSString stringWithFormat:@"#LawSays & { law: #Law & { forbids: \"%s\", wrong: %s, brings: %s, weighs: %d } }",
+                                      law->forbids, law->wrong, law->brings, law->weighs]);
+}
+
+
 - (NSString *) grievanceAbout:(uint32_t) thing
 {
    const BGFinding   *owned;
@@ -2199,6 +2211,30 @@ static int32_t   permille_of( int32_t db)
    if( claim && tri_subtype( tri, tri_node_type( claim), tri_type_named( tri, "#ReservedFor")))
    {
       [self reserved:claim from:speaker store:store news:news];
+      tri_arena_free( arena);
+      return;
+   }
+   if( claim && tri_subtype( tri, tri_node_type( claim), tri_type_named( tri, "#LawSays")))
+   {
+      /* a law stated (INSTITUTIONS.md decision 8): learned, by what it says */
+      const TriNode   *law;
+      BGKnownLaw      k;
+      int64_t         weighs;
+      char            forbids[ 64];
+
+      law = tri_at( tri, claim, "law");
+      if( law && tri_at( tri, law, "forbids") && tri_print( tri, tri_at( tri, law, "forbids"), forbids, sizeof( forbids)) > 2 &&
+          tri_at( tri, law, "wrong") && tri_at( tri, law, "brings"))
+      {
+         forbids[ strlen( forbids) - 1] = 0;
+         k.forbids = [_world intern:forbids + 1];
+         k.wrong   = [_world intern:tri_type_name( tri, tri_node_type( tri_at( tri, law, "wrong")))];
+         k.brings  = [_world intern:tri_type_name( tri, tri_node_type( tri_at( tri, law, "brings")))];
+         k.weighs  = node_int( tri, law, "weighs", &weighs) ? (int32_t) weighs : 0;
+         [store learnLaw:k];
+         [news addObject:[NSString stringWithFormat:@"a law: no %s, when %s, or %s (R%u says)", k.forbids, k.wrong,
+                                                    k.brings, speaker]];
+      }
       tri_arena_free( arena);
       return;
    }
@@ -4217,6 +4253,12 @@ char   *BGDecodeWord( const char *s)
                                                      [store feels:"hunger"], (long long) [store feltAt],
                                                      [store feels:"cold"], [store feels:"stuffy"], [store feels:"tired"],
                                                      [store feels:"pain"]]];
+      for( j = 0; j < [store lawCount]; j++)
+         [lines addObject:[NSString stringWithFormat:@"law %llu %d %@ %@ %@", (unsigned long long) [store agent],
+                                                     [store lawAt:j]->weighs,
+                                                     BGEncodeWord( [store lawAt:j]->forbids),
+                                                     BGEncodeWord( [store lawAt:j]->wrong),
+                                                     BGEncodeWord( [store lawAt:j]->brings)]];
       for( j = 0; j < [store count]; j++)
          if( [store referentAt:j]->sightings || [store referentAt:j]->salience)
             [lines addObject:[NSString stringWithFormat:@"remembers %llu %u %d %d", (unsigned long long) [store agent],
@@ -4366,6 +4408,25 @@ char   *BGDecodeWord( const char *s)
          tr.truth    = (BGEntityID) truth;
          tr.kind     = [_world intern:role];
          [[self storeOf:(BGEntityID) agent] noteTrace:tr];
+      }
+      else if( sscanf( text, "law %llu %d %511s %511s %4095s", &agent, &trust, deeper, kind, features) == 5)
+      {
+         BGKnownLaw   k;
+         char         *forbids;
+         char         *wrong;
+         char         *brings;
+
+         forbids  = BGDecodeWord( deeper);
+         wrong    = BGDecodeWord( kind);
+         brings   = BGDecodeWord( features);
+         k.forbids = [_world intern:forbids];
+         k.wrong   = [_world intern:wrong];
+         k.brings  = [_world intern:brings];
+         k.weighs  = trust;
+         [[self storeOf:(BGEntityID) agent] learnLaw:k];
+         free( forbids);
+         free( wrong);
+         free( brings);
       }
       else if( sscanf( text, "remembers %llu %u %d %d", &agent, &id, &trust, &x) == 4)
       {
