@@ -2818,7 +2818,9 @@ Checked: with twelve takes and a remark, Mira doesn't hear the clatter
 among them; with eight, she hears it but has nothing left to think it over
 with. At the next, quiet boundary she does both.
 
-Not yet: attention for state perception (what a referent looks like is
-taken in freely).
+State perception stays free: what is in the field of view is seen, as
+KNOWLEDGE.md §5 has it ("The classic roguelike field of view and
+remembered map are exactly this system"); attention limits what happens
+and what is new on the floor, not what is in view.
 
 76 tests, 2534 checks, under both compilers, ASan, and leak-free.
