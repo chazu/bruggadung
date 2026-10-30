@@ -82,6 +82,7 @@ src/core/BGWorld.h
 src/domains/BGAtmosphere.h
 src/domains/BGBodies.h
 src/domains/BGFluidDomain.h
+src/domains/BGLight.h
 src/domains/BGThermal.h
 src/domains/BGTraces.h
 src/generated/BGComponents.h

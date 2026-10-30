@@ -22,6 +22,7 @@ src/core/BGWorld.m
 src/domains/BGAtmosphere.m
 src/domains/BGBodies.m
 src/domains/BGFluidDomain.m
+src/domains/BGLight.m
 src/domains/BGThermal.m
 src/domains/BGTraces.m
 src/kinds/BGBodyKind.m

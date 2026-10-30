@@ -25,6 +25,7 @@
 #import "BGAtmosphere.h"
 #import "BGBodies.h"
 #import "BGFluidDomain.h"
+#import "BGLight.h"
 #import "BGThermal.h"
 #import "BGTraces.h"
 #import "BGComponents.h"

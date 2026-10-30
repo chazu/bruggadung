@@ -15,6 +15,7 @@
 #import "BGBodies.h"
 #import "BGAtmosphere.h"
 #import "BGThermal.h"
+#import "BGLight.h"
 
 #include <stdio.h>
 
@@ -9074,6 +9075,137 @@ static void   test_account( void)
 }
 
 
+/* KNOWLEDGE.md decision 14: light is a domain. A room (the shut room's air,
+ * its door shut) and the yard; a lamp in the yard with an hour's oil. By the
+ * clock: noon is day outdoors and dusk in the shut room, day with its door
+ * open; before dawn it is dusk outdoors, dark indoors; at midnight it is
+ * dark but by the lamp, until its oil is spent and it goes out. And what
+ * an agent sees follows: in the yard at midnight, three tiles from the lamp
+ * after it is out, it can't see the crate. */
+static void   test_light( void)
+{
+   BGStage            st;
+   BGKnowledge        *knowledge;
+   BGProposalGroup    *g;
+   BGEntityID         room;
+   BGEntityID         door;
+   BGEntityID         lamp;
+   BGEntityID         worker;
+   BGEntityID         crate;
+   int64_t            v;
+   int64_t            hour;
+   BGLocation         yard;
+   BGLocation         inside;
+   BGLocation         byLamp;
+
+   hour      = 3600000LL;
+   st.w      = BGTestWorld( 167);
+   st.c      = BGTestCommitter( st.w);
+   knowledge = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+   st.s      = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [st.s setPerception:knowledge];
+   [st.s addDomain:[[[BGLight alloc] initWithWorld:st.w] autorelease]];
+   [knowledge setLight:[[[BGLight alloc] initWithWorld:st.w] autorelease]];
+   g      = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: a room and the yard"];
+   room   = [g create:"room_air" key:"the room's air" at:BGLocationMakeNone()];
+   door   = [g create:"room_door" key:"the room's door" at:BGOnTile( 4, 6, 0)];
+   lamp   = [g create:"lamp" key:"the yard lamp" at:BGOnTile( 20, 20, 0)];
+   [g set:"Lamp.oil" of:BGWhole( lamp) to:hour];
+   worker = [g create:"worker" key:"worker" at:BGOnTile( 23, 20, 0)];
+   crate  = [g create:"crate" key:"crate" at:BGOnTile( 26, 20, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   room   = [g idFor:room];
+   door   = [g idFor:door];
+   lamp   = [g idFor:lamp];
+   worker = [g idFor:worker];
+   crate  = [g idFor:crate];
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the room's door"];
+   [g set:"GasStore.door" of:BGWhole( room) to:(int64_t) door];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 2)];
+   yard   = BGOnTile( 10, 10, 0);
+   inside = BGOnTile( 2, 3, 0);
+   byLamp = BGOnTile( 21, 20, 0);
+
+   BG_CHECK( BGLightAt( st.w, yard, 12 * hour) == 2 && BGLightAt( st.w, inside, 12 * hour) == 1);
+   BG_CHECK( BGLightAt( st.w, yard, 5 * hour + hour / 2) == 1 && BGLightAt( st.w, inside, 5 * hour + hour / 2) == 0);
+   BG_CHECK( BGLightAt( st.w, yard, hour / 2) == 0 && BGLightAt( st.w, byLamp, hour / 2) == 2);
+   /* the lamp's oil spent at an hour: out, and dark by it */
+   [st.s runUntil:BGTimeMake( 2 * hour)];
+   BG_CHECK( [st.w getField:"Lamp.shining" of:lamp value:&v] && ! v);
+   BG_CHECK( BGLightAt( st.w, byLamp, 2 * hour) == 0);
+   BG_CHECK( ! referent_of( [knowledge storeOf:worker], crate));
+   /* the morning: it sees the crate */
+   [st.s runUntil:BGTimeMake( 7 * hour)];
+   BG_CHECK( referent_of( [knowledge storeOf:worker], crate));
+   /* the door open, the room is as light as the yard */
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the door opened"];
+   [g set:"Door.ajar" of:BGWhole( door) to:1];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 7 * hour + 1000)];
+   BG_CHECK( BGLightAt( st.w, inside, 12 * hour) == 2);
+}
+
+
+/* KNOWLEDGE.md decision 14: sound is a domain too. A clatter in the shut
+ * room (60): heard beside it; through the wall, from the corridor, too
+ * faint; with the door open, heard there. And a clang by the listener (100)
+ * drowns a clatter further off. */
+static BOOL   hears_clatter( BOOL open, BOOL clang, BGLocation listener)
+{
+   BGStage            st;
+   BGKnowledge        *knowledge;
+   BGProposalGroup    *g;
+   BGEntityID         room;
+   BGEntityID         corridor;
+   BGEntityID         door;
+   BGEntityID         hearer;
+
+   st.w      = BGTestWorld( 169);
+   st.c      = BGTestCommitter( st.w);
+   knowledge = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+   st.s      = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [st.s setPerception:knowledge];
+   g        = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: a room off the corridor"];
+   corridor = [g create:"corridor" key:"the corridor" at:BGLocationMakeNone()];
+   room     = [g create:"room_air" key:"the room's air" at:BGLocationMakeNone()];
+   door     = [g create:"room_door" key:"the room's door" at:BGOnTile( 4, 6, 0)];
+   hearer   = [g create:"watchman" key:"the listener" at:listener];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   room     = [g idFor:room];
+   corridor = [g idFor:corridor];
+   door     = [g idFor:door];
+   hearer   = [g idFor:hearer];
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the door, and the sounds"];
+   [g set:"GasStore.opensTo" of:BGWhole( room) to:(int64_t) corridor];
+   [g set:"GasStore.door" of:BGWhole( room) to:(int64_t) door];
+   if( open)
+      [g set:"Door.ajar" of:BGWhole( door) to:1];
+   BGMakeTrace( st.w, g, "clatter", BGNoEntity, BGOnTile( 2, 3, 0), 60, "the test");
+   if( clang)
+      BGMakeTrace( st.w, g, "clang", BGNoEntity, BGOnTile( listener.x + 1, listener.y, 0), 100, "the test");
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 100)];
+   return( traced( [knowledge storeOf:hearer], "clatter") != NULL);
+}
+
+
+static void   test_sound( void)
+{
+   /* beside it, in the room */
+   BG_CHECK( hears_clatter( NO, NO, BGOnTile( 3, 3, 0)));
+   /* in the corridor, three tiles off: through the wall, about 60 - 9 - 30,
+    * too faint (it fades over its two seconds) */
+   BG_CHECK( ! hears_clatter( NO, NO, BGOnTile( 5, 6, 0)));
+   /* through the open door, about 60 - 9 - 10: heard */
+   BG_CHECK( hears_clatter( YES, NO, BGOnTile( 5, 6, 0)));
+   /* in the room, but a clang beside the listener drowns it */
+   BG_CHECK( ! hears_clatter( NO, YES, BGOnTile( 3, 4, 0)));
+}
+
+
 static void   test_memory_rates( void)
 {
    /* seen once: BG_FADE a day */
@@ -9642,6 +9774,8 @@ const BGTestCase   BGAllTests[] =
    { "account",                       test_account },
    { "shortfall",                     test_shortfall },
    { "recipes",                       test_recipes },
+   { "light",                         test_light },
+   { "sound",                         test_sound },
    { "traces",                        test_traces },
    { "appearance",                    test_appearance },
    { "interpretation",                test_interpretation },

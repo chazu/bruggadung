@@ -3827,3 +3827,37 @@ Not yet: learning by practice; a fitter's knowing being shown in its
 menu or plan.
 
 93 tests, 2889 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: light and sound as domains
+
+KNOWLEDGE.md decision 14: light and sound are domains, giving perception
+its conditions. Light: lamps and fires burn their fuel down, daylight
+follows the clock, rooms and doors shade it. Sound: it propagates through
+rooms and doors, walls muffle it, and noise masks what is quieter.
+
+- **`BGLight`** (a new domain): daylight by the clock, as authored
+  (`daylight`: dawn 6h, nightfall 18h, an hour's twilight either side);
+  a step darker in a room with a door (an air region), unless the door is
+  open; a lamp shining lights its reach while it has oil (`Lamp.oil`,
+  `oilAt`, new; computed when read), and goes out spent; a lit fire glows
+  a tile round. Its horizon is the next change of daylight, or the next
+  lamp to burn out. Knowledge given the domain (`setLight:`) takes its
+  light from it; without, the old ambient setting stands, so the existing
+  scenarios are unchanged.
+- **Sound** (`BGLoudness`, in the traces domain): a sound's strength less
+  3 a tile, and from another room 10 through an open door between them, 30
+  through a wall or a shut door. Heard if as loud as the trace floor, and
+  not 20 or more quieter than the loudest heard there. A sound needn't be
+  seen to be heard: unseen, it is heard from where it came.
+
+Checked: noon is day in the yard and dusk in the shut room, day with its
+door open; before dawn, dusk outdoors and dark within; at midnight, dark
+but by the lamp, which goes out when its hour of oil is spent, and the
+worker by it can't see the crate until morning. A clatter in the room is
+heard beside it, not through the wall from the corridor, but through the
+open door; a clang by the listener drowns it.
+
+Not yet: lamps lit and put out by operations; daylight by season; sound
+masking speech (what is said is heard by earshot, not by loudness).
+
+95 tests, 2901 checks, under both compilers, ASan, and leak-free.

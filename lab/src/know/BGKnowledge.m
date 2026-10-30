@@ -3,6 +3,7 @@
 #import "BGView.h"
 #import "BGTraces.h"
 #import "BGBodies.h"
+#import "BGLight.h"
 #import "BGActions.h"
 
 #include <stdio.h>
@@ -1543,6 +1544,7 @@ static NSString   *known_features( const BGReferent *r)
 {
    [_world release];
    [_stores release];
+   [_light release];
    free( _ancestry);
    [super dealloc];
 }
@@ -1578,6 +1580,13 @@ static NSString   *known_features( const BGReferent *r)
 }
 
 
+- (void) setLight:(id) light
+{
+   [_light autorelease];
+   _light = [light retain];
+}
+
+
 - (int) lightAt:(BGLocation) tile
 {
    const BGLamp   *lamp;
@@ -1585,6 +1594,8 @@ static NSString   *known_features( const BGReferent *r)
    BGLocation     at;
    NSUInteger     i;
 
+   if( _light)
+      return( BGLightAt( _world, tile, [_world time].ms));
    if( _ambient >= 2)
       return( _ambient);
    lamps = [_world storeForKind:[_world kindNamed:"Lamp"]];
@@ -2871,6 +2882,31 @@ static uint32_t   bound_to( BGEntityID e, BGEntityID agent, uint32_t me, const B
 }
 
 
+/* Where a sound was made: what made it's tile, or the floor's; NO if the
+ * trace isn't one. */
+static BOOL   sound_from( BGWorld *world, TriContent *tri, const BGTrace *record, BGEntityID trace, BGLocation *tile)
+{
+   const TriNode   *v;
+   const char      *kind;
+   char            sense[ 16];
+
+   kind = [world textField:"Trace.traceKind" of:trace];
+   v    = kind ? tri_at( tri, tri_pattern( tri, kind), "sense") : NULL;
+   sense[ 0] = 0;
+   if( v)
+      tri_print( tri, v, sense, sizeof( sense));
+   if( strcmp( sense, "\"hearing\""))
+      return( NO);
+   if( record->bearer)
+      return( ground_tile( world, (BGEntityID) record->bearer, tile));
+   tile->form  = BGLocationOnTile;
+   tile->x     = (int32_t) record->tileX;
+   tile->y     = (int32_t) record->tileY;
+   tile->level = (int32_t) record->tileLevel;
+   return( YES);
+}
+
+
 /* Traces in reach of their sense: on what it sees, or on the floor; how
  * strong each seems now. One it perceived at a site it perceives again, and
  * doesn't find, is gone. */
@@ -2908,6 +2944,7 @@ static int   cmp_fresh( const void *a, const void *b)
    uint8_t         *found;
    int64_t         strength;
    int32_t         range[ 3];
+   int64_t         loudest;
    BGTraceSeen     fresh[ 64];
    NSUInteger      nfresh;
    int             sensed;
@@ -2920,19 +2957,58 @@ static int   cmp_fresh( const void *a, const void *b)
    range[ 1] = BG_SMELL + (closely ? 1 : 0);
    range[ 2] = BG_HEARING;
    nfresh    = 0;
+   /* sound (KNOWLEDGE.md decision 14): the loudest heard here, which masks
+    * what is much quieter */
+   loudest = 0;
+   for( i = 0; ! _omniscient && i < [traces count]; i++)
+      if( sound_from( _world, tri, [traces recordAtIndex:i], [traces entityAtIndex:i], &tile))
+      {
+         strength = BGLoudness( _world, BGTraceStrength( [traces recordAtIndex:i], now), tile, here);
+         loudest  = strength > loudest ? strength : loudest;
+      }
    for( i = 0; i < [traces count]; i++)
    {
       record   = [traces recordAtIndex:i];
       kind     = [_world textField:"Trace.traceKind" of:[traces entityAtIndex:i]];
       strength = BGTraceStrength( record, now);
-      if( ! kind || strength <= 0 || strength < (closely ? BG_TRACE_FLOOR_CLOSE : BG_TRACE_FLOOR))
-         continue;      /* too faint to notice */
-      v = tri_at( tri, tri_pattern( tri, kind), "sense");
+      v = kind ? tri_at( tri, tri_pattern( tri, kind), "sense") : NULL;
       sense[ 0] = 0;
       if( v)
          tri_print( tri, v, sense, sizeof( sense));
       sensed = ! strcmp( sense, "\"smell\"") ? 1 : ! strcmp( sense, "\"hearing\"") ? 2 : 0;
       memset( &t, 0, sizeof( t));
+      /* a sound, heard as loud as it carries here: through walls and doors,
+       * unless masked by a louder one; from what made it, if seen, else
+       * from where it came */
+      if( sensed == 2 && ! _omniscient)
+      {
+         if( ! sound_from( _world, tri, record, [traces entityAtIndex:i], &tile))
+            continue;
+         strength = BGLoudness( _world, strength, tile, here);
+         if( strength < (closely ? BG_TRACE_FLOOR_CLOSE : BG_TRACE_FLOOR) || strength < loudest - BG_SOUND_MASK)
+            continue;      /* too faint to notice, or drowned out */
+         for( j = 0; record->bearer && j < nseen && seen[ j].entity != (BGEntityID) record->bearer; j++)
+            ;
+         t.bearer = record->bearer && j < nseen ? assigned[ j] : 0;
+         t.x      = tile.x;
+         t.y      = tile.y;
+         t.level  = tile.level;
+         t.kind     = [_world intern:kind];
+         t.strength = (int32_t) strength;
+         t.seen     = now;
+         t.present  = YES;
+         t.truth    = [traces entityAtIndex:i];        /* developer-only */
+         if( ! [store knowsTrace:t])
+         {
+            if( nfresh < 64)
+               fresh[ nfresh++] = t;
+            continue;
+         }
+         [store noteTrace:t];
+         continue;
+      }
+      if( ! kind || strength <= 0 || strength < (closely ? BG_TRACE_FLOOR_CLOSE : BG_TRACE_FLOOR))
+         continue;      /* too faint to notice */
       if( record->bearer)
       {
          for( j = 0; j < nseen && seen[ j].entity != (BGEntityID) record->bearer; j++)

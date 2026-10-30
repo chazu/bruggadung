@@ -41,6 +41,63 @@ int64_t   BGTraceGone( BGWorld *world, const BGTrace *trace)
 }
 
 
+/* The air region over a tile, or none. */
+static BGEntityID   region_at( BGWorld *world, BGLocation tile)
+{
+   const BGGasStore   *air;
+   BGStore            *stores;
+   NSUInteger         i;
+
+   stores = [world storeForKind:[world kindNamed:"GasStore"]];
+   for( i = 0; i < [stores count]; i++)
+   {
+      air = [stores recordAtIndex:i];
+      if( tile.x >= air->west && tile.x <= air->east && tile.y >= air->north && tile.y <= air->south)
+         return( [stores entityAtIndex:i]);
+   }
+   return( BGNoEntity);
+}
+
+
+/* Whether one region opens to the other through a door ajar. */
+static BOOL   open_between( BGWorld *world, BGEntityID a, BGEntityID b)
+{
+   const BGGasStore   *air;
+   BGEntityID         pair[ 2];
+   int64_t            ajar;
+   int                k;
+
+   pair[ 0] = a;
+   pair[ 1] = b;
+   for( k = 0; k < 2; k++)
+   {
+      air = pair[ k] ? [world record:[world kindNamed:"GasStore"] for:pair[ k]] : NULL;
+      if( air && (BGEntityID) air->opensTo == pair[ 1 - k] && air->door &&
+          [world getField:"Door.ajar" of:(BGEntityID) air->door value:&ajar] && ajar)
+         return( YES);
+   }
+   return( NO);
+}
+
+
+int64_t   BGLoudness( BGWorld *world, int64_t strength, BGLocation from, BGLocation to)
+{
+   BGEntityID   a;
+   BGEntityID   b;
+   int64_t      d;
+
+   if( from.level != to.level)
+      return( 0);
+   d         = abs( from.x - to.x) > abs( from.y - to.y) ? abs( from.x - to.x) : abs( from.y - to.y);
+   strength -= BG_SOUND_FALLOFF * d;
+   a         = region_at( world, from);
+   b         = region_at( world, to);
+   if( a != b)
+      strength -= open_between( world, a, b) ? BG_SOUND_DOOR : BG_SOUND_WALL;
+   return( strength > 0 ? strength : 0);
+}
+
+
 @implementation BGTraces
 
 - (id) initWithWorld:(BGWorld *) world

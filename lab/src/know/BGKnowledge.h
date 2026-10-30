@@ -525,6 +525,7 @@ typedef struct
    NSUInteger       _eventsSeen;
    BOOL             _omniscient;
    int              _ambient;          /* the light where no lamp shines: 2 day, 1 dusk, 0 night */
+   id               _light;            /* the light domain, if light is simulated (KNOWLEDGE.md decision 14) */
    BOOL             _compactAlways;
    BGAncestry       *_ancestry;        /* developer-only, by utterance */
    NSUInteger       _nancestry;
@@ -544,6 +545,9 @@ typedef struct
  * reach is seen a step less precisely; at night it isn't seen, and what is
  * within it is felt a step less precisely, unless the agent just handled it. */
 - (void) setAmbient:(int) light;
+/* With a light domain (BGLight), light is the world's: the daylight by the
+ * clock, rooms, lamps with fuel, fires; the ambient setting is unused. */
+- (void) setLight:(id) light;
 - (int) lightAt:(BGLocation) tile;
 /* dusk, or day */
 - (void) setDusk:(BOOL) flag;
