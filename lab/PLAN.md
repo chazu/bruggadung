@@ -2599,3 +2599,30 @@ Checked: suspended 1.5 s into turning with wrench and pipe beside it
 both in hand.
 
 70 tests, 2429 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: a loan is a debt
+
+The granting slice's "Not yet": lending as a debt the borrower owes back.
+AGENCY.md's glossary: "Commitment: A goal the agent is bound to: a shift,
+a promise, a debt. It has a deadline or a time window."
+
+- **Owed on being granted**: the asker, hearing `#Granted` from the one it
+  asked, binds what it now holds like the thing granted and undertakes
+  `repay` (agency.tri) to the lender, source "debt", a commitment saved
+  like any other. Its window is the loan's last day (`BG_LOAN_TERM`, a
+  week; `BG_LOAN_DUE`, a day), so a borrower with nothing else to do
+  doesn't hand it straight back.
+- **`hand_it_back`**: give what was lent to the lender.
+- **Found: an agent waiting on news never took up a commitment.** Settled
+  into waiting after an "impossible for now", an agent stayed waiting when
+  a commitment's window opened and its goal won the weighing, so it never
+  acted on it. Adopting a newly weighed goal clears the wait.
+
+Checked: the honest Kasimir, lent the carter's wages, owes them back
+within the week (logged and saved); still holds them on the sixth day;
+hands them back on the seventh.
+
+Not yet: the lender expecting it back (a grievance if not, institutions),
+interest, and loan terms from content or from what is said.
+
+70 tests, 2436 checks, under both compilers, ASan, and leak-free.

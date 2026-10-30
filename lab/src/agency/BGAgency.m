@@ -1547,6 +1547,45 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
 }
 
 
+/* Granted what it asked for (`answer` a #Granted), the agent owes it back
+ * (AGENCY.md §7, a debt): a commitment to repay the lender what it now
+ * holds like it, on the loan's last day. */
+- (void) owe:(BGMotivation *) m
+      loanIn:(const char *) answer
+        from:(uint32_t) lender
+       store:(BGKnowledgeStore *) store
+{
+   const TriNode   *granted;
+   BGCommitment    *c;
+   TriContent      *tri;
+   TriArena        *arena;
+   uint32_t        loan;
+   int64_t         now;
+
+   tri     = [_world tri];
+   arena   = tri_arena_new();
+   granted = answer ? tri_value( tri, answer, arena, NULL, 0) : NULL;
+   loan    = 0;
+   if( granted && tri_subtype( tri, tri_node_type( granted), tri_type_named( tri, "#Granted")))
+      loan = [self heldLike:tri_at( tri, granted, "what") store:store];
+   tri_arena_free( arena);
+   if( ! loan)
+      return;
+   now = [_world time].ms;
+   if( ! [self undertake:m->agent goal:"repay" from:now + BG_LOAN_TERM - BG_LOAN_DUE until:now + BG_LOAN_TERM
+                  source:"debt"])
+      return;
+   c                      = &m->commitments[ m->ncommitments - 1];
+   c->params[ 0].slot     = [_world intern:"loan"];
+   c->params[ 0].referent = loan;
+   c->params[ 1].slot     = [_world intern:"lender"];
+   c->params[ 1].referent = lender;
+   c->nparams             = 2;
+   [self note:m line:[NSString stringWithFormat:@"owes R%u R%u back by %lldms", lender, loan,
+                                               (long long) (now + BG_LOAN_TERM)]];
+}
+
+
 /* YES while the agent waits for an answer: none yet from the one it asked,
  * and the while not over. */
 - (BOOL) awaits:(BGMotivation *) m
@@ -1565,6 +1604,7 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
       if( ! strcmp( o->kind, "said") && o->actor == m->awaiting && o->other == [store selfReferent])
       {
          [self note:m line:[NSString stringWithFormat:@"R%u answered: %s", m->awaiting, [self kindOfContent:o->content]]];
+         [self owe:m loanIn:o->content from:m->awaiting store:store];
          m->awaiting = 0;
          return( NO);
       }
@@ -2070,6 +2110,7 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    m->intentions[ m->nintentions - 1].arose      = bestAbout;
    m->intentions[ m->nintentions - 1].commitment = bestCommitment + 1;
    m->intentions[ m->nintentions - 1].pressed    = bestPressed;
+   m->waiting = NO;     /* a new goal: whatever it waited on news for is behind it */
    return( YES);
 }
 

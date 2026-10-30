@@ -44,6 +44,10 @@
 // Getting money: the money, and a friend or someone to work for.
 #Getting:  #Frame & { money: #Body, friend: #Agent, boss: #Agent }
 
+// Repaying a loan (AGENCY.md §7: a debt is a commitment): what was lent,
+// and who lent it.
+#Repaying: #Frame & { loan: #Body, lender: #Agent }
+
 // Eating: the food. Watching: the spot where something stirred.
 #Supper:   #Frame & { food: #Body }
 #Watching: #Frame & { spot: #Container }
@@ -319,6 +323,30 @@ borrow_money: #Method & {
     search: "friend"
     steps:  [#Do & { op: "say", object: "friend", says: #Request & { what: #Body & { material: "cloth" } } }]
     score:  [#Flat & { value: 10 }]
+} @family(methods)
+
+// A loan granted is a debt the borrower owes back: what was lent, back in
+// the lender's hand, by the end of the loan's term.
+repay: #Goal & {
+    title: "repay the loan"
+    done: {
+        find:  ["loan", "lender"]
+        match: #Repaying & {
+            loan:   #Body & { place: #Held & { by: $l } }
+            lender: #Agent & { id: $l }
+        }
+    }
+} @family(goals)
+
+hand_it_back: #Method & {
+    title: "hand it back"
+    goal:  "repay"
+    rank:  1
+    pre: {
+        find:  ["loan", "lender"]
+        match: #Repaying & { loan: #Body & { place: #Held & { by: $me } } }
+    }
+    steps: [#Do & { op: "give", object: "loan", target: "lender" }]
 } @family(methods)
 
 // Take the purse: worth more than borrowing, to the dishonest, unwatched.

@@ -4556,7 +4556,8 @@ typedef enum
    BGPurseBase = 0,
    BGPurseNoticed,               /* A: Mira isn't hiding, and Kasimir sees her */
    BGPurseHonest,                /* B: an honest Kasimir, the same debt */
-   BGPurseNoWitness              /* C: Mira isn't there */
+   BGPurseNoWitness,             /* C: Mira isn't there */
+   BGPurseRepaid                 /* B, and on until the loan's term is out */
 } BGPurse;
 
 
@@ -4571,6 +4572,7 @@ typedef struct
    BGEntityID    merchant;
    BGEntityID    carter;
    BGEntityID    wages;
+   BOOL          owedLate;      /* the wages still Kasimir's on the sixth day */
    NSString      *text;
 } BGPurseRun;
 
@@ -4616,7 +4618,7 @@ static BGPurseRun   tempting_purse( BGPurse variant)
       if( variant == BGPurseNoticed)
          [g set:"Agent.hiding" of:BGWhole( h[ 4]) to:0];
    }
-   if( variant == BGPurseHonest)
+   if( variant == BGPurseHonest || variant == BGPurseRepaid)
       [g set:"Agent.honesty" of:BGWhole( h[ 2]) to:90];
    [st.c submit:g];
    [st.s runUntil:BGTimeMake( 1)];
@@ -4647,6 +4649,13 @@ static BGPurseRun   tempting_purse( BGPurse variant)
       stage_say( &st, run.merchant, run.mira, @"#WhereIs & { what: #Body & { material: \"cloth\" } }");
    }
    [st.s runUntil:BGTimeMake( 90000)];
+   if( variant == BGPurseRepaid)
+   {
+      /* still owed on the sixth day; handed back on the seventh */
+      [st.s runUntil:BGTimeMake( 6 * 86400000LL - 60000)];
+      run.owedLate = [st.w locationOf:run.wages].place == run.kasimir;
+      [st.s runUntil:BGTimeMake( 7 * 86400000LL + 60000)];
+   }
    run.text = BGSave( st.w, st.c, [NSArray arrayWithObjects:knowledge, agency, nil]);
    return( run);
 }
@@ -4659,6 +4668,7 @@ static void   test_tempting_purse( void)
    BGPurseRun         honest;
    BGPurseRun         alone;
    BGPurseRun         again;
+   BGPurseRun         repaid;
    BGKnowledgeStore   *store;
    const BGReferent   *purse;
    const BGTestimony  *t;
@@ -4722,6 +4732,17 @@ static void   test_tempting_purse( void)
    BG_CHECK( logged_by( honest.agency, honest.carter, @"granting: give R"));
    BG_CHECK( [honest.world locationOf:honest.wages].place == honest.kasimir);
    BG_CHECK( logged_by( noticed.agency, noticed.mira, @"for something it hasn't"));
+   /* a loan is a debt (AGENCY.md §7): Kasimir owes the carter its wages
+    * back within the week, a commitment, saved like any other */
+   BG_CHECK( logged_by( honest.agency, honest.kasimir, @"owes R"));
+   BG_CHECK( [honest.text rangeOfString:@" repay "].location != NSNotFound &&
+             [honest.text rangeOfString:@" debt "].location != NSNotFound);
+   /* kept on the loan's last day, not before: the wages back in the carter's hand */
+   repaid = tempting_purse( BGPurseRepaid);
+   BG_CHECK( repaid.owedLate);
+   BG_CHECK( logged_by( repaid.agency, repaid.kasimir, @"hand it back: give R"));
+   BG_CHECK( [repaid.world locationOf:repaid.wages].form == BGLocationHeldBy &&
+             [repaid.world locationOf:repaid.wages].place == repaid.carter);
 
    /* 1: C: no one is there, and Kasimir decides just the same */
    alone = tempting_purse( BGPurseNoWitness);
