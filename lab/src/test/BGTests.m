@@ -1074,8 +1074,10 @@ static NSUInteger   log_count( BGAgency *agency, BGEntityID agent, NSString *tex
  * committed to wedging the lock. `saveAt`, if not 0, is when to save,
  * restore into a fresh world, with fresh knowledge and agency from the
  * save, and carry on there. */
+/* `curious`: the worker's curiosity, with spare nails in a sack in the far
+ * corner, which the worker has seen; -1, no sack. */
 static BGNailsRun   missing_nails( BOOL spares, BOOL omniscient, BGApprentice apprentice, int64_t saveAt,
-                                   int64_t shiftUntil)
+                                   int64_t shiftUntil, int curious)
 {
    BGWorld           *w;
    BGCommitter       *c;
@@ -1089,6 +1091,7 @@ static BGNailsRun   missing_nails( BOOL spares, BOOL omniscient, BGApprentice ap
    BGEntityID        ch;
    BGEntityID        chest;
    BGEntityID        helper;
+   BGEntityID        sack;
    NSString          *error;
    NSString          *text;
    BGNailsRun        run;
@@ -1109,6 +1112,12 @@ static BGNailsRun   missing_nails( BOOL spares, BOOL omniscient, BGApprentice ap
    ch = [g create:"crate" key:"crate" at:BGOnTile( 8, 7, 0)];
    if( spares)
       [g create:"nails_4" key:"spare nails" at:BGIn( ch)];
+   if( curious >= 0)
+   {
+      sack = [g create:"sack" key:"sack" at:BGOnTile( 13, 8, 0)];
+      [g create:"nails_4" key:"spare nails" at:BGIn( sack)];
+      [g set:"Agent.curious" of:BGWhole( 4) to:curious];
+   }
    if( shiftUntil > BG_EIGHT)
    {
       /* breakfast at 7:30, before the shift */
@@ -1276,6 +1285,8 @@ static void   test_missing_nails( void)
    BGNailsRun   spares;
    BGNailsRun   seer;
    BGNailsRun   resumed;
+   BGNailsRun   incurious;
+   BGNailsRun   curious;
    BGEntityID   crate;
    NSArray      *full;
    NSArray      *rest;
@@ -1283,7 +1294,7 @@ static void   test_missing_nails( void)
    crate = 7;           /* after the workshop's six */
 
    /* base: the bin first (believed), then the crate; nowhere left: dropped, with why */
-   base = missing_nails( NO, NO, BGNoApprentice, 0, 0);
+   base = missing_nails( NO, NO, BGNoApprentice, 0, 0, -1);
 
    BG_CHECK( happened( base.world, "attempted", 4, 1));
    BG_CHECK( happened( base.world, "looked", 4, crate));
@@ -1298,13 +1309,13 @@ static void   test_missing_nails( void)
    BG_CHECK( ! wedged( base.world) && [base.agency mindOf:4]->nintentions == 0);
 
    /* the same run is the same, decisions and all */
-   again = missing_nails( NO, NO, BGNoApprentice, 0, 0);
+   again = missing_nails( NO, NO, BGNoApprentice, 0, 0, -1);
    BG_CHECK( [again.world stateHash] == [base.world stateHash]);
    BG_CHECK( [[again.agency logOf:4] isEqualToArray:[base.agency logOf:4]]);
    BG_CHECK( [again.text isEqualToString:base.text]);
 
    /* A: spare nails in the crate: found, taken, and the lock wedged; wedging was the intention throughout */
-   spares = missing_nails( YES, NO, BGNoApprentice, 0, 0);
+   spares = missing_nails( YES, NO, BGNoApprentice, 0, 0, -1);
    BG_CHECK( happened( spares.world, "attempted", 4, 1));
    BG_CHECK( logged( spares.agency, @"[wedge the lock] back to it: have nails is done"));
    BG_CHECK( logged( spares.agency, @"[wedge the lock] drive a nail in: drive"));
@@ -1314,17 +1325,31 @@ static void   test_missing_nails( void)
    BG_CHECK( wedged( spares.world));
 
    /* B: the omniscient stub knows better, and the behaviour shows it: straight to the crate */
-   seer = missing_nails( YES, YES, BGNoApprentice, 0, 0);
+   seer = missing_nails( YES, YES, BGNoApprentice, 0, 0, -1);
    BG_CHECK( ! happened( seer.world, "attempted", 4, 1));
    BG_CHECK( ! logged( seer.agency, @"search for nails"));
    BG_CHECK( wedged( seer.world));
    BG_CHECK( [[seer.agency logOf:4] count] < [[spares.agency logOf:4] count]);
 
+   /* A (AGENCY.md's): spares in a sack in the far corner, which the worker has
+    * seen. The search looks into two places, the bin and the crate, and
+    * gives up; a curious worker's goes on, to the sack, and finds them */
+   incurious = missing_nails( NO, NO, BGNoApprentice, 0, 0, 0);
+   BG_CHECK( happened( incurious.world, "looked", 4, crate));
+   BG_CHECK( ! happened( incurious.world, "looked", 4, crate + 1));
+   BG_CHECK( logged( incurious.agency, @"[have nails] nothing I know of will do: impossible for now"));
+   BG_CHECK( ! wedged( incurious.world));
+   curious = missing_nails( NO, NO, BGNoApprentice, 0, 0, 50);
+   BG_CHECK( happened( curious.world, "looked", 4, crate));
+   BG_CHECK( happened( curious.world, "looked", 4, crate + 1));
+   BG_CHECK( first_at( curious.world, "looked", 4, crate) < first_at( curious.world, "looked", 4, crate + 1));
+   BG_CHECK( wedged( curious.world));
+
    /* saved mid-search, mid-stride (a boundary the run has anyway: the walk
     * toward the crate just committed), the commitment and the subgoal stacked,
     * fetching passed over: restored, the agent carries on exactly as it would
     * have */
-   resumed = missing_nails( YES, NO, BGNoApprentice, 20005, 0);
+   resumed = missing_nails( YES, NO, BGNoApprentice, 20005, 0, -1);
    BG_CHECK( [resumed.world stateHash] == [spares.world stateHash]);
    BG_CHECK( [resumed.text isEqualToString:spares.text]);
    full = [spares.agency logOf:4];
@@ -1381,7 +1406,7 @@ static void   test_asking( void)
    BGEntityID         c;
 
    /* it saw: told where, the worker goes to a chest it has never seen, and wedges the lock */
-   saw = missing_nails( NO, NO, BGApprenticeSaw, 0, 0);
+   saw = missing_nails( NO, NO, BGApprenticeSaw, 0, 0, -1);
    c   = 8;                 /* the crate is 7 */
    BG_CHECK( logged( saw.agency, @"[have nails] ask where nails are: say R"));
    BG_CHECK( logged( saw.agency, @": #WhereIs"));
@@ -1406,25 +1431,25 @@ static void   test_asking( void)
    BG_CHECK( [[saw.knowledge dump:4] rangeOfString:@"seen true; truly seen by"].location != NSNotFound);
    BG_CHECK( [[saw.knowledge dump:4] rangeOfString:@"said R"].location != NSNotFound);
 
-   again = missing_nails( NO, NO, BGApprenticeSaw, 0, 0);
+   again = missing_nails( NO, NO, BGApprenticeSaw, 0, 0, -1);
    BG_CHECK( [again.world stateHash] == [saw.world stateHash]);
    BG_CHECK( [again.text isEqualToString:saw.text]);
    BG_CHECK( [[again.agency logOf:4] isEqualToArray:[saw.agency logOf:4]]);
 
    /* it didn't see: it says so, and the goal is dropped */
-   missed = missing_nails( NO, NO, BGApprenticeMissed, 0, 0);
+   missed = missing_nails( NO, NO, BGApprenticeMissed, 0, 0, -1);
    BG_CHECK( logged( missed.agency, @"answered: #DontKnow"));
    BG_CHECK( logged( missed.agency, @"[wedge the lock] nothing I know of will do: impossible for now"));
    BG_CHECK( ! wedged( missed.world));
    BG_CHECK( ! believed( missed, missed.apprentice, 2));
 
    /* nobody answers: the worker waits a while, then gives up on it */
-   silent = missing_nails( NO, NO, BGApprenticeSilent, 0, 0);
+   silent = missing_nails( NO, NO, BGApprenticeSilent, 0, 0, -1);
    BG_CHECK( logged( silent.agency, @"did not answer"));
    BG_CHECK( ! happened( silent.world, "said", silent.apprentice, 4) && ! wedged( silent.world));
 
    /* saved while it waits, the wait goes on in the restored world, and ends as it would have */
-   resumed = missing_nails( NO, NO, BGApprenticeSilent, 30006, 0);
+   resumed = missing_nails( NO, NO, BGApprenticeSilent, 30006, 0, -1);
    BG_CHECK( [resumed.world stateHash] == [silent.world stateHash]);
    BG_CHECK( [resumed.text isEqualToString:silent.text]);
    full = [silent.agency logOf:4];
@@ -1435,7 +1460,7 @@ static void   test_asking( void)
              [[rest objectAtIndex:0] rangeOfString:@"did not answer"].location != NSNotFound);
 
    /* asked, a surly apprentice weighs answering at less than nothing, and says it won't: the goal is dropped */
-   surly = missing_nails( NO, NO, BGApprenticeSurly, 0, 0);
+   surly = missing_nails( NO, NO, BGApprenticeSurly, 0, 0, -1);
    BG_CHECK( logged_by( surly.agency, surly.apprentice, @"asked by R"));
    BG_CHECK( logged_by( surly.agency, surly.apprentice, @"worth -5, refusing"));
    BG_CHECK( logged_by( surly.agency, surly.apprentice, @"refusing: say R"));
@@ -1446,7 +1471,7 @@ static void   test_asking( void)
    BG_CHECK( logged_by( saw.agency, saw.apprentice, @"worth +20, answering"));
 
    /* the omniscient stub needs no one: straight to the chest */
-   seer = missing_nails( NO, YES, BGApprenticeSaw, 0, 0);
+   seer = missing_nails( NO, YES, BGApprenticeSaw, 0, 0, -1);
    BG_CHECK( ! happened( seer.world, "said", 4, seer.apprentice));
    BG_CHECK( ! happened( seer.world, "attempted", 4, 1) && wedged( seer.world));
 }
@@ -1468,7 +1493,7 @@ static void   test_routine( void)
 
    /* the shift, 8:00 to 16:00: at 8:00, and not before, the worker takes up
     * wedging the lock, worth its duty; no urgency yet */
-   shift = missing_nails( YES, NO, BGNoApprentice, 0, BG_EIGHT + 8 * 3600000LL);
+   shift = missing_nails( YES, NO, BGNoApprentice, 0, BG_EIGHT + 8 * 3600000LL, -1);
    log   = [shift.agency logOf:4];
    BG_CHECK( [log count] && [[log objectAtIndex:0] rangeOfString:@"t=28800000ms [-] weighing wedge the lock: +20 "
                                                                  @"(employment, duty +20, urgency +0) against nothing: "
@@ -1479,23 +1504,23 @@ static void   test_routine( void)
    BG_CHECK( log_count( shift.agency, 4, @"switching") == 1);
 
    /* without spares, impossible, and settled too: not taken up again and again */
-   fruitless = missing_nails( NO, NO, BGNoApprentice, 0, BG_EIGHT + 8 * 3600000LL);
+   fruitless = missing_nails( NO, NO, BGNoApprentice, 0, BG_EIGHT + 8 * 3600000LL, -1);
    BG_CHECK( logged_by( fruitless.agency, 4, @"[wedge the lock] nothing I know of will do: impossible for now"));
    BG_CHECK( log_count( fruitless.agency, 4, @"switching") == 1 && ! wedged( fruitless.world));
 
    /* a shift of five seconds closes mid-search: the commitment is over, and
     * what it needed with it */
-   closing = missing_nails( YES, NO, BGNoApprentice, 0, BG_EIGHT + 5000);
+   closing = missing_nails( YES, NO, BGNoApprentice, 0, BG_EIGHT + 5000, -1);
    BG_CHECK( logged_by( closing.agency, 4, @"t=28805000ms [have nails] wedge the lock is over: its window has closed"));
    BG_CHECK( ! wedged( closing.world) && [closing.agency mindOf:4]->nintentions == 0);
 
    /* urgency rises toward the deadline: a window from 0 to 40 s, taken up
     * at 12 s, three tenths of the way: 6 of 20 */
-   hurried = missing_nails( YES, NO, BGNoApprentice, 0, 40000);
+   hurried = missing_nails( YES, NO, BGNoApprentice, 0, 40000, -1);
    BG_CHECK( logged_by( hurried.agency, 4, @"t=12003ms [-] weighing wedge the lock: +26 (employment, duty +20, urgency +6)"));
 
    /* saved mid-shift, restored, the same end */
-   resumed = missing_nails( YES, NO, BGNoApprentice, BG_EIGHT + 6001, BG_EIGHT + 8 * 3600000LL);
+   resumed = missing_nails( YES, NO, BGNoApprentice, BG_EIGHT + 6001, BG_EIGHT + 8 * 3600000LL, -1);
    BG_CHECK( [resumed.world stateHash] == [shift.world stateHash]);
    BG_CHECK( [resumed.text isEqualToString:shift.text]);
    full = [shift.agency logOf:4];

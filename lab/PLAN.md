@@ -1707,3 +1707,20 @@ Not yet: per-tile regions inside a room, and resting a link inside the
 settle tolerance changes the physics by at most that tolerance.
 
 53 tests, 1980 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: curiosity widens a search
+
+AGENCY.md Scenario 1's variant A. Spare nails are in a sack in the far
+corner, which the worker saw on its way across. A search method now looks
+into so many `places` before giving up (`search_for_nails`: two). The count
+includes the places it has looked into or asked since the goal was adopted,
+so the bin it reached into counts. The worker looks into the crate, has
+looked enough, and drops *have nails* as impossible for now. A worker with
+curiosity 50 (AGENCY.md §9; a place more for every 25) goes on to the sack,
+finds the nails, and wedges the lock.
+
+Not yet: search ordered by credence that the thing is there (the order is
+still recency and distance), and curiosity weighing in elsewhere (which
+methods to try, what to notice).
+
+53 tests, 1990 checks, under both compilers, ASan and UBSan, and leak-free.

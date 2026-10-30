@@ -27,6 +27,8 @@ agent_b: #Agent & { material: "flesh", mass: 65kg, hands: 2, coat: "green" }
 // workshop, and the spare nails that may be in it.
 crate:   #Container & { material: "oak", mass: 2kg, capacity: 20 }
 nails_4: #Stack & { material: "iron", unit: "iron_nail", unitMass: 3g, count: 4 }
+// and a sack in the far corner, where nobody would think to look
+sack:    #Container & { material: "cloth", mass: 300g, capacity: 10 }
 
 // For the missing nails' "ask a coworker": the chest the smith puts the nails
 // in, and the apprentice who may see it.

@@ -111,7 +111,9 @@
 // skipping those that have failed since the goal was adopted; the first whose
 // `pre` holds is followed. A `search` slot is somewhere to look: a referent
 // whose inside the agent has seen since the goal was adopted is passed over.
-// An agent asked since the goal was adopted is passed over too. When no
+// An agent asked since the goal was adopted is passed over too. A search
+// looks into so many `places` (0, no end), counting those seen into or asked
+// since; curiosity widens it, a place more for every 25 (AGENCY.md §9). When no
 // method's `pre` holds, the goal is impossible for now: it is dropped with
 // the reason, and the method that needed it has failed.
 #Method: #Intent & {
@@ -120,6 +122,7 @@
     pre:       #Condition
     order:     [...#Order]
     search:    text
+    places:    *0 | int & >=0 & <=100
     steps:     [...#MethodStep]
     score:     [...#Consideration]
     onUnknown: text
@@ -203,7 +206,7 @@ fetch_nails: #Method & {
 } @family(methods)
 
 // Look into the containers the agent knows of, the most recently seen first,
-// then the nearest.
+// then the nearest: two of them, and more if it is curious.
 search_for_nails: #Method & {
     title:  "search for nails"
     goal:   "have_nails"
@@ -211,6 +214,7 @@ search_for_nails: #Method & {
     pre:    { find: ["box"], match: #HavingNails & { box: #Container } }
     order:  ["recent", "near"]
     search: "box"
+    places: 2
     steps:  [#Do & { op: "look_in", object: "box" }]
 } @family(methods)
 

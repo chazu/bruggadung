@@ -145,6 +145,7 @@ typedef struct
    char               order[ 4][ 32];
    NSUInteger         norder;
    char               search[ 32];                 /* the slot to search, or "" */
+   int64_t            places;                      /* how many to search, curiosity included; 0, no end */
    int64_t            since;                       /* searched means its inside was seen since */
    const char         *instance;                   /* the method or goal */
    const char         *slot;                       /* the slot being bound */
@@ -512,6 +513,7 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
         store:(BGKnowledgeStore *) store
 {
    const TriNode   *variants[ BG_MAX_VARIANTS];
+   const BGAgent   *agent;
    TriContent      *tri;
    NSUInteger      v;
    char            sub[ 32];
@@ -537,6 +539,10 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    c->norder = texts_at( tri, variants[ 0], "order", c->order, 4);
    if( ! text_at( tri, variants[ 0], "search", c->search, sizeof( c->search)))
       c->search[ 0] = 0;
+   /* a search looks into so many places; curiosity widens it */
+   if( (c->places = int_at( tri, variants[ 0], "places", 0)) > 0 &&
+       (agent = [_world record:[_world kindNamed:"Agent"] for:[store agent]]))
+      c->places += agent->curious / 25;
    return( YES);
 }
 
@@ -627,6 +633,7 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    NSUInteger         i;
    NSUInteger         j;
    const char         *slot;
+   int64_t            searched;
    int                before;
 
    if( k == c->nfind)
@@ -650,6 +657,21 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
 
    ncandidates = 0;
    c->slot     = slot;
+
+   /* searched enough: as many places looked into, or asked, as it has in it */
+   if( c->search[ 0] && ! strcmp( slot, c->search) && c->places > 0)
+   {
+      for( searched = 0, i = 0; i < [c->store count]; i++)
+      {
+         r = [c->store referentAt:i];
+         if( r->present && r->id != c->me->id && [self kind:r->kind fitsSlot:slot of:c] &&
+             (r->insideSeen >= c->since || [c->store lastSaidTo:r->id] >= c->since))
+            searched++;
+      }
+      if( searched >= c->places)
+         return( NO);
+   }
+
    for( i = 0; i < [c->store count] && ncandidates < 64; i++)
    {
       r = [c->store referentAt:i];
