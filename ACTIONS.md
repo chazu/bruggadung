@@ -54,6 +54,11 @@ Out of scope here, except through the stub interfaces defined below:
     repair); others are learned by being taught, by reading (a manual is a
     record with a recipe in it), or by practice. An agent without a recipe
     can't choose it; one with a wrong recipe follows it wrongly.
+13. **An operation declares what weights its contests**: the derived value
+    that weights the commit permutation when its groups conflict (taking:
+    quickness; shoving: strength; talking over someone: voice), in the
+    action phase only. Without a declaration, the draw is unweighted;
+    process and system phases are never weighted.
 
 ## Terms
 
@@ -698,5 +703,4 @@ DOMAIN_SIMULATION.md and Scenario 3 of COMPONENTS.md.
    two people lifting a beam? Pooled capabilities, a shared activity entity,
    and dividing up the risk.
 7. **Recipe knowledge.** Decided: decision 12.
-8. **Weights.** Which derived values may weight the commit permutation, and
-   in which phases?
+8. **Weights.** Decided: decision 13.
