@@ -29,6 +29,7 @@
 #import "BGTraces.h"
 #import "BGComponents.h"
 #import "BGBodyKind.h"
+#import "BGLatentKind.h"
 #import "BGValveKind.h"
 #import "BGKnowledge.h"
 #import "BGPlay.h"

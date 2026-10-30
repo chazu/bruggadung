@@ -16,7 +16,7 @@
 #Tap: #Container & {
     @component(Tap)
     open: *false | true         @field(content, saved, proposable, inspect, perceive(sight))
-    rate: int & >=0 & <=100000  @field(content, saved, inspect)
+    rate: int & >=0 & <=100000  @field(content, saved, proposable, inspect)
 }
 
 cistern: #Assembly & #WaterStore & { material: "oak", mass: 40kg, slots: 4, water: 15L, waterCapacity: 200L }

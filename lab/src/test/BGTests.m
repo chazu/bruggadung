@@ -3467,6 +3467,76 @@ static BGPumpRun   pump_open( const char *key, const char *failure, int64_t open
 }
 
 
+/* DOMAIN_SIMULATION.md Scenario 2's drain: the pump `key` under its header
+ * tank (100 L), opened, and its piston taken out: through a leaky outlet
+ * valve the tank drains onto the floor; an hour on, how much left the tank,
+ * and whether the water is the same in all, every boundary. */
+static int64_t   pump_drain( const char *key, BOOL *conserved, BOOL *leaking)
+{
+   BGStage            st;
+   BGFluidDomain      *fluid;
+   BGProposalGroup    *g;
+   BGEntityID         pump;
+   BGEntityID         tank;
+   BGEntityID         worker;
+   BGEntityID         wrench;
+   BGEntityID         piston;
+   BGStore            *parts;
+   NSString           *error;
+   NSUInteger         i;
+   int64_t            v;
+   int64_t            total;
+   int64_t            sum;
+
+   st.w   = BGTestWorld( 163);
+   st.c   = BGTestCommitter( st.w);
+   fluid  = [[[BGFluidDomain alloc] initWithWorld:st.w] autorelease];
+   st.s   = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [st.s addDomain:fluid];
+   g      = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the pump house"];
+   pump   = [g create:"crank_pump" key:key at:BGOnTile( 5, 5, 0)];
+   tank   = [g create:"header_tank" key:"the header tank" at:BGOnTile( 5, 5, 0)];
+   worker = [g create:"worker" key:"worker" at:BGOnTile( 4, 5, 0)];
+   wrench = [g create:"wrench_250" key:"wrench" at:BGHeldBy( worker, 0)];
+   [g set:"Latent.riser" of:BGWhole( pump) to:(int64_t) tank];
+   [g set:"Latent.failure" of:BGWhole( pump) toText:"flow_loss"];
+   [g set:"Latent.failedAt" of:BGWhole( pump) to:0];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   pump   = [g idFor:pump];
+   tank   = [g idFor:tank];
+   worker = [g idFor:worker];
+   wrench = [g idFor:wrench];
+   error  = nil;
+   BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "open_up", worker, wrench, pump), 0, &error) != nil);
+   [st.s runUntil:BGTimeMake( 1000)];
+   BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "open_up", worker, wrench, pump), 0, &error) != nil);
+   [st.s runUntil:BGTimeMake( 2000)];
+   piston = BGNoEntity;
+   parts  = [st.w storeForKind:[st.w kindNamed:"Part"]];
+   for( i = 0; i < [parts count]; i++)
+      if( ! strcmp( [st.w info:[parts entityAtIndex:i]]->blueprint, "piston"))
+         piston = [parts entityAtIndex:i];
+   BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "take", worker, piston, BGNoEntity), 0, &error) != nil);
+   *conserved = YES;
+   total      = 100000;
+   while( [st.w time].ms < 3600000)
+   {
+      if( ! [st.s stepUntil:BGTimeMake( 3600000)])
+         [st.s runUntil:BGTimeMake( 3600000)];
+      sum = [st.w totalTileWater] + [fluid checkedOutWater];
+      if( ! [st.w isCheckedOut:tank] && [st.w getField:"WaterStore.water" of:tank value:&v])
+         sum += v;
+      *conserved = *conserved && sum == total;
+   }
+   *leaking = [st.w getField:"Latent.leaking" of:pump value:&v] && v;
+   BG_CHECK( [st.w locationOf:piston].form == BGLocationHeldBy);
+   /* what left the tank is on the floor (checked out by the domain, or in) */
+   [st.w getField:"WaterStore.water" of:tank value:&v];
+   return( total - v);
+}
+
+
 static void   test_latent_pump( void)
 {
    BGPumpRun   early;
@@ -3511,6 +3581,27 @@ static void   test_latent_pump( void)
       BG_CHECK( [other.menu isEqualToString:early.menu]);
    }
    BG_CHECK( seal && outlet && none);
+   /* check 1: the piston out, the open cylinder is a path: through the
+    * outlet valve, the culprit, the header tank drains onto the floor, the
+    * water conserved exactly at every boundary; with the seal the culprit,
+    * the valve holds and nothing drains */
+   for( k = 0; k < 24; k++)
+   {
+      snprintf( key, sizeof( key), "pump %d", k);
+      if( [pump_open( key, "flow_loss", 300 * 3600000LL, 0).culprit isEqualToString:@"outlet_valve"])
+         break;
+   }
+   {
+      BOOL      conserved;
+      BOOL      leaking;
+      int64_t   floor;
+
+      floor = pump_drain( key, &conserved, &leaking);
+      BG_CHECK( leaking && conserved && floor > 10000);
+      floor = pump_drain( "pump 1", &conserved, &leaking);
+      BG_CHECK( leaking && conserved && floor == 0);
+   }
+
    /* a failure with no candidates: nothing marked */
    seized = pump_open( "pump 1", "seized", 300 * 3600000LL, 0);
    BG_CHECK( [seized.culprit isEqualToString:@""]);

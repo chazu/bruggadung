@@ -2313,9 +2313,27 @@ a wrench (`open_up`):
   declare no new mass: its mass is carved, and the ledger checks the
   assembly lost as much.
 
-Not yet: extracting a part as a topology change for the fluid domain (the
-outlet valve draining the header tank, check 1), the piston leaving with
-its share of heat (check 3's thermal half), and the interrupted repair's
-inspection binding the culprit.
+Not yet: the piston leaving with its share of heat (check 3's thermal
+half), and the interrupted repair's inspection binding the culprit.
+Check 1 follows.
 
 65 tests, 2269 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: the open cylinder drains the header tank
+
+DOMAIN_SIMULATION.md Scenario 2's check 1 and its outlet-valve variant,
+under the same provisional rules. The pump's descriptor names the part
+whose extraction opens a path (`pathWhenOut`: the piston) and the part it
+runs through (`pathThrough`: the outlet valve). The pump knows the store
+it holds back (`riser`: the header tank). A reaction (`BGLatentKind`, on
+parts moving) sees the piston out and opens the path: a leak, a tap
+installed in the tank, at a rate in proportion to the valve's wear past
+half. The fluid domain sees a new tap, which is a topology change: it
+checks in, forms again, and drains the tank onto the floor.
+
+- **Outlet valve the culprit (wear 60)**: 2 L a minute, and the 100 L tank
+  is empty within the hour. Tank, floor, and checked-out water sum to
+  100 L at every boundary.
+- **Seal the culprit**: the valve (wear 2) holds, and nothing drains.
+
+65 tests, 2281 checks, under both compilers, ASan and UBSan, and leak-free.

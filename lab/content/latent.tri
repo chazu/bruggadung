@@ -16,13 +16,19 @@
 
 #LatentRole:   { roleName: text, partKind: text, depth: int }
 #Culprit:      { failing: text, candidates: [...text] }
-#LatentSchema: { parts: [...#LatentRole], culprits: [...#Culprit] }
+// `pathWhenOut`: the role whose extraction opens a path from the store the
+// assembly holds back (its `riser`) to its floor, through `pathThrough`,
+// which passes in proportion to its wear past half (DOMAIN_SIMULATION.md
+// Scenario 2: the open cylinder, through the outlet check valve).
+#LatentSchema: { parts: [...#LatentRole], culprits: [...#Culprit], pathWhenOut: text, pathThrough: text }
 
 #Latent: #Body & {
     @component(Latent)
     revealed: *0 | int & >=0 & <=8             @field(content, saved, proposable, inspect)
     failure:  text                             @field(saved, proposable, inspect)
     failedAt: *0ms | time & >=0ms & <=10000d   @field(content, saved, proposable, inspect)
+    riser:    ref                              @field(saved, proposable, inspect)
+    leaking:  *false | true                    @field(content, saved, proposable, inspect)
     latent:   #LatentSchema
 }
 
@@ -51,8 +57,15 @@ crank_pump: #Pump & #Latent & {
                 { roleName: "outlet_valve", partKind: "outlet_valve", depth: 2 }]
         culprits: [{ failing: "flow_loss", candidates: ["piston_seal", "inlet_valve", "outlet_valve", "housing"] },
                    { failing: "seized", candidates: [] }]
+        pathWhenOut: "piston"
+        pathThrough: "outlet_valve"
     }
 }
+
+// The raised header tank the riser fills, and a leak: a tap installed in a
+// store, open, at the rate the path allows.
+header_tank: #Assembly & #WaterStore & { material: "oak", mass: 30kg, slots: 2, water: 100L, waterCapacity: 100L }
+leak:        #Tap & { material: "brass", mass: 0g, capacity: 1, rate: 0, open: true }
 
 // Open an assembly in reach a level further, with a wrench in hand.
 open_up: #Operation & {

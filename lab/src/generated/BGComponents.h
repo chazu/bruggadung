@@ -1,4 +1,4 @@
-/* Generated from Triangle content 518eeeb1df6e1149: do not edit. Type IDs are valid
+/* Generated from Triangle content 26b1dd45745b93fb: do not edit. Type IDs are valid
  * only for this content; regenerate when it changes. */
 #ifndef BG_COMPONENTS_H
 #define BG_COMPONENTS_H
@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BG_CONTENT_HASH 0x518eeeb1df6e1149ULL
+#define BG_CONTENT_HASH 0x26b1dd45745b93fbULL
 
 typedef struct TriNode TriNode;
 
@@ -189,7 +189,9 @@ typedef struct {
     int64_t         failedAt;    /* time, in quanta of 1ms; content, saved, proposable, inspect */
     const char *    failure;    /* text; saved, proposable, inspect */
     const TriNode * latent;    /* #LatentSchema: a structure */
+    bool            leaking;    /* bool; content, saved, proposable, inspect */
     int64_t         revealed;    /* int, in quanta of 1; content, saved, proposable, inspect */
+    uint64_t        riser;    /* a referent; saved, proposable, inspect */
 } BGLatent;
 
 /* Log, from #Log */
@@ -227,7 +229,7 @@ typedef struct {
 /* Tap, from #Tap */
 typedef struct {
     bool            open;    /* bool; content, saved, proposable, inspect, perceive(sight) */
-    int64_t         rate;    /* int, in quanta of 1; content, saved, inspect */
+    int64_t         rate;    /* int, in quanta of 1; content, saved, proposable, inspect */
 } BGTap;
 
 /* Trace, from #Trace */
@@ -500,7 +502,9 @@ static const BGFieldInfo BGLatent_fields[] = {
     { "failedAt", offsetof(BGLatent, failedAt), BG_VALUE_QUANTITY, "time", "content, saved, proposable, inspect" },
     { "failure", offsetof(BGLatent, failure), BG_VALUE_TEXT, "text", "saved, proposable, inspect" },
     { "latent", offsetof(BGLatent, latent), BG_VALUE_NODE, "#LatentSchema", "" },
+    { "leaking", offsetof(BGLatent, leaking), BG_VALUE_BOOL, "bool", "content, saved, proposable, inspect" },
     { "revealed", offsetof(BGLatent, revealed), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
+    { "riser", offsetof(BGLatent, riser), BG_VALUE_REF, "ref", "saved, proposable, inspect" },
 };
 
 static const BGFieldInfo BGLog_fields[] = {
@@ -531,7 +535,7 @@ static const BGFieldInfo BGStamp_fields[] = {
 
 static const BGFieldInfo BGTap_fields[] = {
     { "open", offsetof(BGTap, open), BG_VALUE_BOOL, "bool", "content, saved, proposable, inspect, perceive(sight)" },
-    { "rate", offsetof(BGTap, rate), BG_VALUE_QUANTITY, "int", "content, saved, inspect" },
+    { "rate", offsetof(BGTap, rate), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
 };
 
 static const BGFieldInfo BGTrace_fields[] = {
@@ -582,7 +586,7 @@ static const BGComponentInfo BGComponents[BG_COMPONENT_COUNT + 1] = {
     { "Inscription", "#Copy", sizeof(BGInscription), 6, BGInscription_fields },
     { "Door", "#Door", sizeof(BGDoor), 2, BGDoor_fields },
     { "Lamp", "#Lamp", sizeof(BGLamp), 2, BGLamp_fields },
-    { "Latent", "#Latent", sizeof(BGLatent), 4, BGLatent_fields },
+    { "Latent", "#Latent", sizeof(BGLatent), 6, BGLatent_fields },
     { "Log", "#Log", sizeof(BGLog), 1, BGLog_fields },
     { "Part", "#Part", sizeof(BGPart), 1, BGPart_fields },
     { "Pump", "#Pump", sizeof(BGPump), 1, BGPump_fields },
