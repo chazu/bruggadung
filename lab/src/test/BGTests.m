@@ -7038,9 +7038,74 @@ static void   test_pain( void)
 }
 
 
+/* KNOWLEDGE.md §12: strength "decays at a rate set by salience and
+ * repetition". The worker sees a stone beside it (`sightings` times, going
+ * away for two minutes between), or moves it itself into a bin (`moves`),
+ * then goes
+ * away for ten days. The strength of its belief of where the stone is. */
+static int32_t   remembered( int sightings, BOOL moves)
+{
+   BGStage            st;
+   BGKnowledge        *knowledge;
+   BGKnowledgeStore   *store;
+   BGProposalGroup    *g;
+   BGEntityID         worker;
+   BGEntityID         stone;
+   BGEntityID         bin;
+   NSString           *error;
+   int                i;
+
+   st.w      = BGTestWorld( 151);
+   st.c      = BGTestCommitter( st.w);
+   knowledge = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+   st.s      = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [st.s setPerception:knowledge];
+   g      = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: a stone"];
+   worker = [g create:"worker" key:"worker" at:BGOnTile( 5, 5, 0)];
+   stone  = [g create:"stone" key:"stone" at:BGOnTile( 6, 5, 0)];
+   bin    = [g create:"bin" key:"bin" at:BGOnTile( 4, 5, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   worker = [g idFor:worker];
+   stone  = [g idFor:stone];
+   bin    = [g idFor:bin];
+   for( i = 1; i < sightings; i++)
+   {
+      stage_move( &st, worker, 25, 25);
+      [st.s runUntil:BGTimeMake( [st.w time].ms + 120000)];
+      stage_move( &st, worker, 5, 5);
+   }
+   if( moves)
+   {
+      error = nil;
+      BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "take", worker, stone, BGNoEntity), 0, &error) != nil);
+      [st.s runUntil:BGTimeMake( [st.w time].ms + 1000)];
+      BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "put_in", worker, stone, bin), 0, &error) != nil);
+      [st.s runUntil:BGTimeMake( [st.w time].ms + 1000)];
+   }
+   stage_move( &st, worker, 25, 25);
+   [st.s runUntil:BGTimeMake( [st.w time].ms + 10 * BG_MEMORY_STEP)];
+   store = [knowledge storeOf:worker];
+   return( [store strengthOf:referent_of( store, stone)]);
+}
+
+
+static void   test_memory_rates( void)
+{
+   /* seen once: BG_FADE a day */
+   BG_CHECK( remembered( 1, NO) == BG_SEEN - 10 * BG_FADE);
+   /* sighted three times: half as fast */
+   BG_CHECK( remembered( 3, NO) == BG_SEEN - 10 * BG_FADE / 2);
+   /* moved by its own hand (salience BG_OWN_DEED): half as fast too */
+   BG_CHECK( remembered( 1, YES) == BG_SEEN - 10 * BG_FADE * BG_NOTICE / BG_OWN_DEED);
+}
+
+
 /* AGENCY.md Scenario 1's belief from habit. The worker puts the wrench
  * in the bin `times` times, taking it out again, then once in the crate,
- * and goes away. A month on, its memory of where the wrench is has faded:
+ * and goes away. Six weeks on (its own doing, the wrench is remembered
+ * twice as long as something only seen: a month isn't enough), its memory
+ * of where the wrench is has faded:
  * by habit it believes it in the bin (wrongly, as Oskar does the hook);
  * with no habit, it doesn't know. The referent, described. */
 static NSString   *habitual_belief( int times, BOOL *present)
@@ -7083,7 +7148,7 @@ static NSString   *habitual_belief( int times, BOOL *present)
    BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "put_in", worker, wrench, crate), 0, &error) != nil);
    [st.s runUntil:BGTimeMake( [st.w time].ms + 1000)];
    stage_move( &st, worker, 25, 25);
-   [st.s runUntil:BGTimeMake( 30 * BG_MEMORY_STEP)];
+   [st.s runUntil:BGTimeMake( 42 * BG_MEMORY_STEP)];
    store    = [knowledge storeOf:worker];
    *present = [store referent:referent_of( store, wrench)]->present;
    return( [NSString stringWithFormat:@"%@ (bin R%u, crate R%u)", [store describeReferent:referent_of( store, wrench)],
@@ -7097,7 +7162,7 @@ static void   test_habitual_belief( void)
    NSString   *none;
    BOOL       present;
 
-   /* three times in the bin: a month on, it believes the wrench there,
+   /* three times in the bin: six weeks on, it believes the wrench there,
     * though it last put it in the crate */
    habit = habitual_belief( 3, &present);
    BG_CHECK( present && [habit rangeOfString:@"place: #Inside & { container: ref(2) }"].location != NSNotFound &&
@@ -7459,6 +7524,7 @@ const BGTestCase   BGAllTests[] =
    { "seized_valve",                  test_seized_valve },
    { "access_resume",                 test_access_resume },
    { "providers_pending",             test_providers_pending },
+   { "memory_rates",                  test_memory_rates },
    { "resume_recheck",                test_resume_recheck },
    { "interrupted_repair",            test_interrupted_repair },
    { "unattended_stove",              test_unattended_stove },

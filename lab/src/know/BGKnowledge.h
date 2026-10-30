@@ -46,7 +46,10 @@
  * becomes "wood"), and one generalized as far as it goes is forgotten. The
  * strength of a belief of where a thing is, BG_SEEN for one seen, its
  * credence for one told, fades by BG_FADE a step, and below BG_BELIEVE the
- * agent forgets where it is, at its next perception phase. Seeing it again
+ * agent forgets where it is, at its next perception phase. It fades slower
+ * for what was sighted again and again (twice as slow at three sightings,
+ * up to four times at seven) and for what took part in something salient
+ * (BG_NOTICE over its peak salience: a third as fast for an anomaly). Seeing it again
  * restores both. A claim of what the speaker saw says how sure it is, its
  * memory's strength, and weighs no more than that.
  *
@@ -170,6 +173,8 @@ typedef struct
    uint32_t         toldBy;        /* the referent who said it is where it is believed; 0 if seen */
    int32_t          trust;         /* dB: in what it says, if it is someone */
    BOOL             present;       /* still believed where it was last seen */
+   int32_t          sightings;     /* how often it was sighted (not seen for a minute before) */
+   int32_t          salience;      /* the most salient thing it was kept in an observation for */
    BGEntityID       truth;         /* developer-only */
 } BGReferent;
 

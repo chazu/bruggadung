@@ -2675,3 +2675,28 @@ second is refused; walking at the same time is not (legs); committed, the
 stone is refused as busy; with the seal in hand, it can be taken up.
 
 71 tests, 2451 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: remembered by repetition and salience
+
+KNOWLEDGE.md §12: "Strength decays at a rate set by salience and
+repetition." The bounded-stores slice's "Not yet": every belief faded at
+one rate.
+
+- **Sightings**: a referent counts how often it was sighted (seen after a
+  minute unseen, the same notion labels and identity hypotheses use).
+- **Salience**: a referent keeps the most salient observation it took part
+  in (actor, subject, or other): its own deed 20, being addressed 30, an
+  anomaly 25.
+- **The rate**: `BG_FADE` a step, times 2 / (1 + sightings, at most 7),
+  times `BG_NOTICE` / its salience (at least `BG_NOTICE`). Seen once,
+  nothing salient: as before. Both are saved (`remembers`).
+
+Checked: ten days on, a stone seen once has faded 20; sighted three times,
+10; moved into a bin by the worker's own hand, 10. The habit-belief
+scenario now waits six weeks, not a month: the wrench, the worker's own
+doing, is remembered twice as long.
+
+Not yet: detail (the feature hierarchy) by salience and repetition too,
+and forgetting at a scheduled time rather than the next perception phase.
+
+72 tests, 2456 checks, under both compilers, ASan, and leak-free.

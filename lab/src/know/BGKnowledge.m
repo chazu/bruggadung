@@ -953,6 +953,8 @@ static NSString   *known_features( const BGReferent *r)
 {
    const BGReferent   *r;
    int32_t            base;
+   int32_t            sightings;
+   int32_t            salience;
 
    r = [self referent:referentID];
    if( ! r)
@@ -960,7 +962,10 @@ static NSString   *known_features( const BGReferent *r)
    base = BG_SEEN;
    if( r->toldBy && r->form == BGLocationIn)
       base = [self credenceThat:r->id isIn:r->container];
-   return( base - BG_FADE * [self stepsSince:r->seen]);
+   /* seen once, nothing salient: BG_FADE a step; slower for repetition and salience */
+   sightings = r->sightings < 1 ? 1 : (r->sightings > 7 ? 7 : r->sightings);
+   salience  = r->salience > BG_NOTICE ? r->salience : BG_NOTICE;
+   return( base - (int32_t) ((int64_t) BG_FADE * [self stepsSince:r->seen] * 2 * BG_NOTICE / ((1 + sightings) * salience)));
 }
 
 
@@ -2959,10 +2964,14 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
          r->level     = tile.level;
          r->slot      = at.slot;
          memcpy( r->role, at.role, sizeof( r->role));
-         /* a label, on sighting it (not seen for a minute before), is read below */
-         if( nglance < 64 && (! r->seen || now - r->seen > 60000) &&
-             [_world record:[_world kindNamed:"Label"] for:seen[ i].entity])
-            glance[ nglance++] = i;
+         /* a sighting (not seen for a minute before): remembered longer for
+          * each; a label, on sighting it, is read below */
+         if( ! r->seen || now - r->seen > 60000)
+         {
+            r->sightings++;
+            if( nglance < 64 && [_world record:[_world kindNamed:"Label"] for:seen[ i].entity])
+               glance[ nglance++] = i;
+         }
          r->seen      = now;
          r->present   = YES;
          r->truth     = seen[ i].entity;                /* developer-only */
@@ -3281,6 +3290,19 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
          continue;      /* unnoticed */
       }
       [store addObservation:o restored:NO];
+      /* what took part in it is remembered as long as its most salient part */
+      {
+         uint32_t     parts[ 3];
+         BGReferent   *p;
+         int          q;
+
+         parts[ 0] = o.actor;
+         parts[ 1] = o.subject;
+         parts[ 2] = o.other;
+         for( q = 0; q < 3; q++)
+            if( parts[ q] && (p = [store mutableReferent:parts[ q]]) && p->salience < o.salience)
+               p->salience = o.salience;
+      }
       if( ! strcmp( ev->kind, "said") && ev->detail && o.actor && o.actor != [store selfReferent])
          [self believe:ev->detail from:o.actor via:0 utterance:ev->index at:now store:store news:news];
    }
@@ -3764,6 +3786,11 @@ char   *BGDecodeWord( const char *s)
                                                      [store feels:"cold"], [store feels:"stuffy"], [store feels:"tired"],
                                                      [store feels:"pain"]]];
       for( j = 0; j < [store count]; j++)
+         if( [store referentAt:j]->sightings || [store referentAt:j]->salience)
+            [lines addObject:[NSString stringWithFormat:@"remembers %llu %u %d %d", (unsigned long long) [store agent],
+                                                        [store referentAt:j]->id, [store referentAt:j]->sightings,
+                                                        [store referentAt:j]->salience]];
+      for( j = 0; j < [store count]; j++)
          for( k = 0; k < BG_HYPOTHESES && [store referentAt:j]->supposed[ k]; k++)
             [lines addObject:[NSString stringWithFormat:@"supposes %llu %u %d %@", (unsigned long long) [store agent],
                                                         [store referentAt:j]->id, [store referentAt:j]->supposedMass[ k],
@@ -3907,6 +3934,17 @@ char   *BGDecodeWord( const char *s)
          tr.truth    = (BGEntityID) truth;
          tr.kind     = [_world intern:role];
          [[self storeOf:(BGEntityID) agent] noteTrace:tr];
+      }
+      else if( sscanf( text, "remembers %llu %u %d %d", &agent, &id, &trust, &x) == 4)
+      {
+         BGReferent   *m;
+
+         m = [[self storeOf:(BGEntityID) agent] mutableReferent:id];
+         if( m)
+         {
+            m->sightings = trust;
+            m->salience  = x;
+         }
       }
       else if( sscanf( text, "supposes %llu %u %d %511s", &agent, &id, &trust, deeper) == 4)
       {
