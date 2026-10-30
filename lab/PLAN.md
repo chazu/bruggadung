@@ -1999,12 +1999,6 @@ the start.
 
 The remaining scenario checks that aren't run, after the passes above:
 
-- **CONTENT_LANGUAGE.md Scenario 3, check 6 (compaction)**: the lab's
-  knowledge stores hold descriptions as text. They build tri nodes in
-  scratch arenas per match, so there is no per-agent knowledge arena to
-  compact, and the check is vacuous. A per-agent arena (§12's memory
-  table) would change how every store holds its referents: a decision
-  about representation, not a feature.
 - **Checks that hold by structure, with no test that could fail**:
   CONTENT_LANGUAGE.md Scenario 3's check 5 (recognition reads no truth
   links) and KNOWLEDGE.md Scenario 1's check 1 (no entity IDs in agent
@@ -2153,3 +2147,21 @@ numbness hiding cold. Neither pain, injury's percept, nor numbness exists
 in the lab yet, and §6 gives no source for them.
 
 60 tests, 2119 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: the knowledge arena, compacted
+
+CONTENT_LANGUAGE.md §12's memory table, and Scenario 3's check 6. Each
+knowledge store has an arena of parsed descriptions, `parsed:`, keyed by
+their text: the same text, the same node. Recognition's conflict check
+reads its descriptions from it. Housekeeping, after each store's
+perception, compacts it as §12 says: the descriptions used since the last
+compaction are copied (`tri_copy`) into a fresh arena and the old one is
+freed, when live data is under half the arena. Forced at every boundary
+(`setCompactAlways:`), the porter's arena compacts many times over the
+coat at dusk, and the save and the dump are the same to the byte as
+without.
+
+Not yet: the rest of the store's parsing through the arena (it parses into
+scratch arenas still), and §12's memory bound counted in bytes.
+
+60 tests, 2122 checks, under both compilers, ASan and UBSan, and leak-free.

@@ -3920,6 +3920,7 @@ typedef struct
    BGEntityID    visitor;
    BGEntityID    smith;
    NSString      *atDusk;        /* the visitor's referent, after the dusk sighting */
+   NSUInteger    compactions;    /* of the porter's knowledge arena */
    int32_t       before;         /* the hypothesis' credence, made */
    NSString      *text;
 } BGCoatRun;
@@ -3930,7 +3931,7 @@ typedef struct
  * coat looks only dark; next morning, a figure in a brown coat (B: a
  * stranger of the visitor's build; A: the visitor, in a brown coat now); a
  * week later, the brown-coated figure again. */
-static BGCoatRun   coat_at_dusk( BOOL sameOne)
+static BGCoatRun   coat_at_dusk( BOOL sameOne, BOOL compactAlways)
 {
    BGStage            st;
    BGKnowledge        *knowledge;
@@ -3946,6 +3947,7 @@ static BGCoatRun   coat_at_dusk( BOOL sameOne)
    knowledge  = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
    st.s       = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
    [st.s setPerception:knowledge];
+   [knowledge setCompactAlways:compactAlways];
    g           = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the yard"];
    run.porter  = [g create:"porter" key:"Ulla" at:BGOnTile( 10, 10, 0)];
    run.visitor = [g create:"agent_a" key:"the visitor" at:BGOnTile( 12, 10, 0)];
@@ -3984,6 +3986,7 @@ static BGCoatRun   coat_at_dusk( BOOL sameOne)
    run.world     = st.w;
    run.knowledge = knowledge;
    run.text      = BGSave( st.w, st.c, [NSArray arrayWithObject:knowledge]);
+   run.compactions = [[knowledge storeOf:run.porter] compactions];
    return( run);
 }
 
@@ -3993,6 +3996,7 @@ static void   test_coat_at_dusk( void)
    BGCoatRun          b;
    BGCoatRun          a;
    BGCoatRun          again;
+   BGCoatRun          compacted;
    BGKnowledgeStore   *store;
    const BGIdentity   *h;
    BGWorld            *w2;
@@ -4001,7 +4005,7 @@ static void   test_coat_at_dusk( void)
    NSString           *error;
    uint64_t           position;
 
-   b     = coat_at_dusk( NO);
+   b     = coat_at_dusk( NO, NO);
    store = [b.knowledge storeOf:b.porter];
 
    /* at dusk the coat looks only dark; it unifies with the visitor's grey,
@@ -4025,15 +4029,22 @@ static void   test_coat_at_dusk( void)
 
    /* A: the visitor itself, in a brown coat: the decayed memory leads to the
     * right answer, for a weak reason */
-   a     = coat_at_dusk( YES);
+   a     = coat_at_dusk( YES, NO);
    store = [a.knowledge storeOf:a.porter];
 
    BG_CHECK( [store identityCount] == 1 && [store identityAt:0]->credence == b.before + 10);
    BG_CHECK( [[a.knowledge dump:a.porter] rangeOfString:@"truly the same"].location != NSNotFound);
 
    /* the same on replay, and saved */
-   again = coat_at_dusk( NO);
+   again = coat_at_dusk( NO, NO);
    BG_CHECK( [again.text isEqualToString:b.text]);
+
+   /* 6: compaction: the porter's knowledge arena compacted at every
+    * boundary changes nothing observable; the save is the same to the byte */
+   compacted = coat_at_dusk( NO, YES);
+   BG_CHECK( compacted.compactions >= 5 && compacted.compactions > b.compactions);
+   BG_CHECK( [compacted.text isEqualToString:b.text]);
+   BG_CHECK( [[compacted.knowledge dump:compacted.porter] isEqualToString:[b.knowledge dump:b.porter]]);
    w2 = BGRestore( b.text, [b.world contentBuild], &deferred, &position, &error);
    BG_CHECK( w2 != nil);
    restored = [[[BGKnowledge alloc] initWithWorld:w2] autorelease];

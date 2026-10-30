@@ -298,7 +298,21 @@ typedef struct
    BGIdentity       *_identities;
    NSUInteger       _nidentities;
    NSUInteger       _icapacity;
+   TriArena         *_arena;         /* its knowledge arena (CONTENT_LANGUAGE.md §12): descriptions parsed */
+   NSMutableDictionary *_parsed;     /* their text, to the node */
+   NSMutableSet     *_used;          /* the texts parsed or used since the last compaction: what is live */
+   size_t           _liveBytes;      /* the arena's bytes after the last compaction */
+   NSUInteger       _compactions;
 }
+
+/* A description parsed into the store's knowledge arena, kept while it is
+ * used: the same text, the same node. NULL if it doesn't parse. */
+- (const TriNode *) parsed:(NSString *) text;
+/* Housekeeping (CONTENT_LANGUAGE.md §12): copies the descriptions used since
+ * the last compaction into a fresh arena, and frees the old; `always`, or
+ * when live data is under half the arena. YES if it compacted. */
+- (BOOL) compact:(BOOL) always;
+- (NSUInteger) compactions;
 
 - (BGEntityID) agent;
 - (uint32_t) selfReferent;
@@ -437,6 +451,7 @@ typedef struct
    NSUInteger       _eventsSeen;
    BOOL             _omniscient;
    BOOL             _dusk;
+   BOOL             _compactAlways;
    BGAncestry       *_ancestry;        /* developer-only, by utterance */
    NSUInteger       _nancestry;
    NSUInteger       _acapacity;
@@ -451,6 +466,9 @@ typedef struct
 
 /* A conditions stub (KNOWLEDGE.md §5): dusk, or day. */
 - (void) setDusk:(BOOL) flag;
+/* Compact every store's knowledge arena at every boundary, not only when it
+ * is half garbage: which must change nothing observable. */
+- (void) setCompactAlways:(BOOL) flag;
 
 /* what the agent's running activities demand of its attention */
 - (int) attentionOf:(BGEntityID) agent;

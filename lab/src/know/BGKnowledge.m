@@ -152,6 +152,10 @@ static NSUInteger   feature_keys( const char *features, char (*keys)[ 32], NSUIn
    free( _traces);
    free( _findings);
    free( _identities);
+   if( _arena)
+      tri_arena_free( _arena);
+   [_parsed release];
+   [_used release];
    [_news release];
    [super dealloc];
 }
@@ -960,6 +964,60 @@ static NSString   *known_features( const BGReferent *r)
 }
 
 
+- (const TriNode *) parsed:(NSString *) text
+{
+   const TriNode   *node;
+   NSValue         *v;
+
+   if( ! _arena)
+   {
+      _arena  = tri_arena_new();
+      _parsed = [NSMutableDictionary new];
+      _used   = [NSMutableSet new];
+   }
+   [_used addObject:text];
+   if( (v = [_parsed objectForKey:text]))
+      return( [v pointerValue]);
+   node = tri_value( [_world tri], [text UTF8String], _arena, NULL, 0);
+   if( node)
+      [_parsed setObject:[NSValue valueWithPointer:node] forKey:text];
+   return( node);
+}
+
+
+- (BOOL) compact:(BOOL) always
+{
+   NSMutableDictionary   *parsed;
+   NSEnumerator          *e;
+   NSString              *text;
+   TriArena              *arena;
+   const TriNode         *node;
+
+   if( ! _arena || (! always && tri_arena_bytes( _arena) <= 2 * (_liveBytes > 4096 ? _liveBytes : 4096)))
+      return( NO);
+   arena  = tri_arena_new();
+   parsed = [NSMutableDictionary new];
+   e      = [[[_used allObjects] sortedArrayUsingSelector:@selector( compare:)] objectEnumerator];
+   while( (text = [e nextObject]))
+      if( (node = [[_parsed objectForKey:text] pointerValue]))
+         [parsed setObject:[NSValue valueWithPointer:tri_copy( [_world tri], node, arena)] forKey:text];
+   tri_arena_free( _arena);
+   [_parsed release];
+   _arena     = arena;
+   _parsed    = parsed;
+   _liveBytes = tri_arena_bytes( arena);
+   [_used removeAllObjects];
+   _compactions++;
+   return( YES);
+}
+
+
+- (NSUInteger) compactions
+{
+   return( _compactions);
+}
+
+
 - (void) suppose:(NSString *) overrides
            about:(uint32_t) referentID
             mass:(int32_t) permille
@@ -1128,6 +1186,12 @@ static NSString   *known_features( const BGReferent *r)
 }
 
 
+- (void) setCompactAlways:(BOOL) flag
+{
+   _compactAlways = flag;
+}
+
+
 - (void) setDusk:(BOOL) flag
 {
    _dusk = flag;
@@ -1175,18 +1239,14 @@ static NSString   *known_features( const BGReferent *r)
 {
    const TriNode   *x;
    const TriNode   *y;
-   TriArena        *arena;
    char            found[ 8][ 256];
    size_t          n;
    size_t          i;
 
-   arena  = tri_arena_new();
-   x      = tri_value( [_world tri], [[NSString stringWithFormat:@"%@ & { %@ }", kind, lasting( [store recall:r])] UTF8String],
-                       arena, NULL, 0);
-   y      = tri_value( [_world tri], [[NSString stringWithFormat:@"%@ & { %@ }", kind, lasting( features)] UTF8String],
-                       arena, NULL, 0);
+   /* both from the store's knowledge arena */
+   x      = [store parsed:[NSString stringWithFormat:@"%@ & { %@ }", kind, lasting( [store recall:r])]];
+   y      = [store parsed:[NSString stringWithFormat:@"%@ & { %@ }", kind, lasting( features)]];
    n      = x && y ? tri_conflicts( [_world tri], x, y, found, 8) : 0;
-   tri_arena_free( arena);
    paths[ 0] = 0;
    for( i = 0; i < n; i++)
       snprintf( paths + strlen( paths), length - strlen( paths), "%s%s", i ? ", " : "", found[ i]);
@@ -2986,9 +3046,13 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
    agents = [_world storeForKind:[_world kindNamed:"Agent"]];
    /* in stable ID order; each depends only on the world and its own store */
    for( i = 0; i < [agents count]; i++)
+   {
       [self perceive:[self storeOf:[agents entityAtIndex:i]]
                 from:_eventsSeen
                   to:last];
+      /* housekeeping: the knowledge arena, compacted when half garbage */
+      [[self storeOf:[agents entityAtIndex:i]] compact:_compactAlways];
+   }
    _eventsSeen = last;
 }
 
