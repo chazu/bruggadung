@@ -57,6 +57,11 @@ Out of scope here, except where they touch components:
     save, and history keeps a summary (who made it, when), so the developer
     can still trace it. Tombstones compact into history summaries after a
     retention period that content declares.
+11. **An installed part keeps its own claim.** Installing transfers
+    nothing: the assembly's claim covers, through `partOf`, only parts
+    with no claim of their own. Whether installing it was a gift, a sale,
+    or a wrong is for people and institutions to settle (INSTITUTIONS.md:
+    a grievance, a court), not the engine.
 
 ## Terms
 
@@ -623,8 +628,7 @@ of the domain simulation doc.
    component classes (open question 6 here).
 2. **Mixed fungible goods.** How do quantity claims resolve after a split?
    Institutions decide, but what does the component layer record?
-3. **Installed parts.** Who owns a part installed in someone else's assembly?
-   Does claim coverage through `partOf` override the part's own claim?
+3. **Installed parts.** Decided: decision 11.
 4. **Lifetime of informational entities.** Decided: decision 10.
 5. **Reaction rounds.** What is the bound on reaction rounds per boundary, and
    what does the player see when proposals are deferred?
