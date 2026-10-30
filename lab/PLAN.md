@@ -1856,3 +1856,35 @@ corridor. At 0.12% it feels nothing, and the door stays shut.
   slot is `exit`, since `door` is GasStore's field.
 
 55 tests, 2038 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: partial effects (a half-sawn log)
+
+ACTIONS.md §5's world-visible progress, and the abort half of Scenario 3's
+check 4. A worker saws a log through (`saw_through`, 8 s), and its cut shows
+as it goes:
+
+- **Checkpoints**: three, evenly spaced. Each is a step boundary, and
+  commits the stage's `partial` effect in proportion: the log is 25% sawn
+  at 2 s, 50% at 4 s, 75% at 6 s, and 100% when the stage completes.
+- **On interruption**, the partial effect commits in the same group:
+  - Suspended at 5 s, the log shows 62%, and its progress is kept. Resumed
+    at 8 s, it reaches 75% at 9 s and 100% at 11 s.
+  - Aborted (`abort:`, a new outcome), its progress is discarded, and the
+    62% cut stays.
+  - The saw taken from its hand: see below. The 62% stays.
+- **Content**: a stage (or a one-stage operation) may declare `partial`
+  (the field, the role it shows on, the whole it reaches) and
+  `checkpoints`. The effect proper still commits on completion.
+- **Found: a requirement failing after a commit didn't interrupt.** §5
+  says a dropped tool rechecks the activities bound to it. The listener
+  checked only for things gone or out of reach, so with the saw gone from
+  its hand the sawing ran on to its due time and failed then. That would
+  have committed its partial effect at 100%. A running activity now also
+  rechecks its operation's pattern when an event touches what it binds,
+  and is suspended (a hard interruption) when the pattern no longer holds.
+
+Not yet: stages declaring fail rather than suspend on a hard interruption,
+partial effects other than setting a field (a trench's length as a split,
+an emptied stock), and the dismantling's stages showing progress.
+
+56 tests, 2051 checks, under both compilers, ASan and UBSan, and leak-free.

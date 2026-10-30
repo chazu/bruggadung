@@ -7,10 +7,14 @@
  *     commits then, and the next stage starts; if commitment rejects it, the
  *     activity fails
  *   - a running timed activity whose bound entities are gone or out of the
- *     actor's reach is suspended (a hard interruption, ACTIONS.md §5)
+ *     actor's reach, or whose operation's pattern no longer holds, is
+ *     suspended (a hard interruption, ACTIONS.md §5)
  *   - an activity with a watch completes when its domain reports the watch
  *     ("watched", from the fluid domain)
  *   - a fill ends, "exhausted", when its tap reports its source ran dry
+ *   - a stage whose progress shows in the world (ACTIONS.md §5's partial
+ *     effects) commits it in proportion at its checkpoints, which bound
+ *     steps, and when it is suspended, aborted, or fails
  *
  * It follows each commit round (a round listener) and bounds the
  * scheduler's steps by the next completion (an activity clock).
@@ -42,5 +46,10 @@
                         error:(NSString **) error;
 - (BGProposalGroup *) resume:(BGEntityID) activity
                        error:(NSString **) error;
+/* The actor's choice to give it up: its progress is discarded, what it
+ * showed of it stays. */
+- (BGProposalGroup *) abort:(BGEntityID) activity
+                    because:(NSString *) why
+                      error:(NSString **) error;
 
 @end

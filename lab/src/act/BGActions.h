@@ -121,6 +121,11 @@ int64_t            BGOperationDuration( BGWorld *world, const char *operation);
  * a duration and no stages has one stage. NO past the last stage. */
 BOOL               BGOperationStage( BGWorld *world, const char *operation, int64_t index,
                                      int64_t *duration, NSString **effect);
+/* Stage `index`'s partial effect (ACTIONS.md §5): the field, the role it
+ * shows on (BGRoleItem or BGRoleDestination), the whole it reaches, and its
+ * checkpoints. NO if it declares none. */
+BOOL               BGOperationPartial( BGWorld *world, const char *operation, int64_t index,
+                                       const char **field, int *role, int64_t *whole, int64_t *checkpoints);
 
 /* Why the actor can't start (or resume) an activity of `operation` now: a
  * running activity of its, other than `except`, uses a provider this one

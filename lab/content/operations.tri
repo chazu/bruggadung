@@ -4,7 +4,7 @@
 // bindings between roles. `effect` names the code that builds the proposal
 // group when the action is performed.
 
-#Effect: "take" | "take_some" | "put_in" | "drive" | "open_tap" | "fill" | "walk" | "loosen" | "look" | "say" | "tend" | "analyse" | "write" | "read" | "eat" | "give" | "investigate" | "tighten" | "rotate" | "strike" | "shut" | "dismantle" | "light" | "rest" | "open_door"
+#Effect: "take" | "take_some" | "put_in" | "drive" | "open_tap" | "fill" | "walk" | "loosen" | "look" | "say" | "tend" | "analyse" | "write" | "read" | "eat" | "give" | "investigate" | "tighten" | "rotate" | "strike" | "shut" | "dismantle" | "light" | "rest" | "open_door" | "saw"
 
 // Which roles an operation has is its roles' type: a structure's type is the
 // most general one with all its features.
@@ -13,10 +13,18 @@
 #PlacingRoles: #ItemRoles & { destination: #Body }
 
 // Something that takes time and has an effect: an operation's single stage,
-// or one of its stages.
+// or one of its stages. A stage whose progress shows in the world declares
+// it `partial` (ACTIONS.md §5): a field of a role's entity (`showsOn`), the `whole` it
+// reaches as the stage completes. It is set in proportion to the stage's
+// progress at each of its `checkpoints` (evenly spaced; each a step
+// boundary), and when the activity is interrupted: suspended, aborted, or
+// failed. Its effect proper commits on completion.
+#Partial: { field: text, showsOn: *"destination" | "item", whole: int }
 #Step: {
-    duration: time & >=0ms & <=1d
-    effect:   #Effect
+    duration:    time & >=0ms & <=1d
+    effect:      #Effect
+    partial:     #Partial
+    checkpoints: *0 | int & >=0 & <=100
 }
 
 // A stage of an activity: it takes `duration`, and its effect commits when
@@ -320,6 +328,21 @@ light: #Operation & {
     roles: {
         actor: #Agent
         item:  #Combustor & #Body & { lit: false }
+    }
+} @family(operations)
+
+// Saw a log through, with a saw in hand: its cut shows as it goes, so a
+// half-sawn log is left when the sawing stops.
+saw_through: #Operation & {
+    effect:      "saw"
+    duration:    8s
+    uses:        ["hands"]
+    partial:     { field: "Log.sawn", whole: 100 }
+    checkpoints: 3
+    roles: {
+        actor:       #Agent & { id: $a }
+        item:        #HandSaw & { place: #Held & { by: $a } }
+        destination: #Log & { sawn: <=99 }
     }
 } @family(operations)
 

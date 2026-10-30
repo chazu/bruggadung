@@ -96,3 +96,13 @@ pump:        #Pump & { material: "iron", mass: 40kg, slots: 4 }
 cock_trough: #Cock & { material: "brass", mass: 300g, serves: "trough" }
 cock_pump:   #Cock & { material: "brass", mass: 300g, serves: "pump" }
 diagram:     #Record & { material: "paper", mass: 20g }
+
+// For ACTIONS.md §5's partial effects: a log, how far it is sawn through
+// (percent), and a saw.
+#Log: #Body & {
+    @component(Log)
+    sawn: *0 | int & >=0 & <=100               @field(content, saved, proposable, inspect, perceive(sight))
+}
+#HandSaw: #Body & {}
+log:      #Log & { material: "oak", mass: 20kg }
+hand_saw: #HandSaw & { material: "steel", mass: 700g }

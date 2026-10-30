@@ -810,6 +810,14 @@ static NSString   *effect_shut( BGWorld *world, BGAction a, int64_t amount, BGPr
 }
 
 
+/* Sawing's end: the log is sawn through. */
+static NSString   *effect_saw( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
+{
+   [g set:"Log.sawn" of:BGWhole( a.roles[ BGRoleDestination]) to:100];
+   return( nil);
+}
+
+
 static NSString   *effect_open_door( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
 {
    [g set:"Door.ajar" of:BGWhole( a.roles[ BGRoleItem]) to:1];
@@ -910,6 +918,7 @@ static const struct
    { "dismantle", effect_dismantle },
    { "light",     effect_light },
    { "open_door", effect_open_door },
+   { "saw",       effect_saw },
    { "rest",      effect_tend },
    { "strike",    effect_strike },
 };
@@ -979,6 +988,50 @@ BOOL   BGOperationStage( BGWorld *world, const char *operation, int64_t index, i
       return( NO);
    text[ n - 1] = 0;
    *effect = [NSString stringWithUTF8String:text + 1];
+   return( YES);
+}
+
+
+BOOL   BGOperationPartial( BGWorld *world, const char *operation, int64_t index,
+                           const char **field, int *role, int64_t *whole, int64_t *checkpoints)
+{
+   const TriNode     *pattern;
+   const TriNode     *stage;
+   NSMutableString   *path;
+   TriContent        *tri;
+   int64_t           lo;
+   int64_t           hi;
+   int64_t           k;
+   char              text[ 64];
+   size_t            n;
+
+   tri     = [world tri];
+   pattern = operation ? tri_pattern( tri, operation) : NULL;
+   if( ! pattern)
+      return( NO);
+   stage = pattern;
+   if( tri_at( tri, pattern, "stages.first"))
+   {
+      path = [NSMutableString stringWithString:@"stages"];
+      for( k = 0; k < index; k++)
+         [path appendString:@".rest"];
+      [path appendString:@".first"];
+      stage = tri_at( tri, pattern, [path UTF8String]);
+   }
+   else if( index)
+      return( NO);
+   n = stage ? tri_print( tri, tri_at( tri, stage, "partial.field"), text, sizeof( text)) : 0;
+   if( n < 3 || n >= sizeof( text) || text[ 0] != '"' ||
+       ! tri_node_interval( tri_at( tri, stage, "partial.whole"), &lo, &hi) || lo != hi)
+      return( NO);
+   text[ n - 1] = 0;
+   *field = [world intern:text + 1];
+   *whole = lo;
+   *role  = BGRoleDestination;
+   n      = tri_print( tri, tri_at( tri, stage, "partial.showsOn"), text, sizeof( text));
+   if( n > 2 && ! strcmp( text, "\"item\""))
+      *role = BGRoleItem;
+   *checkpoints = tri_node_interval( tri_at( tri, stage, "checkpoints"), &lo, &hi) && lo == hi ? lo : 0;
    return( YES);
 }
 

@@ -42,6 +42,71 @@ static BGAction   action_of( BGWorld *world, BGEntityID a, const BGActivity *rec
 }
 
 
+/* --- partial effects ---------------------------------------------------------- */
+
+/* The stage's progress at `t`: kept, plus its running since it started. */
+static int64_t   progress_at( const BGActivity *record, int64_t t)
+{
+   return( record->progress + (record->due ? t - record->started : 0));
+}
+
+
+/* When the stage's next checkpoint falls, after `t`; or BGTimeNever. */
+static int64_t   next_checkpoint( BGWorld *world, BGEntityID a, const BGActivity *record, int64_t t)
+{
+   const char   *operation;
+   const char   *field;
+   NSString     *effect;
+   int64_t      duration;
+   int64_t      whole;
+   int64_t      n;
+   int64_t      k;
+   int64_t      at;
+   int          role;
+
+   operation = [world textField:"Activity.operation" of:a];
+   if( ! record->due || ! BGOperationStage( world, operation, record->stage, &duration, &effect) ||
+       ! BGOperationPartial( world, operation, record->stage, &field, &role, &whole, &n))
+      return( BGTimeNever.ms);
+   for( k = 1; k <= n; k++)
+   {
+      at = record->started + duration * k / (n + 1) - record->progress;
+      if( at > t)
+         return( at);
+   }
+   return( BGTimeNever.ms);
+}
+
+
+/* The stage's partial effect at `progress`, into the group: its field set
+ * in proportion. */
+- (void) partialOf:(BGEntityID) a
+            record:(const BGActivity *) record
+          progress:(int64_t) progress
+              into:(BGProposalGroup *) group
+{
+   const char   *operation;
+   const char   *field;
+   NSString     *effect;
+   BGEntityID   target;
+   int64_t      duration;
+   int64_t      whole;
+   int64_t      n;
+   int          role;
+
+   operation = [_world textField:"Activity.operation" of:a];
+   if( ! BGOperationStage( _world, operation, record->stage, &duration, &effect) ||
+       ! BGOperationPartial( _world, operation, record->stage, &field, &role, &whole, &n))
+      return;
+   target = (BGEntityID) (role == BGRoleItem ? record->itemRef : record->destinationRef);
+   if( ! target || ! [_world isLive:target])
+      return;
+   if( progress > duration)
+      progress = duration;
+   [group set:field of:BGWhole( target) to:whole * (progress < 0 ? 0 : progress) / duration];
+}
+
+
 /* --- the clock ----------------------------------------------------------------- */
 
 - (BGTime) nextCompletion
@@ -58,6 +123,10 @@ static BGAction   action_of( BGWorld *world, BGEntityID a, const BGActivity *rec
       record = [store recordAtIndex:i];
       if( record->due > 0 && running( _world, [store entityAtIndex:i], record) && record->due < next.ms)
          next = BGTimeMake( record->due);
+      /* a checkpoint is a step boundary too */
+      if( running( _world, [store entityAtIndex:i], record) &&
+          next_checkpoint( _world, [store entityAtIndex:i], record, [_world time].ms) < next.ms)
+         next = BGTimeMake( next_checkpoint( _world, [store entityAtIndex:i], record, [_world time].ms));
    }
    return( next);
 }
@@ -81,8 +150,22 @@ static BGAction   action_of( BGWorld *world, BGEntityID a, const BGActivity *rec
    {
       record = [store recordAtIndex:i];
       a      = [store entityAtIndex:i];
-      if( ! record->due || record->due > t.ms || ! running( _world, a, record))
+      if( ! record->due || ! running( _world, a, record))
          continue;
+      /* a checkpoint: the stage's progress shows */
+      if( record->due > t.ms)
+      {
+         if( next_checkpoint( _world, a, record, t.ms - 1) == t.ms)
+         {
+            group = [BGProposalGroup groupWithPhase:BGPhaseAction
+                                             source:[NSString stringWithFormat:@"activity %llu: checkpoint",
+                                                                               (unsigned long long) a]];
+            [group setCause:[self startOf:a]];
+            [self partialOf:a record:record progress:progress_at( record, t.ms) into:group];
+            [_committer submit:group];
+         }
+         continue;
+      }
       operation = [_world textField:"Activity.operation" of:a];
       more      = BGOperationStage( _world, operation, record->stage + 1, &duration, &effect);
       group     = [BGProposalGroup groupWithPhase:BGPhaseAction
@@ -146,10 +229,10 @@ static BGAction   action_of( BGWorld *world, BGEntityID a, const BGActivity *rec
 
 /* Ends an activity: its operation's own clean-up (a fill closes its tap), the
  * status, and the watch removed. */
-- (void) end:(BGEntityID) a
-      status:(const char *) status
-     because:(NSString *) why
-       cause:(uint64_t) cause
+- (BGProposalGroup *) end:(BGEntityID) a
+                  status:(const char *) status
+                 because:(NSString *) why
+                   cause:(uint64_t) cause
 {
    const BGActivity   *record;
    BGProposalGroup    *group;
@@ -157,7 +240,7 @@ static BGAction   action_of( BGWorld *world, BGEntityID a, const BGActivity *rec
 
    record = [_world record:[_world kindNamed:"Activity"] for:a];
    if( ! record)
-      return;
+      return( nil);
    group = [BGProposalGroup groupWithPhase:BGPhaseSystem
                                     source:[NSString stringWithFormat:@"activity %llu: %s (%@)",
                                                                       (unsigned long long) a, status, why]];
@@ -168,7 +251,29 @@ static BGAction   action_of( BGWorld *world, BGEntityID a, const BGActivity *rec
    [group set:"Activity.status" of:BGWhole( a) to:tri_type_named( [_world tri], atom)];
    if( record->watchHolder)
       [group set:"Activity.watchHolder" of:BGWhole( a) to:0];
+   /* stopped short: what its progress shows stays in the world */
+   if( strcmp( status, "completed"))
+      [self partialOf:a record:record progress:progress_at( record, [_world time].ms) into:group];
    [_committer submit:group];
+   return( group);
+}
+
+
+- (BGProposalGroup *) abort:(BGEntityID) a
+                    because:(NSString *) why
+                      error:(NSString **) error
+{
+   const BGActivity   *record;
+
+   record = [_world record:[_world kindNamed:"Activity"] for:a];
+   if( ! record || ! (running( _world, a, record) ||
+                      record->status == (uint32_t) tri_type_named( [_world tri], "\"suspended\"")))
+   {
+      if( error)
+         *error = [NSString stringWithFormat:@"%llu is not under way", (unsigned long long) a];
+      return( nil);
+   }
+   return( [self end:a status:"aborted" because:why cause:[self startOf:a]]);
 }
 
 
@@ -222,6 +327,7 @@ static BGAction   action_of( BGWorld *world, BGEntityID a, const BGActivity *rec
                                                                       (unsigned long long) a, why]];
    [group set:"Activity.progress" of:BGWhole( a) to:record->progress + (now - record->started)];
    [group set:"Activity.due" of:BGWhole( a) to:0];
+   [self partialOf:a record:record progress:record->progress + (now - record->started) into:group];
    [group set:"Activity.status" of:BGWhole( a) to:tri_type_named( [_world tri], "\"suspended\"")];
    [_committer submit:group];
    return( group);
@@ -345,9 +451,10 @@ static BGAction   action_of( BGWorld *world, BGEntityID a, const BGActivity *rec
          }
          else if( record->due && (ev->subject == (BGEntityID) record->actorRef || ev->subject == (BGEntityID) record->itemRef ||
                                   ev->subject == (BGEntityID) record->destinationRef) &&
-                  (why = [self obstacleTo:a record:record]))
+                  ((why = [self obstacleTo:a record:record]) || (why = [self requirementsOf:a record:record])))
          {
-            /* a hard interruption: what it binds is gone or out of reach */
+            /* a hard interruption: what it binds is gone or out of reach, or
+             * what it needs no longer holds (the saw out of its hand) */
             group = [self suspend:a because:why error:NULL];
             [group setCause:ev->index];
             ended[ nended++ % 64] = a;

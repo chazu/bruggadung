@@ -68,7 +68,7 @@ static void   test_registry_and_construction( void)
 
    w = BGTestWorld( 1);
    c = BGTestCommitter( w);
-   BG_CHECK( [w kindCount] == 23);
+   BG_CHECK( [w kindCount] == 24);
    BG_CHECK( [w kindNamed:"Body"] != NSNotFound && [w kindNamed:"Nonesuch"] == NSNotFound);
    bin   = commit_create( c, "bin", BGOnTile( 0, 0, 0));
    nails = commit_create( c, "nails_30", BGIn( bin));
@@ -4937,6 +4937,102 @@ static void   test_stuffy_lodger( void)
 }
 
 
+/* ACTIONS.md §5's partial effects: the worker saws a log through, eight
+ * seconds with three checkpoints. `stop`: what happens at five seconds,
+ * 62.5% of the way: nothing (0), suspended (1), aborted (2), or the saw
+ * taken from its hand, so that completing fails (3). Then three seconds
+ * more, and resuming if suspended. The log's cut as it goes, at each
+ * second, into `cut`. */
+static BOOL   saw_run( int stop, int64_t cut[ 12], const char **status)
+{
+   BGStage            st;
+   BGActivities       *activities;
+   BGProposalGroup    *g;
+   BGEntityID         worker;
+   BGEntityID         log;
+   BGEntityID         saw;
+   BGEntityID         smith;
+   BGEntityID         a;
+   NSString           *error;
+   int64_t            start;
+   int                i;
+
+   st.w       = BGTestWorld( 107);
+   st.c       = BGTestCommitter( st.w);
+   activities = [BGActivities activitiesWithWorld:st.w committer:st.c];
+   st.s       = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [st.s setActivities:activities];
+   g      = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the sawhorse"];
+   worker = [g create:"worker" key:"worker" at:BGOnTile( 3, 3, 0)];
+   smith  = [g create:"smith" key:"smith" at:BGOnTile( 3, 4, 0)];
+   log    = [g create:"log" key:"log" at:BGOnTile( 4, 3, 0)];
+   saw    = [g create:"hand_saw" key:"saw" at:BGHeldBy( worker, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   worker = [g idFor:worker];
+   smith  = [g idFor:smith];
+   log    = [g idFor:log];
+   saw    = [g idFor:saw];
+   error  = nil;
+   g      = BGPerform( st.w, st.c, BGActionMake( "saw_through", worker, saw, log), 0, &error);
+   BG_CHECK( g != nil);
+   [st.s runUntil:BGTimeMake( 2)];
+   a = [g idFor:[g proposals][ 0].handle];
+   [st.w getField:"Activity.started" of:a value:&start];
+   for( i = 0; i < 12; i++)
+   {
+      [st.s runUntil:BGTimeMake( start + i * 1000)];
+      cut[ i] = -1;
+      [st.w getField:"Log.sawn" of:log value:&cut[ i]];
+      if( i == 5 && stop == 1)
+         BG_CHECK( [activities suspend:a because:@"called away" error:&error] != nil);
+      if( i == 5 && stop == 2)
+         BG_CHECK( [activities abort:a because:@"enough" error:&error] != nil);
+      if( i == 5 && stop == 3)
+      {
+         BGProposalGroup   *take;
+
+         take = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the smith takes the saw"];
+         [take move:BGWhole( saw) to:BGHeldBy( smith, 0)];
+         [st.c submit:take];
+      }
+      if( i == 8 && stop == 1)
+         BG_CHECK( [activities resume:a error:&error] != nil);
+   }
+   *status = status_of( st.w, a);
+   return( YES);
+}
+
+
+static void   test_partial_effects( void)
+{
+   int64_t      cut[ 12];
+   const char   *status;
+
+   /* the checkpoints are boundaries, at 2, 4 and 6 s: the cut shows a
+    * quarter at a time, then the whole on completion */
+   saw_run( 0, cut, &status);
+   BG_CHECK( cut[ 1] == 0 && cut[ 2] == 25 && cut[ 3] == 25 && cut[ 4] == 50 && cut[ 6] == 75 && cut[ 7] == 75);
+   BG_CHECK( cut[ 8] == 100 && ! strcmp( status, "\"completed\""));
+
+   /* suspended at 5 s: 62% shows, its progress kept; resumed at 8 s, it
+    * goes on from there, through the last checkpoint at 9 s, to the whole
+    * at 11 s */
+   saw_run( 1, cut, &status);
+   BG_CHECK( cut[ 5] == 50 && cut[ 6] == 62 && cut[ 8] == 62);
+   BG_CHECK( cut[ 9] == 75 && cut[ 10] == 75 && cut[ 11] == 100 && ! strcmp( status, "\"completed\""));
+
+   /* aborted at 5 s: its progress discarded, the 62% cut stays in the world */
+   saw_run( 2, cut, &status);
+   BG_CHECK( cut[ 6] == 62 && cut[ 11] == 62 && ! strcmp( status, "\"aborted\""));
+
+   /* the saw taken from its hand at 5 s: what sawing needs no longer holds,
+    * a hard interruption, and the cut stays where it got to */
+   saw_run( 3, cut, &status);
+   BG_CHECK( cut[ 6] == 62 && cut[ 11] == 62 && ! strcmp( status, "\"suspended\""));
+}
+
+
 /* --- the cistern ----------------------------------------------------------- */
 
 static BGCistern   *run_cistern( BGCisternVariant variant)
@@ -5262,6 +5358,7 @@ const BGTestCase   BGAllTests[] =
    { "local_wake",                    test_local_wake },
    { "cold_lodger",                   test_cold_lodger },
    { "stuffy_lodger",                 test_stuffy_lodger },
+   { "partial_effects",               test_partial_effects },
    { "rumour",                        test_rumour },
    { "memory_decay",                  test_memory_decay },
    { "salience",                      test_salience },

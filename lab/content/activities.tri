@@ -2,7 +2,7 @@
 // entity, with no body and no location. Being a component, it is saved like
 // any other, and so are its watches.
 
-#ActivityStatus: "running" | "suspended" | "completed" | "exhausted" | "failed"
+#ActivityStatus: "running" | "suspended" | "completed" | "exhausted" | "failed" | "aborted"
 
 #Activity: #Thing & {
     @component(Activity)
