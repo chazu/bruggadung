@@ -65,6 +65,11 @@ Out of scope here, except where they touch agency:
     them (reporting to the miller, protecting their things) and makes harm
     to them salient (§10). It is formed by employment, kinship, or
     authored in content.
+13. **Harm is injury and loss**: injury to a body (`Agent.injury`, from a
+    blow, a fall, a burn), and loss of or damage to what an agent believes
+    is its own or its loyalties' (taken, broken, sanctioned). A threat is a
+    belief that harm is happening or about to; it is salient (§10), and
+    can raise a soft interruption.
 
 ## Terms
 
