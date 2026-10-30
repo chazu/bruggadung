@@ -358,7 +358,7 @@ static NSUInteger   feature_keys( const char *features, char (*keys)[ 32], NSUIn
 
 - (int32_t) feels:(const char *) need
 {
-   return( ! strcmp( need, "hunger") ? _hunger : 0);
+   return( ! strcmp( need, "hunger") ? _hunger : ! strcmp( need, "cold") ? _cold : 0);
 }
 
 
@@ -377,6 +377,16 @@ static NSUInteger   feature_keys( const char *features, char (*keys)[ 32], NSUIn
    changed = _feltAt < 0 || hunger != _hunger;
    _hunger = hunger;
    _feltAt = t;
+   return( changed);
+}
+
+
+- (BOOL) feelCold:(int32_t) cold
+{
+   BOOL   changed;
+
+   changed = cold != _cold;
+   _cold   = cold;
    return( changed);
 }
 
@@ -2123,6 +2133,7 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
                to:(NSUInteger) last
 {
    const BGEvent      *ev;
+   const BGThermalBody *body;
    BGReferent         *r;
    BGStore            *bodies;
    BGView             *view;
@@ -2505,6 +2516,18 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
       if( [store feelHunger:(int32_t) hunger at:now])
          [news addObject:[NSString stringWithFormat:@"you feel hunger (%d)", (int) hunger]];
    }
+
+   /* and cold, from its body's heat (the thermal domain's): ten points a
+    * kelvin below 310 K, to the band */
+   if( (body = [_world record:[_world kindNamed:"ThermalBody"] for:agent]) && body->heatCapacity)
+   {
+      int64_t   cold;
+
+      cold = (310000 - body->heat * 1000 / body->heatCapacity) / 100;
+      cold = cold < 0 ? 0 : cold > 100 ? 100 : (cold / BG_HUNGER_BAND) * BG_HUNGER_BAND;
+      if( [store feelCold:(int32_t) cold])
+         [news addObject:[NSString stringWithFormat:@"you feel cold (%d)", (int) cold]];
+   }
    concerns = _concerns ? [_concerns concernsOf:agent] : nil;
    for( i = 0; i < nwitnessed; i++)
    {
@@ -2831,7 +2854,8 @@ static NSString   *attribution_text( const BGTestimony *t)
                       t->strength, (long long) t->seen, t->present ? "" : ", gone", (unsigned long long) t->truth];
    }
    if( [store feltAt] >= 0)
-      [s appendFormat:@"  feels hunger %d, at %lldms\n", [store feels:"hunger"], (long long) [store feltAt]];
+      [s appendFormat:@"  feels hunger %d, cold %d, at %lldms\n", [store feels:"hunger"], [store feels:"cold"],
+                      (long long) [store feltAt]];
    for( i = 0; i < [store findingCount]; i++)
    {
       const BGFinding   *f;
@@ -3043,8 +3067,9 @@ char   *BGDecodeWord( const char *s)
                                                      (unsigned long long) tr->truth, tr->kind]];
       }
       if( [store feltAt] >= 0)
-         [lines addObject:[NSString stringWithFormat:@"feels %llu %d %lld", (unsigned long long) [store agent],
-                                                     [store feels:"hunger"], (long long) [store feltAt]]];
+         [lines addObject:[NSString stringWithFormat:@"feels %llu %d %lld %d", (unsigned long long) [store agent],
+                                                     [store feels:"hunger"], (long long) [store feltAt],
+                                                     [store feels:"cold"]]];
       for( j = 0; j < [store identityCount]; j++)
       {
          const BGIdentity   *h;
@@ -3093,6 +3118,7 @@ char   *BGDecodeWord( const char *s)
    unsigned             told;
    unsigned long long   origin;
    unsigned long long   parent;
+   int                  cold;
    int                  trust;
    BGTestimony          t;
    BGAncestry           a;
@@ -3196,8 +3222,11 @@ char   *BGDecodeWord( const char *s)
          free( paths);
          [[self storeOf:(BGEntityID) agent] addIdentity:h];
       }
-      else if( sscanf( text, "feels %llu %d %lld", &agent, &trust, &seen) == 3)
+      else if( sscanf( text, "feels %llu %d %lld %d", &agent, &trust, &seen, &cold) == 4)
+      {
          [[self storeOf:(BGEntityID) agent] feelHunger:trust at:seen];
+         [[self storeOf:(BGEntityID) agent] feelCold:cold];
+      }
       else if( sscanf( text, "finding %llu %u %d %lld %63s %511s %u", &agent, &id, &trust, &seen, role, kind, &next) == 7)
       {
          BGFinding   f;

@@ -4788,6 +4788,82 @@ static void   test_local_wake( void)
 }
 
 
+/* AGENCY.md §6's warmth: a lodger by the cold stove, its body at `kelvin`
+ * (mK). Interoception feels its body's heat, the thermal domain's, as
+ * cold; cold enough, the needs generator raises *get warm*, and it lights
+ * the stove. */
+static BGStoveRun   cold_lodger( int64_t kelvin, BGAgency **minds, BGKnowledge **known)
+{
+   BGStage            st;
+   BGActivities       *activities;
+   BGKnowledge        *knowledge;
+   BGAgency           *agency;
+   BGAtmosphere       *air;
+   BGThermal          *thermal;
+   BGProposalGroup    *g;
+   BGEntityID         lodger;
+   BGStoveRun         run;
+
+   memset( &run, 0, sizeof( run));
+   st.w       = BGTestWorld( 101);
+   st.c       = BGTestCommitter( st.w);
+   activities = [BGActivities activitiesWithWorld:st.w committer:st.c];
+   knowledge  = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+   agency     = [[[BGAgency alloc] initWithWorld:st.w committer:st.c knowledge:knowledge] autorelease];
+   air        = [[[BGAtmosphere alloc] initWithWorld:st.w] autorelease];
+   thermal    = [[[BGThermal alloc] initWithWorld:st.w] autorelease];
+   st.s       = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [agency setActivities:activities];
+   [st.s setActivities:activities];
+   [st.s setPerception:knowledge];
+   [st.s setDecision:agency];
+   [st.s addDomain:air];
+   [st.s addDomain:thermal];
+   g         = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: a cold room"];
+   run.room  = [g create:"room_air" key:"the room's air" at:BGLocationMakeNone()];
+   run.stove = [g create:"stove" key:"stove" at:BGOnTile( 2, 2, 0)];
+   lodger    = [g create:"lodger" key:"lodger" at:BGOnTile( 3, 2, 0)];
+   [g set:"ThermalBody.heat" of:BGWhole( lodger) to:kelvin * 245000 / 1000];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   run.room  = [g idFor:run.room];
+   run.stove = [g idFor:run.stove];
+   run.rest  = [g idFor:lodger];         /* the lodger */
+   [agency control:run.rest];
+   [st.s runUntil:BGTimeMake( 60000)];
+   run.world     = st.w;
+   run.committer = st.c;
+   run.air       = air;
+   run.thermal   = thermal;
+   *minds        = agency;
+   *known        = knowledge;
+   return( run);
+}
+
+
+static void   test_cold_lodger( void)
+{
+   BGStoveRun   cold;
+   BGStoveRun   cool;
+   BGAgency     *agency;
+   BGKnowledge  *knowledge;
+   int64_t      v;
+
+   /* 305 K, five below: it feels cold 50, more than 30: it lights the stove */
+   cold = cold_lodger( 305000, &agency, &knowledge);
+   BG_CHECK( [[knowledge storeOf:cold.rest] feels:"cold"] == 50);
+   BG_CHECK( logged_by( agency, cold.rest, @"[get warm] light the stove: light R"));
+   BG_CHECK( [cold.world getField:"Combustor.lit" of:cold.stove value:&v] && v);
+   BG_CHECK( logged_by( agency, cold.rest, @"[get warm] done"));
+
+   /* 308.5 K: cold 10, not pressing: the stove stays cold */
+   cool = cold_lodger( 308500, &agency, &knowledge);
+   BG_CHECK( [[knowledge storeOf:cool.rest] feels:"cold"] == 10);
+   BG_CHECK( ! logged_by( agency, cool.rest, @"get warm"));
+   BG_CHECK( [cool.world getField:"Combustor.lit" of:cool.stove value:&v] && ! v);
+}
+
+
 /* --- the cistern ----------------------------------------------------------- */
 
 static BGCistern   *run_cistern( BGCisternVariant variant)
@@ -5111,6 +5187,7 @@ const BGTestCase   BGAllTests[] =
    { "interrupted_repair",            test_interrupted_repair },
    { "unattended_stove",              test_unattended_stove },
    { "local_wake",                    test_local_wake },
+   { "cold_lodger",                   test_cold_lodger },
    { "rumour",                        test_rumour },
    { "memory_decay",                  test_memory_decay },
    { "salience",                      test_salience },

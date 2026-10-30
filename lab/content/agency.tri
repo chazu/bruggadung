@@ -22,6 +22,8 @@
 // Repairing: the shutoff to close, the wrench, and the pump.
 #Repairing: #Frame & { shutoff: #Body, tool: #Body, pump: #Body }
 
+// Warming: a stove to light.
+#Warming: #Frame & { stove: #Body }
 // Tightening: the spanner, and the nut.
 #Tightening: #Frame & { spanner: #Body, nut: #Body }
 
@@ -332,6 +334,24 @@ eat_when_hungry: #Goal & {
     pressed: { need: "hunger", above: 40 }
     worth:   [#Need & { pressure: "hunger", per: 5 }]
 } @family(goals)
+
+// Cold raises getting warm, worth what the agent feels of it: done once a
+// stove it knows of is lit.
+get_warm: #Goal & {
+    title:   "get warm"
+    done:    { find: ["stove"], match: #Warming & { stove: #Combustor & { lit: true } } }
+    pressed: { need: "cold", above: 30 }
+    worth:   [#Need & { pressure: "cold", per: 5 }]
+} @family(goals)
+
+light_the_stove: #Method & {
+    title: "light the stove"
+    goal:  "get_warm"
+    rank:  1
+    pre:   { find: ["stove"], match: #Warming & { stove: #Combustor & #Body & { lit: false } } }
+    order: ["near"]
+    steps: [#Do & { op: "light", object: "stove" }]
+} @family(methods)
 
 eat_what_i_have: #Method & {
     title: "eat what I have"

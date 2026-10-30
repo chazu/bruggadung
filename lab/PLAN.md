@@ -1816,3 +1816,28 @@ The last is ACTIONS.md §5's partial effects on failure, which are also
 undesigned.
 
 53 tests, 2025 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: feeling cold
+
+AGENCY.md §6's warmth, the second need, with its stock in another domain.
+A lodger stands by a cold stove, its body at 305 K. Interoception feels
+the body's heat, which the thermal domain owns, as cold: ten points a
+kelvin below 310 K, in bands of ten. At 50, above 30, the needs generator
+raises *get warm*, worth what it feels, and the lodger lights the stove.
+At 308.5 K it feels 10, and the stove stays cold.
+
+- **The knowledge store keeps what it feels** of cold beside hunger, and
+  saves it.
+- **`get_warm`** is done once a stove the agent knows of is lit, and *light
+  the stove* is its method.
+
+Not yet, then: A resting lodger cools
+(it breathes at rest), and its rest's comfort band wakes it, but the woken
+lodger would need a moment's perception before cold presses. The thermal
+domain gives no horizon for a felt band crossing, as the body domain does
+for hunger.
+
+Not yet: that horizon, numbness hiding cold (misperception), and other
+ways to get warm (a coat, moving to a warmer room).
+
+54 tests, 2032 checks, under both compilers, ASan and UBSan, and leak-free.
