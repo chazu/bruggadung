@@ -3800,3 +3800,30 @@ Not yet: excess (too much, as the valve's lever already has in its own
 code), injury as a mishap, other operations declaring grades.
 
 92 tests, 2874 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: knowing a recipe
+
+ACTIONS.md decision 12: knowing a recipe is knowledge, held as a rule is:
+an agent kind starts with its trade's recipes; others are learned by being
+taught or by reading; without a recipe an agent can't choose it; with a
+wrong one it follows it wrongly.
+
+- **`Agent.trade`** (new; the workshop's `worker` is a fitter) and
+  **`#Method.ofTrade`**: a recipe (a `sequence` method) of a trade is
+  known to those of it; one with none, to anyone.
+- **`#RecipeSays`** (talk.tri): a claim naming a recipe; read in a manual
+  or told, it teaches it (`learnRecipe:`), saved with the knowledge.
+- **Agency** considers only the recipes the agent knows, and won't take
+  autopilot on one it doesn't.
+- **`rash_recipe`**: a wrong recipe for the pump, nobody's trade, only to
+  be learned: take it apart with the line still open.
+
+Checked: at the mill, the smith, no fitter, can't repair the pump; having
+read a manual with the recipe, it shuts the line and opens the pump, and
+the recipe is saved; having read a bad manual, it opens the pump with the
+line still open.
+
+Not yet: learning by practice; a fitter's knowing being shown in its
+menu or plan.
+
+93 tests, 2889 checks, under both compilers, ASan, and leak-free.

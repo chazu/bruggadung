@@ -6294,6 +6294,113 @@ static BGAgency   *urgent_nut( void)
 }
 
 
+/* ACTIONS.md decision 12: knowing a recipe is knowledge. At the mill, the
+ * smith, a wrench in hand, the diagram read, and no fitter, undertakes to
+ * repair the pump, having read `manual` (a recipe's name), if anything.
+ * Whether the line was shut, and the pump opened; its log. */
+static NSArray   *recipe_run( const char *manual, BOOL *shut, BOOL *opened, NSString **saved)
+{
+   BGStage            st;
+   BGActivities       *activities;
+   BGKnowledge        *knowledge;
+   BGAgency           *agency;
+   BGProposalGroup    *g;
+   BGEntityID         smith;
+   BGEntityID         pump;
+   BGEntityID         trough;
+   BGEntityID         diagram;
+   BGEntityID         book;
+   NSString           *error;
+   int64_t            v;
+
+   st.w       = BGTestWorld( 83);
+   st.c       = BGTestCommitter( st.w);
+   activities = [BGActivities activitiesWithWorld:st.w committer:st.c];
+   knowledge  = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+   agency     = [[[BGAgency alloc] initWithWorld:st.w committer:st.c knowledge:knowledge] autorelease];
+   st.s       = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [agency setActivities:activities];
+   [st.s setActivities:activities];
+   [st.s setPerception:knowledge];
+   [st.s setDecision:agency];
+   g       = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the mill"];
+   pump    = [g create:"pump" key:"pump" at:BGOnTile( 10, 10, 0)];
+   trough  = [g create:"cock_trough" key:"the trough line's cock" at:BGOnTile( 9, 9, 0)];
+   [g create:"cock_pump" key:"the riser's cock" at:BGOnTile( 11, 9, 0)];
+   smith   = [g create:"smith" key:"smith" at:BGOnTile( 10, 9, 0)];
+   [g create:"wrench_250" key:"wrench" at:BGHeldBy( smith, 0)];
+   diagram = [g create:"diagram" key:"diagram" at:BGHeldBy( smith, 1)];
+   [g set:"Record.writing" of:BGWhole( diagram)
+   toText:[st.w intern:"#Writing & { author: #Agent & { coat: \"white\" }, entries: [#Serves & { what: #Cock & "
+                       "{ place: #OnTile & { x: 9, y: 9, level: 0 } }, line: \"pump\", attribution: #Saw & { sure: 30 } }] }"]];
+   book = BGNoEntity;
+   if( manual)
+   {
+      book = [g create:"notebook" key:"the manual" at:BGOnTile( 10, 8, 0)];
+      [g set:"Record.writing" of:BGWhole( book)
+      toText:[st.w intern:[[NSString stringWithFormat:@"#Writing & { author: #Agent & { coat: \"white\" }, entries: "
+                                                     @"[#RecipeSays & { recipe: \"%s\", attribution: #Saw & { sure: 30 } }] }",
+                                                     manual] UTF8String]]];
+   }
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   pump    = [g idFor:pump];
+   trough  = [g idFor:trough];
+   smith   = [g idFor:smith];
+   diagram = [g idFor:diagram];
+   error   = nil;
+   BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "read", smith, diagram, BGNoEntity), 0, &error) != nil);
+   [st.s runUntil:BGTimeMake( 1100)];
+   if( manual)
+   {
+      BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "read", smith, [g idFor:book], BGNoEntity), 0, &error) != nil);
+      [st.s runUntil:BGTimeMake( 2200)];
+   }
+   BG_CHECK( [agency commit:smith toGoal:"repair_pump"]);
+   [st.s runUntil:BGTimeMake( 60000)];
+   *shut   = [st.w getField:"Cock.shut" of:trough value:&v] && v;
+   *opened = [st.w getField:"Pump.opened" of:pump value:&v] && v;
+   *saved  = BGSave( st.w, st.c, [NSArray arrayWithObjects:knowledge, agency, nil]);
+   return( [agency logOf:smith]);
+}
+
+
+static BOOL   logged_in( NSArray *log, NSString *text)
+{
+   NSUInteger   i;
+
+   for( i = 0; i < [log count]; i++)
+      if( [[log objectAtIndex:i] rangeOfString:text].location != NSNotFound)
+         return( YES);
+   return( NO);
+}
+
+
+static void   test_recipes( void)
+{
+   NSArray    *log;
+   NSString   *saved;
+   BOOL       shut;
+   BOOL       opened;
+
+   /* no fitter, and no recipe: it can't choose one, and gives up */
+   log = recipe_run( NULL, &shut, &opened, &saved);
+   BG_CHECK( logged_in( log, @"[repair the pump] nothing I know of will do"));
+   BG_CHECK( ! shut && ! opened);
+   /* having read a manual with the recipe in it, it follows it: the line
+    * shut first, then the pump opened; and the recipe is in the save */
+   log = recipe_run( "the_recipe", &shut, &opened, &saved);
+   BG_CHECK( logged_in( log, @"[repair the pump] follow the recipe: shut_off R"));
+   BG_CHECK( shut && opened);
+   BG_CHECK( [saved rangeOfString:@" the_recipe"].location != NSNotFound &&
+             [saved rangeOfString:@"recipe "].location != NSNotFound);
+   /* a bad manual: it follows the wrong recipe, wrongly, the line open */
+   log = recipe_run( "rash_recipe", &shut, &opened, &saved);
+   BG_CHECK( logged_in( log, @"[repair the pump] take it apart: dismantle R"));
+   BG_CHECK( ! shut && opened);
+}
+
+
 /* AGENCY.md §14, autopilot "carry out this recipe": at the mill, the
  * worker, holding the wrench, reads the diagram; the player hands it to
  * agency to follow the recipe. It shuts the line the diagram says, opens
@@ -9534,6 +9641,7 @@ const BGTestCase   BGAllTests[] =
    { "doubts",                        test_doubts },
    { "account",                       test_account },
    { "shortfall",                     test_shortfall },
+   { "recipes",                       test_recipes },
    { "traces",                        test_traces },
    { "appearance",                    test_appearance },
    { "interpretation",                test_interpretation },

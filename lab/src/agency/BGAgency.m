@@ -575,6 +575,7 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    pattern = recipe ? tri_pattern( tri, recipe) : NULL;
    v       = pattern ? tri_at( tri, pattern, "sequence") : NULL;
    if( ! v || tri_node_type( v) != tri_type_named( tri, "true") ||
+       ! [[_knowledge storeOf:agent] knowsRecipe:recipe] ||
        ! text_at( tri, pattern, "goal", goal, sizeof( goal)) ||
        ! [self autopilot:agent toGoal:goal threshold:threshold])
       return( NO);
@@ -1071,7 +1072,11 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
                      into:(const char **) out
                       max:(NSUInteger) max
 {
-   char   buf[ 64];
+   BGKnowledgeStore   *store;
+   NSUInteger         n;
+   NSUInteger         i;
+   NSUInteger         k;
+   char               buf[ 64];
 
    if( m->recipe && max && text_at( [_world tri], tri_pattern( [_world tri], m->recipe), "goal", buf, sizeof( buf)) &&
        ! strcmp( buf, goal))
@@ -1079,7 +1084,13 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
       out[ 0] = m->recipe;
       return( 1);
    }
-   return( [self methodsFor:goal into:out max:max]);
+   /* a recipe it doesn't know, it can't choose (ACTIONS.md decision 12) */
+   n     = [self methodsFor:goal into:out max:max];
+   store = [_knowledge storeOf:m->agent];
+   for( i = 0, k = 0; i < n; i++)
+      if( [store knowsRecipe:out[ i]])
+         out[ k++] = out[ i];
+   return( k);
 }
 
 

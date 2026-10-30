@@ -13,7 +13,7 @@ bin: #Container & { material: "oak", mass: 4kg, capacity: 50 }
 // The lock that gets wedged shut.
 lock: #Assembly & { material: "brass", mass: 600g, slots: 4 }
 
-worker: #Agent & { material: "flesh", mass: 70kg, hands: 2, coat: "blue" }
+worker: #Agent & { material: "flesh", mass: 70kg, hands: 2, coat: "blue", trade: "fitter" }
 smith:  #Agent & { material: "flesh", mass: 85kg, hands: 2, coat: "brown" }
 
 ownership: #Claim & { kind: "ownership" }

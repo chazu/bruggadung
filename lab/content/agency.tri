@@ -169,12 +169,17 @@
     threshold: *1000 | int & >=0 & <=1000
     steps:     [...#MethodStep]
     onUnknown: text
+    ofTrade:   text
     sequence:  *false | true
 }
 
 // A `sequence` method is a recipe (ACTIONS.md §6): its operations are done
 // in order, once each; a timed one is done when its activity has completed
-// since the goal was adopted, and a suspended one is resumed.
+// since the goal was adopted, and a suspended one is resumed. Knowing it is
+// knowledge (ACTIONS.md decision 12): a recipe `ofTrade` is known to those
+// of the trade (`Agent.trade`), and to whoever learned it, read or told;
+// without the recipe an agent can't choose it. One with no trade, anyone
+// knows.
 
 // `onUnknown` (AGENCY.md §5): when the precondition is unknown, rather than
 // false, the goal to adopt first, with the unknown match's bindings: finding
@@ -819,6 +824,27 @@ go_and_peer: #Method & {
 } @family(methods)
 
 
+// A wrong recipe, as a bad manual has it (ACTIONS.md decision 12): take the
+// pump apart straight away, its line still open. Nobody's trade; learned,
+// it is followed, wrongly.
+rash_recipe: #Method & {
+    title:    "take it apart"
+    goal:     "repair_pump"
+    rank:     2
+    sequence: true
+    ofTrade:  "none"
+    pre: {
+        find:  ["tool", "pump"]
+        match: #Repairing & {
+            me:   #Agent & { id: $me }
+            tool: #Wrench & { place: #Held & { by: $me } }
+            pump: #Pump & { opened: false }
+        }
+    }
+    steps: [#Do & { op: "dismantle", object: "tool", target: "pump" }]
+} @family(methods)
+
+
 // --- ACTIONS.md Scenario 3's inspection and replacement --------------------------
 
 // Mend the pump: done once the faulty part is replaced.
@@ -877,6 +903,7 @@ the_recipe: #Method & {
     goal:     "repair_pump"
     rank:     1
     sequence: true
+    ofTrade:  "fitter"
     pre: {
         find:  ["shutoff", "tool", "pump"]
         match: #Repairing & {

@@ -84,6 +84,8 @@
     abiding:    *50 | int & >=0 & <=100      @field(content, saved, proposable, inspect)
     // how readily it trusts what it is told (KNOWLEDGE.md decision 15), dB
     trusting:   *0 | int & >=-20 & <=20      @field(content, saved, proposable, inspect)
+    // its trade (ACTIONS.md decision 12): it knows the trade's recipes
+    trade:      text                         @field(content, saved, proposable, inspect)
     // the job it offers, by name (AGENCY.md decision 15), if any
     hires:      text                         @field(content, saved, proposable, inspect)
     // a deeply held norm against striking anyone (AGENCY.md decision 14), 0

@@ -124,6 +124,10 @@ say: #Operation & {
 // the first; a hearer takes in each.
 #Account: #Utterance & #Entries & {}
 
+// A claim stating a recipe (ACTIONS.md decision 12), by name: read in a
+// manual, or told, it teaches it.
+#RecipeSays: #Telling & { recipe: text }
+
 // A claim: something like `what` serves `line` (a diagram's: which cock shuts
 // off which line).
 #Serves: #Telling & { line: text }

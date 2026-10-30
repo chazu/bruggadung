@@ -315,6 +315,8 @@ typedef struct
    NSUInteger       _fcapacity;
    BGKnownLaw       *_laws;
    NSUInteger       _nlaws;
+   const char       **_recipes;      /* interned: recipes it learned (ACTIONS.md decision 12) */
+   NSUInteger       _nrecipes;
    int32_t          _hunger;         /* as felt */
    int32_t          _cold;
    int32_t          _stuffy;
@@ -473,6 +475,13 @@ typedef struct
 - (NSUInteger) lawCount;
 - (const BGKnownLaw *) lawAt:(NSUInteger) i;
 - (void) learnLaw:(BGKnownLaw) law;
+/* Whether it knows the method (ACTIONS.md decision 12): any that isn't a
+ * recipe; a recipe of no trade, or of its own, or one it learned. */
+- (BOOL) knowsRecipe:(const char *) method;
+- (void) learnRecipe:(const char *) method;
+/* the recipes it learned, first learned first */
+- (NSUInteger) recipeCount;
+- (const char *) recipeAt:(NSUInteger) i;
 /* no longer concluded (KNOWLEDGE.md §9: retracted with a premise) */
 - (void) retractFinding:(const char *) kind
                   about:(uint32_t) referentID;

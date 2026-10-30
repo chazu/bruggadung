@@ -168,6 +168,60 @@ static NSUInteger   feature_keys( const char *features, char (*keys)[ 32], NSUIn
 }
 
 
+- (BOOL) knowsRecipe:(const char *) method
+{
+   const TriNode   *pattern;
+   const TriNode   *v;
+   const char      *trade;
+   TriContent      *tri;
+   NSUInteger      i;
+   char            printed[ 64];
+   size_t          n;
+
+   tri     = [_world tri];
+   pattern = method ? tri_pattern( tri, method) : NULL;
+   v       = pattern ? tri_at( tri, pattern, "sequence") : NULL;
+   if( ! v || tri_node_type( v) != tri_type_named( tri, "true"))
+      return( YES);
+   v = tri_at( tri, pattern, "ofTrade");
+   n = v ? tri_print( tri, v, printed, sizeof( printed)) : 0;
+   if( n < 3 || printed[ 0] != '"')
+      return( YES);
+   printed[ n - 1] = 0;
+   trade = [_world textField:"Agent.trade" of:_agent];
+   if( trade && ! strcmp( trade, printed + 1))
+      return( YES);
+   for( i = 0; i < _nrecipes; i++)
+      if( ! strcmp( _recipes[ i], method))
+         return( YES);
+   return( NO);
+}
+
+
+- (void) learnRecipe:(const char *) method
+{
+   NSUInteger   i;
+
+   for( i = 0; i < _nrecipes; i++)
+      if( ! strcmp( _recipes[ i], method))
+         return;
+   _recipes = realloc( _recipes, sizeof( const char *) * (_nrecipes + 1));
+   _recipes[ _nrecipes++] = [_world intern:method];
+}
+
+
+- (NSUInteger) recipeCount
+{
+   return( _nrecipes);
+}
+
+
+- (const char *) recipeAt:(NSUInteger) i
+{
+   return( i < _nrecipes ? _recipes[ i] : NULL);
+}
+
+
 - (void) learnLaw:(BGKnownLaw) law
 {
    NSUInteger   i;
@@ -201,6 +255,7 @@ static NSUInteger   feature_keys( const char *features, char (*keys)[ 32], NSUIn
    free( _traces);
    free( _findings);
    free( _laws);
+   free( _recipes);
    free( _identities);
    if( _arena)
       tri_arena_free( _arena);
@@ -2400,6 +2455,28 @@ static int32_t   permille_of( int32_t db)
          [store learnLaw:k];
          [news addObject:[NSString stringWithFormat:@"a law: no %s, when %s, or %s (R%u says)", k.forbids, k.wrong,
                                                     k.brings, speaker]];
+      }
+      tri_arena_free( arena);
+      return;
+   }
+   if( claim && tri_subtype( tri, tri_node_type( claim), tri_type_named( tri, "#RecipeSays")))
+   {
+      /* a recipe stated (ACTIONS.md decision 12): learned, if it is one */
+      const TriNode   *v;
+      char            recipe[ 64];
+      size_t          n;
+
+      v = tri_at( tri, claim, "recipe");
+      n = v ? tri_print( tri, v, recipe, sizeof( recipe)) : 0;
+      if( n > 2 && recipe[ 0] == '"')
+      {
+         recipe[ n - 1] = 0;
+         v = tri_pattern( tri, recipe + 1) ? tri_at( tri, tri_pattern( tri, recipe + 1), "sequence") : NULL;
+         if( v && tri_node_type( v) == tri_type_named( tri, "true"))
+         {
+            [store learnRecipe:recipe + 1];
+            [news addObject:[NSString stringWithFormat:@"a recipe: %s (R%u says)", recipe + 1, speaker]];
+         }
       }
       tri_arena_free( arena);
       return;
@@ -4656,6 +4733,9 @@ char   *BGDecodeWord( const char *s)
                                                      [store feels:"hunger"], (long long) [store feltAt],
                                                      [store feels:"cold"], [store feels:"stuffy"], [store feels:"tired"],
                                                      [store feels:"pain"]]];
+      for( j = 0; j < [store recipeCount]; j++)
+         [lines addObject:[NSString stringWithFormat:@"recipe %llu %s", (unsigned long long) [store agent],
+                                                     [store recipeAt:j]]];
       for( j = 0; j < [store lawCount]; j++)
          [lines addObject:[NSString stringWithFormat:@"law %llu %d %@ %@ %@", (unsigned long long) [store agent],
                                                      [store lawAt:j]->weighs,
@@ -4813,6 +4893,8 @@ char   *BGDecodeWord( const char *s)
          tr.kind     = [_world intern:role];
          [[self storeOf:(BGEntityID) agent] noteTrace:tr];
       }
+      else if( sscanf( text, "recipe %llu %63s", &agent, role) == 2)
+         [[self storeOf:(BGEntityID) agent] learnRecipe:role];
       else if( sscanf( text, "law %llu %d %511s %511s %4095s", &agent, &trust, deeper, kind, features) == 5)
       {
          BGKnownLaw   k;
