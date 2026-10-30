@@ -54,7 +54,10 @@ static BGAction   action_of( BGWorld *world, BGEntityID a, const BGActivity *rec
 /* The stage's progress at `t`: kept, plus its running since it started. */
 static int64_t   progress_at( const BGActivity *record, int64_t t)
 {
-   return( record->progress + (record->due ? t - record->started : 0));
+   int64_t   rate;
+
+   rate = record->pace > 0 ? record->pace : 100;
+   return( record->progress + (record->due ? (t - record->started) * rate / 100 : 0));
 }
 
 
@@ -77,7 +80,7 @@ static int64_t   next_checkpoint( BGWorld *world, BGEntityID a, const BGActivity
       return( BGTimeNever.ms);
    for( k = 1; k <= n; k++)
    {
-      at = record->started + duration * k / (n + 1) - record->progress;
+      at = record->started + BGAtRate( duration * k / (n + 1) - record->progress, record->pace);
       if( at > t)
          return( at);
    }
@@ -150,6 +153,7 @@ static int64_t   next_checkpoint( BGWorld *world, BGEntityID a, const BGActivity
    const char         *operation;
    NSUInteger         i;
    int64_t            duration;
+   int64_t            rate;
    BOOL               more;
 
    store = [_world storeForKind:[_world kindNamed:"Activity"]];
@@ -214,7 +218,9 @@ static int64_t   next_checkpoint( BGWorld *world, BGEntityID a, const BGActivity
          [group set:"Activity.stage" of:BGWhole( a) to:record->stage + 1];
          [group set:"Activity.progress" of:BGWhole( a) to:0];
          [group set:"Activity.started" of:BGWhole( a) to:t.ms];
-         [group set:"Activity.due" of:BGWhole( a) to:t.ms + duration];
+         rate = BGWorkRate( _world, (BGEntityID) record->actorRef, operation, record->stage + 1);
+         [group set:"Activity.pace" of:BGWhole( a) to:rate];
+         [group set:"Activity.due" of:BGWhole( a) to:t.ms + BGAtRate( duration, rate)];
       }
       else
       {
@@ -351,9 +357,9 @@ static int64_t   next_checkpoint( BGWorld *world, BGEntityID a, const BGActivity
    group = [BGProposalGroup groupWithPhase:BGPhaseAction
                                     source:[NSString stringWithFormat:@"activity %llu: suspended (%@)",
                                                                       (unsigned long long) a, why]];
-   [group set:"Activity.progress" of:BGWhole( a) to:record->progress + (now - record->started)];
+   [group set:"Activity.progress" of:BGWhole( a) to:progress_at( record, now)];
    [group set:"Activity.due" of:BGWhole( a) to:0];
-   [self partialOf:a record:record progress:record->progress + (now - record->started) into:group];
+   [self partialOf:a record:record progress:progress_at( record, now) into:group];
    [group set:"Activity.status" of:BGWhole( a) to:tri_type_named( [_world tri], "\"suspended\"")];
    [_committer submit:group];
    return( group);
@@ -385,6 +391,7 @@ static int64_t   next_checkpoint( BGWorld *world, BGEntityID a, const BGActivity
    NSString           *effect;
    int64_t            duration;
    int64_t            remaining;
+   int64_t            rate;
    int64_t            now;
 
    record = [_world record:[_world kindNamed:"Activity"] for:a];
@@ -409,9 +416,12 @@ static int64_t   next_checkpoint( BGWorld *world, BGEntityID a, const BGActivity
    [group set:"Activity.started" of:BGWhole( a) to:now];
    /* what it owes: the stage, and bringing its instruments to bear as
     * they lie now, less what it did before */
-   remaining = duration - record->progress;
+   rate      = BGWorkRate( _world, (BGEntityID) record->actorRef, [_world textField:"Activity.operation" of:a],
+                           record->stage);
+   remaining = BGAtRate( duration - record->progress, rate);
    if( record->stage == 0)
       remaining += BGAccessDelay( _world, action_of( _world, a, record));
+   [group set:"Activity.pace" of:BGWhole( a) to:rate];
    [group set:"Activity.due" of:BGWhole( a) to:now + (remaining > 0 ? remaining : 0)];
    [group set:"Activity.status" of:BGWhole( a) to:tri_type_named( [_world tri], "\"running\"")];
    [_committer submit:group];

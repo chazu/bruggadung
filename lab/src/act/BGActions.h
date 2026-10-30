@@ -118,6 +118,20 @@ NSString           *BGApplyEffect( BGWorld *world, BGAction action, int64_t amou
 NSString           *BGOperationEffect( BGWorld *world, const char *operation);
 int64_t            BGOperationDuration( BGWorld *world, const char *operation);
 
+/* How fast the actor works now at stage `index` of the operation, in
+ * percent of its declared pace (ACTIONS.md §5's rate = f(capabilities,
+ * shortfall, actor modifiers)). Provisional, until the document's open
+ * question 4 settles f: modifiers only, and only for a stage that takes
+ * effort (its `exertion`); fatigue and injury slow it, 200 / (200 +
+ * fatigue + injury): half again as long at 100 of them together. Resting,
+ * waiting, talking go at their pace. */
+int64_t            BGWorkRate( BGWorld *world, BGEntityID actor, const char *operation, int64_t index);
+/* A stage's effort in ms of the declared pace, at `rate`: as long, in ms. */
+static inline int64_t   BGAtRate( int64_t effort, int64_t rate)
+{
+   return( rate > 0 && rate < 100 ? (effort * 100 + rate - 1) / rate : effort);
+}
+
 /* What it costs in time to bring the instruments the action will use to
  * bear (ACTIONS.md §2's access cost): take_up's duration for each one
  * on a tile in reach, twice that from a container; added to the first

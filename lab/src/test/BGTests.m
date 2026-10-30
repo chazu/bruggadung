@@ -7502,6 +7502,79 @@ static void   test_hard_fail( void)
  * through, which takes it out of it (exertion 30): it feels tired 70, more
  * than 50, and lies down; rested through, eight hours on, its fatigue is
  * gone. */
+/* ACTIONS.md §5: "rate = f(capabilities, shortfall, actor modifiers)" ...
+ * "A change to any rate input, such as an injured hand ... recomputes it."
+ * Provisionally (open question 4), fatigue and injury slow effortful work:
+ * sawing a log (8 s, 30 exertion) takes a fresh worker 8 s, a worn-out one
+ * (fatigue 100) half again as long, its quarters showing later; suspended
+ * partway, what it has done is the effort, not the time. Resting goes at its
+ * pace. */
+static int64_t   sawn_after( int64_t fatigue, int64_t at, BOOL suspend, int64_t *done)
+{
+   BGStage            st;
+   BGActivities       *activities;
+   BGProposalGroup    *g;
+   BGEntityID         worker;
+   BGEntityID         log;
+   BGEntityID         saw;
+   BGEntityID         a;
+   const BGActivity   *record;
+   NSString           *error;
+   int64_t            v;
+
+   st.w       = BGTestWorld( 193);
+   st.c       = BGTestCommitter( st.w);
+   activities = [BGActivities activitiesWithWorld:st.w committer:st.c];
+   st.s       = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [st.s setActivities:activities];
+   g      = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the sawhorse"];
+   worker = [g create:"worker" key:"worker" at:BGOnTile( 3, 3, 0)];
+   log    = [g create:"log" key:"log" at:BGOnTile( 4, 3, 0)];
+   saw    = [g create:"hand_saw" key:"saw" at:BGHeldBy( worker, 0)];
+   [g set:"Agent.fatigue" of:BGWhole( worker) to:fatigue];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   worker = [g idFor:worker];
+   log    = [g idFor:log];
+   saw    = [g idFor:saw];
+   error  = nil;
+   g      = BGPerform( st.w, st.c, BGActionMake( "saw_through", worker, saw, log), 0, &error);
+   BG_CHECK( g != nil);
+   [st.s runUntil:BGTimeMake( 2)];
+   a = [g idFor:[g proposals][ 0].handle];
+   [st.s runUntil:BGTimeMake( at)];
+   if( suspend)
+   {
+      BG_CHECK( [activities suspend:a because:@"a break" error:&error] != nil);
+      [st.s runUntil:BGTimeMake( at + 1)];
+   }
+   record = [st.w record:[st.w kindNamed:"Activity"] for:a];
+   *done  = record ? record->progress : -1;
+   v      = 0;
+   [st.w getField:"Log.sawn" of:log value:&v];
+   return( v);
+}
+
+
+static void   test_work_rate( void)
+{
+   int64_t   done;
+
+   /* fresh: through at 8 s */
+   BG_CHECK( sawn_after( 0, 8100, NO, &done) == 100);
+   /* worn out: at 8 s half through (its quarters at 3, 6, 9 s), through at
+    * about 12 s */
+   BG_CHECK( sawn_after( 100, 3000, NO, &done) == 0);
+   BG_CHECK( sawn_after( 100, 3100, NO, &done) == 25);
+   BG_CHECK( sawn_after( 100, 8100, NO, &done) == 50);
+   BG_CHECK( sawn_after( 100, 12000, NO, &done) == 75);
+   BG_CHECK( sawn_after( 100, 12200, NO, &done) == 100);
+   /* suspended at 6 s worn out: four seconds' worth of sawing done, and the
+    * log shows half */
+   BG_CHECK( sawn_after( 100, 6001, YES, &done) == 49 && done == 3960);
+}
+
+
 static void   test_tired_worker( void)
 {
    BGStage            st;
@@ -8467,6 +8540,7 @@ const BGTestCase   BGAllTests[] =
    { "scheduled_forgetting",          test_scheduled_forgetting },
    { "trodden",                       test_trodden },
    { "trace_floor",                   test_trace_floor },
+   { "work_rate",                     test_work_rate },
    { "traced_units",                  test_traced_units },
    { "attention_budget",              test_attention_budget },
    { "routine_autopilot",             test_routine_autopilot },

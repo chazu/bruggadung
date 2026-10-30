@@ -3025,10 +3025,10 @@ why" above, and):
   lab's premises are perceived traces, and a trace fading isn't a premise
   found false (fresh paint dries; it was still touched up). Which is a
   retraction isn't said.
-- *Rates from capabilities and modifiers* (walking speed from the
-  walker, fatigue slowing work, impact as a graded effect): ACTIONS.md §5
-  "rate = f(capabilities, shortfall, actor modifiers)", f being open
-  question 4.
+- *Rates from capabilities and shortfall* (walking speed from the walker,
+  impact as a graded effect): ACTIONS.md §5 "rate = f(capabilities,
+  shortfall, actor modifiers)", f being open question 4. The modifiers'
+  part runs, provisionally (below).
 - *Weights from other derived values*: ACTIONS.md open question 8.
 - *Light and sound as domains*: KNOWLEDGE.md open question 2.
 - *How long content lives once unreferenced*: COMPONENTS.md, open.
@@ -3122,3 +3122,30 @@ smith's promise kept on the carter's word, trusting the smith more; it
 looked only the once, early.
 
 85 tests, 2613 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: tired work goes slower, provisionally
+
+ACTIONS.md §5: "rate = f(capabilities, shortfall, actor modifiers)"; "A
+change to any rate input, such as an injured hand ..., recomputes it."
+Open question 4 leaves f open; as with latent assembly, the lab runs a
+provisional one, to be replaced when it is settled.
+
+- **`BGWorkRate`** (provisional): the actor modifiers only, and only for a
+  stage that takes effort (`exertion`): 200 / (200 + fatigue + injury)
+  percent of the declared pace, so half again as long at 100 together.
+  Resting, waiting, talking go at their pace.
+- **Progress is effort**: a stage keeps the pace it started at
+  (`Activity.pace`); elapsed time counts as effort at that pace, for
+  checkpoints and partial effects, suspension, and what resuming owes. A
+  new stage, or resuming, takes the actor as it is then: that is the
+  recompute, at stage boundaries (not yet mid-stage).
+
+Checked: sawing a log takes a fresh worker 8 s; a worn-out one (fatigue
+100) shows its quarters at about 3, 6 and 9 s and is through at about
+12 s; suspended at 6 s, it has done 3960 ms of sawing and the log shows
+49. The tired worker's rest, which takes no effort, is as long as before.
+
+Not yet: recomputing mid-stage when a modifier changes, capabilities and
+shortfall (open question 4).
+
+86 tests, 2628 checks, under both compilers, ASan, and leak-free.

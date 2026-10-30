@@ -13,6 +13,10 @@
     amount:         int & >=0 & <=1000000      @field(content, saved, proposable, inspect)
     // what is being said, for an utterance under way
     words:          text                       @field(saved, proposable, inspect)
+    // how fast the stage under way goes, in percent of its declared pace,
+    // from the actor as it started (ACTIONS.md §5: rate = f(capabilities,
+    // shortfall, actor modifiers); provisionally, modifiers only); 0 is 100
+    pace:           int & >=0 & <=100          @field(content, saved, proposable, inspect)
     // the stage under way, the work done in it, and when it last started
     // running; due is when the stage completes (0ms while suspended, or for an
     // activity that ends by a watch or an event)

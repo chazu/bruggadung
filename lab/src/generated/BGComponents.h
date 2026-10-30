@@ -1,4 +1,4 @@
-/* Generated from Triangle content e2b987385daa3bee: do not edit. Type IDs are valid
+/* Generated from Triangle content 25b1f8d64e237ab9: do not edit. Type IDs are valid
  * only for this content; regenerate when it changes. */
 #ifndef BG_COMPONENTS_H
 #define BG_COMPONENTS_H
@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BG_CONTENT_HASH 0xe2b987385daa3beeULL
+#define BG_CONTENT_HASH 0x25b1f8d64e237ab9ULL
 
 typedef struct TriNode TriNode;
 
@@ -84,6 +84,7 @@ typedef struct {
     int64_t         due;    /* time, in quanta of 1ms; content, saved, proposable, inspect */
     uint64_t        itemRef;    /* a referent; saved, proposable, inspect */
     const char *    operation;    /* text; saved, proposable, inspect */
+    int64_t         pace;    /* int, in quanta of 1; content, saved, proposable, inspect */
     int64_t         progress;    /* time, in quanta of 1ms; content, saved, proposable, inspect */
     int64_t         stage;    /* int, in quanta of 1; content, saved, proposable, inspect */
     int64_t         started;    /* time, in quanta of 1ms; content, saved, proposable, inspect */
@@ -430,6 +431,7 @@ static const BGFieldInfo BGActivity_fields[] = {
     { "due", offsetof(BGActivity, due), BG_VALUE_QUANTITY, "time", "content, saved, proposable, inspect" },
     { "itemRef", offsetof(BGActivity, itemRef), BG_VALUE_REF, "ref", "saved, proposable, inspect" },
     { "operation", offsetof(BGActivity, operation), BG_VALUE_TEXT, "text", "saved, proposable, inspect" },
+    { "pace", offsetof(BGActivity, pace), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "progress", offsetof(BGActivity, progress), BG_VALUE_QUANTITY, "time", "content, saved, proposable, inspect" },
     { "stage", offsetof(BGActivity, stage), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "started", offsetof(BGActivity, started), BG_VALUE_QUANTITY, "time", "content, saved, proposable, inspect" },
@@ -613,7 +615,7 @@ static const BGComponentInfo BGComponents[BG_COMPONENT_COUNT + 1] = {
     { "Scribe", "#Scribe", sizeof(BGScribe), 1, BGScribe_fields },
     { "Sized", "#Sized", sizeof(BGSized), 1, BGSized_fields },
     { "ThermalBody", "#ThermalBody", sizeof(BGThermalBody), 5, BGThermalBody_fields },
-    { "Activity", "#Activity", sizeof(BGActivity), 20, BGActivity_fields },
+    { "Activity", "#Activity", sizeof(BGActivity), 21, BGActivity_fields },
     { "Authorization", "#Authorization", sizeof(BGAuthorization), 3, BGAuthorization_fields },
     { "Claim", "#Claim", sizeof(BGClaim), 2, BGClaim_fields },
     { "Information", "#Content", sizeof(BGInformation), 2, BGInformation_fields },

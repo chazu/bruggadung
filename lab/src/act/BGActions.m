@@ -917,6 +917,19 @@ static int64_t   turning_chain( BGWorld *world, BGEntityID actor, BGEntityID cha
 }
 
 
+int64_t   BGWorkRate( BGWorld *world, BGEntityID actor, const char *operation, int64_t index)
+{
+   const BGAgent   *agent;
+   int64_t         worn;
+
+   agent = [world record:[world kindNamed:"Agent"] for:actor];
+   if( ! agent || BGOperationExertion( world, operation, index) <= 0)
+      return( 100);
+   worn = (int64_t) agent->fatigue + (int64_t) agent->injury;
+   return( 100 * 200 / (200 + (worn > 0 ? worn : 0)));
+}
+
+
 int64_t   BGAccessDelay( BGWorld *world, BGAction action)
 {
    BGEntityID   chain[ 2];
@@ -2234,6 +2247,7 @@ BGProposalGroup   *BGPerform( BGWorld *world, BGCommitter *committer, BGAction a
    BGEntityID        activity;
    NSString          *stageEffect;
    int64_t           duration;
+   int64_t           rate;
    int               r;
 
    reason = nil;
@@ -2282,7 +2296,10 @@ BGProposalGroup   *BGPerform( BGWorld *world, BGCommitter *committer, BGAction a
       /* a timed activity: its first stage's effect commits when the stage is due */
       activity = start_activity( world, action, amount, group);
       [group set:"Activity.started" of:BGWhole( activity) to:[world time].ms];
-      [group set:"Activity.due" of:BGWhole( activity) to:[world time].ms + duration + BGAccessDelay( world, action)];
+      rate = BGWorkRate( world, action.roles[ BGRoleActor], action.operation, 0);
+      [group set:"Activity.pace" of:BGWhole( activity) to:rate];
+      [group set:"Activity.due" of:BGWhole( activity)
+              to:[world time].ms + BGAtRate( duration, rate) + BGAccessDelay( world, action)];
       /* a watch on the floor at the actor's feet */
       {
          const TriNode   *v;
