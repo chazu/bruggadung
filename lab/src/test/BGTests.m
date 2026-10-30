@@ -941,7 +941,7 @@ static void   test_play_talk( void)
    uint64_t   h2;
 
    commands = [NSArray arrayWithObjects:@"do 1", @"walk w", @"tell R4 R5", @"ask R4 where R5", @"ask R4 who R5",
-                                        @"menu", @"do 6", @"tell R4 R5 in R2", @"knows", @"knows 5", @"tell R4",
+                                        @"menu", @"do 7", @"tell R4 R5 in R2", @"knows", @"knows 5", @"tell R4",
                                         @"ask R4 where R99", @"help", nil];
    out   = session( @"workshop", commands, &h1);
    again = session( @"workshop", commands, &h2);
@@ -4746,6 +4746,7 @@ typedef enum
    BGPurseUntold,                /* A, but no one told Kasimir whose the purse is */
    BGPurseWatch,                 /* the base case, and an officer of the town's watch by Mira */
    BGPurseFlight,                /* that, and Kasimir doesn't abide by the rules */
+   BGPurseResist,                /* that, and he has a temper */
    BGPurseRepaid,                /* B, and on until the loan's term is out */
    BGPurseLost                   /* that, but the wages are lost on the third day */
 } BGPurse;
@@ -4821,10 +4822,12 @@ static BGPurseRun   tempting_purse( BGPurse variant)
       if( variant == BGPurseNoticed || variant == BGPurseUntold)
          [g set:"Agent.hiding" of:BGWhole( h[ 4]) to:0];
    }
-   if( variant == BGPurseWatch || variant == BGPurseFlight)
+   if( variant == BGPurseWatch || variant == BGPurseFlight || variant == BGPurseResist)
       run.officer = [g create:"watch_officer" key:"an officer of the watch" at:BGOnTile( 13, 12, 0)];
-   if( variant == BGPurseFlight)
+   if( variant == BGPurseFlight || variant == BGPurseResist)
       [g set:"Agent.abiding" of:BGWhole( h[ 2]) to:0];
+   if( variant == BGPurseResist)
+      [g set:"Agent.temper" of:BGWhole( h[ 2]) to:100];
    if( variant == BGPurseHonest || variant == BGPurseRepaid || variant == BGPurseLost)
       [g set:"Agent.honesty" of:BGWhole( h[ 2]) to:90];
    [st.c submit:g];
@@ -4911,6 +4914,7 @@ static void   test_tempting_purse( void)
    BGPurseRun         untold;
    BGPurseRun         watch;
    BGPurseRun         flight;
+   BGPurseRun         resist;
    BGKnowledgeStore   *store;
    const BGReferent   *purse;
    const BGTestimony  *t;
@@ -5103,6 +5107,32 @@ static void   test_tempting_purse( void)
       o = [flight.world locationOf:flight.officer];
       BG_CHECK( k.form == BGLocationOnTile && (abs( k.x - o.x) >= 4 || abs( k.y - o.y) >= 4));
    }
+
+   /* AGENCY.md §13: with a temper, he resists instead: he hits the officer,
+    * who is hurt and knows by whom, a threat it weighs against its duty */
+   resist = tempting_purse( BGPurseResist);
+   BG_CHECK( logged_by( resist.agency, resist.kasimir,
+                        @"weighing get away (R1): +40 (+40, abiding +0) against resist +60 (+20, abiding +0, temper +40)"));
+   BG_CHECK( logged_by( resist.agency, resist.kasimir, @"[resist] fight them off: hit R"));
+   {
+      int64_t   injury;
+
+      injury = 0;
+      BG_CHECK( [resist.world getField:"Agent.injury" of:resist.officer value:&injury] && injury == 15);
+   }
+   store = [resist.knowledge storeOf:resist.officer];
+   BG_CHECK( [store finding:"#Struck" about:referent_of( store, resist.kasimir)] &&
+             ! strcmp( [store finding:"#Struck" about:referent_of( store, resist.kasimir)]->rule, "felt"));
+   /* the threat is weighed: getting clear, worth the hurt, not the officer's
+    * temper; hitting back, nothing to it. It finishes its duty first, and
+    * by then Kasimir has run, so there is nothing to get clear of */
+   BG_CHECK( logged_by( resist.agency, resist.officer, @"get clear (R"));
+   BG_CHECK( logged_by( resist.agency, resist.officer, @": +7 (injury +7, temper +0)"));
+   BG_CHECK( logged_by( resist.agency, resist.officer, @"is gone from where it was"));
+   BG_CHECK( log_index( resist.agency, resist.officer, @"[recover it and arrest the taker] done") <
+             log_index( resist.agency, resist.officer, @"[get clear]"));
+   /* of the watch, the officer doesn't report the theft to itself */
+   BG_CHECK( ! logged_by( resist.agency, resist.officer, @"report the theft"));
 
    /* 1: C: no one is there, and Kasimir decides just the same */
    alone = tempting_purse( BGPurseNoWitness);

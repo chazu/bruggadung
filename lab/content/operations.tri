@@ -4,7 +4,7 @@
 // bindings between roles. `effect` names the code that builds the proposal
 // group when the action is performed.
 
-#Effect: "take" | "take_some" | "put_in" | "drive" | "open_tap" | "fill" | "walk" | "loosen" | "look" | "say" | "tend" | "analyse" | "write" | "read" | "eat" | "give" | "investigate" | "tighten" | "rotate" | "strike" | "shut" | "dismantle" | "light" | "rest" | "open_door" | "saw" | "pass" | "copy" | "reveal" | "replace" | "cut" | "shape" | "install" | "issue" | "confiscate" | "arrest" | "flee"
+#Effect: "take" | "take_some" | "put_in" | "drive" | "open_tap" | "fill" | "walk" | "loosen" | "look" | "say" | "tend" | "analyse" | "write" | "read" | "eat" | "give" | "investigate" | "tighten" | "rotate" | "strike" | "shut" | "dismantle" | "light" | "rest" | "open_door" | "saw" | "pass" | "copy" | "reveal" | "replace" | "cut" | "shape" | "install" | "issue" | "confiscate" | "arrest" | "flee" | "hit"
 
 // Which roles an operation has is its roles' type: a structure's type is the
 // most general one with all its features.
@@ -310,6 +310,18 @@ strike: #Operation & {
         actor:       #Agent & { id: $a }
         item:        #Body & { material: "stone", place: #Held & { by: $a } }
         destination: #Valve
+    }
+} @family(operations)
+
+// Hit someone in reach (AGENCY.md §13): a blow, an injury of 15 to its
+// body, which it feels, and knows who dealt.
+hit: #Operation & {
+    effect:   "hit"
+    duration: 1s
+    uses:     ["hands"]
+    roles: {
+        actor: #Agent
+        item:  #Agent
     }
 } @family(operations)
 

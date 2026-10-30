@@ -1452,6 +1452,13 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
             return( NO);
          }
       }
+      /* what it names is gone from where it was believed: the method fails */
+      for( q = 0; q < 2; q++)
+         if( roles[ q] && (r = [store referent:roles[ q]]) && ! r->present)
+         {
+            [self fail:m method:index why:[NSString stringWithFormat:@"%s: R%u is gone from where it was", title, r->id]];
+            return( NO);
+         }
       for( q = 0; q < 2; q++)
          if( roles[ q] && ! in_reach( me, r = [store referent:roles[ q]]) && r)
          {
@@ -2216,6 +2223,15 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
 
          badge = [_world textField:"OfficeHolder.badge" of:m->agent];
          if( ! badge || strcmp( badge, title))
+            continue;
+      }
+      /* and not for one who does: its office has a goal of its own */
+      if( text_at( tri, tri_pattern( tri, goal), "arises.exempt", title, sizeof( title)))
+      {
+         const char   *badge;
+
+         badge = [_world textField:"OfficeHolder.badge" of:m->agent];
+         if( badge && ! strcmp( badge, title))
             continue;
       }
       for( j = 0; j < [store findingCount]; j++)

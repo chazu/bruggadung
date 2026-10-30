@@ -3362,3 +3362,37 @@ its own permits); seeing someone sanctioned as a way to learn a law; fines
 and revoking a permit as operations.
 
 88 tests, 2705 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: harm, threats, and resisting arrest
+
+AGENCY.md decision 13: harm is injury and loss; a threat is a belief that
+harm is happening, salient, which can interrupt.
+
+- **`hit`**: a blow to someone in reach, a second on the hands: 15 of
+  injury (the existing `Agent.injury`, felt as pain), and a `struck` event.
+- **`#Struck`**: the one hit knows it, and from whom: a finding about the
+  attacker (rule "felt"), so a goal can arise from it. Witnesses don't yet
+  draw it (perception reads witnessed moves and speech only).
+- **Weighing a threat**: struck, `hit_back` (worth `Agent.temper`, new,
+  0 by default, less 10) and `get_clear` (worth the injury, less the
+  temper) arise, against what the agent is doing.
+- **Resisting arrest** (INSTITUTIONS.md decision 7): `resist_arrest`
+  arises with getting away, worth less (20 against 40) but raised by the
+  temper; its method hits the warden.
+- **`#Arising.exempt`**: a goal that never arises for an office's holders;
+  reporting a theft is exempt for the watch, whose duty is its own goal.
+- **A method fails when what it names is believed gone** from where it
+  was, rather than trying the step again. Fleeing fails, not suspends,
+  when the one fled from is out of reach.
+
+Checked: with a temper (100) and no disposition to abide, arrested,
+Kasimir hits the officer (resist +60 over get away +40), then runs. The
+officer is hurt (15), knows by whom, weighs getting clear (+7) after its
+duty is done, backs away, and finds Kasimir gone. It doesn't report the
+theft to itself.
+
+Not yet: witnesses of a blow; harm to one's loyalties (needs decision
+12); a law against assault (a third kind of wrong); a threat that is
+about to happen, not happening (a raised fist).
+
+88 tests, 2717 checks, under both compilers, ASan, and leak-free.

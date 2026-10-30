@@ -3441,6 +3441,29 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
       [news addObject:[NSString stringWithFormat:@"you are under arrest, by R%u", f.choice]];
    }
 
+   /* struck (AGENCY.md §13): a threat, which it knows, and from whom; the
+    * finding is about the one who struck, so a goal can turn on it */
+   for( i = first; i < last; i++)
+   {
+      BGFinding   f;
+
+      ev = [_world eventAt:i];
+      if( strcmp( ev->kind, "struck") || ev->subject != agent)
+         continue;
+      memset( &f, 0, sizeof( f));
+      f.kind     = [_world intern:"#Struck"];
+      f.about    = bound_to( ev->other, agent, [store selfReferent], seen, assigned, nseen);
+      f.choice   = [store selfReferent];
+      f.credence = BG_SEEN;
+      f.rule     = [_world intern:"felt"];
+      f.time     = now;
+      if( ! f.about)
+         continue;
+      [store retractFinding:"#Struck" about:f.about];
+      [store addFinding:f];
+      [news addObject:[NSString stringWithFormat:@"R%u struck you", f.about]];
+   }
+
    /* what its own analyses found beneath the looks of what they analysed */
    for( i = first; i < last; i++)
    {

@@ -53,6 +53,8 @@
 #Wronging: #Frame & { loot: #Body, officer: #Agent, culprit: #Agent }
 // Under arrest: the arrested, and the one holding it.
 #Custody: #Frame & { arrested: #Agent, warden: #Agent }
+// Harmed: who struck.
+#Harming: #Frame & { attacker: #Agent }
 
 // Eating: the food. Watching: the spot where something stirred.
 #Supper:   #Frame & { food: #Body }
@@ -97,8 +99,8 @@
 // each finding of the kind about something of kind `of`, the slot bound to
 // it, while the finding is salient: drawn no longer ago than `lapse`; with
 // a `duty`, only for an agent whose office's badge it is (INSTITUTIONS.md:
-// an officer's duty).
-#Arising: { finding: text, slot: text, lapse: time, of: #Body, duty: text }
+// an officer's duty); `exempt`, never for one whose it is.
+#Arising: { finding: text, slot: text, lapse: time, of: #Body, duty: text, exempt: text }
 
 // A goal is done when `done` holds. What it `concerns` is salient to an agent
 // that holds it (AGENCY.md §10): something like one of them seen moved, or
@@ -318,13 +320,13 @@ look_into_it: #Method & {
 
 // --- INSTITUTIONS.md decision 6: a wrong reported ---------------------------------
 
-// Seen something taken from its owner (a #Taken finding): tell the watch. A
-// grievance is a claim told to an office holder; whether it acts is its own
-// decision.
+// Seen something taken from its owner (a #Taken finding): tell the watch,
+// unless one is of the watch oneself. A grievance is a claim told to an
+// office holder; whether it acts is its own decision.
 report_wrong: #Goal & {
     title:  "report the theft"
     done:   #Did & { did: "say" }
-    arises: { finding: "#Taken", slot: "loot", lapse: 1h, of: #Body }
+    arises: { finding: "#Taken", slot: "loot", lapse: 1h, of: #Body, exempt: "watch" }
     worth:  [#Flat & { value: 15 }]
 } @family(goals)
 
@@ -383,6 +385,61 @@ run_off: #Method & {
     pre:   { find: ["warden"], match: #Custody & { warden: #Agent & #OfficeHolder & { badge: "watch" } } }
     order: ["near"]
     steps: [#Do & { op: "flee", object: "warden" }]
+} @family(methods)
+
+
+// Or resist (decision 7, AGENCY.md §13): strike the one making the
+// arrest. Worth less than getting away, but more to one with a temper.
+resist_arrest: #Goal & {
+    title:  "resist"
+    done:   #Did & { did: "hit" }
+    arises: { finding: "#Arrested", slot: "arrested", lapse: 60s, of: #Agent }
+    worth:  [#Flat & { value: 20 }, #Trait & { trait: "abiding", per: -8 }, #Trait & { trait: "temper", per: 4 }]
+} @family(goals)
+
+fight_off: #Method & {
+    title: "fight them off"
+    goal:  "resist_arrest"
+    rank:  1
+    pre:   { find: ["warden"], match: #Custody & { warden: #Agent & #OfficeHolder & { badge: "watch" } } }
+    order: ["near"]
+    steps: [#Do & { op: "hit", object: "warden" }]
+} @family(methods)
+
+
+// --- AGENCY.md §13, harm and threats ------------------------------------------
+
+// Struck (a #Struck finding, about who struck): a threat, weighed against
+// whatever the agent is doing. Hit back, as its temper has it; or get
+// clear, the more the more it hurts and the less its temper.
+hit_back: #Goal & {
+    title:  "hit back"
+    done:   #Did & { did: "hit" }
+    arises: { finding: "#Struck", slot: "attacker", lapse: 10s, of: #Agent }
+    worth:  [#Flat & { value: -10 }, #Trait & { trait: "temper", per: 4 }]
+} @family(goals)
+
+strike_back: #Method & {
+    title: "strike back"
+    goal:  "hit_back"
+    rank:  1
+    pre:   { find: ["attacker"], match: #Harming & { attacker: #Agent } }
+    steps: [#Do & { op: "hit", object: "attacker" }]
+} @family(methods)
+
+get_clear: #Goal & {
+    title:  "get clear"
+    done:   #Did & { did: "flee" }
+    arises: { finding: "#Struck", slot: "attacker", lapse: 10s, of: #Agent }
+    worth:  [#Trait & { trait: "injury", per: 5 }, #Trait & { trait: "temper", per: -4 }]
+} @family(goals)
+
+back_away: #Method & {
+    title: "back away"
+    goal:  "get_clear"
+    rank:  1
+    pre:   { find: ["attacker"], match: #Harming & { attacker: #Agent } }
+    steps: [#Do & { op: "flee", object: "attacker" }]
 } @family(methods)
 
 

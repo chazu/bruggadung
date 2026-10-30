@@ -23,6 +23,9 @@
 #Taken: #Finding & {}
 // It (the agent itself) is under arrest, by the finding's choice.
 #Arrested: #Finding & {}
+// It struck someone, the finding's choice (AGENCY.md §13): a threat, to
+// the agent itself when it was the one struck.
+#Struck: #Finding & {}
 // Someone does something the same way, again and again (AGENCY.md §8): the
 // finding's choice is the way.
 #Habit: #Finding & {}

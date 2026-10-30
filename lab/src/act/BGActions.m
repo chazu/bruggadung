@@ -1695,6 +1695,22 @@ static NSString   *effect_flee( BGWorld *world, BGAction a, int64_t amount, BGPr
 }
 
 
+/* A blow (AGENCY.md §13): an injury to the one hit, which it feels, and
+ * knows who dealt. Hitting oneself does nothing. */
+static NSString   *effect_hit( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
+{
+   int64_t   injury;
+
+   if( a.roles[ BGRoleItem] == a.roles[ BGRoleActor])
+      return( @"one cannot hit oneself");
+   injury = 0;
+   [world getField:"Agent.injury" of:a.roles[ BGRoleItem] value:&injury];
+   [g set:"Agent.injury" of:BGWhole( a.roles[ BGRoleItem]) to:injury + 15 > 100 ? 100 : injury + 15];
+   [g emit:"struck" subject:BGWhole( a.roles[ BGRoleItem]) other:BGWhole( a.roles[ BGRoleActor]) detail:NULL];
+   return( nil);
+}
+
+
 /* Through a door: onto its tile. */
 static NSString   *effect_pass( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
 {
@@ -1819,6 +1835,7 @@ static const struct
    { "confiscate", effect_confiscate },
    { "arrest",    effect_arrest },
    { "flee",      effect_flee },
+   { "hit",       effect_hit },
    { "shut",      effect_shut },
    { "dismantle", effect_dismantle },
    { "light",     effect_light },

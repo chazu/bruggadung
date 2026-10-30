@@ -82,6 +82,8 @@
     respectful: *50 | int & >=0 & <=100      @field(content, saved, proposable, inspect)
     // the disposition to abide by the rules (INSTITUTIONS.md decision 5), 0 to 100
     abiding:    *50 | int & >=0 & <=100      @field(content, saved, proposable, inspect)
+    // temper (AGENCY.md §13), 0 to 100: how readily it meets harm with force
+    temper:     *0 | int & >=0 & <=100       @field(content, saved, proposable, inspect)
     // reaction speed (ACTIONS.md §8): it weights the order of the agent's
     // actions among others' at the same boundary
     quickness:  *10 | int & >=1 & <=100      @field(content, saved, proposable, inspect)
