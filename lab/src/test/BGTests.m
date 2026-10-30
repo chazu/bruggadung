@@ -65,7 +65,7 @@ static void   test_registry_and_construction( void)
 
    w = BGTestWorld( 1);
    c = BGTestCommitter( w);
-   BG_CHECK( [w kindCount] == 10);
+   BG_CHECK( [w kindCount] == 11);
    BG_CHECK( [w kindNamed:"Body"] != NSNotFound && [w kindNamed:"Nonesuch"] == NSNotFound);
    bin   = commit_create( c, "bin", BGOnTile( 0, 0, 0));
    nails = commit_create( c, "nails_30", BGIn( bin));
@@ -212,6 +212,7 @@ static void   test_individuation_and_merge_rules( void)
    [c submit:g];
    [c commitBoundary];
    BG_CHECK( [g applied]);
+   if( ! [g applied]) fprintf( stderr, "DEBUG %s\n", [[g rejection] UTF8String]);
    BG_CHECK( [w unitsOf:nails] == 29 && [w massOf:nails] == 87);
    BG_CHECK( [w entitiesAt:lock form:BGLocationPartOf into:parts max:4] == 1);
    BG_CHECK( ! [w isStack:parts[ 0]] && [w massOf:parts[ 0]] == 3);
@@ -2421,6 +2422,153 @@ static void   test_interpretation( void)
 }
 
 
+/* KNOWLEDGE.md Scenario 3's notebook: the worker looks into the bin and
+ * writes down where the nails are, puts the notebook in the bin, and goes;
+ * the smith takes it and reads it. */
+static void   test_notebook( void)
+{
+   BGWorld            *w;
+   BGWorld            *w2;
+   BGCommitter        *c;
+   BGScheduler        *s;
+   BGActivities       *activities;
+   BGKnowledge        *knowledge;
+   BGKnowledge        *restored;
+   BGKnowledgeStore   *store;
+   BGKnowledgeStore   *thief;
+   BGProposalGroup    *g;
+   const BGTestimony  *t;
+   const BGReferent   *nails;
+   NSArray            *deferred;
+   NSString           *error;
+   NSString           *text;
+   NSString           *writing;
+   NSString           *before;
+   BGEntityID         h[ 8];
+   BGEntityID         notebook;
+   uint64_t           position;
+   uint32_t           rnails;
+   uint32_t           rbook;
+   NSUInteger         told;
+   NSUInteger         i;
+
+   w          = BGTestWorld( 37);
+   c          = BGTestCommitter( w);
+   activities = [BGActivities activitiesWithWorld:w committer:c];
+   knowledge  = [[[BGKnowledge alloc] initWithWorld:w] autorelease];
+   s          = [[[BGScheduler alloc] initWithWorld:w committer:c] autorelease];
+   [s setActivities:activities];
+   [s setPerception:knowledge];
+   [c submit:BGWorkshopSetup( NO, h)];
+   [s runUntil:BGTimeMake( 1)];
+   g        = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the worker's notebook"];
+   notebook = [g create:"notebook" key:"notebook" at:BGHeldBy( 4, 1)];       /* the worker's */
+   [c submit:g];
+   [s runUntil:BGTimeMake( 2)];
+   BG_CHECK( [g applied]);
+   notebook = [g idFor:notebook];
+
+   /* the worker looks into the bin, and writes down where the nails are */
+   store = [knowledge storeOf:4];
+   BG_CHECK( BGPerform( w, c, BGActionMake( "look_in", 4, 1, BGNoEntity), 0, &error) != nil);
+   [s runUntil:BGTimeMake( 3)];
+   rnails  = referent_of( store, 2);
+   rbook   = referent_of( store, notebook);
+   writing = [store writingAbout:rnails];
+   BG_CHECK( writing && rbook);
+   {
+      BGAction   action;
+
+      action         = BGActionMake( "write_down", [store selfReferent], rbook, BGNoEntity);
+      action.content = [w intern:[writing UTF8String]];
+      BG_CHECK( BGPerformBelieved( w, c, store, action, 0, &error) != nil);
+   }
+   [s runUntil:BGTimeMake( 4)];
+
+   /* 3: notebook content is a content entity authored by the character, with
+    * claims copied from beliefs at the time of writing */
+   text = [NSString stringWithUTF8String:(char *) [w textField:"Record.writing" of:notebook]];
+   BG_CHECK( [text hasPrefix:@"#Writing & { author: #Agent & {"]);
+   BG_CHECK( [text rangeOfString:@"coat: \"blue\""].location != NSNotFound);
+   BG_CHECK( [text rangeOfString:@"entries: [#IsIn & { what: #Stack"].location != NSNotFound);
+   BG_CHECK( [text rangeOfString:@"attribution: #Saw & { sure: 30 }"].location != NSNotFound);
+   BG_CHECK( [text rangeOfString:@"ref("].location == NSNotFound);
+   BG_CHECK( happened( w, "wrote", 4, notebook));
+
+   /* it puts the notebook in the bin, and goes off */
+   BG_CHECK( BGPerform( w, c, BGActionMake( "put_in", 4, notebook, 1), 0, &error) != nil);
+   [s runUntil:BGTimeMake( 5)];
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the worker goes off"];
+   [g move:BGWhole( 4) to:BGOnTile( 20, 20, 0)];
+   [c submit:g];
+   [s runUntil:BGTimeMake( 6)];
+   nails  = [store referent:rnails];
+   before = [store describeReferent:rnails];
+   told   = [store testimonyCount];
+   BG_CHECK( nails->present && nails->form == BGLocationIn && ! nails->toldBy);
+
+   /* the smith takes it from the bin, and reads it */
+   BG_CHECK( BGPerform( w, c, BGActionMake( "take", 5, notebook, BGNoEntity), 0, &error) != nil);
+   [s runUntil:BGTimeMake( 1000)];
+   BG_CHECK( BGPerform( w, c, BGActionMake( "read", 5, notebook, BGNoEntity), 0, &error) != nil);
+   [s runUntil:BGTimeMake( 2000)];
+
+   /* 4: the thief's beliefs cite the notebook, with the character as perceived root */
+   thief = [knowledge storeOf:5];
+   BG_CHECK( [thief testimonyCount] == 1);
+   t = [thief testimonyCount] ? [thief testimonyAt:0] : NULL;
+   BG_CHECK( t && t->via == referent_of( thief, notebook));
+   BG_CHECK( t && t->source == referent_of( thief, 4) && t->root == t->source && t->attribution == BGSaw);
+   BG_CHECK( t && [thief referent:t->thing]->present && [thief referent:t->thing]->container == referent_of( thief, 1));
+   BG_CHECK( [[knowledge dump:5] rangeOfString:@"wrote so in R"].location != NSNotFound);
+
+   /* 5: the theft leaves the worker's memory as it was */
+   BG_CHECK( [[store describeReferent:rnails] isEqualToString:before]);
+   BG_CHECK( [store testimonyCount] == told);
+   for( i = 0; i < [store count]; i++)
+      BG_CHECK( [store referentAt:i]->truth != 5 || [store referentAt:i]->present);
+
+   /* saved and restored the same */
+   text = BGSave( w, c, [NSArray arrayWithObject:knowledge]);
+   w2   = BGRestore( text, [w contentBuild], &deferred, &position, &error);
+   BG_CHECK( w2 != nil);
+   restored = [[[BGKnowledge alloc] initWithWorld:w2] autorelease];
+   [restored restoreSavedState:BGSavedDomainState( text, @"knowledge")];
+   BG_CHECK( [[restored dump:5] isEqualToString:[knowledge dump:5]]);
+}
+
+
+/* 6: the player's out-of-character notes never reach the character's
+ * knowledge; the notebook view shows what the character knows, as it knows
+ * it, without truth links */
+static void   test_play_notebook( void)
+{
+   NSArray    *commands;
+   NSString   *out;
+   NSRange    knows;
+   NSRange    book;
+   uint64_t   h;
+
+   commands = [NSArray arrayWithObjects:@"do 1", @"walk w", @"tell R4 R5", @"ask R4 where R5", @"notebook",
+                                        @"note check the loft again", @"notes", @"knows", @"write R5", nil];
+   out = session( @"workshop", commands, &h);
+   BG_CHECK( [out rangeOfString:@"Things you know of:\n"].location != NSNotFound);
+   BG_CHECK( [out rangeOfString:@"  R5 #Stack, in R2"].location != NSNotFound);
+   BG_CHECK( [out rangeOfString:@"R4 said so, having heard it from you"].location != NSNotFound);
+   BG_CHECK( [out rangeOfString:@"1. check the loft again"].location != NSNotFound);
+   BG_CHECK( [out rangeOfString:@"You hold no notebook."].location != NSNotFound);
+   /* the character's store, as the developer sees it, has no note in it */
+   knows = [out rangeOfString:@"what 4 knows"];
+   BG_CHECK( knows.location != NSNotFound &&
+             [[out substringFromIndex:knows.location] rangeOfString:@"loft"].location == NSNotFound);
+   /* the notebook view has no truth links */
+   book = [out rangeOfString:@"Things you know of:"];
+   BG_CHECK( book.location != NSNotFound && book.location < knows.location &&
+             [[out substringWithRange:NSMakeRange( book.location, knows.location - book.location)]
+               rangeOfString:@"truth"].location == NSNotFound);
+}
+
+
 /* --- the cistern ----------------------------------------------------------- */
 
 static BGCistern   *run_cistern( BGCisternVariant variant)
@@ -2738,6 +2886,8 @@ const BGTestCase   BGAllTests[] =
    { "traces",                        test_traces },
    { "appearance",                    test_appearance },
    { "interpretation",                test_interpretation },
+   { "notebook",                      test_notebook },
+   { "play_notebook",                 test_play_notebook },
    { "cistern",                       test_cistern },
    { "cistern_b",                     test_cistern_b },
    { "cistern_d",                     test_cistern_d },

@@ -63,7 +63,8 @@
    }
    play        = [[self new] autorelease];
    play->_name = [name copy];
-   play->_out  = [NSMutableString new];
+   play->_out   = [NSMutableString new];
+   play->_notes = [NSMutableArray new];
    [play buildOn:world];
    setup = [name isEqualToString:@"workshop"] ? BGWorkshopSetup( NO, h) : BGCisternSetup( h);
    [play->_committer submit:setup];
@@ -105,6 +106,7 @@
    [_knowledge release];
    [_menu release];
    [_out release];
+   [_notes release];
    [super dealloc];
 }
 
@@ -568,6 +570,134 @@ static char   glyph_of_kind( const char *kind)
 }
 
 
+/* --- the notebook ------------------------------------------------------------------ */
+
+/* What the actor knows, as it knows it: never a truth link. */
+- (void) showNotebook
+{
+   BGKnowledgeStore    *store;
+   const BGReferent    *r;
+   const BGReferent    *holder;
+   const BGTestimony   *t;
+   const BGTestimony   *u;
+   const BGFinding     *f;
+   const BGTraceSeen   *tr;
+   NSMutableString     *places;
+   NSUInteger          i;
+   NSUInteger          j;
+   NSUInteger          n;
+   int64_t             now;
+
+   store = [_knowledge storeOf:_actor];
+   now   = [_world time].ms;
+   [_out appendString:@"Things you know of:\n"];
+   for( i = 0; i < [store count]; i++)
+   {
+      r = [store referentAt:i];
+      if( r->id == [store selfReferent])
+         continue;
+      holder = r->container ? [store referent:r->container] : NULL;
+      [_out appendFormat:@"  R%u %s", r->id, r->kind];
+      if( ! r->present)
+         [_out appendString:@", you don't know where"];
+      else if( holder)
+         [_out appendFormat:@", %s R%u", r->form == BGLocationIn ? "in" : r->form == BGLocationHeldBy ? "held by" : "part of",
+                            holder->id];
+      else
+         [_out appendFormat:@", at (%d, %d)", r->x, r->y];
+      [_out appendFormat:@"%@%@\n", r->seen < now ? [NSString stringWithFormat:@", %llds ago", (long long) (now - r->seen) / 1000] : @"",
+                         r->toldBy ? [NSString stringWithFormat:@", R%u says", r->toldBy] : @""];
+   }
+   if( [store testimonyCount])
+      [_out appendString:@"What you've been told:\n"];
+   for( i = 0; i < [store testimonyCount]; i++)
+   {
+      t = [store testimonyAt:i];
+      [_out appendFormat:@"  R%u in R%u: R%u %s, %@%@\n", t->thing, t->container, t->source,
+                         t->via ? "wrote so" : "said so",
+                         t->attribution == BGSaw ? @"having seen it"
+                            : t->attribution == BGHeardFrom && t->root == [store selfReferent] ? @"having heard it from you"
+                            : t->attribution == BGHeardFrom ? [NSString stringWithFormat:@"having heard it from R%u", t->root]
+                                                          : @"having heard it",
+                         t->settled > 0 ? @"; so it was" : t->settled < 0 ? @"; it wasn't" : @""];
+   }
+   /* open questions: something claimed to be in more than one place */
+   for( i = 0; i < [store testimonyCount]; i++)
+   {
+      t      = [store testimonyAt:i];
+      places = [NSMutableString string];
+      n      = 0;
+      for( j = 0; j < [store testimonyCount]; j++)
+      {
+         u = [store testimonyAt:j];
+         if( u->thing != t->thing || u->settled < 0)
+            continue;
+         if( j < i)
+            break;      /* asked already */
+         if( [places rangeOfString:[NSString stringWithFormat:@" R%u ", u->container]].location != NSNotFound)
+            continue;
+         [places appendFormat:@"%@in R%u (%+d dB) ", n ? @"or " : @"", u->container,
+                              [store credenceThat:u->thing isIn:u->container]];
+         n++;
+      }
+      if( n > 1)
+         [_out appendFormat:@"Where is R%u? %@\n", t->thing, places];
+   }
+   if( [store findingCount])
+      [_out appendString:@"What you make of it:\n"];
+   for( i = 0; i < [store findingCount]; i++)
+   {
+      f = [store findingAt:i];
+      [_out appendFormat:@"  R%u: %s (%+d dB)\n", f->about, f->kind, f->credence];
+   }
+   for( i = 0; i < [store traceCount]; i++)
+   {
+      tr = [store traceAt:i];
+      if( tr->present)
+         [_out appendFormat:@"  %s %@, %d\n", tr->kind,
+                            tr->bearer ? [NSString stringWithFormat:@"on R%u", tr->bearer]
+                                       : [NSString stringWithFormat:@"at (%d, %d)", tr->x, tr->y], tr->strength];
+   }
+}
+
+
+/* write <R>: into a record the actor holds */
+- (void) write:(NSArray *) words
+{
+   BGKnowledgeStore   *store;
+   const BGReferent   *r;
+   NSString           *writing;
+   BGAction           action;
+   NSUInteger         i;
+   uint32_t           what;
+   uint32_t           record;
+
+   store  = [_knowledge storeOf:_actor];
+   what   = [words count] > 1 ? [self referentNamed:[words objectAtIndex:1]] : 0;
+   record = 0;
+   for( i = 0; i < [store count] && ! record; i++)
+   {
+      r = [store referentAt:i];
+      if( r->present && r->form == BGLocationHeldBy && r->container == [store selfReferent] && r->kind &&
+          ! strcmp( r->kind, "#Record"))
+         record = r->id;
+   }
+   if( ! record)
+   {
+      [_out appendString:@"You hold no notebook.\n"];
+      return;
+   }
+   if( ! what || ! (writing = [store writingAbout:what]))
+   {
+      [_out appendString:@"Write where what is? write <R>, for something you believe is in something.\n"];
+      return;
+   }
+   action         = BGActionMake( [_world intern:"write_down"], [store selfReferent], record, BGNoEntity);
+   action.content = [_world intern:[writing UTF8String]];
+   [self perform:action amount:0];
+}
+
+
 /* --- the commands ------------------------------------------------------------------ */
 
 - (BOOL) isRunning:(BGEntityID) activity
@@ -658,7 +788,7 @@ static char   glyph_of_kind( const char *kind)
       return( NO);
    if( [verb isEqualToString:@"help"])
       [_out appendString:@"look, menu, do <n> [amount], walk n|s|e|w, ask <R> where|who <R>, tell <R> <R> [in <R>],\n"
-                         @"wait <ms>, step, idle, as <id>,\n"
+                         @"notebook, write <R>, read <R>, note <text>, notes, wait <ms>, step, idle, as <id>,\n"
                          @"activities, suspend <id>, resume <id>, knows [id], inspect <id>, why <id>, trace [n],\n"
                          @"save <file>, load <file>, time, hash, quit\n"];
    else if( [verb isEqualToString:@"look"])
@@ -677,6 +807,30 @@ static char   glyph_of_kind( const char *kind)
          amount = [words count] > 2 ? [[words objectAtIndex:2] longLongValue] : 0;
          [self perform:*a amount:amount];
       }
+   }
+   else if( [verb isEqualToString:@"notebook"])
+      [self showNotebook];
+   else if( [verb isEqualToString:@"write"])
+      [self write:words];
+   else if( [verb isEqualToString:@"read"])
+   {
+      if( ! [self referentNamed:[words count] > 1 ? [words objectAtIndex:1] : @""])
+         [_out appendString:@"Read what? read <R>.\n"];
+      else
+         [self perform:BGActionMake( [_world intern:"read"], [[_knowledge storeOf:_actor] selfReferent],
+                                     [self referentNamed:[words objectAtIndex:1]], BGNoEntity) amount:0];
+   }
+   else if( [verb isEqualToString:@"note"])
+   {
+      [_notes addObject:[[words subarrayWithRange:NSMakeRange( 1, [words count] - 1)] componentsJoinedByString:@" "]];
+      [_out appendString:@"Noted, for you; your character knows nothing of it.\n"];
+   }
+   else if( [verb isEqualToString:@"notes"])
+   {
+      for( i = 0; i < [_notes count]; i++)
+         [_out appendFormat:@"%lu. %@\n", (unsigned long) i + 1, [_notes objectAtIndex:i]];
+      if( ! [_notes count])
+         [_out appendString:@"You have no notes.\n"];
    }
    else if( [verb isEqualToString:@"ask"])
       [self ask:words];

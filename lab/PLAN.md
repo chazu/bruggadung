@@ -996,7 +996,50 @@ feeding credence and agency, and attention budgets for interpretation.
 
 36 tests, 543 checks, under both compilers, ASan and UBSan, and leak-free.
 
-Next: the player's notebook (KNOWLEDGE.md Scenario 3): what the player's
-character knows, as the player sees it in `lab play`: the remembered map,
-claims heard with their sources and credences, open questions with their
-competing hypotheses, and findings.
+### After the slice: the notebook
+
+KNOWLEDGE.md Scenario 3's remaining half. (The remembered map with its
+ages, and the menu offering what is no longer so, ran already: the stale
+belief test.) The worker looks into the bin, writes down where the nails
+are in its notebook, puts the notebook in the bin, and goes. The smith
+takes the notebook and reads it, and comes to believe the nails are in the
+bin: testimony whose source and perceived root is the worker, recognized
+by the looks the writing gives, read in the notebook. The worker's memory
+is as it was. In `lab play`, `notebook` shows what the character knows,
+as it knows it, and `note` keeps the player's own notes, which never reach
+the character.
+
+- **Records** (`content/talk.tri`): `#Record` bodies carry `writing`, a
+  `#Writing` with its author, by their looks, and its entries, claims as
+  `#IsIn`. `write_down` (the copy operation) appends a claim the writer
+  composed from its beliefs (`writingAbout:`); `read` commits a "read"
+  event carrying the writing, and the reader takes each entry as testimony
+  from the author, `via` the record.
+- **`lab play`**: `notebook` (what the character remembers where, what it
+  was told and by whom, open questions where something is claimed in more
+  than one place, its findings, the traces it sees), `write <R>`, `read
+  <R>`, and `note <text>` / `notes`, the player's, out of character.
+
+What it settled:
+
+- **Free hands are not how someone looks.** A person described by their
+  looks no longer carries `freeHands`, so the writer, holding the notebook
+  when writing, is recognized by a reader who saw them with free hands.
+- **Writing is composed as text, not reprinted.** Printing a parsed
+  `#Agent` expands every open field, so the writing is kept as written,
+  split at top-level commas (`BGSplitTopLevel`).
+- **mulle's Foundation trims differently** (`stringByTrimmingCharactersInSet:`
+  left what Apple's removes), so the splitter trims in C.
+
+Not yet: true ancestry through records (what is read is untraced),
+forging and destroying records, reading taking time, records other than
+notebooks (ledgers, letters), and the player choosing which claim to
+write beyond "where something is".
+
+38 tests, 579 checks, under both compilers, ASan and UBSan, and leak-free.
+
+Next: AGENCY.md Scenario 2, *the false alarm*: goals scored by
+considerations, with expected value weighted by credence, a current
+intention kept unless another beats it by the margin plus the
+interruption cost, no dithering, and trust lowered when a rumour proves
+false.

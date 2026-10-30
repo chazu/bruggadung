@@ -596,6 +596,49 @@ static NSString   *effect_analyse( BGWorld *world, BGAction a, int64_t amount, B
 }
 
 
+/* Writing (the copy operation, KNOWLEDGE.md §15): the command's #Writing,
+ * its entries appended to what the record holds, under the author it has. */
+static NSString   *effect_write( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
+{
+   NSMutableArray   *entries;
+   NSArray          *added;
+   NSArray          *old;
+   NSString         *author;
+   NSString         *was;
+   const char       *written;
+
+   if( ! a.content || ! *a.content)
+      return( @"write what?");
+   author  = nil;
+   was     = nil;
+   added   = BGWritingEntries( a.content, &author);
+   written = [world textField:"Record.writing" of:a.roles[ BGRoleItem]];
+   old     = written && *written ? BGWritingEntries( written, &was) : nil;
+   if( ! added || ! author)
+      return( @"that is not writing");
+   entries = [NSMutableArray arrayWithArray:old ? old : [NSArray array]];
+   [entries addObjectsFromArray:added];
+   [g set:"Record.writing" of:BGWhole( a.roles[ BGRoleItem])
+   toText:[world intern:[[NSString stringWithFormat:@"#Writing & { author: %@, entries: [%@] }", was ? was : author,
+                                                    [entries componentsJoinedByString:@", "]] UTF8String]]];
+   [g emit:"wrote" subject:BGWhole( a.roles[ BGRoleActor]) other:BGWhole( a.roles[ BGRoleItem]) detail:a.content];
+   return( nil);
+}
+
+
+/* Reading: an event the reader perceives, carrying what the record holds. */
+static NSString   *effect_read( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
+{
+   const char   *written;
+
+   written = [world textField:"Record.writing" of:a.roles[ BGRoleItem]];
+   if( ! written || ! *written)
+      return( @"nothing is written in it");
+   [g emit:"read" subject:BGWhole( a.roles[ BGRoleActor]) other:BGWhole( a.roles[ BGRoleItem]) detail:written];
+   return( nil);
+}
+
+
 /* Tending changes nothing but traces, which the operation declares. */
 static NSString   *effect_tend( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
 {
@@ -628,6 +671,8 @@ static const struct
    { "say",       effect_say },
    { "tend",      effect_tend },
    { "analyse",   effect_analyse },
+   { "write",     effect_write },
+   { "read",      effect_read },
 };
 
 

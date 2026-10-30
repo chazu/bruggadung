@@ -1,4 +1,4 @@
-/* Generated from Triangle content 809d22ca731fa4dd: do not edit. Type IDs are valid
+/* Generated from Triangle content f6fad2790813eab7: do not edit. Type IDs are valid
  * only for this content; regenerate when it changes. */
 #ifndef BG_COMPONENTS_H
 #define BG_COMPONENTS_H
@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BG_CONTENT_HASH 0x809d22ca731fa4ddULL
+#define BG_CONTENT_HASH 0xf6fad2790813eab7ULL
 
 /* Activity, from #Activity */
 typedef struct {
@@ -58,6 +58,11 @@ typedef struct {
     int64_t         capacity;    /* int, in quanta of 1; content, saved, inspect, perceive(sight) */
 } BGContainer;
 
+/* Record, from #Record */
+typedef struct {
+    const char *    writing;    /* text; saved, proposable, inspect */
+} BGRecord;
+
 /* Stack, from #Stack */
 typedef struct {
     int64_t         count;    /* int, in quanta of 1; content, saved, proposable, inspect */
@@ -91,52 +96,52 @@ typedef struct {
 
 /* #ActivityStatus */
 enum {
-    BG_ACTIVITYSTATUS_COMPLETED = 109,
-    BG_ACTIVITYSTATUS_EXHAUSTED = 110,
-    BG_ACTIVITYSTATUS_FAILED = 111,
-    BG_ACTIVITYSTATUS_RUNNING = 112,
-    BG_ACTIVITYSTATUS_SUSPENDED = 113,
+    BG_ACTIVITYSTATUS_COMPLETED = 113,
+    BG_ACTIVITYSTATUS_EXHAUSTED = 114,
+    BG_ACTIVITYSTATUS_FAILED = 115,
+    BG_ACTIVITYSTATUS_RUNNING = 116,
+    BG_ACTIVITYSTATUS_SUSPENDED = 117,
 };
 
 /* #ClaimKind */
 enum {
-    BG_CLAIMKIND_CUSTODY = 115,
-    BG_CLAIMKIND_OWNERSHIP = 116,
+    BG_CLAIMKIND_CUSTODY = 119,
+    BG_CLAIMKIND_OWNERSHIP = 120,
 };
 
 /* #Material */
 enum {
-    BG_MATERIAL_FLESH = 167,
-    BG_MATERIAL_BRASS = 169,
-    BG_MATERIAL_IRON = 170,
-    BG_MATERIAL_PAPER = 171,
-    BG_MATERIAL_STEEL = 172,
-    BG_MATERIAL_OAK = 174,
+    BG_MATERIAL_FLESH = 173,
+    BG_MATERIAL_BRASS = 175,
+    BG_MATERIAL_IRON = 176,
+    BG_MATERIAL_PAPER = 177,
+    BG_MATERIAL_STEEL = 178,
+    BG_MATERIAL_OAK = 180,
 };
 
 /* "flesh" | "metal" | "natural" | "paper" | "wood" */
 enum {
-    BG_BODY_SURFACE_NATURAL = 97,
-    BG_BODY_SURFACE_FLESH = 167,
-    BG_BODY_SURFACE_BRASS = 169,
-    BG_BODY_SURFACE_IRON = 170,
-    BG_BODY_SURFACE_PAPER = 171,
-    BG_BODY_SURFACE_STEEL = 172,
-    BG_BODY_SURFACE_OAK = 174,
+    BG_BODY_SURFACE_NATURAL = 101,
+    BG_BODY_SURFACE_FLESH = 173,
+    BG_BODY_SURFACE_BRASS = 175,
+    BG_BODY_SURFACE_IRON = 176,
+    BG_BODY_SURFACE_PAPER = 177,
+    BG_BODY_SURFACE_STEEL = 178,
+    BG_BODY_SURFACE_OAK = 180,
 };
 
 /* #Colour */
 enum {
-    BG_COLOUR_BLUE = 119,
-    BG_COLOUR_BLACK = 121,
-    BG_COLOUR_BROWN = 122,
-    BG_COLOUR_GREEN = 123,
-    BG_COLOUR_GREY = 124,
-    BG_COLOUR_BEIGE = 126,
-    BG_COLOUR_NAVY = 127,
-    BG_COLOUR_RED = 128,
-    BG_COLOUR_WHITE = 129,
-    BG_COLOUR_YELLOW = 130,
+    BG_COLOUR_BLUE = 123,
+    BG_COLOUR_BLACK = 125,
+    BG_COLOUR_BROWN = 126,
+    BG_COLOUR_GREEN = 127,
+    BG_COLOUR_GREY = 128,
+    BG_COLOUR_BEIGE = 130,
+    BG_COLOUR_NAVY = 131,
+    BG_COLOUR_RED = 132,
+    BG_COLOUR_WHITE = 133,
+    BG_COLOUR_YELLOW = 134,
 };
 
 /* The field registry: what code needs to read and write any component
@@ -162,7 +167,7 @@ typedef struct {
     const BGFieldInfo *fields;
 } BGComponentInfo;
 
-#define BG_COMPONENT_COUNT 10
+#define BG_COMPONENT_COUNT 11
 
 #ifdef BG_COMPONENT_REGISTRY
 
@@ -210,6 +215,10 @@ static const BGFieldInfo BGContainer_fields[] = {
     { "capacity", offsetof(BGContainer, capacity), BG_VALUE_QUANTITY, "int", "content, saved, inspect, perceive(sight)" },
 };
 
+static const BGFieldInfo BGRecord_fields[] = {
+    { "writing", offsetof(BGRecord, writing), BG_VALUE_TEXT, "text", "saved, proposable, inspect" },
+};
+
 static const BGFieldInfo BGStack_fields[] = {
     { "count", offsetof(BGStack, count), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "unit", offsetof(BGStack, unit), BG_VALUE_TEXT, "text", "content, saved, inspect, perceive(sight)" },
@@ -244,6 +253,7 @@ static const BGComponentInfo BGComponents[BG_COMPONENT_COUNT + 1] = {
     { "Agent", "#Agent", sizeof(BGAgent), 5, BGAgent_fields },
     { "Assembly", "#Assembly", sizeof(BGAssembly), 1, BGAssembly_fields },
     { "Container", "#Container", sizeof(BGContainer), 1, BGContainer_fields },
+    { "Record", "#Record", sizeof(BGRecord), 1, BGRecord_fields },
     { "Stack", "#Stack", sizeof(BGStack), 3, BGStack_fields },
     { "Tap", "#Tap", sizeof(BGTap), 2, BGTap_fields },
     { "Trace", "#Trace", sizeof(BGTrace), 8, BGTrace_fields },

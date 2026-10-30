@@ -66,6 +66,11 @@
  * the thing now, or perceived before and gone) adds its finding, with the
  * rule as its provenance.
  *
+ * Reading a record (KNOWLEDGE.md §15) is how claims are heard from someone
+ * absent: each entry the agent reads is testimony whose source is the
+ * author, recognized by the looks the writing gives, and whose medium is
+ * the record.
+ *
  * Salience (KNOWLEDGE.md §7, AGENCY.md §10): what an agent perceives happen
  * is kept as an observation only if it is salient enough: being addressed
  * most, its own deeds next, then what its goals concern (agency says what
@@ -191,6 +196,7 @@ typedef struct
    int64_t          heard;         /* ms */
    uint32_t         source;        /* who said it */
    uint32_t         root;          /* who it says saw it, the perceived root; 0 if unknown */
+   uint32_t         via;           /* the record it was read in; 0 if said */
    BGAttribution    attribution;
    int              settled;       /* 1 seen true, -1 found false, 0 open */
    int32_t          sure;          /* dB: how sure "saw" says it is, or BG_UNSTATED */
@@ -260,6 +266,9 @@ typedef struct
  * (nil if it believes it nowhere inside something) */
 - (NSString *) askWhereIs:(uint32_t) thing;
 - (NSString *) askWhoToldOf:(uint32_t) thing;
+/* the claim about the thing, as writing for a record: a #Writing by the
+ * agent, by its looks; nil if it can't say where the thing is */
+- (NSString *) writingAbout:(uint32_t) thing;
 
 /* the referent as a Triangle description, for the knowledge view, with the
  * detail memory has kept */
@@ -357,6 +366,12 @@ typedef struct
 
 @end
 
+
+/* The parts of a text split at its top-level commas (outside quotes,
+ * brackets, braces, and parentheses), trimmed. */
+NSArray    *BGSplitTopLevel( NSString *text);
+/* A #Writing's author and entries, as written. nil if it isn't one. */
+NSArray    *BGWritingEntries( const char *writing, NSString **author);
 
 /* A text as one word for a save line, and back (the result is malloced). */
 NSString   *BGEncodeWord( const char *s);

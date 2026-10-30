@@ -44,3 +44,36 @@ say: #Operation & {
         item:  #Agent
     }
 } @family(operations)
+
+// Records (KNOWLEDGE.md §10, §15): a body that carries writing. Writing is
+// the copy operation: what the writer believes becomes content, with the
+// writer as its author; whoever reads it gains claims whose source is the
+// author and whose medium is the record. It can be stolen, and read by the
+// thief, and the writer's memory is untouched.
+#Record: #Body & {
+    @component(Record)
+    writing: text @field(saved, proposable, inspect)
+}
+
+// What a record holds: who wrote it, by their looks, and the claims written.
+#Writing: { author: #Agent, entries: [...#IsIn] }
+
+// Write a claim into a record the actor holds. What is written is the
+// command's: a #Writing with one entry.
+write_down: #Operation & {
+    effect: "write"
+    uses:   ["hands"]
+    roles: {
+        actor: #Agent & { id: $a }
+        item:  #Record & { place: #Held & { by: $a } }
+    }
+} @family(operations)
+
+// Read a record within reach.
+read: #Operation & {
+    effect: "read"
+    roles: {
+        actor: #Agent
+        item:  #Record
+    }
+} @family(operations)

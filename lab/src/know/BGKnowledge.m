@@ -539,13 +539,23 @@ static BOOL   counts( const BGTestimony *t, uint32_t thing, uint32_t container)
    const BGReferent   *r;
    NSString           *features;
 
+   NSMutableArray     *kept;
+   NSArray            *pairs;
+   NSUInteger         i;
+
    r = [self referent:referentID];
    if( ! r || ! r->kind)
       return( nil);
+   /* how it looks, not what it is doing: free hands come and go */
    features = [self recall:r];
-   if( ! [features length])
+   pairs    = [features length] ? BGSplitTopLevel( features) : [NSArray array];
+   kept     = [NSMutableArray array];
+   for( i = 0; i < [pairs count]; i++)
+      if( ! [[pairs objectAtIndex:i] hasPrefix:@"freeHands:"])
+         [kept addObject:[pairs objectAtIndex:i]];
+   if( ! [kept count])
       return( [NSString stringWithUTF8String:r->kind]);
-   return( [NSString stringWithFormat:@"%s & { %@ }", r->kind, features]);
+   return( [NSString stringWithFormat:@"%s & { %@ }", r->kind, [kept componentsJoinedByString:@", "]]);
 }
 
 
@@ -613,6 +623,17 @@ static BOOL   counts( const BGTestimony *t, uint32_t thing, uint32_t container)
       return( [self claimAbout:thing]);
    return( [self claimThat:r isIn:c attribution:[NSString stringWithFormat:@"#Saw & { sure: %d }", BG_SEEN]
                       when:_world ? [_world time].ms : 0]);
+}
+
+
+- (NSString *) writingAbout:(uint32_t) thing
+{
+   NSString   *claim;
+
+   claim = [self claimAbout:thing];
+   if( ! claim || ! [self describeLooks:_self])
+      return( nil);
+   return( [NSString stringWithFormat:@"#Writing & { author: %@, entries: [%@] }", [self describeLooks:_self], claim]);
 }
 
 
@@ -1155,6 +1176,7 @@ static char   *concrete_features( const char *printed)
  * as of the claim's `when`, told by the speaker. */
 - (void) believe:(const char *) content
             from:(uint32_t) speaker
+             via:(uint32_t) record
        utterance:(uint64_t) utterance
               at:(int64_t) now
            store:(BGKnowledgeStore *) store
@@ -1278,6 +1300,7 @@ static char   *concrete_features( const char *printed)
 
    t.thing     = thing;
    t.container = cid;
+   t.via       = record;
    t.when      = when;
    t.heard     = now;
    t.utterance = utterance;
@@ -1802,6 +1825,32 @@ static BOOL   bears( BGKnowledgeStore *store, uint32_t referent, const char *kin
 
    [self perceiveTraces:store at:here now:now seen:seen assigned:assigned count:nseen news:news];
 
+   /* what it read: each entry, from the author, in the record */
+   for( i = first; i < last; i++)
+   {
+      const TriNode   *who;
+      TriArena        *arena;
+      NSArray         *entries;
+      NSString        *by;
+      NSUInteger      k;
+      uint32_t        author;
+      uint32_t        record;
+
+      ev = [_world eventAt:i];
+      if( ev->actor != agent || strcmp( ev->kind, "read") || ! ev->detail)
+         continue;
+      by      = nil;
+      entries = BGWritingEntries( ev->detail, &by);
+      arena   = tri_arena_new();
+      who     = by ? tri_value( [_world tri], [by UTF8String], arena, NULL, 0) : NULL;
+      author  = who ? [self person:who store:store news:news] : 0;
+      tri_arena_free( arena);
+      record  = bound_to( ev->other, agent, [store selfReferent], seen, assigned, nseen);
+      for( k = 0; author && k < [entries count]; k++)
+         [self believe:[[entries objectAtIndex:k] UTF8String] from:author via:record utterance:ev->index at:now
+                 store:store news:news];
+   }
+
    /* what its own analyses found beneath the looks of what they analysed */
    for( i = first; i < last; i++)
    {
@@ -1917,7 +1966,7 @@ static BOOL   bears( BGKnowledgeStore *store, uint32_t referent, const char *kin
       }
       [store addObservation:o restored:NO];
       if( ! strcmp( ev->kind, "said") && ev->detail && o.actor && o.actor != [store selfReferent])
-         [self believe:ev->detail from:o.actor utterance:ev->index at:now store:store news:news];
+         [self believe:ev->detail from:o.actor via:0 utterance:ev->index at:now store:store news:news];
    }
    memory = [_world record:[_world kindNamed:"Agent"] for:agent];
    [store keepAtMost:memory && memory->memory > 0 ? (NSUInteger) memory->memory : 64];
@@ -2103,7 +2152,8 @@ static NSString   *attribution_text( const BGTestimony *t)
          if( u->thing != t->thing || u->container != t->container)
             continue;
          a = [self rootOf:u->utterance];
-         [s appendFormat:@"    R%u said so at %lldms, as of %lldms: %@, %@, weight %+d dB%s; truly %@\n", u->source,
+         [s appendFormat:@"    R%u %@ at %lldms, as of %lldms: %@, %@, weight %+d dB%s; truly %@\n", u->source,
+                         u->via ? [NSString stringWithFormat:@"wrote so in R%u, read", u->via] : @"said so",
                          (long long) u->heard, (long long) u->when, attribution_text( u),
                          u->root ? [NSString stringWithFormat:@"root R%u", u->root] : @"root unknown",
                          [store weightOf:u], u->settled > 0 ? ", seen true" : u->settled < 0 ? ", found false" : "",
@@ -2186,6 +2236,78 @@ static NSString   *attribution_text( const BGTestimony *t)
 
 
 /* --- saves --------------------------------------------------------------------------- */
+
+NSArray   *BGSplitTopLevel( NSString *text)
+{
+   NSMutableArray   *parts;
+   const char       *s;
+   const char       *p;
+   const char       *start;
+   int              depth;
+   BOOL             quoted;
+
+   parts  = [NSMutableArray array];
+   s      = [text UTF8String];
+   depth  = 0;
+   quoted = NO;
+   for( start = p = s; ; p++)
+   {
+      if( *p == '"' && (p == s || p[ -1] != '\\'))
+         quoted = ! quoted;
+      if( quoted && *p)
+         continue;
+      if( *p == '{' || *p == '[' || *p == '(')
+         depth++;
+      else if( (*p == '}' || *p == ']' || *p == ')') && depth > 0)
+         depth--;
+      else if( (*p == ',' && ! depth) || ! *p)
+      {
+         const char   *end;
+
+         while( start < p && *start == ' ')
+            start++;
+         for( end = p; end > start && end[ -1] == ' '; end--)
+            ;
+         [parts addObject:[[[NSString alloc] initWithBytes:(void *) start length:(NSUInteger) (end - start)
+                                                  encoding:NSUTF8StringEncoding] autorelease]];
+         start = p + 1;
+      }
+      if( ! *p)
+         break;
+   }
+   return( parts);
+}
+
+
+NSArray   *BGWritingEntries( const char *writing, NSString **author)
+{
+   NSString     *text;
+   NSString     *pair;
+   NSString     *list;
+   NSArray      *pairs;
+   NSRange      open;
+   NSUInteger   i;
+
+   text = writing ? [NSString stringWithUTF8String:(char *) writing] : nil;
+   if( ! [text hasPrefix:@"#Writing & {"] || ! [text hasSuffix:@"}"])
+      return( nil);
+   open  = [text rangeOfString:@"{"];
+   pairs = BGSplitTopLevel( [text substringWithRange:NSMakeRange( open.location + 1,
+                                                                   [text length] - open.location - 2)]);
+   list  = nil;
+   for( i = 0; i < [pairs count]; i++)
+   {
+      pair = [pairs objectAtIndex:i];
+      if( [pair hasPrefix:@"author: "] && author)
+         *author = [pair substringFromIndex:8];
+      if( [pair hasPrefix:@"entries: ["] && [pair hasSuffix:@"]"])
+         list = [pair substringWithRange:NSMakeRange( 10, [pair length] - 11)];
+   }
+   if( ! [list length])
+      return( [NSArray array]);
+   return( BGSplitTopLevel( list));
+}
+
 
 NSString   *BGEncodeWord( const char *s)
 {
@@ -2298,11 +2420,11 @@ char   *BGDecodeWord( const char *s)
       for( j = 0; j < [store testimonyCount]; j++)
       {
          t = [store testimonyAt:j];
-         [lines addObject:[NSString stringWithFormat:@"told %llu %u %u %lld %lld %u %u %d %d %d %llu",
+         [lines addObject:[NSString stringWithFormat:@"told %llu %u %u %lld %lld %u %u %d %d %d %llu %u",
                                                      (unsigned long long) [store agent], t->thing, t->container,
                                                      (long long) t->when, (long long) t->heard, t->source, t->root,
                                                      (int) t->attribution, t->settled, t->sure,
-                                                     (unsigned long long) t->utterance]];
+                                                     (unsigned long long) t->utterance, t->via]];
       }
    }
    for( j = 0; j < _nancestry; j++)
@@ -2381,8 +2503,8 @@ char   *BGDecodeWord( const char *s)
          [[self storeOf:(BGEntityID) agent] addObservation:o restored:YES];
          free( o.content);
       }
-      else if( sscanf( text, "told %llu %u %u %lld %lld %u %u %d %d %d %llu", &agent, &id, &container, &seen, &inside,
-                       &told, &me, &form, &present, &trust, &truth) == 11)
+      else if( sscanf( text, "told %llu %u %u %lld %lld %u %u %d %d %d %llu %u", &agent, &id, &container, &seen, &inside,
+                       &told, &me, &form, &present, &trust, &truth, &next) == 12)
       {
          memset( &t, 0, sizeof( t));
          t.thing       = id;
@@ -2395,6 +2517,7 @@ char   *BGDecodeWord( const char *s)
          t.settled     = present;
          t.sure        = trust;
          t.utterance   = truth;
+         t.via         = next;
          [[self storeOf:(BGEntityID) agent] appendTestimony:t];
       }
       else if( sscanf( text, "tracing %llu %u %d %d %d %d %lld %d %llu %63s", &agent, &id, &x, &y, &level, &trust,

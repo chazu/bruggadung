@@ -15,6 +15,13 @@
  *   ask <R> who <R>       ask someone who told them where it is
  *   tell <R> <R> [in <R>] tell someone where something is, as you believe;
  *                         in a container you don't believe it is in: a lie
+ *   notebook              what the actor knows, as it knows it: what it
+ *                         remembers where, what it was told and how much
+ *                         it believes it, open questions, findings, traces
+ *   write <R>             write where something is into a notebook held
+ *   read <R>              read a record in reach
+ *   note <text>, notes    the player's own notes, out of character: they
+ *                         never reach the actor's knowledge
  *   as <id>               control another agent; agency answers for the
  *                         others when they are asked
  *   activities            the actor's activities, with their stages
@@ -58,6 +65,7 @@
    BGMenu           *_menu;
    BGEntityID       _actor;
    NSMutableString  *_out;
+   NSMutableArray   *_notes;            /* the player's, out of character */
    BOOL             _inputDue;
    NSUInteger       _traceShown;
 }

@@ -47,3 +47,6 @@ gossip: #Agent & { material: "flesh", mass: 65kg, hands: 2, coat: "beige", memor
 // For appearance and truth: a fitting that looks brass, and is brass-plated
 // steel.
 fitting: #Body & { material: "steel", surface: "brass", mass: 400g }
+
+// For the notebook: a record a character writes in, which can be stolen.
+notebook: #Record & { material: "paper", mass: 200g }
