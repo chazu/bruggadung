@@ -504,6 +504,117 @@ static NSUInteger   feature_keys( const char *features, char (*keys)[ 32], NSUIn
 }
 
 
+- (void) mergeReferent:(uint32_t) from
+          into:(uint32_t) into
+{
+   BGReferent   *a;
+   BGReferent   *b;
+   BGReferent   keep;
+   NSUInteger   i;
+   NSUInteger   k;
+   NSUInteger   n;
+   int          h;
+
+   a = [self mutableReferent:from];
+   b = [self mutableReferent:into];
+   if( ! a || ! b || from == into || from == _self || into == _self)
+      return;
+   /* what was seen last is how it looks, and where */
+   if( a->seen > b->seen)
+   {
+      keep = *b;
+      free( b->kind);
+      free( b->features);
+      free( b->deeper);
+      b->kind       = a->kind;
+      b->features   = a->features;
+      b->deeper     = a->deeper;
+      a->kind       = NULL;
+      a->features   = NULL;
+      a->deeper     = NULL;
+      b->form       = a->form;
+      b->container  = a->container;
+      b->x          = a->x;
+      b->y          = a->y;
+      b->level      = a->level;
+      b->slot       = a->slot;
+      memcpy( b->role, a->role, sizeof( b->role));
+      b->seen       = a->seen;
+      b->toldBy     = a->toldBy;
+      b->present    = a->present;
+      b->truth      = a->truth;
+      b->insideSeen = a->insideSeen > keep.insideSeen ? a->insideSeen : keep.insideSeen;
+   }
+   b->sightings += a->sightings;
+   b->salience   = a->salience > b->salience ? a->salience : b->salience;
+   b->loyalty    = a->loyalty > b->loyalty ? a->loyalty : b->loyalty;
+   b->trust     += a->trust - BG_TRUST;
+   if( b->trust > BG_TRUST_LIMIT)
+      b->trust = BG_TRUST_LIMIT;
+   if( b->trust < -BG_TRUST_LIMIT)
+      b->trust = -BG_TRUST_LIMIT;
+
+   /* everything of `from`'s is `into`'s */
+   for( i = 0; i < _count; i++)
+      if( _referents[ i].container == from)
+         _referents[ i].container = into;
+   for( i = 0; i < _ntestimony; i++)
+   {
+      if( _testimony[ i].thing == from)
+         _testimony[ i].thing = into;
+      if( _testimony[ i].container == from)
+         _testimony[ i].container = into;
+      if( _testimony[ i].source == from)
+         _testimony[ i].source = into;
+      if( _testimony[ i].root == from)
+         _testimony[ i].root = into;
+      if( _testimony[ i].via == from)
+         _testimony[ i].via = into;
+   }
+   for( i = 0; i < _nfindings; i++)
+   {
+      if( _findings[ i].about == from)
+         _findings[ i].about = into;
+      if( _findings[ i].choice == from)
+         _findings[ i].choice = into;
+   }
+   for( i = 0; i < _nobservations; i++)
+   {
+      if( _observations[ i].actor == from)
+         _observations[ i].actor = into;
+      if( _observations[ i].subject == from)
+         _observations[ i].subject = into;
+      if( _observations[ i].other == from)
+         _observations[ i].other = into;
+   }
+   for( i = 0; i < _ntraces; i++)
+      if( _traces[ i].bearer == from)
+         _traces[ i].bearer = into;
+   for( i = 0, n = 0; i < _nidentities; i++)
+   {
+      if( _identities[ i].a == from)
+         _identities[ i].a = into;
+      if( _identities[ i].b == from)
+         _identities[ i].b = into;
+      if( _identities[ i].a != _identities[ i].b)
+         _identities[ n++] = _identities[ i];
+   }
+   _nidentities = n;
+
+   /* and `from` is gone */
+   for( k = 0; k < _count && _referents[ k].id != from; k++)
+      ;
+   a = &_referents[ k];
+   free( a->kind);
+   free( a->features);
+   free( a->deeper);
+   for( h = 0; h < BG_HYPOTHESES; h++)
+      free( a->supposed[ h]);
+   memmove( &_referents[ k], &_referents[ k + 1], sizeof( BGReferent) * (_count - k - 1));
+   _count--;
+}
+
+
 - (NSUInteger) identityCount
 {
    return( _nidentities);
@@ -2613,6 +2724,48 @@ static int32_t   loyalty( BGWorld *world, BGEntityID holder, BGEntityID toward)
 }
 
 
+/* Each identity hypothesis whose credence reaches the threshold content
+ * declares (`recognition`'s `mergeAt`): the two merged, into the older. */
+- (void) mergeIdentities:(BGKnowledgeStore *) store
+                    news:(NSMutableArray *) news
+{
+   const BGIdentity   *h;
+   const TriNode      *v;
+   TriContent         *tri;
+   TriIndex           *family;
+   NSUInteger         i;
+   int64_t            threshold;
+   int64_t            lo;
+   int64_t            hi;
+   uint32_t           a;
+   uint32_t           b;
+   int32_t            credence;
+
+   tri       = [_world tri];
+   family    = tri_family_index( tri, "recognition");
+   threshold = INT64_MAX;
+   for( i = 0; family && i < tri_index_count( family); i++)
+      if( (v = tri_at( tri, tri_pattern( tri, tri_index_tag( family, i)), "mergeAt")) &&
+          tri_node_interval( v, &lo, &hi) && lo == hi)
+         threshold = lo;
+   for( i = 0; i < [store identityCount];)
+   {
+      h = [store identityAt:i];
+      if( h->credence < threshold)
+      {
+         i++;
+         continue;
+      }
+      a        = h->a;
+      b        = h->b;
+      credence = h->credence;
+      [store mergeReferent:a into:b];
+      [news addObject:[NSString stringWithFormat:@"R%u is R%u (%+d dB): one, not two", a, b, credence]];
+      i = 0;
+   }
+}
+
+
 /* The referent a perceived entity was bound to this phase, or 0. */
 static uint32_t   bound_to( BGEntityID e, BGEntityID agent, uint32_t me, const BGSeen *seen, const uint32_t *assigned,
                             NSUInteger nseen)
@@ -3974,6 +4127,9 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
          }
       }
    }
+   /* believed the same past the threshold content declares (KNOWLEDGE.md
+    * decision 13): one referent, the older */
+   [self mergeIdentities:store news:news];
    memory = [_world record:[_world kindNamed:"Agent"] for:agent];
    [store keepAtMost:memory && memory->memory > 0 ? (NSUInteger) memory->memory : 64];
    /* what the events attended to left of the budget, for traces new to it,

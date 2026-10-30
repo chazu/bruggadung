@@ -444,6 +444,14 @@ typedef struct
 - (BOOL) feelTired:(int32_t) tired;
 - (BOOL) feelPain:(int32_t) pain;
 
+/* Believed the same (KNOWLEDGE.md decision 13): `from` merged into `into`,
+ * one referent, `into`. What was seen last of either is what it looks like
+ * and where it is; sightings add, salience and loyalty are the more of the
+ * two, trust in it moves by both's conduct; everything of `from`'s
+ * (testimony, findings, observations, traces, what it holds, hypotheses
+ * about it) is `into`'s. */
+- (void) mergeReferent:(uint32_t) from
+          into:(uint32_t) into;
 /* its identity hypotheses, first made first */
 - (NSUInteger) identityCount;
 - (const BGIdentity *) identityAt:(NSUInteger) i;

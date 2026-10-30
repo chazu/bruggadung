@@ -14,3 +14,9 @@ coat_persists: #Persistence & { feature: "coat", persists: 1d } @family(persiste
 #Acuity: #OfFeature & { blur: int }
 
 size_blurs: #Acuity & { feature: "size", blur: 1 } @family(acuity)
+
+// Believed the same past `mergeAt` dB (KNOWLEDGE.md decision 13), two
+// referents merge into one; a wrong merge stands until they are seen apart.
+#Merging: { mergeAt: int }
+
+identities_merge: #Merging & { mergeAt: 20 } @family(recognition)

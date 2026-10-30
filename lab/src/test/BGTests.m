@@ -5921,6 +5921,7 @@ typedef struct
    NSString      *atDusk;        /* the visitor's referent, after the dusk sighting */
    NSUInteger    compactions;    /* of the porter's knowledge arena */
    int32_t       before;         /* the hypothesis' credence, made */
+   BOOL          merged;         /* no hypothesis left after the third sighting */
    NSString      *text;
 } BGCoatRun;
 
@@ -5930,7 +5931,7 @@ typedef struct
  * coat looks only dark; next morning, a figure in a brown coat (B: a
  * stranger of the visitor's build; A: the visitor, in a brown coat now); a
  * week later, the brown-coated figure again. */
-static BGCoatRun   coat_at_dusk( BOOL sameOne, BOOL compactAlways)
+static BGCoatRun   coat_at_dusk( BOOL sameOne, BOOL compactAlways, BOOL thrice, BOOL together)
 {
    BGStage            st;
    BGKnowledge        *knowledge;
@@ -5982,6 +5983,21 @@ static BGCoatRun   coat_at_dusk( BOOL sameOne, BOOL compactAlways)
    [st.s runUntil:BGTimeMake( 12 * 3600000LL + 7 * day)];
    stage_move( &st, figure, 13, 11);
 
+   /* and again, a week later (KNOWLEDGE.md decision 13); then the visitor
+    * and the stranger together */
+   if( thrice)
+   {
+      stage_move( &st, figure, 30, 30);
+      [st.s runUntil:BGTimeMake( 12 * 3600000LL + 14 * day)];
+      stage_move( &st, figure, 13, 11);
+      run.merged = [[knowledge storeOf:run.porter] identityCount] == 0;
+   }
+   if( together)
+   {
+      stage_move( &st, run.visitor, 12, 10);
+      stage_move( &st, run.smith, 13, 11);
+   }
+
    run.world     = st.w;
    run.knowledge = knowledge;
    run.text      = BGSave( st.w, st.c, [NSArray arrayWithObject:knowledge]);
@@ -6004,7 +6020,7 @@ static void   test_coat_at_dusk( void)
    NSString           *error;
    uint64_t           position;
 
-   b     = coat_at_dusk( NO, NO);
+   b     = coat_at_dusk( NO, NO, NO, NO);
    store = [b.knowledge storeOf:b.porter];
 
    /* at dusk the coat looks only dark; it unifies with the visitor's grey,
@@ -6028,19 +6044,19 @@ static void   test_coat_at_dusk( void)
 
    /* A: the visitor itself, in a brown coat: the decayed memory leads to the
     * right answer, for a weak reason */
-   a     = coat_at_dusk( YES, NO);
+   a     = coat_at_dusk( YES, NO, NO, NO);
    store = [a.knowledge storeOf:a.porter];
 
    BG_CHECK( [store identityCount] == 1 && [store identityAt:0]->credence == b.before + 10);
    BG_CHECK( [[a.knowledge dump:a.porter] rangeOfString:@"truly the same"].location != NSNotFound);
 
    /* the same on replay, and saved */
-   again = coat_at_dusk( NO, NO);
+   again = coat_at_dusk( NO, NO, NO, NO);
    BG_CHECK( [again.text isEqualToString:b.text]);
 
    /* 6: compaction: the porter's knowledge arena compacted at every
     * boundary changes nothing observable; the save is the same to the byte */
-   compacted = coat_at_dusk( NO, YES);
+   compacted = coat_at_dusk( NO, YES, NO, NO);
    BG_CHECK( compacted.compactions >= 5 && compacted.compactions > b.compactions);
    BG_CHECK( [compacted.text isEqualToString:b.text]);
    BG_CHECK( [[compacted.knowledge dump:compacted.porter] isEqualToString:[b.knowledge dump:b.porter]]);
@@ -6049,6 +6065,30 @@ static void   test_coat_at_dusk( void)
    restored = [[[BGKnowledge alloc] initWithWorld:w2] autorelease];
    [restored restoreSavedState:BGSavedDomainState( b.text, @"knowledge")];
    BG_CHECK( [[restored dump:b.porter] isEqualToString:[b.knowledge dump:b.porter]]);
+
+   /* KNOWLEDGE.md decision 13: believed the same past the threshold (20 dB),
+    * two referents merge. A third sighting that fits both: the porter now
+    * holds one referent for the visitor and the brown-coated figure, the
+    * older of the two, with no hypothesis left. In B it is wrong, two
+    * people taken for one; it stands until they are seen together, when
+    * they are two again */
+   {
+      BGCoatRun          merged;
+      BGCoatRun          apart;
+      BGKnowledgeStore   *ms;
+      uint32_t           older;
+
+      store  = [b.knowledge storeOf:b.porter];
+      older  = referent_of( store, b.visitor);
+      merged = coat_at_dusk( NO, NO, YES, NO);
+      ms     = [merged.knowledge storeOf:merged.porter];
+      BG_CHECK( merged.merged && [ms identityCount] == 0);
+      BG_CHECK( referent_of( ms, merged.smith) == older && ! referent_of( ms, merged.visitor));
+      apart = coat_at_dusk( NO, NO, YES, YES);
+      ms    = [apart.knowledge storeOf:apart.porter];
+      BG_CHECK( referent_of( ms, apart.smith) && referent_of( ms, apart.visitor) &&
+                referent_of( ms, apart.smith) != referent_of( ms, apart.visitor));
+   }
 }
 
 

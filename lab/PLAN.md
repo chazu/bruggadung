@@ -3700,3 +3700,32 @@ generalizes, fading with it); distraction checked end to end (no
 operation yet demands half the attention); intoxication.
 
 90 tests, 2813 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: believed the same, two referents merge
+
+KNOWLEDGE.md decision 13: past a credence threshold content declares, an
+identity hypothesis merges two referents into one: features unified,
+beliefs and testimony pooled. A wrong merge stands until evidence splits
+them (both seen at once).
+
+- **`identities_merge`** (persistence.tri, `recognition` family): merge at
+  20 dB.
+- **`mergeReferent:into:`**: the newer into the older. How it looks and
+  where it is come from whichever was seen last; sightings add; salience
+  and loyalty are the more of the two; trust moves by both's conduct;
+  every testimony, finding, observation, trace, containment and identity
+  hypothesis naming the newer names the older. Perception merges at the
+  end of each pass.
+- **Split**: seen both at once, perception binds the merged referent to
+  one and makes a new one for the other, as it would for any second
+  thing.
+
+Checked: in the coat at dusk, a third sighting of the brown-coated
+stranger, fitting both, raises the hypothesis to 20 and the porter holds
+one referent, the visitor's, now the stranger's look, and no hypothesis.
+Wrong, it stands; the two seen together, the porter holds two again.
+
+Not yet: undoing what was pooled when they split (beliefs gathered under
+the merged referent stay with it).
+
+90 tests, 2816 checks, under both compilers, ASan, and leak-free.
