@@ -12,6 +12,9 @@
 #CoveredUp: #Finding & {}
 // Something stirred there.
 #Disturbance: #Finding & {}
+// Someone does something the same way, again and again (AGENCY.md §8): the
+// finding's choice is the way.
+#Habit: #Finding & {}
 
 // A rule's premises, over the body it is about.
 #Premise:  {}
@@ -21,6 +24,8 @@
 #Formerly: #Premise & { formerly: text }
 // a trace of this kind perceived on the floor at it or beside it
 #Near:     #Premise & { near: text }
+// it was seen to put things into the same container at least this often
+#Repeated: #Premise & { repeated: int }
 
 #Skill: "painting"
 
@@ -57,5 +62,13 @@ stirring: #Rule & {
     premises:  [#Near & { near: "clatter" }]
     mastery:   0
     concludes: "#Disturbance"
+    weight:    10
+} @family(rules)
+
+// Seen putting things in the same place three times: they usually do.
+usually_puts: #Rule & {
+    premises:  [#Repeated & { repeated: 3 }]
+    mastery:   0
+    concludes: "#Habit"
     weight:    10
 } @family(rules)

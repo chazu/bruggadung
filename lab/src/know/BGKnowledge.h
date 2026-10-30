@@ -76,6 +76,10 @@
  * band of ten below, and dulled by what its running activity demands of
  * its attention. It acts on what it feels, not on what its body is.
  *
+ * Habits seen in others (AGENCY.md §8): a rule over repeated observations
+ * concludes someone usually puts things in the same place; seeing them put
+ * something elsewhere is an anomaly, and salient.
+ *
  * Salience (KNOWLEDGE.md §7, AGENCY.md §10): what an agent perceives happen
  * is kept as an observation only if it is salient enough: being addressed
  * most, its own deeds next, then what its goals concern (agency says what
@@ -119,6 +123,7 @@
 #define BG_ADDRESSED      30      /* said to the agent */
 #define BG_OWN_DEED       20      /* done by the agent */
 #define BG_CONCERN        15      /* about something its goals concern */
+#define BG_ANOMALY        25      /* against what it believes someone usually does */
 #define BG_NOTICE         10      /* what an observation must reach to be kept, at rest */
 
 typedef struct
@@ -186,6 +191,7 @@ typedef struct
 {
    const char       *kind;         /* interned: a #Finding type, "#Tampered" */
    uint32_t         about;         /* referent */
+   uint32_t         choice;        /* for a #Habit: the referent it usually chooses; else 0 */
    int32_t          credence;      /* dB */
    const char       *rule;         /* interned: its provenance */
    int64_t          time;          /* ms */

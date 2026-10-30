@@ -146,10 +146,30 @@ typedef struct
    NSUInteger         norder;
    char               search[ 32];                 /* the slot to search, or "" */
    int64_t            since;                       /* searched means its inside was seen since */
+   const char         *instance;                   /* the method or goal */
+   const char         *slot;                       /* the slot being bound */
+   BGMotivation       *mind;                       /* whose habits order it, or nil */
+   int64_t            now;
    BGKnowledgeStore   *store;
    const BGReferent   *me;
    NSUInteger         tries;
 } BGCondition;
+
+
+/* How strong the habit is at `now`: faded a point a day since. */
+static int32_t   habit_strength( BGMotivation *m, const char *context, uint32_t choice, int64_t now)
+{
+   int32_t   s;
+   int       k;
+
+   for( k = 0; m && k < m->nhabits; k++)
+      if( ! strcmp( m->habits[ k].context, context) && m->habits[ k].choice == choice)
+      {
+         s = m->habits[ k].strength - (int32_t) (BG_HABIT_FADE * ((now - m->habits[ k].at) / 86400000LL));
+         return( s > 0 ? s : 0);
+      }
+   return( 0);
+}
 
 
 static int   compare_candidates( BGCondition *c, const BGReferent *a, const BGReferent *b)
@@ -157,9 +177,18 @@ static int   compare_candidates( BGCondition *c, const BGReferent *a, const BGRe
    NSUInteger   k;
    int          da;
    int          db;
+   char         context[ 128];
 
    for( k = 0; k < c->norder; k++)
-      if( ! strcmp( c->order[ k], "near"))
+      if( ! strcmp( c->order[ k], "habit") && c->mind && c->instance && c->slot)
+      {
+         snprintf( context, sizeof( context), "%s.%s", c->instance, c->slot);
+         da = habit_strength( c->mind, context, a->id, c->now);
+         db = habit_strength( c->mind, context, b->id, c->now);
+         if( da != db)
+            return( da > db ? -1 : 1);
+      }
+      else if( ! strcmp( c->order[ k], "near"))
       {
          da = distance( c->me, a);
          db = distance( c->me, b);
@@ -437,6 +466,7 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    m              = [self mindOf:agent];
    m->nintentions = 0;
    m->waiting     = NO;
+   m->wake        = [_world time].ms + 1;     /* it decides soon, whatever else happens */
    [self adopt:goal mind:m params:NULL count:0];
    return( YES);
 }
@@ -457,8 +487,11 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
 
    tri = [_world tri];
    memset( c, 0, sizeof( *c));
-   c->store = store;
-   c->me    = [store referent:[store selfReferent]];
+   c->store    = store;
+   c->me       = [store referent:[store selfReferent]];
+   c->instance = instance;
+   c->mind     = _deciding && _deciding->agent == [store agent] ? _deciding : nil;
+   c->now      = [_world time].ms;
    for( v = 0; v < variants_of( tri, instance, variants, BG_MAX_VARIANTS); v++)
    {
       snprintf( sub, sizeof( sub), "%s.match", path);
@@ -568,6 +601,7 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
       return( NO);
 
    ncandidates = 0;
+   c->slot     = slot;
    for( i = 0; i < [c->store count] && ncandidates < 64; i++)
    {
       r = [c->store referentAt:i];
@@ -817,6 +851,33 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
 
 /* --- deciding ----------------------------------------------------------------------- */
 
+/* A repetition: the habit grows, from what is left of it. */
+- (void) practise:(BGMotivation *) m
+          context:(const char *) context
+           choice:(uint32_t) choice
+{
+   BGHabit   *h;
+   int32_t   s;
+   int       k;
+
+   context = [_world intern:context];
+   s       = habit_strength( m, context, choice, [_world time].ms);
+   for( k = 0; k < m->nhabits && ! (m->habits[ k].context == context && m->habits[ k].choice == choice); k++)
+      ;
+   if( k == m->nhabits)
+   {
+      if( m->nhabits == BG_MAX_HABITS)
+         return;
+      m->nhabits++;
+   }
+   h           = &m->habits[ k];
+   h->context  = context;
+   h->choice   = choice;
+   h->strength = s + BG_HABIT_GAIN > 100 ? 100 : s + BG_HABIT_GAIN;
+   h->at       = [_world time].ms;
+}
+
+
 /* The method's failure: the goal tries its next. */
 - (void) fail:(BGMotivation *) m
        method:(int) index
@@ -932,8 +993,23 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
          content = text;
       }
       if( [self act:m why:title store:store operation:op object:roles[ 0] target:roles[ 1]
-              units:int_at( tri, step, "units", 0) content:content] &&
-          content && tri_subtype( tri, tri_node_type( says), tri_type_named( tri, "#Question")))
+              units:int_at( tri, step, "units", 0) content:content])
+      {
+         char   context[ 128];
+
+         /* a repetition of the method, and of what it chose for each slot */
+         snprintf( context, sizeof( context), "%s:%s", m->intentions[ m->nintentions - 1].goal, method);
+         [self practise:m context:context choice:0];
+         for( k = 0; k < 2; k++)
+            if( roles[ k] && text_at( tri, step, names[ k], slot, sizeof( slot)))
+            {
+               snprintf( context, sizeof( context), "%s.%s", method, slot);
+               [self practise:m context:context choice:roles[ k]];
+            }
+      }
+      else
+         content = NULL;
+      if( content && tri_subtype( tri, tri_node_type( says), tri_type_named( tri, "#Question")))
       {
          m->awaiting   = roles[ 0];
          m->awaitSince = [_world time].ms;
@@ -1653,8 +1729,9 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    int                n;
    int                k;
 
-   store = [_knowledge storeOf:m->agent];
-   me    = [store referent:[store selfReferent]];
+   store     = [_knowledge storeOf:m->agent];
+   me        = [store referent:[store selfReferent]];
+   _deciding = m;
    if( m->wake && m->wake <= [_world time].ms)
       m->wake = 0;
    if( ! me || m->handedBack)
@@ -1729,6 +1806,18 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
          continue;
       parts = [NSMutableArray array];
       score = [self sum:methods[ i] path:"score" bindings:b count:n store:store parts:parts];
+      {
+         char      context[ 128];
+         int32_t   habit;
+
+         snprintf( context, sizeof( context), "%s:%s", top->goal, methods[ i]);
+         habit = habit_strength( m, context, 0, [_world time].ms) / 10;
+         if( habit)
+         {
+            score += habit;
+            [parts addObject:[NSString stringWithFormat:@"habit %+d", habit]];
+         }
+      }
       if( [parts count])
          [scores addObject:[NSString stringWithFormat:@"%s %+d (%@)",
                                                       text_at( [_world tri], tri_pattern( [_world tri], methods[ i]), "title",
@@ -1866,6 +1955,10 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
          [lines addObject:[NSString stringWithFormat:@"autopilot %llu %d", (unsigned long long) m->agent, m->threshold]];
       if( m->wake)
          [lines addObject:[NSString stringWithFormat:@"wake %llu %lld", (unsigned long long) m->agent, (long long) m->wake]];
+      for( k = 0; k < m->nhabits; k++)
+         [lines addObject:[NSString stringWithFormat:@"habit %llu %s %u %d %lld", (unsigned long long) m->agent,
+                                                     m->habits[ k].context, m->habits[ k].choice, m->habits[ k].strength,
+                                                     (long long) m->habits[ k].at]];
       for( k = 0; k < m->ncommitments; k++)
          [lines addObject:[NSString stringWithFormat:@"commitment %llu %s %lld %lld %s %d", (unsigned long long) m->agent,
                                                      m->commitments[ k].goal, (long long) m->commitments[ k].from,
@@ -1916,6 +2009,20 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
          c->until   = [[words objectAtIndex:4] longLongValue];
          c->source  = [_world intern:[[words objectAtIndex:5] UTF8String]];
          c->settled = [[words objectAtIndex:6] intValue] != 0;
+         continue;
+      }
+      if( [words count] == 6 && [[words objectAtIndex:0] isEqualToString:@"habit"])
+      {
+         BGHabit   *h;
+
+         m = [self mindOf:(BGEntityID) [[words objectAtIndex:1] longLongValue]];
+         if( m->nhabits == BG_MAX_HABITS)
+            continue;
+         h           = &m->habits[ m->nhabits++];
+         h->context  = [_world intern:[[words objectAtIndex:2] UTF8String]];
+         h->choice   = (uint32_t) [[words objectAtIndex:3] longLongValue];
+         h->strength = [[words objectAtIndex:4] intValue];
+         h->at       = [[words objectAtIndex:5] longLongValue];
          continue;
       }
       if( [words count] == 3 && [[words objectAtIndex:0] isEqualToString:@"wake"])

@@ -54,6 +54,13 @@
  * worth the pressure of what it feels. Done or given up, it doesn't press
  * again until the need is felt 20 more.
  *
+ * Habits (AGENCY.md §8): each time the agent performs a method's operation,
+ * the method grows habitual for the goal, and each referent it acted on
+ * for a slot grows habitual for that slot, BG_HABIT_GAIN a time, up to 100,
+ * fading BG_HABIT_FADE a day, computed when read. Habitual methods win ties
+ * (a tenth of the strength adds to the score), and a slot ordered by
+ * "habit" tries its habitual referents first.
+ *
  * Autopilot (AGENCY.md §14): the player hands their character to agency
  * with a goal and an interruption threshold. Agency decides for it from its
  * knowledge view, as for anyone, but takes up no goal of its own: when one
@@ -83,6 +90,9 @@
 #define BG_INTERRUPT       5      /* and more, to interrupt an activity under way */
 #define BG_MAX_SETTLED     16
 #define BG_MAX_COMMITMENTS 8
+#define BG_MAX_HABITS      16
+#define BG_HABIT_GAIN      10     /* each repetition */
+#define BG_HABIT_FADE      1      /* a day */
 #define BG_DUTY            20     /* what a commitment is worth */
 #define BG_URGENCY         20     /* and more, rising toward its deadline */
 
@@ -109,6 +119,16 @@ typedef struct
    int             commitment;   /* the commitment it keeps, + 1, or 0 */
    int             pressed;      /* a need raised it */
 } BGIntention;
+
+
+/* A habit (AGENCY.md §8): a context, a choice, a strength. */
+typedef struct
+{
+   const char      *context;     /* interned: "goal:method", "method.slot" */
+   uint32_t        choice;       /* the referent chosen for a slot; 0 for a method */
+   int32_t         strength;     /* as of `at` */
+   int64_t         at;           /* ms */
+} BGHabit;
 
 
 /* A goal undertaken for a window (AGENCY.md §7). */
@@ -161,6 +181,8 @@ typedef struct
    int              nweighed;
    BGCommitment     commitments[ BG_MAX_COMMITMENTS];
    int              ncommitments;
+   BGHabit          habits[ BG_MAX_HABITS];
+   int              nhabits;
    int64_t          wake;              /* a decision is due then (ms), or 0 */
    BOOL             autopilot;         /* the player's character, handed over */
    int32_t          threshold;         /* worth above which control returns */
@@ -179,6 +201,7 @@ typedef struct
    NSMutableArray   *_minds;           /* sorted by agent */
    NSMutableArray   *_notices;         /* control returned, for the player */
    NSMutableArray   *_former;          /* pairs: an agent let go, its log */
+   BGMotivation     *_deciding;        /* whose decision this is, for its habits */
 }
 
 - (id) initWithWorld:(BGWorld *) world

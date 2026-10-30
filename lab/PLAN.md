@@ -1227,6 +1227,42 @@ the body domain in `lab play`, starvation's consequences, and finding food.
 
 43 tests, 719 checks, under both compilers, ASan and UBSan, and leak-free.
 
-Next: habits (AGENCY.md §8): a context, a choice, and a strength that rises
-with repetition and decays, supplying method defaults (where to put
-things), and others' beliefs about them, so a broken habit is salient.
+### After the slice: habits
+
+AGENCY.md §8. Each morning the worker comes in at the door and is handed
+nails to put away. For three days it knows only the crate, two tiles off,
+and puts them there, watched by a curious apprentice. On day 4 a bin
+stands right beside it, and the worker walks past it to the crate, its
+habit (the method's, and the crate's for the slot) deciding; a worker
+without the habit uses the bin. By day 45 the habit has faded, and the bin
+wins. The apprentice, having seen it three times, believes the worker
+usually puts things in the crate, and the day-45 bin is an anomaly to it,
+salient.
+
+- **An agent's habits** are kept in its motivation store, with a
+  context ("goal:method", "method.slot"), a choice (a referent, or none for
+  a method), and a strength that gains 10 each time the agent performs
+  the method's operation, up to 100, and fades a point a day, computed
+  when read. Saved.
+- **Method defaults**: a habitual method adds a tenth of its strength to
+  its score, so habitual ways win ties; a slot ordered by `"habit"` tries
+  its habitual referents first.
+- **Others' habits**: the `#Repeated` premise holds for someone seen
+  putting things into the same container at least so often, and the rule
+  *usually puts* concludes a `#Habit` finding with that choice. Seeing them
+  put something elsewhere is an anomaly, salience 25.
+- **Committing to a goal wakes the agent**, as taking it over does.
+- **Recognition no longer weighs free hands**: someone seen elsewhere,
+  holding something they weren't, is still themselves.
+
+Not yet: habits of routes (which way to walk), habits feeding back into
+belief (Oskar believes the wrench is on the hook because he always hangs
+it there), habit strength set by salience, and beliefs about habits
+decaying.
+
+44 tests, 741 checks, under both compilers, ASan and UBSan, and leak-free.
+
+Next: promises (AGENCY.md §7): a promise made by saying so becomes the
+speaker's commitment, held by hearers as a claim; keeping or breaking it is
+a history event the hearers come to learn, and it moves their trust in the
+promiser.

@@ -19,6 +19,9 @@
 // to ask.
 #HavingNails: #WithNails & { box: #Container, someone: #Agent }
 
+// Tidying: what to put away, and the bin to put it in.
+#Tidying:  #Frame & { stuff: #Body, bin: #Container }
+
 // Getting money: the money, and a friend or someone to work for.
 #Getting:  #Frame & { money: #Body, friend: #Agent, boss: #Agent }
 
@@ -76,8 +79,10 @@
 #Did:    #Condition & { did: text }
 
 // How a candidate's referents are ordered, for each slot as it is found:
-// nearest first, or most recently seen first. Ties go to the lower referent.
-#Order: "near" | "recent"
+// nearest first, most recently seen first, or the one the agent has most
+// often chosen for the slot (its habit, AGENCY.md §8). Ties go to the lower
+// referent.
+#Order: "near" | "recent" | "habit"
 
 // A method's steps, done in order and re-read at every decision: a subgoal
 // whose goal is already done is passed over, and its bindings join the
@@ -308,4 +313,30 @@ eat_what_i_have: #Method & {
         }
     }
     steps: [#Do & { op: "eat", object: "food" }]
+} @family(methods)
+
+
+// --- AGENCY.md §8, habits -------------------------------------------------------
+
+// Put away the nails in hand: done when both hands are free.
+put_away: #Goal & {
+    title: "put the nails away"
+    done:  { find: [], match: #Tidying & { me: #Agent & { freeHands: 2 } } }
+} @family(goals)
+
+// Into a container: the habitual one, else the nearest.
+put_them_in_a_box: #Method & {
+    title: "put them in a box"
+    goal:  "put_away"
+    rank:  1
+    pre: {
+        find:  ["stuff", "bin"]
+        match: #Tidying & {
+            me:    #Agent & { id: $me }
+            stuff: #Stack & { unit: "iron_nail", place: #Held & { by: $me } }
+            bin:   #Container
+        }
+    }
+    order: ["habit", "near"]
+    steps: [#Do & { op: "put_in", object: "stuff", target: "bin" }]
 } @family(methods)

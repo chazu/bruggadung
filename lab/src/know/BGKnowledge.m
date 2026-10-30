@@ -1392,8 +1392,24 @@ static char   *concrete_features( const char *printed)
 }
 
 
+/* The features, without what comes and goes as a thing is used: free hands. */
+static NSString   *lasting( NSString *features)
+{
+   NSMutableArray   *kept;
+   NSArray          *pairs;
+   NSUInteger       i;
+
+   pairs = [features length] ? BGSplitTopLevel( features) : [NSArray array];
+   kept  = [NSMutableArray array];
+   for( i = 0; i < [pairs count]; i++)
+      if( ! [[pairs objectAtIndex:i] hasPrefix:@"freeHands:"])
+         [kept addObject:[pairs objectAtIndex:i]];
+   return( [kept componentsJoinedByString:@", "]);
+}
+
+
 /* Whether a percept could be the referent by its looks: the features memory
- * keeps of it unify with those perceived. */
+ * keeps of it unify with those perceived, but for what comes and goes. */
 - (BOOL) looksAlike:(const BGReferent *) r
                  in:(BGKnowledgeStore *) store
                kind:(NSString *) kind
@@ -1403,7 +1419,7 @@ static char   *concrete_features( const char *printed)
    TriArena        *arena;
    NSString        *expr;
 
-   expr  = [NSString stringWithFormat:@"%@ & { %@ } & { %@ }", kind, [store recall:r], features];
+   expr  = [NSString stringWithFormat:@"%@ & { %@ } & { %@ }", kind, lasting( [store recall:r]), lasting( features)];
    arena = tri_arena_new();
    both  = tri_value( [_world tri], [expr UTF8String], arena, NULL, 0);
    tri_arena_free( arena);
@@ -1600,6 +1616,40 @@ static BOOL   near( BGKnowledgeStore *store, const BGReferent *r, const char *ki
 }
 
 
+/* The container the agent was seen to put things into at least `times`
+ * times, by that referent; the most often, the lowest first; or 0. */
+static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t times)
+{
+   const BGObservation   *o;
+   const BGReferent      *c;
+   NSUInteger            i;
+   NSUInteger            j;
+   uint32_t              best;
+   int64_t               n;
+   int64_t               most;
+
+   best = 0;
+   most = 0;
+   for( i = 0; i < [store observationCount]; i++)
+   {
+      o = [store observationAt:i];
+      c = [store referent:o->other];
+      if( strcmp( o->kind, "moved") || o->actor != actor || ! c || ! c->kind || ! strcmp( c->kind, "#Agent"))
+         continue;
+      for( n = 0, j = 0; j < [store observationCount]; j++)
+         if( ! strcmp( [store observationAt:j]->kind, "moved") && [store observationAt:j]->actor == actor &&
+             [store observationAt:j]->other == o->other)
+            n++;
+      if( n >= times && (n > most || (n == most && o->other < best)))
+      {
+         most = n;
+         best = o->other;
+      }
+   }
+   return( best);
+}
+
+
 /* Immediate interpretation: each rule the agent has the expertise for, over
  * each referent; a rule whose premises all hold adds its finding. */
 - (void) interpret:(BGKnowledgeStore *) store
@@ -1623,6 +1673,7 @@ static BOOL   near( BGKnowledgeStore *store, const BGReferent *r, const char *ki
    char               path[ 96];
    char               concludes[ 64];
    size_t             n;
+   uint32_t           choice;
    BOOL               holds;
 
    tri    = [_world tri];
@@ -1653,7 +1704,8 @@ static BOOL   near( BGKnowledgeStore *store, const BGReferent *r, const char *ki
          r = [store referentAt:j];
          if( r->id == [store selfReferent] || [store finding:concludes about:r->id])
             continue;
-         holds = YES;
+         holds  = YES;
+         choice = 0;
          for( list = tri_at( tri, rule, "premises"); holds && list && (premise = tri_at( tri, list, "first"));
               list = tri_at( tri, list, "rest"))
          {
@@ -1667,6 +1719,8 @@ static BOOL   near( BGKnowledgeStore *store, const BGReferent *r, const char *ki
                text[ strlen( text) - 1] = 0;
                holds = bears( store, r->id, text + 1, YES);
             }
+            else if( (v = tri_at( tri, premise, "repeated")) && tri_node_interval( v, &lo, &hi) && lo == hi)
+               holds = (choice = usual_place( store, r->id, lo)) != 0;
             else if( (v = tri_at( tri, premise, "near")) && tri_print( tri, v, text, sizeof( text)) > 2)
             {
                text[ strlen( text) - 1] = 0;
@@ -1678,8 +1732,9 @@ static BOOL   near( BGKnowledgeStore *store, const BGReferent *r, const char *ki
          if( ! holds)
             continue;
          memset( &f, 0, sizeof( f));
-         f.kind  = [_world intern:concludes];
-         f.about = r->id;
+         f.kind   = [_world intern:concludes];
+         f.about  = r->id;
+         f.choice = choice;
          v       = tri_at( tri, rule, "weight");
          f.credence = v && tri_node_interval( v, &lo, &hi) && lo == hi ? (int32_t) lo : 0;
          f.rule  = [_world intern:tri_index_tag( family, i)];
@@ -2043,6 +2098,24 @@ static BOOL   near( BGKnowledgeStore *store, const BGReferent *r, const char *ki
           [self concerns:concerns
              description:! strcmp( ev->kind, "said") ? [self topicOf:ev->detail] : [store describeReferent:o.subject]])
          o.salience = BG_CONCERN;
+      /* someone not doing as they usually do */
+      if( ! strcmp( ev->kind, "moved") && o.other && ev->location.form == BGLocationIn)
+      {
+         NSUInteger   k;
+
+         for( k = 0; k < [store findingCount]; k++)
+         {
+            const BGFinding   *habit;
+
+            habit = [store findingAt:k];
+            if( ! strcmp( habit->kind, "#Habit") && habit->about == o.actor && habit->choice && habit->choice != o.other)
+            {
+               o.salience = BG_ANOMALY > o.salience ? BG_ANOMALY : o.salience;
+               [news addObject:[NSString stringWithFormat:@"R%u broke a habit: R%u, not R%u, this time", o.actor, o.other,
+                                                          habit->choice]];
+            }
+         }
+      }
       if( o.salience < notice)
       {
          [news removeObjectsInRange:NSMakeRange( lines, [news count] - lines)];
@@ -2304,7 +2377,8 @@ static NSString   *attribution_text( const BGTestimony *t)
       const BGFinding   *f;
 
       f = [store findingAt:i];
-      [s appendFormat:@"  finding %s about R%u, %+d dB, by %s at %lldms\n", f->kind, f->about, f->credence, f->rule,
+      [s appendFormat:@"  finding %s about R%u%@, %+d dB, by %s at %lldms\n", f->kind, f->about,
+                      f->choice ? [NSString stringWithFormat:@", choosing R%u", f->choice] : @"", f->credence, f->rule,
                       (long long) f->time];
    }
    [s appendString:[self dumpTestimony:store]];
@@ -2503,8 +2577,8 @@ char   *BGDecodeWord( const char *s)
          const BGFinding   *f;
 
          f = [store findingAt:j];
-         [lines addObject:[NSString stringWithFormat:@"finding %llu %u %d %lld %s %s", (unsigned long long) [store agent],
-                                                     f->about, f->credence, (long long) f->time, f->kind, f->rule]];
+         [lines addObject:[NSString stringWithFormat:@"finding %llu %u %d %lld %s %s %u", (unsigned long long) [store agent],
+                                                     f->about, f->credence, (long long) f->time, f->kind, f->rule, f->choice]];
       }
       for( j = 0; j < [store testimonyCount]; j++)
       {
@@ -2628,7 +2702,7 @@ char   *BGDecodeWord( const char *s)
       }
       else if( sscanf( text, "feels %llu %d %lld", &agent, &trust, &seen) == 3)
          [[self storeOf:(BGEntityID) agent] feelHunger:trust at:seen];
-      else if( sscanf( text, "finding %llu %u %d %lld %63s %511s", &agent, &id, &trust, &seen, role, kind) == 6)
+      else if( sscanf( text, "finding %llu %u %d %lld %63s %511s %u", &agent, &id, &trust, &seen, role, kind, &next) == 7)
       {
          BGFinding   f;
 
@@ -2638,6 +2712,7 @@ char   *BGDecodeWord( const char *s)
          f.time     = seen;
          f.kind     = [_world intern:role];
          f.rule     = [_world intern:kind];
+         f.choice   = next;
          [[self storeOf:(BGEntityID) agent] addFinding:f];
       }
       else if( sscanf( text, "ancestry %llu %llu %llu %llu %d %d", &truth, &agent, &origin, &parent, &form,

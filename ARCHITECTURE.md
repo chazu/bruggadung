@@ -310,7 +310,8 @@ A rebuilt world produces the same next step as one that never saved.
    dispositions, norms, and the belief about being watched (AGENCY.md's
    tempting purse); and commitments with windows and rising urgency, the
    routine generator; and needs felt through interoception, the needs
-   generator. Next, per [lab/PLAN.md](lab/PLAN.md): habits.
+   generator; and habits, an agent's own and those others believe it has.
+   Next, per [lab/PLAN.md](lab/PLAN.md): promises.
 
 ## Cross-cutting open questions
 

@@ -1624,6 +1624,153 @@ static void   test_needs( void)
 }
 
 
+/* AGENCY.md §8: each morning the worker is handed nails, and puts them away.
+ * Days 1 to 3 (if `practised`) it knows only the crate, two tiles off, and
+ * puts them there, watched by a curious apprentice. On day 4 a bin stands
+ * right beside it. On day 45 it puts them away again. */
+typedef struct
+{
+   BGWorld       *world;
+   BGKnowledge   *knowledge;
+   BGAgency      *agency;
+   BGEntityID    crate;
+   BGEntityID    bin;
+   BGEntityID    apprentice;
+   NSString      *text;
+} BGHabitRun;
+
+
+#define BG_DAY   86400000LL
+
+static void   hand_nails( BGWorld *w, BGCommitter *c, BGScheduler *s, BGAgency *agency, int64_t day)
+{
+   BGProposalGroup   *g;
+
+   [s runUntil:BGTimeMake( day * BG_DAY)];
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: in at the door, with nails for the day"];
+   [g move:BGWhole( 4) to:BGOnTile( 5, 5, 0)];
+   [g create:"nails_10" key:[[NSString stringWithFormat:@"nails of day %lld", (long long) day] UTF8String]
+          at:BGHeldBy( 4, 0)];
+   [c submit:g];
+   [s runUntil:BGTimeMake( day * BG_DAY + 1)];
+   BG_CHECK( [agency commit:4 toGoal:"put_away"]);
+   [s runUntil:BGTimeMake( day * BG_DAY + 10000)];
+}
+
+
+static BGHabitRun   habits_run( BOOL practised)
+{
+   BGWorld           *w;
+   BGCommitter       *c;
+   BGScheduler       *s;
+   BGActivities      *activities;
+   BGKnowledge       *knowledge;
+   BGAgency          *agency;
+   BGProposalGroup   *g;
+   BGEntityID        crate;
+   BGEntityID        apprentice;
+   BGEntityID        bin;
+   BGHabitRun        run;
+   int               day;
+
+   memset( &run, 0, sizeof( run));
+   w          = BGTestWorld( 53);
+   c          = BGTestCommitter( w);
+   activities = [BGActivities activitiesWithWorld:w committer:c];
+   knowledge  = [[[BGKnowledge alloc] initWithWorld:w] autorelease];
+   agency     = [[[BGAgency alloc] initWithWorld:w committer:c knowledge:knowledge] autorelease];
+   s          = [[[BGScheduler alloc] initWithWorld:w committer:c] autorelease];
+   [agency setActivities:activities];
+   [s setActivities:activities];
+   [s setPerception:knowledge];
+   [s setDecision:agency];
+   g          = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the workshop"];
+   [g create:"lock" key:"lock" at:BGOnTile( 20, 20, 0)];
+   [g create:"lock" key:"lock 2" at:BGOnTile( 21, 20, 0)];
+   [g create:"smith" key:"smith" at:BGOnTile( 22, 20, 0)];
+   [g create:"worker" key:"worker" at:BGOnTile( 5, 5, 0)];
+   crate      = [g create:"crate" key:"crate" at:BGOnTile( 5, 7, 0)];
+   apprentice = [g create:"apprentice" key:"apprentice" at:BGOnTile( 7, 4, 0)];
+   [g set:"Agent.curious" of:BGWhole( apprentice) to:100];
+   [c submit:g];
+   [s runUntil:BGTimeMake( 1)];
+   BG_CHECK( [g idFor:BGHandle( 4)] == 4);
+   run.crate      = [g idFor:crate];
+   run.apprentice = [g idFor:apprentice];
+   [agency control:4];
+
+   for( day = 1; practised && day <= 3; day++)
+      hand_nails( w, c, s, agency, day);
+
+   /* day 4: a bin beside the worker */
+   [s runUntil:BGTimeMake( 4 * BG_DAY - 1000)];
+   g   = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: a bin, right beside"];
+   bin = [g create:"bin" key:"bin" at:BGOnTile( 4, 5, 0)];
+   [c submit:g];
+   [s runUntil:BGTimeMake( 4 * BG_DAY - 500)];
+   run.bin = [g idFor:bin];
+   hand_nails( w, c, s, agency, 4);
+   if( practised)
+      hand_nails( w, c, s, agency, 45);
+
+   run.world     = w;
+   run.knowledge = knowledge;
+   run.agency    = agency;
+   run.text      = BGSave( w, c, [NSArray arrayWithObjects:knowledge, agency, nil]);
+   return( run);
+}
+
+
+/* how many nails lie in the container */
+static int64_t   nails_in( BGWorld *w, BGEntityID container)
+{
+   BGEntityID   inside[ 16];
+   NSUInteger   n;
+   NSUInteger   i;
+   int64_t      units;
+
+   n     = [w entitiesAt:container form:BGLocationIn into:inside max:16];
+   units = 0;
+   for( i = 0; i < n; i++)
+      units += [w unitsOf:inside[ i]];
+   return( units);
+}
+
+
+static void   test_habits( void)
+{
+   BGHabitRun         practised;
+   BGHabitRun         fresh;
+   BGHabitRun         again;
+   BGKnowledgeStore   *store;
+   const BGFinding    *f;
+
+   practised = habits_run( YES);
+   fresh     = habits_run( NO);
+
+   /* a method default: three days of the crate, and on day 4 the worker
+    * walks past the bin beside it to the crate; with no habit, the bin */
+   BG_CHECK( nails_in( fresh.world, fresh.bin) == 10 && nails_in( fresh.world, fresh.crate) == 0);
+   BG_CHECK( nails_in( practised.world, practised.crate) == 40);
+   /* the method, habitual too: 10 a day, less a point for each day between: 27 by day 4 */
+   BG_CHECK( logged_by( practised.agency, 4, @"scoring put them in a box +2 (habit +2)"));
+   BG_CHECK( log_count( practised.agency, 4, @"put them in a box: put_in R") == 5);
+   /* on day 45 the habit has faded, and the bin beside it wins */
+   BG_CHECK( nails_in( practised.world, practised.bin) == 10);
+
+   /* the apprentice, who watched, believes the worker usually puts things in the crate */
+   store = [practised.knowledge storeOf:practised.apprentice];
+   f     = [store finding:"#Habit" about:referent_of( store, 4)];
+   BG_CHECK( f && f->choice == referent_of( store, practised.crate) && ! strcmp( f->rule, "usually_puts"));
+   /* and its breaking it on day 45 is salient: an anomaly */
+   BG_CHECK( [[practised.knowledge dump:practised.apprentice] rangeOfString:@"salience 25"].location != NSNotFound);
+
+   /* the same on replay */
+   again = habits_run( YES);
+   BG_CHECK( [again.text isEqualToString:practised.text]);
+}
+
+
 /* --- the rumour ------------------------------------------------------------ */
 
 /* KNOWLEDGE.md Scenario 1, "the witness and the rumour", in the workshop: the
@@ -3518,6 +3665,7 @@ const BGTestCase   BGAllTests[] =
    { "asking",                        test_asking },
    { "routine",                       test_routine },
    { "needs",                         test_needs },
+   { "habits",                        test_habits },
    { "rumour",                        test_rumour },
    { "memory_decay",                  test_memory_decay },
    { "salience",                      test_salience },
