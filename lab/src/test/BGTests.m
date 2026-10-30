@@ -935,13 +935,25 @@ static void   test_play( void)
 static void   test_play_talk( void)
 {
    NSArray    *commands;
+   NSRange    take;
    NSString   *out;
    NSString   *again;
    uint64_t   h1;
    uint64_t   h2;
 
+   /* taking the nails: whichever its menu number is, as operations come and go */
    commands = [NSArray arrayWithObjects:@"do 1", @"walk w", @"tell R4 R5", @"ask R4 where R5", @"ask R4 who R5",
-                                        @"menu", @"do 7", @"tell R4 R5 in R2", @"knows", @"knows 5", @"tell R4",
+                                        @"menu", nil];
+   out      = session( @"workshop", commands, &h1);
+   take     = [out rangeOfString:@". take item R5 (#Stack)" options:NSBackwardsSearch];
+   BG_CHECK( take.location != NSNotFound && take.location >= 2);
+   if( take.location == NSNotFound || take.location < 2)
+      return;
+   commands = [NSArray arrayWithObjects:@"do 1", @"walk w", @"tell R4 R5", @"ask R4 where R5", @"ask R4 who R5",
+                                        @"menu",
+                                        [NSString stringWithFormat:@"do %d",
+                                           [[out substringWithRange:NSMakeRange( take.location - 2, 2)] intValue]],
+                                        @"tell R4 R5 in R2", @"knows", @"knows 5", @"tell R4",
                                         @"ask R4 where R99", @"help", nil];
    out   = session( @"workshop", commands, &h1);
    again = session( @"workshop", commands, &h2);
@@ -4765,6 +4777,8 @@ typedef enum
    BGPurseKin,                   /* the watch case, and Mira is the merchant's daughter */
    BGPurseWary,                  /* B, and the carter trusts no one */
    BGPurseStrangers,             /* B, and the carter and Kasimir aren't friends */
+   BGPurseHired,                 /* wary, strangers, and a foreman by Kasimir who hires */
+   BGPurseStiffed,               /* that, and the foreman is dishonest */
    BGPurseRepaid,                /* B, and on until the loan's term is out */
    BGPurseLost                   /* that, but the wages are lost on the third day */
 } BGPurse;
@@ -4782,6 +4796,10 @@ typedef struct
    BGEntityID    carter;
    BGEntityID    wages;
    BGEntityID    officer;
+   BGEntityID    foreman;
+   BGEntityID    pay;
+   BGEntityID    fitting;
+   BGEntityID    crate;
    BOOL          owedLate;      /* the wages still Kasimir's on the sixth day */
    NSString      *text;
 } BGPurseRun;
@@ -4856,10 +4874,25 @@ static BGPurseRun   tempting_purse( BGPurse variant)
       [g set:"Agent.trusting" of:BGWhole( h[ 4]) to:3];
    }
    if( variant == BGPurseHonest || variant == BGPurseRepaid || variant == BGPurseLost || variant == BGPurseWary ||
-       variant == BGPurseStrangers)
+       variant == BGPurseStrangers || variant == BGPurseHired || variant == BGPurseStiffed)
       [g set:"Agent.honesty" of:BGWhole( h[ 2]) to:90];
+   /* a foreman who hires (AGENCY.md decision 15): the job, a stone into the
+    * crate; the pay, a purse in hand. Neither it nor the carter
+    * will lend to a stranger */
+   if( variant == BGPurseHired || variant == BGPurseStiffed)
+   {
+      [g set:"Agent.trusting" of:BGWhole( h[ 3]) to:-20];
+      run.foreman = [g create:"foreman" key:"the foreman" at:BGOnTile( 13, 10, 0)];
+      [g set:"Agent.hires" of:BGWhole( run.foreman) toText:"crate_job"];
+      [g set:"Agent.trusting" of:BGWhole( run.foreman) to:-20];
+      if( variant == BGPurseStiffed)
+         [g set:"Agent.honesty" of:BGWhole( run.foreman) to:0];
+      run.pay     = [g create:"purse" key:"the foreman's purse" at:BGHeldBy( run.foreman, 0)];
+      run.fitting = [g create:"stone" key:"the stone" at:BGOnTile( 10, 8, 0)];
+      run.crate   = [g create:"crate" key:"the crate" at:BGOnTile( 12, 11, 0)];
+   }
    /* the carter and Kasimir are friends (AGENCY.md decision 12) */
-   if( variant != BGPurseStrangers)
+   if( variant != BGPurseStrangers && variant != BGPurseHired && variant != BGPurseStiffed)
    {
       BGEntityID   bond;
 
@@ -4883,6 +4916,14 @@ static BGPurseRun   tempting_purse( BGPurse variant)
    run.carter    = [g idFor:h[ 3]];
    run.wages     = [g idFor:h[ 5]];
    run.officer   = run.officer ? [g idFor:run.officer] : BGNoEntity;
+   if( run.foreman)
+   {
+      run.foreman = [g idFor:run.foreman];
+      run.pay     = [g idFor:run.pay];
+      run.fitting = [g idFor:run.fitting];
+      run.crate   = [g idFor:run.crate];
+      [agency control:run.foreman];
+   }
    if( run.officer)
       [agency control:run.officer];
    [agency control:run.carter];
@@ -4913,6 +4954,8 @@ static BGPurseRun   tempting_purse( BGPurse variant)
       stage_say( &st, run.merchant, run.mira, @"#WhereIs & { what: #Body & { material: \"cloth\" } }");
    }
    [st.s runUntil:BGTimeMake( 90000)];
+   if( run.foreman)
+      [st.s runUntil:BGTimeMake( 3700000)];
    if( variant == BGPurseRepaid || variant == BGPurseLost)
    {
       if( variant == BGPurseLost)
@@ -4997,6 +5040,8 @@ static void   test_tempting_purse( void)
    BGPurseRun         kin;
    BGPurseRun         wary;
    BGPurseRun         strangers;
+   BGPurseRun         hired;
+   BGPurseRun         stiffed;
    BGKnowledgeStore   *store;
    const BGReferent   *purse;
    const BGTestimony  *t;
@@ -5009,7 +5054,7 @@ static void   test_tempting_purse( void)
     * (the merchant is gone, Mira unseen), so taking the purse scores best,
     * though a witness is truly there */
    BG_CHECK( logged_by( base.agency, base.kasimir, @"take the purse +20 (+30, honesty -5, scruples -5, unlawful, unwatched +0)"));
-   BG_CHECK( logged_by( base.agency, base.kasimir, @"borrow from a friend +10 (+10)"));
+   BG_CHECK( logged_by( base.agency, base.kasimir, @"borrow from a friend +10 (loyal +10)"));
    BG_CHECK( logged_by( base.agency, base.kasimir, @"[get money] take the purse: take R"));
    BG_CHECK( [base.world locationOf:base.purse].form == BGLocationHeldBy &&
              [base.world locationOf:base.purse].place == base.kasimir);
@@ -5037,13 +5082,13 @@ static void   test_tempting_purse( void)
    BG_CHECK( t && t->settled == 1 && [store trustIn:t->source] == BG_TRUST + BG_CONFIRMED);
 
    /* 2: A: Kasimir sees Mira, believes himself watched, and taking scores
-    * below nothing: unthinkable. He borrows instead: Mira has nothing to
-    * lend, and the carter lends him his wages */
+    * below nothing: unthinkable. He borrows instead, from his friend first
+    * (AGENCY.md decision 12): the carter lends him his wages, and he never
+    * asks Mira */
    noticed = tempting_purse( BGPurseNoticed);
    BG_CHECK( referent_of( [noticed.knowledge storeOf:noticed.kasimir], noticed.mira));
    BG_CHECK( logged_by( noticed.agency, noticed.kasimir, @"take the purse -20 (+30, honesty -5, scruples -5, unlawful, watched -40)"));
    BG_CHECK( logged_by( noticed.agency, noticed.kasimir, @"borrow from a friend: say R"));
-   BG_CHECK( logged_by( noticed.agency, noticed.kasimir, @"answered: #HaveNone"));
    BG_CHECK( logged_by( noticed.agency, noticed.kasimir, @"answered: #Granted"));
    BG_CHECK( logged_by( noticed.agency, noticed.kasimir, @"[get money] done"));
    BG_CHECK( [noticed.world locationOf:noticed.purse].form == BGLocationOnTile);
@@ -5062,7 +5107,7 @@ static void   test_tempting_purse( void)
    BG_CHECK( logged_by( honest.agency, honest.carter, @"worth +18, granting"));
    BG_CHECK( logged_by( honest.agency, honest.carter, @"granting: give R"));
    BG_CHECK( [honest.world locationOf:honest.wages].place == honest.kasimir);
-   BG_CHECK( logged_by( noticed.agency, noticed.mira, @"for something it hasn't"));
+   BG_CHECK( ! logged_by( noticed.agency, noticed.mira, @"for something it hasn't"));
    /* a wary carter, disposed to trust no one (-20), trusts him at 2: lending
     * costs nearly half the wages' worth, and it refuses */
    wary = tempting_purse( BGPurseWary);
@@ -5086,6 +5131,46 @@ static void   test_tempting_purse( void)
              [said_with( honest.world, honest.carter, @"#Granted") rangeOfString:@"owedIn"].location == NSNotFound);
    BG_CHECK( owed_by( strangers.agency, strangers.kasimir) > 0 &&
              owed_by( honest.agency, honest.kasimir) - owed_by( strangers.agency, strangers.kasimir) == 6 * 86400000LL);
+
+   /* AGENCY.md decision 15: employment is a deal. Neither stranger will
+    * lend to Kasimir; asked for work, the foreman weighs it like any
+    * request (its trust in him, nothing, plus what having the job done is
+    * worth to it, 40, less the pay's worth, 30), hires him, and says the
+    * job: a stone into the crate within the hour. Asked for a loan, the
+    * foreman can still be asked for work: a search passes over only those
+    * asked the same */
+   hired = tempting_purse( BGPurseHired);
+   BG_CHECK( logged_by( hired.agency, hired.foreman, @"asked by R4: worth -15, refusing"));
+   BG_CHECK( logged_by( hired.agency, hired.foreman, @"for work: worth +10, hiring"));
+   BG_CHECK( logged_by( hired.agency, hired.foreman, @"hiring: hire R"));
+   BG_CHECK( logged_by( hired.agency, hired.kasimir, @"answered: #Job"));
+   BG_CHECK( logged_by( hired.agency, hired.kasimir, @"hired by R5: deliver, by "));
+   /* the job is a commitment of his, an employment, and he does it */
+   BG_CHECK( logged_by( hired.agency, hired.kasimir, @"weighing deliver it: +20 (employment, duty +20"));
+   BG_CHECK( [hired.world locationOf:hired.fitting].form == BGLocationIn &&
+             [hired.world locationOf:hired.fitting].place == hired.crate);
+   /* loyalty to his employer forms with it (decision 12) */
+   store = [hired.knowledge storeOf:hired.kasimir];
+   BG_CHECK( [store loyaltyTo:referent_of( store, hired.foreman)] == 30);
+   /* as the shift ends, the foreman, believing the job done, keeps its
+    * promise: the purse is in Kasimir's hand, and he finds it kept */
+   BG_CHECK( logged_by( hired.agency, hired.foreman, @"scoring pay up +5 (-20, honesty +25)"));
+   BG_CHECK( [hired.world locationOf:hired.pay].form == BGLocationHeldBy &&
+             [hired.world locationOf:hired.pay].place == hired.kasimir);
+   t = pledge_from( store, referent_of( store, hired.foreman));
+   BG_CHECK( t && t->settled == 1);
+   /* a dishonest foreman can't bring itself to pay: the promise is broken,
+    * and Kasimir, the shift over and nothing in his hand, finds it so */
+   stiffed = tempting_purse( BGPurseStiffed);
+   BG_CHECK( [stiffed.world locationOf:stiffed.fitting].place == stiffed.crate);
+   BG_CHECK( logged_by( stiffed.agency, stiffed.foreman, @"scoring pay up -20 (-20, honesty +0): unthinkable"));
+   BG_CHECK( [stiffed.world locationOf:stiffed.pay].place == stiffed.foreman);
+   store = [stiffed.knowledge storeOf:stiffed.kasimir];
+   t     = pledge_from( store, referent_of( store, stiffed.foreman));
+   BG_CHECK( t && t->settled == -1);
+   BG_CHECK( [store trustIn:referent_of( store, stiffed.foreman)] <
+             [[hired.knowledge storeOf:hired.kasimir] trustIn:referent_of( [hired.knowledge storeOf:hired.kasimir],
+                                                                           hired.foreman)]);
 
    /* kept on the loan's last day, not before: the wages back in the carter's hand */
    repaid = tempting_purse( BGPurseRepaid);

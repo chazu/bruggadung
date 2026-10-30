@@ -1,0 +1,73 @@
+// Work (AGENCY.md decision 15): employment is a deal. An employer weighs a
+// request for work like any request; granting it, it hires the worker (a
+// bond, with the worker's loyalty to it, AGENCY.md decision 12), says the
+// job, and so promises the pay, a promise it can keep or break.
+
+// Have you work, for something like `what`?
+#AskWork: #Question & {}
+
+// A job: said when hiring, or authored as one an employer offers (its
+// `hires`). Its `task` is a goal, its first two slots (by the goal's
+// `find`) bound to things like `what` and `within`; the worker's to do
+// within `shift`, for pay like `pay`, paid as the shift ends if it is done.
+// What having it done is worth to the employer: `gain`, in dB.
+#Job: #Placing & { task: text, pay: #Body, shift: time & >=1s & <=30d, gain: int }
+
+// Hire someone in reach: a bond of theirs to the actor, their loyalty to
+// whoever employs them.
+hire: #Operation & {
+    effect: "hire"
+    roles: {
+        actor: #Agent
+        item:  #Agent
+    }
+} @family(operations)
+
+// Paying a worker: the wage, the worker, and the job's goods and where
+// they were to go.
+#Paying: #Delivering & { wage: #Body, worker: #Agent }
+
+// The pay in the worker's hand: what the employer promised, as the shift
+// ends.
+pay_wage: #Goal & {
+    title: "pay the worker"
+    done: {
+        find:  ["wage", "worker"]
+        match: #Paying & { wage: #Body & { place: #Held & { by: $w } }, worker: #Agent & { id: $w } }
+    }
+} @family(goals)
+
+// If the job is done, as the employer believes it, hand over the wage. The
+// honest keep their word; the dishonest find a reason not to.
+pay_up: #Method & {
+    title: "pay up"
+    goal:  "pay_wage"
+    rank:  1
+    pre: {
+        find:  ["wage", "goods", "dest"]
+        match: #Paying & {
+            me:    #Agent & { id: $me }
+            wage:  #Body & { place: #Held & { by: $me } }
+            goods: #Body & { place: #Inside & { container: $c } }
+            dest:  #Container & { id: $c }
+        }
+    }
+    steps: [#Do & { op: "give", object: "wage", target: "worker" }]
+    score: [#Flat & { value: -20 }, #Trait & { trait: "honesty", per: 5 }]
+} @family(methods)
+
+// Needing money, ask someone for work, the nearest first: one, then give up.
+ask_for_work: #Method & {
+    title:  "ask for work"
+    goal:   "get_money"
+    rank:   2
+    pre:    { find: ["boss"], match: #Getting & { boss: #Agent } }
+    order:  ["near"]
+    search: "boss"
+    places: 1
+    steps:  [#Do & { op: "say", object: "boss", says: #AskWork & { what: #Body & { material: "cloth" } } }]
+} @family(methods)
+
+// A foreman's job: a stone into the oak crate, within the hour, for a purse.
+crate_job: #Job & { task: "deliver", what: #Body & { material: "stone" }, within: #Container & { material: "oak" },
+                    pay: #Body & { material: "cloth" }, shift: 1h, gain: 40 }

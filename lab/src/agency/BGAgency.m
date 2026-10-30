@@ -189,6 +189,7 @@ typedef struct
    int64_t            since;                       /* searched means its inside was seen since */
    const char         *instance;                   /* the method or goal */
    const TriNode      *seeks;                      /* what a search is for, or NULL */
+   char               asks[ 64];                   /* what a search says, by type: one asked it is passed over; "" any */
    TriContent         *tri;
    const char         *slot;                       /* the slot being bound */
    BGMotivation       *mind;                       /* whose habits order it, or nil */
@@ -276,6 +277,13 @@ static int   compare_candidates( BGCondition *c, const BGReferent *a, const BGRe
       }
       else if( ! strcmp( c->order[ k], "recent") && a->seen != b->seen)
          return( a->seen > b->seen ? -1 : 1);
+      else if( ! strcmp( c->order[ k], "loyal"))
+      {
+         da = [c->store loyaltyTo:a->id];
+         db = [c->store loyaltyTo:b->id];
+         if( da != db)
+            return( da > db ? -1 : 1);
+      }
       else if( ! strcmp( c->order[ k], "likely"))
       {
          da = likely_in( c, a->id);
@@ -742,6 +750,8 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
         store:(BGKnowledgeStore *) store
 {
    const TriNode   *variants[ BG_MAX_VARIANTS];
+   const TriNode   *list;
+   const TriNode   *step;
    const BGAgent   *agent;
    TriContent      *tri;
    NSUInteger      v;
@@ -770,6 +780,12 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    c->tri    = tri;
    if( ! text_at( tri, variants[ 0], "search", c->search, sizeof( c->search)))
       c->search[ 0] = 0;
+   /* asking: the kind of thing it asks, the first step's that says one */
+   c->asks[ 0] = 0;
+   for( list = tri_at( tri, variants[ 0], "steps"); list && (step = tri_at( tri, list, "first")) && ! c->asks[ 0];
+        list = tri_at( tri, list, "rest"))
+      if( tri_at( tri, step, "says"))
+         snprintf( c->asks, sizeof( c->asks), "%s", tri_type_name( tri, tri_node_type( tri_at( tri, step, "says"))));
    c->threshold = int_at( tri, variants[ 0], "threshold", 1000);
    /* a search looks into so many places; curiosity widens it */
    if( (c->places = int_at( tri, variants[ 0], "places", 0)) > 0 &&
@@ -963,7 +979,7 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
       {
          r = [c->store referentAt:i];
          if( r->present && r->id != c->me->id && [self kind:r->kind fitsSlot:slot of:c] &&
-             (r->insideSeen >= c->since || [c->store lastSaidTo:r->id] >= c->since))
+             (r->insideSeen >= c->since || [c->store lastSaidTo:r->id like:c->asks[ 0] ? c->asks : NULL] >= c->since))
             searched++;
       }
       if( searched >= c->places)
@@ -980,8 +996,8 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
       if( j < (NSUInteger) *n)
          continue;      /* one referent fills one slot */
       if( c->search[ 0] && ! strcmp( slot, c->search) &&
-          (r->insideSeen >= c->since || [c->store lastSaidTo:r->id] >= c->since))
-         continue;      /* searched already: looked into, or asked */
+          (r->insideSeen >= c->since || [c->store lastSaidTo:r->id like:c->asks[ 0] ? c->asks : NULL] >= c->since))
+         continue;      /* searched already: looked into, or asked the same */
       if( ! [self kind:r->kind fitsSlot:slot of:c])
          continue;
       /* in the condition's order */
@@ -1634,6 +1650,7 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
       if( question && (tri_subtype( tri, tri_node_type( question), tri_type_named( tri, "#WhereIs")) ||
                        tri_subtype( tri, tri_node_type( question), tri_type_named( tri, "#WhoToldYou")) ||
                        tri_subtype( tri, tri_node_type( question), tri_type_named( tri, "#Request")) ||
+                       tri_subtype( tri, tri_node_type( question), tri_type_named( tri, "#AskWork")) ||
                        tri_subtype( tri, tri_node_type( question), tri_type_named( tri, "#Call"))))
       {
          memset( &m->questions[ m->nquestions], 0, sizeof( BGQuestion));
@@ -1744,6 +1761,156 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
 }
 
 
+/* Something the agent believes is here like the description, not itself:
+ * the lowest such referent, or 0. */
+- (uint32_t) believedLike:(const TriNode *) what
+                    store:(BGKnowledgeStore *) store
+{
+   const BGReferent   *r;
+   const TriNode      *description;
+   TriMatchResult     result;
+   TriContent         *tri;
+   TriArena           *arena;
+   NSUInteger         i;
+   uint32_t           found;
+
+   tri   = [_world tri];
+   arena = tri_arena_new();
+   found = 0;
+   for( i = 0; what && i < [store count] && ! found; i++)
+   {
+      r = [store referentAt:i];
+      if( ! r->present || r->id == [store selfReferent])
+         continue;
+      description = tri_value( tri, [[store describeReferent:r->id] UTF8String], arena, NULL, 0);
+      if( description && tri_match( tri, what, description, &result) == TRI_ENTAILED)
+         found = r->id;
+   }
+   tri_arena_free( arena);
+   return( found);
+}
+
+
+/* A job's task's slots, bound to what the agent believes is like the job's
+ * `what` and `within`, in the order the task's goal finds them; their
+ * count, or -1 if it knows of nothing like one of them. */
+- (int) bindJob:(const TriNode *) job
+             to:(BGSlotBinding *) params
+          store:(BGKnowledgeStore *) store
+{
+   TriContent   *tri;
+   char         task[ 64];
+   char         slots[ 2][ 32];
+   NSUInteger   n;
+   NSUInteger   q;
+   int          count;
+
+   tri   = [_world tri];
+   count = 0;
+   if( ! text_at( tri, job, "task", task, sizeof( task)))
+      return( 0);
+   n = texts_at( tri, tri_pattern( tri, task), "done.find", slots, 2);
+   for( q = 0; q < n; q++)
+   {
+      params[ count].slot     = [_world intern:slots[ q]];
+      params[ count].referent = [self believedLike:tri_at( tri, job, q ? "within" : "what") store:store];
+      if( ! params[ count].referent)
+         return( -1);
+      count++;
+   }
+   return( count);
+}
+
+
+/* Hiring the asker for the job (AGENCY.md decision 15): it is bound to the
+ * agent, and the agent undertakes to pay it as the shift ends, if the job is
+ * done, a promise. What it says: the job. */
+- (NSString *) hire:(BGMotivation *) m
+             worker:(uint32_t) worker
+                job:(const char *) name
+               wage:(uint32_t) wage
+              store:(BGKnowledgeStore *) store
+{
+   const TriNode   *job;
+   BGCommitment    *c;
+   TriContent      *tri;
+   int64_t         now;
+   int64_t         shift;
+   int             n;
+   char            printed[ 2048];
+
+   tri   = [_world tri];
+   job   = tri_pattern( tri, name);
+   now   = [_world time].ms;
+   shift = int_at( tri, job, "shift", 3600000);
+   if( ! [self act:m why:"hiring" store:store operation:"hire" object:worker target:0 units:0 content:NULL])
+      return( nil);
+   if( [self undertake:m->agent goal:"pay_wage" from:now + shift - shift / BG_LOAN_DUE until:now + shift
+                source:"promise"])
+   {
+      c                      = &m->commitments[ m->ncommitments - 1];
+      c->params[ 0].slot     = [_world intern:"wage"];
+      c->params[ 0].referent = wage;
+      c->params[ 1].slot     = [_world intern:"worker"];
+      c->params[ 1].referent = worker;
+      n                      = [self bindJob:job to:&c->params[ 2] store:store];
+      c->nparams             = 2 + (n > 0 ? n : 0);
+   }
+   tri_print( tri, job, printed, sizeof( printed));
+   return( [NSString stringWithUTF8String:printed]);
+}
+
+
+/* Hired (`answer` a #Job), the agent undertakes the job's task, for the
+ * shift, an employment; and holds the pay the employer said as a promise:
+ * in its hand by the shift's end. */
+- (void) take:(BGMotivation *) m
+        jobIn:(const char *) answer
+         from:(uint32_t) employer
+        store:(BGKnowledgeStore *) store
+{
+   const TriNode   *job;
+   BGCommitment    *c;
+   TriContent      *tri;
+   TriArena        *arena;
+   BGSlotBinding   params[ BG_MAX_SLOTS];
+   int64_t         now;
+   int64_t         shift;
+   int             n;
+   char            task[ 64];
+   char            pay[ 1024];
+   NSString        *pledge;
+
+   tri   = [_world tri];
+   arena = tri_arena_new();
+   job   = answer ? tri_value( tri, answer, arena, NULL, 0) : NULL;
+   if( ! job || ! tri_subtype( tri, tri_node_type( job), tri_type_named( tri, "#Job")) ||
+       ! text_at( tri, job, "task", task, sizeof( task)) || ! tri_at( tri, job, "pay"))
+   {
+      tri_arena_free( arena);
+      return;
+   }
+   now   = [_world time].ms;
+   shift = int_at( tri, job, "shift", 3600000);
+   n     = [self bindJob:job to:params store:store];
+   if( n < 0)
+      [self note:m line:[NSString stringWithFormat:@"hired by R%u: %s, but it can't tell what of", employer, task]];
+   else if( [self undertake:m->agent goal:task from:now until:now + shift source:"employment"])
+   {
+      c          = &m->commitments[ m->ncommitments - 1];
+      memcpy( c->params, params, sizeof( params));
+      c->nparams = n;
+      [self note:m line:[NSString stringWithFormat:@"hired by R%u: %s, by %lldms", employer, task,
+                                                  (long long) (now + shift)]];
+   }
+   tri_print( tri, tri_at( tri, job, "pay"), pay, sizeof( pay));
+   tri_arena_free( arena);
+   pledge = [NSString stringWithFormat:@"#IsHeld & { what: %s, holder: %@, when: %lldms, attribution: #Pledged }", pay,
+                                       [store describeLooks:[store selfReferent]], (long long) (now + shift)];
+   [_knowledge hear:[pledge UTF8String] from:employer agent:m->agent];
+}
+
+
 /* Each question asked, weighed (AGENCY.md §11): answered, put off while the
  * agent is busy, refused, or, waited on too long, let go. */
 - (void) considerQuestions:(BGMotivation *) m
@@ -1759,8 +1926,11 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
    int32_t         worth;
    int32_t         busy;
    uint32_t        given;
+   uint32_t        wage;
+   const TriNode   *job;
    BOOL            request;
    BOOL            call;
+   BOOL            work;
    int             k;
    char            printed[ 2048];
 
@@ -1781,9 +1951,16 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
       request  = question && tri_subtype( tri, tri_node_type( question), tri_type_named( tri, "#Request"));
       call     = question && tri_subtype( tri, tri_node_type( question), tri_type_named( tri, "#Call"));
       given    = request ? [self heldLike:tri_at( tri, question, "what") store:store] : 0;
+      /* asked for work (AGENCY.md decision 15): the job it offers, if any,
+       * and the pay for it in hand; worth what having it done is, less the
+       * pay's worth to it */
+      work     = question && tri_subtype( tri, tri_node_type( question), tri_type_named( tri, "#AskWork"));
+      job      = work && agent && agent->hires ? tri_pattern( tri, agent->hires) : NULL;
+      wage     = job ? [self heldLike:tri_at( tri, job, "pay") store:store] : 0;
       tri_arena_free( arena);
       worth = [store trustIn:q->asker] + (agent ? (int32_t) agent->helpful : 0) - busy -
-              (m->nintentions ? BG_COMMITTED : 0) - (given ? [self lending:given to:q->asker store:store] : 0);
+              (m->nintentions ? BG_COMMITTED : 0) - (given ? [self lending:given to:q->asker store:store] : 0) +
+              (wage ? (int32_t) int_at( tri, job, "gain", 0) - [self worth:wage store:store] : 0);
       if( call)
       {
          /* a soft interruption: worth putting down what it is doing, if more
@@ -1847,6 +2024,29 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
                                                          q->asker, given, [self worth:given store:store],
                                                          [self lending:given to:q->asker store:store]]];
             [self note:m line:[NSString stringWithFormat:@"asked by R%u: worth %+d, refusing", q->asker, worth]];
+            answer = [NSString stringWithFormat:@"#WontSay & { what: %s }", *printed ? printed : "#Body"];
+         }
+      }
+      else if( question && work)
+      {
+         what = tri_at( tri, question, "what");
+         printed[ 0] = 0;
+         if( what)
+            tri_print( tri, what, printed, sizeof( printed));
+         if( ! wage)
+         {
+            [self note:m line:[NSString stringWithFormat:@"asked by R%u for work it hasn't", q->asker]];
+            answer = [NSString stringWithFormat:@"#HaveNone & { what: %s }", *printed ? printed : "#Body"];
+            worth  = 1;
+         }
+         else if( worth > 0)
+         {
+            [self note:m line:[NSString stringWithFormat:@"asked by R%u for work: worth %+d, hiring", q->asker, worth]];
+            answer = [self hire:m worker:q->asker job:agent->hires wage:wage store:store];
+         }
+         else
+         {
+            [self note:m line:[NSString stringWithFormat:@"asked by R%u for work: worth %+d, refusing", q->asker, worth]];
             answer = [NSString stringWithFormat:@"#WontSay & { what: %s }", *printed ? printed : "#Body"];
          }
       }
@@ -1937,12 +2137,14 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
    for( i = [store observationCount]; i > 0; i--)
    {
       o = [store observationAt:i - 1];
-      if( o->time < m->awaitSince)
+      /* said at the asking or before: not an answer (saying takes time) */
+      if( o->time <= m->awaitSince)
          break;
       if( ! strcmp( o->kind, "said") && o->actor == m->awaiting && o->other == [store selfReferent])
       {
          [self note:m line:[NSString stringWithFormat:@"R%u answered: %s", m->awaiting, [self kindOfContent:o->content]]];
          [self owe:m loanIn:o->content from:m->awaiting store:store];
+         [self take:m jobIn:o->content from:m->awaiting store:store];
          m->awaiting = 0;
          return( NO);
       }
@@ -2157,7 +2359,8 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
          owned = who ? [store finding:"#Owned" about:who] : NULL;
          if( owned)
             who = owned->choice;
-         v = who ? (int32_t) ([store loyaltyTo:who] * int_at( tri, c, "per", 0) / 10) : 0;
+         if( ! curve_at( tri, tri_at( tri, c, "curve"), who ? [store loyaltyTo:who] : 0, &v))
+            v = who ? (int32_t) ([store loyaltyTo:who] * int_at( tri, c, "per", 0) / 10) : 0;
          [parts addObject:[NSString stringWithFormat:@"loyal %+d", v]];
       }
       else if( text_at( tri, c, "watched", slot, sizeof( slot)))

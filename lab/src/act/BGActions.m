@@ -1711,6 +1711,21 @@ static NSString   *effect_hit( BGWorld *world, BGAction a, int64_t amount, BGPro
 }
 
 
+/* Hiring (AGENCY.md decision 15): the one hired is bound to the actor, its
+ * loyalty to whoever employs it (decision 12). */
+static NSString   *effect_hire( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
+{
+   BGEntityID   bond;
+
+   if( a.roles[ BGRoleItem] == a.roles[ BGRoleActor])
+      return( @"one cannot hire oneself");
+   bond = [g create:"work_bond" key:"employment" at:BGLocationMakeNone()];
+   [g set:"Bond.bondOf" of:BGWhole( bond) to:(int64_t) a.roles[ BGRoleItem]];
+   [g set:"Bond.toward" of:BGWhole( bond) to:(int64_t) a.roles[ BGRoleActor]];
+   return( nil);
+}
+
+
 /* Through a door: onto its tile. */
 static NSString   *effect_pass( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
 {
@@ -1836,6 +1851,7 @@ static const struct
    { "arrest",    effect_arrest },
    { "flee",      effect_flee },
    { "hit",       effect_hit },
+   { "hire",      effect_hire },
    { "shut",      effect_shut },
    { "dismantle", effect_dismantle },
    { "light",     effect_light },

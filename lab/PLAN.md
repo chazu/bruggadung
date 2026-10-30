@@ -3477,3 +3477,48 @@ Not yet: interest (things lent are single bodies; it needs divisible
 money); a borrower proposing terms; terms written down.
 
 88 tests, 2744 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: employment, a deal
+
+AGENCY.md decision 15: an employer weighs a request for work like any
+request; granting it, it gives the worker a commitment and promises pay on
+completion, a promise it can keep or break; loyalty forms with it.
+
+- **`#AskWork`** (work.tri): a question, "have you work, for something
+  like `what`?". `ask_for_work`, a way to get money after borrowing.
+- **`#Job`**: a `task` (a goal, its first two slots bound to what is like
+  `what` and `within`), a `shift`, the `pay`, and what having it done is
+  worth to the employer (`gain`). An employer offers the one its
+  `Agent.hires` names (`crate_job`: a stone into the crate in the hour).
+- **Weighed like a request**: trust in the asker, helpfulness, less busy
+  and committed, plus the gain, less the pay's worth to it (decision 16).
+  Granting, it `hire`s the asker (an operation: a `work_bond`, the
+  worker's loyalty, 30), says the job, and undertakes `pay_wage` as a
+  promise, in the shift's last seventh.
+- **The worker** undertakes the task for the shift (an employment) with
+  its slots bound to what it recognizes, and holds the pay as the
+  employer's promise. A job whose things it can't make out it doesn't
+  take on.
+- **Paying** (`pay_up`): if the employer believes the job done, it hands
+  over the wage; its honesty weighs in, and a dishonest one can't bring
+  itself to.
+- **Fixes and generalizations** on the way: borrowing asks the friend it
+  is most loyal to first (`"loyal"`, a slot order), and a stranger is
+  barely worth asking (a `#Loyal` curve); a search passes over only those
+  asked the same kind of thing, so one asked for a loan can still be asked
+  for work; a promise of something into the hearer's hand binds to what
+  the promiser holds; an answer can't be what was said at the asking;
+  `lab play`'s scripted session finds its menu number by name.
+
+Checked: neither stranger lends; the foreman hires Kasimir (+10: trust 0,
+gain 40, pay 30); he carries the stone to the crate; his loyalty to the
+foreman is 30; at the shift's end the foreman pays, and Kasimir finds the
+promise kept. A dishonest foreman doesn't pay (−20, unthinkable), and
+Kasimir finds the promise broken and trusts it less.
+
+Not yet: posted deals (a flyer or an ad naming a job and where to
+answer: next); recurring shifts; a job's task checked generically by the
+employer (`pay_up` knows deliveries only); being paid ending the need
+that sent one looking.
+
+88 tests, 2766 checks, under both compilers, ASan, and leak-free.

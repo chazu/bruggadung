@@ -361,14 +361,26 @@ static NSUInteger   feature_keys( const char *features, char (*keys)[ 32], NSUIn
 
 - (int64_t) lastSaidTo:(uint32_t) referentID
 {
+   return( [self lastSaidTo:referentID like:NULL]);
+}
+
+
+- (int64_t) lastSaidTo:(uint32_t) referentID
+                  like:(const char *) kind
+{
    const BGObservation   *o;
    NSUInteger            i;
+   size_t                n;
 
+   n = kind ? strlen( kind) : 0;
    for( i = _nobservations; i > 0; i--)
    {
       o = &_observations[ i - 1];
-      if( ! strcmp( o->kind, "said") && o->actor == _self && o->other == referentID)
-         return( o->time);
+      if( strcmp( o->kind, "said") || o->actor != _self || o->other != referentID)
+         continue;
+      if( kind && (! o->content || strncmp( o->content, kind, n) || (o->content[ n] && o->content[ n] != ' ')))
+         continue;
+      return( o->time);
    }
    return( -1);
 }
@@ -1719,6 +1731,17 @@ static NSString   *known_features( const BGReferent *r)
 }
 
 
+- (void) hear:(const char *) claim
+         from:(uint32_t) speaker
+        agent:(BGEntityID) agent
+{
+   BGKnowledgeStore   *store;
+
+   store = [self storeOf:agent];
+   [self believe:claim from:speaker via:0 utterance:0 at:[_world time].ms store:store news:[store mutableNews]];
+}
+
+
 - (BGKnowledgeStore *) storeOf:(BGEntityID) agent
 {
    BGKnowledgeStore   *store;
@@ -2332,7 +2355,7 @@ static int32_t   permille_of( int32_t db)
 
    /* the thing */
    thing = 0;
-   for( pass = 0; pass < 2 && ! thing; pass++)
+   for( pass = 0; pass < 3 && ! thing; pass++)
       for( i = 0; i < [store count] && ! thing; i++)
       {
          r = [store referentAt:i];
@@ -2343,9 +2366,18 @@ static int32_t   permille_of( int32_t db)
          for( j = 0; pass == 0 && ! thing && j < [store testimonyCount]; j++)
             if( [store testimonyAt:j]->thing == r->id && [store testimonyAt:j]->container == cid)
                thing = r->id;
+         /* promised: by its looks, what the one promising holds first (it
+          * will hand over what it has: a wage, AGENCY.md decision 15) */
+         if( pass == 1 && t.attribution == BGPledged && r->present && r->form == BGLocationHeldBy &&
+             r->container == speaker)
+         {
+            description = tri_value( tri, [[store describeReferent:r->id] UTF8String], arena, NULL, 0);
+            if( description && tri_match( tri, what, description, &result) != TRI_INCOMPATIBLE)
+               thing = r->id;
+         }
          /* by its looks, among those it doesn't know where they are; or,
           * promised somewhere, among all: where it is now says nothing of then */
-         if( pass == 1 && (! r->present || t.attribution == BGPledged))
+         if( pass == 2 && (! r->present || t.attribution == BGPledged))
          {
             description = tri_value( tri, [[store describeReferent:r->id] UTF8String], arena, NULL, 0);
             if( description && tri_match( tri, what, description, &result) != TRI_INCOMPATIBLE)

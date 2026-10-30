@@ -422,6 +422,9 @@ typedef struct
 - (uint64_t) nextSerial;
 /* when the agent last said something to the referent, or -1 */
 - (int64_t) lastSaidTo:(uint32_t) referentID;
+/* ... something of the kind (its content's type: "#Request"); NULL, anything */
+- (int64_t) lastSaidTo:(uint32_t) referentID
+                  like:(const char *) kind;
 
 /* the traces it has perceived, first perceived first */
 - (NSUInteger) traceCount;
@@ -537,6 +540,12 @@ typedef struct
 
 /* the agent's store, made when first asked for */
 - (BGKnowledgeStore *) storeOf:(BGEntityID) agent;
+/* The agent takes the claim as said by the speaker, out of earshot of
+ * anyone else: what a deal said implies (AGENCY.md decision 15, a job's
+ * promise of pay). */
+- (void) hear:(const char *) claim
+         from:(uint32_t) speaker
+        agent:(BGEntityID) agent;
 
 /* everything an agent's store holds, with truth links, the true ancestry of
  * what it was told, and false corroboration flagged: the developer's view */

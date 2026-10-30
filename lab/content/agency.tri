@@ -122,11 +122,12 @@
 
 // How a candidate's referents are ordered, for each slot as it is found:
 // nearest first, most recently seen first, the one the agent has most
-// often chosen for the slot (its habit, AGENCY.md §8), or the one it most
+// often chosen for the slot (its habit, AGENCY.md §8), the one it is most
+// loyal to (AGENCY.md decision 12), or the one it most
 // believes holds what the method `seeks` (AGENCY.md §5: "ordering the
 // places to look by the belief that the item is there"), told so if not
 // believing it. Ties go to the lower referent.
-#Order: "near" | "recent" | "habit" | "likely"
+#Order: "near" | "recent" | "habit" | "loyal" | "likely"
 
 // A method's steps, done in order and re-read at every decision: a subgoal
 // whose goal is already done is passed over, and its bindings join the
@@ -141,7 +142,8 @@
 // skipping those that have failed since the goal was adopted; the first whose
 // `pre` holds is followed. A `search` slot is somewhere to look: a referent
 // whose inside the agent has seen since the goal was adopted is passed over.
-// An agent asked since the goal was adopted is passed over too. A search
+// An agent asked the same kind of thing (the method's first `says`) since
+// the goal was adopted is passed over too. A search
 // looks into so many `places` (0, no end), counting those seen into or asked
 // since; curiosity widens it, a place more for every 25 (AGENCY.md §9).
 // Against a referent with a competing hypothesis (CONTENT_LANGUAGE.md §9),
@@ -461,16 +463,17 @@ get_money: #Goal & {
     }
 } @family(goals)
 
-// Ask a friend to lend it: awkward, but no harm.
+// Ask a friend to lend it: awkward, but no harm. The closest friend first;
+// anyone it is not loyal to is barely worth asking.
 borrow_money: #Method & {
     title:  "borrow from a friend"
     goal:   "get_money"
     rank:   1
     pre:    { find: ["friend"], match: #Getting & { friend: #Agent } }
-    order:  ["near"]
+    order:  ["loyal", "near"]
     search: "friend"
     steps:  [#Do & { op: "say", object: "friend", says: #Request & { what: #Body & { material: "cloth" } } }]
-    score:  [#Flat & { value: 10 }]
+    score:  [#Loyal & { loyal: "friend", curve: [{ input: 0, output: 1 }, { input: 20, output: 10 }] }]
 } @family(methods)
 
 // A loan granted is a debt the borrower owes back: what was lent, back in
