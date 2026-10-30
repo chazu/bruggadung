@@ -1831,13 +1831,11 @@ At 308.5 K it feels 10, and the stove stays cold.
 - **`get_warm`** is done once a stove the agent knows of is lit, and *light
   the stove* is its method.
 
-Not yet, then: A resting lodger cools
-(it breathes at rest), and its rest's comfort band wakes it, but the woken
-lodger would need a moment's perception before cold presses. The thermal
-domain gives no horizon for a felt band crossing, as the body domain does
-for hunger.
+Not yet:
 
-Not yet: that horizon, numbness hiding cold (misperception), and other
-ways to get warm (a coat, moving to a warmer room).
+- a horizon for cold crossing a band, as the body domain gives for hunger
+  (cold is felt at whatever boundaries the domains give);
+- numbness hiding cold (misperception);
+- other ways to get warm (a coat, a warmer room).
 
 54 tests, 2032 checks, under both compilers, ASan and UBSan, and leak-free.
