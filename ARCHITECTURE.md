@@ -19,7 +19,7 @@ proven on COMPONENTS.md's first scenario.
 | --- | --- | --- |
 | [DESIGN.md](DESIGN.md) | The six systems, ambitions, and development sequence | Proposal |
 | [STACK.md](STACK.md) | Language: mulle Objective-C | Decided |
-| [DOMAIN_SIMULATION.md](DOMAIN_SIMULATION.md) | §3: domains, stocks, horizons, the scheduler | Contract proposed, 3 scenarios; Scenario 3 runs in [lab/](lab/README.md) |
+| [DOMAIN_SIMULATION.md](DOMAIN_SIMULATION.md) | §3: domains, stocks, horizons, the scheduler | Contract proposed, 3 scenarios; Scenario 3, and Scenario 1's atmosphere, run in [lab/](lab/README.md) |
 | [COMPONENTS.md](COMPONENTS.md) | §2: entities, components, relations, identity on demand | Contract proposed, 3 scenarios; Scenario 1 runs in [lab/](lab/README.md) |
 | [ACTIONS.md](ACTIONS.md) | §1: capabilities, actions, activities; change commitment | Contract proposed, 3 scenarios |
 | [KNOWLEDGE.md](KNOWLEDGE.md) | §4: history, traces, perception, referents, claims, beliefs, memory | Contract proposed, 3 scenarios; Scenario 3's stale map and menu run in [lab/](lab/README.md), with event perception and claims believed |

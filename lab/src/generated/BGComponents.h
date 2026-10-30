@@ -1,4 +1,4 @@
-/* Generated from Triangle content 3f0e703ea121318d: do not edit. Type IDs are valid
+/* Generated from Triangle content e2d3badf4f84918c: do not edit. Type IDs are valid
  * only for this content; regenerate when it changes. */
 #ifndef BG_COMPONENTS_H
 #define BG_COMPONENTS_H
@@ -6,7 +6,31 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BG_CONTENT_HASH 0x3f0e703ea121318dULL
+#define BG_CONTENT_HASH 0xe2d3badf4f84918cULL
+
+/* Combustor, from #Combustor */
+typedef struct {
+    int64_t         burnRate;    /* int, in quanta of 1; content, saved, inspect */
+    bool            damper;    /* bool; content, saved, proposable, inspect, perceive(sight) */
+    bool            lit;    /* bool; content, saved, proposable, inspect, perceive(sight) */
+} BGCombustor;
+
+/* FuelContainer, from #FuelContainer */
+typedef struct {
+    int64_t         fuel;    /* mass, in quanta of 1g; content, saved, proposable, inspect */
+} BGFuelContainer;
+
+/* GasStore, from #GasStore */
+typedef struct {
+    int64_t         dioxide;    /* int, in quanta of 1; content, saved, proposable, inspect */
+    int64_t         east;    /* int, in quanta of 1; content, saved, inspect */
+    int64_t         gasHeat;    /* int, in quanta of 1; content, saved, proposable, inspect */
+    int64_t         north;    /* int, in quanta of 1; content, saved, inspect */
+    int64_t         oxygen;    /* int, in quanta of 1; content, saved, proposable, inspect */
+    int64_t         south;    /* int, in quanta of 1; content, saved, inspect */
+    int64_t         total;    /* int, in quanta of 1; content, saved, inspect */
+    int64_t         west;    /* int, in quanta of 1; content, saved, inspect */
+} BGGasStore;
 
 /* Lever, from #Lever */
 typedef struct {
@@ -33,6 +57,7 @@ typedef struct {
     int64_t         started;    /* time, in quanta of 1ms; content, saved, proposable, inspect */
     uint32_t        status;    /* #ActivityStatus: a type ID; content, saved, proposable, inspect */
     int64_t         watchAtLeast;    /* volume, in quanta of 1mL; content, saved, proposable, inspect */
+    int64_t         watchDioxide;    /* int, in quanta of 1; content, saved, proposable, inspect */
     uint64_t        watchHolder;    /* a referent; saved, proposable, inspect */
 } BGActivity;
 
@@ -140,57 +165,57 @@ typedef struct {
 
 /* #ActivityStatus */
 enum {
-    BG_ACTIVITYSTATUS_COMPLETED = 220,
-    BG_ACTIVITYSTATUS_EXHAUSTED = 221,
-    BG_ACTIVITYSTATUS_FAILED = 222,
-    BG_ACTIVITYSTATUS_RUNNING = 223,
-    BG_ACTIVITYSTATUS_SUSPENDED = 224,
+    BG_ACTIVITYSTATUS_COMPLETED = 223,
+    BG_ACTIVITYSTATUS_EXHAUSTED = 224,
+    BG_ACTIVITYSTATUS_FAILED = 225,
+    BG_ACTIVITYSTATUS_RUNNING = 226,
+    BG_ACTIVITYSTATUS_SUSPENDED = 227,
 };
 
 /* #ClaimKind */
 enum {
-    BG_CLAIMKIND_CUSTODY = 226,
-    BG_CLAIMKIND_OWNERSHIP = 227,
-    BG_CLAIMKIND_RESERVATION = 228,
+    BG_CLAIMKIND_CUSTODY = 229,
+    BG_CLAIMKIND_OWNERSHIP = 230,
+    BG_CLAIMKIND_RESERVATION = 231,
 };
 
 /* #Material */
 enum {
-    BG_MATERIAL_CLOTH = 267,
-    BG_MATERIAL_FOOD = 268,
-    BG_MATERIAL_RUBBER = 269,
-    BG_MATERIAL_STONE = 270,
-    BG_MATERIAL_FLESH = 295,
-    BG_MATERIAL_BRASS = 297,
-    BG_MATERIAL_IRON = 298,
-    BG_MATERIAL_PAPER = 299,
-    BG_MATERIAL_STEEL = 300,
-    BG_MATERIAL_OAK = 302,
+    BG_MATERIAL_CLOTH = 271,
+    BG_MATERIAL_FOOD = 272,
+    BG_MATERIAL_RUBBER = 273,
+    BG_MATERIAL_STONE = 274,
+    BG_MATERIAL_FLESH = 299,
+    BG_MATERIAL_BRASS = 301,
+    BG_MATERIAL_IRON = 302,
+    BG_MATERIAL_PAPER = 303,
+    BG_MATERIAL_STEEL = 304,
+    BG_MATERIAL_OAK = 306,
 };
 
 /* "flesh" | "metal" | "natural" | "paper" | "wood" */
 enum {
-    BG_BODY_SURFACE_NATURAL = 183,
-    BG_BODY_SURFACE_FLESH = 295,
-    BG_BODY_SURFACE_BRASS = 297,
-    BG_BODY_SURFACE_IRON = 298,
-    BG_BODY_SURFACE_PAPER = 299,
-    BG_BODY_SURFACE_STEEL = 300,
-    BG_BODY_SURFACE_OAK = 302,
+    BG_BODY_SURFACE_NATURAL = 186,
+    BG_BODY_SURFACE_FLESH = 299,
+    BG_BODY_SURFACE_BRASS = 301,
+    BG_BODY_SURFACE_IRON = 302,
+    BG_BODY_SURFACE_PAPER = 303,
+    BG_BODY_SURFACE_STEEL = 304,
+    BG_BODY_SURFACE_OAK = 306,
 };
 
 /* #Colour */
 enum {
-    BG_COLOUR_BLUE = 231,
-    BG_COLOUR_BLACK = 233,
-    BG_COLOUR_BROWN = 234,
-    BG_COLOUR_GREEN = 235,
-    BG_COLOUR_GREY = 236,
-    BG_COLOUR_BEIGE = 238,
-    BG_COLOUR_NAVY = 239,
-    BG_COLOUR_RED = 240,
-    BG_COLOUR_WHITE = 241,
+    BG_COLOUR_BLUE = 234,
+    BG_COLOUR_BLACK = 236,
+    BG_COLOUR_BROWN = 237,
+    BG_COLOUR_GREEN = 238,
+    BG_COLOUR_GREY = 239,
+    BG_COLOUR_NAVY = 240,
+    BG_COLOUR_RED = 241,
     BG_COLOUR_YELLOW = 242,
+    BG_COLOUR_BEIGE = 252,
+    BG_COLOUR_WHITE = 268,
 };
 
 /* The field registry: what code needs to read and write any component
@@ -216,9 +241,30 @@ typedef struct {
     const BGFieldInfo *fields;
 } BGComponentInfo;
 
-#define BG_COMPONENT_COUNT 17
+#define BG_COMPONENT_COUNT 20
 
 #ifdef BG_COMPONENT_REGISTRY
+
+static const BGFieldInfo BGCombustor_fields[] = {
+    { "burnRate", offsetof(BGCombustor, burnRate), BG_VALUE_QUANTITY, "int", "content, saved, inspect" },
+    { "damper", offsetof(BGCombustor, damper), BG_VALUE_BOOL, "bool", "content, saved, proposable, inspect, perceive(sight)" },
+    { "lit", offsetof(BGCombustor, lit), BG_VALUE_BOOL, "bool", "content, saved, proposable, inspect, perceive(sight)" },
+};
+
+static const BGFieldInfo BGFuelContainer_fields[] = {
+    { "fuel", offsetof(BGFuelContainer, fuel), BG_VALUE_QUANTITY, "mass", "content, saved, proposable, inspect" },
+};
+
+static const BGFieldInfo BGGasStore_fields[] = {
+    { "dioxide", offsetof(BGGasStore, dioxide), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
+    { "east", offsetof(BGGasStore, east), BG_VALUE_QUANTITY, "int", "content, saved, inspect" },
+    { "gasHeat", offsetof(BGGasStore, gasHeat), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
+    { "north", offsetof(BGGasStore, north), BG_VALUE_QUANTITY, "int", "content, saved, inspect" },
+    { "oxygen", offsetof(BGGasStore, oxygen), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
+    { "south", offsetof(BGGasStore, south), BG_VALUE_QUANTITY, "int", "content, saved, inspect" },
+    { "total", offsetof(BGGasStore, total), BG_VALUE_QUANTITY, "int", "content, saved, inspect" },
+    { "west", offsetof(BGGasStore, west), BG_VALUE_QUANTITY, "int", "content, saved, inspect" },
+};
 
 static const BGFieldInfo BGLever_fields[] = {
     { "leverage", offsetof(BGLever, leverage), BG_VALUE_QUANTITY, "length", "content, saved, inspect, perceive(sight)" },
@@ -242,6 +288,7 @@ static const BGFieldInfo BGActivity_fields[] = {
     { "started", offsetof(BGActivity, started), BG_VALUE_QUANTITY, "time", "content, saved, proposable, inspect" },
     { "status", offsetof(BGActivity, status), BG_VALUE_TYPE, "#ActivityStatus", "content, saved, proposable, inspect" },
     { "watchAtLeast", offsetof(BGActivity, watchAtLeast), BG_VALUE_QUANTITY, "volume", "content, saved, proposable, inspect" },
+    { "watchDioxide", offsetof(BGActivity, watchDioxide), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "watchHolder", offsetof(BGActivity, watchHolder), BG_VALUE_REF, "ref", "saved, proposable, inspect" },
 };
 
@@ -334,9 +381,12 @@ static const BGFieldInfo BGFastener_fields[] = {
 };
 
 static const BGComponentInfo BGComponents[BG_COMPONENT_COUNT + 1] = {
+    { "Combustor", "#Combustor", sizeof(BGCombustor), 3, BGCombustor_fields },
+    { "FuelContainer", "#FuelContainer", sizeof(BGFuelContainer), 1, BGFuelContainer_fields },
+    { "GasStore", "#GasStore", sizeof(BGGasStore), 8, BGGasStore_fields },
     { "Lever", "#Lever", sizeof(BGLever), 3, BGLever_fields },
     { "Sized", "#Sized", sizeof(BGSized), 1, BGSized_fields },
-    { "Activity", "#Activity", sizeof(BGActivity), 12, BGActivity_fields },
+    { "Activity", "#Activity", sizeof(BGActivity), 13, BGActivity_fields },
     { "Claim", "#Claim", sizeof(BGClaim), 2, BGClaim_fields },
     { "Body", "#Body", sizeof(BGBody), 5, BGBody_fields },
     { "Agent", "#Agent", sizeof(BGAgent), 14, BGAgent_fields },

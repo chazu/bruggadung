@@ -1,0 +1,42 @@
+// Air, for DOMAIN_SIMULATION.md's first scenario, "The unattended stove".
+// Gas is a stock: whole millimoles of oxygen and carbon dioxide, and whole
+// joules of the heat the gas carries, held by a region of air (the room)
+// and moved by the atmosphere domain while anything there changes. The rest
+// of the air (nitrogen) is the region's fixed total, less those two.
+
+// A region of air over tiles from (west, north) to (east, south).
+#GasStore: {
+    @component(GasStore)
+    oxygen:  int & >=0 & <=100000000           @field(content, saved, proposable, inspect)
+    dioxide: int & >=0 & <=100000000           @field(content, saved, proposable, inspect)
+    gasHeat: int & >=0 & <=1000000000000       @field(content, saved, proposable, inspect)
+    total:   int & >=1 & <=100000000           @field(content, saved, inspect)
+    west:    int & >=0 & <=1000                @field(content, saved, inspect)
+    north:   int & >=0 & <=1000                @field(content, saved, inspect)
+    east:    int & >=0 & <=1000                @field(content, saved, inspect)
+    south:   int & >=0 & <=1000                @field(content, saved, inspect)
+}
+
+// A stove's firebox: lit or not, its damper open to the flue or not, and how
+// fast it burns at most (mg of wood a second).
+#Combustor: {
+    @component(Combustor)
+    lit:      *false | true                    @field(content, saved, proposable, inspect, perceive(sight))
+    damper:   *true | false                    @field(content, saved, proposable, inspect, perceive(sight))
+    burnRate: int & >=0 & <=100000             @field(content, saved, inspect)
+}
+
+// Fuel in a stove, a stock the atmosphere domain checks out while it burns.
+#FuelContainer: {
+    @component(FuelContainer)
+    fuel: mass & >=0g & <=1000kg               @field(content, saved, proposable, inspect)
+}
+
+#Stove: #Body & #Combustor & #FuelContainer & {}
+
+// A 4 by 5 room, at 275 K, with 2 mol of air for each of its 20 m3 or so:
+// 2,000,000 mmol, 21% oxygen, 0.04% carbon dioxide; its heat, 29 mJ per mmol
+// per kelvin.
+room_air: #GasStore & { oxygen: 420000, dioxide: 800, gasHeat: 15950000, total: 2000000,
+                        west: 1, north: 1, east: 4, south: 5 }
+stove:    #Stove & { material: "iron", mass: 120kg, burnRate: 250, fuel: 3kg }

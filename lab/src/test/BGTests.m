@@ -13,6 +13,7 @@
 #import "BGAgency.h"
 #import "BGTraces.h"
 #import "BGBodies.h"
+#import "BGAtmosphere.h"
 
 #include <stdio.h>
 
@@ -66,7 +67,7 @@ static void   test_registry_and_construction( void)
 
    w = BGTestWorld( 1);
    c = BGTestCommitter( w);
-   BG_CHECK( [w kindCount] == 17);
+   BG_CHECK( [w kindCount] == 20);
    BG_CHECK( [w kindNamed:"Body"] != NSNotFound && [w kindNamed:"Nonesuch"] == NSNotFound);
    bin   = commit_create( c, "bin", BGOnTile( 0, 0, 0));
    nails = commit_create( c, "nails_30", BGIn( bin));
@@ -576,8 +577,8 @@ static void   test_menu( void)
                                    @"take_up item 2: entailed; take_up item 3: entailed; test_scratch item 1: entailed; "
                                    @"test_scratch item 3: entailed; touch_up item 3: entailed; "
                                    @"walk_east: entailed; walk_north: entailed; walk_south: entailed; walk_west: entailed; "
-                                   @"wash_floor: entailed; watch_closely: entailed"]);
-   if( [text rangeOfString:@"wash_floor: entailed; watch_closely: entailed"].location == NSNotFound)
+                                   @"wash_floor: entailed; watch_closely: entailed; while_away: entailed"]);
+   if( [text rangeOfString:@"watch_closely: entailed; while_away: entailed"].location == NSNotFound)
       fprintf( stderr, "    menu: %s\n", [text UTF8String]);
 
    /* a description carries perceivable fields only: the stack's count is hidden */
@@ -4350,6 +4351,143 @@ static void   test_interrupted_repair( void)
 }
 
 
+/* --- the unattended stove ------------------------------------------------------ */
+
+typedef struct
+{
+   BGWorld        *world;
+   BGCommitter    *committer;
+   BGAtmosphere   *air;
+   BGEntityID     room;
+   BGEntityID     stove;
+   BGEntityID     rest;
+   int64_t        outAt;          /* when the stove went out, ms; 0 if it didn't */
+   int64_t        wokenAt;        /* when the rest ended */
+   NSUInteger     boundaries;
+   BOOL           balanced;       /* after every boundary */
+   NSString       *text;
+} BGStoveRun;
+
+
+/* DOMAIN_SIMULATION.md Scenario 1, "the unattended stove", its air: a room
+ * with a stove and 3 kg of wood; the worker lights it and rests for 8 hours,
+ * with a watch on the air. `stepped`: in one-minute steps (variant C). */
+static BGStoveRun   stove_run( BOOL damper, BOOL stepped)
+{
+   BGWorld            *w;
+   BGCommitter        *c;
+   BGScheduler        *s;
+   BGActivities       *activities;
+   BGAtmosphere       *air;
+   BGProposalGroup    *g;
+   BGEntityID         worker;
+   NSString           *error;
+   BGStoveRun         run;
+   int64_t            v;
+   int64_t            end;
+
+   memset( &run, 0, sizeof( run));
+   w          = BGTestWorld( 89);
+   c          = BGTestCommitter( w);
+   activities = [BGActivities activitiesWithWorld:w committer:c];
+   air        = [[[BGAtmosphere alloc] initWithWorld:w] autorelease];
+   s          = [[[BGScheduler alloc] initWithWorld:w committer:c] autorelease];
+   [s setActivities:activities];
+   [s addDomain:air];
+   g         = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the room"];
+   run.room  = [g create:"room_air" key:"the room's air" at:BGLocationMakeNone()];
+   run.stove = [g create:"stove" key:"stove" at:BGOnTile( 2, 2, 0)];
+   worker    = [g create:"worker" key:"worker" at:BGOnTile( 3, 2, 0)];
+   if( ! damper)
+      [g set:"Combustor.damper" of:BGWhole( run.stove) to:0];
+   [c submit:g];
+   [s runUntil:BGTimeMake( 1)];
+   run.room  = [g idFor:run.room];
+   run.stove = [g idFor:run.stove];
+   worker    = [g idFor:worker];
+
+   error = nil;
+   BG_CHECK( BGPerform( w, c, BGActionMake( "light", worker, run.stove, BGNoEntity), 0, &error) != nil);
+   [s runUntil:BGTimeMake( 2)];
+   g = BGPerform( w, c, BGActionMake( "while_away", worker, BGNoEntity, BGNoEntity), 0, &error);
+   BG_CHECK( g != nil);
+   [s runUntil:BGTimeMake( 3)];
+   run.rest     = [g idFor:[g proposals][ 0].handle];
+   run.balanced = YES;
+   end          = 8 * 3600000LL + 10000;
+   while( [w time].ms < end)
+   {
+      if( stepped)
+         [s runUntil:BGTimeMake( [w time].ms - [w time].ms % 60000 + 60000)];
+      else if( ! [s stepUntil:BGTimeMake( end)])
+         break;
+      run.boundaries++;
+      run.balanced = run.balanced && [air balanced];
+      if( ! run.outAt && [w getField:"Combustor.lit" of:run.stove value:&v] && ! v)
+         run.outAt = [w time].ms;
+      if( ! run.wokenAt && strcmp( status_of( w, run.rest), "\"running\""))
+         run.wokenAt = [w time].ms;
+   }
+   run.world     = w;
+   run.committer = c;
+   run.air       = air;
+   run.text      = BGSave( w, c, [NSArray arrayWithObject:air]);
+   return( run);
+}
+
+
+static void   test_unattended_stove( void)
+{
+   BGStoveRun     a;
+   BGStoveRun     again;
+   BGStoveRun     b;
+   BGStoveRun     stepped;
+   BGAtmosphere   *restored;
+   NSString       *trace;
+   NSRange        at;
+   int64_t        fuel;
+   long long      reached;
+
+   /* A, the flue open: the fire burns 3 kg at 0.25 g a second, 12,000 s, and
+    * goes out then, a predicted event; the room is warmer; the rest runs its
+    * 8 hours; and every step balances exactly */
+   a = stove_run( YES, NO);
+   BG_CHECK( a.balanced);
+   BG_CHECK( a.outAt >= 2 + 12000000 && a.outAt <= 2 + 12000000 + 2);     /* to the millisecond, rounded up */
+   BG_CHECK( [a.world getField:"FuelContainer.fuel" of:a.stove value:&fuel] && fuel == 0);
+   BG_CHECK( a.wokenAt >= 8 * 3600000LL);
+   /* 2: time jumps: dozens of steps for eight hours, not thousands */
+   BG_CHECK( a.boundaries < 200);
+   BG_CHECK( [a.air temperatureOf:a.room] > 275000);
+
+   /* B, the damper left closed: the fire fills the room with carbon dioxide,
+    * and the watch wakes the rest at the boundary it crosses, within the
+    * event tolerance of a second */
+   b = stove_run( NO, NO);
+   BG_CHECK( b.balanced);
+   BG_CHECK( b.wokenAt > 0 && b.wokenAt < 3600000);
+   trace = [[b.committer trace] componentsJoinedByString:@"\n"];
+   at    = [trace rangeOfString:@"reaches "];
+   reached = at.location != NSNotFound ? atoll( [[trace substringFromIndex:at.location + 8] UTF8String]) : 0;
+   BG_CHECK( reached >= 4000 && reached < 4000 + 50);
+
+   /* 3, C: the same, in 480 one-minute steps: exactly as conserved, the
+    * fuel all burned, and the room's temperature within a kelvin */
+   stepped = stove_run( YES, YES);
+   BG_CHECK( stepped.balanced);
+   BG_CHECK( [stepped.world getField:"FuelContainer.fuel" of:stepped.stove value:&fuel] && fuel == 0);
+   BG_CHECK( llabs( [stepped.air temperatureOf:stepped.room] - [a.air temperatureOf:a.room]) < 1000);
+   BG_CHECK( stepped.boundaries >= 480);
+
+   /* determinism, and the domain's state saved */
+   again = stove_run( YES, NO);
+   BG_CHECK( [again.text isEqualToString:a.text]);
+   restored = [[[BGAtmosphere alloc] initWithWorld:a.world] autorelease];
+   [restored restoreSavedState:BGSavedDomainState( a.text, @"atmosphere")];
+   BG_CHECK( [[restored savedState] isEqualToArray:[a.air savedState]]);
+}
+
+
 /* --- the cistern ----------------------------------------------------------- */
 
 static BGCistern   *run_cistern( BGCisternVariant variant)
@@ -4671,6 +4809,7 @@ const BGTestCase   BGAllTests[] =
    { "seized_valve",                  test_seized_valve },
    { "resume_recheck",                test_resume_recheck },
    { "interrupted_repair",            test_interrupted_repair },
+   { "unattended_stove",              test_unattended_stove },
    { "rumour",                        test_rumour },
    { "memory_decay",                  test_memory_decay },
    { "salience",                      test_salience },

@@ -134,6 +134,9 @@ NSString           *BGProvidersBusy( BGWorld *world, BGEntityID actor, const cha
  * its effect, when an instant action is performed or an activity completes. */
 void               BGLeaveTraces( BGWorld *world, BGAction action, BGProposalGroup *group);
 
+/* The region of air (a GasStore) over the entity's tile, or 0. */
+BGEntityID         BGAirOver( BGWorld *world, BGEntityID e);
+
 /* A named effect, as proposals added to `group`. */
 NSString           *BGApplyNamedEffect( BGWorld *world, NSString *effect, BGAction action, int64_t amount,
                                         BGProposalGroup *group);

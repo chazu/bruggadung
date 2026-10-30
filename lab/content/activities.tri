@@ -23,6 +23,10 @@
     // water reaches watchAtLeast; no holder, no watch
     watchHolder:    ref                        @field(saved, proposable, inspect)
     watchAtLeast:   volume & >=0mL & <=10m3    @field(content, saved, proposable, inspect)
+    // a watch on the air (the atmosphere domain): tell this activity when
+    // the holder's carbon dioxide reaches watchDioxide (mmol); 0, no watch
+    watchDioxide:   int & >=0 & <=100000000    @field(content, saved, proposable, inspect)
 }
 
-activity: #Activity & { amount: 0, stage: 0, progress: 0ms, started: 0ms, due: 0ms, status: "running", watchAtLeast: 0mL }
+activity: #Activity & { amount: 0, stage: 0, progress: 0ms, started: 0ms, due: 0ms, status: "running", watchAtLeast: 0mL,
+                        watchDioxide: 0 }

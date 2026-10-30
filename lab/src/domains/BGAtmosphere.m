@@ -1,0 +1,586 @@
+#import "BGAtmosphere.h"
+
+#import "BGActions.h"
+
+
+/* the outdoors, a reservoir: per mille oxygen, per ten thousand carbon
+ * dioxide, and the heat a millimole of its air carries at 275 K, in mJ */
+#define BG_OUT_OXYGEN       210
+#define BG_OUT_DIOXIDE      4
+#define BG_OUT_HEAT         7975
+#define BG_GAS_CAPACITY     29          /* mJ per mmol per kelvin */
+
+/* combustion, per gram of wood */
+#define BG_BURN_OXYGEN      33          /* mmol consumed */
+#define BG_BURN_DIOXIDE     33          /* mmol produced */
+#define BG_BURN_HEAT        15          /* J per mg */
+
+
+@implementation BGAtmosphere
+
+- (id) initWithWorld:(BGWorld *) world
+{
+   if( ! (self = [super init]))
+      return( nil);
+   _world = [world retain];
+   return( self);
+}
+
+
+- (void) dealloc
+{
+   [_world release];
+   [super dealloc];
+}
+
+
+- (NSString *) name
+{
+   return( @"atmosphere");
+}
+
+
+- (NSUInteger) steps
+{
+   return( _steps);
+}
+
+
+/* --- reading the world ------------------------------------------------------------ */
+
+- (int) regionOf:(BGEntityID) entity
+{
+   int   i;
+
+   for( i = 0; i < _nregions; i++)
+      if( _regions[ i].entity == entity)
+         return( i);
+   if( _nregions == BG_ATMOS_REGIONS)
+      return( -1);
+   memset( &_regions[ _nregions], 0, sizeof( BGAirRegion));
+   _regions[ _nregions].entity = entity;
+   return( _nregions++);
+}
+
+
+- (int) stoveOf:(BGEntityID) entity
+{
+   int   i;
+
+   for( i = 0; i < _nstoves; i++)
+      if( _stoves[ i].entity == entity)
+         return( i);
+   if( _nstoves == BG_ATMOS_STOVES)
+      return( -1);
+   memset( &_stoves[ _nstoves], 0, sizeof( BGStoveState));
+   _stoves[ _nstoves].entity = entity;
+   _stoves[ _nstoves].fuel   = -1;
+   return( _nstoves++);
+}
+
+
+/* The regions' and stoves' values from their records, which mirror ours;
+ * a stove not burning takes its fuel from its record. */
+- (void) load
+{
+   const BGGasStore        *air;
+   const BGCombustor       *combustor;
+   const BGFuelContainer   *fuel;
+   BGStore                 *stores;
+   NSUInteger              i;
+   int                     k;
+
+   stores = [_world storeForKind:[_world kindNamed:"GasStore"]];
+   for( i = 0; i < [stores count]; i++)
+   {
+      air = [stores recordAtIndex:i];
+      if( (k = [self regionOf:[stores entityAtIndex:i]]) < 0)
+         continue;
+      _regions[ k].oxygen  = air->oxygen;
+      _regions[ k].dioxide = air->dioxide;
+      _regions[ k].heat    = air->gasHeat;
+      _regions[ k].total   = air->total;
+   }
+   stores = [_world storeForKind:[_world kindNamed:"Combustor"]];
+   for( i = 0; i < [stores count]; i++)
+   {
+      combustor = [stores recordAtIndex:i];
+      fuel      = [_world record:[_world kindNamed:"FuelContainer"] for:[stores entityAtIndex:i]];
+      if( ! fuel || (k = [self stoveOf:[stores entityAtIndex:i]]) < 0)
+         continue;
+      if( ! combustor->lit || _stoves[ k].fuel < 0)
+         _stoves[ k].fuel = fuel->fuel * 1000;
+      _stoves[ k].region = [self regionOf:BGAirOver( _world, [stores entityAtIndex:i])];
+   }
+}
+
+
+- (BOOL) lit:(int) s
+{
+   const BGCombustor   *combustor;
+
+   combustor = [_world record:[_world kindNamed:"Combustor"] for:_stoves[ s].entity];
+   return( combustor && combustor->lit && _stoves[ s].fuel > 0);
+}
+
+
+/* What the stove burns now, mg a second: its rate, or, damper closed, what
+ * the room's oxygen allows: all of it at 21%, nothing at 10%. */
+- (int64_t) rateOf:(int) s
+{
+   const BGCombustor   *combustor;
+   BGAirRegion         *r;
+   int64_t             permille;
+
+   combustor = [_world record:[_world kindNamed:"Combustor"] for:_stoves[ s].entity];
+   if( ! combustor || ! [self lit:s])
+      return( 0);
+   if( combustor->damper || _stoves[ s].region < 0)
+      return( combustor->burnRate);
+   r        = &_regions[ _stoves[ s].region];
+   permille = r->oxygen * 1000 / r->total - 100;
+   if( permille <= 0)
+      return( 0);
+   if( permille > 110)
+      permille = 110;
+   return( combustor->burnRate * permille / 110);
+}
+
+
+- (BOOL) settled:(const BGAirRegion *) r
+{
+   int64_t   t;
+
+   t = r->heat * 1000000 / (r->total * BG_GAS_CAPACITY);
+   return( llabs( r->oxygen - r->total * BG_OUT_OXYGEN / 1000) <= r->total / 1000 &&
+           llabs( r->dioxide - r->total * BG_OUT_DIOXIDE / 10000) <= 100 &&
+           llabs( t - 275000) <= 500);
+}
+
+
+- (int64_t) temperatureOf:(BGEntityID) region
+{
+   int   i;
+
+   [self load];
+   for( i = 0; i < _nregions; i++)
+      if( _regions[ i].entity == region)
+         return( _regions[ i].heat * 1000000 / (_regions[ i].total * BG_GAS_CAPACITY));
+   return( 0);
+}
+
+
+/* --- the domain ----------------------------------------------------------------- */
+
+- (BOOL) isActive
+{
+   int   i;
+
+   [self load];
+   for( i = 0; i < _nstoves; i++)
+      if( [self lit:i])
+         return( YES);
+   for( i = 0; i < _nregions; i++)
+      if( ! [self settled:&_regions[ i]])
+         return( YES);
+   return( NO);
+}
+
+
+/* The activities watching a region's carbon dioxide, running. */
+- (NSUInteger) watches:(BGEntityID *) out
+                   max:(NSUInteger) max
+{
+   const BGActivity   *record;
+   BGStore            *store;
+   NSUInteger         i;
+   NSUInteger         n;
+
+   store = [_world storeForKind:[_world kindNamed:"Activity"]];
+   n     = 0;
+   for( i = 0; i < [store count] && n < max; i++)
+   {
+      record = [store recordAtIndex:i];
+      if( record->watchDioxide > 0 && record->watchHolder &&
+          record->status == (uint32_t) tri_type_named( [_world tri], "\"running\""))
+         out[ n++] = [store entityAtIndex:i];
+   }
+   return( n);
+}
+
+
+- (BGHorizon) horizonAt:(BGTime) t
+{
+   const BGActivity   *record;
+   BGEntityID         watched[ 16];
+   BGHorizon          h;
+   NSUInteger         n;
+   NSUInteger         i;
+   int64_t            rate;
+   int64_t            when;
+   int                s;
+   int                k;
+   BOOL               burning;
+
+   [self load];
+   burning = NO;
+   h.nextEvent = BGTimeNever;
+   for( s = 0; s < _nstoves; s++)
+   {
+      if( ! [self lit:s])
+         continue;
+      burning = YES;
+      /* the fuel runs out: at this rate, or later, as a smoulder slows */
+      if( (rate = [self rateOf:s]) > 0)
+      {
+         when = t.ms + (_stoves[ s].fuel * 1000 + rate - 1) / rate;
+         if( when > t.ms && when < h.nextEvent.ms)
+            h.nextEvent = BGTimeMake( when);
+      }
+   }
+   /* a watch crossing, at the rise the rates give now (mmol per 1000 s):
+    * the fires venting into the region, and the door; the rise only slows as
+    * the oxygen falls, so this is never late. No sooner than a second, the
+    * event tolerance */
+   n = [self watches:watched max:16];
+   for( i = 0; i < n; i++)
+   {
+      int64_t   rise;
+
+      record = [_world record:[_world kindNamed:"Activity"] for:watched[ i]];
+      for( k = 0; k < _nregions && _regions[ k].entity != (BGEntityID) record->watchHolder; k++)
+         ;
+      if( k == _nregions || _regions[ k].dioxide >= record->watchDioxide)
+         continue;
+      rise = BG_DOOR_FLOW * (BG_OUT_DIOXIDE * _regions[ k].total / 10000 - _regions[ k].dioxide) * 1000 /
+             _regions[ k].total;
+      for( s = 0; s < _nstoves; s++)
+         if( _stoves[ s].region == k && [self lit:s] &&
+             ! ((const BGCombustor *) [_world record:[_world kindNamed:"Combustor"] for:_stoves[ s].entity])->damper)
+            rise += [self rateOf:s] * BG_BURN_DIOXIDE;
+      if( rise <= 0)
+         continue;
+      when = t.ms + (record->watchDioxide - _regions[ k].dioxide) * 1000000 / rise;
+      if( when < t.ms + 1000)
+         when = t.ms + 1000;
+      if( when < h.nextEvent.ms)
+         h.nextEvent = BGTimeMake( when);
+   }
+   h.safeStep = BGTimeMake( burning ? 600000 : 3600000);
+   return( h);
+}
+
+
+/* What comes in through the door from outdoors, and goes out, for one
+ * quantity of a region: in whole quanta, the fraction carried. */
+static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t outNum, int64_t outDen,
+                           int64_t *carryIn, int64_t *carryOut)
+{
+   int64_t   in;
+   int64_t   out;
+
+   *carryIn  += air * outNum;
+   in         = *carryIn / outDen;
+   *carryIn  %= outDen;
+   *carryOut += air * mine;
+   out        = *carryOut / total;
+   *carryOut %= total;
+   return( in - out);
+}
+
+
+- (void) advanceFrom:(BGTime) t0
+                  to:(BGTime) t1
+               world:(BGWorld *) world
+           committer:(BGCommitter *) committer
+{
+   const BGActivity   *record;
+   BGProposalGroup    *g;
+   BGAirRegion        *r;
+   BGAirRegion        before[ BG_ATMOS_REGIONS];
+   BGEntityID         watched[ 16];
+   NSUInteger         n;
+   NSUInteger         i;
+   int64_t            dt;
+   int64_t            air;
+   int64_t            d[ 3];
+   int64_t            burned;
+   int64_t            rate;
+   int64_t            used;
+   int64_t            made;
+   int64_t            heat;
+   int64_t            rates[ BG_ATMOS_STOVES];
+   int                k;
+   int                s;
+   BOOL               open;
+
+   dt = t1.ms - t0.ms;
+   [self load];
+   if( dt <= 0)
+      return;
+   if( ! _ledgered)
+   {
+      memset( &_ledger, 0, sizeof( _ledger));
+      for( k = 0; k < _nregions; k++)
+      {
+         _ledger.initial[ 0] += _regions[ k].oxygen;
+         _ledger.initial[ 1] += _regions[ k].dioxide;
+         _ledger.initial[ 2] += _regions[ k].heat;
+      }
+      for( s = 0; s < _nstoves; s++)
+         _ledger.fuel += _stoves[ s].fuel;
+      _ledgered = YES;
+   }
+   memcpy( before, _regions, sizeof( before));
+   for( s = 0; s < _nstoves; s++)
+      rates[ s] = [self rateOf:s];          /* from step-start values */
+
+   /* the door: each region mixes with the outdoors, from step-start values */
+   for( k = 0; k < _nregions; k++)
+   {
+      r            = &_regions[ k];
+      r->carryAir += BG_DOOR_FLOW * dt;
+      air          = r->carryAir / 1000;
+      r->carryAir %= 1000;
+      d[ 0] = exchange( air, before[ k].oxygen, r->total, BG_OUT_OXYGEN, 1000, &r->carryIn[ 0], &r->carryOut[ 0]);
+      d[ 1] = exchange( air, before[ k].dioxide, r->total, BG_OUT_DIOXIDE, 10000, &r->carryIn[ 1], &r->carryOut[ 1]);
+      d[ 2] = exchange( air, before[ k].heat, r->total, BG_OUT_HEAT, 1000, &r->carryIn[ 2], &r->carryOut[ 2]);
+      r->oxygen  += d[ 0];
+      r->dioxide += d[ 1];
+      r->heat    += d[ 2];
+      _ledger.inflow[ 0] += d[ 0];
+      _ledger.inflow[ 1] += d[ 1];
+      _ledger.inflow[ 2] += d[ 2];
+   }
+
+   /* the stoves: from step-start values */
+   for( s = 0; s < _nstoves; s++)
+   {
+      _stoves[ s].out = NO;
+      if( ! [self lit:s])
+         continue;
+      rate               = rates[ s];
+      _stoves[ s].carry += rate * dt;
+      burned             = _stoves[ s].carry / 1000;
+      _stoves[ s].carry %= 1000;
+      if( burned > _stoves[ s].fuel)
+         burned = _stoves[ s].fuel;
+      _stoves[ s].fuel -= burned;
+      _ledger.burned   += burned;
+      open = ((const BGCombustor *) [_world record:[_world kindNamed:"Combustor"] for:_stoves[ s].entity])->damper;
+      if( _stoves[ s].region >= 0)
+      {
+         r = &_regions[ _stoves[ s].region];
+         if( open)
+         {
+            /* drawn from outdoors and up the flue: a tenth of the heat stays */
+            r->carryBurn[ 2] += burned * BG_BURN_HEAT;
+            heat              = r->carryBurn[ 2] / 10;
+            r->carryBurn[ 2] %= 10;
+            r->heat          += heat;
+            _ledger.produced[ 2] += heat;
+         }
+         else
+         {
+            /* from the room and into it */
+            r->carryBurn[ 0] += burned * BG_BURN_OXYGEN;
+            used              = r->carryBurn[ 0] / 1000;
+            r->carryBurn[ 0] %= 1000;
+            if( used > r->oxygen)
+               used = r->oxygen;
+            r->carryBurn[ 1] += burned * BG_BURN_DIOXIDE;
+            made              = r->carryBurn[ 1] / 1000;
+            r->carryBurn[ 1] %= 1000;
+            r->oxygen  -= used;
+            r->dioxide += made;
+            r->heat    += burned * BG_BURN_HEAT;
+            _ledger.consumed[ 0] += used;
+            _ledger.produced[ 1] += made;
+            _ledger.produced[ 2] += burned * BG_BURN_HEAT;
+         }
+      }
+      if( ! _stoves[ s].fuel)
+         _stoves[ s].out = YES;
+   }
+
+   /* the records mirror the domain */
+   for( k = 0; k < _nregions; k++)
+   {
+      [_world setField:"GasStore.oxygen" of:_regions[ k].entity value:_regions[ k].oxygen];
+      [_world setField:"GasStore.dioxide" of:_regions[ k].entity value:_regions[ k].dioxide];
+      [_world setField:"GasStore.gasHeat" of:_regions[ k].entity value:_regions[ k].heat];
+   }
+   for( s = 0; s < _nstoves; s++)
+      [_world setField:"FuelContainer.fuel" of:_stoves[ s].entity value:(_stoves[ s].fuel + 999) / 1000];
+   _rise = _nregions && dt ? (_regions[ 0].dioxide - before[ 0].dioxide) * 1000 / dt : 0;
+   _steps++;
+
+   /* a fire out, at the boundary: by proposal */
+   for( s = 0; s < _nstoves; s++)
+      if( _stoves[ s].out)
+      {
+         g = [BGProposalGroup groupWithPhase:BGPhaseProcess
+                                      source:[NSString stringWithFormat:@"atmosphere: stove %llu goes out",
+                                                                        (unsigned long long) _stoves[ s].entity]];
+         [g set:"Combustor.lit" of:BGWhole( _stoves[ s].entity) to:0];
+         [g set:"FuelContainer.fuel" of:BGWhole( _stoves[ s].entity) to:0];
+         [committer submit:g];
+      }
+
+   /* watches crossed */
+   n = [self watches:watched max:16];
+   for( i = 0; i < n; i++)
+   {
+      record = [_world record:[_world kindNamed:"Activity"] for:watched[ i]];
+      for( k = 0; k < _nregions && _regions[ k].entity != (BGEntityID) record->watchHolder; k++)
+         ;
+      if( k == _nregions || _regions[ k].dioxide < record->watchDioxide)
+         continue;
+      for( s = 0; s < _nfired && _fired[ s] != watched[ i]; s++)
+         ;
+      if( s < _nfired)
+         continue;
+      if( _nfired < 16)
+         _fired[ _nfired++] = watched[ i];
+      g = [BGProposalGroup groupWithPhase:BGPhaseProcess
+                                   source:[NSString stringWithFormat:@"atmosphere: the air at %llu reaches %lld mmol of "
+                                                                     @"carbon dioxide",
+                                                                     (unsigned long long) _regions[ k].entity,
+                                                                     (long long) _regions[ k].dioxide]];
+      [g emit:"watched" subject:BGWhole( watched[ i]) other:BGWhole( _regions[ k].entity)];
+      [committer submit:g];
+   }
+}
+
+
+- (BOOL) balanced
+{
+   int64_t   sum[ 3];
+   int64_t   fuel;
+   int       k;
+
+   memset( sum, 0, sizeof( sum));
+   for( k = 0; k < _nregions; k++)
+   {
+      sum[ 0] += _regions[ k].oxygen;
+      sum[ 1] += _regions[ k].dioxide;
+      sum[ 2] += _regions[ k].heat;
+   }
+   for( fuel = 0, k = 0; k < _nstoves; k++)
+      fuel += _stoves[ k].fuel;
+   for( k = 0; k < 3; k++)
+      if( sum[ k] != _ledger.initial[ k] + _ledger.inflow[ k] + _ledger.produced[ k] - _ledger.consumed[ k])
+         return( NO);
+   return( ! _ledgered || fuel + _ledger.burned == _ledger.fuel);
+}
+
+
+/* --- saves ----------------------------------------------------------------------- */
+
+- (void) checkInAll
+{
+}
+
+
+- (NSArray *) savedState
+{
+   NSMutableArray   *lines;
+   BGAirRegion      *r;
+   int              k;
+
+   lines = [NSMutableArray array];
+   [lines addObject:[NSString stringWithFormat:@"air %d %llu %lld", _ledgered ? 1 : 0, (unsigned long long) _steps,
+                                               (long long) _rise]];
+   [lines addObject:[NSString stringWithFormat:@"ledger %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld",
+                                               _ledger.initial[ 0], _ledger.initial[ 1], _ledger.initial[ 2],
+                                               _ledger.inflow[ 0], _ledger.inflow[ 1], _ledger.inflow[ 2],
+                                               _ledger.produced[ 0], _ledger.produced[ 1], _ledger.produced[ 2],
+                                               _ledger.consumed[ 0], _ledger.consumed[ 1], _ledger.consumed[ 2],
+                                               _ledger.fuel, _ledger.burned]];
+   for( k = 0; k < _nregions; k++)
+   {
+      r = &_regions[ k];
+      [lines addObject:[NSString stringWithFormat:@"region %llu %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld",
+                                                  (unsigned long long) r->entity, r->carryAir,
+                                                  r->carryIn[ 0], r->carryIn[ 1], r->carryIn[ 2],
+                                                  r->carryOut[ 0], r->carryOut[ 1], r->carryOut[ 2],
+                                                  r->carryBurn[ 0], r->carryBurn[ 1], r->carryBurn[ 2],
+                                                  (long long) 0, (long long) 0]];
+   }
+   for( k = 0; k < _nstoves; k++)
+      [lines addObject:[NSString stringWithFormat:@"stove %llu %lld %lld", (unsigned long long) _stoves[ k].entity,
+                                                  _stoves[ k].fuel, _stoves[ k].carry]];
+   for( k = 0; k < _nfired; k++)
+      [lines addObject:[NSString stringWithFormat:@"fired %llu", (unsigned long long) _fired[ k]]];
+   return( lines);
+}
+
+
+- (void) restoreSavedState:(NSArray *) lines
+{
+   unsigned long long   e;
+   unsigned long long   steps;
+   long long            v[ 14];
+   NSUInteger           i;
+   BGAirRegion          *r;
+   const char           *text;
+   int                  flag;
+   int                  k;
+
+   _nregions = 0;
+   _nstoves  = 0;
+   _nfired   = 0;
+   for( i = 0; i < [lines count]; i++)
+   {
+      text = [[lines objectAtIndex:i] UTF8String];
+      if( sscanf( text, "air %d %llu %lld", &flag, &steps, &v[ 0]) == 3)
+      {
+         _ledgered = flag != 0;
+         _steps    = (NSUInteger) steps;
+         _rise     = v[ 0];
+      }
+      else if( sscanf( text, "ledger %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld", &v[ 0], &v[ 1],
+                       &v[ 2], &v[ 3], &v[ 4], &v[ 5], &v[ 6], &v[ 7], &v[ 8], &v[ 9], &v[ 10], &v[ 11], &v[ 12],
+                       &v[ 13]) == 14)
+      {
+         for( k = 0; k < 3; k++)
+         {
+            _ledger.initial[ k]  = v[ k];
+            _ledger.inflow[ k]   = v[ 3 + k];
+            _ledger.produced[ k] = v[ 6 + k];
+            _ledger.consumed[ k] = v[ 9 + k];
+         }
+         _ledger.fuel   = v[ 12];
+         _ledger.burned = v[ 13];
+      }
+      else if( sscanf( text, "region %llu %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld", &e, &v[ 0], &v[ 1],
+                       &v[ 2], &v[ 3], &v[ 4], &v[ 5], &v[ 6], &v[ 7], &v[ 8], &v[ 9], &v[ 10], &v[ 11]) == 13)
+      {
+         if( (k = [self regionOf:(BGEntityID) e]) < 0)
+            continue;
+         r           = &_regions[ k];
+         r->carryAir = v[ 0];
+         r->carryIn[ 0]  = v[ 1];
+         r->carryIn[ 1]  = v[ 2];
+         r->carryIn[ 2]  = v[ 3];
+         r->carryOut[ 0] = v[ 4];
+         r->carryOut[ 1] = v[ 5];
+         r->carryOut[ 2] = v[ 6];
+         r->carryBurn[ 0] = v[ 7];
+         r->carryBurn[ 1] = v[ 8];
+         r->carryBurn[ 2] = v[ 9];
+      }
+      else if( sscanf( text, "stove %llu %lld %lld", &e, &v[ 0], &v[ 1]) == 3)
+      {
+         if( (k = [self stoveOf:(BGEntityID) e]) < 0)
+            continue;
+         _stoves[ k].fuel  = v[ 0];
+         _stoves[ k].carry = v[ 1];
+      }
+      else if( sscanf( text, "fired %llu", &e) == 1 && _nfired < 16)
+         _fired[ _nfired++] = (BGEntityID) e;
+   }
+   [self load];
+}
+
+@end

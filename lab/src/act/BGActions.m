@@ -818,6 +818,48 @@ static NSString   *effect_dismantle( BGWorld *world, BGAction a, int64_t amount,
 }
 
 
+/* Lighting a stove: it burns, while it has fuel. */
+static NSString   *effect_light( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
+{
+   int64_t   fuel;
+
+   if( ! [world getField:"FuelContainer.fuel" of:a.roles[ BGRoleItem] value:&fuel] || fuel <= 0)
+      return( @"there is nothing in it to burn");
+   [g set:"Combustor.lit" of:BGWhole( a.roles[ BGRoleItem]) to:1];
+   return( nil);
+}
+
+
+/* The region of air (a GasStore) over the entity's tile, or 0. */
+BGEntityID   BGAirOver( BGWorld *world, BGEntityID e)
+{
+   const BGGasStore   *air;
+   BGStore            *stores;
+   BGLocation         at;
+   BGEntityID         p;
+   NSUInteger         i;
+   int                k;
+
+   for( p = e, k = 0; p && k < 64; k++)
+   {
+      at = [world locationOf:p];
+      if( at.form == BGLocationOnTile)
+         break;
+      p = at.place;
+   }
+   if( at.form != BGLocationOnTile)
+      return( BGNoEntity);
+   stores = [world storeForKind:[world kindNamed:"GasStore"]];
+   for( i = 0; i < [stores count]; i++)
+   {
+      air = [stores recordAtIndex:i];
+      if( at.x >= air->west && at.x <= air->east && at.y >= air->north && at.y <= air->south)
+         return( [stores entityAtIndex:i]);
+   }
+   return( BGNoEntity);
+}
+
+
 /* Tending changes nothing but traces, which the operation declares. */
 static NSString   *effect_tend( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
 {
@@ -859,6 +901,8 @@ static const struct
    { "rotate",    effect_rotate },
    { "shut",      effect_shut },
    { "dismantle", effect_dismantle },
+   { "light",     effect_light },
+   { "rest",      effect_tend },
    { "strike",    effect_strike },
 };
 
@@ -1252,6 +1296,12 @@ BGProposalGroup   *BGPerform( BGWorld *world, BGCommitter *committer, BGAction a
       activity = start_activity( world, action, amount, group);
       [group set:"Activity.started" of:BGWhole( activity) to:[world time].ms];
       [group set:"Activity.due" of:BGWhole( activity) to:[world time].ms + duration];
+      if( [effect isEqualToString:@"rest"] && BGAirOver( world, action.roles[ BGRoleActor]))
+      {
+         /* resting, with a watch on the air: woken when it grows stuffy */
+         [group set:"Activity.watchHolder" of:BGWhole( activity) to:(int64_t) BGAirOver( world, action.roles[ BGRoleActor])];
+         [group set:"Activity.watchDioxide" of:BGWhole( activity) to:amount > 0 ? amount : 4000];
+      }
    }
    else if( (reason = BGApplyEffect( world, action, amount, group)))
    {

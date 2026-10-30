@@ -1554,3 +1554,39 @@ its progress kept, and the pump is opened.
 
 51 tests, 1931 checks, under both compilers, ASan and UBSan, and leak-free.
 
+
+### After the slice: the air (the unattended stove)
+
+DOMAIN_SIMULATION.md Scenario 1, the atmosphere half. A room with a door
+gap to the outdoors (275 K, fixed composition) and a stove holding 3 kg of
+wood. The worker lights it and rests for eight hours, watching the room's
+carbon dioxide. Flue open (A), the fire burns at 0.25 g a second and goes
+out at 12,000 s, a predicted event that becomes a step boundary and a
+proposal; the room is warmer; the rest runs its eight hours in 25 steps.
+Damper closed (B), the stove draws from the room and vents into it, smoulders
+as the oxygen falls, and the watch wakes the rest at the boundary it
+crosses, within a second of the crossing and never before it. Stepped
+minute by minute (C), it is exactly as conserved, the fuel all burned, and
+the room within a kelvin of A.
+
+- **BGAtmosphere** (`content/air.tri`: `#GasStore`, `#Combustor`,
+  `#FuelContainer`, `#Stove`): whole millimoles of oxygen and carbon
+  dioxide, whole joules of gas heat, milligrams of fuel, with carries for
+  what is fractional, so that a ledger balances exactly after every step.
+  It checks the fuel and gas out while anything moves, mirrors them into the
+  records each step, and sleeps (an infinite horizon) when the room settles
+  with no fire.
+- **Horizons**: fuel exhaustion and a watch's crossing, predicted from the
+  rates now (the rise only slows as the oxygen falls, so the prediction is
+  never late), no sooner than the event tolerance.
+- **Watches on a domain's quantity**: `watchDioxide` on a rest; the domain
+  reports the crossing as an event for the activity.
+- `light` and `while_away` (the rest) set up the fire and the watch.
+
+Not yet, of the scenario: the thermal domain (the stove's iron, the walls,
+the body) and the atmosphere ↔ thermal contributions, which the doc's open
+question 1 needs; respiration; per-tile regions and the corridor; the
+comfort band watch; order independence across domains (there is one); and
+local wake on opening the door.
+
+52 tests, 1954 checks, under both compilers, ASan and UBSan, and leak-free.
