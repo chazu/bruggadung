@@ -1,4 +1,4 @@
-/* Generated from Triangle content ad8fab5c88f72118: do not edit. Type IDs are valid
+/* Generated from Triangle content ac6af9d2384902a1: do not edit. Type IDs are valid
  * only for this content; regenerate when it changes. */
 #ifndef BG_COMPONENTS_H
 #define BG_COMPONENTS_H
@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BG_CONTENT_HASH 0xad8fab5c88f72118ULL
+#define BG_CONTENT_HASH 0xac6af9d2384902a1ULL
 
 /* Combustor, from #Combustor */
 typedef struct {
@@ -39,6 +39,14 @@ typedef struct {
     bool            sleeve;    /* bool; content, saved, inspect, perceive(sight) */
 } BGLever;
 
+/* Respirator, from #Respirator */
+typedef struct {
+    int64_t         atRest;    /* int, in quanta of 1; content, saved, inspect */
+    int64_t         atWork;    /* int, in quanta of 1; content, saved, inspect */
+    int64_t         restsAbove;    /* int, in quanta of 1; content, saved, proposable, inspect */
+    int64_t         restsBelow;    /* int, in quanta of 1; content, saved, proposable, inspect */
+} BGRespirator;
+
 /* Sized, from #Sized */
 typedef struct {
     int64_t         size;    /* length, in quanta of 0.1mm; content, saved, inspect, perceive(sight) */
@@ -66,8 +74,10 @@ typedef struct {
     int64_t         started;    /* time, in quanta of 1ms; content, saved, proposable, inspect */
     uint32_t        status;    /* #ActivityStatus: a type ID; content, saved, proposable, inspect */
     int64_t         watchAtLeast;    /* volume, in quanta of 1mL; content, saved, proposable, inspect */
+    int64_t         watchCool;    /* int, in quanta of 1; content, saved, proposable, inspect */
     int64_t         watchDioxide;    /* int, in quanta of 1; content, saved, proposable, inspect */
     uint64_t        watchHolder;    /* a referent; saved, proposable, inspect */
+    int64_t         watchWarm;    /* int, in quanta of 1; content, saved, proposable, inspect */
 } BGActivity;
 
 /* Claim, from #Claim */
@@ -174,57 +184,57 @@ typedef struct {
 
 /* #ActivityStatus */
 enum {
-    BG_ACTIVITYSTATUS_COMPLETED = 225,
-    BG_ACTIVITYSTATUS_EXHAUSTED = 226,
-    BG_ACTIVITYSTATUS_FAILED = 227,
-    BG_ACTIVITYSTATUS_RUNNING = 228,
-    BG_ACTIVITYSTATUS_SUSPENDED = 229,
+    BG_ACTIVITYSTATUS_COMPLETED = 226,
+    BG_ACTIVITYSTATUS_EXHAUSTED = 227,
+    BG_ACTIVITYSTATUS_FAILED = 228,
+    BG_ACTIVITYSTATUS_RUNNING = 229,
+    BG_ACTIVITYSTATUS_SUSPENDED = 230,
 };
 
 /* #ClaimKind */
 enum {
-    BG_CLAIMKIND_CUSTODY = 231,
-    BG_CLAIMKIND_OWNERSHIP = 232,
-    BG_CLAIMKIND_RESERVATION = 233,
+    BG_CLAIMKIND_CUSTODY = 232,
+    BG_CLAIMKIND_OWNERSHIP = 233,
+    BG_CLAIMKIND_RESERVATION = 234,
 };
 
 /* #Material */
 enum {
-    BG_MATERIAL_CLOTH = 273,
-    BG_MATERIAL_FOOD = 274,
-    BG_MATERIAL_RUBBER = 275,
-    BG_MATERIAL_STONE = 276,
-    BG_MATERIAL_FLESH = 301,
-    BG_MATERIAL_BRASS = 303,
-    BG_MATERIAL_IRON = 304,
-    BG_MATERIAL_PAPER = 305,
-    BG_MATERIAL_STEEL = 306,
-    BG_MATERIAL_OAK = 308,
+    BG_MATERIAL_CLOTH = 274,
+    BG_MATERIAL_FOOD = 275,
+    BG_MATERIAL_RUBBER = 276,
+    BG_MATERIAL_STONE = 277,
+    BG_MATERIAL_FLESH = 302,
+    BG_MATERIAL_BRASS = 304,
+    BG_MATERIAL_IRON = 305,
+    BG_MATERIAL_PAPER = 306,
+    BG_MATERIAL_STEEL = 307,
+    BG_MATERIAL_OAK = 309,
 };
 
 /* "flesh" | "metal" | "natural" | "paper" | "wood" */
 enum {
-    BG_BODY_SURFACE_NATURAL = 188,
-    BG_BODY_SURFACE_FLESH = 301,
-    BG_BODY_SURFACE_BRASS = 303,
-    BG_BODY_SURFACE_IRON = 304,
-    BG_BODY_SURFACE_PAPER = 305,
-    BG_BODY_SURFACE_STEEL = 306,
-    BG_BODY_SURFACE_OAK = 308,
+    BG_BODY_SURFACE_NATURAL = 189,
+    BG_BODY_SURFACE_FLESH = 302,
+    BG_BODY_SURFACE_BRASS = 304,
+    BG_BODY_SURFACE_IRON = 305,
+    BG_BODY_SURFACE_PAPER = 306,
+    BG_BODY_SURFACE_STEEL = 307,
+    BG_BODY_SURFACE_OAK = 309,
 };
 
 /* #Colour */
 enum {
-    BG_COLOUR_BLUE = 236,
-    BG_COLOUR_BLACK = 238,
-    BG_COLOUR_BROWN = 239,
-    BG_COLOUR_GREEN = 240,
-    BG_COLOUR_GREY = 241,
-    BG_COLOUR_NAVY = 242,
-    BG_COLOUR_RED = 243,
-    BG_COLOUR_YELLOW = 244,
-    BG_COLOUR_BEIGE = 254,
-    BG_COLOUR_WHITE = 270,
+    BG_COLOUR_BLUE = 237,
+    BG_COLOUR_BLACK = 239,
+    BG_COLOUR_BROWN = 240,
+    BG_COLOUR_GREEN = 241,
+    BG_COLOUR_GREY = 242,
+    BG_COLOUR_NAVY = 243,
+    BG_COLOUR_RED = 244,
+    BG_COLOUR_YELLOW = 245,
+    BG_COLOUR_BEIGE = 255,
+    BG_COLOUR_WHITE = 271,
 };
 
 /* The field registry: what code needs to read and write any component
@@ -250,7 +260,7 @@ typedef struct {
     const BGFieldInfo *fields;
 } BGComponentInfo;
 
-#define BG_COMPONENT_COUNT 21
+#define BG_COMPONENT_COUNT 22
 
 #ifdef BG_COMPONENT_REGISTRY
 
@@ -281,6 +291,13 @@ static const BGFieldInfo BGLever_fields[] = {
     { "sleeve", offsetof(BGLever, sleeve), BG_VALUE_BOOL, "bool", "content, saved, inspect, perceive(sight)" },
 };
 
+static const BGFieldInfo BGRespirator_fields[] = {
+    { "atRest", offsetof(BGRespirator, atRest), BG_VALUE_QUANTITY, "int", "content, saved, inspect" },
+    { "atWork", offsetof(BGRespirator, atWork), BG_VALUE_QUANTITY, "int", "content, saved, inspect" },
+    { "restsAbove", offsetof(BGRespirator, restsAbove), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
+    { "restsBelow", offsetof(BGRespirator, restsBelow), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
+};
+
 static const BGFieldInfo BGSized_fields[] = {
     { "size", offsetof(BGSized, size), BG_VALUE_QUANTITY, "length", "content, saved, inspect, perceive(sight)" },
 };
@@ -305,8 +322,10 @@ static const BGFieldInfo BGActivity_fields[] = {
     { "started", offsetof(BGActivity, started), BG_VALUE_QUANTITY, "time", "content, saved, proposable, inspect" },
     { "status", offsetof(BGActivity, status), BG_VALUE_TYPE, "#ActivityStatus", "content, saved, proposable, inspect" },
     { "watchAtLeast", offsetof(BGActivity, watchAtLeast), BG_VALUE_QUANTITY, "volume", "content, saved, proposable, inspect" },
+    { "watchCool", offsetof(BGActivity, watchCool), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "watchDioxide", offsetof(BGActivity, watchDioxide), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "watchHolder", offsetof(BGActivity, watchHolder), BG_VALUE_REF, "ref", "saved, proposable, inspect" },
+    { "watchWarm", offsetof(BGActivity, watchWarm), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
 };
 
 static const BGFieldInfo BGClaim_fields[] = {
@@ -402,9 +421,10 @@ static const BGComponentInfo BGComponents[BG_COMPONENT_COUNT + 1] = {
     { "FuelContainer", "#FuelContainer", sizeof(BGFuelContainer), 1, BGFuelContainer_fields },
     { "GasStore", "#GasStore", sizeof(BGGasStore), 8, BGGasStore_fields },
     { "Lever", "#Lever", sizeof(BGLever), 3, BGLever_fields },
+    { "Respirator", "#Respirator", sizeof(BGRespirator), 4, BGRespirator_fields },
     { "Sized", "#Sized", sizeof(BGSized), 1, BGSized_fields },
     { "ThermalBody", "#ThermalBody", sizeof(BGThermalBody), 5, BGThermalBody_fields },
-    { "Activity", "#Activity", sizeof(BGActivity), 13, BGActivity_fields },
+    { "Activity", "#Activity", sizeof(BGActivity), 15, BGActivity_fields },
     { "Claim", "#Claim", sizeof(BGClaim), 2, BGClaim_fields },
     { "Body", "#Body", sizeof(BGBody), 5, BGBody_fields },
     { "Agent", "#Agent", sizeof(BGAgent), 14, BGAgent_fields },

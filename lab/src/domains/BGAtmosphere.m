@@ -16,6 +16,10 @@
 #define BG_BURN_HEAT        15          /* J per mg */
 #define BG_BURN_SHARE       3           /* tenths of it to the stove's iron */
 
+/* breathing, per mmol of oxygen */
+#define BG_BREATH_DIOXIDE   4           /* fifths of a mmol produced */
+#define BG_BREATH_HEAT      448         /* J, to the body */
+
 
 @implementation BGAtmosphere
 
@@ -101,6 +105,21 @@
 }
 
 
+- (int) breatherOf:(BGEntityID) entity
+{
+   int   i;
+
+   for( i = 0; i < _nbreathers; i++)
+      if( _breathers[ i].entity == entity)
+         return( i);
+   if( _nbreathers == BG_ATMOS_BREATHERS)
+      return( -1);
+   memset( &_breathers[ _nbreathers], 0, sizeof( BGBreather));
+   _breathers[ _nbreathers].entity = entity;
+   return( _nbreathers++);
+}
+
+
 /* The regions' and stoves' values from their records, which mirror ours;
  * a stove not burning takes its fuel from its record. A solid's surface is
  * to the air over it, or, with no place, the air it bounds. */
@@ -146,6 +165,36 @@
       _surfaces[ k].region      = [self regionOf:body->bounds ? (BGEntityID) body->bounds
                                                                : BGAirOver( _world, [stores entityAtIndex:i])];
    }
+   stores = [_world storeForKind:[_world kindNamed:"Respirator"]];
+   for( i = 0; i < [stores count]; i++)
+      if( (k = [self breatherOf:[stores entityAtIndex:i]]) >= 0)
+         _breathers[ k].region = [self regionOf:BGAirOver( _world, [stores entityAtIndex:i])];
+}
+
+
+/* What a breather takes now, mmol of oxygen a thousand seconds: at rest
+ * while it is the actor of a running rest, else at work. */
+- (int64_t) breathOf:(int) b
+{
+   const BGRespirator   *respirator;
+   const BGActivity     *record;
+   BGStore              *store;
+   NSUInteger           i;
+
+   respirator = [_world record:[_world kindNamed:"Respirator"] for:_breathers[ b].entity];
+   if( ! respirator || _breathers[ b].region < 0)
+      return( 0);
+   store = [_world storeForKind:[_world kindNamed:"Activity"]];
+   for( i = 0; i < [store count]; i++)
+   {
+      record = [store recordAtIndex:i];
+      if( (BGEntityID) record->actorRef == _breathers[ b].entity &&
+          record->status == (uint32_t) tri_type_named( [_world tri], "\"running\"") &&
+          [BGOperationEffect( _world, [_world textField:"Activity.operation" of:[store entityAtIndex:i]])
+             isEqualToString:@"rest"])
+         return( respirator->atRest);
+   }
+   return( respirator->atWork);
 }
 
 
@@ -247,11 +296,14 @@ static int64_t   gasTemperature( const BGAirRegion *r)
    for( i = 0; i < _nsurfaces; i++)
       if( [self surfaceDelta:i capacity:NULL])
          return( YES);
-   return( NO);
+   for( i = 0; i < _nbreathers; i++)
+      if( [self breathOf:i])
+         return( YES);
+   return( [self crossedWatch] != BGNoEntity);
 }
 
 
-/* The activities watching a region's carbon dioxide, running. */
+/* The activities watching a region's air, running. */
 - (NSUInteger) watches:(BGEntityID *) out
                    max:(NSUInteger) max
 {
@@ -265,11 +317,82 @@ static int64_t   gasTemperature( const BGAirRegion *r)
    for( i = 0; i < [store count] && n < max; i++)
    {
       record = [store recordAtIndex:i];
-      if( record->watchDioxide > 0 && record->watchHolder &&
+      if( (record->watchDioxide > 0 || record->watchCool > 0 || record->watchWarm > 0) && record->watchHolder &&
           record->status == (uint32_t) tri_type_named( [_world tri], "\"running\""))
          out[ n++] = [store entityAtIndex:i];
    }
    return( n);
+}
+
+
+- (int) regionWatchedBy:(const BGActivity *) record
+{
+   int   k;
+
+   for( k = 0; k < _nregions && _regions[ k].entity != (BGEntityID) record->watchHolder; k++)
+      ;
+   return( k == _nregions ? -1 : k);
+}
+
+
+/* Why a running watch has fired, now: nil while its region's air is within
+ * what it watches. */
+- (NSString *) crossingOf:(const BGActivity *) record
+{
+   const BGAirRegion   *r;
+   int                 k;
+
+   if( (k = [self regionWatchedBy:record]) < 0)
+      return( nil);
+   r = &_regions[ k];
+   if( record->watchDioxide && r->dioxide >= record->watchDioxide)
+      return( [NSString stringWithFormat:@"reaches %lld mmol of carbon dioxide", (long long) r->dioxide]);
+   if( record->watchCool && gasTemperature( r) < record->watchCool)
+      return( [NSString stringWithFormat:@"cools to %lld mK", (long long) gasTemperature( r)]);
+   if( record->watchWarm && gasTemperature( r) > record->watchWarm)
+      return( [NSString stringWithFormat:@"warms to %lld mK", (long long) gasTemperature( r)]);
+   return( nil);
+}
+
+
+/* A running watch already crossed and not yet reported: it wakes the domain. */
+- (BGEntityID) crossedWatch
+{
+   BGEntityID   watched[ 16];
+   NSUInteger   n;
+   NSUInteger   i;
+   int          s;
+
+   n = [self watches:watched max:16];
+   for( i = 0; i < n; i++)
+   {
+      for( s = 0; s < _nfired && _fired[ s] != watched[ i]; s++)
+         ;
+      if( s == _nfired && [self crossingOf:[_world record:[_world kindNamed:"Activity"] for:watched[ i]]])
+         return( watched[ i]);
+   }
+   return( BGNoEntity);
+}
+
+
+/* The heat flowing into a region's gas now, mW: the door, the solids'
+ * surfaces, and a fire venting into it. */
+- (int64_t) heatFlowInto:(int) k
+{
+   const BGAirRegion   *r;
+   int64_t             flow;
+   int                 i;
+
+   r    = &_regions[ k];
+   flow = BG_DOOR_FLOW * (BG_OUT_HEAT - r->heat * 1000 / r->total);
+   for( i = 0; i < _nsurfaces; i++)
+      if( _surfaces[ i].region == k)
+         flow -= _surfaces[ i].conductance * [self surfaceDelta:i capacity:NULL];
+   for( i = 0; i < _nstoves; i++)
+      if( _stoves[ i].region == k && [self lit:i] &&
+          ! ((const BGCombustor *) [_world record:[_world kindNamed:"Combustor"] for:_stoves[ i].entity])->damper)
+         flow += [self rateOf:i] * BG_BURN_HEAT * (10 - BG_BURN_SHARE) * 100;
+   return( flow);
 }
 
 
@@ -303,29 +426,51 @@ static int64_t   gasTemperature( const BGAirRegion *r)
             h.nextEvent = BGTimeMake( when);
       }
    }
-   /* a watch crossing, at the rise the rates give now (mmol per 1000 s):
-    * the fires venting into the region, and the door; the rise only slows as
-    * the oxygen falls, so this is never late. No sooner than a second, the
-    * event tolerance */
+   /* a watch crossing. Carbon dioxide at the rise the rates give now (mmol
+    * per 1000 s): the fires venting into the region, the breathers, and the
+    * door; the rise only slows as the oxygen falls, so this is never late. A
+    * temperature at twice the rate the heat flows give now, and again from
+    * closer in. No sooner than a second, the event tolerance; a watch
+    * already crossed, at once */
+   if( [self crossedWatch] != BGNoEntity)
+      h.nextEvent = BGTimeMake( t.ms + 1);
    n = [self watches:watched max:16];
    for( i = 0; i < n; i++)
    {
       int64_t   rise;
+      int64_t   flow;
+      int64_t   capacity;
+      int64_t   temperature;
 
       record = [_world record:[_world kindNamed:"Activity"] for:watched[ i]];
-      for( k = 0; k < _nregions && _regions[ k].entity != (BGEntityID) record->watchHolder; k++)
-         ;
-      if( k == _nregions || _regions[ k].dioxide >= record->watchDioxide)
+      if( (k = [self regionWatchedBy:record]) < 0 || [self crossingOf:record])
          continue;
-      rise = BG_DOOR_FLOW * (BG_OUT_DIOXIDE * _regions[ k].total / 10000 - _regions[ k].dioxide) * 1000 /
-             _regions[ k].total;
-      for( s = 0; s < _nstoves; s++)
-         if( _stoves[ s].region == k && [self lit:s] &&
-             ! ((const BGCombustor *) [_world record:[_world kindNamed:"Combustor"] for:_stoves[ s].entity])->damper)
-            rise += [self rateOf:s] * BG_BURN_DIOXIDE;
-      if( rise <= 0)
+      when = BGTimeNever.ms;
+      if( record->watchDioxide)
+      {
+         rise = BG_DOOR_FLOW * (BG_OUT_DIOXIDE * _regions[ k].total / 10000 - _regions[ k].dioxide) * 1000 /
+                _regions[ k].total;
+         for( s = 0; s < _nstoves; s++)
+            if( _stoves[ s].region == k && [self lit:s] &&
+                ! ((const BGCombustor *) [_world record:[_world kindNamed:"Combustor"] for:_stoves[ s].entity])->damper)
+               rise += [self rateOf:s] * BG_BURN_DIOXIDE;
+         for( s = 0; s < _nbreathers; s++)
+            if( _breathers[ s].region == k)
+               rise += [self breathOf:s] * BG_BREATH_DIOXIDE / 5;
+         if( rise > 0)
+            when = t.ms + (record->watchDioxide - _regions[ k].dioxide) * 1000000 / rise;
+      }
+      flow        = [self heatFlowInto:k];
+      capacity    = _regions[ k].total * BG_GAS_CAPACITY / 1000;
+      temperature = gasTemperature( &_regions[ k]);
+      if( record->watchCool && flow < 0 &&
+          t.ms + (temperature - record->watchCool) * capacity * 1000 / (-2 * flow) < when)
+         when = t.ms + (temperature - record->watchCool) * capacity * 1000 / (-2 * flow);
+      if( record->watchWarm && flow > 0 &&
+          t.ms + (record->watchWarm - temperature) * capacity * 1000 / (2 * flow) < when)
+         when = t.ms + (record->watchWarm - temperature) * capacity * 1000 / (2 * flow);
+      if( when == BGTimeNever.ms)
          continue;
-      when = t.ms + (record->watchDioxide - _regions[ k].dioxide) * 1000000 / rise;
       if( when < t.ms + 1000)
          when = t.ms + 1000;
       if( when < h.nextEvent.ms)
@@ -454,6 +599,8 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
    int64_t            share;
    int64_t            solid;
    int64_t            delta;
+   int64_t            breath;
+   NSString           *why;
    int64_t            q;
    int64_t            rates[ BG_ATMOS_STOVES];
    int                k;
@@ -588,6 +735,40 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
          _stoves[ s].out = YES;
    }
 
+   /* the breathers: from the air over them, their heat to their bodies */
+   for( s = 0; s < _nbreathers; s++)
+   {
+      if( (breath = [self breathOf:s]) <= 0)
+         continue;
+      r                          = &_regions[ _breathers[ s].region];
+      _breathers[ s].carry      += breath * dt;
+      used                       = _breathers[ s].carry / 1000000;
+      _breathers[ s].carry      %= 1000000;
+      if( used > r->oxygen)
+         used = r->oxygen;
+      _breathers[ s].carryDioxide += used * BG_BREATH_DIOXIDE;
+      made                         = _breathers[ s].carryDioxide / 5;
+      _breathers[ s].carryDioxide %= 5;
+      r->oxygen  -= used;
+      r->dioxide += made;
+      _ledger.consumed[ 0] += used;
+      _ledger.produced[ 1] += made;
+      heat = used * BG_BREATH_HEAT;
+      if( outbox && [_world record:[_world kindNamed:"ThermalBody"] for:_breathers[ s].entity])
+      {
+         _ledger.toSolids += heat;
+         [self send:heat
+                 to:_breathers[ s].entity
+               from:_breathers[ s].entity
+             outbox:outbox];
+      }
+      else
+      {
+         r->heat              += heat;
+         _ledger.produced[ 2] += heat;
+      }
+   }
+
    /* the records mirror the domain */
    for( k = 0; k < _nregions; k++)
    {
@@ -617,9 +798,7 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
    for( i = 0; i < n; i++)
    {
       record = [_world record:[_world kindNamed:"Activity"] for:watched[ i]];
-      for( k = 0; k < _nregions && _regions[ k].entity != (BGEntityID) record->watchHolder; k++)
-         ;
-      if( k == _nregions || _regions[ k].dioxide < record->watchDioxide)
+      if( ! (why = [self crossingOf:record]))
          continue;
       for( s = 0; s < _nfired && _fired[ s] != watched[ i]; s++)
          ;
@@ -627,11 +806,10 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
          continue;
       if( _nfired < 16)
          _fired[ _nfired++] = watched[ i];
+      k = [self regionWatchedBy:record];
       g = [BGProposalGroup groupWithPhase:BGPhaseProcess
-                                   source:[NSString stringWithFormat:@"atmosphere: the air at %llu reaches %lld mmol of "
-                                                                     @"carbon dioxide",
-                                                                     (unsigned long long) _regions[ k].entity,
-                                                                     (long long) _regions[ k].dioxide]];
+                                   source:[NSString stringWithFormat:@"atmosphere: the air at %llu %@",
+                                                                     (unsigned long long) _regions[ k].entity, why]];
       [g emit:"watched" subject:BGWhole( watched[ i]) other:BGWhole( _regions[ k].entity)];
       [committer submit:g];
    }
@@ -701,6 +879,9 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
    for( k = 0; k < _nsurfaces; k++)
       [lines addObject:[NSString stringWithFormat:@"surface %llu %lld", (unsigned long long) _surfaces[ k].entity,
                                                   _surfaces[ k].carry]];
+   for( k = 0; k < _nbreathers; k++)
+      [lines addObject:[NSString stringWithFormat:@"breather %llu %lld %lld", (unsigned long long) _breathers[ k].entity,
+                                                  _breathers[ k].carry, _breathers[ k].carryDioxide]];
    for( k = 0; k < _nfired; k++)
       [lines addObject:[NSString stringWithFormat:@"fired %llu", (unsigned long long) _fired[ k]]];
    return( lines);
@@ -721,7 +902,8 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
    _nregions = 0;
    _nstoves  = 0;
    _nfired   = 0;
-   _nsurfaces = 0;
+   _nsurfaces  = 0;
+   _nbreathers = 0;
    for( i = 0; i < [lines count]; i++)
    {
       text = [[lines objectAtIndex:i] UTF8String];
@@ -779,6 +961,13 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
          if( (k = [self surfaceOf:(BGEntityID) e]) < 0)
             continue;
          _surfaces[ k].carry = v[ 0];
+      }
+      else if( sscanf( text, "breather %llu %lld %lld", &e, &v[ 0], &v[ 1]) == 3)
+      {
+         if( (k = [self breatherOf:(BGEntityID) e]) < 0)
+            continue;
+         _breathers[ k].carry        = v[ 0];
+         _breathers[ k].carryDioxide = v[ 1];
       }
       else if( sscanf( text, "fired %llu", &e) == 1 && _nfired < 16)
          _fired[ _nfired++] = (BGEntityID) e;

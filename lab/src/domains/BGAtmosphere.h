@@ -18,6 +18,10 @@
  *     draws from the room and vents into it, smouldering as the oxygen
  *     falls below 21% and going out by 10%.
  *
+ * A respirator (content/air.tri) breathes the air over it: oxygen at its
+ * rate, at rest or at work, for four fifths as much carbon dioxide, and the
+ * heat to its body, as a contribution.
+ *
  * Coupled to the thermal domain (BGCoupledDomain): a stove's iron takes
  * three tenths of its fire's heat, and every solid with a surface to the air
  * (`toAir`, W/K) exchanges heat with it. The atmosphere computes that
@@ -31,8 +35,11 @@
  * exactly: the region's gas plus what combustion consumed less what it
  * produced, less what came in from outdoors, plus what it sent the solids,
  * less what it received, is what there was (the ledger). Fuel run out is a predicted event: the stove goes out then, by
- * proposal. A rest's watch on a region's carbon dioxide is another, and the
- * domain reports it at the boundary it crosses. A region settled near the
+ * proposal. A rest's watch on a region's air is another: its carbon dioxide
+ * rising past a level, at the rate the sources give now (never late), or its
+ * temperature leaving a band, predicted at twice the rate the heat flows now
+ * give and again from closer in. The domain reports it at the boundary it
+ * crosses, within a second. A region settled near the
  * outdoors, with no fire, lets the domain sleep: an infinite horizon.
  */
 #import "BGScheduler.h"
@@ -41,7 +48,8 @@
 #define BG_ATMOS_REGIONS   8
 #define BG_ATMOS_STOVES    8
 #define BG_ATMOS_SURFACES  16
-#define BG_DOOR_FLOW       20         /* mmol of air a second, each way */
+#define BG_ATMOS_BREATHERS 8
+#define BG_DOOR_FLOW       200        /* mmol of air a second, each way */
 
 
 typedef struct
@@ -80,6 +88,16 @@ typedef struct
 } BGAirSurface;
 
 
+/* What breathes, over a region's air. */
+typedef struct
+{
+   BGEntityID   entity;
+   int          region;
+   int64_t      carry;           /* oxygen, mmol·10⁻⁶ */
+   int64_t      carryDioxide;    /* fifths of a mmol */
+} BGBreather;
+
+
 /* What balances: per quantity, the totals a ledger adds up. */
 typedef struct
 {
@@ -106,6 +124,8 @@ typedef struct
    int            _nstoves;
    BGAirSurface   _surfaces[ BG_ATMOS_SURFACES];
    int            _nsurfaces;
+   BGBreather     _breathers[ BG_ATMOS_BREATHERS];
+   int            _nbreathers;
    BGAirLedger    _ledger;
    int64_t        _rise;          /* the last step's carbon dioxide rise, per second, in the first region */
    NSUInteger     _steps;

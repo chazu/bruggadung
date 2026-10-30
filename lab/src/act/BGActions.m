@@ -1298,9 +1298,17 @@ BGProposalGroup   *BGPerform( BGWorld *world, BGCommitter *committer, BGAction a
       [group set:"Activity.due" of:BGWhole( activity) to:[world time].ms + duration];
       if( [effect isEqualToString:@"rest"] && BGAirOver( world, action.roles[ BGRoleActor]))
       {
-         /* resting, with a watch on the air: woken when it grows stuffy */
+         const BGRespirator   *breather;
+
+         /* resting, with a watch on the air: woken when it grows stuffy, or
+          * leaves the band the sleeper rests easy in */
          [group set:"Activity.watchHolder" of:BGWhole( activity) to:(int64_t) BGAirOver( world, action.roles[ BGRoleActor])];
          [group set:"Activity.watchDioxide" of:BGWhole( activity) to:amount > 0 ? amount : 4000];
+         breather = [world record:[world kindNamed:"Respirator"] for:action.roles[ BGRoleActor]];
+         if( breather && breather->restsAbove)
+            [group set:"Activity.watchCool" of:BGWhole( activity) to:breather->restsAbove];
+         if( breather && breather->restsBelow)
+            [group set:"Activity.watchWarm" of:BGWhole( activity) to:breather->restsBelow];
       }
    }
    else if( (reason = BGApplyEffect( world, action, amount, group)))

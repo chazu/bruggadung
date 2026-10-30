@@ -1644,3 +1644,36 @@ a domain's sleep once the room is near the outdoors but not at it (the
 atmosphere steps hourly until then).
 
 52 tests, 1963 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: the lodger (breathing, body heat, the comfort band)
+
+More of DOMAIN_SIMULATION.md Scenario 1's character. The one who lights the
+stove and rests is a lodger: a `#Respirator`, taking oxygen from the air over
+it (190 mmol a thousand seconds at rest, 600 at work), giving back four
+fifths as much carbon dioxide and 448 J a mmol to its body, a `#ThermalBody`
+at 310 K (245 kJ/K, 4 W/K to the air). In A its breath leaves the room near
+2,300 mmol of carbon dioxide, well below stuffy. The room peaks near 288 K
+three hours in. In D the lodger lies down two hours after lighting the
+stove, resting easy only above 280 K. The fire goes out, the room cools,
+and the rest wakes at the boundary where the air is 1 mK below the band.
+
+- **Breathing** is in the atmosphere, at rest while the breather is the
+  actor of a running rest. Its heat goes to the body as a contribution, as
+  the fire's share goes to the stove's iron.
+- **Temperature watches** (`watchCool`, `watchWarm`, from the respirator's
+  `restsAbove` and `restsBelow`) are predicted at twice the rate the heat
+  flows now give, so as never to be late, and predicted again from closer
+  in. A watch already crossed wakes the domain at once.
+- **The door gap passes 200 mmol a second** (about 17 m³ an hour), not 20.
+  At 20, one sleeper's breath made the room stuffy in six hours. The
+  scenario says the air stays fresh in A.
+
+Found: a steady heat source (the lodger's 100 W) keeps the air more than
+half a kelvin above the walls, so their exchange never rests, and the lag's
+bound holds the steps near 72 s after the fire is out: about 400 steps for
+the eight hours. "Once the room equalizes, the remaining time passes in one
+step" holds only for an empty room. To jump through a steady state, the
+coupling needs an analytic or implicit step (open question 2), or to live
+inside one domain.
+
+52 tests, 1968 checks, under both compilers, ASan and UBSan, and leak-free.

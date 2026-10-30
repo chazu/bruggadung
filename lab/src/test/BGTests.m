@@ -68,7 +68,7 @@ static void   test_registry_and_construction( void)
 
    w = BGTestWorld( 1);
    c = BGTestCommitter( w);
-   BG_CHECK( [w kindCount] == 21);
+   BG_CHECK( [w kindCount] == 22);
    BG_CHECK( [w kindNamed:"Body"] != NSNotFound && [w kindNamed:"Nonesuch"] == NSNotFound);
    bin   = commit_create( c, "bin", BGOnTile( 0, 0, 0));
    nails = commit_create( c, "nails_30", BGIn( bin));
@@ -4368,8 +4368,8 @@ typedef struct
    int64_t        wokenAt;        /* when the rest ended */
    NSUInteger     boundaries;
    int64_t        litAt;
-   int64_t        stoveHottest;   /* mK */
-   NSUInteger     settledBoundaries;   /* once the fire is out and the iron within half a kelvin of the air */
+   int64_t        roomHottest;    /* mK */
+   int64_t        stoveHottest;
    NSUInteger     thermalBeforeLit;    /* the thermal domain's steps before the fire's heat reached it */
    BOOL           balanced;       /* after every boundary, both domains, and between them */
    NSString       *text;
@@ -4377,10 +4377,12 @@ typedef struct
 
 
 /* DOMAIN_SIMULATION.md Scenario 1, "the unattended stove": a room of stone
- * with a stove and 3 kg of wood; the worker lights it and rests for 8 hours,
- * with a watch on the air. `stepped`: in one-minute steps (variant C).
- * `reversed`: the domains added the other way round. */
-static BGStoveRun   stove_run( BOOL damper, BOOL stepped, BOOL reversed)
+ * with a stove and 3 kg of wood; a lodger, breathing, lights it and rests
+ * for 8 hours, with a watch on the air. `stepped`: in one-minute steps
+ * (variant C). `reversed`: the domains added the other way round.
+ * `restsAbove`: the lodger rests easy only above it (mK), and lies down two
+ * hours after lighting the stove, once the room has warmed. */
+static BGStoveRun   stove_run( BOOL damper, BOOL stepped, BOOL reversed, int64_t restsAbove)
 {
    BGWorld            *w;
    BGCommitter        *c;
@@ -4409,9 +4411,11 @@ static BGStoveRun   stove_run( BOOL damper, BOOL stepped, BOOL reversed)
    run.room  = [g create:"room_air" key:"the room's air" at:BGLocationMakeNone()];
    run.shell = [g create:"room_shell" key:"the room's walls" at:BGLocationMakeNone()];
    run.stove = [g create:"stove" key:"stove" at:BGOnTile( 2, 2, 0)];
-   worker    = [g create:"worker" key:"worker" at:BGOnTile( 3, 2, 0)];
+   worker    = [g create:"lodger" key:"lodger" at:BGOnTile( 3, 2, 0)];
    if( ! damper)
       [g set:"Combustor.damper" of:BGWhole( run.stove) to:0];
+   if( restsAbove)
+      [g set:"Respirator.restsAbove" of:BGWhole( worker) to:restsAbove];
    [c submit:g];
    [s runUntil:BGTimeMake( 1)];
    run.room  = [g idFor:run.room];
@@ -4429,9 +4433,11 @@ static BGStoveRun   stove_run( BOOL damper, BOOL stepped, BOOL reversed)
    [s runUntil:BGTimeMake( 2)];
    if( [w getField:"Combustor.lit" of:run.stove value:&v] && v)
       run.litAt = [w time].ms;
+   if( restsAbove)
+      [s runUntil:BGTimeMake( 2 * 3600000LL)];
    g = BGPerform( w, c, BGActionMake( "while_away", worker, BGNoEntity, BGNoEntity), 0, &error);
    BG_CHECK( g != nil);
-   [s runUntil:BGTimeMake( 3)];
+   [s runUntil:BGTimeMake( [w time].ms + 1)];
    run.rest     = [g idFor:[g proposals][ 0].handle];
    run.balanced = YES;
    end          = 8 * 3600000LL + 10000;
@@ -4444,10 +4450,10 @@ static BGStoveRun   stove_run( BOOL damper, BOOL stepped, BOOL reversed)
       run.boundaries++;
       run.balanced = run.balanced && [air balanced] && [thermal balanced] &&
                      [air sent] == [thermal received] + [thermal pending];
+      if( [air temperatureOf:run.room] > run.roomHottest)
+         run.roomHottest = [air temperatureOf:run.room];
       if( [thermal temperatureOf:run.stove] > run.stoveHottest)
          run.stoveHottest = [thermal temperatureOf:run.stove];
-      if( run.outAt && llabs( [thermal temperatureOf:run.stove] - [air temperatureOf:run.room]) < 500)
-         run.settledBoundaries++;
       if( ! run.outAt && [w getField:"Combustor.lit" of:run.stove value:&v] && ! v)
          run.outAt = [w time].ms;
       if( ! run.wokenAt && strcmp( status_of( w, run.rest), "\"running\""))
@@ -4469,39 +4475,42 @@ static void   test_unattended_stove( void)
    BGStoveRun     b;
    BGStoveRun     stepped;
    BGStoveRun     reversed;
+   BGStoveRun     d;
    BGAtmosphere   *restored;
    BGThermal      *restoredThermal;
    NSString       *trace;
    NSRange        at;
    int64_t        fuel;
+   int64_t        v;
    long long      reached;
+   long long      cooled;
 
    /* A, the flue open: the fire burns 3 kg at 0.25 g a second, 12,000 s, and
     * goes out then, to the millisecond, a predicted event; its iron takes
     * three tenths of the heat and warms the room, and the room its walls; the
+    * lodger breathes, and its carbon dioxide stays well below stuffy; the
     * rest runs its 8 hours; and every step balances exactly, in each domain
     * and between them, with what is in transit */
-   a = stove_run( YES, NO, NO);
+   a = stove_run( YES, NO, NO, 0);
    BG_CHECK( a.balanced);
    BG_CHECK( a.litAt > 0 && a.outAt == a.litAt + 12000000);
    BG_CHECK( [a.world getField:"FuelContainer.fuel" of:a.stove value:&fuel] && fuel == 0);
    BG_CHECK( a.wokenAt >= 8 * 3600000LL);
-   BG_CHECK( a.stoveHottest > 330000);
+   BG_CHECK( a.stoveHottest > 330000 && a.roomHottest > 285000);
    BG_CHECK( [a.air temperatureOf:a.room] > 277000);
    BG_CHECK( [a.thermal temperatureOf:a.shell] > 277000);
+   BG_CHECK( [a.world getField:"GasStore.dioxide" of:a.room value:&v] && v > 1500 && v < 3000);
    /* 2: time jumps: hundreds of steps for eight hours, not hundreds of
-    * thousands; the exchange with the solids lags a step, and bounds them
-    * while it runs (about 300; 25 without it). Once the iron has cooled to
-    * the air, the hours left pass in a step each */
+    * thousands. The exchange with the solids lags a step and bounds them
+    * while it runs, and the lodger's warmth keeps it running: about 400 */
    BG_CHECK( a.boundaries < 1000);
-   BG_CHECK( a.settledBoundaries <= 8);
    /* 6: the thermal domain sleeps until the fire's heat reaches it */
    BG_CHECK( a.thermalBeforeLit == 0 && [a.thermal steps] > 0);
 
    /* B, the damper left closed: the fire fills the room with carbon dioxide,
     * and the watch wakes the rest at the boundary it crosses, within the
     * event tolerance of a second */
-   b = stove_run( NO, NO, NO);
+   b = stove_run( NO, NO, NO, 0);
    BG_CHECK( b.balanced);
    BG_CHECK( b.wokenAt > 0 && b.wokenAt < 3600000);
    trace = [[b.committer trace] componentsJoinedByString:@"\n"];
@@ -4512,7 +4521,7 @@ static void   test_unattended_stove( void)
    /* 3, C: the same, in 480 one-minute steps: exactly as conserved, the
     * fuel all burned, and the room's and walls' temperatures within a
     * kelvin */
-   stepped = stove_run( YES, YES, NO);
+   stepped = stove_run( YES, YES, NO, 0);
    BG_CHECK( stepped.balanced);
    BG_CHECK( [stepped.world getField:"FuelContainer.fuel" of:stepped.stove value:&fuel] && fuel == 0);
    BG_CHECK( llabs( [stepped.air temperatureOf:stepped.room] - [a.air temperatureOf:a.room]) < 1000);
@@ -4520,7 +4529,7 @@ static void   test_unattended_stove( void)
    BG_CHECK( stepped.boundaries >= 480);
 
    /* determinism, and the domains' state saved */
-   again = stove_run( YES, NO, NO);
+   again = stove_run( YES, NO, NO, 0);
    BG_CHECK( [again.text isEqualToString:a.text]);
    restored = [[[BGAtmosphere alloc] initWithWorld:a.world] autorelease];
    [restored restoreSavedState:BGSavedDomainState( a.text, @"atmosphere")];
@@ -4531,8 +4540,18 @@ static void   test_unattended_stove( void)
 
    /* 4: order independence: the domains run the other way round, bit for bit
     * the same */
-   reversed = stove_run( YES, NO, YES);
+   reversed = stove_run( YES, NO, YES, 0);
    BG_CHECK( [reversed.text isEqualToString:a.text]);
+
+   /* D, the comfort band: the lodger lies down in the warmed room, resting
+    * easy above 280 K, and the cold wakes it after the fire is out */
+   d = stove_run( YES, NO, NO, 280000);
+   BG_CHECK( d.balanced);
+   BG_CHECK( d.wokenAt > d.outAt && d.wokenAt < 8 * 3600000LL);
+   trace  = [[d.committer trace] componentsJoinedByString:@"\n"];
+   at     = [trace rangeOfString:@"cools to "];
+   cooled = at.location != NSNotFound ? atoll( [[trace substringFromIndex:at.location + 9] UTF8String]) : 0;
+   BG_CHECK( cooled < 280000 && cooled > 280000 - 5);     /* within a second of the crossing */
 }
 
 

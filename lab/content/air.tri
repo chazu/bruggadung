@@ -55,6 +55,18 @@
 // warms with the air.
 #Shell: #ThermalBody & {}
 
+// What breathes: the oxygen it takes from the air over it (mmol a thousand
+// seconds), at rest and at work, giving back four fifths as much carbon
+// dioxide and 448 J for each mmol to its body. And the air it rests easy in
+// (mK; 0, no bound): a rest wakes when the air leaves it.
+#Respirator: {
+    @component(Respirator)
+    atRest:     int & >=0 & <=100000           @field(content, saved, inspect)
+    atWork:     int & >=0 & <=100000           @field(content, saved, inspect)
+    restsAbove: int & >=0 & <=400000           @field(content, saved, proposable, inspect)
+    restsBelow: int & >=0 & <=400000           @field(content, saved, proposable, inspect)
+}
+
 // A 4 by 5 room, at 275 K, with 2 mol of air for each of its 20 m3 or so:
 // 2,000,000 mmol, 21% oxygen, 0.04% carbon dioxide; its heat, 29 mJ per mmol
 // per kelvin.
@@ -63,4 +75,10 @@ room_air:   #GasStore & { oxygen: 420000, dioxide: 800, gasHeat: 15950000, total
 stove:      #Stove & { material: "iron", mass: 120kg, burnRate: 250, fuel: 3kg,
                        heat: 12375000, heatCapacity: 45000, toAir: 20, toOutdoors: 0 }
 // at 275 K
+// someone to rest by the stove: at 310 K, 70 kg at 3.5 kJ/kg/K, abed and
+// clothed (4 W/K)
+lodger:     #Agent & #Respirator & #ThermalBody & {
+                material: "flesh", mass: 70kg, hands: 2, coat: "grey",
+                atRest: 190, atWork: 600, restsAbove: 0, restsBelow: 0,
+                heat: 75950000, heatCapacity: 245000, toAir: 4, toOutdoors: 0 }
 room_shell: #Shell & { heat: 1100000000, heatCapacity: 4000000, toAir: 100, toOutdoors: 50 }
