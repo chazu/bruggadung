@@ -7,7 +7,7 @@
 // memory loses detail along them (KNOWLEDGE.md §12): an oak chest is
 // remembered as wooden, then as made of something.
 #Material: "metal" | "wood" | "flesh" | "paper"
-"metal":   "iron" | "brass"
+"metal":   "iron" | "brass" | "steel"
 "wood":    "oak"
 
 #Colour:  "dark" | "light" | "bright"
@@ -44,6 +44,9 @@
     @component(Body)
     mass:      mass                    @field(content, saved, proposable, inspect, perceive(touch))
     material:  #Material               @field(content, saved, inspect, perceive(sight))
+    // what its material looks like, if not itself (KNOWLEDGE.md §4): the
+    // senses report it instead; an analysis reaches beneath it
+    surface:   *"natural" | "metal" | "wood" | "flesh" | "paper" @field(content, saved, inspect, appears(material))
     bent:      *false | true           @field(saved, proposable, inspect, perceive(sight))
     toolMarks: *0 | int & >=0 & <=100  @field(saved, proposable, inspect, perceive(sight))
 }

@@ -135,6 +135,7 @@ static NSUInteger   feature_keys( const char *features, char (*keys)[ 32], NSUIn
    {
       free( _referents[ i].kind);
       free( _referents[ i].features);
+      free( _referents[ i].deeper);
    }
    free( _referents);
    for( i = 0; i < _nobservations; i++)
@@ -615,6 +616,64 @@ static BOOL   counts( const BGTestimony *t, uint32_t thing, uint32_t container)
 }
 
 
+/* The referent's features, with what an analysis found beneath them in
+ * place of what they looked like. */
+static NSString   *known_features( const BGReferent *r)
+{
+   NSMutableString   *out;
+   NSString          *value;
+   const char        *p;
+   char              keys[ 32][ 32];
+   char              deep[ 32][ 32];
+   NSUInteger        n;
+   NSUInteger        m;
+   NSUInteger        k;
+   NSUInteger        j;
+   int               depth;
+   BOOL              quoted;
+   BOOL              overridden;
+
+   if( ! r->deeper || ! *r->deeper)
+      return( [NSString stringWithUTF8String:r->features ? r->features : ""]);
+   n   = r->features ? feature_keys( r->features, keys, 32) : 0;
+   m   = feature_keys( r->deeper, deep, 32);
+   out = [NSMutableString string];
+   for( p = r->features, k = 0; p && *p && k < n; k++)
+   {
+      /* the pair at p, up to the next top-level comma */
+      const char   *start;
+
+      while( *p == ' ' || *p == ',')
+         p++;
+      start  = p;
+      depth  = 0;
+      quoted = NO;
+      for( ; *p; p++)
+      {
+         if( *p == '"' && (p == start || p[ -1] != '\\'))
+            quoted = ! quoted;
+         if( quoted)
+            continue;
+         if( *p == '{' || *p == '[' || *p == '(')
+            depth++;
+         else if( (*p == '}' || *p == ']' || *p == ')') && depth > 0)
+            depth--;
+         else if( *p == ',' && ! depth)
+            break;
+      }
+      for( overridden = NO, j = 0; j < m && ! overridden; j++)
+         overridden = ! strcmp( keys[ k], deep[ j]);
+      if( overridden)
+         continue;
+      value = [[[NSString alloc] initWithBytes:(void *) start length:(NSUInteger) (p - start)
+                                      encoding:NSUTF8StringEncoding] autorelease];
+      [out appendFormat:@"%@%@", [out length] ? @", " : @"", value];
+   }
+   [out appendFormat:@"%@%s", [out length] ? @", " : @"", r->deeper];
+   return( out);
+}
+
+
 /* Each feature generalized a step along its primary parent for each memory
  * step since the referent was seen; one generalized as far as it goes is
  * forgotten. */
@@ -633,22 +692,24 @@ static BOOL   counts( const BGTestimony *t, uint32_t thing, uint32_t container)
    char              b[ 512];
    int               steps;
 
+   NSString          *known;
+
    if( ! r->features)
       return( @"");
+   known = known_features( r);
    steps = [self stepsSince:r->seen];
-   if( ! steps || ! *r->features || ! r->kind)
-      return( [NSString stringWithUTF8String:r->features]);
+   if( ! steps || ! [known length] || ! r->kind)
+      return( known);
    tri   = [_world tri];
    arena = tri_arena_new();
-   node  = tri_value( tri, [[NSString stringWithFormat:@"%s & { %s }", r->kind, r->features] UTF8String], arena,
-                      NULL, 0);
+   node  = tri_value( tri, [[NSString stringWithFormat:@"%s & { %@ }", r->kind, known] UTF8String], arena, NULL, 0);
    if( ! node)
    {
       tri_arena_free( arena);
-      return( [NSString stringWithUTF8String:r->features]);
+      return( known);
    }
    out   = [NSMutableString string];
-   nkeys = feature_keys( r->features, keys, 32);
+   nkeys = feature_keys( [known UTF8String], keys, 32);
    for( k = 0; k < nkeys; k++)
    {
       part = tri_generalize( tri, node, keys[ k], steps, arena);
@@ -1604,6 +1665,20 @@ static uint32_t   bound_to( BGEntityID e, BGEntityID agent, uint32_t me, const B
 
    [self perceiveTraces:store at:here now:now seen:seen assigned:assigned count:nseen news:news];
 
+   /* what its own analyses found beneath the looks of what they analysed */
+   for( i = first; i < last; i++)
+   {
+      ev = [_world eventAt:i];
+      if( ev->actor != agent || strcmp( ev->kind, "analysed") || ! ev->detail)
+         continue;
+      r = [store mutableReferent:bound_to( ev->other, agent, [store selfReferent], seen, assigned, nseen)];
+      if( ! r)
+         continue;
+      free( r->deeper);
+      r->deeper = strdup( ev->detail);
+      [news addObject:[NSString stringWithFormat:@"R%u, beneath its looks: %s", r->id, ev->detail]];
+   }
+
    /* absence: believed at a place in sight, and not seen there */
    for( j = 0; j < [store count]; j++)
    {
@@ -2039,12 +2114,13 @@ char   *BGDecodeWord( const char *s)
       for( j = 0; j < [store count]; j++)
       {
          r = [store referentAt:j];
-         [lines addObject:[NSString stringWithFormat:@"ref %llu %u %d %u %d %d %d %d %lld %lld %u %d %d %llu %@ %@ %@",
+         [lines addObject:[NSString stringWithFormat:@"ref %llu %u %d %u %d %d %d %d %lld %lld %u %d %d %llu %@ %@ %@ %@",
                                                      (unsigned long long) [store agent], r->id, (int) r->form,
                                                      r->container, r->x, r->y, r->level, r->slot, (long long) r->seen,
                                                      (long long) r->insideSeen, r->toldBy, r->trust, r->present ? 1 : 0,
                                                      (unsigned long long) r->truth,
-                                                     BGEncodeWord( r->role), BGEncodeWord( r->kind), BGEncodeWord( r->features)]];
+                                                     BGEncodeWord( r->role), BGEncodeWord( r->kind), BGEncodeWord( r->features),
+                                                     BGEncodeWord( r->deeper)]];
       }
       for( j = 0; j < [store observationCount]; j++)
       {
@@ -2114,6 +2190,7 @@ char   *BGDecodeWord( const char *s)
    char                 role[ 64];
    char                 kind[ 512];
    char                 features[ 4096];
+   char                 deeper[ 512];
    char                 *text;
    NSUInteger           i;
 
@@ -2195,9 +2272,9 @@ char   *BGDecodeWord( const char *s)
          a.fabricated = present != 0;
          [self addAncestry:a];
       }
-      else if( sscanf( text, "ref %llu %u %d %u %d %d %d %d %lld %lld %u %d %d %llu %63s %511s %4095s", &agent, &id,
-                       &form, &container, &x, &y, &level, &slot, &seen, &inside, &told, &trust, &present, &truth, role,
-                       kind, features) == 17)
+      else if( sscanf( text, "ref %llu %u %d %u %d %d %d %d %lld %lld %u %d %d %llu %63s %511s %4095s %511s", &agent,
+                       &id, &form, &container, &x, &y, &level, &slot, &seen, &inside, &told, &trust, &present, &truth,
+                       role, kind, features, deeper) == 18)
       {
          store        = [self storeOf:(BGEntityID) agent];
          next         = [store nextID];
@@ -2219,6 +2296,12 @@ char   *BGDecodeWord( const char *s)
          free( text);
          r->kind      = BGDecodeWord( kind);
          r->features  = BGDecodeWord( features);
+         r->deeper    = BGDecodeWord( deeper);
+         if( ! *r->deeper)
+         {
+            free( r->deeper);
+            r->deeper = NULL;
+         }
          [store setNextID:(uint32_t) max64( next, [store nextID]) self:[store selfReferent]];
       }
    }

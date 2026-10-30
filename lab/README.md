@@ -96,7 +96,10 @@ forgotten. Operations leave traces (tool marks, scuffs) and remove them,
 and each removal leaves its own (a damp floor, a smell of soap); traces
 fade with age, computed when read, and are removed when they run out,
 with nothing to compute between. Agents perceive them by sight or smell,
-never what made them. Agents keep observations only if they are salient: being
+never what made them. A component field can declare another's appearance
+(`#Body.surface` for `material`): perception reports the appearance, and
+only an analysis (`test_scratch`) finds the truth beneath, which the
+analyser then keeps. Agents keep observations only if they are salient: being
 addressed, their own deeds, or what their goals concern, more than a busy
 agent's activity demands of its attention; and only as many as their
 `memory` holds, the least salient evicted first. The menu `lab play`

@@ -300,8 +300,9 @@ A rebuilt world produces the same next step as one that never saved.
    keep what matters to them within a bounded memory; and talking in `lab
    play`, asking, telling, and lying; and answering as a choice weighed by
    trust, disposition, and how busy the agent is; and traces that operations
-   leave and remove, aging analytically, so a cover-up leaves its own. Next,
-   per [lab/PLAN.md](lab/PLAN.md): appearance and truth.
+   leave and remove, aging analytically, so a cover-up leaves its own; and
+   appearance that differs from the truth until an analysis reaches beneath
+   it. Next, per [lab/PLAN.md](lab/PLAN.md): interpretation rules.
 
 ## Cross-cutting open questions
 

@@ -578,6 +578,24 @@ static NSString   *effect_say( BGWorld *world, BGAction a, int64_t amount, BGPro
 }
 
 
+/* An analysis (KNOWLEDGE.md §4): what the actor finds beneath the item's
+ * appearance, as the detail of an "analysed" event it perceives: its true
+ * material. */
+static NSString   *effect_analyse( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
+{
+   const BGBody   *body;
+   char           detail[ 128];
+
+   body = [world record:[world kindNamed:"Body"] for:a.roles[ BGRoleItem]];
+   if( ! body)
+      return( @"there is nothing there to analyse");
+   snprintf( detail, sizeof( detail), "material: %s", tri_type_name( [world tri], body->material));
+   [g emit:"analysed" subject:BGWhole( a.roles[ BGRoleActor]) other:BGWhole( a.roles[ BGRoleItem])
+    detail:[world intern:detail]];
+   return( nil);
+}
+
+
 /* Tending changes nothing but traces, which the operation declares. */
 static NSString   *effect_tend( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
 {
@@ -609,6 +627,7 @@ static const struct
    { "look",      effect_look },
    { "say",       effect_say },
    { "tend",      effect_tend },
+   { "analyse",   effect_analyse },
 };
 
 

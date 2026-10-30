@@ -1,4 +1,4 @@
-/* Generated from Triangle content 93fe613cce7edc2f: do not edit. Type IDs are valid
+/* Generated from Triangle content 7b8bff62cce2e9d7: do not edit. Type IDs are valid
  * only for this content; regenerate when it changes. */
 #ifndef BG_COMPONENTS_H
 #define BG_COMPONENTS_H
@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BG_CONTENT_HASH 0x93fe613cce7edc2fULL
+#define BG_CONTENT_HASH 0x7b8bff62cce2e9d7ULL
 
 /* Activity, from #Activity */
 typedef struct {
@@ -35,6 +35,7 @@ typedef struct {
     bool            bent;    /* bool; saved, proposable, inspect, perceive(sight) */
     int64_t         mass;    /* mass, in quanta of 1g; content, saved, proposable, inspect, perceive(touch) */
     uint32_t        material;    /* #Material: a type ID; content, saved, inspect, perceive(sight) */
+    uint32_t        surface;    /* "flesh" | "metal" | "natural" | "paper" | "wood": a type ID; content, saved, inspect, appears(material) */
     int64_t         toolMarks;    /* int, in quanta of 1; saved, proposable, inspect, perceive(sight) */
 } BGBody;
 
@@ -89,40 +90,52 @@ typedef struct {
 
 /* #ActivityStatus */
 enum {
-    BG_ACTIVITYSTATUS_COMPLETED = 95,
-    BG_ACTIVITYSTATUS_EXHAUSTED = 96,
-    BG_ACTIVITYSTATUS_FAILED = 97,
-    BG_ACTIVITYSTATUS_RUNNING = 98,
-    BG_ACTIVITYSTATUS_SUSPENDED = 99,
+    BG_ACTIVITYSTATUS_COMPLETED = 98,
+    BG_ACTIVITYSTATUS_EXHAUSTED = 99,
+    BG_ACTIVITYSTATUS_FAILED = 100,
+    BG_ACTIVITYSTATUS_RUNNING = 101,
+    BG_ACTIVITYSTATUS_SUSPENDED = 102,
 };
 
 /* #ClaimKind */
 enum {
-    BG_CLAIMKIND_CUSTODY = 101,
-    BG_CLAIMKIND_OWNERSHIP = 102,
+    BG_CLAIMKIND_CUSTODY = 104,
+    BG_CLAIMKIND_OWNERSHIP = 105,
 };
 
 /* #Material */
 enum {
-    BG_MATERIAL_FLESH = 130,
-    BG_MATERIAL_BRASS = 132,
-    BG_MATERIAL_IRON = 133,
-    BG_MATERIAL_PAPER = 134,
-    BG_MATERIAL_OAK = 136,
+    BG_MATERIAL_FLESH = 154,
+    BG_MATERIAL_BRASS = 156,
+    BG_MATERIAL_IRON = 157,
+    BG_MATERIAL_PAPER = 158,
+    BG_MATERIAL_STEEL = 159,
+    BG_MATERIAL_OAK = 161,
+};
+
+/* "flesh" | "metal" | "natural" | "paper" | "wood" */
+enum {
+    BG_BODY_SURFACE_NATURAL = 86,
+    BG_BODY_SURFACE_FLESH = 154,
+    BG_BODY_SURFACE_BRASS = 156,
+    BG_BODY_SURFACE_IRON = 157,
+    BG_BODY_SURFACE_PAPER = 158,
+    BG_BODY_SURFACE_STEEL = 159,
+    BG_BODY_SURFACE_OAK = 161,
 };
 
 /* #Colour */
 enum {
-    BG_COLOUR_BLUE = 105,
-    BG_COLOUR_BLACK = 107,
-    BG_COLOUR_BROWN = 108,
-    BG_COLOUR_GREEN = 109,
-    BG_COLOUR_GREY = 110,
-    BG_COLOUR_BEIGE = 112,
-    BG_COLOUR_NAVY = 113,
-    BG_COLOUR_RED = 114,
-    BG_COLOUR_WHITE = 115,
-    BG_COLOUR_YELLOW = 116,
+    BG_COLOUR_BLUE = 108,
+    BG_COLOUR_BLACK = 110,
+    BG_COLOUR_BROWN = 111,
+    BG_COLOUR_GREEN = 112,
+    BG_COLOUR_GREY = 113,
+    BG_COLOUR_BEIGE = 115,
+    BG_COLOUR_NAVY = 116,
+    BG_COLOUR_RED = 117,
+    BG_COLOUR_WHITE = 118,
+    BG_COLOUR_YELLOW = 119,
 };
 
 /* The field registry: what code needs to read and write any component
@@ -176,6 +189,7 @@ static const BGFieldInfo BGBody_fields[] = {
     { "bent", offsetof(BGBody, bent), BG_VALUE_BOOL, "bool", "saved, proposable, inspect, perceive(sight)" },
     { "mass", offsetof(BGBody, mass), BG_VALUE_QUANTITY, "mass", "content, saved, proposable, inspect, perceive(touch)" },
     { "material", offsetof(BGBody, material), BG_VALUE_TYPE, "#Material", "content, saved, inspect, perceive(sight)" },
+    { "surface", offsetof(BGBody, surface), BG_VALUE_TYPE, "\"flesh\" | \"metal\" | \"natural\" | \"paper\" | \"wood\"", "content, saved, inspect, appears(material)" },
     { "toolMarks", offsetof(BGBody, toolMarks), BG_VALUE_QUANTITY, "int", "saved, proposable, inspect, perceive(sight)" },
 };
 
@@ -224,7 +238,7 @@ static const BGFieldInfo BGWaterStore_fields[] = {
 static const BGComponentInfo BGComponents[BG_COMPONENT_COUNT + 1] = {
     { "Activity", "#Activity", sizeof(BGActivity), 12, BGActivity_fields },
     { "Claim", "#Claim", sizeof(BGClaim), 2, BGClaim_fields },
-    { "Body", "#Body", sizeof(BGBody), 4, BGBody_fields },
+    { "Body", "#Body", sizeof(BGBody), 5, BGBody_fields },
     { "Agent", "#Agent", sizeof(BGAgent), 4, BGAgent_fields },
     { "Assembly", "#Assembly", sizeof(BGAssembly), 1, BGAssembly_fields },
     { "Container", "#Container", sizeof(BGContainer), 1, BGContainer_fields },

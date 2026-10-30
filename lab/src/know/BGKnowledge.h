@@ -50,6 +50,10 @@
  * restores both. A claim of what the speaker saw says how sure it is, its
  * memory's strength, and weighs no more than that.
  *
+ * Perception reads appearance (KNOWLEDGE.md §4): a plated fitting looks
+ * brass. What an analysis the agent did found beneath it is kept with the
+ * referent and overrides its looks, however often it is seen again.
+ *
  * Traces (KNOWLEDGE.md §3) are perceived by their kind's sense: by sight on
  * what the agent sees, or on the floor in sight; by smell within
  * BG_SMELL tiles. What it perceives is the trace's kind, where, and how
@@ -105,6 +109,7 @@ typedef struct
    uint32_t         id;
    char             *kind;         /* a type expression: "#Stack" */
    char             *features;     /* "mass: 90g, material: \"iron\", ..." */
+   char             *deeper;       /* what an analysis found beneath its looks: "material: \"steel\"", or NULL */
    BGLocationForm   form;          /* how it was placed when last seen */
    uint32_t         container;     /* the referent it was in, held by, or part of */
    int32_t          x;             /* the tile it was on, or its holder's */

@@ -930,7 +930,42 @@ leaves its traces when it completes), and traces from reactions.
 
 34 tests, 510 checks, under both compilers, ASan and UBSan, and leak-free.
 
-Next: appearance and truth (KNOWLEDGE.md §4, Scenario 2's plated fitting):
-appearance fields that perception reads instead of the truth, and an
-analysis operation (a scratch test) that reads the deeper field and leaves
-a scratch.
+### After the slice: appearance and truth
+
+KNOWLEDGE.md Scenario 2's plated fitting: a fitting that looks brass and
+is steel. The foreman sees brass. A scratch test reveals steel and leaves
+a scratch; the foreman then knows steel however often it sees brass again.
+The smith, who watched, sees the scratch, and still believes brass. On the
+lock, which is what it looks like, the test says brass.
+
+- **Appearance fields** (KNOWLEDGE.md §4): a component field may declare
+  itself another's appearance, `appears(material)`. `#Body.surface` is
+  what its material looks like: "natural" by default, or a material from
+  the top of the hierarchy down. The view reports the appearance in the
+  true field's place wherever it is set.
+- **An analysis operation**, `test_scratch` (3 s, hands): its `analyse`
+  effect commits an "analysed" event whose detail is what lies beneath,
+  the true material, and it leaves a `scratch` trace.
+- **What an analysis found is kept** with the referent (`deeper`), the
+  analyser's own, and overrides its looks when the agent recalls it:
+  descriptions, recognition, answers, and decay all read it. Saved.
+
+What it settled:
+
+- **An open enum field is a seeded variation point**, so a field like
+  `surface` needs a default that means "nothing of its own"; an
+  anonymous disjunction with a named enum type doesn't parse as one, so
+  `surface` lists the material hierarchy's top atoms.
+
+Not yet: appearance for fields other than material (a disguise's face and
+coat), analyses reaching more than one level down, other agents learning
+what an analysis found (by being told, or by examining the scratch), and
+analysis operations beyond the scratch test (acid, comparing seals).
+
+35 tests, 526 checks, under both compilers, ASan and UBSan, and leak-free.
+
+Next: interpretation rules (KNOWLEDGE.md §9, Scenario 2's second half),
+content that derives beliefs from percepts and beliefs, gated by the
+interpreter's expertise ("touched-up paint means something happened to
+it" needs a painter's eye) and by prior beliefs ("the wrench was
+replaced" needs a belief that the old one was worn).

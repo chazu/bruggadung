@@ -570,7 +570,8 @@ static void   test_menu( void)
    [scenario runUntil:BGTimeMake( 0)];
    text = menu_text( w, 4);
    BG_CHECK( [text isEqualToString:@"look_in item 1: entailed; take item 1: entailed; take item 2: entailed; "
-                                   @"take item 3: entailed; take_some item 2: entailed; touch_up item 3: entailed; "
+                                   @"take item 3: entailed; take_some item 2: entailed; test_scratch item 1: entailed; "
+                                   @"test_scratch item 3: entailed; touch_up item 3: entailed; "
                                    @"walk_east: entailed; walk_north: entailed; walk_south: entailed; walk_west: entailed; "
                                    @"wash_floor: entailed"]);
    if( [text rangeOfString:@"walk_west: entailed; wash_floor: entailed"].location == NSNotFound)
@@ -2206,6 +2207,102 @@ static void   test_traces( void)
 }
 
 
+/* KNOWLEDGE.md §4 and Scenario 2's plated fitting: the fitting looks brass
+ * and is steel. The foreman sees brass; a scratch test reveals steel, which
+ * the foreman then knows however often it sees brass again, and leaves a
+ * scratch anyone can see. The smith, watching, still sees brass. */
+static void   test_appearance( void)
+{
+   BGWorld            *w;
+   BGWorld            *w2;
+   BGCommitter        *c;
+   BGScheduler        *s;
+   BGActivities       *activities;
+   BGKnowledge        *knowledge;
+   BGKnowledge        *restored;
+   BGTraces           *traces;
+   BGKnowledgeStore   *store;
+   BGProposalGroup    *g;
+   NSArray            *deferred;
+   NSString           *error;
+   NSString           *text;
+   NSString           *fittingSeen;
+   BGEntityID         fitting;
+   BGEntityID         lock;
+   BGEntityID         smith;
+   BGEntityID         foreman;
+   uint64_t           position;
+   uint32_t           r;
+
+   w          = BGTestWorld( 29);
+   c          = BGTestCommitter( w);
+   activities = [BGActivities activitiesWithWorld:w committer:c];
+   knowledge  = [[[BGKnowledge alloc] initWithWorld:w] autorelease];
+   traces     = [[[BGTraces alloc] initWithWorld:w] autorelease];
+   s          = [[[BGScheduler alloc] initWithWorld:w committer:c] autorelease];
+   [s setActivities:activities];
+   [s setPerception:knowledge];
+   [s addDomain:traces];
+   g       = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the fitting"];
+   fitting = [g create:"fitting" key:"fitting" at:BGOnTile( 5, 4, 0)];
+   lock    = [g create:"lock" key:"lock" at:BGOnTile( 5, 5, 0)];
+   foreman = [g create:"foreman" key:"foreman" at:BGOnTile( 4, 4, 0)];
+   smith   = [g create:"smith" key:"smith" at:BGOnTile( 2, 4, 0)];
+   [c submit:g];
+   [s runUntil:BGTimeMake( 1)];
+   fitting = [g idFor:fitting];
+   lock    = [g idFor:lock];
+   foreman = [g idFor:foreman];
+   smith   = [g idFor:smith];
+
+   /* 3: perception reports the appearance: brass */
+   store       = [knowledge storeOf:foreman];
+   r           = referent_of( store, fitting);
+   fittingSeen = [store describeReferent:r];
+   BG_CHECK( [fittingSeen rangeOfString:@"material: \"brass\""].location != NSNotFound);
+   BG_CHECK( [fittingSeen rangeOfString:@"steel"].location == NSNotFound);
+   BG_CHECK( tri_subtype( [w tri], ((const BGBody *) [w record:[w kindNamed:"Body"] for:fitting])->material,
+                          tri_type_named( [w tri], "\"steel\"")));
+
+   /* only the scratch test reveals steel, and leaves a scratch */
+   BG_CHECK( BGPerform( w, c, BGActionMake( "test_scratch", foreman, fitting, BGNoEntity), 0, &error) != nil);
+   [s runUntil:BGTimeMake( 5000)];
+   BG_CHECK( [[store describeReferent:r] rangeOfString:@"material: \"steel\""].location != NSNotFound);
+   BG_CHECK( [[store describeReferent:r] rangeOfString:@"brass"].location == NSNotFound);
+   BG_CHECK( any_trace( w, "scratch"));
+   BG_CHECK( traced( store, "scratch") && traced( store, "scratch")->bearer == r);
+   /* seen again, it still looks brass; the foreman still knows steel */
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the foreman steps back"];
+   [g move:BGWhole( foreman) to:BGOnTile( 3, 4, 0)];
+   [c submit:g];
+   [s runUntil:BGTimeMake( 6000)];
+   BG_CHECK( [store referentAt:0] && [store referent:r]->seen == 6000);
+   BG_CHECK( [[store describeReferent:r] rangeOfString:@"material: \"steel\""].location != NSNotFound);
+   /* the smith, who watched, sees the scratch, and still brass */
+   BG_CHECK( traced( [knowledge storeOf:smith], "scratch"));
+   BG_CHECK( [[[knowledge storeOf:smith] describeReferent:referent_of( [knowledge storeOf:smith], fitting)]
+              rangeOfString:@"material: \"brass\""].location != NSNotFound);
+
+   /* a thing that is what it looks like: the test says so */
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the foreman goes to the lock"];
+   [g move:BGWhole( foreman) to:BGOnTile( 4, 5, 0)];
+   [c submit:g];
+   [s runUntil:BGTimeMake( 7000)];
+   BG_CHECK( BGPerform( w, c, BGActionMake( "test_scratch", foreman, lock, BGNoEntity), 0, &error) != nil);
+   [s runUntil:BGTimeMake( 11000)];
+   BG_CHECK( [store referent:referent_of( store, lock)]->deeper &&
+             ! strcmp( [store referent:referent_of( store, lock)]->deeper, "material: \"brass\""));
+
+   /* saved and restored the same */
+   text = BGSave( w, c, [NSArray arrayWithObjects:knowledge, traces, nil]);
+   w2   = BGRestore( text, [w contentBuild], &deferred, &position, &error);
+   BG_CHECK( w2 != nil);
+   restored = [[[BGKnowledge alloc] initWithWorld:w2] autorelease];
+   [restored restoreSavedState:BGSavedDomainState( text, @"knowledge")];
+   BG_CHECK( [[restored dump:foreman] isEqualToString:[knowledge dump:foreman]]);
+}
+
+
 /* --- the cistern ----------------------------------------------------------- */
 
 static BGCistern   *run_cistern( BGCisternVariant variant)
@@ -2521,6 +2618,7 @@ const BGTestCase   BGAllTests[] =
    { "memory_decay",                  test_memory_decay },
    { "salience",                      test_salience },
    { "traces",                        test_traces },
+   { "appearance",                    test_appearance },
    { "cistern",                       test_cistern },
    { "cistern_b",                     test_cistern_b },
    { "cistern_d",                     test_cistern_d },

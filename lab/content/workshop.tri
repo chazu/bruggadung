@@ -43,3 +43,7 @@ foreman:   #Agent & { material: "flesh", mass: 90kg, hands: 2, coat: "black" }
 
 // For salience and bounded stores: someone who keeps little in mind.
 gossip: #Agent & { material: "flesh", mass: 65kg, hands: 2, coat: "beige", memory: 4 }
+
+// For appearance and truth: a fitting that looks brass, and is brass-plated
+// steel.
+fitting: #Body & { material: "steel", surface: "brass", mass: 400g }

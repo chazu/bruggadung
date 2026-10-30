@@ -195,6 +195,27 @@ static void   append_place( NSMutableString *s, BGLocation loc)
 }
 
 
+/* The field that says what `f` looks like (KNOWLEDGE.md §4), "appears(f)",
+ * if it says anything other than "natural"; otherwise `f`. */
+static const BGFieldInfo   *appearance_of( const BGComponentInfo *kind, const BGFieldInfo *f, const uint8_t *record,
+                                           uint32_t natural)
+{
+   const BGFieldInfo   *g;
+   size_t              i;
+   char                flag[ 64];
+
+   snprintf( flag, sizeof( flag), "appears(%s)", f->name);
+   for( i = 0; i < kind->nfields; i++)
+   {
+      g = &kind->fields[ i];
+      if( g->value == f->value && strstr( g->flags, flag) && g->value == BG_VALUE_TYPE &&
+          *(const uint32_t *) (record + g->offset) && *(const uint32_t *) (record + g->offset) != natural)
+         return( g);
+   }
+   return( f);
+}
+
+
 - (NSString *) featuresOf:(BGEntityID) entity
 {
    const BGComponentInfo     *kind;
@@ -221,6 +242,8 @@ static void   append_place( NSMutableString *s, BGLocation loc)
          if( ! strstr( f->flags, "perceive"))
             continue;
          [s appendFormat:@"%s%s: ", [s length] ? ", " : "", f->name];
+         /* what the senses report: its appearance, if it has one */
+         f = appearance_of( kind, f, record, (uint32_t) tri_type_named( [_world tri], "\"natural\""));
          switch( f->value)
          {
          case BG_VALUE_QUANTITY:
