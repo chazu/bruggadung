@@ -1994,3 +1994,34 @@ run:
 
 The test drops the variant; C stays as it was, with the source named from
 the start.
+
+### What stays open, and why
+
+The remaining scenario checks that aren't run, after the passes above:
+
+- **CONTENT_LANGUAGE.md Scenario 3, check 6 (compaction)**: the lab's
+  knowledge stores hold descriptions as text. They build tri nodes in
+  scratch arenas per match, so there is no per-agent knowledge arena to
+  compact, and the check is vacuous. A per-agent arena (§12's memory
+  table) would change how every store holds its referents: a decision
+  about representation, not a feature.
+- **Checks that hold by structure, with no test that could fail**:
+  CONTENT_LANGUAGE.md Scenario 3's check 5 (recognition reads no truth
+  links) and KNOWLEDGE.md Scenario 1's check 1 (no entity IDs in agent
+  data). Descriptions use the store's own `ref(n)`; the truth link is a
+  field the inspector alone prints. A text check can't tell entity IDs
+  from store IDs, both small integers.
+- **Needing design** (each noted in its section above):
+  - latent assembly: DOMAIN_SIMULATION.md Scenario 2, COMPONENTS.md
+    Scenario 3, and ACTIONS.md Scenario 3's steps 2 and 7;
+  - institutions: COMPONENTS.md Scenario 2, grievances, and reporting to
+    the miller;
+  - closed doors and failed moves: KNOWLEDGE.md Scenario 3's check 2;
+  - premises over remembered features, and recognizing a swapped look-alike:
+    KNOWLEDGE.md Scenario 2's wrench;
+  - told, featureless referents in recognition: AGENCY.md Scenario 2's
+    variant C by asking;
+  - competing feature hypotheses with masses: CONTENT_LANGUAGE.md
+    Scenario 2's variant C;
+  - light as a domain: the lamp;
+  - urgency curves, belief from habit, loyalty.
