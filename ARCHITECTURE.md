@@ -24,7 +24,7 @@ proven on COMPONENTS.md's first scenario.
 | [ACTIONS.md](ACTIONS.md) | §1: capabilities, actions, activities; change commitment | Contract proposed, 3 scenarios; all run in [lab/](lab/README.md), Scenario 3's latent-assembly steps aside |
 | [KNOWLEDGE.md](KNOWLEDGE.md) | §4: history, traces, perception, referents, claims, beliefs, memory | Contract proposed, 3 scenarios; all run in [lab/](lab/README.md) |
 | [AGENCY.md](AGENCY.md) | §5: goals, methods, needs, commitments, habits, dispositions, salience | Contract proposed, 3 scenarios; all run in [lab/](lab/README.md), Scenario 1 adapted, its step 5 (loyalty) aside |
-| — | §6: institutions | Next |
+| [INSTITUTIONS.md](INSTITUTIONS.md) | §6: institutions | Decisions being made |
 | — | Latent physical assembly | Not specified; the lab runs provisional rules (lab/content/latent.tri) to COMPONENTS.md §7's hooks |
 | [CONTENT_LANGUAGE.md](CONTENT_LANGUAGE.md) | Triangle, the content language: typed feature structures, TDL semantics, CUE-style syntax, the engine | Contract proposed, 3 scenarios; Scenario 1 runs in triangle/, 2 and 3 in [lab/](lab/README.md) |
 | [CHAT.md](CHAT.md) | Original brainstorm. The setting is discarded. | Reference |
@@ -39,7 +39,7 @@ proven on COMPONENTS.md's first scenario.
 | Change commitment (in ACTIONS.md) | Ordering, validation, atomic application, ID allocation, committed events | It is the only writer of shared world state outside domains |
 | Knowledge (§4) | History, perception, agents' private knowledge stores (referents, observations, beliefs) | The perception phase writes knowledge stores. Traces and records are world state, changed through commitment. |
 | Agency (§5) | Agents' private motivation stores; choosing activities at decision points; salience | The decision phase writes motivation stores. Actions go through activities. |
-| Institutions (§6) | Membership, jurisdiction, authority, procedures, recognition of claims | To be specified |
+| Institutions (§6) | Organizations and their offices, the rules they issue, recognition of claims; they act only through their members | Members' actions, through activities (INSTITUTIONS.md) |
 
 ### How they connect
 
