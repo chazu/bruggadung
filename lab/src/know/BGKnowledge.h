@@ -89,6 +89,16 @@
  * concludes someone usually puts things in the same place; seeing them put
  * something elsewhere is an anomaly, and salient.
  *
+ * Recognition by unification (CONTENT_LANGUAGE.md Scenario 3): a percept
+ * that fails to unify with a referent only on short-lived features
+ * (content/persistence.tri: a coat) may still be that one, changed: the
+ * agent makes a new referent and an identity hypothesis, "it may be that
+ * one", with a credence from the paths that agree and those that conflict,
+ * all of them reported. A percept that later fits both is evidence they are
+ * one, and the hypothesis gains. Conditions stub: at dusk, what is beyond
+ * arm's reach is seen a step less precisely (grey looks dark); a match keeps
+ * the more specific description.
+ *
  * Salience (KNOWLEDGE.md §7, AGENCY.md §10): what an agent perceives happen
  * is kept as an observation only if it is salient enough: being addressed
  * most, its own deeds next, then what its goals concern (agency says what
@@ -199,6 +209,17 @@ typedef enum
 } BGAttribution;
 
 
+/* An identity hypothesis: referent `a` may be referent `b`. */
+typedef struct
+{
+   uint32_t         a;             /* the newer */
+   uint32_t         b;
+   int32_t          credence;      /* dB that they are one */
+   char             paths[ 64];    /* where they differed: "coat" */
+   int64_t          time;          /* ms: last weighed */
+} BGIdentity;
+
+
 /* What a rule concluded (KNOWLEDGE.md §9): something about a referent. */
 typedef struct
 {
@@ -267,6 +288,9 @@ typedef struct
    NSUInteger       _fcapacity;
    int32_t          _hunger;         /* as felt */
    int64_t          _feltAt;         /* ms, or -1 */
+   BGIdentity       *_identities;
+   NSUInteger       _nidentities;
+   NSUInteger       _icapacity;
 }
 
 - (BGEntityID) agent;
@@ -330,6 +354,16 @@ typedef struct
  * "hunger" */
 - (int32_t) feels:(const char *) need;
 
+/* its identity hypotheses, first made first */
+- (NSUInteger) identityCount;
+- (const BGIdentity *) identityAt:(NSUInteger) i;
+
+/* the features generalized `steps` along their primary parents; those that
+ * go as far as they can, dropped */
+- (NSString *) generalize:(NSString *) features
+                     kind:(const char *) kind
+                    steps:(int) steps;
+
 /* what it has concluded, first concluded first */
 - (NSUInteger) findingCount;
 - (const BGFinding *) findingAt:(NSUInteger) i;
@@ -371,6 +405,7 @@ typedef struct
    NSMutableArray   *_stores;          /* sorted by agent */
    NSUInteger       _eventsSeen;
    BOOL             _omniscient;
+   BOOL             _dusk;
    BGAncestry       *_ancestry;        /* developer-only, by utterance */
    NSUInteger       _nancestry;
    NSUInteger       _acapacity;
@@ -382,6 +417,9 @@ typedef struct
  * everywhere, inside containers too. Agency run on it must behave visibly
  * differently from agency run on what agents can know. */
 - (void) setOmniscient:(BOOL) flag;
+
+/* A conditions stub (KNOWLEDGE.md §5): dusk, or day. */
+- (void) setDusk:(BOOL) flag;
 
 /* what the agent's running activities demand of its attention */
 - (int) attentionOf:(BGEntityID) agent;

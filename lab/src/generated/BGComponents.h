@@ -1,4 +1,4 @@
-/* Generated from Triangle content e6c0a7e10038bb51: do not edit. Type IDs are valid
+/* Generated from Triangle content 3d23f52008ec921f: do not edit. Type IDs are valid
  * only for this content; regenerate when it changes. */
 #ifndef BG_COMPONENTS_H
 #define BG_COMPONENTS_H
@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BG_CONTENT_HASH 0xe6c0a7e10038bb51ULL
+#define BG_CONTENT_HASH 0x3d23f52008ec921fULL
 
 /* Activity, from #Activity */
 typedef struct {
@@ -41,7 +41,7 @@ typedef struct {
 
 /* Agent, from #Agent */
 typedef struct {
-    uint32_t        coat;    /* #Colour: a type ID; content, saved, inspect, perceive(sight) */
+    uint32_t        coat;    /* #Colour: a type ID; content, saved, proposable, inspect, perceive(sight) */
     int64_t         curious;    /* int, in quanta of 1; content, saved, proposable, inspect */
     int64_t         fed;    /* int, in quanta of 1; content, saved, proposable, inspect */
     int64_t         fedAt;    /* time, in quanta of 1ms; content, saved, proposable, inspect */
@@ -104,56 +104,56 @@ typedef struct {
 
 /* #ActivityStatus */
 enum {
-    BG_ACTIVITYSTATUS_COMPLETED = 187,
-    BG_ACTIVITYSTATUS_EXHAUSTED = 188,
-    BG_ACTIVITYSTATUS_FAILED = 189,
-    BG_ACTIVITYSTATUS_RUNNING = 190,
-    BG_ACTIVITYSTATUS_SUSPENDED = 191,
+    BG_ACTIVITYSTATUS_COMPLETED = 189,
+    BG_ACTIVITYSTATUS_EXHAUSTED = 190,
+    BG_ACTIVITYSTATUS_FAILED = 191,
+    BG_ACTIVITYSTATUS_RUNNING = 192,
+    BG_ACTIVITYSTATUS_SUSPENDED = 193,
 };
 
 /* #ClaimKind */
 enum {
-    BG_CLAIMKIND_CUSTODY = 193,
-    BG_CLAIMKIND_OWNERSHIP = 194,
-    BG_CLAIMKIND_RESERVATION = 195,
+    BG_CLAIMKIND_CUSTODY = 195,
+    BG_CLAIMKIND_OWNERSHIP = 196,
+    BG_CLAIMKIND_RESERVATION = 197,
 };
 
 /* #Material */
 enum {
-    BG_MATERIAL_CLOTH = 229,
-    BG_MATERIAL_FOOD = 230,
-    BG_MATERIAL_RUBBER = 231,
-    BG_MATERIAL_FLESH = 256,
-    BG_MATERIAL_BRASS = 258,
-    BG_MATERIAL_IRON = 259,
-    BG_MATERIAL_PAPER = 260,
-    BG_MATERIAL_STEEL = 261,
-    BG_MATERIAL_OAK = 263,
+    BG_MATERIAL_CLOTH = 231,
+    BG_MATERIAL_FOOD = 232,
+    BG_MATERIAL_RUBBER = 233,
+    BG_MATERIAL_FLESH = 258,
+    BG_MATERIAL_BRASS = 260,
+    BG_MATERIAL_IRON = 261,
+    BG_MATERIAL_PAPER = 262,
+    BG_MATERIAL_STEEL = 263,
+    BG_MATERIAL_OAK = 265,
 };
 
 /* "flesh" | "metal" | "natural" | "paper" | "wood" */
 enum {
-    BG_BODY_SURFACE_NATURAL = 164,
-    BG_BODY_SURFACE_FLESH = 256,
-    BG_BODY_SURFACE_BRASS = 258,
-    BG_BODY_SURFACE_IRON = 259,
-    BG_BODY_SURFACE_PAPER = 260,
-    BG_BODY_SURFACE_STEEL = 261,
-    BG_BODY_SURFACE_OAK = 263,
+    BG_BODY_SURFACE_NATURAL = 166,
+    BG_BODY_SURFACE_FLESH = 258,
+    BG_BODY_SURFACE_BRASS = 260,
+    BG_BODY_SURFACE_IRON = 261,
+    BG_BODY_SURFACE_PAPER = 262,
+    BG_BODY_SURFACE_STEEL = 263,
+    BG_BODY_SURFACE_OAK = 265,
 };
 
 /* #Colour */
 enum {
-    BG_COLOUR_BLUE = 198,
-    BG_COLOUR_BLACK = 200,
-    BG_COLOUR_BROWN = 201,
-    BG_COLOUR_GREEN = 202,
-    BG_COLOUR_GREY = 203,
-    BG_COLOUR_BEIGE = 205,
-    BG_COLOUR_NAVY = 206,
-    BG_COLOUR_RED = 207,
-    BG_COLOUR_WHITE = 208,
-    BG_COLOUR_YELLOW = 209,
+    BG_COLOUR_BLUE = 200,
+    BG_COLOUR_BLACK = 202,
+    BG_COLOUR_BROWN = 203,
+    BG_COLOUR_GREEN = 204,
+    BG_COLOUR_GREY = 205,
+    BG_COLOUR_BEIGE = 207,
+    BG_COLOUR_NAVY = 208,
+    BG_COLOUR_RED = 209,
+    BG_COLOUR_WHITE = 210,
+    BG_COLOUR_YELLOW = 211,
 };
 
 /* The field registry: what code needs to read and write any component
@@ -212,7 +212,7 @@ static const BGFieldInfo BGBody_fields[] = {
 };
 
 static const BGFieldInfo BGAgent_fields[] = {
-    { "coat", offsetof(BGAgent, coat), BG_VALUE_TYPE, "#Colour", "content, saved, inspect, perceive(sight)" },
+    { "coat", offsetof(BGAgent, coat), BG_VALUE_TYPE, "#Colour", "content, saved, proposable, inspect, perceive(sight)" },
     { "curious", offsetof(BGAgent, curious), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "fed", offsetof(BGAgent, fed), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "fedAt", offsetof(BGAgent, fedAt), BG_VALUE_QUANTITY, "time", "content, saved, proposable, inspect" },

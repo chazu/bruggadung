@@ -1,0 +1,7 @@
+// How long features usually last (KNOWLEDGE.md §8, CONTENT_LANGUAGE.md §17's
+// recognition): a coat changes daily, the rest of how someone looks hardly
+// at all. Recognition weighs a conflict on a short-lived feature lightly: it
+// may be the same one, changed.
+#Persistence: { feature: text, persists: time }
+
+coat_persists: #Persistence & { feature: "coat", persists: 1d } @family(persistence)

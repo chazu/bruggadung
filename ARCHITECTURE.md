@@ -315,7 +315,9 @@ A rebuilt world produces the same next step as one that never saved.
    to come; requests, granted or refused; and investigation, a close look
    that notices faint traces and draws the rules that take thought; and
    fair, weighted conflict resolution with soft reservations (ACTIONS.md's
-   two hands, one seal).
+   two hands, one seal); and recognition weighing failure paths by
+   persistence into identity hypotheses (CONTENT_LANGUAGE.md's coat at
+   dusk).
 
 ## Cross-cutting open questions
 

@@ -96,7 +96,11 @@ forgotten. Operations leave traces (tool marks, scuffs) and remove them,
 and each removal leaves its own (a damp floor, a smell of soap); traces
 fade with age, computed when read, and are removed when they run out,
 with nothing to compute between. Agents perceive them by sight or smell,
-never what made them. A component field can declare another's appearance
+never what made them. Recognition is unification: a percept that differs from someone only in
+what changes daily (a coat) may still be them, and the agent keeps an
+identity hypothesis, which a later percept fitting both raises; at dusk
+less is seen, and memory keeps the more specific. A component field can
+declare another's appearance
 (`#Body.surface` for `material`): perception reports the appearance, and
 only an analysis (`test_scratch`) finds the truth beneath, which the
 analyser then keeps. Interpretation rules in content draw findings from

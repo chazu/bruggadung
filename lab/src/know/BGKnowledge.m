@@ -147,6 +147,7 @@ static NSUInteger   feature_keys( const char *features, char (*keys)[ 32], NSUIn
    free( _testimony);
    free( _traces);
    free( _findings);
+   free( _identities);
    [_news release];
    [super dealloc];
 }
@@ -377,6 +378,35 @@ static NSUInteger   feature_keys( const char *features, char (*keys)[ 32], NSUIn
    _hunger = hunger;
    _feltAt = t;
    return( changed);
+}
+
+
+- (NSUInteger) identityCount
+{
+   return( _nidentities);
+}
+
+
+- (const BGIdentity *) identityAt:(NSUInteger) i
+{
+   return( &_identities[ i]);
+}
+
+
+- (BGIdentity *) mutableIdentityAt:(NSUInteger) i
+{
+   return( &_identities[ i]);
+}
+
+
+- (void) addIdentity:(BGIdentity) h
+{
+   if( _nidentities == _icapacity)
+   {
+      _icapacity  = _icapacity ? _icapacity * 2 : 8;
+      _identities = realloc( _identities, sizeof( BGIdentity) * _icapacity);
+   }
+   _identities[ _nidentities++] = h;
 }
 
 
@@ -798,6 +828,23 @@ static NSString   *known_features( const BGReferent *r)
  * forgotten. */
 - (NSString *) recall:(const BGReferent *) r
 {
+   NSString   *known;
+   int        steps;
+
+   if( ! r->features)
+      return( @"");
+   known = known_features( r);
+   steps = [self stepsSince:r->seen];
+   if( ! steps || ! [known length] || ! r->kind)
+      return( known);
+   return( [self generalize:known kind:r->kind steps:steps]);
+}
+
+
+- (NSString *) generalize:(NSString *) known
+                     kind:(const char *) kind
+                    steps:(int) steps
+{
    const TriNode     *node;
    const TriNode     *part;
    const TriNode     *full;
@@ -809,19 +856,10 @@ static NSString   *known_features( const BGReferent *r)
    char              keys[ 32][ 32];
    char              a[ 512];
    char              b[ 512];
-   int               steps;
 
-   NSString          *known;
-
-   if( ! r->features)
-      return( @"");
-   known = known_features( r);
-   steps = [self stepsSince:r->seen];
-   if( ! steps || ! [known length] || ! r->kind)
-      return( known);
    tri   = [_world tri];
    arena = tri_arena_new();
-   node  = tri_value( tri, [[NSString stringWithFormat:@"%s & { %@ }", r->kind, known] UTF8String], arena, NULL, 0);
+   node  = tri_value( tri, [[NSString stringWithFormat:@"%s & { %@ }", kind, known] UTF8String], arena, NULL, 0);
    if( ! node)
    {
       tri_arena_free( arena);
@@ -955,6 +993,131 @@ static NSString   *known_features( const BGReferent *r)
 - (void) setOmniscient:(BOOL) flag
 {
    _omniscient = flag;
+}
+
+
+- (void) setDusk:(BOOL) flag
+{
+   _dusk = flag;
+}
+
+
+/* How long a feature usually lasts (content/persistence.tri): long, unless
+ * said. */
+- (int64_t) persistenceOf:(const char *) feature
+{
+   TriContent   *tri;
+   TriIndex     *family;
+   size_t       i;
+   int64_t      lo;
+   int64_t      hi;
+   char         name[ 64];
+
+   tri    = [_world tri];
+   family = tri_family_index( tri, "persistence");
+   for( i = 0; family && i < tri_index_count( family); i++)
+   {
+      const TriNode   *p;
+
+      p = tri_pattern( tri, tri_index_tag( family, i));
+      if( tri_at( tri, p, "feature") && tri_print( tri, tri_at( tri, p, "feature"), name, sizeof( name)) > 2)
+      {
+         name[ strlen( name) - 1] = 0;
+         if( ! strcmp( name + 1, feature) && tri_node_interval( tri_at( tri, p, "persists"), &lo, &hi))
+            return( lo);
+      }
+   }
+   return( 10000LL * 86400000LL);
+}
+
+
+/* Where what memory keeps of the referent and the percept conflict, every
+ * path, into `paths` ("coat, bent"); how many, and how many agree. */
+- (int) conflictsOf:(const BGReferent *) r
+                 in:(BGKnowledgeStore *) store
+               kind:(NSString *) kind
+           features:(NSString *) features
+              paths:(char *) paths
+             length:(size_t) length
+              agree:(int *) agree
+{
+   const TriNode   *x;
+   const TriNode   *y;
+   TriArena        *arena;
+   char            found[ 8][ 256];
+   size_t          n;
+   size_t          i;
+
+   arena  = tri_arena_new();
+   x      = tri_value( [_world tri], [[NSString stringWithFormat:@"%@ & { %@ }", kind, lasting( [store recall:r])] UTF8String],
+                       arena, NULL, 0);
+   y      = tri_value( [_world tri], [[NSString stringWithFormat:@"%@ & { %@ }", kind, lasting( features)] UTF8String],
+                       arena, NULL, 0);
+   n      = x && y ? tri_conflicts( [_world tri], x, y, found, 8) : 0;
+   tri_arena_free( arena);
+   paths[ 0] = 0;
+   for( i = 0; i < n; i++)
+      snprintf( paths + strlen( paths), length - strlen( paths), "%s%s", i ? ", " : "", found[ i]);
+   *agree = (int) [BGSplitTopLevel( lasting( features)) count] - (int) n;
+   return( (int) n);
+}
+
+
+/* Whether every conflict is on a feature that changes within a week. */
+- (BOOL) shortLived:(const char *) paths
+{
+   NSArray      *each;
+   NSUInteger   i;
+
+   each = BGSplitTopLevel( [NSString stringWithUTF8String:(char *) paths]);
+   for( i = 0; i < [each count]; i++)
+      if( [self persistenceOf:[[each objectAtIndex:i] UTF8String]] > 7 * 86400000LL)
+         return( NO);
+   return( [each count] > 0);
+}
+
+
+/* The percept's features, unified with what memory keeps, so a match keeps
+ * the more specific; the percept's, if they don't unify. */
+- (NSString *) unified:(const BGReferent *) r
+                    in:(BGKnowledgeStore *) store
+                  kind:(NSString *) kind
+              features:(NSString *) features
+{
+   const TriNode     *both;
+   TriArena          *arena;
+   NSMutableString   *out;
+   NSString          *remembered;
+   char              keys[ 64][ 32];
+   char              printed[ 512];
+   NSUInteger        n;
+   NSUInteger        k;
+   NSUInteger        j;
+
+   remembered = [store recall:r];
+   arena      = tri_arena_new();
+   both       = tri_value( [_world tri], [[NSString stringWithFormat:@"%@ & { %@ } & { %@ }", kind, remembered, features]
+                                          UTF8String], arena, NULL, 0);
+   if( ! both)
+   {
+      tri_arena_free( arena);
+      return( features);
+   }
+   /* the features either had, as unified */
+   n = feature_keys( [remembered UTF8String], keys, 32);
+   n += feature_keys( [features UTF8String], keys + n, 32);
+   out = [NSMutableString string];
+   for( k = 0; k < n; k++)
+   {
+      for( j = 0; j < k && strcmp( keys[ j], keys[ k]); j++)
+         ;
+      if( j < k || ! tri_at( [_world tri], both, keys[ k]))
+         continue;
+      tri_print( [_world tri], tri_at( [_world tri], both, keys[ k]), printed, sizeof( printed));
+      [out appendFormat:@"%@%s: %s", [out length] ? @", " : @"", keys[ k], printed];
+   }
+   tri_arena_free( arena);
+   return( out);
 }
 
 
@@ -1878,6 +2041,12 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
    uint8_t            *taken;         /* per referent index: matched this phase */
    uint32_t           container;
    BOOL               closely;
+   BOOL               degraded;
+   NSUInteger         maybe;
+   int                maybeN;
+   int                maybeD;
+   int                maybeA;
+   char               maybePaths[ 64];
    const BGAgent      *hider;
    const BGAgent      *memory;
    NSArray            *concerns;
@@ -1984,6 +2153,11 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
          features = [view featuresOf:seen[ i].entity];
          at       = [_world locationOf:seen[ i].entity];
          ground_tile( _world, seen[ i].entity, &tile);
+         /* at dusk, beyond arm's reach, a step less precisely */
+         degraded = _dusk && ! _omniscient && seen[ i].entity != agent &&
+                    (abs( tile.x - here.x) > 1 || abs( tile.y - here.y) > 1);
+         if( degraded)
+            features = [store generalize:features kind:[kind UTF8String] steps:1];
          container = 0;
          for( j = 0; j < i; j++)
             if( seen[ j].entity == at.place)
@@ -1997,8 +2171,12 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
          }
          else
          {
-            best  = NSNotFound;
-            bestd = 1 << 30;
+            best      = NSNotFound;
+            bestd     = 1 << 30;
+            maybe     = NSNotFound;
+            maybeN    = 1 << 30;
+            maybeD    = 1 << 30;
+            maybePaths[ 0] = 0;
             for( j = 0; j < [store count]; j++)
             {
                r = (BGReferent *) [store referentAt:j];
@@ -2009,9 +2187,26 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
                d = exact ? 0 : (r->present ? 1 : 2) + (int) max64( abs( r->x - tile.x), abs( r->y - tile.y));
                if( pass == 0 && ! exact)
                   continue;
-               /* elsewhere than believed, it must look the same: the crate isn't the chest */
+               /* elsewhere than believed, it must look the same: the crate isn't the chest;
+                * unless only what changes daily differs, when it may be the same, changed */
                if( ! exact && ! [self looksAlike:r in:store kind:kind features:features])
+               {
+                  int    nc;
+                  int    agree;
+                  char   paths[ 64];
+
+                  nc = [self conflictsOf:r in:store kind:kind features:features paths:paths length:sizeof( paths)
+                                   agree:&agree];
+                  if( pass == 1 && nc && [self shortLived:paths] && (nc < maybeN || (nc == maybeN && d < maybeD)))
+                  {
+                     maybe  = j;
+                     maybeN = nc;
+                     maybeD = d;
+                     maybeA = agree;
+                     strncpy( maybePaths, paths, sizeof( maybePaths) - 1);
+                  }
                   continue;
+               }
                if( d < bestd)
                {
                   bestd = d;
@@ -2022,8 +2217,26 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
                continue;
             if( best == NSNotFound)
             {
-               r = [store addReferent:0];
+               uint32_t   other;
+
+               other = maybe != NSNotFound ? [store referentAt:maybe]->id : 0;
+               r     = [store addReferent:0];
                [news addObject:[NSString stringWithFormat:@"R%u: %@, at (%d, %d)", r->id, kind, tile.x, tile.y]];
+               if( other)
+               {
+                  BGIdentity   h;
+
+                  /* it may be the other, changed: the agreeing paths for it, the conflicts against */
+                  memset( &h, 0, sizeof( h));
+                  h.a        = r->id;
+                  h.b        = other;
+                  h.credence = BG_PRIOR + 3 * maybeA - 5 * maybeN;
+                  h.time     = now;
+                  strncpy( h.paths, maybePaths, sizeof( h.paths) - 1);
+                  [store addIdentity:h];
+                  [news addObject:[NSString stringWithFormat:@"R%u may be R%u (%+d dB): only %s differs", r->id, other,
+                                                             h.credence, h.paths]];
+               }
             }
             else
             {
@@ -2033,7 +2246,28 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
                   [news addObject:[NSString stringWithFormat:@"R%u is at (%d, %d) now", r->id, tile.x, tile.y]];
             }
          }
-         /* the referent takes what was perceived */
+         /* it fits the other of a hypothesis about it as well: evidence they
+          * are one, once a sighting (not seen for a minute before) */
+         for( j = 0; r->id != [store selfReferent] && now - r->seen > 60000 && j < [store identityCount]; j++)
+         {
+            BGIdentity         *h;
+            const BGReferent   *o;
+
+            h = [store mutableIdentityAt:j];
+            if( (h->a != r->id && h->b != r->id) || h->time >= now)
+               continue;
+            o = [store referent:h->a == r->id ? h->b : h->a];
+            if( ! o || ! [self looksAlike:o in:store kind:kind features:features])
+               continue;
+            h->credence += 10;
+            h->time      = now;
+            [news addObject:[NSString stringWithFormat:@"R%u may be R%u (%+d dB): it fits both", h->a, h->b, h->credence]];
+         }
+
+         /* the referent takes what was perceived: kept more specific where
+          * memory was, when it was seen less well */
+         if( r->features && r->id != [store selfReferent] && degraded)
+            features = [self unified:r in:store kind:kind features:features];
          free( r->kind);
          free( r->features);
          r->kind      = strdup( [kind UTF8String]);
@@ -2502,6 +2736,19 @@ static NSString   *attribution_text( const BGTestimony *t)
                       f->choice ? [NSString stringWithFormat:@", choosing R%u", f->choice] : @"", f->credence, f->rule,
                       (long long) f->time];
    }
+   for( i = 0; i < [store identityCount]; i++)
+   {
+      const BGIdentity   *h;
+      BGEntityID         ta;
+      BGEntityID         tb;
+
+      h  = [store identityAt:i];
+      ta = [store referent:h->a] ? [store referent:h->a]->truth : 0;
+      tb = [store referent:h->b] ? [store referent:h->b]->truth : 0;
+      [s appendFormat:@"  identity R%u may be R%u: %+d dB, differing in %s; truly %s%s\n", h->a, h->b, h->credence,
+                      h->paths, ! ta || ! tb ? "unknown" : ta == tb ? "the same" : "not",
+                      ta && tb && ta != tb && h->credence >= 0 ? ": false merge" : ""];
+   }
    [s appendString:[self dumpTestimony:store]];
    for( i = 0; i < [store observationCount]; i++)
    {
@@ -2693,6 +2940,14 @@ char   *BGDecodeWord( const char *s)
       if( [store feltAt] >= 0)
          [lines addObject:[NSString stringWithFormat:@"feels %llu %d %lld", (unsigned long long) [store agent],
                                                      [store feels:"hunger"], (long long) [store feltAt]]];
+      for( j = 0; j < [store identityCount]; j++)
+      {
+         const BGIdentity   *h;
+
+         h = [store identityAt:j];
+         [lines addObject:[NSString stringWithFormat:@"identity %llu %u %u %d %lld %@", (unsigned long long) [store agent],
+                                                     h->a, h->b, h->credence, (long long) h->time, BGEncodeWord( h->paths)]];
+      }
       for( j = 0; j < [store findingCount]; j++)
       {
          const BGFinding   *f;
@@ -2820,6 +3075,21 @@ char   *BGDecodeWord( const char *s)
          tr.truth    = (BGEntityID) truth;
          tr.kind     = [_world intern:role];
          [[self storeOf:(BGEntityID) agent] noteTrace:tr];
+      }
+      else if( sscanf( text, "identity %llu %u %u %d %lld %511s", &agent, &id, &container, &trust, &seen, deeper) == 6)
+      {
+         BGIdentity   h;
+         char         *paths;
+
+         memset( &h, 0, sizeof( h));
+         h.a        = id;
+         h.b        = container;
+         h.credence = trust;
+         h.time     = seen;
+         paths      = BGDecodeWord( deeper);
+         strncpy( h.paths, paths, sizeof( h.paths) - 1);
+         free( paths);
+         [[self storeOf:(BGEntityID) agent] addIdentity:h];
       }
       else if( sscanf( text, "feels %llu %d %lld", &agent, &trust, &seen) == 3)
          [[self storeOf:(BGEntityID) agent] feelHunger:trust at:seen];

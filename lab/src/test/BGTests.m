@@ -3699,6 +3699,138 @@ static void   test_two_hands( void)
 }
 
 
+/* --- the coat at dusk ------------------------------------------------------- */
+
+typedef struct
+{
+   BGWorld       *world;
+   BGKnowledge   *knowledge;
+   BGEntityID    porter;
+   BGEntityID    visitor;
+   BGEntityID    smith;
+   NSString      *atDusk;        /* the visitor's referent, after the dusk sighting */
+   int32_t       before;         /* the hypothesis' credence, made */
+   NSString      *text;
+} BGCoatRun;
+
+
+/* CONTENT_LANGUAGE.md Scenario 3, "the coat at dusk": the porter (Ulla) sees
+ * a visitor in a grey coat by day; at dusk, a figure three tiles off whose
+ * coat looks only dark; next morning, a figure in a brown coat (B: a
+ * stranger of the visitor's build; A: the visitor, in a brown coat now); a
+ * week later, the brown-coated figure again. */
+static BGCoatRun   coat_at_dusk( BOOL sameOne)
+{
+   BGStage            st;
+   BGKnowledge        *knowledge;
+   BGProposalGroup    *g;
+   BGEntityID         figure;
+   BGCoatRun          run;
+   int64_t            day;
+
+   memset( &run, 0, sizeof( run));
+   day        = 86400000LL;
+   st.w       = BGTestWorld( 67);
+   st.c       = BGTestCommitter( st.w);
+   knowledge  = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+   st.s       = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [st.s setPerception:knowledge];
+   g           = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the yard"];
+   run.porter  = [g create:"porter" key:"Ulla" at:BGOnTile( 10, 10, 0)];
+   run.visitor = [g create:"agent_a" key:"the visitor" at:BGOnTile( 12, 10, 0)];
+   run.smith   = [g create:"stranger" key:"the stranger" at:BGOnTile( 30, 30, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   run.porter  = [g idFor:run.porter];
+   run.visitor = [g idFor:run.visitor];
+   run.smith   = [g idFor:run.smith];
+   stage_move( &st, run.visitor, 25, 25);
+
+   /* dusk: a figure three tiles off, its coat only dark */
+   [knowledge setDusk:YES];
+   [st.s runUntil:BGTimeMake( 3600000)];
+   stage_move( &st, run.visitor, 13, 10);
+   run.atDusk = [[knowledge storeOf:run.porter] describeReferent:referent_of( [knowledge storeOf:run.porter], run.visitor)];
+   stage_move( &st, run.visitor, 25, 25);
+   [knowledge setDusk:NO];
+
+   /* the morning: a figure in a brown coat at the pump */
+   figure = sameOne ? run.visitor : run.smith;
+   [st.s runUntil:BGTimeMake( 12 * 3600000LL)];
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: a figure in a brown coat"];
+   if( sameOne)
+      [g set:"Agent.coat" of:BGWhole( figure) to:tri_type_named( [st.w tri], "\"brown\"")];
+   [g move:BGWhole( figure) to:BGOnTile( 13, 11, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 12 * 3600000LL + 1000)];
+   run.before = [[knowledge storeOf:run.porter] identityCount] ? [[knowledge storeOf:run.porter] identityAt:0]->credence : 99;
+   stage_move( &st, figure, 30, 30);
+
+   /* a week passes; the brown-coated figure again */
+   [st.s runUntil:BGTimeMake( 12 * 3600000LL + 7 * day)];
+   stage_move( &st, figure, 13, 11);
+
+   run.world     = st.w;
+   run.knowledge = knowledge;
+   run.text      = BGSave( st.w, st.c, [NSArray arrayWithObject:knowledge]);
+   return( run);
+}
+
+
+static void   test_coat_at_dusk( void)
+{
+   BGCoatRun          b;
+   BGCoatRun          a;
+   BGCoatRun          again;
+   BGKnowledgeStore   *store;
+   const BGIdentity   *h;
+   BGWorld            *w2;
+   BGKnowledge        *restored;
+   NSArray            *deferred;
+   NSString           *error;
+   uint64_t           position;
+
+   b     = coat_at_dusk( NO);
+   store = [b.knowledge storeOf:b.porter];
+
+   /* at dusk the coat looks only dark; it unifies with the visitor's grey,
+    * and memory keeps the more specific */
+   BG_CHECK( [b.atDusk rangeOfString:@"coat: \"grey\""].location != NSNotFound);
+
+   /* 1, 2: the brown coat fails to unify at exactly one path, the coat; a
+    * coat changes daily, so it is a new referent that may be the visitor,
+    * not an error */
+   BG_CHECK( [store identityCount] == 1);
+   h = [store identityCount] ? [store identityAt:0] : NULL;
+   BG_CHECK( h && ! strcmp( h->paths, "coat"));
+   BG_CHECK( h && h->b == referent_of( store, b.visitor) && h->a == referent_of( store, b.smith));
+   BG_CHECK( b.before == BG_PRIOR + 3 * 5 - 5);          /* five features agree, the coat doesn't */
+
+   /* 3, 4: a week on, both coats have decayed past telling; the brown-coated
+    * figure fits both, and that alone raises the credence that they are one */
+   BG_CHECK( h && h->credence == b.before + 10);
+   /* B: they are not: the inspector flags the false merge */
+   BG_CHECK( [[b.knowledge dump:b.porter] rangeOfString:@"truly not: false merge"].location != NSNotFound);
+
+   /* A: the visitor itself, in a brown coat: the decayed memory leads to the
+    * right answer, for a weak reason */
+   a     = coat_at_dusk( YES);
+   store = [a.knowledge storeOf:a.porter];
+
+   BG_CHECK( [store identityCount] == 1 && [store identityAt:0]->credence == b.before + 10);
+   BG_CHECK( [[a.knowledge dump:a.porter] rangeOfString:@"truly the same"].location != NSNotFound);
+
+   /* the same on replay, and saved */
+   again = coat_at_dusk( NO);
+   BG_CHECK( [again.text isEqualToString:b.text]);
+   w2 = BGRestore( b.text, [b.world contentBuild], &deferred, &position, &error);
+   BG_CHECK( w2 != nil);
+   restored = [[[BGKnowledge alloc] initWithWorld:w2] autorelease];
+   [restored restoreSavedState:BGSavedDomainState( b.text, @"knowledge")];
+   BG_CHECK( [[restored dump:b.porter] isEqualToString:[b.knowledge dump:b.porter]]);
+}
+
+
 /* --- the cistern ----------------------------------------------------------- */
 
 static BGCistern   *run_cistern( BGCisternVariant variant)
@@ -4015,6 +4147,7 @@ const BGTestCase   BGAllTests[] =
    { "habits",                        test_habits },
    { "promises",                      test_promises },
    { "two_hands",                     test_two_hands },
+   { "coat_at_dusk",                  test_coat_at_dusk },
    { "rumour",                        test_rumour },
    { "memory_decay",                  test_memory_decay },
    { "salience",                      test_salience },

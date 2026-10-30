@@ -1379,3 +1379,38 @@ weights from other derived values.
 46 tests, 1799 checks (a thousand of them the fairness draws), under both
 compilers, ASan and UBSan, and leak-free.
 
+### After the slice: the coat at dusk
+
+CONTENT_LANGUAGE.md Scenario 3. The porter (Ulla) sees a visitor in a grey
+coat by day. At dusk, a figure three tiles off, its coat looking only
+dark: it unifies with the visitor, and the porter's memory keeps the more
+specific grey. Next morning, a figure of the visitor's build in a brown
+coat: recognition fails at exactly one path, the coat, and a coat changes
+daily, so the porter makes a new referent and a hypothesis that it may be
+the visitor (0 dB: five features agree, the coat doesn't). A week later
+both coats have decayed past telling, and the brown-coated figure fits
+both: that alone raises the hypothesis to +10. If the figure was a
+stranger (B), the inspector flags a false merge; if it was the visitor in
+a brown coat (A), the decayed memory found the right answer for a weak
+reason.
+
+- **Persistence** is content (`content/persistence.tri`): a coat lasts a
+  day; a feature not listed, long.
+- **Recognition weighs failure**: a percept that doesn't unify with a
+  referent elsewhere is checked with `tri_conflicts`, every conflicting
+  path; if all are short-lived (a week or less), the new referent gets an
+  identity hypothesis (`BGIdentity`) with a credence from the paths that
+  agree (+3 each) and conflict (-5 each), the failing paths recorded.
+- **A later percept that fits both** referents of a hypothesis raises it by
+  10, once a sighting.
+- **Dusk** is a conditions stub: beyond arm's reach, what is seen is
+  generalized a step (grey looks dark), and a match keeps memory's more
+  specific values, as unified, only the features either had.
+- **Coats are proposable**: people change them.
+
+Not yet: merging referents when a hypothesis is believed, hypotheses about
+things other than agents' looks, persistence feeding decay rates, light
+from a domain rather than a flag, and compacting knowledge arenas.
+
+47 tests, 1811 checks, under both compilers, ASan and UBSan, and leak-free.
+
