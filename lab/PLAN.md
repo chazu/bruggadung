@@ -2442,3 +2442,14 @@ wrench in the smith's hand won't do. A spanner taken up will, and the
 dismantling goes on to the end.
 
 68 tests, 2368 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: the pump repair saved mid-interruption
+
+DOMAIN_SIMULATION.md Scenario 2's check 5. The work is suspended by the
+rising water, with the piston out and the puddle as it is. Saved then and
+restored with its fluid domain, the world's state hash is the same. A
+minute on, both runs' saves are the same to the byte. With checks 1, 2,
+3, 4 (the piston in no domain while inside), and 6 already run, all of
+Scenario 2's checks now run, on the provisional latent assembly.
+
+68 tests, 2372 checks, under both compilers, ASan and UBSan, and leak-free.

@@ -3890,6 +3890,30 @@ static const char   *flood_run( const char *key, int64_t *crossed, int64_t *inte
          *interrupted = [st.w time].ms;
    }
    [st.w getField:"Activity.watchFloor" of:a value:watch];
+
+   /* DOMAIN_SIMULATION.md Scenario 2's check 5: saved now, the piston
+    * out, the puddle as it is, the work suspended; restored with its fluid
+    * domain, the next step is the same, to the byte */
+   {
+      BGStage         st2;
+      BGFluidDomain   *fluid2;
+      NSString        *text;
+      int64_t         next;
+
+      text    = BGSave( st.w, st.c, [NSArray arrayWithObject:fluid]);
+      st2.w   = restore( text, [st.w contentBuild], &st2.c, &error);
+      fluid2  = [[[BGFluidDomain alloc] initWithWorld:st2.w] autorelease];
+      [fluid2 restoreSavedState:BGSavedDomainState( text, @"fluid")];
+      st2.s   = [[[BGScheduler alloc] initWithWorld:st2.w committer:st2.c] autorelease];
+      [st2.s setActivities:[BGActivities activitiesWithWorld:st2.w committer:st2.c]];
+      [st2.s addDomain:fluid2];
+      BG_CHECK( st2.w && [st2.w stateHash] == [st.w stateHash]);
+      next = [st.w time].ms + 60000;
+      [st.s runUntil:BGTimeMake( next)];
+      [st2.s runUntil:BGTimeMake( next)];
+      BG_CHECK( [BGSave( st2.w, st2.c, [NSArray arrayWithObject:fluid2]) isEqualToString:
+                 BGSave( st.w, st.c, [NSArray arrayWithObject:fluid])]);
+   }
    return( status_of( st.w, a));
 }
 
