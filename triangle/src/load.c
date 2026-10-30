@@ -3139,10 +3139,81 @@ static void check_blueprint(Content *c, uint32_t i)
     inst_spec(c, i);
 }
 
+/* --- packages (CONTENT_LANGUAGE.md decision 12) ---------------------------------- */
+
+/* The name as its package qualifies it: #Wrench in tools is tools.#Wrench,
+ * wrench_250 is tools.wrench_250. */
+static Sym qualify(Content *c, Sym pkg, Sym name)
+{
+    Buf b = { 0 };
+    buf_printf(&b, "%s.%s", pkg, name);
+    Sym q = intern(c, b.s);
+    buf_free(&b);
+    return q;
+}
+
+/* Within a package, a plain name is the package's own if it declares one,
+ * else the root's. Qualified names are taken as written. */
+static void resolve_names(Content *c, X *x, Sym pkg, const U64Map *declared)
+{
+    if (!x) return;
+    switch (x->k) {
+    case X_NAME:
+        if (pkg && !strchr(x->u.name, '.')) {
+            Sym q = qualify(c, pkg, x->u.name);
+            if (u64map_get(declared, (uint64_t) (uintptr_t) q, NULL)) x->u.name = q;
+        }
+        break;
+    case X_STRUCT:
+        for (int i = 0; i < x->u.st.n; i++) resolve_names(c, x->u.st.fields[i].value, pkg, declared);
+        break;
+    case X_LIST:
+        for (int i = 0; i < x->u.list.n; i++) resolve_names(c, x->u.list.items[i], pkg, declared);
+        resolve_names(c, x->u.list.tail, pkg, declared);
+        resolve_names(c, x->u.list.elem, pkg, declared);
+        break;
+    case X_AND:
+    case X_OR:
+        resolve_names(c, x->u.bin.a, pkg, declared);
+        resolve_names(c, x->u.bin.b, pkg, declared);
+        break;
+    case X_DEFAULT:
+        resolve_names(c, x->u.sub, pkg, declared);
+        break;
+    case X_ARITH:
+        resolve_names(c, x->u.ar.a, pkg, declared);
+        resolve_names(c, x->u.ar.b, pkg, declared);
+        break;
+    default:
+        break;
+    }
+}
+
+/* Types and blueprints declared in a package take its name; references to
+ * them inside it are resolved. Atoms and features stay global. */
+static void resolve_packages(Content *c)
+{
+    U64Map declared = { 0 };
+    bool any = false;
+    for (size_t i = 0; i < c->decls.n; i++) {
+        Decl *d = &c->decls.v[i];
+        if (!d->pkg || d->kind == L_ATOM) continue;
+        d->label = qualify(c, d->pkg, d->label);
+        u64map_put(&declared, (uint64_t) (uintptr_t) d->label, 1);
+        any = true;
+    }
+    for (size_t i = 0; any && i < c->decls.n; i++)
+        if (c->decls.v[i].pkg) resolve_names(c, c->decls.v[i].value, c->decls.v[i].pkg, &declared);
+    u64map_free(&declared);
+}
+
+
 static void finish_load(Content *c, bool ok, double t0)
 {
     double t1 = now_ms();
     c->stats.parse_ms = t1 - t0;
+    if (ok && !c->tdl)
+        resolve_packages(c);
     if (ok && types_build(c)) {
         double t2 = now_ms();
         c->stats.hierarchy_ms = t2 - t1;

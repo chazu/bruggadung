@@ -1398,7 +1398,16 @@ bool types_build(Content *c)
                 for (int a = 0; a < x->u.st.nattrs; a++) {
                     if (strcmp(x->u.st.attrs[a].name, "component") == 0) {
                         char *nm = trim_dup(x->u.st.attrs[a].args);
-                        Sym s = intern(c, nm);
+                        const char *dot = strstr(ti->name, ".#");
+                        Sym s;
+                        /* a packaged type's component is the package's: tools.Record */
+                        if (dot) {
+                            Buf q = { 0 };
+                            buf_printf(&q, "%.*s.%s", (int) (dot - ti->name), ti->name, nm);
+                            s = intern(c, q.s);
+                            buf_free(&q);
+                        } else
+                            s = intern(c, nm);
                         free(nm);
                         if (ti->component && ti->component != s)
                             diag(c, true, x->loc, "%s is already component %s", ti->name, ti->component);

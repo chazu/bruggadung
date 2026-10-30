@@ -33,6 +33,7 @@ hold any bytes except a newline and `"`.
 | --- | --- | --- |
 | Identifier | `[A-Za-z_][A-Za-z0-9_]*` | Instance names, feature labels. `_` alone is the top type. |
 | Type name | `#` then an identifier | `#Wrench` |
+| Qualified name | an identifier, `.`, then an identifier or a type name | `tools.wrench_250`, `tools.#Wrench`: a name in another package (see [Packages](#packages)) |
 | String | `"` … `"` | No escapes, no newlines. |
 | Number | digits with an optional `.` and fraction, then an optional unit | `19`, `0.85kg`, `2m3`. No exponent form; no leading `.`. The unit follows with no space. |
 | Negative number | `-` directly before a digit | Only where an operand is expected. After an operand, `-` subtracts. |
@@ -53,7 +54,7 @@ leading space is removed from each.
 ## Grammar
 
 ```text
-file        = { decl [ "," ] }
+file        = [ "package" IDENT ] { decl [ "," ] }
 decl        = label ":" fieldvalue
 label       = TYPENAME | STRING | IDENT          (type, atom enum, instance)
 fieldvalue  = IDENT ":" fieldvalue               (path shorthand: a: b: c)
@@ -67,7 +68,7 @@ unary       = "*" unary                          (default)
             | primary
 primary     = "_" | "true" | "false"
             | "ref" "(" NUMBER ")"
-            | IDENT | TYPENAME | STRING | NUMBER | TAG
+            | IDENT | TYPENAME | QUALIFIED | STRING | NUMBER | TAG
             | struct | list
             | "(" expr ")"
 struct      = "{" { field | ATTR | "," } "}"
@@ -119,6 +120,30 @@ general type whose body declares it. Its subtypes inherit it and may narrow its
 value. A feature that two unrelated types introduce is an error. Structures
 are closed: a structure may only carry features its type has, and a struct
 literal's features must all belong to one type.
+
+### Packages
+
+A file that begins `package name` puts its declarations in that package; a
+file without one is in the root. Many files may declare the same package.
+
+- **Types, instances (blueprints and patterns), and components are the
+  package's.** `#Wrench` declared in `package tools` is `tools.#Wrench`;
+  `wrench_250` is `tools.wrench_250`; `@component(Record)` is the component
+  `tools.Record`. Two packages may each declare the same name.
+- **Inside a package, a plain name is the package's own** if it declares
+  one, else the root's. Another package's names are always qualified:
+  `spare: tools.#Wrench & { … }`. The root sees only the root's names
+  plainly.
+- **Features and atoms stay global.** A feature is still introduced by
+  exactly one type, whatever its package; a qualified field label is an
+  error. Atoms (`"steel"`) are values, not names.
+- A declaration's own label is never qualified: a name is declared in its
+  package's files.
+- Qualified names print as written, and parse back: `tri_type_name` gives
+  `tools.#Wrench`, and `tri_spec(c, "tools.wrench_250")` finds the blueprint.
+- **Generated C names carry the package**: the component `tools.Record`
+  under the prefix `BG` is the struct `BGtools_Record`, and its registry
+  entry is named `"tools.Record"`. A root component's names are unchanged.
 
 ## Expressions
 

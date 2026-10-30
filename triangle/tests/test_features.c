@@ -1223,3 +1223,77 @@ void test_migration(void)
     tri_content_free(old);
     tri_content_free(new);
 }
+
+
+/* Packages (CONTENT_LANGUAGE.md decision 12): a file's `package` scopes the
+ * types, blueprints and components it declares; features stay global. Two
+ * packages each declare a #Wrench and a `wrench`; inside a package a plain
+ * name is its own, else the root's; across, it is qualified. */
+static int diag_says(TriContent *c, const char *text)
+{
+    for (size_t i = 0; i < tri_diag_count(c); i++)
+        if (strstr(tri_diag_message(c, i), text)) return 1;
+    return 0;
+}
+
+void test_packages(void)
+{
+    const char *names[] = { "core.tri", "tools.tri", "kitchen.tri" };
+    const char *srcs[] = {
+        "#Thing: { mass: mass }\n#Tool: #Thing & {}\n",
+        "package tools\n"
+        "#Wrench: #Tool & { size: length }\n"
+        "wrench: #Wrench & { mass: 400g, size: 19mm }\n",
+        "package kitchen\n"
+        "#Wrench: #Tool & { @component(Gadget)\n handle: length @field(content) }\n"
+        "wrench: #Wrench & { mass: 90g, handle: 120mm }\n"
+        "spare: tools.#Wrench & { mass: 500g, size: 22mm }\n",
+    };
+    TriContent *c = load(names, srcs, 3);
+    CHECK(tri_content_ok(c));
+    if (!tri_content_ok(c)) dump_diags(c);
+    /* two types of one name, one in each package; none in the root */
+    TriType tw = tri_type_named(c, "tools.#Wrench"), kw = tri_type_named(c, "kitchen.#Wrench");
+    CHECK(tw != kw && tri_type_named(c, "#Wrench") == tri_type_named(c, "#Nonesuch"));
+    /* a plain name inside a package is its own */
+    CHECK(tri_spec(c, "tools.wrench") && tri_spec(c, "kitchen.wrench") && ! tri_spec(c, "wrench"));
+    CHECK_STR(tri_type_name(c, tri_node_type(tri_spec(c, "kitchen.wrench"))), "kitchen.#Wrench");
+    /* across, qualified: the kitchen's spare is a tools wrench */
+    const TriNode *spare = tri_spec(c, "kitchen.spare");
+    CHECK(spare && !strcmp(tri_type_name(c, tri_node_type(spare)), "tools.#Wrench"));
+    int64_t lo, hi;
+    CHECK(tri_node_interval(tri_at(c, spare, "size"), &lo, &hi) && lo == 220);
+    /* what prints parses back */
+    TriArena *a = tri_arena_new();
+    char err[256];
+    CHECK(tri_value(c, "tools.#Wrench & { size: 19mm }", a, err, sizeof err) != NULL);
+    CHECK(!tri_value(c, "#Wrench & { size: 19mm }", a, err, sizeof err));
+    tri_arena_free(a);
+    /* a packaged component's generated names carry its package */
+    char buf[8192];
+    tri_component_header(c, "BG", buf, sizeof buf);
+    CHECK_CONTAINS(buf, "} BGkitchen_Gadget;");
+    CHECK_CONTAINS(buf, "{ \"kitchen.Gadget\", \"kitchen.#Wrench\", sizeof(BGkitchen_Gadget)");
+    tri_content_free(c);
+
+    /* features take no package; a declaration is named in its own files; an
+     * unknown qualified name is unknown; the root sees no package's names */
+    const char *bad1[] = { "package tools\n#Wrench: { tools.size: length }\n" };
+    const char *n1[] = { "a.tri" };
+    c = load(n1, bad1, 1);
+    CHECK(!tri_content_ok(c) && diag_says(c, "features are global"));
+    tri_content_free(c);
+    const char *bad2[] = { "tools.#Wrench: { size: length }\n" };
+    c = load(n1, bad2, 1);
+    CHECK(!tri_content_ok(c) && diag_says(c, "declare it in its package's files"));
+    tri_content_free(c);
+    const char *bad3[] = { "package tools\n#Wrench: { size: length }\n", "x: kitchen.#Wrench & {}\n" };
+    const char *n3[] = { "a.tri", "b.tri" };
+    c = load(n3, bad3, 2);
+    CHECK(!tri_content_ok(c));
+    tri_content_free(c);
+    const char *bad4[] = { "package tools\n#Wrench: { size: length }\n", "x: #Wrench & {}\n" };
+    c = load(n3, bad4, 2);
+    CHECK(!tri_content_ok(c));
+    tri_content_free(c);
+}

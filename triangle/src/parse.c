@@ -66,6 +66,16 @@ static bool lex(Parser *p, const char *src)
             t.k = ch == '#' ? T_DEF : T_IDENT;
             ADV();
             while (isalnum((unsigned char) *s) || *s == '_') ADV();
+            /* a qualified name, one package deep: pkg.#Type, pkg.blueprint */
+            if (ch != '#' && *s == '.' && (s[1] == '#' || isalpha((unsigned char) s[1]) || s[1] == '_')) {
+                ADV();
+                if (*s == '#') { t.k = T_DEF; ADV(); }
+                if (!isalpha((unsigned char) *s) && *s != '_') {
+                    perr(p, t.loc, "expected a name after the package");
+                    return false;
+                }
+                while (isalnum((unsigned char) *s) || *s == '_') ADV();
+            }
         } else if (ch == '$') {
             t.k = T_TAG;
             ADV();
@@ -202,6 +212,19 @@ static Sym tok_sym(Parser *p, Tok *t)
     return sym_intern(&p->c->syms, t->s, t->len);
 }
 
+static bool qualified(Tok *t)
+{
+    return memchr(t->s, '.', t->len) != NULL;
+}
+
+/* Features are global (CONTENT_LANGUAGE.md decision 12): a label takes no package. */
+static bool plain_label(Parser *p, Tok *t)
+{
+    if (!qualified(t)) return true;
+    perr(p, t->loc, "a feature name takes no package: features are global");
+    return false;
+}
+
 static X *parse_expr(Parser *p);
 
 static void parse_attrs(Parser *p, Attr **attrs, int *n)
@@ -225,6 +248,7 @@ static X *parse_field_value(Parser *p, Attr **attrs, int *nattrs)
 {
     if (peek(p, 0)->k == T_IDENT && peek(p, 1)->k == T_COLON) {
         Tok *lab = next(p);
+        if (!plain_label(p, lab)) return NULL;
         next(p);
         XField f = { 0 };
         f.label = tok_sym(p, lab);
@@ -262,6 +286,7 @@ static X *parse_struct(Parser *p)
         if (peek(p, 0)->k == T_COMMA) { next(p); continue; }
         Tok *lab = peek(p, 0);
         if (lab->k != T_IDENT) { perr(p, lab->loc, "expected a field label"); return NULL; }
+        if (!plain_label(p, lab)) return NULL;
         next(p);
         if (!expect(p, T_COLON, "':' after field label")) return NULL;
         XField f = { 0 };
@@ -523,11 +548,25 @@ static const char *doc_above(Parser *p, int line)
 bool parse_source(Content *c, Sym file, const char *src, DeclVec *out)
 {
     Parser p = { c, file, { 0 }, 0, false, { 0 } };
+    Sym pkg = NULL;
     if (!lex(&p, src)) { parser_free(&p); return false; }
+    /* `package name`, first: the file's declarations are in it */
+    if (peek(&p, 0)->k == T_IDENT && peek(&p, 0)->len == 7 && memcmp(peek(&p, 0)->s, "package", 7) == 0 &&
+        peek(&p, 1)->k == T_IDENT && peek(&p, 2)->k != T_COLON) {
+        next(&p);
+        Tok *name = next(&p);
+        if (qualified(name)) perr(&p, name->loc, "a package name is one name");
+        pkg = tok_sym(&p, name);
+    }
     while (peek(&p, 0)->k != T_EOF && !p.error) {
         Tok *lab = peek(&p, 0);
         if (lab->k == T_COMMA) { next(&p); continue; }
+        if ((lab->k == T_IDENT || lab->k == T_DEF) && qualified(lab)) {
+            perr(&p, lab->loc, "a declaration's name is its own: declare it in its package's files, unqualified");
+            break;
+        }
         Decl d = { 0 };
+        d.pkg = pkg;
         if (lab->k == T_DEF) d.kind = L_DEF;
         else if (lab->k == T_STRING) d.kind = L_ATOM;
         else if (lab->k == T_IDENT) d.kind = L_INST;

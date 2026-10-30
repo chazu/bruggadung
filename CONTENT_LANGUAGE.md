@@ -194,8 +194,10 @@ Three constructs look like CUE but mean something else:
    are dropped, with a warning.
 
 **Not adopted from CUE:** comprehensions, string interpolation, field
-references, `let`, and packages (files are simply included). Arithmetic is
-adopted, but between tags rather than field references (§5).
+references, and `let`. Arithmetic is adopted, but between tags rather than
+field references (§5). Packages are adopted for names only (decision 12):
+a `package` scopes types, instances, and components, and features stay
+global; files are otherwise simply included.
 
 ### 3. The type hierarchy
 

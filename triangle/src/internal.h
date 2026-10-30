@@ -147,6 +147,7 @@ typedef struct {
     bool  addendum;      /* TDL :+ */
     Sym   status;        /* TDL instance status, e.g. lex-entry */
     const char *doc;     /* the comment directly above, or NULL */
+    Sym   pkg;           /* the package its file declares, or NULL (the root) */
 } Decl;
 
 typedef VEC(Decl) DeclVec;
