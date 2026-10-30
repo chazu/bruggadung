@@ -10,6 +10,8 @@
 #Tampered:  #Finding & {}
 // Something was done to it, and hidden.
 #CoveredUp: #Finding & {}
+// Something stirred there.
+#Disturbance: #Finding & {}
 
 // A rule's premises, over the body it is about.
 #Premise:  {}
@@ -17,6 +19,8 @@
 #Sign:     #Premise & { sign: text }
 // a trace of this kind perceived on it before, gone now
 #Formerly: #Premise & { formerly: text }
+// a trace of this kind perceived on the floor at it or beside it
+#Near:     #Premise & { near: text }
 
 #Skill: "painting"
 
@@ -46,4 +50,12 @@ covered_up: #Rule & {
     mastery:   0
     concludes: "#CoveredUp"
     weight:    20
+} @family(rules)
+
+// A clatter heard by something: something stirred there.
+stirring: #Rule & {
+    premises:  [#Near & { near: "clatter" }]
+    mastery:   0
+    concludes: "#Disturbance"
+    weight:    10
 } @family(rules)

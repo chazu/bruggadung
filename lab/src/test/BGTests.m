@@ -2569,6 +2569,229 @@ static void   test_play_notebook( void)
 }
 
 
+/* --- the false alarm -------------------------------------------------------- */
+
+typedef enum
+{
+   BGAlarmNoRumour = 0,          /* A */
+   BGAlarmRumour,                /* B */
+   BGAlarmDeflated,              /* C: the rumour has one named source */
+   BGAlarmRepeated               /* D: B, with noise after noise */
+} BGAlarm;
+
+
+typedef struct
+{
+   BGWorld       *world;
+   BGKnowledge   *knowledge;
+   BGAgency      *agency;
+   BGEntityID    watchman;
+   BGEntityID    carter;
+   BGEntityID    porter;
+   BGEntityID    storeroom;
+   NSString      *text;
+} BGAlarmRun;
+
+
+/* AGENCY.md Scenario 2, "the false alarm", in the workshop: the watchman
+ * walks past the storeroom, then sits down by the gate to eat supper, eight
+ * tiles off, out of sight and in earshot. The carter and the porter tell it
+ * someone has been getting into the storeroom (B, D: neither names a source;
+ * C: both heard it from the neighbour). Then a cat by the storeroom knocks
+ * something over (D: again and again). */
+static BGAlarmRun   false_alarm( BGAlarm variant, int64_t saveAt)
+{
+   BGStage           st;
+   BGActivities      *activities;
+   BGKnowledge       *knowledge;
+   BGAgency          *agency;
+   BGProposalGroup   *g;
+   BGEntityID        h[ 8];
+   NSString          *error;
+   NSString          *source;
+   NSString          *rumour;
+   BGAlarmRun        run;
+   NSString          *text;
+   int               i;
+
+   memset( &run, 0, sizeof( run));
+   st.w       = BGTestWorld( 41);
+   st.c       = BGTestCommitter( st.w);
+   activities = [BGActivities activitiesWithWorld:st.w committer:st.c];
+   knowledge  = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+   agency     = [[[BGAgency alloc] initWithWorld:st.w committer:st.c knowledge:knowledge] autorelease];
+   st.s       = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [agency setActivities:activities];
+   [st.s setActivities:activities];
+   [st.s setPerception:knowledge];
+   [st.s setDecision:agency];
+   [st.s addDomain:[[[BGTraces alloc] initWithWorld:st.w] autorelease]];
+
+   g     = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the storeroom at night"];
+   h[ 0] = [g create:"storeroom" key:"storeroom" at:BGOnTile( 12, 4, 0)];
+   h[ 1] = [g create:"cat" key:"cat" at:BGOnTile( 12, 5, 0)];
+   h[ 2] = [g create:"watchman" key:"watchman" at:BGOnTile( 9, 4, 0)];
+   h[ 3] = [g create:"supper" key:"supper" at:BGHeldBy( h[ 2], 0)];
+   h[ 4] = [g create:"carter" key:"carter" at:BGOnTile( 3, 5, 0)];
+   h[ 5] = [g create:"porter" key:"porter" at:BGOnTile( 5, 5, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   run.world     = st.w;
+   run.knowledge = knowledge;
+   run.agency    = agency;
+   run.storeroom = [g idFor:h[ 0]];
+   run.watchman  = [g idFor:h[ 2]];
+   run.carter    = [g idFor:h[ 4]];
+   run.porter    = [g idFor:h[ 5]];
+   [agency control:run.watchman];
+
+   /* past the storeroom (it sees it, under the cat's eye), to the gate */
+   stage_move( &st, run.watchman, 4, 4);
+
+   /* the rumour */
+   if( variant != BGAlarmNoRumour)
+   {
+      source = variant == BGAlarmDeflated
+                  ? @"#Heard & { from: #Agent & { material: \"flesh\", hands: 2, coat: \"grey\", mass: 60kg } }"
+                  : @"#Heard";
+      rumour = [NSString stringWithFormat:@"#IsIn & { what: #Agent, within: #Container & { place: #OnTile & "
+                                          @"{ x: 12, y: 4, level: 0 } }, attribution: %@ }", source];
+      stage_say( &st, run.carter, run.watchman, rumour);
+      stage_say( &st, run.porter, run.watchman, rumour);
+   }
+   stage_move( &st, run.carter, 3, 20);
+   stage_move( &st, run.porter, 5, 20);
+
+   /* supper */
+   BG_CHECK( [agency commit:run.watchman toGoal:"eat_supper"]);
+   [st.s runUntil:BGTimeMake( [st.w time].ms + 2000)];
+
+   /* the cat */
+   for( i = 0; i < (variant == BGAlarmRepeated ? 5 : 1); i++)
+   {
+      error = nil;
+      BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "knock_over", [g idFor:h[ 1]], BGNoEntity, BGNoEntity), 0,
+                           &error) != nil);
+      [st.s runUntil:BGTimeMake( [st.w time].ms + 1500)];
+   }
+   if( saveAt)
+   {
+      /* saved, restored into a fresh world, and carried on there */
+      [st.s runUntil:BGTimeMake( saveAt)];
+      text  = BGSave( st.w, st.c, [NSArray arrayWithObjects:knowledge, agency, nil]);
+      error = nil;
+      st.w  = restore( text, [st.w contentBuild], &st.c, &error);
+      BG_CHECK( st.w != nil);
+      activities = [BGActivities activitiesWithWorld:st.w committer:st.c];
+      knowledge  = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+      agency     = [[[BGAgency alloc] initWithWorld:st.w committer:st.c knowledge:knowledge] autorelease];
+      st.s       = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+      [knowledge restoreSavedState:BGSavedDomainState( text, @"knowledge")];
+      [agency restoreSavedState:BGSavedDomainState( text, @"agency")];
+      [agency setActivities:activities];
+      [st.s setActivities:activities];
+      [st.s setPerception:knowledge];
+      [st.s setDecision:agency];
+      [st.s addDomain:[[[BGTraces alloc] initWithWorld:st.w] autorelease]];
+      BG_CHECK( [BGSave( st.w, st.c, [NSArray arrayWithObjects:knowledge, agency, nil]) isEqualToString:text]);
+      run.world     = st.w;
+      run.knowledge = knowledge;
+      run.agency    = agency;
+   }
+   [st.s runUntil:BGTimeMake( 120000)];
+   run.text = BGSave( st.w, st.c, [NSArray arrayWithObjects:knowledge, agency, nil]);
+   return( run);
+}
+
+
+static NSUInteger   log_count( BGAgency *agency, BGEntityID agent, NSString *text)
+{
+   NSArray      *log;
+   NSUInteger   i;
+   NSUInteger   n;
+
+   log = [agency logOf:agent];
+   n   = 0;
+   for( i = 0; i < [log count]; i++)
+      if( [[log objectAtIndex:i] rangeOfString:text].location != NSNotFound)
+         n++;
+   return( n);
+}
+
+
+static void   test_false_alarm( void)
+{
+   BGAlarmRun         a;
+   BGAlarmRun         b;
+   BGAlarmRun         c;
+   BGAlarmRun         d;
+   BGAlarmRun         again;
+   BGAlarmRun         resumed;
+   BGKnowledgeStore   *store;
+
+   a = false_alarm( BGAlarmNoRumour, 0);
+   b = false_alarm( BGAlarmRumour, 0);
+   c = false_alarm( BGAlarmDeflated, 0);
+
+   /* everyone hears the cat, and makes of it that something stirred by the storeroom */
+   BG_CHECK( logged_by( a.agency, a.watchman, @"weighing investigate the disturbance"));
+   BG_CHECK( logged_by( c.agency, c.watchman, @"weighing investigate the disturbance"));
+
+   /* 1, 2: credence changes the decision; the margin and the interruption
+    * decide the comparison with supper. A: the noise alone, credence 0: 15
+    * against supper's 20 + 5 + 5, it stays. B: two rumours whose sources it
+    * doesn't know, two groups, credence 20: 35, it switches. C: one named
+    * source, one group, credence 15: 30, not more than 30, it stays. */
+   BG_CHECK( logged_by( a.agency, a.watchman, @"+15 (credence +0, +20, risk -5) against eat supper +20 (+20) + margin 5 + "
+                                              @"interruption 5: staying"));
+   BG_CHECK( logged_by( b.agency, b.watchman, @"+35 (credence +20, +20, risk -5) against eat supper +20 (+20) + margin 5 + "
+                                              @"interruption 5: switching"));
+   BG_CHECK( logged_by( c.agency, c.watchman, @"+30 (credence +15, +20, risk -5) against eat supper +20 (+20) + margin 5 + "
+                                              @"interruption 5: staying"));
+   BG_CHECK( ! logged_by( a.agency, a.watchman, @"switching") && ! logged_by( c.agency, c.watchman, @"switching"));
+   BG_CHECK( ! happened( a.world, "looked", a.watchman, a.storeroom) && ! happened( c.world, "looked", c.watchman, c.storeroom));
+
+   /* B: it puts supper down, looks, and goes back to it, resuming where it left off */
+   BG_CHECK( logged_by( b.agency, b.watchman, @"suspending eat"));
+   BG_CHECK( happened( b.world, "looked", b.watchman, b.storeroom));
+   BG_CHECK( logged_by( b.agency, b.watchman, @"[investigate the disturbance] done"));
+   BG_CHECK( logged_by( b.agency, b.watchman, @"back to it: investigate the disturbance is done"));
+   BG_CHECK( logged_by( b.agency, b.watchman, @"[eat supper] eat: resuming eat"));
+   BG_CHECK( logged_by( b.agency, b.watchman, @"[eat supper] done"));
+   BG_CHECK( log_index( b.agency, b.watchman, @"switching") < log_index( b.agency, b.watchman, @"resuming eat"));
+
+   /* 4: no one was there: the claim is found false, and it trusts the carter
+    * and the porter less */
+   store = [b.knowledge storeOf:b.watchman];
+   BG_CHECK( [store testimonyCount] == 2 && [store testimonyAt:0]->settled == -1 && [store testimonyAt:1]->settled == -1);
+   BG_CHECK( [store trustIn:referent_of( store, b.carter)] == BG_TRUST - BG_REFUTED);
+   BG_CHECK( [store trustIn:referent_of( store, b.porter)] == BG_TRUST - BG_REFUTED);
+   /* untested, in A and C */
+   store = [c.knowledge storeOf:c.watchman];
+   BG_CHECK( [store trustIn:referent_of( store, c.carter)] == BG_TRUST);
+
+   /* 3: no dithering: noise after noise, the intention changes once */
+   d = false_alarm( BGAlarmRepeated, 0);
+   BG_CHECK( log_count( d.agency, d.watchman, @"switching") == 1);
+   BG_CHECK( log_count( d.agency, d.watchman, @"staying") == 0);
+   BG_CHECK( log_count( d.agency, d.watchman, @"suspending eat") == 1);
+   BG_CHECK( happened( d.world, "looked", d.watchman, d.storeroom));
+
+   /* 6: determinism */
+   again = false_alarm( BGAlarmRumour, 0);
+   BG_CHECK( [again.world stateHash] == [b.world stateHash]);
+   BG_CHECK( [again.text isEqualToString:b.text]);
+   BG_CHECK( [[again.agency logOf:again.watchman] isEqualToArray:[b.agency logOf:b.watchman]]);
+
+   /* saved mid-investigation, supper suspended beneath it, restored: the same
+    * end (a boundary the run has: a step toward the storeroom) */
+   resumed = false_alarm( BGAlarmRumour, 10003);
+   BG_CHECK( [resumed.world stateHash] == [b.world stateHash]);
+   BG_CHECK( [resumed.text isEqualToString:b.text]);
+   BG_CHECK( logged_by( resumed.agency, resumed.watchman, @"[eat supper] eat: resuming eat"));
+}
+
+
 /* --- the cistern ----------------------------------------------------------- */
 
 static BGCistern   *run_cistern( BGCisternVariant variant)
@@ -2888,6 +3111,7 @@ const BGTestCase   BGAllTests[] =
    { "interpretation",                test_interpretation },
    { "notebook",                      test_notebook },
    { "play_notebook",                 test_play_notebook },
+   { "false_alarm",                   test_false_alarm },
    { "cistern",                       test_cistern },
    { "cistern_b",                     test_cistern_b },
    { "cistern_d",                     test_cistern_d },

@@ -50,3 +50,10 @@ fitting: #Body & { material: "steel", surface: "brass", mass: 400g }
 
 // For the notebook: a record a character writes in, which can be stolen.
 notebook: #Record & { material: "paper", mass: 200g }
+
+// For AGENCY.md's false alarm: the watchman, with supper; the storeroom; and
+// a cat.
+watchman:  #Agent & { material: "flesh", mass: 80kg, hands: 2, coat: "grey" }
+cat:       #Agent & { material: "flesh", mass: 4kg, hands: 0, coat: "black" }
+storeroom: #Container & { material: "oak", mass: 200kg, capacity: 1000 }
+supper:    #Body & { material: "food", mass: 300g }

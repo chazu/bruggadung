@@ -19,6 +19,10 @@
 // to ask.
 #HavingNails: #WithNails & { box: #Container, someone: #Agent }
 
+// Eating: the food. Watching: the spot where something stirred.
+#Supper:   #Frame & { food: #Body }
+#Watching: #Frame & { spot: #Container }
+
 // A condition over the knowledge view: `find` names the slots to bind, in
 // order, to referents believed present (slots already bound keep their
 // referent); it holds when the frame's description, with those referents
@@ -27,10 +31,34 @@
 
 #Intent: { title: text }
 
+// What a goal is worth (AGENCY.md §3): its considerations, added, in the
+// units of credence (dB).
+#Consideration: {}
+// a fixed worth: a duty, a meal
+#Flat:      #Consideration & { value: int }
+// a cost, the believed risk
+#Cost:      #Consideration & { cost: int }
+// how strongly the agent believes something like `suspect` is in the slot's
+// referent: the credence of what it was told, with its findings of
+// `evidence` about the place as a group of their own (KNOWLEDGE.md §11)
+#Suspicion: #Consideration & { suspect: #Body, inside: text, evidence: text }
+
+// Where a goal arises (AGENCY.md §4's reactive generator): a candidate for
+// each finding of the kind about something of kind `of`, the slot bound to
+// it, while the finding is salient: drawn no longer ago than `lapse`.
+#Arising: { finding: text, slot: text, lapse: time, of: #Body }
+
 // A goal is done when `done` holds. What it `concerns` is salient to an agent
 // that holds it (AGENCY.md §10): something like one of them seen moved, or
-// talked of, is worth remembering.
-#Goal: #Intent & { done: #Condition, concerns: [...#Body] }
+// talked of, is worth remembering. A goal with `arises` is weighed against
+// what the agent is doing whenever it arises.
+#Goal: #Intent & { done: #Condition, concerns: [...#Body], worth: [...#Consideration], arises: #Arising }
+
+// Conditions of what the agent did, not of how things are: it has looked
+// into the slot's referent since adopting the goal; an activity of the
+// operation it started since has completed.
+#Looked: #Condition & { looked: text }
+#Did:    #Condition & { did: text }
 
 // How a candidate's referents are ordered, for each slot as it is found:
 // nearest first, or most recently seen first. Ties go to the lower referent.
@@ -138,4 +166,49 @@ ask_for_nails: #Method & {
     order:  ["near"]
     search: "someone"
     steps:  [#Do & { op: "say", object: "someone", says: #WhereIs & { what: #Stack & { unit: "iron_nail" } } }]
+} @family(methods)
+
+
+// --- AGENCY.md Scenario 2, "the false alarm" ----------------------------------
+
+eat_supper: #Goal & {
+    title: "eat supper"
+    done:  #Did & { did: "eat" }
+    worth: [#Flat & { value: 20 }]
+} @family(goals)
+
+eat_it: #Method & {
+    title: "eat"
+    goal:  "eat_supper"
+    rank:  1
+    pre: {
+        find:  ["food"]
+        match: #Supper & {
+            me:   #Agent & { id: $me }
+            food: #Body & { material: "food", place: #Held & { by: $me } }
+        }
+    }
+    steps: [#Do & { op: "eat", object: "food" }]
+} @family(methods)
+
+// Arises from a disturbance: worth how strongly the agent believes someone is
+// there, its duty, and less the risk.
+investigate: #Goal & {
+    title:    "investigate the disturbance"
+    done:     #Looked & { looked: "spot" }
+    arises:   { finding: "#Disturbance", slot: "spot", lapse: 30s, of: #Container }
+    concerns: [#Agent]
+    worth: [
+        #Suspicion & { suspect: #Agent, inside: "spot", evidence: "#Disturbance" },
+        #Flat & { value: 20 },
+        #Cost & { cost: 5 },
+    ]
+} @family(goals)
+
+look_into_it: #Method & {
+    title: "look into it"
+    goal:  "investigate"
+    rank:  1
+    pre:   { find: ["spot"], match: #Watching & { spot: #Container } }
+    steps: [#Do & { op: "look_in", object: "spot" }]
 } @family(methods)

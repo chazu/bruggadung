@@ -30,6 +30,17 @@
  * Worth nothing only because it is busy, it answers once it isn't, if the
  * asker can still be waiting. Otherwise it says it won't.
  *
+ * Goals have worth (AGENCY.md §3): their considerations, added in dB, among
+ * them the credence that something is so. A goal that `arises` from a kind
+ * of finding (§4's reactive generator) is a candidate for each such finding
+ * the agent holds, and is weighed against what the agent is doing at every
+ * decision point, mid-activity too: it wins only if it is worth more than
+ * the current intention plus BG_MARGIN plus, while an activity runs,
+ * BG_INTERRUPT, so the agent doesn't dither. Winning, it suspends what the
+ * agent was doing and goes on top; done, the agent goes back to it, and
+ * resumes the activity it suspended. A goal that arose about something is
+ * settled with it, and doesn't arise about it again.
+ *
  * Each agent's motivation store (its intentions, with their bindings and
  * failed methods, what it waits for, and the decision count) is private and
  * saved, and every decision is logged for the developer.
@@ -40,6 +51,7 @@
 #import "BGCommitter.h"
 #import "BGScheduler.h"
 #import "BGKnowledge.h"
+#import "BGActivities.h"
 
 
 #define BG_MAX_INTENTIONS  8
@@ -48,6 +60,9 @@
 
 #define BG_BUSY_COST       3      /* per point of attention the running activity demands */
 #define BG_COMMITTED       5      /* for holding a goal of its own */
+#define BG_MARGIN          5      /* what another goal must beat the current one by */
+#define BG_INTERRUPT       5      /* and more, to interrupt an activity under way */
+#define BG_MAX_SETTLED     16
 
 
 typedef struct
@@ -68,7 +83,17 @@ typedef struct
    int             following;    /* the method last followed, or -1 */
    BGSlotBinding   params[ BG_MAX_SLOTS];
    int             nparams;
+   uint32_t        arose;        /* the referent it arose about, or 0 */
 } BGIntention;
+
+
+/* A goal that arose about something: settled, or last weighed. */
+typedef struct
+{
+   const char      *goal;        /* interned */
+   uint32_t        about;        /* referent */
+   int             verdict;      /* weighed: 1 switch, 0 stay */
+} BGArisen;
 
 
 /* A question put to the agent, not yet answered. */
@@ -95,6 +120,10 @@ typedef struct
    uint64_t         heard;             /* the serial of the first observation it has not yet considered for questions */
    BGQuestion       questions[ BG_MAX_QUESTIONS];
    int              nquestions;
+   BGArisen         settled[ BG_MAX_SETTLED];
+   int              nsettled;
+   BGArisen         weighed[ BG_MAX_SETTLED];  /* the last verdict, so it is logged when it changes */
+   int              nweighed;
    NSMutableArray   *log;
 }
 @end
@@ -105,6 +134,7 @@ typedef struct
    BGWorld          *_world;
    BGCommitter      *_committer;       /* not retained */
    BGKnowledge      *_knowledge;
+   BGActivities     *_activities;      /* not retained: to suspend and resume the agents' own */
    NSMutableArray   *_minds;           /* sorted by agent */
 }
 
@@ -123,6 +153,9 @@ typedef struct
 
 /* Agency lets the agent go, its mind with it: someone else controls it. */
 - (void) relinquish:(BGEntityID) agent;
+
+/* Lets agency suspend and resume its agents' activities. */
+- (void) setActivities:(BGActivities *) activities;
 
 - (BGMotivation *) mindOf:(BGEntityID) agent;
 /* the agent's decision log, for the developer */

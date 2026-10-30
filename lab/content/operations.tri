@@ -193,3 +193,22 @@ test_scratch: #Operation & {
     }
     leaves:    [{ trace: "scratch", on: "item", strength: 30 }]
 } @family(operations)
+
+// Eat what the actor holds: a while, with the hands, easily put down.
+eat: #Operation & {
+    effect:    "tend"
+    duration:  60s
+    uses:      ["hands"]
+    attention: 5
+    roles: {
+        actor: #Agent & { id: $a }
+        item:  #Body & { material: "food", place: #Held & { by: $a } }
+    }
+} @family(operations)
+
+// Knock things over, as a cat does at night: a clatter where it is.
+knock_over: #Operation & {
+    effect: "tend"
+    roles:  { actor: #Agent & { hands: 0 } }
+    leaves: [{ trace: "clatter", on: "tile", strength: 60 }]
+} @family(operations)

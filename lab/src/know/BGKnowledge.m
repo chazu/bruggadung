@@ -1432,15 +1432,16 @@ static uint32_t   bound_to( BGEntityID e, BGEntityID agent, uint32_t me, const B
    NSUInteger      j;
    uint8_t         *found;
    int64_t         strength;
-   int32_t         range[ 2];
+   int32_t         range[ 3];
+   int             sensed;
    char            sense[ 16];
    const char      *kind;
-   BOOL            smell;
 
    tri      = [_world tri];
    traces   = [_world storeForKind:[_world kindNamed:"Trace"]];
    range[ 0] = BG_SIGHT;
    range[ 1] = BG_SMELL;
+   range[ 2] = BG_HEARING;
    for( i = 0; i < [traces count]; i++)
    {
       record   = [traces recordAtIndex:i];
@@ -1452,7 +1453,7 @@ static uint32_t   bound_to( BGEntityID e, BGEntityID agent, uint32_t me, const B
       sense[ 0] = 0;
       if( v)
          tri_print( tri, v, sense, sizeof( sense));
-      smell = ! strcmp( sense, "\"smell\"");
+      sensed = ! strcmp( sense, "\"smell\"") ? 1 : ! strcmp( sense, "\"hearing\"") ? 2 : 0;
       memset( &t, 0, sizeof( t));
       if( record->bearer)
       {
@@ -1471,8 +1472,8 @@ static uint32_t   bound_to( BGEntityID e, BGEntityID agent, uint32_t me, const B
          t.y     = (int32_t) record->tileY;
          t.level = (int32_t) record->tileLevel;
       }
-      if( ! _omniscient && (t.level != here.level || abs( t.x - here.x) > range[ smell] ||
-                            abs( t.y - here.y) > range[ smell]))
+      if( ! _omniscient && (t.level != here.level || abs( t.x - here.x) > range[ sensed] ||
+                            abs( t.y - here.y) > range[ sensed]))
          continue;
       t.kind     = [_world intern:kind];
       t.strength = (int32_t) strength;
@@ -1497,7 +1498,7 @@ static uint32_t   bound_to( BGEntityID e, BGEntityID agent, uint32_t me, const B
       sense[ 0] = 0;
       if( v)
          tri_print( tri, v, sense, sizeof( sense));
-      smell = ! strcmp( sense, "\"smell\"");
+      sensed = ! strcmp( sense, "\"smell\"") ? 1 : ! strcmp( sense, "\"hearing\"") ? 2 : 0;
       if( old->bearer)
       {
          for( j = 0; j < nseen && assigned[ j] != old->bearer; j++)
@@ -1511,8 +1512,8 @@ static uint32_t   bound_to( BGEntityID e, BGEntityID agent, uint32_t me, const B
          tile.y     = old->y;
          tile.level = old->level;
       }
-      if( ! _omniscient && (tile.level != here.level || abs( tile.x - here.x) > range[ smell] ||
-                            abs( tile.y - here.y) > range[ smell]))
+      if( ! _omniscient && (tile.level != here.level || abs( tile.x - here.x) > range[ sensed] ||
+                            abs( tile.y - here.y) > range[ sensed]))
          continue;
       old->present = NO;
       old->seen    = now;
@@ -1534,6 +1535,24 @@ static BOOL   bears( BGKnowledgeStore *store, uint32_t referent, const char *kin
    {
       t = [store traceAt:i];
       if( t->bearer == referent && ! strcmp( t->kind, kind) && t->present == ! gone)
+         return( YES);
+   }
+   return( NO);
+}
+
+
+/* Whether the agent perceives a trace of the kind on the floor at the
+ * referent's tile or beside it. */
+static BOOL   near( BGKnowledgeStore *store, const BGReferent *r, const char *kind)
+{
+   const BGTraceSeen   *t;
+   NSUInteger          i;
+
+   for( i = 0; i < [store traceCount]; i++)
+   {
+      t = [store traceAt:i];
+      if( ! t->bearer && t->present && ! strcmp( t->kind, kind) && t->level == r->level &&
+          abs( t->x - r->x) <= 1 && abs( t->y - r->y) <= 1)
          return( YES);
    }
    return( NO);
@@ -1607,6 +1626,13 @@ static BOOL   bears( BGKnowledgeStore *store, uint32_t referent, const char *kin
                text[ strlen( text) - 1] = 0;
                holds = bears( store, r->id, text + 1, YES);
             }
+            else if( (v = tri_at( tri, premise, "near")) && tri_print( tri, v, text, sizeof( text)) > 2)
+            {
+               text[ strlen( text) - 1] = 0;
+               holds = r->present && near( store, r, text + 1);
+            }
+            else
+               holds = NO;      /* a premise it can't read never holds */
          }
          if( ! holds)
             continue;

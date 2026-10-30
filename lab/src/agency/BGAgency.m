@@ -271,6 +271,12 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
 }
 
 
+- (void) setActivities:(BGActivities *) activities
+{
+   _activities = activities;
+}
+
+
 - (void) relinquish:(BGEntityID) agent
 {
    NSUInteger   i;
@@ -504,8 +510,19 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
          count:(int *) n
          store:(BGKnowledgeStore *) store
 {
-   BGCondition   c;
-   int           start;
+   const TriNode   *done;
+   BGCondition     c;
+   int             start;
+   char            text[ 64];
+
+   /* what the agent did: looked into the slot's referent since; an activity
+    * of the operation it started since has completed */
+   done = ! strcmp( path, "done") ? tri_at( [_world tri], tri_pattern( [_world tri], instance), "done") : NULL;
+   if( done && text_at( [_world tri], done, "looked", text, sizeof( text)))
+      return( bound( b, *n, text) && [store referent:bound( b, *n, text)] &&
+              [store referent:bound( b, *n, text)]->insideSeen >= since);
+   if( done && text_at( [_world tri], done, "did", text, sizeof( text)))
+      return( [self activity:text of:[store agent] status:"completed" since:since] != BGNoEntity);
 
    if( ! [self load:&c instance:instance path:path store:store])
       return( NO);
@@ -515,6 +532,33 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
       return( YES);
    *n = start;
    return( NO);
+}
+
+
+/* The agent's own activity of the operation in that status, started at or
+ * after `since`; its own doings it knows. */
+- (BGEntityID) activity:(const char *) operation
+                     of:(BGEntityID) agent
+                 status:(const char *) status
+                  since:(int64_t) since
+{
+   const BGActivity   *record;
+   BGStore            *store;
+   NSUInteger         i;
+   const char         *op;
+   char               quoted[ 32];
+
+   snprintf( quoted, sizeof( quoted), "\"%s\"", status);
+   store = [_world storeForKind:[_world kindNamed:"Activity"]];
+   for( i = 0; i < [store count]; i++)
+   {
+      record = [store recordAtIndex:i];
+      op     = [_world textField:"Activity.operation" of:[store entityAtIndex:i]];
+      if( (BGEntityID) record->actorRef == agent && op && ! strcmp( op, operation) &&
+          record->status == (uint32_t) tri_type_named( [_world tri], quoted) && record->started >= since)
+         return( [store entityAtIndex:i]);
+   }
+   return( BGNoEntity);
 }
 
 
@@ -707,6 +751,7 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    const TriNode      *says;
    const char         *content;
    TriType            utterance;
+   BGEntityID         suspended;
    char               text[ 2048];
    int                k;
 
@@ -760,6 +805,18 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
             [self walk:m why:title me:me toward:r];
             return( YES);
          }
+      /* an activity of it the agent suspended: resumed, not begun again */
+      if( _activities && (suspended = [self activity:op of:m->agent status:"suspended" since:0]) != BGNoEntity)
+      {
+         NSString   *error;
+
+         error = nil;
+         if( [_activities resume:suspended error:&error])
+            [self note:m line:[NSString stringWithFormat:@"%s: resuming %s", title, op]];
+         else
+            [self note:m line:[NSString stringWithFormat:@"%s: could not resume %s: %@", title, op, error]];
+         return( YES);
+      }
       /* what it says, if anything: after a question, it waits for the answer */
       says    = tri_at( tri, step, "says");
       content = NULL;
@@ -1002,6 +1059,301 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
 }
 
 
+/* --- weighing goals (AGENCY.md §3) --------------------------------------------------- */
+
+/* How strongly the agent believes something like the consideration's
+ * suspect is in the place: the credence of what it was told, the strongest
+ * claim, with its findings of the evidence about the place as a group of
+ * their own. */
+- (int32_t) suspicion:(const TriNode *) consideration
+                   of:(uint32_t) place
+                store:(BGKnowledgeStore *) store
+{
+   const BGTestimony   *t;
+   const BGFinding     *f;
+   const BGReferent    *r;
+   const TriNode       *suspect;
+   const TriNode       *kind;
+   TriContent          *tri;
+   TriArena            *arena;
+   NSUInteger          i;
+   int32_t             best;
+   int32_t             credence;
+   int32_t             evidence;
+   char                text[ 64];
+
+   tri     = [_world tri];
+   suspect = tri_at( tri, consideration, "suspect");
+   best    = BG_PRIOR;
+   arena   = tri_arena_new();
+   for( i = 0; suspect && i < [store testimonyCount]; i++)
+   {
+      t = [store testimonyAt:i];
+      r = [store referent:t->thing];
+      if( t->container != place || t->settled < 0 || ! r || ! r->kind)
+         continue;
+      kind = tri_value( tri, r->kind, arena, NULL, 0);
+      if( ! kind || ! tri_subtype( tri, tri_node_type( kind), tri_node_type( suspect)))
+         continue;
+      credence = [store credenceThat:t->thing isIn:place];
+      if( credence > best)
+         best = credence;
+   }
+   tri_arena_free( arena);
+   evidence = 0;
+   if( text_at( tri, consideration, "evidence", text, sizeof( text)))
+      for( i = 0; i < [store findingCount]; i++)
+      {
+         f = [store findingAt:i];
+         if( f->about == place && ! strcmp( f->kind, text) && f->credence > evidence)
+            evidence = f->credence;
+      }
+   return( best + evidence);
+}
+
+
+/* Whether the referent is believed of the kind (any, without one). */
+- (BOOL) referent:(const BGReferent *) r
+             isOf:(const TriNode *) kind
+{
+   const TriNode   *k;
+   TriArena        *arena;
+   BOOL            yes;
+
+   if( ! kind)
+      return( YES);
+   if( ! r || ! r->kind)
+      return( NO);
+   arena = tri_arena_new();
+   k     = tri_value( [_world tri], r->kind, arena, NULL, 0);
+   yes   = k && tri_subtype( [_world tri], tri_node_type( k), tri_node_type( kind));
+   tri_arena_free( arena);
+   return( yes);
+}
+
+
+/* What the goal is worth with these bindings: its considerations, added. */
+- (int32_t) worthOf:(const char *) goal
+           bindings:(const BGSlotBinding *) b
+              count:(int) n
+              store:(BGKnowledgeStore *) store
+              parts:(NSMutableArray *) parts
+{
+   const TriNode   *list;
+   const TriNode   *c;
+   TriContent      *tri;
+   int32_t         worth;
+   int32_t         v;
+   char            slot[ 32];
+
+   tri   = [_world tri];
+   worth = 0;
+   for( list = tri_at( tri, tri_pattern( tri, goal), "worth"); list && (c = tri_at( tri, list, "first"));
+        list = tri_at( tri, list, "rest"))
+   {
+      if( tri_at( tri, c, "value"))
+      {
+         v = (int32_t) int_at( tri, c, "value", 0);
+         [parts addObject:[NSString stringWithFormat:@"%+d", v]];
+      }
+      else if( tri_at( tri, c, "cost"))
+      {
+         v = - (int32_t) int_at( tri, c, "cost", 0);
+         [parts addObject:[NSString stringWithFormat:@"risk %+d", v]];
+      }
+      else if( text_at( tri, c, "inside", slot, sizeof( slot)))
+      {
+         v = [self suspicion:c of:bound( b, n, slot) store:store];
+         [parts addObject:[NSString stringWithFormat:@"credence %+d", v]];
+      }
+      else
+         continue;
+      worth += v;
+   }
+   return( worth);
+}
+
+
+- (BOOL) has:(BGArisen *) list
+       count:(int) n
+        goal:(const char *) goal
+       about:(uint32_t) about
+     verdict:(int *) verdict
+{
+   int   k;
+
+   for( k = 0; k < n; k++)
+      if( list[ k].goal == goal && list[ k].about == about)
+      {
+         if( verdict)
+            *verdict = list[ k].verdict;
+         return( YES);
+      }
+   return( NO);
+}
+
+
+/* A goal that arose about something, done or dropped, is settled with it. */
+- (void) settle:(BGMotivation *) m
+      intention:(BGIntention *) intention
+{
+   if( ! intention->arose || m->nsettled == BG_MAX_SETTLED ||
+       [self has:m->settled count:m->nsettled goal:intention->goal about:intention->arose verdict:NULL])
+      return;
+   m->settled[ m->nsettled].goal    = intention->goal;
+   m->settled[ m->nsettled].about   = intention->arose;
+   m->settled[ m->nsettled].verdict = 0;
+   m->nsettled++;
+}
+
+
+/* The goals that arise from the agent's findings, weighed against what it is
+ * doing: the best, if it beats the current intention by the margin, and the
+ * interruption while an activity runs, wins; what the agent was doing is
+ * suspended, and stays beneath. YES when it switched. */
+- (BOOL) weigh:(BGMotivation *) m
+         store:(BGKnowledgeStore *) store
+          busy:(BOOL) busy
+{
+   const BGFinding    *f;
+   const BGActivity   *record;
+   BGIntention        *current;
+   BGSlotBinding      b;
+   TriContent         *tri;
+   TriIndex           *family;
+   NSMutableArray     *parts;
+   NSMutableArray     *bestParts;
+   NSMutableArray     *currentParts;
+   BGStore            *activities;
+   const char         *goal;
+   const char         *best;
+   NSString           *error;
+   NSUInteger         i;
+   NSUInteger         j;
+   uint32_t           bestAbout;
+   int32_t            worth;
+   int32_t            bestWorth;
+   int32_t            against;
+   int                k;
+   int                verdict;
+   int                last;
+   char               finding[ 64];
+   char               slot[ 32];
+   char               title[ 64];
+   char               currentTitle[ 64];
+   const char         *bestSlot;
+
+   tri       = [_world tri];
+   family    = tri_family_index( tri, "goals");
+   best      = NULL;
+   bestAbout = 0;
+   bestWorth = 0;
+   bestParts = nil;
+   bestSlot  = NULL;
+   for( i = 0; family && i < tri_index_count( family); i++)
+   {
+      goal = [_world intern:tri_index_tag( family, i)];
+      if( ! text_at( tri, tri_pattern( tri, goal), "arises.finding", finding, sizeof( finding)) ||
+          ! text_at( tri, tri_pattern( tri, goal), "arises.slot", slot, sizeof( slot)))
+         continue;
+      for( j = 0; j < [store findingCount]; j++)
+      {
+         f = [store findingAt:j];
+         if( strcmp( f->kind, finding) || [self has:m->settled count:m->nsettled goal:goal about:f->about verdict:NULL])
+            continue;
+         if( tri_at( tri, tri_pattern( tri, goal), "arises.lapse") &&
+             [_world time].ms - f->time > int_at( tri, tri_pattern( tri, goal), "arises.lapse", 0))
+            continue;      /* no longer salient */
+         if( ! [self referent:[store referent:f->about] isOf:tri_at( tri, tri_pattern( tri, goal), "arises.of")])
+            continue;
+         for( k = 0; k < m->nintentions; k++)
+            if( m->intentions[ k].goal == goal && m->intentions[ k].arose == f->about)
+               break;
+         if( k < m->nintentions)
+            continue;      /* already pursued */
+         b.slot     = [_world intern:slot];
+         b.referent = f->about;
+         parts      = [NSMutableArray array];
+         worth      = [self worthOf:goal bindings:&b count:1 store:store parts:parts];
+         if( ! best || worth > bestWorth)
+         {
+            best      = goal;
+            bestAbout = f->about;
+            bestWorth = worth;
+            bestParts = parts;
+            bestSlot  = b.slot;
+         }
+      }
+   }
+   if( ! best)
+      return( NO);
+
+   /* against what it is doing: the topmost intention that has a worth */
+   current      = NULL;
+   against      = 0;
+   currentParts = [NSMutableArray array];
+   for( k = m->nintentions - 1; k >= 0 && ! current; k--)
+      if( tri_at( tri, tri_pattern( tri, m->intentions[ k].goal), "worth.first"))
+      {
+         current = &m->intentions[ k];
+         against = [self worthOf:current->goal bindings:current->params count:current->nparams store:store
+                           parts:currentParts];
+      }
+   if( m->nintentions)
+      against += BG_MARGIN;
+   if( busy)
+      against += BG_INTERRUPT;
+   verdict = bestWorth > against;
+
+   /* logged when the verdict changes */
+   last = -1;
+   if( ! [self has:m->weighed count:m->nweighed goal:best about:bestAbout verdict:&last] && m->nweighed < BG_MAX_SETTLED)
+   {
+      m->weighed[ m->nweighed].goal  = best;
+      m->weighed[ m->nweighed].about = bestAbout;
+      m->nweighed++;
+   }
+   for( k = 0; k < m->nweighed; k++)
+      if( m->weighed[ k].goal == best && m->weighed[ k].about == bestAbout)
+         m->weighed[ k].verdict = verdict;
+   if( verdict != last)
+   {
+      goal_title( tri, best, title, sizeof( title));
+      if( current)
+         goal_title( tri, current->goal, currentTitle, sizeof( currentTitle));
+      [self note:m line:[NSString stringWithFormat:@"weighing %s (R%u): %+d (%@) against %s%@%@%@: %s", title, bestAbout,
+                                                    bestWorth, [bestParts componentsJoinedByString:@", "],
+                                                    current ? currentTitle : "nothing",
+                                                    current ? [NSString stringWithFormat:@" %+d (%@)", against -
+                                                                 (m->nintentions ? BG_MARGIN : 0) - (busy ? BG_INTERRUPT : 0),
+                                                                 [currentParts componentsJoinedByString:@", "]] : @"",
+                                                    m->nintentions ? [NSString stringWithFormat:@" + margin %d", BG_MARGIN] : @"",
+                                                    busy ? [NSString stringWithFormat:@" + interruption %d", BG_INTERRUPT] : @"",
+                                                    verdict ? "switching" : "staying"]];
+   }
+   if( ! verdict || m->nintentions == BG_MAX_INTENTIONS)
+      return( NO);
+
+   /* what it was doing, suspended */
+   activities = [_world storeForKind:[_world kindNamed:"Activity"]];
+   for( i = 0; busy && _activities && i < [activities count]; i++)
+   {
+      record = [activities recordAtIndex:i];
+      if( (BGEntityID) record->actorRef != m->agent || record->status != (uint32_t) tri_type_named( tri, "\"running\""))
+         continue;
+      error = nil;
+      if( [_activities suspend:[activities entityAtIndex:i] because:@"something else matters more" error:&error])
+         [self note:m line:[NSString stringWithFormat:@"suspending %s",
+                                                      [_world textField:"Activity.operation" of:[activities entityAtIndex:i]]]];
+   }
+   b.slot     = bestSlot;
+   b.referent = bestAbout;
+   [self adopt:best mind:m params:&b count:1];
+   m->intentions[ m->nintentions - 1].arose = bestAbout;
+   return( YES);
+}
+
+
 /* One decision, for the current intention. YES when it acted or settled into
  * waiting; NO when it only changed its intentions, so it decides again. */
 - (BOOL) decide:(BGMotivation *) m
@@ -1016,6 +1368,7 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    char               title[ 64];
    char               method[ 64];
    NSString           *passed;
+   BOOL               busy;
    int                n;
 
    store = [_knowledge storeOf:m->agent];
@@ -1024,8 +1377,13 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
       return( YES);
    [self hearQuestions:m store:store];
    [self considerQuestions:m store:store];
-   if( [self awaits:m store:store] || ! m->nintentions || [self busy:m->agent])
-      return( YES);     /* waiting for an answer, mid-activity, or nothing to do: no cost */
+   if( [self awaits:m store:store])
+      return( YES);     /* waiting for an answer */
+   busy = [self busy:m->agent];
+   if( [self weigh:m store:store busy:busy])
+      return( NO);      /* something else won: decide again, for it */
+   if( ! m->nintentions || busy)
+      return( YES);     /* mid-activity, or nothing to do: no cost */
    if( m->waiting && ! [[store news] count])
       return( YES);
    m->waiting = NO;
@@ -1034,9 +1392,10 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
 
    n = top->nparams;
    memcpy( b, top->params, sizeof( BGSlotBinding) * n);
-   if( [self holds:top->goal path:"done" since:0 bindings:b count:&n store:store])
+   if( [self holds:top->goal path:"done" since:top->adopted bindings:b count:&n store:store])
    {
       [self note:m line:@"done"];
+      [self settle:m intention:top];
       if( --m->nintentions)
       {
          m->intentions[ m->nintentions - 1].pending = -1;
@@ -1066,6 +1425,7 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
 
    /* no way left: impossible for now, and the method that needed it has failed */
    [self note:m line:@"nothing I know of will do: impossible for now"];
+   [self settle:m intention:top];
    goal_title( [_world tri], top->goal, title, sizeof( title));
    if( --m->nintentions)
    {
@@ -1142,12 +1502,18 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
       for( k = 0; k < m->nintentions; k++)
       {
          t = &m->intentions[ k];
-         [line appendFormat:@" %s %lld %u %d %d %d", t->goal, (long long) t->adopted, t->failed, t->pending,
-                                                 t->following, t->nparams];
+         [line appendFormat:@" %s %lld %u %d %d %u %d", t->goal, (long long) t->adopted, t->failed, t->pending,
+                                                    t->following, t->arose, t->nparams];
          for( p = 0; p < t->nparams; p++)
             [line appendFormat:@" %s %u", t->params[ p].slot, t->params[ p].referent];
       }
       [lines addObject:line];
+      for( k = 0; k < m->nsettled; k++)
+         [lines addObject:[NSString stringWithFormat:@"settled %llu %s %u", (unsigned long long) m->agent,
+                                                     m->settled[ k].goal, m->settled[ k].about]];
+      for( k = 0; k < m->nweighed; k++)
+         [lines addObject:[NSString stringWithFormat:@"weighed %llu %s %u %d", (unsigned long long) m->agent,
+                                                     m->weighed[ k].goal, m->weighed[ k].about, m->weighed[ k].verdict]];
       for( k = 0; k < m->nquestions; k++)
          [lines addObject:[NSString stringWithFormat:@"question %llu %u %lld %d %@", (unsigned long long) m->agent,
                                                      m->questions[ k].asker, (long long) m->questions[ k].heard,
@@ -1174,6 +1540,20 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    for( i = 0; i < [lines count]; i++)
    {
       words = [[lines objectAtIndex:i] componentsSeparatedByString:@" "];
+      if( ([words count] == 4 && [[words objectAtIndex:0] isEqualToString:@"settled"]) ||
+          ([words count] == 5 && [[words objectAtIndex:0] isEqualToString:@"weighed"]))
+      {
+         BGArisen   *a;
+
+         m = [self mindOf:(BGEntityID) [[words objectAtIndex:1] longLongValue]];
+         if( [words count] == 4 ? m->nsettled == BG_MAX_SETTLED : m->nweighed == BG_MAX_SETTLED)
+            continue;
+         a          = [words count] == 4 ? &m->settled[ m->nsettled++] : &m->weighed[ m->nweighed++];
+         a->goal    = [_world intern:[[words objectAtIndex:2] UTF8String]];
+         a->about   = (uint32_t) [[words objectAtIndex:3] longLongValue];
+         a->verdict = [words count] == 5 ? [[words objectAtIndex:4] intValue] : 0;
+         continue;
+      }
       if( [words count] == 6 && [[words objectAtIndex:0] isEqualToString:@"question"])
       {
          m = [self mindOf:(BGEntityID) [[words objectAtIndex:1] longLongValue]];
@@ -1199,7 +1579,7 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
       m->awaitUntil = [[words objectAtIndex:7] longLongValue];
       n             = [[words objectAtIndex:8] intValue];
       w             = 9;
-      for( k = 0; k < n && k < BG_MAX_INTENTIONS && w + 6 <= [words count]; k++)
+      for( k = 0; k < n && k < BG_MAX_INTENTIONS && w + 7 <= [words count]; k++)
       {
          t          = &m->intentions[ m->nintentions++];
          memset( t, 0, sizeof( *t));
@@ -1208,6 +1588,7 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
          t->failed  = (uint32_t) [[words objectAtIndex:w++] longLongValue];
          t->pending   = [[words objectAtIndex:w++] intValue];
          t->following = [[words objectAtIndex:w++] intValue];
+         t->arose     = (uint32_t) [[words objectAtIndex:w++] longLongValue];
          t->nparams   = [[words objectAtIndex:w++] intValue];
          for( p = 0; p < t->nparams && p < BG_MAX_SLOTS && w + 2 <= [words count]; p++)
          {

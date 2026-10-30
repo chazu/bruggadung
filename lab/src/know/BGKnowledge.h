@@ -56,7 +56,7 @@
  *
  * Traces (KNOWLEDGE.md §3) are perceived by their kind's sense: by sight on
  * what the agent sees, or on the floor in sight; by smell within
- * BG_SMELL tiles. What it perceives is the trace's kind, where, and how
+ * BG_SMELL tiles; by hearing within BG_HEARING, out of sight too. What it perceives is the trace's kind, where, and how
  * strong it seems now (its age fades it), never what made it; a trace it
  * perceived at a site it perceives again, and no longer finds, is gone.
  *
@@ -93,6 +93,7 @@
 
 #define BG_SIGHT   4
 #define BG_SMELL   1
+#define BG_HEARING 10
 
 /* credence and trust, in dB */
 #define BG_PRIOR         -10      /* a claim of where something is, before any testimony */

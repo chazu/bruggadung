@@ -4,7 +4,7 @@
 // made, and when it was made and runs out. Its cause is its creation's, in
 // history, for the developer.
 
-#Sense: "sight" | "smell"
+#Sense: "sight" | "smell" | "hearing"
 
 // A kind of trace: the sense that perceives it, and how long it lasts. It
 // fades evenly from its magnitude to nothing over `lasts`, and is removed
@@ -40,3 +40,4 @@ soap_smell:  #TraceKind & { sense: "smell", lasts: 2d }   @family(traces)
 fresh_paint: #TraceKind & { sense: "sight", lasts: 3d }   @family(traces)
 paint_smell: #TraceKind & { sense: "smell", lasts: 4d }   @family(traces)
 scratch:     #TraceKind & { sense: "sight", lasts: 365d } @family(traces)
+clatter:     #TraceKind & { sense: "hearing", lasts: 2s } @family(traces)

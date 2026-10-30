@@ -1038,8 +1038,60 @@ write beyond "where something is".
 
 38 tests, 579 checks, under both compilers, ASan and UBSan, and leak-free.
 
-Next: AGENCY.md Scenario 2, *the false alarm*: goals scored by
-considerations, with expected value weighted by credence, a current
-intention kept unless another beats it by the margin plus the
-interruption cost, no dithering, and trust lowered when a rumour proves
-false.
+### After the slice: weighing goals (the false alarm)
+
+AGENCY.md Scenario 2, *the false alarm*, variants A to D. A watchman walks
+past the storeroom, sits down by the gate to eat supper, out of sight of
+the storeroom and in earshot, and hears a cat knock something over beside
+it. The rule *stirring* makes of the clatter that something stirred there.
+*Investigate the disturbance* arises, and is weighed against supper.
+- **A** (the noise alone): credence 0, worth 15 against supper's 20 plus
+  the margin and the interruption, 30. It keeps eating.
+- **B** (two rumours, neither naming a source): two groups, credence 20,
+  worth 35. It puts supper down, walks over, and looks in. No one is
+  there: the claim is found false, and it trusts the carter and the
+  porter less. Then it goes back and resumes its supper where it left off.
+- **C** (the same rumour, both naming the neighbour): one group, credence
+  15, worth 30, not more than 30. It stays.
+- **D** (B with noise after noise): the intention changes once.
+
+The run is the same on replay, and saved mid-investigation, with supper
+suspended beneath, it ends the same.
+
+- **Worth** (AGENCY.md §3): goals declare considerations in content
+  (`#Flat`, `#Cost`, `#Suspicion`), added in dB. A suspicion is the
+  credence that something like the suspect is in the slot's referent: the
+  strongest claim, with findings of the evidence about the place as a
+  group of their own.
+- **Arising** (§4's reactive generator): a goal with `arises` is a
+  candidate for each recent finding of its kind about something of its
+  kind (`of`), while the finding is salient (`lapse`). The agent doesn't
+  investigate, after supper, a noise from a minute before.
+- **Weighing**, at every decision point and mid-activity (a soft
+  interruption): the best candidate wins only by more than the current
+  intention's worth plus a margin (5), plus an interruption cost (5) while
+  an activity runs. Winning, agency suspends the agent's activity, and
+  puts the new goal on top; the old one stays beneath, and its activity is
+  resumed, not begun again, when the agent comes back to it. A goal that
+  arose about something is settled with it. The log gives each weighing's
+  considerations and verdict, when the verdict changes.
+- **Conditions of what the agent did**: `#Looked` (the slot's inside seen
+  since adopting the goal) and `#Did` (an activity of the operation
+  completed since).
+- **Hearing**: traces have a third sense; a clatter is heard within 10
+  tiles, out of sight too. The interpretation premise `#Near` holds for
+  something at or beside a trace on the floor. A premise the interpreter
+  can't read never holds.
+
+Not yet: autopilot returning control to the player (variant E),
+consideration curves (considerations add, without curves), risk weighted
+by a risk-tolerance disposition, duty from a commitment rather than a flat
+worth, needs and routines as generators, scoring methods as well as goals,
+and the seeded tiebreak.
+
+39 tests, 635 checks, under both compilers, ASan and UBSan, and leak-free.
+
+Next: autopilot (AGENCY.md §14, Scenario 2's variant E): the player hands
+the character to agency with a mode (*keep watch*), and control returns
+to the player at a salience crossing, with agency never using what the
+character doesn't know.

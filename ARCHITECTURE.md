@@ -303,9 +303,10 @@ A rebuilt world produces the same next step as one that never saved.
    leave and remove, aging analytically, so a cover-up leaves its own; and
    appearance that differs from the truth until an analysis reaches beneath
    it; interpretation rules gated by expertise and prior beliefs; and a
-   notebook that can be written, stolen, and read. Next, per
-   [lab/PLAN.md](lab/PLAN.md): AGENCY.md's false alarm, goals scored by
-   credence.
+   notebook that can be written, stolen, and read; and goals weighed by
+   credence against what the agent is doing, with a margin against
+   dithering (AGENCY.md's false alarm). Next, per
+   [lab/PLAN.md](lab/PLAN.md): autopilot.
 
 ## Cross-cutting open questions
 

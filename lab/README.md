@@ -136,8 +136,13 @@ method that needed it has failed, so the goal beneath tries its next.
 A step can say something: *ask where nails are* puts a `#WhereIs` to the
 nearest agent the worker knows of, then waits up to five seconds for the
 answer (the scheduler wakes it then if nothing else does), and a search slot
-passes over whoever it has asked since adopting the goal. Being asked is a
-choice for agents agency controls: answering is worth their trust in the
+passes over whoever it has asked since adopting the goal. Goals have worth,
+from considerations in content (credence among them), and a goal that
+arises from a finding (a noise heard near the storeroom) is weighed
+against what the agent is doing, mid-activity too: it wins only by a margin
+and the cost of interrupting, then the agent suspends what it was doing
+and comes back to it after. Being asked is a choice for agents agency
+controls: answering is worth their trust in the
 asker plus their `helpful` disposition, less what their running activity
 demands of their attention and a little for a goal of their own. Worth
 something, they answer from what they know: where they believe something

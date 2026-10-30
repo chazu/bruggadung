@@ -1,4 +1,4 @@
-/* Generated from Triangle content f6fad2790813eab7: do not edit. Type IDs are valid
+/* Generated from Triangle content e5cd5f6bbbe2229c: do not edit. Type IDs are valid
  * only for this content; regenerate when it changes. */
 #ifndef BG_COMPONENTS_H
 #define BG_COMPONENTS_H
@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BG_CONTENT_HASH 0xf6fad2790813eab7ULL
+#define BG_CONTENT_HASH 0xe5cd5f6bbbe2229cULL
 
 /* Activity, from #Activity */
 typedef struct {
@@ -96,52 +96,53 @@ typedef struct {
 
 /* #ActivityStatus */
 enum {
-    BG_ACTIVITYSTATUS_COMPLETED = 113,
-    BG_ACTIVITYSTATUS_EXHAUSTED = 114,
-    BG_ACTIVITYSTATUS_FAILED = 115,
-    BG_ACTIVITYSTATUS_RUNNING = 116,
-    BG_ACTIVITYSTATUS_SUSPENDED = 117,
+    BG_ACTIVITYSTATUS_COMPLETED = 135,
+    BG_ACTIVITYSTATUS_EXHAUSTED = 136,
+    BG_ACTIVITYSTATUS_FAILED = 137,
+    BG_ACTIVITYSTATUS_RUNNING = 138,
+    BG_ACTIVITYSTATUS_SUSPENDED = 139,
 };
 
 /* #ClaimKind */
 enum {
-    BG_CLAIMKIND_CUSTODY = 119,
-    BG_CLAIMKIND_OWNERSHIP = 120,
+    BG_CLAIMKIND_CUSTODY = 141,
+    BG_CLAIMKIND_OWNERSHIP = 142,
 };
 
 /* #Material */
 enum {
-    BG_MATERIAL_FLESH = 173,
-    BG_MATERIAL_BRASS = 175,
-    BG_MATERIAL_IRON = 176,
-    BG_MATERIAL_PAPER = 177,
-    BG_MATERIAL_STEEL = 178,
-    BG_MATERIAL_OAK = 180,
+    BG_MATERIAL_FOOD = 173,
+    BG_MATERIAL_FLESH = 197,
+    BG_MATERIAL_BRASS = 199,
+    BG_MATERIAL_IRON = 200,
+    BG_MATERIAL_PAPER = 201,
+    BG_MATERIAL_STEEL = 202,
+    BG_MATERIAL_OAK = 204,
 };
 
 /* "flesh" | "metal" | "natural" | "paper" | "wood" */
 enum {
-    BG_BODY_SURFACE_NATURAL = 101,
-    BG_BODY_SURFACE_FLESH = 173,
-    BG_BODY_SURFACE_BRASS = 175,
-    BG_BODY_SURFACE_IRON = 176,
-    BG_BODY_SURFACE_PAPER = 177,
-    BG_BODY_SURFACE_STEEL = 178,
-    BG_BODY_SURFACE_OAK = 180,
+    BG_BODY_SURFACE_NATURAL = 122,
+    BG_BODY_SURFACE_FLESH = 197,
+    BG_BODY_SURFACE_BRASS = 199,
+    BG_BODY_SURFACE_IRON = 200,
+    BG_BODY_SURFACE_PAPER = 201,
+    BG_BODY_SURFACE_STEEL = 202,
+    BG_BODY_SURFACE_OAK = 204,
 };
 
 /* #Colour */
 enum {
-    BG_COLOUR_BLUE = 123,
-    BG_COLOUR_BLACK = 125,
-    BG_COLOUR_BROWN = 126,
-    BG_COLOUR_GREEN = 127,
-    BG_COLOUR_GREY = 128,
-    BG_COLOUR_BEIGE = 130,
-    BG_COLOUR_NAVY = 131,
-    BG_COLOUR_RED = 132,
-    BG_COLOUR_WHITE = 133,
-    BG_COLOUR_YELLOW = 134,
+    BG_COLOUR_BLUE = 145,
+    BG_COLOUR_BLACK = 147,
+    BG_COLOUR_BROWN = 148,
+    BG_COLOUR_GREEN = 149,
+    BG_COLOUR_GREY = 150,
+    BG_COLOUR_BEIGE = 152,
+    BG_COLOUR_NAVY = 153,
+    BG_COLOUR_RED = 154,
+    BG_COLOUR_WHITE = 155,
+    BG_COLOUR_YELLOW = 156,
 };
 
 /* The field registry: what code needs to read and write any component
