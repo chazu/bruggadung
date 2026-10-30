@@ -492,6 +492,59 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
 }
 
 
+- (BOOL) autopilotExplore:(BGEntityID) agent
+                threshold:(int32_t) threshold
+{
+   BGMotivation   *m;
+
+   [self control:agent];
+   m             = [self mindOf:agent];
+   m->autopilot  = YES;
+   m->explore    = YES;
+   m->threshold  = threshold;
+   m->handedBack = NO;
+   m->wake       = [_world time].ms + 1;
+   return( YES);
+}
+
+
+/* Exploring: a step toward the nearest tile on its level it has never seen,
+ * the lowest row, then column, among equals; NO if there is none. */
+- (BOOL) explore:(BGMotivation *) m
+           store:(BGKnowledgeStore *) store
+{
+   const BGReferent   *me;
+   BGReferent         goal;
+   int32_t            x;
+   int32_t            y;
+   int                d;
+   int                best;
+
+   me = [store referent:[store selfReferent]];
+   if( ! me)
+      return( NO);
+   best = INT_MAX;
+   memset( &goal, 0, sizeof( goal));
+   for( y = 0; y < 32; y++)
+      for( x = 0; x < 32; x++)
+      {
+         if( ! [_world isTileX:x y:y level:me->level] || [store tileSeenAtX:x y:y] >= 0)
+            continue;
+         d = abs( x - me->x) + abs( y - me->y);
+         if( d < best)
+         {
+            best   = d;
+            goal.x = x;
+            goal.y = y;
+         }
+      }
+   if( best == INT_MAX)
+      return( NO);
+   [self walk:m why:"exploring" me:me toward:&goal];
+   return( YES);
+}
+
+
 /* YES while a commitment of its is still to keep: not settled, its window
  * not yet closed. */
 - (BOOL) hasRoutine:(BGMotivation *) m
@@ -2241,6 +2294,13 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
    {
       if( m->routine && [self hasRoutine:m])
          return( YES);      /* waiting for its routine */
+      if( m->explore)
+      {
+         if( busy || [self explore:m store:store])
+            return( YES);   /* under way, or a step taken */
+         [self handBack:m why:@"there is nothing left to explore"];
+         return( YES);
+      }
       [self handBack:m why:m->routine ? @"its routine is done" : @"there is nothing left to do"];
       return( YES);
    }
@@ -2394,7 +2454,7 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
    for( i = 0; i < [_minds count]; i++)
    {
       m = [_minds objectAtIndex:i];
-      if( m->autopilot && ! m->nintentions && ! m->handedBack && ! (m->routine && [self hasRoutine:m]))
+      if( m->autopilot && ! m->nintentions && ! m->handedBack && ! (m->routine && [self hasRoutine:m]) && ! m->explore)
          [self handBack:m why:m->routine ? @"its routine is done" : @"there is nothing left to do"];
    }
    for( i = [_minds count]; i > 0; i--)
@@ -2472,6 +2532,8 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
          [lines addObject:[NSString stringWithFormat:@"autopilot %llu %d", (unsigned long long) m->agent, m->threshold]];
       if( m->routine)
          [lines addObject:[NSString stringWithFormat:@"routine %llu", (unsigned long long) m->agent]];
+      if( m->explore)
+         [lines addObject:[NSString stringWithFormat:@"explore %llu", (unsigned long long) m->agent]];
       if( m->wake)
          [lines addObject:[NSString stringWithFormat:@"wake %llu %lld", (unsigned long long) m->agent, (long long) m->wake]];
       for( k = 0; k < m->nhabits; k++)
@@ -2563,6 +2625,11 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
       if( [words count] == 3 && [[words objectAtIndex:0] isEqualToString:@"wake"])
       {
          [self mindOf:(BGEntityID) [[words objectAtIndex:1] longLongValue]]->wake = [[words objectAtIndex:2] longLongValue];
+         continue;
+      }
+      if( [words count] == 2 && [[words objectAtIndex:0] isEqualToString:@"explore"])
+      {
+         [self mindOf:(BGEntityID) [[words objectAtIndex:1] longLongValue]]->explore = YES;
          continue;
       }
       if( [words count] == 2 && [[words objectAtIndex:0] isEqualToString:@"routine"])

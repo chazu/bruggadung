@@ -2880,7 +2880,6 @@ text they give is quoted.
   content, and with what units?"
 - **Recipes, and the "carry out this recipe" autopilot**: ACTIONS.md open
   question 7, "How is recipe knowledge represented".
-- **Auto-explore**: AGENCY.md §14 names it; what exploring is, isn't said.
 - **Latent assembly's own rules, how considerations combine, memory making
   hypotheses of its own, loyalty**: as listed above.
 
@@ -2912,7 +2911,29 @@ its words; the speaker walked meanwhile; a second remark at once is
 refused; once said, it can speak again. Every conversation scenario
 (promises, the rumour, decay, asking, the purse, play) runs as before.
 
-Not yet: how long a remark takes by what is said (every one is a
-second).
+Every remark is a second: what is said is content (talk.tri), not words,
+and no document says how its length becomes time.
 
 78 tests, 2550 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: autopilot, "auto-explore"
+
+AGENCY.md §14 names it; roguelikes fix what it means: go toward the
+nearest place not yet seen until there is none.
+
+- **`autopilotExplore:threshold:`**: with nothing else to do, agency walks
+  the player's character a step toward the nearest tile on its level its
+  map memory has never seen (lowest row, then column, among equals). The
+  map's extent is the frame's (32 by 32), as a roguelike's map size is
+  known to the player; what has been seen is the character's own memory.
+  Something worth more than the threshold returns control, as for the
+  other modes; nothing left unseen does too. Saved (`explore`).
+
+Checked: a worker alone in the middle of the map explores it, a step a
+second, until every tile is seen, and control returns ("there is nothing
+left to explore"); saved midway, the mode is restored.
+
+Not yet: exploring around what blocks the way (the lab has no walls; a
+refused step is only logged).
+
+79 tests, 2557 checks, under both compilers, ASan, and leak-free.

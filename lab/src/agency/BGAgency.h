@@ -195,6 +195,7 @@ typedef struct
    int64_t          wake;              /* a decision is due then (ms), or 0 */
    BOOL             autopilot;         /* the player's character, handed over */
    BOOL             routine;           /* to carry on with its commitments */
+   BOOL             explore;           /* to go where it hasn't seen */
    int32_t          threshold;         /* worth above which control returns */
    BOOL             handedBack;
    NSMutableArray   *log;
@@ -266,6 +267,13 @@ typedef struct
  * control returns. With nothing to do it waits for its routine; with no
  * commitment left to keep, control returns. */
 - (BOOL) autopilotRoutine:(BGEntityID) agent
+                threshold:(int32_t) threshold;
+/* Autopilot, "auto-explore" (AGENCY.md §14), as roguelikes have it: agency
+ * walks the player's character toward the nearest tile it has never seen
+ * (by its own map memory; the map's extent is the frame's, known to all),
+ * taking up nothing of its own: past `threshold`, control returns; with
+ * nothing left unseen, too. */
+- (BOOL) autopilotExplore:(BGEntityID) agent
                 threshold:(int32_t) threshold;
 /* why control returned since last asked, one line each */
 - (NSArray *) takeNotices;

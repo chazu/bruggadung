@@ -5494,6 +5494,70 @@ static BGAgency   *urgent_nut( void)
 }
 
 
+/* AGENCY.md §14, autopilot "auto-explore": the player hands a worker,
+ * alone in the middle of the map, to agency to explore. It walks toward the
+ * nearest tile it has never seen, a step at a time, until it has seen every
+ * one; then control returns. Saved midway, the mode is kept. */
+static void   test_explore_autopilot( void)
+{
+   BGStage            st;
+   BGActivities       *activities;
+   BGKnowledge        *knowledge;
+   BGAgency           *agency;
+   BGAgency           *restored;
+   BGKnowledgeStore   *store;
+   BGProposalGroup    *g;
+   BGEntityID         worker;
+   NSArray            *notices;
+   NSString           *text;
+   NSString           *mode;
+   int32_t            x;
+   int32_t            y;
+   int                unseen;
+
+   st.w       = BGTestWorld( 179);
+   st.c       = BGTestCommitter( st.w);
+   activities = [BGActivities activitiesWithWorld:st.w committer:st.c];
+   knowledge  = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+   agency     = [[[BGAgency alloc] initWithWorld:st.w committer:st.c knowledge:knowledge] autorelease];
+   st.s       = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [agency setActivities:activities];
+   [st.s setActivities:activities];
+   [st.s setPerception:knowledge];
+   [st.s setDecision:agency];
+   g      = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: an empty map"];
+   worker = [g create:"worker" key:"worker" at:BGOnTile( 16, 16, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   worker = [g idFor:worker];
+   BG_CHECK( [agency autopilotExplore:worker threshold:50]);
+
+   /* midway: under way, and the mode saved */
+   [st.s runUntil:BGTimeMake( 10000)];
+   BG_CHECK( [[agency takeNotices] count] == 0 && logged_by( agency, worker, @"exploring: walk_"));
+   text     = BGSave( st.w, st.c, [NSArray arrayWithObjects:knowledge, agency, nil]);
+   mode     = [NSString stringWithFormat:@"explore %llu", (unsigned long long) worker];
+   BG_CHECK( [text rangeOfString:mode].location != NSNotFound);
+   restored = [[[BGAgency alloc] initWithWorld:st.w committer:st.c knowledge:knowledge] autorelease];
+   [restored restoreSavedState:BGSavedDomainState( text, @"agency")];
+   BG_CHECK( [restored mindOf:worker]->explore && [restored mindOf:worker]->autopilot);
+
+   /* on until it has seen it all */
+   [st.s runUntil:BGTimeMake( 600000)];
+   store  = [knowledge storeOf:worker];
+   unseen = 0;
+   for( y = 0; y < 32; y++)
+      for( x = 0; x < 32; x++)
+         if( [store tileSeenAtX:x y:y] < 0)
+            unseen++;
+   BG_CHECK( unseen == 0);
+   notices = [agency takeNotices];
+   BG_CHECK( [notices count] == 1 &&
+             [[notices objectAtIndex:0] isEqualToString:@"Control returns to you: there is nothing left to explore."]);
+   BG_CHECK( ! [agency controls:worker]);
+}
+
+
 /* Talking takes time (ACTIONS.md §5, AGENCY.md §11: conversations are
  * communicate activities): a remark is a second on the voice, the words
  * said when it ends. Walking while talking works; a second remark at once
@@ -7977,6 +8041,7 @@ const BGTestCase   BGAllTests[] =
    { "attention_budget",              test_attention_budget },
    { "routine_autopilot",             test_routine_autopilot },
    { "talking_takes_time",            test_talking_takes_time },
+   { "explore_autopilot",             test_explore_autopilot },
    { "resume_recheck",                test_resume_recheck },
    { "interrupted_repair",            test_interrupted_repair },
    { "unattended_stove",              test_unattended_stove },
