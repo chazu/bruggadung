@@ -2781,7 +2781,24 @@ Checked: curious Mira, with twelve workers taking up a stone each at one
 boundary and the last speaking to her, attends to ten: the remark first,
 then the first nine takes as committed; the other three go unnoticed.
 
-Not yet: attention for state and trace perception (only events spend it),
-and interpretation within the budget.
+Not yet: attention for state and trace perception (only events spend it).
 
 76 tests, 2509 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: thinking it over takes attention too
+
+KNOWLEDGE.md §9: "Immediate: cheap rules that run on observation, within
+the attention budget." Deliberate interpretation (investigating) "spends
+time" instead.
+
+- **Immediate conclusions spend what the events left**: each finding an
+  immediate rule draws costs a percept's worth; with none left, the rule
+  waits for a boundary that has some ("no attention left to think R… over").
+  Investigating isn't limited.
+
+Checked: Mira, her attention spent on the twelve takes and the remark,
+draws no disturbance from a clatter among them at that boundary; at the
+next, quiet one, while it can still be heard, she does. With ten times the
+budget, the same scene's checks fail: the budget is what holds.
+
+76 tests, 2511 checks, under both compilers, ASan, and leak-free.

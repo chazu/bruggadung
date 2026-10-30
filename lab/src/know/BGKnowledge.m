@@ -2577,6 +2577,7 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
  * each referent; a rule whose premises all hold adds its finding. */
 - (void) interpret:(BGKnowledgeStore *) store
       deliberately:(BOOL) deliberately
+            budget:(NSInteger) budget
               news:(NSMutableArray *) news
 {
    const TriNode      *rule;
@@ -2665,6 +2666,13 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
          }
          if( ! holds)
             continue;
+         /* immediate interpretation spends attention (KNOWLEDGE.md §9): with
+          * none left, it waits for a boundary that has some */
+         if( ! deliberately && budget-- <= 0)
+         {
+            [news addObject:[NSString stringWithFormat:@"no attention left to think R%u over", r->id]];
+            continue;
+         }
          memset( &f, 0, sizeof( f));
          f.kind   = [_world intern:concludes];
          f.about  = r->id;
@@ -2783,6 +2791,7 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
    BGCandidate        candidates[ 64];
    NSUInteger         ncandidates;
    NSInteger          budget;
+   NSInteger          left;
 
    agent       = [store agent];
    news        = [store mutableNews];
@@ -3387,7 +3396,11 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
    }
    memory = [_world record:[_world kindNamed:"Agent"] for:agent];
    [store keepAtMost:memory && memory->memory > 0 ? (NSUInteger) memory->memory : 64];
-   [self interpret:store deliberately:closely news:news];
+   /* what the events attended to left of the budget */
+   left = budget - (NSInteger) ncandidates;
+   if( left < 0)
+      left = 0;
+   [self interpret:store deliberately:closely budget:left news:news];
    free( seen);
    free( assigned);
    free( taken);

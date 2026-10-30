@@ -7044,6 +7044,9 @@ static void   test_pain( void)
  * the last of them speaking to her as well. At rest she attends to ten: the
  * remark first (being addressed), then the first nine takes; the other
  * three go unnoticed. */
+static BOOL   disturbed( BGKnowledgeStore *store);
+
+
 static void   test_attention_budget( void)
 {
    BGStage            st;
@@ -7097,6 +7100,10 @@ static void   test_attention_budget( void)
    say         = BGActionMake( "say", workers[ 11], mira, BGNoEntity);
    say.content = [st.w intern:"#Here & { what: #Agent }"];
    BG_CHECK( BGPerform( st.w, st.c, say, 0, &error) != nil);
+   /* and a clatter on the floor among them */
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: something falls"];
+   BGMakeTrace( st.w, g, "clatter", BGNoEntity, BGOnTile( 8, 9, 0), 60, "a falling tin");
+   [st.c submit:g];
    [st.s runUntil:BGTimeMake( 1001)];
    at = [st.w time].ms;
 
@@ -7133,6 +7140,25 @@ static void   test_attention_budget( void)
       n++;
    }
    BG_CHECK( n == 12);
+
+   /* nothing left to think over the clatter with (KNOWLEDGE.md §9:
+    * immediate interpretation, within the budget); at the next, quiet
+    * boundary, while it can still be heard, she does */
+   BG_CHECK( ! disturbed( store));
+   [st.s runUntil:BGTimeMake( 1500)];
+   BG_CHECK( disturbed( store));
+}
+
+
+/* Whether the store has concluded a disturbance about anything. */
+static BOOL   disturbed( BGKnowledgeStore *store)
+{
+   NSUInteger   i;
+
+   for( i = 0; i < [store findingCount]; i++)
+      if( ! strcmp( [store findingAt:i]->kind, "#Disturbance"))
+         return( YES);
+   return( NO);
 }
 
 
