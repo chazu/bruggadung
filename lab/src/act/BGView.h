@@ -35,6 +35,9 @@
  * ("mass: 90g, material: \"iron\", ..."), without id or place */
 - (NSString *) kindOf:(BGEntityID) entity;
 - (NSString *) featuresOf:(BGEntityID) entity;
+/* every field the inspector sees, hidden ones too: the omniscient stub's */
+- (NSString *) featuresOf:(BGEntityID) entity
+                      all:(BOOL) all;
 
 @end
 

@@ -928,6 +928,26 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
 }
 
 
+/* Whether the agent has a suspended activity of one of the method's
+ * operations. */
+- (BOOL) suspendedStepOf:(const char *) method
+                    mind:(BGMotivation *) m
+{
+   const TriNode   *steps;
+   const TriNode   *step;
+   TriContent      *tri;
+   char            op[ 64];
+
+   tri = [_world tri];
+   for( steps = tri_at( tri, tri_pattern( tri, method), "steps"); steps && (step = tri_at( tri, steps, "first"));
+        steps = tri_at( tri, steps, "rest"))
+      if( text_at( tri, step, "op", op, sizeof( op)) &&
+          [self activity:op of:m->agent status:"suspended" since:0] != BGNoEntity)
+         return( YES);
+   return( NO);
+}
+
+
 /* The method's failure: the goal tries its next. */
 - (void) fail:(BGMotivation *) m
        method:(int) index
@@ -969,6 +989,8 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    const char         *content;
    TriType            utterance;
    BGEntityID         suspended;
+   BOOL               sequence;
+   int                q;
    char               text[ 2048];
    int                k;
 
@@ -980,8 +1002,23 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    if( ! text_at( tri, pattern, "title", title, sizeof( title)))
       snprintf( title, sizeof( title), "%s", method);
 
-   for( steps = tri_at( tri, pattern, "steps"); steps && (step = tri_at( tri, steps, "first")); steps = tri_at( tri, steps, "rest"))
+   sequence = tri_at( tri, pattern, "sequence") && tri_node_type( tri_at( tri, pattern, "sequence")) == tri_type_named( tri, "true");
+   for( k = 0, steps = tri_at( tri, pattern, "steps"); steps && (step = tri_at( tri, steps, "first"));
+        steps = tri_at( tri, steps, "rest"), k++)
    {
+      /* a recipe's operation done already: an instant one performed, a timed
+       * one completed since the goal was adopted */
+      if( sequence && text_at( tri, step, "op", op, sizeof( op)))
+      {
+         int64_t    d;
+         NSString   *e;
+
+         if( k < 32 && (m->intentions[ m->nintentions - 1].stepsDone & (1u << k)))
+            continue;
+         if( BGOperationStage( _world, op, 0, &d, &e) && d > 0 &&
+             [self activity:op of:m->agent status:"completed" since:m->intentions[ m->nintentions - 1].adopted] != BGNoEntity)
+            continue;
+      }
       if( tri_node_type( step) == achieve)
       {
          if( ! text_at( tri, step, "subgoal", goal, sizeof( goal)) || ! tri_at( tri, tri_pattern( tri, goal), "done"))
@@ -1005,23 +1042,6 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
       /* the operation, within reach of what it names */
       if( ! text_at( tri, step, "op", op, sizeof( op)))
          continue;
-      for( k = 0; k < 2; k++)
-      {
-         roles[ k] = 0;
-         if( ! text_at( tri, step, names[ k], slot, sizeof( slot)))
-            continue;
-         if( ! (roles[ k] = bound( b, n, slot)))
-         {
-            [self fail:m method:index why:[NSString stringWithFormat:@"%s: %s names %s, which nothing fills", title, op, slot]];
-            return( NO);
-         }
-      }
-      for( k = 0; k < 2; k++)
-         if( roles[ k] && ! in_reach( me, r = [store referent:roles[ k]]) && r)
-         {
-            [self walk:m why:title me:me toward:r];
-            return( YES);
-         }
       /* an activity of it the agent suspended: resumed, not begun again */
       if( _activities && (suspended = [self activity:op of:m->agent status:"suspended" since:0]) != BGNoEntity)
       {
@@ -1034,6 +1054,23 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
             [self note:m line:[NSString stringWithFormat:@"%s: could not resume %s: %@", title, op, error]];
          return( YES);
       }
+      for( q = 0; q < 2; q++)
+      {
+         roles[ q] = 0;
+         if( ! text_at( tri, step, names[ q], slot, sizeof( slot)))
+            continue;
+         if( ! (roles[ q] = bound( b, n, slot)))
+         {
+            [self fail:m method:index why:[NSString stringWithFormat:@"%s: %s names %s, which nothing fills", title, op, slot]];
+            return( NO);
+         }
+      }
+      for( q = 0; q < 2; q++)
+         if( roles[ q] && ! in_reach( me, r = [store referent:roles[ q]]) && r)
+         {
+            [self walk:m why:title me:me toward:r];
+            return( YES);
+         }
       /* what it says, if anything: after a question, it waits for the answer */
       says    = tri_at( tri, step, "says");
       content = NULL;
@@ -1047,14 +1084,23 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
       {
          char   context[ 128];
 
+         if( sequence && k < 32)
+         {
+            int64_t    d;
+            NSString   *e;
+
+            if( ! (BGOperationStage( _world, op, 0, &d, &e) && d > 0))
+               m->intentions[ m->nintentions - 1].stepsDone |= 1u << k;
+         }
+
          /* a repetition of the method, and of what it chose for each slot */
          snprintf( context, sizeof( context), "%s:%s", m->intentions[ m->nintentions - 1].goal, method);
          [self practise:m context:context choice:0];
-         for( k = 0; k < 2; k++)
-            if( roles[ k] && text_at( tri, step, names[ k], slot, sizeof( slot)))
+         for( q = 0; q < 2; q++)
+            if( roles[ q] && text_at( tri, step, names[ q], slot, sizeof( slot)))
             {
                snprintf( context, sizeof( context), "%s.%s", method, slot);
-               [self practise:m context:context choice:roles[ k]];
+               [self practise:m context:context choice:roles[ q]];
             }
       }
       else
@@ -1939,6 +1985,14 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
       memcpy( b, top->params, sizeof( BGSlotBinding) * n);
       _nunknown    = 0;
       _residual[ 0] = 0;
+      if( (int) i == top->following && [self suspendedStepOf:methods[ i] mind:m])
+      {
+         /* back to what it put down: resuming rechecks what it needs */
+         chosen  = (int) i;
+         chosenN = n;
+         memcpy( chosenB, b, sizeof( BGSlotBinding) * (size_t) n);
+         break;
+      }
       if( ! [self holds:methods[ i] path:"pre" since:top->adopted bindings:b count:&n store:store])
       {
          /* unknown, not false: a method may find out first (AGENCY.md §5, onUnknown) */
@@ -2104,8 +2158,9 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
       for( k = 0; k < m->nintentions; k++)
       {
          t = &m->intentions[ k];
-         [line appendFormat:@" %s %lld %u %d %d %u %d %d %d", t->goal, (long long) t->adopted, t->failed, t->pending,
-                                                          t->following, t->arose, t->commitment, t->pressed, t->nparams];
+         [line appendFormat:@" %s %lld %u %d %d %u %d %d %u %d", t->goal, (long long) t->adopted, t->failed, t->pending,
+                                                             t->following, t->arose, t->commitment, t->pressed, t->stepsDone,
+                                                             t->nparams];
          for( p = 0; p < t->nparams; p++)
             [line appendFormat:@" %s %u", t->params[ p].slot, t->params[ p].referent];
       }
@@ -2251,7 +2306,7 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
       m->awaitUntil = [[words objectAtIndex:7] longLongValue];
       n             = [[words objectAtIndex:8] intValue];
       w             = 9;
-      for( k = 0; k < n && k < BG_MAX_INTENTIONS && w + 9 <= [words count]; k++)
+      for( k = 0; k < n && k < BG_MAX_INTENTIONS && w + 10 <= [words count]; k++)
       {
          t          = &m->intentions[ m->nintentions++];
          memset( t, 0, sizeof( *t));
@@ -2263,6 +2318,7 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
          t->arose      = (uint32_t) [[words objectAtIndex:w++] longLongValue];
          t->commitment = [[words objectAtIndex:w++] intValue];
          t->pressed    = [[words objectAtIndex:w++] intValue];
+         t->stepsDone  = (uint32_t) [[words objectAtIndex:w++] longLongValue];
          t->nparams    = [[words objectAtIndex:w++] intValue];
          for( p = 0; p < t->nparams && p < BG_MAX_SLOTS && w + 2 <= [words count]; p++)
          {

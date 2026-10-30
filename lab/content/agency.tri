@@ -19,6 +19,9 @@
 // to ask.
 #HavingNails: #WithNails & { box: #Container, someone: #Agent }
 
+// Repairing: the shutoff to close, the wrench, and the pump.
+#Repairing: #Frame & { shutoff: #Body, tool: #Body, pump: #Body }
+
 // Tightening: the spanner, and the nut.
 #Tightening: #Frame & { spanner: #Body, nut: #Body }
 
@@ -120,7 +123,12 @@
     steps:     [...#MethodStep]
     score:     [...#Consideration]
     onUnknown: text
+    sequence:  *false | true
 }
+
+// A `sequence` method is a recipe (ACTIONS.md §6): its operations are done
+// in order, once each; a timed one is done when its activity has completed
+// since the goal was adopted, and a suspended one is resumed.
 
 // `onUnknown` (AGENCY.md §5): when the precondition is unknown, rather than
 // false, the goal to adopt first, with the unknown match's bindings: finding
@@ -466,4 +474,34 @@ go_and_peer: #Method & {
     rank:  1
     pre:   { find: ["nut"], match: #Tightening & { nut: #Fastener } }
     steps: [#Do & { op: "peer_at", object: "nut" }]
+} @family(methods)
+
+
+// --- ACTIONS.md Scenario 3, "the interrupted repair" ------------------------------
+
+repair_pump: #Goal & {
+    title: "repair the pump"
+    done:  { find: ["pump"], match: #Repairing & { pump: #Pump & { opened: true } } }
+} @family(goals)
+
+// The recipe: shut off the pump's line, then dismantle it. Which cock is
+// the shutoff comes from what the agent knows: a diagram, say.
+the_recipe: #Method & {
+    title:    "follow the recipe"
+    goal:     "repair_pump"
+    rank:     1
+    sequence: true
+    pre: {
+        find:  ["shutoff", "tool", "pump"]
+        match: #Repairing & {
+            me:      #Agent & { id: $me }
+            shutoff: #Cock & { serves: "pump" }
+            tool:    #Wrench & { place: #Held & { by: $me } }
+            pump:    #Pump & { opened: false }
+        }
+    }
+    steps: [
+        #Do & { op: "shut_off", object: "shutoff" },
+        #Do & { op: "dismantle", object: "tool", target: "pump" },
+    ]
 } @family(methods)

@@ -66,7 +66,7 @@ static void   test_registry_and_construction( void)
 
    w = BGTestWorld( 1);
    c = BGTestCommitter( w);
-   BG_CHECK( [w kindCount] == 15);
+   BG_CHECK( [w kindCount] == 17);
    BG_CHECK( [w kindNamed:"Body"] != NSNotFound && [w kindNamed:"Nonesuch"] == NSNotFound);
    bin   = commit_create( c, "bin", BGOnTile( 0, 0, 0));
    nails = commit_create( c, "nails_30", BGIn( bin));
@@ -4158,6 +4158,172 @@ static void   test_resume_recheck( void)
 }
 
 
+/* --- the interrupted repair --------------------------------------------------- */
+
+/* the agent's activity of the operation, in that status ("running"), or 0 */
+static BGEntityID   activity_of( BGWorld *w, BGEntityID actor, const char *operation, const char *status)
+{
+   const BGActivity   *record;
+   BGStore            *store;
+   NSUInteger         i;
+   char               quoted[ 32];
+
+   snprintf( quoted, sizeof( quoted), "\"%s\"", status);
+   store = [w storeForKind:[w kindNamed:"Activity"]];
+   for( i = 0; i < [store count]; i++)
+   {
+      record = [store recordAtIndex:i];
+      if( (BGEntityID) record->actorRef == actor && record->status == (uint32_t) tri_type_named( [w tri], quoted) &&
+          ! strcmp( [w textField:"Activity.operation" of:[store entityAtIndex:i]], operation))
+         return( [store entityAtIndex:i]);
+   }
+   return( BGNoEntity);
+}
+
+
+typedef struct
+{
+   BGWorld       *world;
+   BGAgency      *agency;
+   BGEntityID    worker;
+   BGEntityID    trough;
+   BGEntityID    riser;
+   BGEntityID    pump;
+   int64_t       stage;          /* the dismantling, when suspended */
+   int64_t       progress;
+   BOOL          openWhileSuspended;
+   BOOL          saved;          /* a save while suspended restores the same */
+} BGRepairRun;
+
+
+/* ACTIONS.md Scenario 3, "the interrupted repair": the worker, with a wrench
+ * and the miller's diagram (which wrongly shows the trough line's cock as
+ * the pump's shutoff), repairs the pump by the recipe. At 60% of the last
+ * stage of dismantling it is called away, and puts it down; the smith,
+ * beside it, takes the wrench; later the wrench is back. `omniscient`: the
+ * stub, which needs no diagram. */
+static BGRepairRun   repair_run( BOOL omniscient)
+{
+   BGStage            st;
+   BGActivities       *activities;
+   BGKnowledge        *knowledge;
+   BGAgency           *agency;
+   BGProposalGroup    *g;
+   BGEntityID         wrench;
+   BGEntityID         diagram;
+   BGEntityID         smith;
+   BGEntityID         a;
+   NSString           *error;
+   NSString           *text;
+   BGWorld            *w2;
+   NSArray            *deferred;
+   uint64_t           position;
+   BGRepairRun        run;
+   int64_t            start;
+   int64_t            v;
+
+   memset( &run, 0, sizeof( run));
+   st.w       = BGTestWorld( 83);
+   st.c       = BGTestCommitter( st.w);
+   activities = [BGActivities activitiesWithWorld:st.w committer:st.c];
+   knowledge  = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+   agency     = [[[BGAgency alloc] initWithWorld:st.w committer:st.c knowledge:knowledge] autorelease];
+   st.s       = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [knowledge setOmniscient:omniscient];
+   [agency setActivities:activities];
+   [st.s setActivities:activities];
+   [st.s setPerception:knowledge];
+   [st.s setDecision:agency];
+   g          = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the mill"];
+   run.pump   = [g create:"pump" key:"pump" at:BGOnTile( 10, 10, 0)];
+   run.trough = [g create:"cock_trough" key:"the trough line's cock" at:BGOnTile( 9, 9, 0)];
+   run.riser  = [g create:"cock_pump" key:"the riser's cock" at:BGOnTile( 11, 9, 0)];
+   run.worker = [g create:"worker" key:"worker" at:BGOnTile( 10, 9, 0)];
+   smith      = [g create:"smith" key:"smith" at:BGOnTile( 11, 10, 0)];
+   wrench     = [g create:"wrench_250" key:"wrench" at:BGHeldBy( run.worker, 0)];
+   diagram    = [g create:"diagram" key:"diagram" at:BGHeldBy( run.worker, 1)];
+   [g set:"Record.writing" of:BGWhole( diagram)
+   toText:[st.w intern:"#Writing & { author: #Agent & { coat: \"white\" }, entries: [#Serves & { what: #Cock & "
+                       "{ place: #OnTile & { x: 9, y: 9, level: 0 } }, line: \"pump\", attribution: #Saw & { sure: 30 } }] }"]];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   run.pump   = [g idFor:run.pump];
+   run.trough = [g idFor:run.trough];
+   run.riser  = [g idFor:run.riser];
+   run.worker = [g idFor:run.worker];
+   smith      = [g idFor:smith];
+   wrench     = [g idFor:wrench];
+   diagram    = [g idFor:diagram];
+
+   /* it reads the diagram, and sets to the repair */
+   error = nil;
+   if( ! omniscient)
+      BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "read", run.worker, diagram, BGNoEntity), 0, &error) != nil);
+   [st.s runUntil:BGTimeMake( 1000)];
+   BG_CHECK( [agency commit:run.worker toGoal:"repair_pump"]);
+   [st.s runUntil:BGTimeMake( 3000)];
+   a     = activity_of( st.w, run.worker, "dismantle", "running");
+   start = 0;
+   BG_CHECK( a && [st.w getField:"Activity.started" of:a value:&start]);
+
+   /* stage 3 is 60% done: called away, it puts the work down; the smith takes the wrench */
+   [st.s runUntil:BGTimeMake( start + 3000 + 3000 + 3000)];
+   BG_CHECK( [activities suspend:a because:@"someone shouts its name" error:&error] != nil);
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the smith takes the wrench"];
+   [g move:BGWhole( wrench) to:BGHeldBy( smith, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( [st.w time].ms + 1000)];
+   [st.w getField:"Activity.stage" of:a value:&run.stage];
+   [st.w getField:"Activity.progress" of:a value:&run.progress];
+   run.openWhileSuspended = [st.w getField:"Pump.opened" of:run.pump value:&v] && v;
+
+   /* saved while suspended, and restored the same */
+   text      = BGSave( st.w, st.c, [NSArray arrayWithObjects:knowledge, agency, nil]);
+   w2        = BGRestore( text, [st.w contentBuild], &deferred, &position, &error);
+   run.saved = w2 && [w2 stateHash] == [st.w stateHash];
+
+   /* the wrench back: the repair goes on */
+   [st.s runUntil:BGTimeMake( [st.w time].ms + 2000)];
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the wrench back"];
+   [g move:BGWhole( wrench) to:BGHeldBy( run.worker, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( [st.w time].ms + 10000)];
+   run.world  = st.w;
+   run.agency = agency;
+   return( run);
+}
+
+
+static void   test_interrupted_repair( void)
+{
+   BGRepairRun   run;
+   BGRepairRun   seer;
+   int64_t       v;
+
+   /* 1: the recipe binds through knowledge: by the diagram, the trough line's cock */
+   run = repair_run( NO);
+   BG_CHECK( logged_by( run.agency, run.worker, @"[repair the pump] follow the recipe: shut_off R"));
+   BG_CHECK( [run.world getField:"Cock.shut" of:run.trough value:&v] && v);
+   BG_CHECK( [run.world getField:"Cock.shut" of:run.riser value:&v] && ! v);
+   /* the omniscient stub binds the riser's */
+   seer = repair_run( YES);
+   BG_CHECK( [seer.world getField:"Cock.shut" of:seer.riser value:&v] && v);
+   BG_CHECK( [seer.world getField:"Cock.shut" of:seer.trough value:&v] && ! v);
+
+   /* 4: suspended at 60% of the last stage: its progress kept, nothing committed */
+   BG_CHECK( run.stage == 2 && run.progress == 3000);
+   BG_CHECK( ! run.openWhileSuspended);
+   /* 6: resuming without the wrench is refused, with the reason */
+   BG_CHECK( logged_by( run.agency, run.worker, @"could not resume dismantle: what it needs no longer holds"));
+   /* 5: saved while suspended, restored the same */
+   BG_CHECK( run.saved);
+   /* the wrench back, it resumes, and the pump is open */
+   BG_CHECK( logged_by( run.agency, run.worker, @"follow the recipe: resuming dismantle"));
+   BG_CHECK( [run.world getField:"Pump.opened" of:run.pump value:&v] && v);
+   BG_CHECK( logged_by( run.agency, run.worker, @"[repair the pump] done"));
+}
+
+
 /* --- the cistern ----------------------------------------------------------- */
 
 static BGCistern   *run_cistern( BGCisternVariant variant)
@@ -4478,6 +4644,7 @@ const BGTestCase   BGAllTests[] =
    { "unknown_nut",                   test_unknown_nut },
    { "seized_valve",                  test_seized_valve },
    { "resume_recheck",                test_resume_recheck },
+   { "interrupted_repair",            test_interrupted_repair },
    { "rumour",                        test_rumour },
    { "memory_decay",                  test_memory_decay },
    { "salience",                      test_salience },

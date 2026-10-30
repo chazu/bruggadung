@@ -1395,6 +1395,42 @@ static char   *concrete_features( const char *printed)
 }
 
 
+/* Told (a diagram, say) which line something serves: what it says, kept
+ * with the referent beyond its looks, as an analysis's finding is; the
+ * referent recognized by its kind on the tile the claim gives. */
+- (void) serves:(const TriNode *) claim
+           from:(uint32_t) speaker
+          store:(BGKnowledgeStore *) store
+           news:(NSMutableArray *) news
+{
+   const BGReferent   *r;
+   BGReferent         *m;
+   const char         *kind;
+   NSUInteger         i;
+   int64_t            x;
+   int64_t            y;
+   char               line[ 64];
+   char               deeper[ 128];
+
+   kind = tri_type_name( [_world tri], tri_node_type( tri_at( [_world tri], claim, "what")));
+   if( ! node_int( [_world tri], claim, "what.place.x", &x) || ! node_int( [_world tri], claim, "what.place.y", &y) ||
+       tri_print( [_world tri], tri_at( [_world tri], claim, "line"), line, sizeof( line)) < 3)
+      return;
+   for( i = 0; i < [store count]; i++)
+   {
+      r = [store referentAt:i];
+      if( ! r->kind || strcmp( r->kind, kind) || r->form != BGLocationOnTile || r->x != x || r->y != y)
+         continue;
+      m = [store mutableReferent:r->id];
+      snprintf( deeper, sizeof( deeper), "serves: %s", line);
+      free( m->deeper);
+      m->deeper = strdup( deeper);
+      [news addObject:[NSString stringWithFormat:@"R%u serves %s, R%u says", r->id, line, speaker]];
+      return;
+   }
+}
+
+
 /* Told something is reserved for someone (ACTIONS.md §7): a #Reserved
  * finding about the thing, recognized among the referents of its kind that
  * look alike, its choice whom it is reserved for. */
@@ -1546,6 +1582,12 @@ static char   *concrete_features( const char *printed)
    tri   = [_world tri];
    arena = tri_arena_new();
    claim = tri_value( tri, content, arena, NULL, 0);
+   if( claim && tri_subtype( tri, tri_node_type( claim), tri_type_named( tri, "#Serves")))
+   {
+      [self serves:claim from:speaker store:store news:news];
+      tri_arena_free( arena);
+      return;
+   }
    if( claim && tri_subtype( tri, tri_node_type( claim), tri_type_named( tri, "#ReservedFor")))
    {
       [self reserved:claim from:speaker store:store news:news];
@@ -2209,7 +2251,7 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
          if( assigned[ i])
             continue;
          kind     = [view kindOf:seen[ i].entity];
-         features = [view featuresOf:seen[ i].entity];
+         features = [view featuresOf:seen[ i].entity all:_omniscient];
          at       = [_world locationOf:seen[ i].entity];
          ground_tile( _world, seen[ i].entity, &tile);
          /* at dusk, beyond arm's reach, a step less precisely */

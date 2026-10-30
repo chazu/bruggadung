@@ -218,6 +218,13 @@ static const BGFieldInfo   *appearance_of( const BGComponentInfo *kind, const BG
 
 - (NSString *) featuresOf:(BGEntityID) entity
 {
+   return( [self featuresOf:entity all:NO]);
+}
+
+
+- (NSString *) featuresOf:(BGEntityID) entity
+                      all:(BOOL) all
+{
    const BGComponentInfo     *kind;
    const BGFieldInfo         *f;
    const uint8_t             *record;
@@ -239,7 +246,7 @@ static const BGFieldInfo   *appearance_of( const BGComponentInfo *kind, const BG
       for( i = 0; i < kind->nfields; i++)
       {
          f = &kind->fields[ i];
-         if( ! strstr( f->flags, "perceive"))
+         if( ! strstr( f->flags, "perceive") && ! (all && strstr( f->flags, "inspect") && strstr( f->flags, "content")))
             continue;
          [s appendFormat:@"%s%s: ", [s length] ? ", " : "", f->name];
          /* what the senses report: its appearance, if it has one */

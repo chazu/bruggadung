@@ -1502,3 +1502,39 @@ interruption, partial effects on abort, and the watch on rising water.
 
 50 tests, 1902 checks, under both compilers, ASan and UBSan, and leak-free.
 
+### After the slice: the interrupted repair
+
+ACTIONS.md Scenario 3, most of it. The worker holds a wrench and the
+miller's diagram, which wrongly shows the trough line's cock as the pump's
+shutoff. It reads the diagram and sets to *repair the pump* by the recipe:
+shut off the pump's line, then dismantle the pump (three stages). The
+recipe binds through what it knows, so it shuts the trough line's cock;
+the omniscient stub, which needs no diagram, shuts the riser's. At 60% of
+dismantling's last stage the worker is called away and puts the work down:
+the progress is kept and nothing is committed. The smith, beside it, takes
+the wrench. A save then restores the same. The worker goes back to the
+recipe, and resuming is refused, with the reason; with the wrench back, it
+resumes, and the pump is open.
+
+- **Recipes** are `sequence` methods: their operations in order, once
+  each; a timed one is done when its activity has completed since the goal
+  was adopted, an instant one when performed (kept, and saved, with the
+  intention). A recipe being followed with a suspended activity is
+  followed again even if its precondition no longer holds: resuming
+  rechecks what it needs.
+- **Diagrams** are records whose entries are `#Serves` claims (which line
+  something serves); a reader keeps what one says with the referent,
+  beyond its looks, as it does an analysis's finding. `#Writing` entries are
+  any `#Telling`.
+- **The omniscient stub sees hidden fields** (`featuresOf:all:`): every
+  content field the inspector shows.
+- **Cocks** (`serves`, hidden; `shut`) and **the pump** (`opened`), with
+  `shut_off` and the three-stage `dismantle`.
+
+Not yet, of the scenario: talking while working as a voice provider (an
+utterance is instant), the shout as a soft interruption agency decides on
+(the test suspends), abort committing partial effects, inspection binding
+the faulty part, improvising another chain, and the watch on rising water.
+
+51 tests, 1921 checks, under both compilers, ASan and UBSan, and leak-free.
+

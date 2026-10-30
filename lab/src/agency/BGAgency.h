@@ -122,6 +122,7 @@ typedef struct
    uint32_t        arose;        /* the referent it arose about, or 0 */
    int             commitment;   /* the commitment it keeps, + 1, or 0 */
    int             pressed;      /* a need raised it */
+   uint32_t        stepsDone;    /* a sequence's instant steps done, by index */
 } BGIntention;
 
 

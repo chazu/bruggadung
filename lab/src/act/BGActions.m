@@ -802,6 +802,22 @@ static NSString   *effect_strike( BGWorld *world, BGAction a, int64_t amount, BG
 }
 
 
+/* Shutting a cock. */
+static NSString   *effect_shut( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
+{
+   [g set:"Cock.shut" of:BGWhole( a.roles[ BGRoleItem]) to:1];
+   return( nil);
+}
+
+
+/* Dismantling's last stage: the pump is open. */
+static NSString   *effect_dismantle( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
+{
+   [g set:"Pump.opened" of:BGWhole( a.roles[ BGRoleDestination]) to:1];
+   return( nil);
+}
+
+
 /* Tending changes nothing but traces, which the operation declares. */
 static NSString   *effect_tend( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
 {
@@ -841,6 +857,8 @@ static const struct
    { "investigate", effect_investigate },
    { "tighten",   effect_tighten },
    { "rotate",    effect_rotate },
+   { "shut",      effect_shut },
+   { "dismantle", effect_dismantle },
    { "strike",    effect_strike },
 };
 

@@ -82,7 +82,11 @@ say: #Operation & {
 }
 
 // What a record holds: who wrote it, by their looks, and the claims written.
-#Writing: { author: #Agent, entries: [...#IsIn] }
+#Writing: { author: #Agent, entries: [...#Telling] }
+
+// A claim: something like `what` serves `line` (a diagram's: which cock shuts
+// off which line).
+#Serves: #Telling & { line: text }
 
 // Write a claim into a record the actor holds. What is written is the
 // command's: a #Writing with one entry.

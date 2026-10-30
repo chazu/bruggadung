@@ -318,8 +318,10 @@ A rebuilt world produces the same next step as one that never saved.
    two hands, one seal); and recognition weighing failure paths by
    persistence into identity hypotheses (CONTENT_LANGUAGE.md's coat at
    dusk); perception's precision, with unknown matches made goals (the nut
-   of unknown size); and instrument chains, graded excess, and effects
-   with no success flag (ACTIONS.md's seized valve).
+   of unknown size); instrument chains, graded excess, and effects with no
+   success flag (ACTIONS.md's seized valve); and recipes bound through
+   knowledge, suspended, and resumed with their requirements rechecked
+   (the interrupted repair).
 
 ## Cross-cutting open questions
 

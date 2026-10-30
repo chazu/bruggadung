@@ -152,3 +152,17 @@
     turned:    *false | true                 @field(content, saved, proposable, inspect, perceive(sight))
 }
 
+// A shutoff cock on a line (ACTIONS.md Scenario 3): which line it serves
+// can't be seen; a diagram may say, rightly or not.
+#Cock: #Body & {
+    @component(Cock)
+    serves: text          @field(content, saved, inspect)
+    shut:   *false | true @field(content, saved, proposable, inspect, perceive(sight))
+}
+
+// The miller's pump: open once dismantled.
+#Pump: #Assembly & {
+    @component(Pump)
+    opened: *false | true @field(content, saved, proposable, inspect, perceive(sight))
+}
+

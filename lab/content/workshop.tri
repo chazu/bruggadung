@@ -87,3 +87,10 @@ seized_valve: #Valve & { material: "brass", mass: 2kg, rating: 12Nm, breakaway: 
 wrench_250:   #Wrench & { material: "steel", mass: 400g, leverage: 250mm, limit: 80Nm }
 pipe_600:     #Pipe & { material: "iron", mass: 1500g, leverage: 600mm, limit: 2000Nm, sleeve: true }
 stone:        #Body & { material: "stone", mass: 800g }
+
+// For ACTIONS.md's interrupted repair: the miller's pump, the cocks on the
+// riser and the trough line, and the diagram.
+pump:        #Pump & { material: "iron", mass: 40kg, slots: 4 }
+cock_trough: #Cock & { material: "brass", mass: 300g, serves: "trough" }
+cock_pump:   #Cock & { material: "brass", mass: 300g, serves: "pump" }
+diagram:     #Record & { material: "paper", mass: 20g }
