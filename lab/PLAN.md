@@ -3522,3 +3522,28 @@ employer (`pay_up` knows deliveries only); being paid ending the need
 that sent one looking.
 
 88 tests, 2766 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: a deal posted
+
+AGENCY.md decision 15: "deals can also be posted in the world: a flyer or
+a classified ad is a record offering one, and an agent who reads it can
+take it up, going to the employer".
+
+- **`#Hiring`** (work.tri): a claim, someone like `holder` hires, for pay
+  like `what`; find them at `site`. Read (or heard), the reader believes
+  the employer there, unless it has seen them, and draws a `#Hires`
+  finding about them, as credible as the author.
+- **`flyer`**: a label legible from two tiles, its writing a `#Hiring` by
+  the employer.
+- **`"hiring"`**: a slot order, those believed hiring first; asking for
+  work uses it.
+
+Checked: with the foreman out of sight and its flyer by Kasimir, he reads
+it at a glance, walks to where it says, and is hired, does the job, and is
+paid. Without the flyer, he asks the nearest, the carter, who has no work
+(`#HaveNone`), and gives up.
+
+Not yet: answering an ad as it says (a written reply, a place to call);
+ads that expire; a posted job read by someone not looking for work.
+
+88 tests, 2782 checks, under both compilers, ASan, and leak-free.

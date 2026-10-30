@@ -23,6 +23,8 @@
 #Taken: #Finding & {}
 // It (the agent itself) is under arrest, by the finding's choice.
 #Arrested: #Finding & {}
+// It hires (AGENCY.md decision 15): as the agent read, or was told.
+#Hires: #Finding & {}
 // It struck someone, the finding's choice (AGENCY.md §13): a threat, to
 // the agent itself when it was the one struck.
 #Struck: #Finding & {}

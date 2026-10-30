@@ -13,6 +13,13 @@
 // What having it done is worth to the employer: `gain`, in dB.
 #Job: #Placing & { task: text, pay: #Body, shift: time & >=1s & <=30d, gain: int }
 
+// A deal posted (decision 15): someone like `holder` hires, for pay like
+// `what`; to answer, find them at `site`. Written on a flyer, or an ad, by
+// the employer; a reader who needs work goes to them first.
+#Hiring: #Naming & { site: #OnTile }
+
+flyer: #Label & { material: "paper", mass: 5g, legible: 2 }
+
 // Hire someone in reach: a bond of theirs to the actor, their loyalty to
 // whoever employs them.
 hire: #Operation & {
@@ -56,13 +63,14 @@ pay_up: #Method & {
     score: [#Flat & { value: -20 }, #Trait & { trait: "honesty", per: 5 }]
 } @family(methods)
 
-// Needing money, ask someone for work, the nearest first: one, then give up.
+// Needing money, ask someone for work: one it read or was told is hiring
+// first, else the nearest; one, then give up.
 ask_for_work: #Method & {
     title:  "ask for work"
     goal:   "get_money"
     rank:   2
     pre:    { find: ["boss"], match: #Getting & { boss: #Agent } }
-    order:  ["near"]
+    order:  ["hiring", "near"]
     search: "boss"
     places: 1
     steps:  [#Do & { op: "say", object: "boss", says: #AskWork & { what: #Body & { material: "cloth" } } }]

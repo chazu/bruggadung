@@ -4779,6 +4779,8 @@ typedef enum
    BGPurseStrangers,             /* B, and the carter and Kasimir aren't friends */
    BGPurseHired,                 /* wary, strangers, and a foreman by Kasimir who hires */
    BGPurseStiffed,               /* that, and the foreman is dishonest */
+   BGPurseAdvert,                /* hired, but the foreman is out of sight, and its flyer by Kasimir */
+   BGPurseUnadvertised,          /* that, with no flyer */
    BGPurseRepaid,                /* B, and on until the loan's term is out */
    BGPurseLost                   /* that, but the wages are lost on the third day */
 } BGPurse;
@@ -4874,25 +4876,41 @@ static BGPurseRun   tempting_purse( BGPurse variant)
       [g set:"Agent.trusting" of:BGWhole( h[ 4]) to:3];
    }
    if( variant == BGPurseHonest || variant == BGPurseRepaid || variant == BGPurseLost || variant == BGPurseWary ||
-       variant == BGPurseStrangers || variant == BGPurseHired || variant == BGPurseStiffed)
+       variant == BGPurseStrangers || variant == BGPurseHired || variant == BGPurseStiffed || variant == BGPurseAdvert ||
+       variant == BGPurseUnadvertised)
       [g set:"Agent.honesty" of:BGWhole( h[ 2]) to:90];
    /* a foreman who hires (AGENCY.md decision 15): the job, a stone into the
     * crate; the pay, a purse in hand. Neither it nor the carter
     * will lend to a stranger */
-   if( variant == BGPurseHired || variant == BGPurseStiffed)
+   if( variant == BGPurseHired || variant == BGPurseStiffed || variant == BGPurseAdvert || variant == BGPurseUnadvertised)
    {
+      int32_t   far;
+
+      far = variant == BGPurseAdvert || variant == BGPurseUnadvertised ? 4 : 0;
       [g set:"Agent.trusting" of:BGWhole( h[ 3]) to:-20];
-      run.foreman = [g create:"foreman" key:"the foreman" at:BGOnTile( 13, 10, 0)];
+      run.foreman = [g create:"foreman" key:"the foreman" at:BGOnTile( 13 + far, 10, 0)];
       [g set:"Agent.hires" of:BGWhole( run.foreman) toText:"crate_job"];
       [g set:"Agent.trusting" of:BGWhole( run.foreman) to:-20];
       if( variant == BGPurseStiffed)
          [g set:"Agent.honesty" of:BGWhole( run.foreman) to:0];
       run.pay     = [g create:"purse" key:"the foreman's purse" at:BGHeldBy( run.foreman, 0)];
-      run.fitting = [g create:"stone" key:"the stone" at:BGOnTile( 10, 8, 0)];
-      run.crate   = [g create:"crate" key:"the crate" at:BGOnTile( 12, 11, 0)];
+      run.fitting = [g create:"stone" key:"the stone" at:BGOnTile( 10 + far, 8, 0)];
+      run.crate   = [g create:"crate" key:"the crate" at:BGOnTile( 12 + far, 11, 0)];
+      /* the foreman's flyer, by Kasimir (decision 15: a deal posted) */
+      if( variant == BGPurseAdvert)
+      {
+         BGEntityID   flyer;
+
+         flyer = [g create:"flyer" key:"the flyer" at:BGOnTile( 9, 9, 0)];
+         [g set:"Record.writing" of:BGWhole( flyer)
+         toText:[st.w intern:"#Writing & { author: #Agent & { coat: \"black\" }, entries: [#Hiring & { "
+                             "what: #Body & { material: \"cloth\" }, holder: #Agent & { coat: \"black\" }, "
+                             "site: #OnTile & { x: 17, y: 10, level: 0 }, when: 0ms, attribution: #Saw & { sure: 30 } }] }"]];
+      }
    }
    /* the carter and Kasimir are friends (AGENCY.md decision 12) */
-   if( variant != BGPurseStrangers && variant != BGPurseHired && variant != BGPurseStiffed)
+   if( variant != BGPurseStrangers && variant != BGPurseHired && variant != BGPurseStiffed && variant != BGPurseAdvert &&
+       variant != BGPurseUnadvertised)
    {
       BGEntityID   bond;
 
@@ -5042,6 +5060,8 @@ static void   test_tempting_purse( void)
    BGPurseRun         strangers;
    BGPurseRun         hired;
    BGPurseRun         stiffed;
+   BGPurseRun         advert;
+   BGPurseRun         unadvertised;
    BGKnowledgeStore   *store;
    const BGReferent   *purse;
    const BGTestimony  *t;
@@ -5171,6 +5191,25 @@ static void   test_tempting_purse( void)
    BG_CHECK( [store trustIn:referent_of( store, stiffed.foreman)] <
              [[hired.knowledge storeOf:hired.kasimir] trustIn:referent_of( [hired.knowledge storeOf:hired.kasimir],
                                                                            hired.foreman)]);
+
+   /* decision 15: deals can be posted. The foreman is out of Kasimir's
+    * sight, but its flyer by him says it hires, and where: he reads it at a
+    * glance, believes it there, goes to it, and is hired. Without the
+    * flyer, he asks the nearest, the carter, who has no work, and gives up */
+   advert = tempting_purse( BGPurseAdvert);
+   store  = [advert.knowledge storeOf:advert.kasimir];
+   BG_CHECK( [store finding:"#Hires" about:referent_of( store, advert.foreman)] &&
+             ! strcmp( [store finding:"#Hires" about:referent_of( store, advert.foreman)]->rule, "told"));
+   BG_CHECK( logged_by( advert.agency, advert.kasimir, @"toward R7 at (17, 10)"));
+   BG_CHECK( logged_by( advert.agency, advert.kasimir, @"ask for work: say R7: #AskWork"));
+   BG_CHECK( logged_by( advert.agency, advert.kasimir, @"hired by R7: deliver"));
+   BG_CHECK( [advert.world locationOf:advert.fitting].place == advert.crate);
+   BG_CHECK( [advert.world locationOf:advert.pay].place == advert.kasimir);
+   unadvertised = tempting_purse( BGPurseUnadvertised);
+   BG_CHECK( logged_by( unadvertised.agency, unadvertised.kasimir, @"ask for work: say R4: #AskWork"));
+   BG_CHECK( logged_by( unadvertised.agency, unadvertised.kasimir, @"R4 answered: #HaveNone"));
+   BG_CHECK( logged_by( unadvertised.agency, unadvertised.carter, @"for work it hasn't"));
+   BG_CHECK( ! logged_by( unadvertised.agency, unadvertised.kasimir, @"hired by"));
 
    /* kept on the loan's last day, not before: the wages back in the carter's hand */
    repaid = tempting_purse( BGPurseRepaid);

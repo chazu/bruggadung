@@ -2275,6 +2275,45 @@ static int32_t   permille_of( int32_t db)
       tri_arena_free( arena);
       return;
    }
+   if( claim && tri_subtype( tri, tri_node_type( claim), tri_type_named( tri, "#Hiring")))
+   {
+      /* a deal posted (AGENCY.md decision 15): someone hires, and where to
+       * find them; believed there, unless seen since */
+      const TriNode   *site;
+      BGFinding       f;
+      uint32_t        employer;
+      int64_t         sx;
+      int64_t         sy;
+      int64_t         sl;
+
+      employer = tri_at( tri, claim, "holder") ? [self person:tri_at( tri, claim, "holder") store:store news:news] : 0;
+      site     = tri_at( tri, claim, "site");
+      if( employer && employer != [store selfReferent])
+      {
+         m = [store mutableReferent:employer];
+         if( site && ! m->seen && node_int( tri, site, "x", &sx) && node_int( tri, site, "y", &sy) &&
+             node_int( tri, site, "level", &sl))
+         {
+            m->form    = BGLocationOnTile;
+            m->x       = (int32_t) sx;
+            m->y       = (int32_t) sy;
+            m->level   = (int32_t) sl;
+            m->present = YES;
+            m->toldBy  = speaker;
+         }
+         memset( &f, 0, sizeof( f));
+         f.kind     = [_world intern:"#Hires"];
+         f.about    = employer;
+         f.credence = [store trustIn:speaker];
+         f.rule     = [_world intern:"told"];
+         f.time     = now;
+         [store retractFinding:"#Hires" about:employer];
+         [store addFinding:f];
+         [news addObject:[NSString stringWithFormat:@"R%u hires, R%u says", employer, speaker]];
+      }
+      tri_arena_free( arena);
+      return;
+   }
    if( claim && tri_subtype( tri, tri_node_type( claim), tri_type_named( tri, "#Grievance")))
    {
       [self grieved:claim from:speaker store:store news:news];

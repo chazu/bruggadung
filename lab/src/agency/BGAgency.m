@@ -277,6 +277,13 @@ static int   compare_candidates( BGCondition *c, const BGReferent *a, const BGRe
       }
       else if( ! strcmp( c->order[ k], "recent") && a->seen != b->seen)
          return( a->seen > b->seen ? -1 : 1);
+      else if( ! strcmp( c->order[ k], "hiring"))
+      {
+         da = [c->store finding:"#Hires" about:a->id] != NULL;
+         db = [c->store finding:"#Hires" about:b->id] != NULL;
+         if( da != db)
+            return( da > db ? -1 : 1);
+      }
       else if( ! strcmp( c->order[ k], "loyal"))
       {
          da = [c->store loyaltyTo:a->id];
