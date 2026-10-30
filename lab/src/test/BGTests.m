@@ -3659,6 +3659,8 @@ static BGSealRun   seal_scene( uint64_t seed, BOOL agency, int64_t respectful)
       BG_CHECK( BGPerform( st.w, st.c, action, 0, &error) != nil);
       [st.s runUntil:BGTimeMake( 1000)];
       BG_CHECK( [minds commit:run.b toGoal:"get_the_seal"]);
+      /* A starts as B's decision does: both takes complete at one boundary */
+      [st.s runUntil:BGTimeMake( [st.w time].ms + 1)];
       BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "take_up", run.a, run.seal, BGNoEntity), 0, &error) != nil);
    }
    else
@@ -3735,10 +3737,24 @@ static void   test_two_hands( void)
    BG_CHECK( logged_by( respect.agency, respect.b, @"take the seal -30 (+10, reserved -40)"));
    BG_CHECK( ! logged_by( respect.agency, respect.b, @"take_up R"));
    BG_CHECK( [respect.world locationOf:respect.seal].place == respect.a);
-   /* B: B, who doesn't mind, races A for it */
-   ignore = seal_scene( 61, YES, 0);
+   /* B: B, who doesn't mind, races A for it, and wins the draw: the
+    * reservation doesn't block the commit. A's take fails with the reason;
+    * A, who knew the seal was reserved for it, sees it in B's hand */
+   for( w = 61; w < 81; w++)
+   {
+      ignore = seal_scene( (uint64_t) w, YES, 0);
+      if( [ignore.world locationOf:ignore.seal].place == ignore.b)
+         break;
+   }
    BG_CHECK( logged_by( ignore.agency, ignore.b, @"take the seal +10 (+10, reserved +0)"));
    BG_CHECK( logged_by( ignore.agency, ignore.b, @"take_up R"));
+   BG_CHECK( [ignore.world locationOf:ignore.seal].form == BGLocationHeldBy &&
+             [ignore.world locationOf:ignore.seal].place == ignore.b);
+   trace = [[ignore.committer trace] componentsJoinedByString:@"\n"];
+   BG_CHECK( [trace rangeOfString:@"rejected: 1 is no longer where it was taken from"].location != NSNotFound);
+   store = [ignore.knowledge storeOf:ignore.a];
+   seal  = [store referent:referent_of( store, ignore.seal)];
+   BG_CHECK( seal && seal->form == BGLocationHeldBy && seal->container == referent_of( store, ignore.b));
 }
 
 

@@ -95,7 +95,12 @@ static BGAction   action_of( BGWorld *world, BGEntityID a, const BGActivity *rec
       [group setActor:(BGEntityID) record->actorRef];
       if( ! BGOperationStage( _world, operation, record->stage, &duration, &effect))
          effect = nil;
-      reason = BGApplyNamedEffect( _world, effect, action_of( _world, a, record), record->amount, group);
+      /* what it needs must still hold when its effect commits: taken from
+       * the bench by someone else meanwhile, the seal is not to be taken
+       * from their hand */
+      reason = [self requirementsOf:a record:record];
+      if( ! reason)
+         reason = BGApplyNamedEffect( _world, effect, action_of( _world, a, record), record->amount, group);
       if( reason)
       {
          [self end:a status:"failed" because:reason cause:[self startOf:a]];

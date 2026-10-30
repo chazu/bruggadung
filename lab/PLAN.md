@@ -1776,3 +1776,23 @@ Not yet: risk as a believed quantity (it is a flat cost per goal), and
 consideration curves.
 
 53 tests, 2014 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: the seal taken from under a reservation
+
+ACTIONS.md Scenario 2's variant B, and a bug it found. B, who doesn't mind
+A's reservation, and A start taking the seal up at the same boundary. Over
+seeds, B wins a draw: the reservation doesn't block the commit. A's take
+is rejected ("1 is no longer where it was taken from") and its activity
+fails with that reason. A, who had told B the seal was its own, sees it in
+B's hand. That is the hook for grievances, which wait on institutions.
+
+- **Found: a completing stage didn't recheck what its operation needs.**
+  When A's take began a boundary before B's, B's completed a boundary
+  later and took the seal out of A's hand. A take's effect expects the
+  item where it is when the effect is built, and by then the seal was in
+  A's hand. A stage now rechecks the operation's pattern when it
+  completes, as a resumed one does, and fails with the reason if the
+  pattern no longer holds ("what it needs no longer holds, at
+  roles.item.place").
+
+53 tests, 2023 checks, under both compilers, ASan and UBSan, and leak-free.
