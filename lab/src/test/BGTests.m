@@ -68,7 +68,7 @@ static void   test_registry_and_construction( void)
 
    w = BGTestWorld( 1);
    c = BGTestCommitter( w);
-   BG_CHECK( [w kindCount] == 36);
+   BG_CHECK( [w kindCount] == 37);
    BG_CHECK( [w kindNamed:"Body"] != NSNotFound && [w kindNamed:"Nonesuch"] == NSNotFound);
    bin   = commit_create( c, "bin", BGOnTile( 0, 0, 0));
    nails = commit_create( c, "nails_30", BGIn( bin));
@@ -4747,6 +4747,7 @@ typedef enum
    BGPurseWatch,                 /* the base case, and an officer of the town's watch by Mira */
    BGPurseFlight,                /* that, and Kasimir doesn't abide by the rules */
    BGPurseResist,                /* that, and he has a temper */
+   BGPurseKin,                   /* the watch case, and Mira is the merchant's daughter */
    BGPurseRepaid,                /* B, and on until the loan's term is out */
    BGPurseLost                   /* that, but the wages are lost on the third day */
 } BGPurse;
@@ -4822,12 +4823,21 @@ static BGPurseRun   tempting_purse( BGPurse variant)
       if( variant == BGPurseNoticed || variant == BGPurseUntold)
          [g set:"Agent.hiding" of:BGWhole( h[ 4]) to:0];
    }
-   if( variant == BGPurseWatch || variant == BGPurseFlight || variant == BGPurseResist)
+   if( variant == BGPurseWatch || variant == BGPurseFlight || variant == BGPurseResist || variant == BGPurseKin)
       run.officer = [g create:"watch_officer" key:"an officer of the watch" at:BGOnTile( 13, 12, 0)];
    if( variant == BGPurseFlight || variant == BGPurseResist)
       [g set:"Agent.abiding" of:BGWhole( h[ 2]) to:0];
    if( variant == BGPurseResist)
       [g set:"Agent.temper" of:BGWhole( h[ 2]) to:100];
+   if( variant == BGPurseKin)
+   {
+      BGEntityID   bond;
+
+      bond = [g create:"kin_bond" key:"Mira's to her father" at:BGLocationMakeNone()];
+      [g set:"Bond.bondOf" of:BGWhole( bond) to:(int64_t) h[ 4]];
+      [g set:"Bond.toward" of:BGWhole( bond) to:(int64_t) h[ 1]];
+      [g set:"Agent.trusting" of:BGWhole( h[ 4]) to:3];
+   }
    if( variant == BGPurseHonest || variant == BGPurseRepaid || variant == BGPurseLost)
       [g set:"Agent.honesty" of:BGWhole( h[ 2]) to:90];
    [st.c submit:g];
@@ -4915,6 +4925,7 @@ static void   test_tempting_purse( void)
    BGPurseRun         watch;
    BGPurseRun         flight;
    BGPurseRun         resist;
+   BGPurseRun         kin;
    BGKnowledgeStore   *store;
    const BGReferent   *purse;
    const BGTestimony  *t;
@@ -5133,6 +5144,23 @@ static void   test_tempting_purse( void)
              log_index( resist.agency, resist.officer, @"[get clear]"));
    /* of the watch, the officer doesn't report the theft to itself */
    BG_CHECK( ! logged_by( resist.agency, resist.officer, @"report the theft"));
+
+   /* AGENCY.md decision 12: loyalty is a weighted relation. The merchant's
+    * daughter knows it of him when she sees him; she trusts him more
+    * (KNOWLEDGE.md decision 15: a tenth of a point a point, and her
+    * disposition to trust adds its own), and reporting
+    * the theft of what she believes his is worth more to her. Kasimir owes
+    * him nothing, and the bond is saved and restored with her knowledge */
+   kin   = tempting_purse( BGPurseKin);
+   store = [kin.knowledge storeOf:kin.mira];
+   BG_CHECK( [store loyaltyTo:referent_of( store, kin.merchant)] == 60);
+   BG_CHECK( [store trustIn:referent_of( store, kin.merchant)] ==
+             [store referent:referent_of( store, kin.merchant)]->trust + 6 + 3);
+   BG_CHECK( logged_by( kin.agency, kin.mira, @"report the theft (R2): +33 (+15, loyal +18)"));
+   BG_CHECK( logged_by( watch.agency, watch.mira, @"report the theft (R2): +15 (+15, loyal +0)"));
+   store = [kin.knowledge storeOf:kin.kasimir];
+   BG_CHECK( [store loyaltyTo:referent_of( store, kin.merchant)] == 0);
+   BG_CHECK( [kin.text rangeOfString:@" 60 1 "].location != NSNotFound);
 
    /* 1: C: no one is there, and Kasimir decides just the same */
    alone = tempting_purse( BGPurseNoWitness);

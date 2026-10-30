@@ -1,4 +1,4 @@
-/* Generated from Triangle content 10514f8fa9fa21d0: do not edit. Type IDs are valid
+/* Generated from Triangle content d14f6d625dd97156: do not edit. Type IDs are valid
  * only for this content; regenerate when it changes. */
 #ifndef BG_COMPONENTS_H
 #define BG_COMPONENTS_H
@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BG_CONTENT_HASH 0x10514f8fa9fa21d0ULL
+#define BG_CONTENT_HASH 0xd14f6d625dd97156ULL
 
 typedef struct TriNode TriNode;
 
@@ -109,6 +109,14 @@ typedef struct {
     uint64_t        over;    /* a referent; saved, proposable, inspect */
 } BGAuthorization;
 
+/* Bond, from #Bond */
+typedef struct {
+    uint64_t        bondOf;    /* a referent; saved, proposable, inspect */
+    int64_t         loyalty;    /* int, in quanta of 1; content, saved, proposable, inspect */
+    uint32_t        tie;    /* #Tie: a type ID; content, saved, inspect */
+    uint64_t        toward;    /* a referent; saved, proposable, inspect */
+} BGBond;
+
 /* Claim, from #Claim */
 typedef struct {
     uint32_t        kind;    /* #ClaimKind: a type ID; content, saved, inspect */
@@ -168,6 +176,7 @@ typedef struct {
     int64_t         riskTolerance;    /* int, in quanta of 1; content, saved, proposable, inspect */
     int64_t         scruples;    /* int, in quanta of 1; content, saved, proposable, inspect */
     int64_t         temper;    /* int, in quanta of 1; content, saved, proposable, inspect */
+    int64_t         trusting;    /* int, in quanta of 1; content, saved, proposable, inspect */
 } BGAgent;
 
 /* Assembly, from #Assembly */
@@ -298,72 +307,79 @@ typedef struct {
 
 /* #ActivityStatus */
 enum {
-    BG_ACTIVITYSTATUS_ABORTED = 362,
-    BG_ACTIVITYSTATUS_COMPLETED = 363,
-    BG_ACTIVITYSTATUS_EXHAUSTED = 364,
-    BG_ACTIVITYSTATUS_FAILED = 365,
-    BG_ACTIVITYSTATUS_RUNNING = 366,
-    BG_ACTIVITYSTATUS_SUSPENDED = 367,
+    BG_ACTIVITYSTATUS_ABORTED = 364,
+    BG_ACTIVITYSTATUS_COMPLETED = 365,
+    BG_ACTIVITYSTATUS_EXHAUSTED = 366,
+    BG_ACTIVITYSTATUS_FAILED = 367,
+    BG_ACTIVITYSTATUS_RUNNING = 368,
+    BG_ACTIVITYSTATUS_SUSPENDED = 369,
+};
+
+/* #Tie */
+enum {
+    BG_TIE_EMPLOY = 448,
+    BG_TIE_KIN = 449,
+    BG_TIE_SWORN = 450,
 };
 
 /* #ClaimKind */
 enum {
-    BG_CLAIMKIND_CUSTODY = 369,
-    BG_CLAIMKIND_OWNERSHIP = 370,
-    BG_CLAIMKIND_RESERVATION = 371,
+    BG_CLAIMKIND_CUSTODY = 371,
+    BG_CLAIMKIND_OWNERSHIP = 372,
+    BG_CLAIMKIND_RESERVATION = 373,
 };
 
 /* #Penalty */
 enum {
-    BG_PENALTY_FINE = 434,
-    BG_PENALTY_ARREST = 460,
-    BG_PENALTY_CONFISCATE = 461,
+    BG_PENALTY_FINE = 436,
+    BG_PENALTY_ARREST = 466,
+    BG_PENALTY_CONFISCATE = 467,
 };
 
 /* #Wrong */
 enum {
-    BG_WRONG_ANOTHERS = 452,
-    BG_WRONG_UNAUTHORIZED = 453,
+    BG_WRONG_ANOTHERS = 458,
+    BG_WRONG_UNAUTHORIZED = 459,
 };
 
 /* #Material */
 enum {
-    BG_MATERIAL_CLOTH = 423,
-    BG_MATERIAL_FOOD = 424,
-    BG_MATERIAL_LEATHER = 425,
-    BG_MATERIAL_RUBBER = 426,
-    BG_MATERIAL_STONE = 427,
-    BG_MATERIAL_FLESH = 463,
-    BG_MATERIAL_BRASS = 465,
-    BG_MATERIAL_IRON = 466,
-    BG_MATERIAL_PAPER = 467,
-    BG_MATERIAL_STEEL = 468,
-    BG_MATERIAL_OAK = 470,
+    BG_MATERIAL_CLOTH = 425,
+    BG_MATERIAL_FOOD = 426,
+    BG_MATERIAL_LEATHER = 427,
+    BG_MATERIAL_RUBBER = 428,
+    BG_MATERIAL_STONE = 429,
+    BG_MATERIAL_FLESH = 469,
+    BG_MATERIAL_BRASS = 471,
+    BG_MATERIAL_IRON = 472,
+    BG_MATERIAL_PAPER = 473,
+    BG_MATERIAL_STEEL = 474,
+    BG_MATERIAL_OAK = 476,
 };
 
 /* "flesh" | "metal" | "natural" | "paper" | "wood" */
 enum {
-    BG_BODY_SURFACE_NATURAL = 285,
-    BG_BODY_SURFACE_FLESH = 463,
-    BG_BODY_SURFACE_BRASS = 465,
-    BG_BODY_SURFACE_IRON = 466,
-    BG_BODY_SURFACE_PAPER = 467,
-    BG_BODY_SURFACE_STEEL = 468,
-    BG_BODY_SURFACE_OAK = 470,
+    BG_BODY_SURFACE_NATURAL = 287,
+    BG_BODY_SURFACE_FLESH = 469,
+    BG_BODY_SURFACE_BRASS = 471,
+    BG_BODY_SURFACE_IRON = 472,
+    BG_BODY_SURFACE_PAPER = 473,
+    BG_BODY_SURFACE_STEEL = 474,
+    BG_BODY_SURFACE_OAK = 476,
 };
 
 /* #Colour */
 enum {
-    BG_COLOUR_BLUE = 374,
-    BG_COLOUR_BLACK = 376,
-    BG_COLOUR_BROWN = 377,
-    BG_COLOUR_GREEN = 378,
-    BG_COLOUR_GREY = 379,
-    BG_COLOUR_NAVY = 380,
-    BG_COLOUR_RED = 381,
-    BG_COLOUR_YELLOW = 382,
-    BG_COLOUR_BEIGE = 398,
-    BG_COLOUR_WHITE = 420,
+    BG_COLOUR_BLUE = 376,
+    BG_COLOUR_BLACK = 378,
+    BG_COLOUR_BROWN = 379,
+    BG_COLOUR_GREEN = 380,
+    BG_COLOUR_GREY = 381,
+    BG_COLOUR_NAVY = 382,
+    BG_COLOUR_RED = 383,
+    BG_COLOUR_YELLOW = 384,
+    BG_COLOUR_BEIGE = 400,
+    BG_COLOUR_WHITE = 422,
 };
 
 /* The field registry: what code needs to read and write any component
@@ -389,7 +405,7 @@ typedef struct {
     const BGFieldInfo *fields;
 } BGComponentInfo;
 
-#define BG_COMPONENT_COUNT 36
+#define BG_COMPONENT_COUNT 37
 
 #ifdef BG_COMPONENT_REGISTRY
 
@@ -481,6 +497,13 @@ static const BGFieldInfo BGAuthorization_fields[] = {
     { "over", offsetof(BGAuthorization, over), BG_VALUE_REF, "ref", "saved, proposable, inspect" },
 };
 
+static const BGFieldInfo BGBond_fields[] = {
+    { "bondOf", offsetof(BGBond, bondOf), BG_VALUE_REF, "ref", "saved, proposable, inspect" },
+    { "loyalty", offsetof(BGBond, loyalty), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
+    { "tie", offsetof(BGBond, tie), BG_VALUE_TYPE, "#Tie", "content, saved, inspect" },
+    { "toward", offsetof(BGBond, toward), BG_VALUE_REF, "ref", "saved, proposable, inspect" },
+};
+
 static const BGFieldInfo BGClaim_fields[] = {
     { "kind", offsetof(BGClaim, kind), BG_VALUE_TYPE, "#ClaimKind", "content, saved, inspect" },
     { "quantity", offsetof(BGClaim, quantity), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
@@ -534,6 +557,7 @@ static const BGFieldInfo BGAgent_fields[] = {
     { "riskTolerance", offsetof(BGAgent, riskTolerance), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "scruples", offsetof(BGAgent, scruples), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "temper", offsetof(BGAgent, temper), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
+    { "trusting", offsetof(BGAgent, trusting), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
 };
 
 static const BGFieldInfo BGAssembly_fields[] = {
@@ -655,12 +679,13 @@ static const BGComponentInfo BGComponents[BG_COMPONENT_COUNT + 1] = {
     { "ThermalBody", "#ThermalBody", sizeof(BGThermalBody), 5, BGThermalBody_fields },
     { "Activity", "#Activity", sizeof(BGActivity), 21, BGActivity_fields },
     { "Authorization", "#Authorization", sizeof(BGAuthorization), 3, BGAuthorization_fields },
+    { "Bond", "#Bond", sizeof(BGBond), 4, BGBond_fields },
     { "Claim", "#Claim", sizeof(BGClaim), 2, BGClaim_fields },
     { "Information", "#Content", sizeof(BGInformation), 2, BGInformation_fields },
     { "Law", "#Law", sizeof(BGLaw), 6, BGLaw_fields },
     { "Organization", "#Organization", sizeof(BGOrganization), 1, BGOrganization_fields },
     { "Body", "#Body", sizeof(BGBody), 5, BGBody_fields },
-    { "Agent", "#Agent", sizeof(BGAgent), 21, BGAgent_fields },
+    { "Agent", "#Agent", sizeof(BGAgent), 22, BGAgent_fields },
     { "Assembly", "#Assembly", sizeof(BGAssembly), 1, BGAssembly_fields },
     { "Cock", "#Cock", sizeof(BGCock), 2, BGCock_fields },
     { "Container", "#Container", sizeof(BGContainer), 1, BGContainer_fields },

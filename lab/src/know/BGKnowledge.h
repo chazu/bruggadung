@@ -173,7 +173,8 @@ typedef struct
    int64_t          seen;          /* ms */
    int64_t          insideSeen;    /* when it last saw inside it (ms), or -1 */
    uint32_t         toldBy;        /* the referent who said it is where it is believed; 0 if seen */
-   int32_t          trust;         /* dB: in what it says, if it is someone */
+   int32_t          trust;         /* dB: in what it says, if it is someone, from its conduct */
+   int32_t          loyalty;       /* 0 to 100: the agent's to it, if someone it is bound to (AGENCY.md §12) */
    BOOL             present;       /* still believed where it was last seen */
    int32_t          sightings;     /* how often it was sighted (not seen for a minute before) */
    int32_t          salience;      /* the most salient thing it was kept in an observation for */
@@ -465,8 +466,12 @@ typedef struct
 /* the claims it has heard, oldest first */
 - (NSUInteger) testimonyCount;
 - (const BGTestimony *) testimonyAt:(NSUInteger) i;
-/* trust in what the referent says, in dB */
+/* trust in what the referent says, in dB (KNOWLEDGE.md decision 15): from
+ * its conduct, the agent's loyalty to it (a tenth of a point a point), and
+ * the agent's disposition to trust */
 - (int32_t) trustIn:(uint32_t) referentID;
+/* the agent's loyalty to the referent, 0 to 100 */
+- (int32_t) loyaltyTo:(uint32_t) referentID;
 /* what the testimony adds to its group's credence, in dB, by the trust the
  * agent has in its source and root now */
 - (int32_t) weightOf:(const BGTestimony *) t;

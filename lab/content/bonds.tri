@@ -1,0 +1,17 @@
+// Loyalty (AGENCY.md decision 12): a weighted relation from an agent to
+// another. It is the agent's own, as its dispositions are, formed by
+// kinship, employment, or authored. Like a claim, it is reified: a bond,
+// with no body and no location, of its holder (`bondOf`) `toward` the other.
+// The holder knows it of whoever it recognizes as the other.
+#Tie: "kin" | "employ" | "sworn"
+
+#Bond: #Thing & {
+    @component(Bond)
+    tie:     #Tie                              @field(content, saved, inspect)
+    loyalty: int & >=0 & <=100                 @field(content, saved, proposable, inspect)
+    bondOf:  ref                               @field(saved, proposable, inspect)
+    toward:  ref                               @field(saved, proposable, inspect)
+}
+
+kin_bond:  #Bond & { tie: "kin", loyalty: 60 }
+work_bond: #Bond & { tie: "employ", loyalty: 30 }

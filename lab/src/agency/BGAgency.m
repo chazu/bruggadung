@@ -2070,6 +2070,20 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
             v = (int32_t) (trait * int_at( tri, c, "per", 0) / 10);
          [parts addObject:[NSString stringWithFormat:@"%s %+d", slot, v]];
       }
+      else if( text_at( tri, c, "loyal", slot, sizeof( slot)))
+      {
+         /* its loyalty to the slot's referent, or to whom it believes owns
+          * it (AGENCY.md §12) */
+         const BGFinding   *owned;
+         uint32_t          who;
+
+         who   = bound( b, n, slot);
+         owned = who ? [store finding:"#Owned" about:who] : NULL;
+         if( owned)
+            who = owned->choice;
+         v = who ? (int32_t) ([store loyaltyTo:who] * int_at( tri, c, "per", 0) / 10) : 0;
+         [parts addObject:[NSString stringWithFormat:@"loyal %+d", v]];
+      }
       else if( text_at( tri, c, "watched", slot, sizeof( slot)))
       {
          v = [self watched:bound( b, n, slot) store:store] ? - (int32_t) int_at( tri, c, "penalty", 0) : 0;

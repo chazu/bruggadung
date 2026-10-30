@@ -3396,3 +3396,36 @@ Not yet: witnesses of a blow; harm to one's loyalties (needs decision
 about to happen, not happening (a raised fist).
 
 88 tests, 2717 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: loyalty, and trust from it
+
+AGENCY.md decision 12: loyalty is a weighted relation, formed by kinship,
+employment, or authored; it raises the worth of goals that serve them, and
+makes harm to them salient. KNOWLEDGE.md decision 15: trust comes from
+relationships, disposition and conduct.
+
+- **`#Bond`** (bonds.tri): a reified relation, like a claim, with no body
+  and no location: its holder (`bondOf`), `toward` whom, its `tie` (kin,
+  employ, sworn) and `loyalty` (0 to 100). `kin_bond` (60), `work_bond` (30).
+- **Known on recognition**: the holder's referent for the other carries
+  its loyalty, set whenever perception binds it to the other (its own
+  disposition; a mistaken identity takes the loyalty with it). Saved with
+  the referent.
+- **Trust** (`trustIn:`) is now conduct (the referent's `trust`, as
+  before), plus a tenth of a point a point of loyalty, plus the agent's
+  `trusting` disposition (new, dB, 0 by default); within the trust limit.
+- **`#Loyal`**: a consideration, the agent's loyalty to the slot's
+  referent, or to whom it believes owns it. Reporting a theft weighs it.
+- **Salient**: an event moving one it is loyal to, or what it believes
+  theirs, is noticed as a concern is.
+
+Checked: Mira, the merchant's daughter, knows her bond to him, trusts him
+by 6 more and her disposition's 3, and reporting the theft of his purse is
+worth +33 to her (+15, loyal +18), against +15 to her as a stranger.
+Kasimir owes him nothing. The loyalty is in the save.
+
+Not yet: loyalty to an organization (it is never seen, so never
+recognized: it needs a referent of its own); employment forming a bond
+(decision 15, next); a bond known before the other is first seen.
+
+88 tests, 2726 checks, under both compilers, ASan, and leak-free.

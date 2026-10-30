@@ -620,9 +620,23 @@ static NSUInteger   feature_keys( const char *features, char (*keys)[ 32], NSUIn
 - (int32_t) trustIn:(uint32_t) referentID
 {
    const BGReferent   *r;
+   int64_t            trusting;
+   int32_t            trust;
+
+   r        = [self referent:referentID];
+   trusting = 0;
+   [_world getField:"Agent.trusting" of:_agent value:&trusting];
+   trust = (r ? r->trust + r->loyalty / 10 : BG_TRUST) + (int32_t) trusting;
+   return( trust > BG_TRUST_LIMIT ? BG_TRUST_LIMIT : trust < -BG_TRUST_LIMIT ? -BG_TRUST_LIMIT : trust);
+}
+
+
+- (int32_t) loyaltyTo:(uint32_t) referentID
+{
+   const BGReferent   *r;
 
    r = [self referent:referentID];
-   return( r ? r->trust : BG_TRUST);
+   return( r ? r->loyalty : 0);
 }
 
 
@@ -2502,6 +2516,27 @@ static void   settle( BGKnowledgeStore *store, uint32_t thing, uint32_t containe
 }
 
 
+/* The holder's loyalty to the entity (AGENCY.md §12): its strongest bond
+ * toward it, or 0. */
+static int32_t   loyalty( BGWorld *world, BGEntityID holder, BGEntityID toward)
+{
+   const BGBond   *bond;
+   BGStore        *bonds;
+   NSUInteger     i;
+   int32_t        most;
+
+   most  = 0;
+   bonds = [world storeForKind:[world kindNamed:"Bond"]];
+   for( i = 0; i < [bonds count]; i++)
+   {
+      bond = [bonds recordAtIndex:i];
+      if( (BGEntityID) bond->bondOf == holder && (BGEntityID) bond->toward == toward && bond->loyalty > most)
+         most = (int32_t) bond->loyalty;
+   }
+   return( most);
+}
+
+
 /* The referent a perceived entity was bound to this phase, or 0. */
 static uint32_t   bound_to( BGEntityID e, BGEntityID agent, uint32_t me, const BGSeen *seen, const uint32_t *assigned,
                             NSUInteger nseen)
@@ -3347,6 +3382,8 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
          r->present   = YES;
          r->truth     = seen[ i].entity;                /* developer-only */
          r->toldBy    = 0;
+         /* whom it is bound to, it knows when it recognizes them */
+         r->loyalty   = loyalty( _world, agent, seen[ i].entity);
          if( _omniscient || contains( lookedIn, nlooked, seen[ i].entity))
             r->insideSeen = now;
          if( r->form == BGLocationIn || r->form == BGLocationHeldBy)
@@ -3679,6 +3716,16 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
           [self concerns:concerns
              description:! strcmp( ev->kind, "said") ? [self topicOf:ev->detail] : [store describeReferent:o.subject]])
          o.salience = BG_CONCERN;
+      /* harm to those it is loyal to, or to what it believes theirs, is
+       * salient (AGENCY.md §12): what happens to them, it notices */
+      if( o.salience < BG_CONCERN && o.subject)
+      {
+         const BGFinding   *owned;
+
+         owned = [store finding:"#Owned" about:o.subject];
+         if( [store loyaltyTo:o.subject] > 0 || (owned && [store loyaltyTo:owned->choice] > 0))
+            o.salience = BG_CONCERN;
+      }
       /* someone not doing as they usually do */
       if( ! strcmp( ev->kind, "moved") && o.other && ev->location.form == BGLocationIn)
       {
@@ -4041,7 +4088,9 @@ static NSString   *attribution_text( const BGTestimony *t)
                                          : @"",
                       r->toldBy ? [NSString stringWithFormat:@", told by R%u", r->toldBy] : @"",
                       r->kind && ! strcmp( r->kind, "#Agent") && r->id != [store selfReferent]
-                         ? [NSString stringWithFormat:@", trust %+d dB", r->trust] : @"",
+                         ? [NSString stringWithFormat:@", trust %+d dB%@", [store trustIn:r->id],
+                                                      r->loyalty ? [NSString stringWithFormat:@", loyalty %d", r->loyalty] : @""]
+                         : @"",
                       [store describeReferent:r->id]];
       for( j = 0; j < BG_HYPOTHESES && r->supposed[ j]; j++)
          [s appendFormat:@"    or, %d in 1000: %s\n", r->supposedMass[ j], r->supposed[ j]];
@@ -4244,10 +4293,10 @@ char   *BGDecodeWord( const char *s)
       for( j = 0; j < [store count]; j++)
       {
          r = [store referentAt:j];
-         [lines addObject:[NSString stringWithFormat:@"ref %llu %u %d %u %d %d %d %d %lld %lld %u %d %d %llu %@ %@ %@ %@",
+         [lines addObject:[NSString stringWithFormat:@"ref %llu %u %d %u %d %d %d %d %lld %lld %u %d %d %d %llu %@ %@ %@ %@",
                                                      (unsigned long long) [store agent], r->id, (int) r->form,
                                                      r->container, r->x, r->y, r->level, r->slot, (long long) r->seen,
-                                                     (long long) r->insideSeen, r->toldBy, r->trust, r->present ? 1 : 0,
+                                                     (long long) r->insideSeen, r->toldBy, r->trust, r->loyalty, r->present ? 1 : 0,
                                                      (unsigned long long) r->truth,
                                                      BGEncodeWord( r->role), BGEncodeWord( r->kind), BGEncodeWord( r->features),
                                                      BGEncodeWord( r->deeper)]];
@@ -4358,6 +4407,7 @@ char   *BGDecodeWord( const char *s)
    int                  level;
    int                  slot;
    int                  present;
+   int                  loyal;
    char                 role[ 64];
    char                 kind[ 512];
    char                 features[ 4096];
@@ -4518,9 +4568,9 @@ char   *BGDecodeWord( const char *s)
          a.fabricated = present != 0;
          [self addAncestry:a];
       }
-      else if( sscanf( text, "ref %llu %u %d %u %d %d %d %d %lld %lld %u %d %d %llu %63s %511s %4095s %511s", &agent,
-                       &id, &form, &container, &x, &y, &level, &slot, &seen, &inside, &told, &trust, &present, &truth,
-                       role, kind, features, deeper) == 18)
+      else if( sscanf( text, "ref %llu %u %d %u %d %d %d %d %lld %lld %u %d %d %d %llu %63s %511s %4095s %511s", &agent,
+                       &id, &form, &container, &x, &y, &level, &slot, &seen, &inside, &told, &trust, &loyal, &present,
+                       &truth, role, kind, features, deeper) == 19)
       {
          store        = [self storeOf:(BGEntityID) agent];
          next         = [store nextID];
@@ -4535,6 +4585,7 @@ char   *BGDecodeWord( const char *s)
          r->insideSeen = inside;
          r->toldBy     = told;
          r->trust      = trust;
+         r->loyalty    = loyal;
          r->present    = present != 0;
          r->truth     = (BGEntityID) truth;
          text         = BGDecodeWord( role);

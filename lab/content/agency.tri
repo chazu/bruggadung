@@ -185,6 +185,10 @@
 // a penalty if the agent believes someone, not itself, could see the slot's
 // referent
 #Watched: #Consideration & { watched: text, penalty: int }
+// what loyalty adds (AGENCY.md decision 12): the agent's loyalty to the
+// slot's referent, or to whoever it believes owns it, `per` tenths of a
+// point for each point of it
+#Loyal: #Scaled & { loyal: text }
 // what the law weighs (INSTITUTIONS.md decision 5): if the agent knows a law
 // forbidding `act` on the slot's referent as it believes it to be (another's),
 // and believes itself seen, what the law weighs; unseen, nothing
@@ -321,13 +325,13 @@ look_into_it: #Method & {
 // --- INSTITUTIONS.md decision 6: a wrong reported ---------------------------------
 
 // Seen something taken from its owner (a #Taken finding): tell the watch,
-// unless one is of the watch oneself. A grievance is a claim told to an
+// unless one is of the watch oneself; the more, the more loyal to the owner. A grievance is a claim told to an
 // office holder; whether it acts is its own decision.
 report_wrong: #Goal & {
     title:  "report the theft"
     done:   #Did & { did: "say" }
     arises: { finding: "#Taken", slot: "loot", lapse: 1h, of: #Body, exempt: "watch" }
-    worth:  [#Flat & { value: 15 }]
+    worth:  [#Flat & { value: 15 }, #Loyal & { loyal: "loot", per: 3 }]
 } @family(goals)
 
 // Go to someone wearing the watch's badge, the nearest first, and say what
