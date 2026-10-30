@@ -2349,6 +2349,19 @@ static int32_t   permille_of( int32_t db)
    tri   = [_world tri];
    arena = tri_arena_new();
    claim = tri_value( tri, content, arena, NULL, 0);
+   if( claim && tri_subtype( tri, tri_node_type( claim), tri_type_named( tri, "#Account")))
+   {
+      /* an account (ACTIONS.md decision 14): each of its claims, in order */
+      const TriNode   *list;
+
+      for( list = tri_at( tri, claim, "entries"); list && tri_at( tri, list, "first"); list = tri_at( tri, list, "rest"))
+      {
+         tri_print( tri, tri_at( tri, list, "first"), printed, sizeof( printed));
+         [self believe:printed from:speaker via:record utterance:utterance at:now store:store news:news];
+      }
+      tri_arena_free( arena);
+      return;
+   }
    if( claim && tri_subtype( tri, tri_node_type( claim), tri_type_named( tri, "#Serves")))
    {
       [self serves:claim from:speaker store:store news:news];

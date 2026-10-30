@@ -8895,6 +8895,69 @@ static void   test_doubts( void)
 }
 
 
+/* ACTIONS.md decision 14: talking takes as long as what is said. The worker
+ * tells the smith beside it where three things are, in one account: three
+ * seconds, not one, its voice busy all the while; the smith takes in each
+ * claim. One claim alone takes a second. */
+static BOOL   said_by( BGWorld *w, BGEntityID speaker)
+{
+   NSUInteger   i;
+
+   for( i = 0; i < [w eventCount]; i++)
+      if( ! strcmp( [w eventAt:i]->kind, "said") && [w eventAt:i]->actor == speaker)
+         return( YES);
+   return( NO);
+}
+
+
+static void   test_account( void)
+{
+   BGStage            st;
+   BGKnowledge        *knowledge;
+   BGProposalGroup    *g;
+   BGAction           action;
+   BGEntityID         worker;
+   BGEntityID         smith;
+   NSString           *error;
+   NSString           *claim;
+   int                n;
+   int64_t            t0;
+
+   for( n = 1; n <= 3; n += 2)
+   {
+      st.w      = BGTestWorld( 163);
+      st.c      = BGTestCommitter( st.w);
+      knowledge = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+      st.s      = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+      [st.s setActivities:[BGActivities activitiesWithWorld:st.w committer:st.c]];
+      [st.s setPerception:knowledge];
+      g      = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: two in the workshop"];
+      worker = [g create:"worker" key:"worker" at:BGOnTile( 5, 5, 0)];
+      smith  = [g create:"smith" key:"smith" at:BGOnTile( 6, 5, 0)];
+      [st.c submit:g];
+      [st.s runUntil:BGTimeMake( 1)];
+      worker = [g idFor:worker];
+      smith  = [g idFor:smith];
+      claim  = @"#IsIn & { what: #Stack & { unit: \"iron_nail\" }, within: #Container & { material: \"oak\", "
+               @"capacity: 40, place: #OnTile & { x: %d, y: 20, level: 0 } }, attribution: #Saw & { sure: 30 } }";
+      action = BGActionMake( "say", worker, smith, BGNoEntity);
+      action.content = [st.w intern:[(n == 1 ? [NSString stringWithFormat:claim, 2]
+                                            : [NSString stringWithFormat:@"#Account & { what: #Stack, entries: [%@, %@, %@] }",
+                                                 [NSString stringWithFormat:claim, 2], [NSString stringWithFormat:claim, 12],
+                                                 [NSString stringWithFormat:claim, 22]]) UTF8String]];
+      error = nil;
+      t0    = [st.w time].ms;
+      BG_CHECK( BGPerform( st.w, st.c, action, 0, &error) != nil);
+      [st.s runUntil:BGTimeMake( t0 + 1500)];
+      BG_CHECK( said_by( st.w, worker) == (n == 1));
+      BG_CHECK( n == 1 || BGProvidersBusy( st.w, worker, "say", BGNoEntity) != nil);
+      [st.s runUntil:BGTimeMake( t0 + 3500)];
+      BG_CHECK( said_by( st.w, worker));
+      BG_CHECK( [[knowledge storeOf:smith] testimonyCount] == (NSUInteger) n);
+   }
+}
+
+
 static void   test_memory_rates( void)
 {
    /* seen once: BG_FADE a day */
@@ -9383,6 +9446,7 @@ const BGTestCase   BGAllTests[] =
    { "salience",                      test_salience },
    { "going_without",                 test_going_without },
    { "doubts",                        test_doubts },
+   { "account",                       test_account },
    { "traces",                        test_traces },
    { "appearance",                    test_appearance },
    { "interpretation",                test_interpretation },

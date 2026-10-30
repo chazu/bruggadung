@@ -135,7 +135,9 @@ static inline int64_t   BGAtRate( int64_t effort, int64_t rate)
 /* What it costs in time to bring the instruments the action will use to
  * bear (ACTIONS.md §2's access cost): take_up's duration for each one
  * on a tile in reach, twice that from a container; added to the first
- * stage. 0 for an action that searches for none. */
+ * stage. 0 for an action that searches for none. Saying an account takes
+ * its duration again for each claim after the first (ACTIONS.md decision
+ * 14), added the same way. */
 int64_t            BGAccessDelay( BGWorld *world, BGAction action);
 
 /* Stage `index` of an operation: its duration and effect. An operation with

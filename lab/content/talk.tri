@@ -113,8 +113,16 @@ say: #Operation & {
     legible: int & >=0 & <=8                @field(content, saved, inspect, perceive(sight))
 }
 
+// Claims, in order: written, or told one after another.
+#Entries: { entries: [...#Telling] }
+
 // What a record holds: who wrote it, by their looks, and the claims written.
-#Writing: { author: #Agent, entries: [...#Telling] }
+#Writing: #Entries & { author: #Agent }
+
+// An account (ACTIONS.md decision 14): several claims about something like
+// `what`, said together. Saying it takes a second more for each claim after
+// the first; a hearer takes in each.
+#Account: #Utterance & #Entries & {}
 
 // A claim: something like `what` serves `line` (a diagram's: which cock shuts
 // off which line).

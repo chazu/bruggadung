@@ -3729,3 +3729,22 @@ Not yet: undoing what was pooled when they split (beliefs gathered under
 the merged referent stay with it).
 
 90 tests, 2816 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: talking takes as long as what is said
+
+ACTIONS.md decision 14: a second, and a second more for each claim or
+entry, so an account takes longer than a yes; it occupies the voice.
+
+- **`#Account`** (talk.tri): an utterance of several claims (`entries`,
+  now declared once on `#Entries`, which `#Writing` shares). Saying one
+  takes the say's second again for each claim after the first, added as
+  the access delay is; a hearer takes in each claim, in order.
+- A single utterance, claim or question, still takes a second.
+
+Checked: an account of where three things are takes three seconds, the
+voice busy throughout, and the hearer holds three claims; one claim alone
+is said within the second.
+
+Not yet: agents composing accounts themselves (they answer with one claim).
+
+91 tests, 2826 checks, under both compilers, ASan, and leak-free.

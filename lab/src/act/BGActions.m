@@ -932,12 +932,30 @@ int64_t   BGWorkRate( BGWorld *world, BGEntityID actor, const char *operation, i
 
 int64_t   BGAccessDelay( BGWorld *world, BGAction action)
 {
-   BGEntityID   chain[ 2];
-   int          cost[ 2];
-   int64_t      take;
-   NSString     *effect;
+   const TriNode   *said;
+   const TriNode   *list;
+   TriArena        *arena;
+   BGEntityID      chain[ 2];
+   int             cost[ 2];
+   int64_t         take;
+   int64_t         claims;
+   NSString        *effect;
 
    effect = BGOperationEffect( world, action.operation);
+   /* talking takes as long as what is said (ACTIONS.md decision 14): an
+    * account a second more for each claim after the first */
+   if( [effect isEqualToString:@"say"] && action.content)
+   {
+      arena  = tri_arena_new();
+      said   = tri_value( [world tri], action.content, arena, NULL, 0);
+      claims = 0;
+      if( said && tri_subtype( [world tri], tri_node_type( said), tri_type_named( [world tri], "#Account")))
+         for( list = tri_at( [world tri], said, "entries"); list && tri_at( [world tri], list, "first");
+              list = tri_at( [world tri], list, "rest"))
+            claims++;
+      tri_arena_free( arena);
+      return( claims > 1 ? (claims - 1) * BGOperationDuration( world, action.operation) : 0);
+   }
    if( ! [effect isEqualToString:@"rotate"])
       return( 0);
    take = BGOperationDuration( world, "take_up");
