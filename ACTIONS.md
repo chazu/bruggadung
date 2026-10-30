@@ -44,6 +44,11 @@ Out of scope here, except through the stub interfaces defined below:
    Until knowledge exists, recipes are authored and never consult hidden
    state.
 10. **Change commitment is defined here.**
+11. **Graded shortfall is curves**, the lookup tables agency's
+    considerations use (AGENCY.md): the input is capacity as a percent of
+    the requirement; an operation declares curves for its duration
+    multiplier (percent), the chance of a mishap (thousandths), and the
+    result's quality (percent).
 
 ## Terms
 
@@ -682,8 +687,7 @@ DOMAIN_SIMULATION.md and Scenario 3 of COMPONENTS.md.
 2. **Reaction rounds.** What is the bound R per boundary (shared with
    COMPONENTS.md), and how do players perceive deferred reactions?
 3. **Chain search.** What depth and scoring work well in practice?
-4. **Shortfall curves.** How should graded shortfall functions be
-   represented in content, and with what units?
+4. **Shortfall curves.** Decided: decision 11.
 5. **Outcome messages.** How exactly does perception compose them (§4)?
 6. **Joint activities.** How do activities with several actors work, such as
    two people lifting a beam? Pooled capabilities, a shared activity entity,
