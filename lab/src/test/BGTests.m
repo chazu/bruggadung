@@ -4774,6 +4774,7 @@ typedef enum
    BGPurseWatch,                 /* the base case, and an officer of the town's watch by Mira */
    BGPurseFlight,                /* that, and Kasimir doesn't abide by the rules */
    BGPurseResist,                /* that, and he has a temper */
+   BGPurseGentle,                /* that, and he holds never to strike anyone */
    BGPurseKin,                   /* the watch case, and Mira is the merchant's daughter */
    BGPurseWary,                  /* B, and the carter trusts no one */
    BGPurseStrangers,             /* B, and the carter and Kasimir aren't friends */
@@ -4860,12 +4861,15 @@ static BGPurseRun   tempting_purse( BGPurse variant)
       if( variant == BGPurseNoticed || variant == BGPurseUntold)
          [g set:"Agent.hiding" of:BGWhole( h[ 4]) to:0];
    }
-   if( variant == BGPurseWatch || variant == BGPurseFlight || variant == BGPurseResist || variant == BGPurseKin)
+   if( variant == BGPurseWatch || variant == BGPurseFlight || variant == BGPurseResist || variant == BGPurseKin ||
+       variant == BGPurseGentle)
       run.officer = [g create:"watch_officer" key:"an officer of the watch" at:BGOnTile( 13, 12, 0)];
-   if( variant == BGPurseFlight || variant == BGPurseResist)
+   if( variant == BGPurseFlight || variant == BGPurseResist || variant == BGPurseGentle)
       [g set:"Agent.abiding" of:BGWhole( h[ 2]) to:0];
-   if( variant == BGPurseResist)
+   if( variant == BGPurseResist || variant == BGPurseGentle)
       [g set:"Agent.temper" of:BGWhole( h[ 2]) to:100];
+   if( variant == BGPurseGentle)
+      [g set:"Agent.gentle" of:BGWhole( h[ 2]) to:100];
    if( variant == BGPurseKin)
    {
       BGEntityID   bond;
@@ -5055,6 +5059,7 @@ static void   test_tempting_purse( void)
    BGPurseRun         watch;
    BGPurseRun         flight;
    BGPurseRun         resist;
+   BGPurseRun         gentle;
    BGPurseRun         kin;
    BGPurseRun         wary;
    BGPurseRun         strangers;
@@ -5340,7 +5345,7 @@ static void   test_tempting_purse( void)
     * who is hurt and knows by whom, a threat it weighs against its duty */
    resist = tempting_purse( BGPurseResist);
    BG_CHECK( logged_by( resist.agency, resist.kasimir,
-                        @"weighing get away (R1): +40 (+40, abiding +0) against resist +60 (+20, abiding +0, temper +40)"));
+                        @"weighing get away (R1): +40 (+40, abiding +0) against resist +60 (+20, abiding +0, temper +40, gentle +0)"));
    BG_CHECK( logged_by( resist.agency, resist.kasimir, @"[resist] fight them off: hit R"));
    {
       int64_t   injury;
@@ -5359,6 +5364,12 @@ static void   test_tempting_purse( void)
    BG_CHECK( logged_by( resist.agency, resist.officer, @"is gone from where it was"));
    BG_CHECK( log_index( resist.agency, resist.officer, @"[recover it and arrest the taker] done") <
              log_index( resist.agency, resist.officer, @"[get clear]"));
+   /* AGENCY.md decision 14: some considerations veto. Holding never to
+    * strike anyone, he doesn't resist, whatever his temper adds: he runs */
+   gentle = tempting_purse( BGPurseGentle);
+   BG_CHECK( logged_by( gentle.agency, gentle.kasimir, @"(+20, abiding +0, temper +40, gentle -10, a veto)"));
+   BG_CHECK( ! logged_by( gentle.agency, gentle.kasimir, @"fight them off"));
+   BG_CHECK( logged_by( gentle.agency, gentle.kasimir, @"[get away] run off: flee R"));
    /* of the watch, the officer doesn't report the theft to itself */
    BG_CHECK( ! logged_by( resist.agency, resist.officer, @"report the theft"));
 

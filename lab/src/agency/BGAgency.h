@@ -91,6 +91,7 @@
 #define BG_BUSY_COST       3      /* per point of attention the running activity demands */
 #define BG_COMMITTED       5      /* for holding a goal of its own */
 #define BG_WORTH           10     /* what a thing is worth, with no value authored for it */
+#define BG_VETO            1000   /* what a veto counts: more than anything else can weigh */
 #define BG_MARGIN          5      /* what another goal must beat the current one by */
 #define BG_INTERRUPT       5      /* and more, to interrupt an activity under way */
 #define BG_MAX_SETTLED     16

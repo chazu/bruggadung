@@ -74,7 +74,10 @@
 // tables"): its points, the worth `output` at the value `input`, straight
 // between them and level beyond the ends. Without one, `per` scales the value.
 #Point:         { input: int, output: int }
-#Consideration: { curve: [...#Point] }
+// A consideration that is a `veto` (AGENCY.md decision 14) rules the option
+// out when it counts against it at all, whatever else scores: a deeply held
+// norm.
+#Consideration: { curve: [...#Point], veto: *false | true }
 // a fixed worth: a duty, a meal
 #Flat:      #Consideration & { value: int }
 // one that scales something of the agent's: `per` tenths of a point for
@@ -396,12 +399,14 @@ run_off: #Method & {
 
 
 // Or resist (decision 7, AGENCY.md §13): strike the one making the
-// arrest. Worth less than getting away, but more to one with a temper.
+// arrest. Worth less than getting away, but more to one with a temper;
+// never, to one who holds never to strike anyone.
 resist_arrest: #Goal & {
     title:  "resist"
     done:   #Did & { did: "hit" }
     arises: { finding: "#Arrested", slot: "arrested", lapse: 60s, of: #Agent }
-    worth:  [#Flat & { value: 20 }, #Trait & { trait: "abiding", per: -8 }, #Trait & { trait: "temper", per: 4 }]
+    worth:  [#Flat & { value: 20 }, #Trait & { trait: "abiding", per: -8 }, #Trait & { trait: "temper", per: 4 },
+             #Trait & { trait: "gentle", per: -1, veto: true }]
 } @family(goals)
 
 fight_off: #Method & {
@@ -417,13 +422,14 @@ fight_off: #Method & {
 // --- AGENCY.md §13, harm and threats ------------------------------------------
 
 // Struck (a #Struck finding, about who struck): a threat, weighed against
-// whatever the agent is doing. Hit back, as its temper has it; or get
-// clear, the more the more it hurts and the less its temper.
+// whatever the agent is doing. Hit back, as its temper has it, unless it
+// holds never to strike anyone (a veto); or get clear, the more the more it
+// hurts and the less its temper.
 hit_back: #Goal & {
     title:  "hit back"
     done:   #Did & { did: "hit" }
     arises: { finding: "#Struck", slot: "attacker", lapse: 10s, of: #Agent }
-    worth:  [#Flat & { value: -10 }, #Trait & { trait: "temper", per: 4 }]
+    worth:  [#Flat & { value: -10 }, #Trait & { trait: "temper", per: 4 }, #Trait & { trait: "gentle", per: -1, veto: true }]
 } @family(goals)
 
 strike_back: #Method & {

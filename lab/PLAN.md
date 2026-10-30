@@ -3547,3 +3547,22 @@ Not yet: answering an ad as it says (a written reply, a place to call);
 ads that expire; a posted job read by someone not looking for work.
 
 88 tests, 2782 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: vetoes
+
+AGENCY.md decision 14: considerations add in dB, and some veto: a
+consideration content declares a veto rules the option out when it
+applies, whatever else scores.
+
+- **`#Consideration.veto`**: when a veto counts against the option at
+  all, it counts `BG_VETO` (−1000): more than anything can weigh, so a
+  goal is never adopted and a method is unthinkable. The log marks it
+  ("gentle −10, a veto").
+- **`Agent.gentle`** (new, 0 by default): a deeply held norm against
+  striking anyone. It vetoes resisting arrest and hitting back.
+
+Checked: with a temper and no disposition to abide, but gentle, Kasimir
+doesn't resist arrest (resist is vetoed, though his temper adds 40); he
+runs instead.
+
+88 tests, 2788 checks, under both compilers, ASan, and leak-free.

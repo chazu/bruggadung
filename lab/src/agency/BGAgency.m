@@ -2295,6 +2295,7 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
 {
    const TriNode   *list;
    const TriNode   *c;
+   const TriNode   *veto;
    TriContent      *tri;
    int64_t         trait;
    int32_t         worth;
@@ -2405,6 +2406,15 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
       }
       else
          continue;
+      /* a veto (AGENCY.md decision 14): counting against it at all, it rules
+       * the option out, whatever else scores */
+      if( v < 0 && (veto = tri_at( tri, c, "veto")) && tri_node_type( veto) == tri_type_named( tri, "true"))
+      {
+         if( [parts count])
+            [parts replaceObjectAtIndex:[parts count] - 1
+                             withObject:[[parts lastObject] stringByAppendingString:@", a veto"]];
+         v = -BG_VETO;
+      }
       worth += v;
    }
    return( worth);
