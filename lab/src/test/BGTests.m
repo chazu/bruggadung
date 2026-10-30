@@ -1047,7 +1047,8 @@ typedef enum
    BGNoApprentice = 0,
    BGApprenticeSaw,
    BGApprenticeMissed,
-   BGApprenticeSilent
+   BGApprenticeSilent,
+   BGApprenticeSurly             /* it saw, and won't help */
 } BGApprentice;
 
 
@@ -1102,6 +1103,8 @@ static BGNailsRun   missing_nails( BOOL spares, BOOL omniscient, BGApprentice ap
       chest  = [g create:"chest" key:"chest" at:BGOnTile( 2, 12, 0)];
       helper = [g create:"apprentice" key:"apprentice"
                       at:apprentice == BGApprenticeMissed ? BGOnTile( 12, 13, 0) : BGOnTile( 3, 13, 0)];
+      if( apprentice == BGApprenticeSurly)
+         [g set:"Agent.helpful" of:BGWhole( helper) to:-25];
    }
    [c submit:g];
    [s runUntil:BGTimeMake( 1)];
@@ -1345,6 +1348,7 @@ static void   test_asking( void)
    BGNailsRun         silent;
    BGNailsRun         resumed;
    BGNailsRun         seer;
+   BGNailsRun         surly;
    const BGReferent   *nails;
    const BGReferent   *chest;
    BGKnowledgeStore   *store;
@@ -1405,6 +1409,17 @@ static void   test_asking( void)
              [rest isEqualToArray:[full subarrayWithRange:NSMakeRange( [full count] - [rest count], [rest count])]]);
    BG_CHECK( [rest count] && [[rest objectAtIndex:0] rangeOfString:@"t=35005ms"].location != NSNotFound &&
              [[rest objectAtIndex:0] rangeOfString:@"did not answer"].location != NSNotFound);
+
+   /* asked, a surly apprentice weighs answering at less than nothing, and says it won't: the goal is dropped */
+   surly = missing_nails( NO, NO, BGApprenticeSurly, 0);
+   BG_CHECK( logged_by( surly.agency, surly.apprentice, @"asked by R"));
+   BG_CHECK( logged_by( surly.agency, surly.apprentice, @"worth -5, refusing"));
+   BG_CHECK( logged_by( surly.agency, surly.apprentice, @"refusing: say R"));
+   BG_CHECK( logged( surly.agency, @"answered: #WontSay"));
+   BG_CHECK( logged( surly.agency, @"[wedge the lock] nothing I know of will do: impossible for now"));
+   BG_CHECK( ! wedged( surly.world));
+   /* a helpful one weighed it at the trust in the asker */
+   BG_CHECK( logged_by( saw.agency, saw.apprentice, @"worth +20, answering"));
 
    /* the omniscient stub needs no one: straight to the chest */
    seer = missing_nails( NO, YES, BGApprenticeSaw, 0);
@@ -1868,6 +1883,7 @@ static BGSalienceRun   salience_run( void)
    BGActivities      *activities;
    BGKnowledge       *knowledge;
    BGAgency          *agency;
+   BGAgency          *copy;
    BGKnowledgeStore  *store;
    BGProposalGroup   *g;
    BGEntityID        h[ 8];
@@ -1919,6 +1935,13 @@ static BGSalienceRun   salience_run( void)
    action.content = [w intern:[where UTF8String]];
    BG_CHECK( BGPerform( w, c, action, 0, &error) != nil);
    [s runUntil:BGTimeMake( [w time].ms + 1000)];
+   /* the question put off is part of the worker's mind, and saved with it */
+   copy = [[[BGAgency alloc] initWithWorld:w committer:c knowledge:knowledge] autorelease];
+   [copy restoreSavedState:[agency savedState]];
+   [knowledge setConcerns:agency];
+   BG_CHECK( [[copy savedState] isEqualToArray:[agency savedState]]);
+   BG_CHECK( [agency mindOf:4]->nquestions == 1 && [[[agency savedState] componentsJoinedByString:@"\n"]
+                                                     rangeOfString:@"question 4 "].location != NSNotFound);
 
    /* the gossip asks the smith, and is told five things */
    action         = BGActionMake( "say", gossip, 5, BGNoEntity);
@@ -1941,6 +1964,20 @@ static BGSalienceRun   salience_run( void)
    run.gossip    = gossip;
    run.text      = BGSave( w, c, [NSArray arrayWithObjects:knowledge, agency, nil]);
    return( run);
+}
+
+
+/* the index of the first line of the agent's log with the text, or NSNotFound */
+static NSUInteger   log_index( BGAgency *agency, BGEntityID agent, NSString *text)
+{
+   NSArray      *log;
+   NSUInteger   i;
+
+   log = [agency logOf:agent];
+   for( i = 0; i < [log count]; i++)
+      if( [[log objectAtIndex:i] rangeOfString:text].location != NSNotFound)
+         return( i);
+   return( NSNotFound);
 }
 
 
@@ -1974,8 +2011,12 @@ static void   test_salience( void)
       if( ! strcmp( o->kind, "moved") && o->actor != [store selfReferent])
          BG_CHECK( o->salience == BG_CONCERN);
    }
-   /* being asked is noticed even while driving, and answered */
+   /* being asked is noticed even while driving; answering is put off until the drive is done */
+   BG_CHECK( logged( run.agency, @"worth -15, busy: not now"));
    BG_CHECK( logged( run.agency, @"answering: say R"));
+   BG_CHECK( log_index( run.agency, 4, @"busy: not now") < log_index( run.agency, 4, @"answering: say R"));
+   /* ... at the boundary the drive completes, still holding its goal */
+   BG_CHECK( logged( run.agency, @"t=5002ms [wedge the lock] asked by R5: worth +15, answering"));
    BG_CHECK( [[run.knowledge dump:4] rangeOfString:@"salience 30"].location != NSNotFound);
 
    /* the gossip keeps four: what it said itself goes first, then the oldest it was told */

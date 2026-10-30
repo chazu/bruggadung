@@ -18,11 +18,17 @@
  *
  * A step can say something (talk.tri): after a question, the agent waits
  * for the one it asked to answer, a while at most, and a search slot passes
- * over whoever it has asked since adopting the goal. Agents agency controls
- * answer when asked, from what they know: where they believe something like
- * it is, and whether they saw it or were told, and by whom, or that they
- * don't know. Asked who told them, they say the claim again, with its
- * source.
+ * over whoever it has asked since adopting the goal.
+ *
+ * Being asked is a candidate goal (AGENCY.md §4's social generator, §11),
+ * considered at every decision point: answering is worth the agent's trust
+ * in the asker, plus its `helpful` disposition, less BG_BUSY_COST for each
+ * point of attention its running activity demands, less BG_COMMITTED if it
+ * holds a goal of its own. Worth more than nothing, it answers, from what it
+ * knows: where it believes something like it is, and how it knows, or that
+ * it doesn't know; asked who told it, the claim again, with its source.
+ * Worth nothing only because it is busy, it answers once it isn't, if the
+ * asker can still be waiting. Otherwise it says it won't.
  *
  * Each agent's motivation store (its intentions, with their bindings and
  * failed methods, what it waits for, and the decision count) is private and
@@ -38,6 +44,10 @@
 
 #define BG_MAX_INTENTIONS  8
 #define BG_MAX_SLOTS       8
+#define BG_MAX_QUESTIONS   8
+
+#define BG_BUSY_COST       3      /* per point of attention the running activity demands */
+#define BG_COMMITTED       5      /* for holding a goal of its own */
 
 
 typedef struct
@@ -61,6 +71,16 @@ typedef struct
 } BGIntention;
 
 
+/* A question put to the agent, not yet answered. */
+typedef struct
+{
+   uint32_t         asker;         /* referent */
+   const char       *content;      /* interned */
+   int64_t          heard;         /* ms */
+   BOOL             deferred;      /* "not now" is logged */
+} BGQuestion;
+
+
 @interface BGMotivation : NSObject
 {
 @public
@@ -73,6 +93,8 @@ typedef struct
    int64_t          awaitSince;        /* ms */
    int64_t          awaitUntil;        /* ms: then it stops waiting */
    uint64_t         heard;             /* the serial of the first observation it has not yet considered for questions */
+   BGQuestion       questions[ BG_MAX_QUESTIONS];
+   int              nquestions;
    NSMutableArray   *log;
 }
 @end

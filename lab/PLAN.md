@@ -861,7 +861,34 @@ that take turns over time.
 
 33 tests, 472 checks, under both compilers, ASan and UBSan, and leak-free.
 
-Next: answering as a choice (AGENCY.md §11). Being addressed raises a
-decision point, and *answer* is a goal scored by trust in the asker, the
-agent's commitments, and the cost, rather than a reflex every agent obeys
-at once.
+### After the slice: answering as a choice
+
+Being asked is a candidate goal (AGENCY.md §4's social generator, §11),
+kept in the motivation store and weighed at every decision point. It is
+worth the agent's trust in the asker (dB), plus its `helpful` disposition
+(a new `#Agent` field, not perceivable, -30 to 30 dB, 0 by default), less
+3 for each point of attention its running activity demands, less 5 if it
+holds a goal of its own. Worth more than nothing, it answers. Worth nothing
+only because it's busy, it puts the question off ("busy: not now") and
+answers when it's free, if the asker can still be waiting (5 s). Otherwise
+it refuses, saying `#WontSay`. A question waited on too long is let go.
+
+In the tests, a surly apprentice (helpful -25) weighs the worker's
+question at -5, says it won't, and the worker's goal is dropped. The
+worker, driving a nail (attention 10), weighs the gossip's question at -15
+and puts it off; at the boundary the drive completes, it weighs it at +15
+and answers, before noting its goal done. A question put off is saved
+with the mind.
+
+Not yet: dispositions beyond helpfulness (honesty, so lying is agency's
+choice too), refusing changing the asker's trust, comply or refuse for
+requests other than questions, and consideration curves (the
+considerations add, in dB, without curves).
+
+33 tests, 488 checks, under both compilers, ASan and UBSan, and leak-free.
+
+Next: traces and appearance (KNOWLEDGE.md Scenario 2, its first half).
+Traces as component state that age analytically, removal that leaves
+traces of its own, and appearance that differs from the truth until an
+analysis operation reveals it. Interpretation rules gated by expertise and
+prior beliefs come after.

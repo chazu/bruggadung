@@ -65,6 +65,9 @@
     hands:  int & >=0 & <=4                  @field(content, saved, inspect, perceive(sight))
     coat:   #Colour                          @field(content, saved, inspect, perceive(sight))
     memory: *64 | int & >=1 & <=100000       @field(content, saved, inspect)
+    // a disposition (AGENCY.md §9), in dB: how much it likes to help whoever
+    // asks; others can't see it, only how it behaves
+    helpful: *0 | int & >=-30 & <=30         @field(content, saved, proposable, inspect)
 }
 
 // Something entities can be put in.

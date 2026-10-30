@@ -275,6 +275,9 @@ typedef struct
  * differently from agency run on what agents can know. */
 - (void) setOmniscient:(BOOL) flag;
 
+/* what the agent's running activities demand of its attention */
+- (int) attentionOf:(BGEntityID) agent;
+
 /* who says what each agent's goals concern: agency */
 - (void) setConcerns:(id <BGConcerns>) concerns;
 - (id <BGConcerns>) concerns;
@@ -292,3 +295,8 @@ typedef struct
 - (const BGAncestry *) rootOf:(uint64_t) utterance;
 
 @end
+
+
+/* A text as one word for a save line, and back (the result is malloced). */
+NSString   *BGEncodeWord( const char *s);
+char       *BGDecodeWord( const char *s);

@@ -123,10 +123,14 @@ method that needed it has failed, so the goal beneath tries its next.
 A step can say something: *ask where nails are* puts a `#WhereIs` to the
 nearest agent the worker knows of, then waits up to five seconds for the
 answer (the scheduler wakes it then if nothing else does), and a search slot
-passes over whoever it has asked since adopting the goal. Agents agency
-controls answer when asked, from what they know: where they believe
-something like it is, and whether they saw it or were told; or that they
-don't know.
+passes over whoever it has asked since adopting the goal. Being asked is a
+choice for agents agency controls: answering is worth their trust in the
+asker plus their `helpful` disposition, less what their running activity
+demands of their attention and a little for a goal of their own. Worth
+something, they answer from what they know: where they believe something
+like it is, and how they know, or that they don't know. Busy, they answer
+once they're done, if the asker can still be waiting; otherwise they say
+they won't.
 
 The missing nails runs on this content: *wedge the lock*
 (drive a nail in, after *have nails*), and *have nails* (fetch them, else

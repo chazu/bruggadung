@@ -33,6 +33,9 @@
 // The speaker knows of nothing like `what` that it could say where it is.
 #DontKnow: #Utterance & {}
 
+// The speaker won't say where something like `what` is (AGENCY.md §11).
+#WontSay: #Utterance & {}
+
 // Say something to an agent in reach. What is said is the command's.
 say: #Operation & {
     effect: "say"

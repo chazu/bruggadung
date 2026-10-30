@@ -863,19 +863,16 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
 }
 
 
-/* Answering when asked (AGENCY.md §11), for now a reflex: every question
- * put to the agent since it last considered what it heard is answered. */
-- (void) answerQuestions:(BGMotivation *) m
-                   store:(BGKnowledgeStore *) store
+/* Questions put to the agent since it last looked become candidates. */
+- (void) hearQuestions:(BGMotivation *) m
+                 store:(BGKnowledgeStore *) store
 {
    const BGObservation   *o;
    const TriNode         *question;
    TriContent            *tri;
    TriArena              *arena;
-   NSString              *answer;
    NSUInteger            i;
    uint32_t              me;
-   uint32_t              asker;
 
    tri = [_world tri];
    me  = [store selfReferent];
@@ -883,21 +880,95 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    {
       o = [store observationAt:i];
       if( o->serial < m->heard || strcmp( o->kind, "said") || o->other != me || ! o->actor || o->actor == me ||
-          ! o->content)
+          ! o->content || m->nquestions == BG_MAX_QUESTIONS)
          continue;
-      asker    = o->actor;
       arena    = tri_arena_new();
       question = tri_value( tri, o->content, arena, NULL, 0);
-      answer   = nil;
       if( question && (tri_subtype( tri, tri_node_type( question), tri_type_named( tri, "#WhereIs")) ||
                        tri_subtype( tri, tri_node_type( question), tri_type_named( tri, "#WhoToldYou"))))
-         answer = [self answerTo:question store:store];
+      {
+         memset( &m->questions[ m->nquestions], 0, sizeof( BGQuestion));
+         m->questions[ m->nquestions].asker   = o->actor;
+         m->questions[ m->nquestions].content = [_world intern:o->content];
+         m->questions[ m->nquestions].heard   = o->time;
+         m->nquestions++;
+      }
       tri_arena_free( arena);
-      if( answer)
-         [self act:m why:"answering" store:store operation:"say" object:asker target:0 units:0
-           content:[answer UTF8String]];
    }
    m->heard = [store nextSerial];
+}
+
+
+- (void) dropQuestion:(BGMotivation *) m
+                   at:(int) k
+{
+   memmove( &m->questions[ k], &m->questions[ k + 1], sizeof( BGQuestion) * (size_t) (m->nquestions - k - 1));
+   m->nquestions--;
+}
+
+
+/* Each question asked, weighed (AGENCY.md §11): answered, put off while the
+ * agent is busy, refused, or, waited on too long, let go. */
+- (void) considerQuestions:(BGMotivation *) m
+                     store:(BGKnowledgeStore *) store
+{
+   const BGAgent   *agent;
+   const TriNode   *question;
+   const TriNode   *what;
+   BGQuestion      *q;
+   TriContent      *tri;
+   TriArena        *arena;
+   NSString        *answer;
+   int32_t         worth;
+   int32_t         busy;
+   int             k;
+   char            printed[ 2048];
+
+   tri   = [_world tri];
+   agent = [_world record:[_world kindNamed:"Agent"] for:m->agent];
+   busy  = BG_BUSY_COST * [_knowledge attentionOf:m->agent];
+   for( k = 0; k < m->nquestions;)
+   {
+      q = &m->questions[ k];
+      if( [_world time].ms - q->heard > BG_REPLY_WAIT)
+      {
+         [self note:m line:[NSString stringWithFormat:@"asked by R%u: it has waited too long; let go", q->asker]];
+         [self dropQuestion:m at:k];
+         continue;
+      }
+      worth = [store trustIn:q->asker] + (agent ? (int32_t) agent->helpful : 0) - busy -
+              (m->nintentions ? BG_COMMITTED : 0);
+      if( worth <= 0 && worth + busy > 0)
+      {
+         if( ! q->deferred)
+            [self note:m line:[NSString stringWithFormat:@"asked by R%u: worth %+d, busy: not now", q->asker, worth]];
+         q->deferred = YES;
+         k++;
+         continue;
+      }
+      arena    = tri_arena_new();
+      question = tri_value( tri, q->content, arena, NULL, 0);
+      answer   = nil;
+      if( question && worth > 0)
+      {
+         [self note:m line:[NSString stringWithFormat:@"asked by R%u: worth %+d, answering", q->asker, worth]];
+         answer = [self answerTo:question store:store];
+      }
+      else if( question)
+      {
+         [self note:m line:[NSString stringWithFormat:@"asked by R%u: worth %+d, refusing", q->asker, worth]];
+         what = tri_at( tri, question, "what");
+         printed[ 0] = 0;
+         if( what)
+            tri_print( tri, what, printed, sizeof( printed));
+         answer = [NSString stringWithFormat:@"#WontSay & { what: %s }", *printed ? printed : "#Body"];
+      }
+      tri_arena_free( arena);
+      if( answer)
+         [self act:m why:worth > 0 ? "answering" : "refusing" store:store operation:"say" object:q->asker target:0
+             units:0 content:[answer UTF8String]];
+      [self dropQuestion:m at:k];
+   }
 }
 
 
@@ -951,7 +1022,8 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    me    = [store referent:[store selfReferent]];
    if( ! me)
       return( YES);
-   [self answerQuestions:m store:store];
+   [self hearQuestions:m store:store];
+   [self considerQuestions:m store:store];
    if( [self awaits:m store:store] || ! m->nintentions || [self busy:m->agent])
       return( YES);     /* waiting for an answer, mid-activity, or nothing to do: no cost */
    if( m->waiting && ! [[store news] count])
@@ -1076,6 +1148,11 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
             [line appendFormat:@" %s %u", t->params[ p].slot, t->params[ p].referent];
       }
       [lines addObject:line];
+      for( k = 0; k < m->nquestions; k++)
+         [lines addObject:[NSString stringWithFormat:@"question %llu %u %lld %d %@", (unsigned long long) m->agent,
+                                                     m->questions[ k].asker, (long long) m->questions[ k].heard,
+                                                     m->questions[ k].deferred ? 1 : 0,
+                                                     BGEncodeWord( m->questions[ k].content)]];
    }
    return( lines);
 }
@@ -1086,6 +1163,7 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    NSArray        *words;
    BGMotivation   *m;
    BGIntention    *t;
+   char           *text;
    NSUInteger     i;
    NSUInteger     w;
    int            n;
@@ -1096,6 +1174,20 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    for( i = 0; i < [lines count]; i++)
    {
       words = [[lines objectAtIndex:i] componentsSeparatedByString:@" "];
+      if( [words count] == 6 && [[words objectAtIndex:0] isEqualToString:@"question"])
+      {
+         m = [self mindOf:(BGEntityID) [[words objectAtIndex:1] longLongValue]];
+         if( m->nquestions == BG_MAX_QUESTIONS)
+            continue;
+         text = BGDecodeWord( [[words objectAtIndex:5] UTF8String]);
+         m->questions[ m->nquestions].asker    = (uint32_t) [[words objectAtIndex:2] longLongValue];
+         m->questions[ m->nquestions].heard    = [[words objectAtIndex:3] longLongValue];
+         m->questions[ m->nquestions].deferred = [[words objectAtIndex:4] intValue] != 0;
+         m->questions[ m->nquestions].content  = [_world intern:text];
+         m->nquestions++;
+         free( text);
+         continue;
+      }
       if( [words count] < 9 || ! [[words objectAtIndex:0] isEqualToString:@"mind"])
          continue;
       m             = [self mindOf:(BGEntityID) [[words objectAtIndex:1] longLongValue]];

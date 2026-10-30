@@ -1799,7 +1799,7 @@ static NSString   *attribution_text( const BGTestimony *t)
 
 /* --- saves --------------------------------------------------------------------------- */
 
-static NSString   *encode( const char *s)
+NSString   *BGEncodeWord( const char *s)
 {
    NSMutableString   *out;
 
@@ -1815,7 +1815,7 @@ static NSString   *encode( const char *s)
 }
 
 
-static char   *decode( const char *s)
+char   *BGDecodeWord( const char *s)
 {
    char     *out;
    char     *w;
@@ -1877,7 +1877,7 @@ static char   *decode( const char *s)
                                                      r->container, r->x, r->y, r->level, r->slot, (long long) r->seen,
                                                      (long long) r->insideSeen, r->toldBy, r->trust, r->present ? 1 : 0,
                                                      (unsigned long long) r->truth,
-                                                     encode( r->role), encode( r->kind), encode( r->features)]];
+                                                     BGEncodeWord( r->role), BGEncodeWord( r->kind), BGEncodeWord( r->features)]];
       }
       for( j = 0; j < [store observationCount]; j++)
       {
@@ -1886,7 +1886,7 @@ static char   *decode( const char *s)
                                                      (unsigned long long) [store agent],
                                                      (long long) o->time, o->kind, o->actor, o->subject, o->other,
                                                      o->unbelieved ? 1 : 0, o->salience, (unsigned long long) o->serial,
-                                                     encode( o->content)]];
+                                                     BGEncodeWord( o->content)]];
       }
       for( j = 0; j < [store testimonyCount]; j++)
       {
@@ -1964,7 +1964,7 @@ static char   *decode( const char *s)
          o.unbelieved = present != 0;
          o.salience   = trust;
          o.serial     = origin;
-         o.content    = decode( features);
+         o.content    = BGDecodeWord( features);
          if( ! *o.content)
          {
             free( o.content);
@@ -2020,11 +2020,11 @@ static char   *decode( const char *s)
          r->trust      = trust;
          r->present    = present != 0;
          r->truth     = (BGEntityID) truth;
-         text         = decode( role);
+         text         = BGDecodeWord( role);
          strncpy( r->role, text, sizeof( r->role) - 1);
          free( text);
-         r->kind      = decode( kind);
-         r->features  = decode( features);
+         r->kind      = BGDecodeWord( kind);
+         r->features  = BGDecodeWord( features);
          [store setNextID:(uint32_t) max64( next, [store nextID]) self:[store selfReferent]];
       }
    }

@@ -298,8 +298,9 @@ A rebuilt world produces the same next step as one that never saved.
    is traced, and a lie is recorded as a fabrication root; and memory
    that decays along the content's hierarchies; and salience, so agents
    keep what matters to them within a bounded memory; and talking in `lab
-   play`, asking, telling, and lying. Next, per [lab/PLAN.md](lab/PLAN.md):
-   answering as a choice.
+   play`, asking, telling, and lying; and answering as a choice weighed by
+   trust, disposition, and how busy the agent is. Next, per
+   [lab/PLAN.md](lab/PLAN.md): traces and appearance.
 
 ## Cross-cutting open questions
 
