@@ -1031,17 +1031,22 @@ static NSString   *known_features( const BGReferent *r)
 
 
 /* Each feature generalized a step along its primary parent for each memory
- * step since the referent was seen; one generalized as far as it goes is
- * forgotten. */
+ * step since the referent was seen, as strength fades (KNOWLEDGE.md decision
+ * 16): slower for what was seen again and again, or salient; one
+ * generalized as far as it goes is forgotten. */
 - (NSString *) recall:(const BGReferent *) r
 {
    NSString   *known;
+   int32_t    sightings;
+   int32_t    salience;
    int        steps;
 
    if( ! r->features)
       return( @"");
-   known = known_features( r);
-   steps = [self stepsSince:r->seen];
+   known     = known_features( r);
+   sightings = r->sightings < 1 ? 1 : (r->sightings > 7 ? 7 : r->sightings);
+   salience  = r->salience > BG_NOTICE ? r->salience : BG_NOTICE;
+   steps     = (int) ((int64_t) [self stepsSince:r->seen] * 2 * BG_NOTICE / ((1 + sightings) * salience));
    if( ! steps || ! [known length] || ! r->kind)
       return( known);
    return( [self generalize:known kind:r->kind steps:steps]);

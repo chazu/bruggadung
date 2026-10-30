@@ -3659,3 +3659,17 @@ relationship's own starting trust beyond loyalty (coworker, employer, as
 kinds of tie).
 
 89 tests, 2808 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: detail fades as strength does
+
+KNOWLEDGE.md decision 16: a memory's features generalize at the same rate
+its strength fades, slower for what was salient or seen again and again.
+
+- **`recall:`** generalizes each feature by the memory steps since it was
+  seen, scaled as strength is: by 2 × `BG_NOTICE` / ((1 + sightings) ×
+  salience). Seen once with nothing salient, a step a day, as before.
+
+Checked: a stone seen once has lost its details a day later; sighted three
+times, it still has them a day later, and loses them the next.
+
+89 tests, 2810 checks, under both compilers, ASan, and leak-free.

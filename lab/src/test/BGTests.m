@@ -8724,7 +8724,7 @@ static void   test_trodden( void)
  * away for two minutes between), or moves it itself into a bin (`moves`),
  * then goes
  * away for ten days. The strength of its belief of where the stone is. */
-static int32_t   remembered( int sightings, BOOL moves)
+static int32_t   remembered( int sightings, BOOL moves, int64_t days, NSString **recall)
 {
    BGStage            st;
    BGKnowledge        *knowledge;
@@ -8765,8 +8765,10 @@ static int32_t   remembered( int sightings, BOOL moves)
       [st.s runUntil:BGTimeMake( [st.w time].ms + 1000)];
    }
    stage_move( &st, worker, 25, 25);
-   [st.s runUntil:BGTimeMake( [st.w time].ms + 10 * BG_MEMORY_STEP)];
+   [st.s runUntil:BGTimeMake( [st.w time].ms + days * BG_MEMORY_STEP)];
    store = [knowledge storeOf:worker];
+   if( recall)
+      *recall = [store recall:[store referent:referent_of( store, stone)]];
    return( [store strengthOf:referent_of( store, stone)]);
 }
 
@@ -8816,11 +8818,24 @@ static void   test_scheduled_forgetting( void)
 static void   test_memory_rates( void)
 {
    /* seen once: BG_FADE a day */
-   BG_CHECK( remembered( 1, NO) == BG_SEEN - 10 * BG_FADE);
+   BG_CHECK( remembered( 1, NO, 10, NULL) == BG_SEEN - 10 * BG_FADE);
    /* sighted three times: half as fast */
-   BG_CHECK( remembered( 3, NO) == BG_SEEN - 10 * BG_FADE / 2);
+   BG_CHECK( remembered( 3, NO, 10, NULL) == BG_SEEN - 10 * BG_FADE / 2);
    /* moved by its own hand (salience BG_OWN_DEED): half as fast too */
-   BG_CHECK( remembered( 1, YES) == BG_SEEN - 10 * BG_FADE * BG_NOTICE / BG_OWN_DEED);
+   BG_CHECK( remembered( 1, YES, 10, NULL) == BG_SEEN - 10 * BG_FADE * BG_NOTICE / BG_OWN_DEED);
+   /* KNOWLEDGE.md decision 16: detail fades as strength does. Seen once,
+    * a day on, the stone's details are gone; sighted three times, it still
+    * remembers them a day on, and loses them the next */
+   {
+      NSString   *once;
+      NSString   *thrice;
+
+      remembered( 1, NO, 1, &once);
+      remembered( 3, NO, 1, &thrice);
+      BG_CHECK( [once length] == 0 && [thrice rangeOfString:@"material: \"stone\""].location != NSNotFound);
+      remembered( 3, NO, 2, &thrice);
+      BG_CHECK( [thrice length] == 0);
+   }
 }
 
 
