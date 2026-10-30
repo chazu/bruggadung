@@ -238,6 +238,7 @@ static BGAction   action_of( BGWorld *world, BGEntityID a, const BGActivity *rec
       return( nil);
    }
    if( (reason = [self obstacleTo:a record:record]) ||
+       (reason = BGProvidersBusy( _world, record->actorRef, [_world textField:"Activity.operation" of:a], a)) ||
        ! BGOperationStage( _world, [_world textField:"Activity.operation" of:a], record->stage, &duration, &effect))
    {
       if( error)

@@ -566,6 +566,11 @@ What it settled:
   mid-search and restored into fresh knowledge and agency now ends in the
   same state, with the same decisions.
 
+Open: recognition binds the crate's spare nails to the referent of the
+bin's missing ones (same kind, the nearest absent referent), so the agent in
+effect concludes it has found its missing nails. Whether that is right is
+undecided; KNOWLEDGE.md's recognition by unification may settle it.
+
 Not yet: method scores (believed cost, habits, dispositions), credence
 thresholds and residuals as subgoals (`onUnknown`), parameters that are
 values rather than referents (*have nails* should be *have some of a unit*),
@@ -573,5 +578,31 @@ and the rest of what the agency slice left open.
 
 28 tests, 271 checks, under both compilers, ASan and UBSan, and leak-free.
 
+### After the slice: walking as an activity
+
+A step is now an activity of a second (`#Walk`, with `duration: 1s`): the
+walker arrives when it is done, so agents and the player cross the workshop
+at a walking pace instead of a tile a millisecond. Operations declare the
+providers they use (`uses: ["hands"]`, `["legs"]`; ACTIONS.md §5), and an
+activity isn't started or resumed while a running one of the actor's uses
+the same: two steps at once are refused, while prying goes on during a step
+away and is suspended when the walker arrives out of reach. `lab play`'s
+`walk` runs until the step lands. Agency needed no change: it waits while
+its agent is busy, and decides again when the step is done.
+
+What it settled:
+
+- **An operation is described by its own type**, not always `#Operation`,
+  and with its `uses`: otherwise a `#Walk` matched as unknown at its root.
+- **The step's check is at arrival.** Walking off the map starts, and fails
+  when the move would commit, with the reason.
+
+Not yet: provider allocation counts only committed activities, so two
+activities submitted for the same boundary both start (nothing does that
+yet); walking speed from the walker (a tile a second for everyone);
+movement along a path rather than a tile per decision.
+
+28 tests, 276 checks, under both compilers, ASan and UBSan, and leak-free.
+
 Next: event perception and communication, so the scenario's "ask a
-coworker" can run; walking as an activity.
+coworker" can run.

@@ -63,13 +63,15 @@ static TriMatch   match_described( BGWorld *world, const TriNode *pattern, BGAct
    TriMatch          match;
    char              duration[ 128];
    char              stages[ 1024];
+   char              uses[ 128];
    char              effect[ 64];
    char              err[ 256];
    int               r;
 
    tri = [world tri];
    tri_print( tri, tri_at( tri, pattern, "effect"), effect, sizeof( effect));
-   expr = [NSMutableString stringWithFormat:@"#Operation & { effect: %s, ", effect];
+   /* the operation's own type: a walk is a #Walk, an operation by its kind */
+   expr = [NSMutableString stringWithFormat:@"%s & { effect: %s, ", tri_type_name( tri, tri_node_type( pattern)), effect];
    if( tri_at( tri, pattern, "duration"))
    {
       tri_print( tri, tri_at( tri, pattern, "duration"), duration, sizeof( duration));
@@ -79,6 +81,11 @@ static TriMatch   match_described( BGWorld *world, const TriNode *pattern, BGAct
    {
       tri_print( tri, tri_at( tri, pattern, "stages"), stages, sizeof( stages));
       [expr appendFormat:@"stages: %s, ", stages];
+   }
+   if( tri_at( tri, pattern, "uses"))
+   {
+      tri_print( tri, tri_at( tri, pattern, "uses"), uses, sizeof( uses));
+      [expr appendFormat:@"uses: %s, ", uses];
    }
    [expr appendString:@"roles: {"];
    for( r = 0; r < BGRoleCount; r++)
@@ -750,6 +757,64 @@ static BGEntityID   start_activity( BGWorld *world, BGAction action, int64_t amo
 }
 
 
+/* The providers an operation's activity uses: "hands", "legs". */
+static NSUInteger   providers_of( TriContent *tri, const char *operation, char (*out)[ 16], NSUInteger max)
+{
+   const TriNode   *list;
+   NSUInteger      n;
+   char            text[ 32];
+   size_t          len;
+
+   n = 0;
+   for( list = operation ? tri_at( tri, tri_pattern( tri, operation), "uses") : NULL;
+        list && tri_at( tri, list, "first") && n < max;
+        list = tri_at( tri, list, "rest"))
+   {
+      tri_print( tri, tri_at( tri, list, "first"), text, sizeof( text));
+      len = strlen( text);
+      if( len > 2 && text[ 0] == '"' && text[ len - 1] == '"')
+         snprintf( out[ n++], 16, "%.*s", (int) (len - 2), text + 1);
+   }
+   return( n);
+}
+
+
+NSString   *BGProvidersBusy( BGWorld *world, BGEntityID actor, const char *operation, BGEntityID except)
+{
+   const BGActivity   *record;
+   const char         *other;
+   BGStore            *store;
+   TriContent         *tri;
+   TriType            running;
+   NSUInteger         nwanted;
+   NSUInteger         nused;
+   NSUInteger         i;
+   NSUInteger         j;
+   NSUInteger         k;
+   char               wanted[ 4][ 16];
+   char               used[ 4][ 16];
+
+   tri     = [world tri];
+   nwanted = providers_of( tri, operation, wanted, 4);
+   store   = [world storeForKind:[world kindNamed:"Activity"]];
+   running = tri_type_named( tri, "\"running\"");
+   for( i = 0; nwanted && i < [store count]; i++)
+   {
+      record = [store recordAtIndex:i];
+      if( record->actorRef != actor || record->status != (uint32_t) running || [store entityAtIndex:i] == except)
+         continue;
+      other = [world textField:"Activity.operation" of:[store entityAtIndex:i]];
+      nused = providers_of( tri, other, used, 4);
+      for( j = 0; j < nwanted; j++)
+         for( k = 0; k < nused; k++)
+            if( ! strcmp( wanted[ j], used[ k]))
+               return( [NSString stringWithFormat:@"its %s are busy with activity %llu (%s)", wanted[ j],
+                                                  (unsigned long long) [store entityAtIndex:i], other]);
+   }
+   return( nil);
+}
+
+
 BGProposalGroup   *BGPerform( BGWorld *world, BGCommitter *committer, BGAction action, int64_t amount,
                               NSString **error)
 {
@@ -773,6 +838,13 @@ BGProposalGroup   *BGPerform( BGWorld *world, BGCommitter *committer, BGAction a
    effect = BGOperationEffect( world, action.operation);
    if( ! BGOperationStage( world, action.operation, 0, &duration, &stageEffect))
       duration = 0;
+   if( (duration > 0 || [effect isEqualToString:@"fill"]) &&
+       (reason = BGProvidersBusy( world, action.roles[ BGRoleActor], action.operation, BGNoEntity)))
+   {
+      if( error)
+         *error = reason;
+      return( nil);
+   }
    source   = [NSString stringWithFormat:@"%llu: %s", (unsigned long long) action.roles[ BGRoleActor], action.operation];
    for( r = BGRoleItem; r < BGRoleCount; r++)
       if( action.roles[ r])

@@ -103,7 +103,7 @@ straight to the spare nails: the behaviour depends on what the agent knows.
 
 `lab play workshop` (or `cistern`) is an interactive session: `look` draws
 the map as the actor knows it (what it sees, and what it remembers, with the
-memory's age), `menu` numbers the actions it believes it can take, `do <n> [amount]` performs one, `walk n|s|e|w` moves, and `wait`,
+memory's age), `menu` numbers the actions it believes it can take, `do <n> [amount]` performs one, `walk n|s|e|w` takes a step (a second; the session runs until it lands), and `wait`,
 `step`, and `idle` run time. `activities`, `suspend`, and `resume` manage
 what the actor has under way. The developer's side: `inspect <id>` shows an
 entity's truth, relations, activities, and history; `why <id>` follows the
@@ -113,6 +113,12 @@ chain of causes behind its last change back to the command that began it;
 (`--log file`): feeding them back reproduces the session exactly.
 
 ## How an activity runs
+
+Walking is one: a step is an activity of a second, and the walker arrives
+when it is done. An operation declares what of the actor it `uses` (hands,
+legs), and an actor runs two activities at once only if they use different
+ones: it can walk away from a prying, which goes on until it arrives out of
+reach, but not take two steps at once.
 
 An operation with stages, or a `duration` (one stage), is a timed activity:
 performing it commits an Activity entity, the scheduler puts a boundary at

@@ -120,6 +120,12 @@ int64_t            BGOperationDuration( BGWorld *world, const char *operation);
 BOOL               BGOperationStage( BGWorld *world, const char *operation, int64_t index,
                                      int64_t *duration, NSString **effect);
 
+/* Why the actor can't start (or resume) an activity of `operation` now: a
+ * running activity of its, other than `except`, uses a provider this one
+ * needs (ACTIONS.md §5: an actor runs two activities at once only if they
+ * use different providers). nil when it can. */
+NSString           *BGProvidersBusy( BGWorld *world, BGEntityID actor, const char *operation, BGEntityID except);
+
 /* A named effect, as proposals added to `group`. */
 NSString           *BGApplyNamedEffect( BGWorld *world, NSString *effect, BGAction action, int64_t amount,
                                         BGProposalGroup *group);

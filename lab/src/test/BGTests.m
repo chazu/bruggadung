@@ -753,23 +753,30 @@ static void   test_stages_and_suspension( void)
    a = [g idFor:[g proposals][ 0].handle];
    BG_CHECK( ! strcmp( status_of( w, a), "\"running\""));
 
-   /* a second in, the worker walks away: suspended, with the second kept */
-   BGPerform( w, c, BGActionMake( "walk_west", worker, BGNoEntity, BGNoEntity), 0, &error);
-   [s runUntil:BGTimeMake( 1001)];
+   /* a second in, the worker walks away: the prying goes on while it walks
+    * (hands and legs), and is suspended when it arrives out of reach, with
+    * the two seconds kept */
+   BG_CHECK( BGPerform( w, c, BGActionMake( "walk_west", worker, BGNoEntity, BGNoEntity), 0, &error) != nil);
+   [s runUntil:BGTimeMake( 1999)];
+   BG_CHECK( ! strcmp( status_of( w, a), "\"running\"") && [w locationOf:worker].x == 1);
+   /* one walk at a time: its legs are busy */
+   BG_CHECK( ! BGPerform( w, c, BGActionMake( "walk_east", worker, BGNoEntity, BGNoEntity), 0, &error) &&
+             [error rangeOfString:@"its legs are busy with activity"].location != NSNotFound);
+   [s runUntil:BGTimeMake( 2000)];
    record = [w record:[w kindNamed:"Activity"] for:a];
-   /* the walk, given at 1000 ms, commits at the next boundary, 1001 ms */
-   BG_CHECK( ! strcmp( status_of( w, a), "\"suspended\"") && record->progress == 1001 && record->stage == 0);
+   BG_CHECK( [w locationOf:worker].x == 0);
+   BG_CHECK( ! strcmp( status_of( w, a), "\"suspended\"") && record->progress == 2000 && record->stage == 0);
    BG_CHECK( ! [activities resume:a error:&error] && [error rangeOfString:@"out of reach"].location != NSNotFound);
    [s runUntil:BGTimeMake( 10000)];
    BG_CHECK( [w getField:"Body.toolMarks" of:nail value:&v] && v == 0);      /* nothing happened meanwhile */
 
-   /* back, and resumed at 10 s: what is left of the loosening, then 2 s of pulling */
+   /* back, and resumed at 11 s: what is left of the loosening, then 2 s of pulling */
    BGPerform( w, c, BGActionMake( "walk_east", worker, BGNoEntity, BGNoEntity), 0, &error);
-   [s runUntil:BGTimeMake( 10001)];
+   [s runUntil:BGTimeMake( 11000)];
    BG_CHECK( [activities resume:a error:&error] != nil);
-   [s runUntil:BGTimeMake( 10002)];
+   [s runUntil:BGTimeMake( 11001)];
    record = [w record:[w kindNamed:"Activity"] for:a];
-   BG_CHECK( record->due == 10001 + 1999);
+   BG_CHECK( record->due == 11000 + 1000);
    [s runUntil:BGTimeMake( 12000)];
    BG_CHECK( [w getField:"Body.toolMarks" of:nail value:&v] && v == 1);      /* loosened */
    record = [w record:[w kindNamed:"Activity"] for:a];
@@ -822,7 +829,7 @@ static void   test_play( void)
    uint64_t   h2;
 
    commands = [NSArray arrayWithObjects:@"look", @"menu", @"do 1", @"menu", @"do 5 5", @"walk w", @"walk e", @"menu",
-                                        @"do 1", @"idle", @"inspect 9", @"why 9", @"knows", @"walk n", @"walk n",
+                                        @"do 1", @"idle", @"inspect 11", @"why 11", @"knows", @"walk n", @"walk n",
                                         @"walk n", @"walk n", @"walk n", @"hash", nil];
    out   = session( @"workshop", commands, &h1);
    again = session( @"workshop", commands, &h2);
@@ -837,15 +844,17 @@ static void   test_play( void)
    BG_CHECK( [out rangeOfString:@"you notice: R6: #Stack, at (4, 4)"].location != NSNotFound);
    BG_CHECK( [out rangeOfString:@" 1. drive item R6 (#Stack) destination R3 (#Assembly)"].location != NSNotFound);
    /* the drive completes as an activity, and the nail it split off is in the lock, bent */
-   BG_CHECK( [out rangeOfString:@"activity 8: drive completes"].location != NSNotFound);
+   BG_CHECK( [out rangeOfString:@"activity 10: drive completes"].location != NSNotFound);
    BG_CHECK( [out rangeOfString:@"Body.bent=true"].location != NSNotFound);
    BG_CHECK( [out rangeOfString:@"at partOf(3, wedge, 0)"].location != NSNotFound);
-   BG_CHECK( [out rangeOfString:@"R7 #Body, seen at 4000ms, truth 9"].location != NSNotFound);
+   BG_CHECK( [out rangeOfString:@"R7 #Body, seen at 6000ms, truth 11"].location != NSNotFound);
    /* why: the move into the lock, in the drive's completion, because the worker started the drive */
-   BG_CHECK( [out rangeOfString:@"moved 9 to partOf(3, wedge, 0) at boundary 7, in \"activity 8: drive completes\"\n"
-                                @"because:\n  created 8 activity at boundary 6, in \"4: drive item 7 destination 3\""].location
+   BG_CHECK( [out rangeOfString:@"moved 11 to partOf(3, wedge, 0) at boundary 9, in \"activity 10: drive completes\"\n"
+                                @"because:\n  created 10 activity at boundary 8, in \"4: drive item 7 destination 3\""].location
              != NSNotFound);
-   /* the map's edge: walking off it is refused */
+   /* walks are activities of a second each: two of them, so the drive is activity 10, and done at 6 s */
+   BG_CHECK( [out rangeOfString:@"activity 9: walk_east completes"].location != NSNotFound);
+   /* the map's edge: the step off it fails when it would arrive */
    BG_CHECK( [out rangeOfString:@"is off the map"].location != NSNotFound);
    if( [out rangeOfString:@"is off the map"].location == NSNotFound)
       fprintf( stderr, "%s\n", [out UTF8String]);
@@ -1182,9 +1191,11 @@ static void   test_missing_nails( void)
    BG_CHECK( wedged( seer.world));
    BG_CHECK( [[seer.agency logOf:4] count] < [[spares.agency logOf:4] count]);
 
-   /* saved mid-search, the commitment and the subgoal stacked, fetching passed
-    * over: restored, the agent carries on exactly as it would have */
-   resumed = missing_nails( YES, NO, 12012);
+   /* saved mid-search, mid-stride (a boundary the run has anyway: the walk
+    * toward the crate just committed), the commitment and the subgoal stacked,
+    * fetching passed over: restored, the agent carries on exactly as it would
+    * have */
+   resumed = missing_nails( YES, NO, 20005);
    BG_CHECK( [resumed.world stateHash] == [spares.world stateHash]);
    BG_CHECK( [resumed.text isEqualToString:spares.text]);
    full = [spares.agency logOf:4];

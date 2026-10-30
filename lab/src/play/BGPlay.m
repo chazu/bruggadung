@@ -147,8 +147,9 @@
 }
 
 
-/* An action chosen from what the actor knows; walking is the actor's own. */
-- (void) perform:(BGAction) action
+/* An action chosen from what the actor knows; walking is the actor's own.
+ * The group submitted, or nil if it can't be attempted. */
+- (BGProposalGroup *) perform:(BGAction) action
           amount:(int64_t) amount
 {
    BGProposalGroup   *g;
@@ -165,12 +166,13 @@
    if( ! g)
    {
       [_out appendFormat:@"You can't: %@.\n", error];
-      return;
+      return( nil);
    }
    _inputDue = YES;
    [_scheduler stepUntil:[_world time]];
    [self showTrace];
    [self showNews];
+   return( g);
 }
 
 
@@ -456,6 +458,15 @@ static char   glyph_of_kind( const char *kind)
 
 /* --- the commands ------------------------------------------------------------------ */
 
+- (BOOL) isRunning:(BGEntityID) activity
+{
+   const BGActivity   *record;
+
+   record = [_world record:[_world kindNamed:"Activity"] for:activity];
+   return( record && record->status == (uint32_t) tri_type_named( [_world tri], "\"running\""));
+}
+
+
 - (BOOL) actorBusy
 {
    const BGActivity   *record;
@@ -509,7 +520,9 @@ static char   glyph_of_kind( const char *kind)
    NSString         *verb;
    NSString         *w;
    const BGAction   *a;
+   BGProposalGroup  *g;
    BGEntityID       e;
+   BGEntityID       step;
    NSUInteger       i;
    NSUInteger       n;
    int64_t          amount;
@@ -557,7 +570,15 @@ static char   glyph_of_kind( const char *kind)
       w = [words objectAtIndex:1];
       snprintf( walk, sizeof( walk), "walk_%s",
                 [w hasPrefix:@"n"] ? "north" : [w hasPrefix:@"s"] ? "south" : [w hasPrefix:@"e"] ? "east" : "west");
-      [self perform:BGActionMake( [_world intern:walk], _actor, BGNoEntity, BGNoEntity) amount:0];
+      if( (g = [self perform:BGActionMake( [_world intern:walk], _actor, BGNoEntity, BGNoEntity) amount:0]))
+      {
+         /* a step takes a second: the player's character arrives before the next command */
+         step = [g idFor:[g proposals][ 0].handle];
+         while( [self isRunning:step] && [_scheduler stepUntil:BGTimeMake( [_world time].ms + 600000)])
+            ;
+         [self showTrace];
+         [self showNews];
+      }
    }
    else if( [verb isEqualToString:@"wait"])
    {
