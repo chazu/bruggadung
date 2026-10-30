@@ -2696,7 +2696,25 @@ Checked: ten days on, a stone seen once has faded 20; sighted three times,
 scenario now waits six weeks, not a month: the wrench, the worker's own
 doing, is remembered twice as long.
 
-Not yet: detail (the feature hierarchy) by salience and repetition too,
-and forgetting at a scheduled time rather than the next perception phase.
+Not yet: detail (the feature hierarchy) by salience and repetition too.
 
 72 tests, 2456 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: forgetting, scheduled
+
+KNOWLEDGE.md §12: "When a belief's strength would fall below the
+forgetting threshold, it is forgotten at a scheduled time, which is a
+`nextEvent`."
+
+- **`forgettingOf:`**: when a referent's strength will fall below
+  `BG_BELIEVE` at the rate it fades now, solved from `strengthOf:`'s
+  formula, not searched.
+- **`nextForgetting`**, an optional part of the perception phase: the
+  earliest such time after now across the stores. The scheduler bounds
+  its next boundary by it, as by a decision's.
+
+Checked: a stone seen once is forgotten on the sixteenth day; with nothing
+else happening, a boundary comes then (two boundaries to an hour past it,
+one to just before), and after it nothing is due.
+
+73 tests, 2463 checks, under both compilers, ASan, and leak-free.

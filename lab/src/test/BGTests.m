@@ -7090,6 +7090,48 @@ static int32_t   remembered( int sightings, BOOL moves)
 }
 
 
+/* Forgetting is a scheduled `nextEvent` (KNOWLEDGE.md §12): a stone seen
+ * once fades below belief on the sixteenth day after it was last seen;
+ * with nothing else happening, a boundary comes then, and it is forgotten
+ * there, not at the next boundary something else brings. */
+static void   test_scheduled_forgetting( void)
+{
+   BGStage            st;
+   BGKnowledge        *knowledge;
+   BGKnowledgeStore   *store;
+   BGProposalGroup    *g;
+   BGEntityID         worker;
+   BGEntityID         stone;
+   int64_t            when;
+   int64_t            seen;
+
+   st.w      = BGTestWorld( 151);
+   st.c      = BGTestCommitter( st.w);
+   knowledge = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+   st.s      = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [st.s setPerception:knowledge];
+   g      = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: a stone"];
+   worker = [g create:"worker" key:"worker" at:BGOnTile( 5, 5, 0)];
+   stone  = [g create:"stone" key:"stone" at:BGOnTile( 6, 5, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   worker = [g idFor:worker];
+   stone  = [g idFor:stone];
+   stage_move( &st, worker, 25, 25);
+   store = [knowledge storeOf:worker];
+   seen  = [store referent:referent_of( store, stone)]->seen;
+   when  = [store forgettingOf:referent_of( store, stone)];
+   BG_CHECK( when == seen + 16 * BG_MEMORY_STEP);
+   BG_CHECK( [knowledge nextForgetting].ms == when);
+   /* nothing but the forgetting between: one boundary there, one at the end */
+   BG_CHECK( [st.s runUntil:BGTimeMake( when - 1)] == 1);
+   BG_CHECK( [store referent:referent_of( store, stone)]->present);
+   BG_CHECK( [st.s runUntil:BGTimeMake( when + 3600000)] == 2);
+   BG_CHECK( ! [store referent:referent_of( store, stone)]->present);
+   BG_CHECK( [knowledge nextForgetting].ms == BGTimeNever.ms);
+}
+
+
 static void   test_memory_rates( void)
 {
    /* seen once: BG_FADE a day */
@@ -7525,6 +7567,7 @@ const BGTestCase   BGAllTests[] =
    { "access_resume",                 test_access_resume },
    { "providers_pending",             test_providers_pending },
    { "memory_rates",                  test_memory_rates },
+   { "scheduled_forgetting",          test_scheduled_forgetting },
    { "resume_recheck",                test_resume_recheck },
    { "interrupted_repair",            test_interrupted_repair },
    { "unattended_stove",              test_unattended_stove },

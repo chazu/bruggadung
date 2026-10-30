@@ -969,6 +969,35 @@ static NSString   *known_features( const BGReferent *r)
 }
 
 
+- (int64_t) forgettingOf:(uint32_t) referentID
+{
+   const BGReferent   *r;
+   int64_t            base;
+   int64_t            rate;
+   int64_t            over;
+   int64_t            steps;
+   int32_t            sightings;
+   int32_t            salience;
+
+   r = [self referent:referentID];
+   if( ! r || ! r->present || r->id == _self)
+      return( INT64_MAX);
+   base = BG_SEEN;
+   if( r->toldBy && r->form == BGLocationIn)
+      base = [self credenceThat:r->id isIn:r->container];
+   /* the strength after n steps is base - floor(n * rate / over) (strengthOf):
+    * below BG_BELIEVE from the first n with n * rate >= (base - BG_BELIEVE + 1) * over */
+   sightings = r->sightings < 1 ? 1 : (r->sightings > 7 ? 7 : r->sightings);
+   salience  = r->salience > BG_NOTICE ? r->salience : BG_NOTICE;
+   rate      = (int64_t) BG_FADE * 2 * BG_NOTICE;
+   over      = (int64_t) (1 + sightings) * salience;
+   if( base < BG_BELIEVE)
+      return( r->seen);
+   steps = ((base - BG_BELIEVE + 1) * over + rate - 1) / rate;
+   return( r->seen + steps * BG_MEMORY_STEP);
+}
+
+
 - (uint32_t) nextID
 {
    return( _next);
@@ -3424,6 +3453,31 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
       break;
    }
    [self addAncestry:a];
+}
+
+
+- (BGTime) nextForgetting
+{
+   BGKnowledgeStore   *store;
+   NSUInteger         i;
+   NSUInteger         j;
+   int64_t            now;
+   int64_t            when;
+   int64_t            next;
+
+   now  = [_world time].ms;
+   next = INT64_MAX;
+   for( i = 0; i < [_stores count]; i++)
+   {
+      store = [_stores objectAtIndex:i];
+      for( j = 0; j < [store count]; j++)
+      {
+         when = [store forgettingOf:[store referentAt:j]->id];
+         if( when > now && when < next)
+            next = when;
+      }
+   }
+   return( next == INT64_MAX ? BGTimeNever : BGTimeMake( next));
 }
 
 

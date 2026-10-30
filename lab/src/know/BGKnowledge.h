@@ -386,6 +386,9 @@ typedef struct
 - (int) stepsSince:(int64_t) t;
 /* how strongly it believes the referent is where it is believed, in dB */
 - (int32_t) strengthOf:(uint32_t) referentID;
+/* when the strength of where the referent is believed will fall below
+ * BG_BELIEVE, as it fades now (ms); INT64_MAX if never */
+- (int64_t) forgettingOf:(uint32_t) referentID;
 
 /* what it perceived happen and kept, oldest first */
 - (NSUInteger) observationCount;

@@ -100,6 +100,11 @@ typedef struct
 
 - (void) perceiveBoundary:(uint64_t) boundary;
 
+@optional
+/* when something perceived will have faded from memory (KNOWLEDGE.md §12,
+ * a `nextEvent`), after now; or BGTimeNever */
+- (BGTime) nextForgetting;
+
 @end
 
 /* The decision phase (ARCHITECTURE.md step 6, AGENCY.md §12): after

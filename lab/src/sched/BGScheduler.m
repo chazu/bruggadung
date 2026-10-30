@@ -82,6 +82,8 @@ static BGTime   earlier( BGTime a, BGTime b)
       bound = earlier( bound, [_activities nextCompletion]);
    if( _decision)
       bound = earlier( bound, [_decision nextDecisionTime]);
+   if( _perception && [(id) _perception respondsToSelector:@selector( nextForgetting)])
+      bound = earlier( bound, [_perception nextForgetting]);
    for( i = 0; i < [_domains count]; i++)
    {
       d = [_domains objectAtIndex:i];
