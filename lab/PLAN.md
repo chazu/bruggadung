@@ -1532,9 +1532,25 @@ resumes, and the pump is open.
   `shut_off` and the three-stage `dismantle`.
 
 Not yet, of the scenario: talking while working as a voice provider (an
-utterance is instant), the shout as a soft interruption agency decides on
-(the test suspends), abort committing partial effects, inspection binding
-the faulty part, improvising another chain, and the watch on rising water.
+utterance is instant), abort committing partial effects, inspection
+binding the faulty part, improvising another chain, and the watch on
+rising water. The last three wait on latent assembly (the pump's parts and
+culprit), which is to get its own document.
 
 51 tests, 1921 checks, under both compilers, ASan and UBSan, and leak-free.
+
+### After the slice: a shout as a soft interruption
+
+AGENCY.md §7's soft interruption, and ACTIONS.md Scenario 3's shout. At 60%
+of dismantling's last stage the smith shouts the worker's name (a `#Call`).
+Agency weighs it like a question, without the cost of being busy: trust 20,
+less 5 for the worker's own goal, 15, more than the interruption (5). The
+worker puts the dismantling down, answers (`#Here`), and goes back to it,
+its progress kept, and the pump is opened.
+
+- **Calls** (`#Call`, answered by `#Here`): worth more than the
+  interruption, the agent suspends what it is doing (`putDown:why:`) and
+  answers; otherwise it carries on.
+
+51 tests, 1931 checks, under both compilers, ASan and UBSan, and leak-free.
 

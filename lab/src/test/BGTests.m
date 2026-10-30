@@ -4202,7 +4202,7 @@ typedef struct
  * stage of dismantling it is called away, and puts it down; the smith,
  * beside it, takes the wrench; later the wrench is back. `omniscient`: the
  * stub, which needs no diagram. */
-static BGRepairRun   repair_run( BOOL omniscient)
+static BGRepairRun   repair_run( BOOL omniscient, BOOL shout)
 {
    BGStage            st;
    BGActivities       *activities;
@@ -4268,6 +4268,21 @@ static BGRepairRun   repair_run( BOOL omniscient)
 
    /* stage 3 is 60% done: called away, it puts the work down; the smith takes the wrench */
    [st.s runUntil:BGTimeMake( start + 3000 + 3000 + 3000)];
+   if( shout)
+   {
+      /* the smith shouts its name: agency decides */
+      BGAction   call;
+
+      call         = BGActionMake( "say", smith, run.worker, BGNoEntity);
+      call.content = [st.w intern:"#Call & { what: #Agent & { coat: \"blue\" } }"];
+      BG_CHECK( BGPerform( st.w, st.c, call, 0, &error) != nil);
+      [st.s runUntil:BGTimeMake( [st.w time].ms + 2)];
+      [st.w getField:"Activity.progress" of:a value:&run.progress];
+      [st.s runUntil:BGTimeMake( [st.w time].ms + 10000)];
+      run.world  = st.w;
+      run.agency = agency;
+      return( run);
+   }
    BG_CHECK( [activities suspend:a because:@"someone shouts its name" error:&error] != nil);
    g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the smith takes the wrench"];
    [g move:BGWhole( wrench) to:BGHeldBy( smith, 0)];
@@ -4298,15 +4313,16 @@ static void   test_interrupted_repair( void)
 {
    BGRepairRun   run;
    BGRepairRun   seer;
+   BGRepairRun   shout;
    int64_t       v;
 
    /* 1: the recipe binds through knowledge: by the diagram, the trough line's cock */
-   run = repair_run( NO);
+   run = repair_run( NO, NO);
    BG_CHECK( logged_by( run.agency, run.worker, @"[repair the pump] follow the recipe: shut_off R"));
    BG_CHECK( [run.world getField:"Cock.shut" of:run.trough value:&v] && v);
    BG_CHECK( [run.world getField:"Cock.shut" of:run.riser value:&v] && ! v);
    /* the omniscient stub binds the riser's */
-   seer = repair_run( YES);
+   seer = repair_run( YES, NO);
    BG_CHECK( [seer.world getField:"Cock.shut" of:seer.riser value:&v] && v);
    BG_CHECK( [seer.world getField:"Cock.shut" of:seer.trough value:&v] && ! v);
 
@@ -4321,6 +4337,16 @@ static void   test_interrupted_repair( void)
    BG_CHECK( logged_by( run.agency, run.worker, @"follow the recipe: resuming dismantle"));
    BG_CHECK( [run.world getField:"Pump.opened" of:run.pump value:&v] && v);
    BG_CHECK( logged_by( run.agency, run.worker, @"[repair the pump] done"));
+
+   /* the shout as a soft interruption agency decides on: worth 15, more than
+    * the interruption, it puts the dismantling down, answers, and goes back */
+   shout = repair_run( NO, YES);
+   BG_CHECK( logged_by( shout.agency, shout.worker, @"called by R"));
+   BG_CHECK( logged_by( shout.agency, shout.worker, @": worth +15: putting dismantle down"));
+   BG_CHECK( logged_by( shout.agency, shout.worker, @"answering: say R"));
+   BG_CHECK( logged_by( shout.agency, shout.worker, @"follow the recipe: resuming dismantle"));
+   BG_CHECK( shout.progress == 3001);            /* put down a millisecond after the shout */
+   BG_CHECK( [shout.world getField:"Pump.opened" of:shout.pump value:&v] && v);
 }
 
 

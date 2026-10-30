@@ -928,6 +928,30 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
 }
 
 
+/* The agent puts down what it is doing: its running activities suspended. */
+- (void) putDown:(BGMotivation *) m
+             why:(NSString *) why
+{
+   const BGActivity   *record;
+   BGStore            *activities;
+   NSString           *error;
+   NSUInteger         i;
+
+   activities = [_world storeForKind:[_world kindNamed:"Activity"]];
+   for( i = 0; _activities && i < [activities count]; i++)
+   {
+      record = [activities recordAtIndex:i];
+      if( (BGEntityID) record->actorRef != m->agent ||
+          record->status != (uint32_t) tri_type_named( [_world tri], "\"running\""))
+         continue;
+      error = nil;
+      if( [_activities suspend:[activities entityAtIndex:i] because:why error:&error])
+         [self note:m line:[NSString stringWithFormat:@"%@: putting %s down", why,
+                                                      [_world textField:"Activity.operation" of:[activities entityAtIndex:i]]]];
+   }
+}
+
+
 /* Whether the agent has a suspended activity of one of the method's
  * operations. */
 - (BOOL) suspendedStepOf:(const char *) method
@@ -1224,7 +1248,8 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
       question = tri_value( tri, o->content, arena, NULL, 0);
       if( question && (tri_subtype( tri, tri_node_type( question), tri_type_named( tri, "#WhereIs")) ||
                        tri_subtype( tri, tri_node_type( question), tri_type_named( tri, "#WhoToldYou")) ||
-                       tri_subtype( tri, tri_node_type( question), tri_type_named( tri, "#Request"))))
+                       tri_subtype( tri, tri_node_type( question), tri_type_named( tri, "#Request")) ||
+                       tri_subtype( tri, tri_node_type( question), tri_type_named( tri, "#Call"))))
       {
          memset( &m->questions[ m->nquestions], 0, sizeof( BGQuestion));
          m->questions[ m->nquestions].asker   = o->actor;
@@ -1291,6 +1316,7 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    int32_t         busy;
    uint32_t        given;
    BOOL            request;
+   BOOL            call;
    int             k;
    char            printed[ 2048];
 
@@ -1309,9 +1335,29 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
       arena    = tri_arena_new();
       question = tri_value( tri, q->content, arena, NULL, 0);
       request  = question && tri_subtype( tri, tri_node_type( question), tri_type_named( tri, "#Request"));
+      call     = question && tri_subtype( tri, tri_node_type( question), tri_type_named( tri, "#Call"));
       tri_arena_free( arena);
       worth = [store trustIn:q->asker] + (agent ? (int32_t) agent->helpful : 0) - busy -
               (m->nintentions ? BG_COMMITTED : 0) - (request ? BG_PARTING : 0);
+      if( call)
+      {
+         /* a soft interruption: worth putting down what it is doing, if more
+          * than the interruption costs */
+         worth = [store trustIn:q->asker] + (agent ? (int32_t) agent->helpful : 0) - (m->nintentions ? BG_COMMITTED : 0);
+         if( [self busy:m->agent] && worth > BG_INTERRUPT)
+            [self putDown:m why:[NSString stringWithFormat:@"called by R%u: worth %+d", q->asker, worth]];
+         else if( [self busy:m->agent])
+         {
+            [self note:m line:[NSString stringWithFormat:@"called by R%u: worth %+d, not now", q->asker, worth]];
+            [self dropQuestion:m at:k];
+            continue;
+         }
+         [self act:m why:"answering" store:store operation:"say" object:q->asker target:0 units:0
+           content:[[NSString stringWithFormat:@"#Here & { what: %@ }", [store describeLooks:[store selfReferent]]]
+                    UTF8String]];
+         [self dropQuestion:m at:k];
+         continue;
+      }
       if( worth <= 0 && worth + busy > 0)
       {
          if( ! q->deferred)

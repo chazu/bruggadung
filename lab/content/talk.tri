@@ -16,6 +16,12 @@
 // Where is something like `what`?
 #WhereIs: #Question & {}
 
+// Someone shouts the hearer's name (`what`: the hearer, by looks): a call,
+// answered with `#Here`, which may be worth putting down what it is doing
+// (AGENCY.md §7, a soft interruption).
+#Call: #Question & {}
+#Here: #Utterance & {}
+
 // Who told you something like `what` is inside `within`? (questioning a
 // source, KNOWLEDGE.md §10). The answer is the claim again, with its source.
 #WhoToldYou: #Question & #Placing & {}
