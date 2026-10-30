@@ -192,6 +192,8 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    _committer = committer;
    _knowledge = [knowledge retain];
    _minds     = [NSMutableArray new];
+   _notices   = [NSMutableArray new];
+   _former    = [NSMutableArray new];
    [_knowledge setConcerns:self];
    return( self);
 }
@@ -204,6 +206,8 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    [_world release];
    [_knowledge release];
    [_minds release];
+   [_notices release];
+   [_former release];
    [super dealloc];
 }
 
@@ -236,7 +240,31 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
 
 - (NSArray *) logOf:(BGEntityID) agent
 {
-   return( [self mindOf:agent]->log);
+   BGMotivation   *m;
+   NSUInteger     i;
+
+   for( i = 0; i < [_minds count]; i++)
+   {
+      m = [_minds objectAtIndex:i];
+      if( m->agent == agent)
+         return( m->log);
+   }
+   for( i = [_former count]; i >= 2; i -= 2)
+      if( [[_former objectAtIndex:i - 2] unsignedLongLongValue] == agent)
+         return( [_former objectAtIndex:i - 1]);
+   return( [NSArray array]);
+}
+
+
+/* The mind at i goes; its log stays, for the developer. */
+- (void) retireMindAt:(NSUInteger) i
+{
+   BGMotivation   *m;
+
+   m = [_minds objectAtIndex:i];
+   [_former addObject:[NSNumber numberWithUnsignedLongLong:m->agent]];
+   [_former addObject:m->log];
+   [_minds removeObjectAtIndex:i];
 }
 
 
@@ -284,9 +312,61 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    for( i = 0; i < [_minds count]; i++)
       if( ((BGMotivation *) [_minds objectAtIndex:i])->agent == agent)
       {
-         [_minds removeObjectAtIndex:i];
+         [self retireMindAt:i];
          return;
       }
+}
+
+
+- (BOOL) controls:(BGEntityID) agent
+{
+   NSUInteger   i;
+
+   for( i = 0; i < [_minds count]; i++)
+      if( ((BGMotivation *) [_minds objectAtIndex:i])->agent == agent)
+         return( YES);
+   return( NO);
+}
+
+
+- (BOOL) autopilot:(BGEntityID) agent
+            toGoal:(const char *) goal
+         threshold:(int32_t) threshold
+{
+   BGMotivation   *m;
+
+   [self control:agent];
+   if( ! [self commit:agent toGoal:goal])
+   {
+      [self relinquish:agent];
+      return( NO);
+   }
+   m             = [self mindOf:agent];
+   m->autopilot  = YES;
+   m->threshold  = threshold;
+   m->handedBack = NO;
+   return( YES);
+}
+
+
+- (NSArray *) takeNotices
+{
+   NSArray   *notices;
+
+   notices = [[_notices copy] autorelease];
+   [_notices removeAllObjects];
+   return( notices);
+}
+
+
+/* Control returns to the player, with why; the mind goes after this
+ * boundary's decisions. */
+- (void) handBack:(BGMotivation *) m
+              why:(NSString *) why
+{
+   [self note:m line:[NSString stringWithFormat:@"control returns: %@", why]];
+   [_notices addObject:[NSString stringWithFormat:@"Control returns to you: %@.", why]];
+   m->handedBack = YES;
 }
 
 
@@ -1304,6 +1384,19 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    if( busy)
       against += BG_INTERRUPT;
    verdict = bestWorth > against;
+   if( m->autopilot)
+   {
+      /* the player's character takes up nothing of its own: past the
+       * player's threshold, the player decides */
+      if( bestWorth > m->threshold && ! m->handedBack)
+      {
+         goal_title( tri, best, title, sizeof( title));
+         [self handBack:m why:[NSString stringWithFormat:@"%s (R%u) is worth %+d, more than your %+d", title, bestAbout,
+                                                         bestWorth, m->threshold]];
+         return( YES);
+      }
+      return( NO);
+   }
 
    /* logged when the verdict changes */
    last = -1;
@@ -1373,7 +1466,7 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
 
    store = [_knowledge storeOf:m->agent];
    me    = [store referent:[store selfReferent]];
-   if( ! me)
+   if( ! me || m->handedBack)
       return( YES);
    [self hearQuestions:m store:store];
    [self considerQuestions:m store:store];
@@ -1382,6 +1475,11 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    busy = [self busy:m->agent];
    if( [self weigh:m store:store busy:busy])
       return( NO);      /* something else won: decide again, for it */
+   if( m->autopilot && ! m->nintentions)
+   {
+      [self handBack:m why:@"there is nothing left to do"];
+      return( YES);
+   }
    if( ! m->nintentions || busy)
       return( YES);     /* mid-activity, or nothing to do: no cost */
    if( m->waiting && ! [[store news] count])
@@ -1447,13 +1545,24 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
 
 - (void) decideBoundary:(uint64_t) boundary
 {
-   NSUInteger   i;
+   BGMotivation   *m;
+   NSUInteger     i;
    int          k;
 
    /* in stable ID order; each reads only its own stores and committed state */
    for( i = 0; i < [_minds count]; i++)
       for( k = 0; k < 2 * BG_MAX_INTENTIONS && ! [self decide:[_minds objectAtIndex:i]]; k++)
          ;
+   /* the player's: with nothing left to do, or handed back */
+   for( i = 0; i < [_minds count]; i++)
+   {
+      m = [_minds objectAtIndex:i];
+      if( m->autopilot && ! m->nintentions && ! m->handedBack)
+         [self handBack:m why:@"there is nothing left to do"];
+   }
+   for( i = [_minds count]; i > 0; i--)
+      if( ((BGMotivation *) [_minds objectAtIndex:i - 1])->handedBack)
+         [self retireMindAt:i - 1];
 }
 
 
@@ -1508,6 +1617,8 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
             [line appendFormat:@" %s %u", t->params[ p].slot, t->params[ p].referent];
       }
       [lines addObject:line];
+      if( m->autopilot)
+         [lines addObject:[NSString stringWithFormat:@"autopilot %llu %d", (unsigned long long) m->agent, m->threshold]];
       for( k = 0; k < m->nsettled; k++)
          [lines addObject:[NSString stringWithFormat:@"settled %llu %s %u", (unsigned long long) m->agent,
                                                      m->settled[ k].goal, m->settled[ k].about]];
@@ -1540,6 +1651,13 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    for( i = 0; i < [lines count]; i++)
    {
       words = [[lines objectAtIndex:i] componentsSeparatedByString:@" "];
+      if( [words count] == 3 && [[words objectAtIndex:0] isEqualToString:@"autopilot"])
+      {
+         m            = [self mindOf:(BGEntityID) [[words objectAtIndex:1] longLongValue]];
+         m->autopilot = YES;
+         m->threshold = [[words objectAtIndex:2] intValue];
+         continue;
+      }
       if( ([words count] == 4 && [[words objectAtIndex:0] isEqualToString:@"settled"]) ||
           ([words count] == 5 && [[words objectAtIndex:0] isEqualToString:@"weighed"]))
       {

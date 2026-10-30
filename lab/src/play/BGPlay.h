@@ -22,6 +22,9 @@
  *   read <R>              read a record in reach
  *   note <text>, notes    the player's own notes, out of character: they
  *                         never reach the actor's knowledge
+ *   autopilot <goal> [n]  hand the actor to agency, committed to the goal
+ *                         (a #Goal in content), until something arises
+ *                         worth more than n (20), or the goal is done
  *   as <id>               control another agent; agency answers for the
  *                         others when they are asked
  *   activities            the actor's activities, with their stages

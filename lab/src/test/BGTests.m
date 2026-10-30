@@ -2576,7 +2576,9 @@ typedef enum
    BGAlarmNoRumour = 0,          /* A */
    BGAlarmRumour,                /* B */
    BGAlarmDeflated,              /* C: the rumour has one named source */
-   BGAlarmRepeated               /* D: B, with noise after noise */
+   BGAlarmRepeated,              /* D: B, with noise after noise */
+   BGAlarmAutopilot,             /* E: B, the watchman the player's, on autopilot */
+   BGAlarmAutopilotQuiet         /* E under A: the noise alone */
 } BGAlarm;
 
 
@@ -2589,6 +2591,7 @@ typedef struct
    BGEntityID    carter;
    BGEntityID    porter;
    BGEntityID    storeroom;
+   NSArray       *notices;
    NSString      *text;
 } BGAlarmRun;
 
@@ -2643,13 +2646,14 @@ static BGAlarmRun   false_alarm( BGAlarm variant, int64_t saveAt)
    run.watchman  = [g idFor:h[ 2]];
    run.carter    = [g idFor:h[ 4]];
    run.porter    = [g idFor:h[ 5]];
-   [agency control:run.watchman];
+   if( variant < BGAlarmAutopilot)
+      [agency control:run.watchman];
 
    /* past the storeroom (it sees it, under the cat's eye), to the gate */
    stage_move( &st, run.watchman, 4, 4);
 
    /* the rumour */
-   if( variant != BGAlarmNoRumour)
+   if( variant != BGAlarmNoRumour && variant != BGAlarmAutopilotQuiet)
    {
       source = variant == BGAlarmDeflated
                   ? @"#Heard & { from: #Agent & { material: \"flesh\", hands: 2, coat: \"grey\", mass: 60kg } }"
@@ -2662,8 +2666,12 @@ static BGAlarmRun   false_alarm( BGAlarm variant, int64_t saveAt)
    stage_move( &st, run.carter, 3, 20);
    stage_move( &st, run.porter, 5, 20);
 
-   /* supper */
-   BG_CHECK( [agency commit:run.watchman toGoal:"eat_supper"]);
+   /* supper; E: the player puts the watchman on autopilot, to come back for
+    * anything worth more than 25 */
+   if( variant >= BGAlarmAutopilot)
+      BG_CHECK( [agency autopilot:run.watchman toGoal:"eat_supper" threshold:25]);
+   else
+      BG_CHECK( [agency commit:run.watchman toGoal:"eat_supper"]);
    [st.s runUntil:BGTimeMake( [st.w time].ms + 2000)];
 
    /* the cat */
@@ -2699,7 +2707,8 @@ static BGAlarmRun   false_alarm( BGAlarm variant, int64_t saveAt)
       run.agency    = agency;
    }
    [st.s runUntil:BGTimeMake( 120000)];
-   run.text = BGSave( st.w, st.c, [NSArray arrayWithObjects:knowledge, agency, nil]);
+   run.notices = [agency takeNotices];
+   run.text    = BGSave( st.w, st.c, [NSArray arrayWithObjects:knowledge, agency, nil]);
    return( run);
 }
 
@@ -2727,6 +2736,8 @@ static void   test_false_alarm( void)
    BGAlarmRun         d;
    BGAlarmRun         again;
    BGAlarmRun         resumed;
+   BGAlarmRun         e;
+   BGAlarmRun         quiet;
    BGKnowledgeStore   *store;
 
    a = false_alarm( BGAlarmNoRumour, 0);
@@ -2789,6 +2800,45 @@ static void   test_false_alarm( void)
    BG_CHECK( [resumed.world stateHash] == [b.world stateHash]);
    BG_CHECK( [resumed.text isEqualToString:b.text]);
    BG_CHECK( logged_by( resumed.agency, resumed.watchman, @"[eat supper] eat: resuming eat"));
+
+   /* 5: E, autopilot: in B's conditions, the noise is worth more than the
+    * player's 25: control returns at that weighing, supper still under way,
+    * nothing looked into; autopilot used nothing the watchman didn't know */
+   e = false_alarm( BGAlarmAutopilot, 0);
+   BG_CHECK( [e.notices count] == 1 &&
+             [[e.notices objectAtIndex:0] isEqualToString:@"Control returns to you: investigate the disturbance (R2) is "
+                                                         @"worth +35, more than your +25."]);
+   BG_CHECK( ! [e.agency controls:e.watchman]);
+   BG_CHECK( ! logged_by( e.agency, e.watchman, @"switching") && ! logged_by( e.agency, e.watchman, @"suspending"));
+   BG_CHECK( ! happened( e.world, "looked", e.watchman, e.storeroom));
+   /* in A's, it eats on, and hands back when supper is done */
+   quiet = false_alarm( BGAlarmAutopilotQuiet, 0);
+   BG_CHECK( [quiet.notices count] == 1 &&
+             [[quiet.notices objectAtIndex:0] isEqualToString:@"Control returns to you: there is nothing left to do."]);
+   BG_CHECK( logged_by( quiet.agency, quiet.watchman, @"[eat supper] done"));
+}
+
+
+/* Autopilot in a session: the worker looks into the bin, then hands itself
+ * to agency to wedge the lock; it fetches nails, drives one, and control
+ * returns. */
+static void   test_play_autopilot( void)
+{
+   NSArray    *commands;
+   NSString   *out;
+   NSString   *again;
+   uint64_t   h1;
+   uint64_t   h2;
+
+   commands = [NSArray arrayWithObjects:@"do 1", @"autopilot wedge_lock 100", @"autopilot nonesuch", @"menu", nil];
+   out   = session( @"workshop", commands, &h1);
+   again = session( @"workshop", commands, &h2);
+   BG_CHECK( h1 == h2 && [out isEqualToString:again]);
+   BG_CHECK( [out rangeOfString:@"Autopilot: wedge_lock, until something is worth more than 100."].location != NSNotFound);
+   BG_CHECK( [out rangeOfString:@"action 4: take_some item 2"].location != NSNotFound);
+   BG_CHECK( [out rangeOfString:@"drive completes"].location != NSNotFound);
+   BG_CHECK( [out rangeOfString:@"Control returns to you: there is nothing left to do."].location != NSNotFound);
+   BG_CHECK( [out rangeOfString:@"There is no goal nonesuch."].location != NSNotFound);
 }
 
 
@@ -3112,6 +3162,7 @@ const BGTestCase   BGAllTests[] =
    { "notebook",                      test_notebook },
    { "play_notebook",                 test_play_notebook },
    { "false_alarm",                   test_false_alarm },
+   { "play_autopilot",                test_play_autopilot },
    { "cistern",                       test_cistern },
    { "cistern_b",                     test_cistern_b },
    { "cistern_d",                     test_cistern_d },

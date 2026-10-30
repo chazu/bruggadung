@@ -698,6 +698,39 @@ static char   glyph_of_kind( const char *kind)
 }
 
 
+/* --- autopilot ----------------------------------------------------------------------- */
+
+- (void) autopilot:(NSArray *) words
+{
+   NSArray      *notices;
+   NSUInteger   i;
+   int32_t      threshold;
+
+   threshold = [words count] > 2 ? (int32_t) [[words objectAtIndex:2] intValue] : 20;
+   if( [words count] < 2 ||
+       ! [_agency autopilot:_actor toGoal:[_world intern:[[words objectAtIndex:1] UTF8String]] threshold:threshold])
+   {
+      [_out appendFormat:@"There is no goal %@.\n", [words count] > 1 ? [words objectAtIndex:1] : @""];
+      return;
+   }
+   [_out appendFormat:@"Autopilot: %@, until something is worth more than %d.\n", [words objectAtIndex:1], threshold];
+   _inputDue = YES;
+   while( [_agency controls:_actor] && [_scheduler stepUntil:BGTimeMake( [_world time].ms + 600000)])
+      ;
+   [self showTrace];
+   [self showNews];
+   notices = [_agency takeNotices];
+   for( i = 0; i < [notices count]; i++)
+      [_out appendFormat:@"%@\n", [notices objectAtIndex:i]];
+   if( [_agency controls:_actor])
+   {
+      [_agency relinquish:_actor];
+      [_out appendString:@"Nothing more happens. Control returns to you.\n"];
+   }
+   [_out appendFormat:@"t=%lldms\n", (long long) [_world time].ms];
+}
+
+
 /* --- the commands ------------------------------------------------------------------ */
 
 - (BOOL) isRunning:(BGEntityID) activity
@@ -788,7 +821,8 @@ static char   glyph_of_kind( const char *kind)
       return( NO);
    if( [verb isEqualToString:@"help"])
       [_out appendString:@"look, menu, do <n> [amount], walk n|s|e|w, ask <R> where|who <R>, tell <R> <R> [in <R>],\n"
-                         @"notebook, write <R>, read <R>, note <text>, notes, wait <ms>, step, idle, as <id>,\n"
+                         @"notebook, write <R>, read <R>, note <text>, notes, autopilot <goal> [n],\n"
+                         @"wait <ms>, step, idle, as <id>,\n"
                          @"activities, suspend <id>, resume <id>, knows [id], inspect <id>, why <id>, trace [n],\n"
                          @"save <file>, load <file>, time, hash, quit\n"];
    else if( [verb isEqualToString:@"look"])
@@ -832,6 +866,8 @@ static char   glyph_of_kind( const char *kind)
       if( ! [_notes count])
          [_out appendString:@"You have no notes.\n"];
    }
+   else if( [verb isEqualToString:@"autopilot"])
+      [self autopilot:words];
    else if( [verb isEqualToString:@"ask"])
       [self ask:words];
    else if( [verb isEqualToString:@"tell"])
@@ -878,6 +914,7 @@ static char   glyph_of_kind( const char *kind)
          [_out appendFormat:@"%llu is not an agent.\n", (unsigned long long) e];
       else
       {
+         [_agency relinquish:_actor];        /* off autopilot, if it was */
          _actor = e;
          [self controlOthers];
          [_menu release];

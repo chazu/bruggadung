@@ -1091,7 +1091,32 @@ and the seeded tiebreak.
 
 39 tests, 635 checks, under both compilers, ASan and UBSan, and leak-free.
 
-Next: autopilot (AGENCY.md §14, Scenario 2's variant E): the player hands
-the character to agency with a mode (*keep watch*), and control returns
-to the player at a salience crossing, with agency never using what the
-character doesn't know.
+### After the slice: autopilot
+
+AGENCY.md §14 and Scenario 2's variant E. The player hands the watchman to
+agency to eat supper, to be called back for anything worth more than 25.
+In B's conditions, the noise weighs 35: control returns at that weighing,
+supper still under way, and nothing is looked into. In A's, it eats on,
+and control returns when supper is done. In `lab play`, `autopilot <goal>
+[n]` hands the character over and runs time until control returns: the
+worker, having looked into the bin, fetches nails, wedges the lock, and is
+handed back.
+
+- **Autopilot** decides for the player's character exactly as for anyone,
+  from its knowledge view. It takes up no goal of its own: a candidate
+  worth more than the player's threshold hands control back, with a notice
+  saying why; so does a goal done or impossible. The mind goes, and its
+  log stays for the developer.
+- **`logOf:` no longer makes a mind**: asking for the log of an agent
+  agency didn't control had put it under agency's control.
+
+Not yet: autopilot modes beyond "this goal" (a routine, auto-explore,
+carrying out a recipe), and control returning at a salience crossing that
+isn't a goal arising (a question asked of the character, say).
+
+40 tests, 653 checks, under both compilers, ASan and UBSan, and leak-free.
+
+Next: AGENCY.md Scenario 3, *the tempting purse*: dispositions and norms
+scoring method alternatives, the belief about being observed versus who
+truly sees, a commitment (a debt) as motivation, and what a witness saw
+flowing on through knowledge.

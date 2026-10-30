@@ -41,6 +41,12 @@
  * resumes the activity it suspended. A goal that arose about something is
  * settled with it, and doesn't arise about it again.
  *
+ * Autopilot (AGENCY.md §14): the player hands their character to agency
+ * with a goal and an interruption threshold. Agency decides for it from its
+ * knowledge view, as for anyone, but takes up no goal of its own: when one
+ * arises worth more than the threshold, or the goal is done or can't be,
+ * control returns to the player, with a notice saying why.
+ *
  * Each agent's motivation store (its intentions, with their bindings and
  * failed methods, what it waits for, and the decision count) is private and
  * saved, and every decision is logged for the developer.
@@ -124,6 +130,9 @@ typedef struct
    int              nsettled;
    BGArisen         weighed[ BG_MAX_SETTLED];  /* the last verdict, so it is logged when it changes */
    int              nweighed;
+   BOOL             autopilot;         /* the player's character, handed over */
+   int32_t          threshold;         /* worth above which control returns */
+   BOOL             handedBack;
    NSMutableArray   *log;
 }
 @end
@@ -136,6 +145,8 @@ typedef struct
    BGKnowledge      *_knowledge;
    BGActivities     *_activities;      /* not retained: to suspend and resume the agents' own */
    NSMutableArray   *_minds;           /* sorted by agent */
+   NSMutableArray   *_notices;         /* control returned, for the player */
+   NSMutableArray   *_former;          /* pairs: an agent let go, its log */
 }
 
 - (id) initWithWorld:(BGWorld *) world
@@ -153,12 +164,22 @@ typedef struct
 
 /* Agency lets the agent go, its mind with it: someone else controls it. */
 - (void) relinquish:(BGEntityID) agent;
+- (BOOL) controls:(BGEntityID) agent;
+
+/* Autopilot: agency takes the player's character, committed to the goal,
+ * until something arises worth more than `threshold`, or the goal is done
+ * or impossible. NO if content has no such goal. */
+- (BOOL) autopilot:(BGEntityID) agent
+            toGoal:(const char *) goal
+         threshold:(int32_t) threshold;
+/* why control returned since last asked, one line each */
+- (NSArray *) takeNotices;
 
 /* Lets agency suspend and resume its agents' activities. */
 - (void) setActivities:(BGActivities *) activities;
 
 - (BGMotivation *) mindOf:(BGEntityID) agent;
-/* the agent's decision log, for the developer */
+/* the agent's decision log, for the developer; kept when agency lets it go */
 - (NSArray *) logOf:(BGEntityID) agent;
 
 @end
