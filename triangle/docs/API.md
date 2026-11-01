@@ -96,6 +96,15 @@ tri_content_free(c);
 - `tri_content_ok` is true when there are no errors. Warnings are allowed.
 - `tri_diag_count`, `tri_diag_message`, `tri_diag_is_error`: the diagnostics,
   as `file:line:col: error: message`. REFERENCE.md lists them.
+- `tri_diag_location(c, i, &file, &line, &col)`: where a diagnostic points,
+  for tools that place it themselves; 0 if it has none. Lines and columns
+  count from 1, and columns count bytes. `tri_diag_text` is the message
+  without the location and severity.
+- `tri_decl_count`, `tri_decl(c, i, &decl)`: every declaration as written,
+  in load order, with its kind (type, atom, or instance), its name qualified
+  by its package, the location of its label, and its docstring. The
+  prelude's are left out. A file with a syntax error keeps the declarations
+  before the error, so an editor can still navigate it.
 - `tri_log_count`, `tri_log_message`: the build log. It lists every type the
   loader generated and every pair of conflicting defaults it dropped.
 - `tri_content_hash`: a hash of the content's meaning. It doesn't depend on

@@ -5,7 +5,7 @@ SRC      = $(wildcard src/*.c)
 OBJ      = $(SRC:src/%.c=build/%.o)
 TESTS    = $(wildcard tests/*.c)
 
-all: build/libtriangle.a build/test build/tri-components
+all: build/libtriangle.a build/test build/tri-components build/triangle
 
 build/%.o: src/%.c src/internal.h include/triangle.h | build
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
@@ -18,6 +18,25 @@ build/test: $(TESTS) build/libtriangle.a tests/test.h
 
 build/tri-components: tools/tri-components.c build/libtriangle.a
 	$(CC) $(CPPFLAGS) $(CFLAGS) $< build/libtriangle.a -o $@
+
+# The command-line tool, with the language server.
+TOOLSRC = tools/triangle.c tools/lsp.c tools/json.c
+
+build/triangle: $(TOOLSRC) tools/json.h build/libtriangle.a
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(TOOLSRC) build/libtriangle.a -o $@
+
+# The language server driven over stdio, and the Emacs mode's tests.
+lsp-test: build/triangle
+	python3 tests/lsp_test.py build/triangle
+
+emacs-test:
+	emacs -Q --batch -L emacs -l emacs/triangle-mode-test.el -f ert-run-tests-batch-and-exit
+
+PREFIX ?= $(HOME)/.local
+
+install: build/triangle
+	install -d $(PREFIX)/bin
+	install build/triangle $(PREFIX)/bin/triangle
 
 # The library for the game: without the TDL front end, which stays a test oracle.
 GAMEOBJ = $(filter-out build/game/tdl.o,$(SRC:src/%.c=build/game/%.o))
@@ -64,4 +83,4 @@ objc: build/libtriangle.a
 clean:
 	rm -rf build
 
-.PHONY: all test asan objc leakcheck game clean
+.PHONY: all test asan objc leakcheck game clean lsp-test emacs-test install

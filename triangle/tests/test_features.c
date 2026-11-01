@@ -434,6 +434,51 @@ void test_docstrings(void)
     tri_content_free(c);
 }
 
+void test_declarations_and_locations(void)
+{
+    const char *names[] = { "a.tri", "b.tri" };
+    const char *srcs[] = {
+        "// A tool.\n#Tool: { size: length }\n\"steel\": \"mild\" | \"forged\"\n",
+        "package shop\nw: #Tool & { size: 19mm }\nx: #Tool & { size: \"big\" }\n",
+    };
+    TriContent *c = load(names, srcs, 2);
+    CHECK(tri_decl_count(c) == 4);
+    TriDecl d;
+    CHECK(tri_decl(c, 0, &d));
+    CHECK_STR(d.name, "#Tool");
+    CHECK(d.kind == TRI_DECL_TYPE && d.line == 2 && d.col == 1 && !d.package);
+    CHECK_STR(d.file, "a.tri");
+    CHECK_STR(d.doc, "A tool.");
+    CHECK(tri_decl(c, 1, &d) && d.kind == TRI_DECL_ATOM);
+    CHECK(tri_decl(c, 2, &d) && d.kind == TRI_DECL_INSTANCE);
+    CHECK_STR(d.name, "shop.w");
+    CHECK_STR(d.package, "shop");
+    CHECK(!tri_decl(c, 4, &d));
+
+    CHECK(!tri_content_ok(c));
+    const char *file = NULL;
+    int line = 0, col = 0, found = 0;
+    for (size_t i = 0; i < tri_diag_count(c); i++)
+        if (tri_diag_is_error(c, i) && tri_diag_location(c, i, &file, &line, &col)) {
+            CHECK_STR(file, "b.tri");
+            CHECK(line == 3);
+            CHECK(strncmp(tri_diag_message(c, i), "b.tri:3:", 8) == 0);
+            CHECK(strstr(tri_diag_message(c, i), tri_diag_text(c, i)) != NULL);
+            CHECK(strncmp(tri_diag_text(c, i), "error", 5) != 0);
+            found = 1;
+        }
+    CHECK(found);
+    tri_content_free(c);
+
+    /* a syntax error keeps the declarations before it, and has a location */
+    const char *bad[] = { "#A: { n: int }\na1: #A & { n: 1 }\na2: #A & { n: }\n" };
+    const char *badname[] = { "bad.tri" };
+    c = load(badname, bad, 1);
+    CHECK(tri_decl_count(c) == 2);
+    CHECK(tri_diag_count(c) >= 1 && tri_diag_location(c, 0, &file, &line, &col) && line == 3);
+    tri_content_free(c);
+}
+
 void test_families(void)
 {
     TriContent *c = load1_ok(

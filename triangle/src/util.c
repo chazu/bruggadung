@@ -262,7 +262,7 @@ void diag(Content *c, bool error, Loc loc, const char *fmt, ...)
     va_end(ap);
     buf_puts(&b, msg);
     free(msg);
-    Diag d = { error, b.s };
+    Diag d = { error, b.s, loc };
     VEC_PUSH(c->diags, d);
     if (error) c->nerrors++;
 }

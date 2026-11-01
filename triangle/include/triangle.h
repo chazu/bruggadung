@@ -64,6 +64,28 @@ const char *tri_log_message(const TriContent *content, size_t i);
 size_t      tri_diag_count(const TriContent *content);
 const char *tri_diag_message(const TriContent *content, size_t i);
 int         tri_diag_is_error(const TriContent *content, size_t i);
+/* Where a diagnostic points: 1 with its file, line and column (both from 1;
+ * the column counts bytes), or 0 if it has no location. */
+int         tri_diag_location(const TriContent *content, size_t i, const char **file, int *line, int *col);
+/* The message without its location and severity prefix. */
+const char *tri_diag_text(const TriContent *content, size_t i);
+
+/* Every declaration as written, in load order (a name declared several times
+ * appears once per declaration). Names are qualified by their package. The
+ * location is the label's; the doc is its docstring or NULL. A file that fails
+ * to parse keeps the declarations before its error. */
+typedef enum { TRI_DECL_TYPE, TRI_DECL_ATOM, TRI_DECL_INSTANCE } TriDeclKind;
+typedef struct {
+    const char *name;
+    TriDeclKind kind;
+    const char *package;       /* NULL in the root */
+    const char *file;
+    int         line, col;
+    const char *doc;
+} TriDecl;
+
+size_t      tri_decl_count(const TriContent *content);
+int         tri_decl(const TriContent *content, size_t i, TriDecl *out);
 
 /* The comment directly above a type's or instance's declaration. */
 const char *tri_doc(TriContent *content, const char *name);

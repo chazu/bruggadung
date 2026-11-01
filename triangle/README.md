@@ -13,6 +13,8 @@ Documentation:
 - [docs/REFERENCE.md](docs/REFERENCE.md): the grammar, built-in types, units,
   every attribute, the rules for defaults and variation, and every diagnostic
 - [docs/API.md](docs/API.md): embedding the engine from C and Objective-C
+- [The command-line tool and the editor](#the-command-line-tool-and-the-editor):
+  `triangle check`, `triangle inspect`, the language server, and Emacs
 
 ```sh
 make            # library and tests
@@ -20,6 +22,9 @@ make test       # the leak check, then the tests
 make asan       # rebuild and test with AddressSanitizer and UBSan
 make objc       # the Objective-C wrapper and its test (macOS: Foundation)
 make game       # build/libtriangle-game.a, without the TDL front end
+make install    # build/triangle into ~/.local/bin (PREFIX=... to change)
+make lsp-test   # drive the language server over stdio
+make emacs-test # the Emacs mode's tests
 ./build/tri-components BG content/*.tri > components.h   # C structs for the components
 TRI_PROPS_SCALE=10 ./build/test properties     # ten times the randomised cases
 ```
@@ -40,6 +45,9 @@ TRI_PROPS_SCALE=10 ./build/test properties     # ten times the randomised cases
 | `src/arith.c` | Interval arithmetic over quantities, with units |
 | `src/clause.c` | Definite clauses: resolution with a depth limit |
 | `tools/tri-components.c` | Generates the C structs for a content build's components |
+| `tools/triangle.c` | The `triangle` command: check, inspect, components, and the language server |
+| `tools/lsp.c`, `tools/json.c` | The language server, and the JSON it speaks |
+| `emacs/` | `triangle-mode`, the Emacs major mode, with its tests |
 | `src/xtree.c` | Syntax tree printing and construction |
 | `src/util.c` | Arenas, symbols, maps, diagnostics |
 | `objc/` | `BGContent`, the Objective-C wrapper, with its test; runs under Apple's runtime and mulle-objc |
@@ -48,6 +56,57 @@ TRI_PROPS_SCALE=10 ./build/test properties     # ten times the randomised cases
 | `bench/erg.c` | Benchmark against a TDL grammar such as the English Resource Grammar |
 | `bench/content.c` | Benchmark of a synthetic content build shaped like bruggadung's |
 | `bench/ace/` | Comparison with ACE: glb dump, matched unification workload, and the patch to build ACE on Apple silicon |
+
+## The command-line tool and the editor
+
+`build/triangle` loads content from files, or from directories that stand for
+the `.tri` files in them (the current directory by default):
+
+```sh
+triangle check ../lab/content              # diagnostics, or a summary and the content hash
+triangle inspect iron_nail ../lab/content  # an instance's spec, each value with its origin
+triangle inspect '#Agent' ../lab/content   # a type's docstring, supertypes and components
+triangle components BG ../lab/content      # what tri-components prints
+triangle lsp                               # the language server, over stdio
+```
+
+`check` exits 1 when there are errors. Its diagnostics have the
+`file:line:col:` form that compilation buffers and editors parse.
+
+**The language server** treats the directory of the file being edited as one
+content build. Every change reloads that directory, with the text of open
+files in place of the files on disk; loading bruggadung's content takes a few
+milliseconds. It provides:
+
+- **Diagnostics** for every file in the directory, as the loader reports them.
+- **Hover**: the declarations of the name under the cursor, with its
+  docstring; a type's supertypes and components; an instance's spec, each
+  value annotated with its origin.
+- **Go to definition** (every declaration of a name, in any file),
+  **references**, **document symbols** and **workspace symbols**.
+- **Completion** of type and instance names (qualified where the package
+  requires it), features, built-in types, and attributes after `@`.
+
+Names resolve by the package rules: inside a package, a plain name is the
+package's own if it declares one, else the root's. A string resolves to an
+atom, or else to the instance it names (`unit: "iron_nail"`). Specs and
+supertypes come from the last load without errors, so they stay available
+while you fix one; names and locations work even past a syntax error.
+
+**Emacs.** `emacs/triangle-mode.el` highlights `.tri` files, indents them in
+the content's style (structures by `triangle-indent-offset`, elements aligned
+under the first one when it shares the opener's line), indexes declarations
+for imenu, and registers the server with both lsp-mode and eglot. `C-c C-c`
+runs `triangle check` in a compilation buffer, and `C-c C-i` inspects the
+name at point.
+
+```elisp
+(use-package triangle-mode
+  :load-path "~/dev/objc/bruggadung/triangle/emacs"
+  :mode "\\.tri\\'"
+  :custom (triangle-program (expand-file-name "~/.local/bin/triangle"))
+  :hook (triangle-mode . lsp-deferred))     ; or eglot-ensure
+```
 
 ## A taste
 

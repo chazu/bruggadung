@@ -568,6 +568,7 @@ TriNode *type_expansion(Content *c, uint32_t t)
                     if (rest) buf_printf(&nb, "%s:%d:%d%s", here.file, here.line, here.col, rest);
                     else buf_printf(&nb, "%s:%d:%d: %s", here.file, here.line, here.col, old);
                     dg->msg = nb.s;
+                    dg->loc = here;
                     free(old);
                     break;
                 }
@@ -3370,6 +3371,56 @@ uint64_t tri_content_hash(const TriContent *c) { return c->hash; }
 size_t tri_diag_count(const TriContent *c) { return c->diags.n; }
 const char *tri_diag_message(const TriContent *c, size_t i) { return i < c->diags.n ? c->diags.v[i].msg : NULL; }
 int tri_diag_is_error(const TriContent *c, size_t i) { return i < c->diags.n && c->diags.v[i].error; }
+
+int tri_diag_location(const TriContent *c, size_t i, const char **file, int *line, int *col)
+{
+    if (i >= c->diags.n || !c->diags.v[i].loc.file) return 0;
+    const Loc *l = &c->diags.v[i].loc;
+    if (file) *file = l->file;
+    if (line) *line = l->line;
+    if (col) *col = l->col;
+    return 1;
+}
+
+const char *tri_diag_text(const TriContent *c, size_t i)
+{
+    if (i >= c->diags.n) return NULL;
+    const char *m = c->diags.v[i].msg;
+    const char *tag = c->diags.v[i].error ? "error: " : "warning: ";
+    const char *r = strstr(m, tag);
+    return r ? r + strlen(tag) : m;
+}
+
+/* Declarations as written: the prelude's are left out. */
+static bool decl_visible(const Decl *d)
+{
+    return d->loc.file && d->loc.file[0] != '<';
+}
+
+size_t tri_decl_count(const TriContent *c)
+{
+    size_t n = 0;
+    for (size_t i = 0; i < c->decls.n; i++) n += decl_visible(&c->decls.v[i]);
+    return n;
+}
+
+int tri_decl(const TriContent *c, size_t i, TriDecl *out)
+{
+    for (size_t k = 0; k < c->decls.n; k++) {
+        const Decl *d = &c->decls.v[k];
+        if (!decl_visible(d)) continue;
+        if (i--) continue;
+        out->name = d->label;
+        out->kind = d->kind == L_DEF ? TRI_DECL_TYPE : d->kind == L_ATOM ? TRI_DECL_ATOM : TRI_DECL_INSTANCE;
+        out->package = d->pkg;
+        out->file = d->loc.file;
+        out->line = d->loc.line;
+        out->col = d->loc.col;
+        out->doc = d->doc;
+        return 1;
+    }
+    return 0;
+}
 
 /* --- types API ------------------------------------------------------------------------------------- */
 

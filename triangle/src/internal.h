@@ -332,7 +332,7 @@ typedef struct { Sym name; TriFn fn; void *ctx; } FnReg;
 
 /* --- the content object ------------------------------------------------------------- */
 
-typedef struct { bool error; char *msg; } Diag;
+typedef struct { bool error; char *msg; Loc loc; } Diag;   /* loc.file NULL: no location */
 
 struct TriContent {
     SymTable syms;
