@@ -199,6 +199,19 @@ field references (§5). Packages are adopted for names only (decision 12):
 a `package` scopes types, instances, and components, and features stay
 global; files are otherwise simply included.
 
+**Adopted later from CUE, for usability:** string escapes and raw strings
+(`#"..."#`), and regex constraints (`=~`, `!~`, RE2 syntax). They change
+nothing for content without them. A string means its contents, so every
+spelling of the same contents is one atom or text, interned in one canonical
+spelling that reads back as itself; that also lets runtime text with quotes
+or newlines survive printing and parsing. A regex is a constraint carried by
+text until it is concrete, never a type: the hierarchy is fixed at load, and
+two unrelated regex types would meet at bottom, failing `=~"a" & =~"b"`. On
+atoms a regex tests names and must narrow an enum to a type that exists,
+since widening a pattern would make it match too much; at runtime a
+description may be widened instead, as that only loses information. Matching
+doesn't prove that one regex implies another, so it answers unknown there.
+
 ### 3. The type hierarchy
 
 - **Declaration order never matters.** All files are read before anything is

@@ -448,9 +448,15 @@ static void save_rec(Content *c, Buf *b, TriNode *n, bool ids, U64Map *num, uint
     else put_quoted(b, c->types.v[n->type].name);
     if (n->flags & NF_DIM) {
         int dim = c->types.v[n->type].dim;
+        const RxSet *rx = dim == DIM_TEXT ? text_rx(n->lo, n->hi) : NULL;
         if (dim == DIM_TEXT && n->lo == n->hi) {
             buf_puts(b, " =");
             put_quoted(b, (const char *) (intptr_t) n->lo);
+        } else if (rx) {
+            for (uint32_t i = 0; i < rx->n; i++) {
+                buf_puts(b, rx->v[i].neg ? " !~" : " =~");
+                put_quoted(b, rx->v[i].pat);
+            }
         } else if (dim != DIM_TEXT && (n->lo != TRI_NINF || n->hi != TRI_INF)) {
             buf_puts(b, " =");
             put_q(b, n->lo);
@@ -572,6 +578,21 @@ static TriNode *read_node(Reader *r, TriArena *a)
     TriNode *n = node_new(c, a, t);
     VEC_PUSH(r->nodes, n);
     skip_ws(r);
+    while ((r->s[0] == '=' || r->s[0] == '!') && r->s[1] == '~') {
+        bool neg = r->s[0] == '!';
+        r->s += 2;
+        if (!(n->flags & NF_DIM) || c->types.v[t].dim != DIM_TEXT) { rerr(r, "%s takes no regex", c->types.v[t].name); return NULL; }
+        char *pat = get_quoted(r);
+        if (!pat) return NULL;
+        char why[160] = "";
+        const RxSet *one = rx_single(c, intern(c, pat), neg, why, sizeof why);
+        if (!one) { rerr(r, "a saved regex no longer compiles: %s", why); free(pat); return NULL; }
+        free(pat);
+        const RxSet *cur = text_rx(n->lo, n->hi);
+        n->lo = TRI_NINF;
+        n->hi = (int64_t) (intptr_t) rx_union(c, cur, one);
+        skip_ws(r);
+    }
     if (*r->s == '=') {
         r->s++;
         skip_ws(r);

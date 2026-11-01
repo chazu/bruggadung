@@ -140,6 +140,7 @@ static void describe_value(Content *c, Buf *b, uint32_t type, int64_t lo, int64_
     if (is_dim(c, type)) {
         int dim = c->types.v[type].dim;
         if (lo == hi) units_format(b, dim, lo);
+        else if (dim == DIM_TEXT && text_rx(lo, hi)) rx_print(b, text_rx(lo, hi));
         else if ((lo == TRI_NINF && hi == TRI_INF) || dim == DIM_TEXT) buf_puts(b, dim_names[dim]);
         else {
             if (lo != TRI_NINF) { buf_puts(b, ">="); units_format(b, dim, lo); }
@@ -222,6 +223,126 @@ static bool is_text(Content *c, TriNode *n)
     return (n->flags & NF_DIM) && c->types.v[n->type].dim == DIM_TEXT;
 }
 
+/* --- text and its regex constraints ------------------------------------------------------- */
+
+static uint32_t join_type(Content *c, uint32_t a, uint32_t b, uint32_t bound);
+
+static const RxSet *node_rx(Content *c, TriNode *n)
+{
+    int64_t lo, hi;
+    node_iv(c, n, &lo, &hi);
+    return text_rx(lo, hi);
+}
+
+/* Meets two text values: concrete, constrained (a set), or open. */
+static bool text_meet(Content *c, int64_t lo1, int64_t hi1, int64_t lo2, int64_t hi2, int64_t *lo, int64_t *hi)
+{
+    bool c1 = lo1 == hi1, c2 = lo2 == hi2;
+    if (c1 && c2) { *lo = *hi = lo1; return lo1 == lo2; }
+    if (c1 || c2) {
+        int64_t v = c1 ? lo1 : lo2;
+        *lo = *hi = v;
+        return rx_accepts(c1 ? text_rx(lo2, hi2) : text_rx(lo1, hi1), (Sym) (intptr_t) v);
+    }
+    const RxSet *u = rx_union(c, text_rx(lo1, hi1), text_rx(lo2, hi2));
+    *lo = TRI_NINF;
+    *hi = u ? (int64_t) (intptr_t) u : TRI_INF;
+    return true;
+}
+
+/* An atom, or an enum of atoms, with no structure of its own. */
+static bool is_enum_value(Content *c, TriNode *n)
+{
+    if ((n->flags & NF_DIM) || arc_count(c, n) || c->types.v[n->type].feats.n) return false;
+    if (c->types.v[n->type].kind == TK_ATOM) return true;
+    if (n->type == c->top || n->type == c->atomroot) return false;
+    const U32Vec *leaves = enum_leaves(c, n->type);
+    for (size_t i = 0; i < leaves->n; i++)
+        if (c->types.v[leaves->v[i]].kind != TK_ATOM) return false;
+    return leaves->n > 0;
+}
+
+static bool same_leaves(const U32Vec *a, const U32Vec *b)
+{
+    if (a->n != b->n) return false;
+    for (size_t i = 0; i < a->n; i++) if (a->v[i] != b->v[i]) return false;
+    return true;
+}
+
+/* Constrained text meeting an atom or an enum: the regexes test the atoms'
+ * names. The result is the atom, the enum, or the enum (or atom) whose atoms
+ * are exactly those that match. When no type is exactly those, load reports
+ * it (a widened pattern would match too much), and at runtime the value keeps
+ * the most specific type covering them: less precise, never wrong. */
+static bool text_meets_enum(Content *c, TriNode *tx, TriNode *e)
+{
+    const RxSet *set = node_rx(c, tx);
+    if (is_leaf(c, e->type)) {
+        if (!rx_accepts(set, c->types.v[e->type].name)) { fail_at(c, tx, e, NULL); return false; }
+        sx_make(c, tx)->fwd = e;
+        return true;
+    }
+    const U32Vec *leaves = enum_leaves(c, e->type);
+    U32Vec match = { 0 };
+    for (size_t i = 0; i < leaves->n; i++)
+        if (rx_accepts(set, c->types.v[leaves->v[i]].name)) VEC_PUSH(match, leaves->v[i]);
+    if (!match.n) { VEC_FREE(match); fail_at(c, tx, e, NULL); return false; }
+    if (match.n == leaves->n) { VEC_FREE(match); sx_make(c, tx)->fwd = e; return true; }
+    uint32_t t = match.v[0];
+    for (size_t i = 1; i < match.n; i++) t = join_type(c, t, match.v[i], e->type);
+    if (!is_subtype(c, t, e->type)) t = e->type;
+    bool exact = same_leaves(enum_leaves(c, t), &match);
+    if (exact || c->loaded) VEC_FREE(match);
+    if (!exact && !c->loaded) {
+        if (!c->failed) {
+            Buf w = { 0 };
+            rx_print(&w, set);
+            buf_puts(&w, " (allows only ");
+            for (size_t i = 0; i < match.n; i++) {
+                if (i) buf_puts(&w, i + 1 == match.n ? " and " : ", ");
+                buf_puts(&w, c->types.v[match.v[i]].name);
+            }
+            buf_puts(&w, ", and no enum is exactly those: declare one)");
+            snprintf(c->failwhy, sizeof c->failwhy, "%s", w.s);
+            buf_free(&w);
+        }
+        VEC_FREE(match);
+        fail_at(c, tx, e, c->failwhy);
+        return false;
+    }
+    TriNode *n = node_new(c, c->scratch, t);
+    sx_make(c, tx)->fwd = n;
+    sx_make(c, e)->fwd = n;
+    return true;
+}
+
+/* Whether text value g subsumes s (both as lo, hi). */
+static bool text_subsumes(int64_t glo, int64_t ghi, int64_t slo, int64_t shi)
+{
+    if (glo == TRI_NINF && ghi == TRI_INF) return true;
+    if (glo == ghi) return slo == shi && slo == glo;
+    const RxSet *g = text_rx(glo, ghi);
+    if (slo == shi) return rx_accepts(g, (Sym) (intptr_t) slo);
+    const RxSet *sr = text_rx(slo, shi);
+    return sr && rx_subset(g, sr);
+}
+
+/* The most specific text value subsuming both. */
+static void text_join(Content *c, int64_t lo1, int64_t hi1, int64_t lo2, int64_t hi2, int64_t *lo, int64_t *hi)
+{
+    bool c1 = lo1 == hi1, c2 = lo2 == hi2;
+    const RxSet *r = NULL;
+    if (c1 && c2) {
+        if (lo1 == lo2) { *lo = *hi = lo1; return; }
+    } else if (c1 || c2) {
+        r = rx_satisfied(c, c1 ? text_rx(lo2, hi2) : text_rx(lo1, hi1), (Sym) (intptr_t) (c1 ? lo1 : lo2));
+    } else {
+        r = rx_common(c, text_rx(lo1, hi1), text_rx(lo2, hi2));
+    }
+    *lo = TRI_NINF;
+    *hi = r ? (int64_t) (intptr_t) r : TRI_INF;
+}
+
 static int dim_of(Content *c, TriNode *n)
 {
     return (n->flags & NF_DIM) ? c->types.v[n->type].dim : -1;
@@ -246,6 +367,8 @@ bool unify1(Content *c, TriNode *a, TriNode *b)
     b = deref(c, b);
     if (a == b) return true;
     if ((a->flags ^ b->flags) & NF_DIM) {
+        if (is_text(c, a) && node_rx(c, a) && is_enum_value(c, b)) return text_meets_enum(c, a, b);
+        if (is_text(c, b) && node_rx(c, b) && is_enum_value(c, a)) return text_meets_enum(c, b, a);
         if (is_text(c, a) && c->types.v[b->type].kind == TK_ATOM) b = atom_as_text(c, b);
         else if (is_text(c, b) && c->types.v[a->type].kind == TK_ATOM) a = atom_as_text(c, a);
     } else if ((a->flags & NF_DIM) && a->type != b->type) {
@@ -285,11 +408,16 @@ bool unify1(Content *c, TriNode *a, TriNode *b)
     }
 
     if (target->flags & NF_DIM) {
-        int64_t lo1, hi1, lo2, hi2;
+        int64_t lo1, hi1, lo2, hi2, lo, hi;
         node_iv(c, target, &lo1, &hi1);
         node_iv(c, src, &lo2, &hi2);
-        int64_t lo = lo1 > lo2 ? lo1 : lo2, hi = hi1 < hi2 ? hi1 : hi2;
-        if (lo > hi) { fail_at(c, a, b, NULL); return false; }
+        if (is_text(c, target)) {
+            if (!text_meet(c, lo1, hi1, lo2, hi2, &lo, &hi)) { fail_at(c, a, b, NULL); return false; }
+        } else {
+            lo = lo1 > lo2 ? lo1 : lo2;
+            hi = hi1 < hi2 ? hi1 : hi2;
+            if (lo > hi) { fail_at(c, a, b, NULL); return false; }
+        }
         if (lo != lo1 || hi != hi1) {
             Scratch *s = sx_make(c, target);
             s->slo = lo;
@@ -519,11 +647,22 @@ static void subsume_rec(Content *c, TriNode *a, TriNode *b, SubState *s)
     if (bmapped && sb->bwd != a && !ext_equal(c, sb->bwd, a)) s->bwd = false;
     if (!amapped) sa->fwd = b;
     if (!bmapped) sb->bwd = a;
-    if (!is_subtype(c, b->type, a->type)) s->fwd = false;
-    if (!is_subtype(c, a->type, b->type)) s->bwd = false;
+    /* constrained text subsumes the atoms whose names it accepts */
+    const RxSet *arx = is_text(c, a) ? text_rx(a->lo, a->hi) : NULL, *brx = is_text(c, b) ? text_rx(b->lo, b->hi) : NULL;
+    bool fwd_atom = arx && !(b->flags & NF_DIM) && is_leaf(c, b->type) && c->types.v[b->type].kind == TK_ATOM;
+    bool bwd_atom = brx && !(a->flags & NF_DIM) && is_leaf(c, a->type) && c->types.v[a->type].kind == TK_ATOM;
+    if (fwd_atom) { if (!rx_accepts(arx, c->types.v[b->type].name)) s->fwd = false; }
+    else if (!is_subtype(c, b->type, a->type)) s->fwd = false;
+    if (bwd_atom) { if (!rx_accepts(brx, c->types.v[a->type].name)) s->bwd = false; }
+    else if (!is_subtype(c, a->type, b->type)) s->bwd = false;
     if ((a->flags & NF_DIM) && (b->flags & NF_DIM)) {
-        if (!(b->lo >= a->lo && b->hi <= a->hi)) s->fwd = false;
-        if (!(a->lo >= b->lo && a->hi <= b->hi)) s->bwd = false;
+        if (is_text(c, a) && is_text(c, b)) {
+            if (!text_subsumes(a->lo, a->hi, b->lo, b->hi)) s->fwd = false;
+            if (!text_subsumes(b->lo, b->hi, a->lo, a->hi)) s->bwd = false;
+        } else {
+            if (!(b->lo >= a->lo && b->hi <= a->hi)) s->fwd = false;
+            if (!(a->lo >= b->lo && a->hi <= b->hi)) s->bwd = false;
+        }
     }
     if (!s->fwd && !s->bwd) return;
     uint32_t i = 0, j = 0;
@@ -779,9 +918,13 @@ static TriNode *gen_rec(Content *c, TriArena *out, TriNode *a, TriNode *b, uint3
     u64map_put(&st->idx, k, st->pairs.n);
     if (r->flags & NF_DIM) {
         bool both = (a->flags & NF_DIM) && (b->flags & NF_DIM);
+        int dim = c->types.v[t].dim;
+        if (dim == DIM_TEXT && both && is_text(c, a) && is_text(c, b)) {
+            text_join(c, a->lo, a->hi, b->lo, b->hi, &r->lo, &r->hi);
+            return r;
+        }
         r->lo = both ? (a->lo < b->lo ? a->lo : b->lo) : TRI_NINF;
         r->hi = both ? (a->hi > b->hi ? a->hi : b->hi) : TRI_INF;
-        int dim = c->types.v[t].dim;
         if ((dim == DIM_TEXT || dim == DIM_REF) && r->lo != r->hi) { r->lo = TRI_NINF; r->hi = TRI_INF; }
         return r;
     }

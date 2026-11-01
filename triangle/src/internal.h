@@ -103,7 +103,7 @@ typedef struct { Sym file; int line, col; } Loc;
 typedef struct { Sym name; char *args; } Attr;
 
 typedef enum { X_TOP, X_NAME, X_ATOM, X_NUM, X_BOUND, X_TAG, X_STRUCT, X_LIST,
-               X_AND, X_OR, X_DEFAULT, X_ARITH } XKind;
+               X_AND, X_OR, X_DEFAULT, X_ARITH, X_REGEX } XKind;
 
 typedef struct X X;
 typedef struct TriContent Content;
@@ -132,6 +132,7 @@ struct X {
         struct { X *a, *b; } bin;
         X *sub;                                           /* DEFAULT */
         struct { X *a, *b; int op; } ar;                  /* ARITH: '+', '-', '*', '/' */
+        struct { Sym pat; bool neg; } rx;                 /* REGEX: =~ or !~ a pattern */
     } u;
 };
 
@@ -172,6 +173,29 @@ void        arith_narrow(const X *x, Quantity want, bool (*lookup)(void *ctx, Sy
                          void (*narrow)(void *ctx, Sym tag, const Quantity *q));
 const char *arith_eval(const X *x, bool (*lookup)(void *ctx, Sym tag, Quantity *q), void *ctx, Quantity *out);
 void        arith_tags(const X *x, SymVec *out);
+
+/* regex.c: RE2 syntax, matched anywhere in the text (as CUE's =~). */
+typedef struct Regex Regex;
+Regex *regex_compile(const char *pat, size_t len, char *err, size_t errlen);   /* NULL with err */
+bool   regex_match(const Regex *re, const char *s, size_t n);
+void   regex_free(Regex *re);
+
+/* text.c: regex constraints on text (=~, !~), as sets interned per content.
+ * An open text value with constraints has lo == TRI_NINF and hi pointing at
+ * its set (text_rx); concrete text has lo == hi, its canonical string; open
+ * text without constraints is TRI_NINF..TRI_INF. Sets are sorted and
+ * interned, so equal sets are the same pointer. */
+typedef struct { Sym pat; bool neg; Regex *re; } RxItem;
+typedef struct { uint32_t n; RxItem *v; uint64_t hash; } RxSet;
+const RxSet *text_rx(int64_t lo, int64_t hi);                       /* NULL unless constrained */
+const RxSet *rx_single(Content *c, Sym pat, bool neg, char *err, size_t errlen);
+const RxSet *rx_union(Content *c, const RxSet *a, const RxSet *b);
+const RxSet *rx_common(Content *c, const RxSet *a, const RxSet *b); /* NULL if they share none */
+const RxSet *rx_satisfied(Content *c, const RxSet *s, Sym text);    /* those text meets; NULL if none */
+bool         rx_accepts(const RxSet *s, Sym text);                  /* text: a canonical string or a name */
+bool         rx_subset(const RxSet *a, const RxSet *b);
+void         rx_print(Buf *b, const RxSet *s);                      /* =~"..." & !~"..." */
+void         rx_free_all(Content *c);
 
 /* Parses a source into declarations appended to the content. Returns false on
  * error (diagnostics recorded). */
@@ -365,6 +389,9 @@ struct TriContent {
     size_t narith;               /* arithmetic constraints anywhere: none means nothing to propagate */
     const ArithVec *varskip;     /* instance-level arithmetic targets, not variation points */
     VEC(FnReg) fns;
+    VEC(RxSet *) rxsets;         /* interned regex constraint sets */
+    U64Map rxsetidx;             /* hash of a set → index + 1 (probed) */
+    U64Map rxcache;              /* pattern Sym → compiled Regex */
     VEC(DisjInfo) disjs;
     U64Map disjidx;              /* X * of a disjunction → index + 1 */
 
@@ -385,8 +412,10 @@ struct TriContent {
     uint32_t failpath[128];      /* the failing path, as feature IDs */
     int faildepth;
     struct { const char *why; uint32_t ltype, rtype; int64_t llo, lhi, rlo, rhi; bool hasr; } failraw;
+    char failwhy[256];           /* a failure's reason, when it is made up on the spot */
 
     uint64_t hash;
+    bool loaded;                 /* load is over: the rest are runtime operations */
     TriStats stats;
     bool cyclic;                 /* set when sharing meets a cycle during copy_out */
 };
@@ -411,6 +440,7 @@ uint32_t meet(Content *c, uint32_t a, uint32_t b);
 bool     approp(const Content *c, uint32_t t, uint32_t f);
 bool     is_dim(const Content *c, uint32_t t);
 bool     is_leaf(const Content *c, uint32_t t);           /* no subtypes, no features */
+const U32Vec *enum_leaves(Content *c, uint32_t t);        /* an enum's leaves, ascending */
 Sym      anon_name(Content *c, X *orx);
 Sym      list_type_name(Content *c, const X *elem, bool cons);
 

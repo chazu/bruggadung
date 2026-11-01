@@ -293,6 +293,11 @@ static TriNode *build_raw(Build *b, X *x)
         numeric_interval(b, x, &dim, &lo, &hi);
         return leaf_new(c, c->scratch, c->dimtype[dim], lo, hi);
     }
+    case X_REGEX: {
+        const RxSet *set = rx_single(c, x->u.rx.pat, x->u.rx.neg, NULL, 0);
+        if (!set) { build_error(b, x->loc, "bad regular expression %s", x->u.rx.pat); return NULL; }
+        return leaf_new(c, c->scratch, c->dimtype[DIM_TEXT], TRI_NINF, (int64_t) (intptr_t) set);
+    }
     case X_TAG: {
         for (size_t i = 0; i < b->tags.n; i++)
             if (b->tags.v[i].name == x->u.name) return b->tags.v[i].node;
@@ -1889,7 +1894,7 @@ static uint32_t inst_index(Content *c, const char *name)
 }
 
 /* The maximal subtypes of t that are not alternatives: an enum's leaves. */
-static const U32Vec *enum_leaves(Content *c, uint32_t t)
+const U32Vec *enum_leaves(Content *c, uint32_t t)
 {
     if (!c->leafcache) c->leafcache = calloc(c->types.n, sizeof(U32Vec *));
     if (c->leafcache[t]) return c->leafcache[t];
@@ -2982,7 +2987,9 @@ static void hash_node(Content *c, uint64_t *h, TriNode *n, uint32_t cg, uint64_t
     n->cpy = (TriNode *) (uintptr_t) (*next)++;
     hmix(h, ((uint64_t) n->type << 8) | (n->flags & NF_LAZY));
     if (n->flags & NF_DIM) {
+        const RxSet *rx = c->types.v[n->type].dim == DIM_TEXT ? text_rx(n->lo, n->hi) : NULL;
         if (c->types.v[n->type].dim == DIM_TEXT && n->lo == n->hi) hstr(h, (const char *) (intptr_t) n->lo);
+        else if (rx) hmix(h, rx->hash);         /* by contents, never by address */
         else { hmix(h, (uint64_t) n->lo); hmix(h, (uint64_t) n->hi); }
         return;
     }
@@ -3234,6 +3241,7 @@ static void finish_load(Content *c, bool ok, double t0)
         c->stats.instances_ms = now_ms() - t3;
         compute_hash(c);
     }
+    c->loaded = true;
 }
 
 TriContent *tri_content_load_tdl(const char *topfile)
@@ -3349,6 +3357,7 @@ void tri_content_free(TriContent *c)
     for (size_t i = 0; i < c->disjs.n; i++) { VEC_FREE(c->disjs.v[i].altx); VEC_FREE(c->disjs.v[i].alts); }
     VEC_FREE(c->disjs);
     u64map_free(&c->disjidx);
+    rx_free_all(c);
     VEC_FREE(c->feats);
     VEC_FREE(c->decls);
     u64map_free(&c->typeidx);

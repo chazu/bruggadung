@@ -69,9 +69,17 @@
     (should (memq (triangle-test-face-at "k:") '(font-lock-property-name-face font-lock-variable-name-face)))
     (should (memq (triangle-test-face-at "\\\"hi")
                   '(font-lock-escape-face font-lock-regexp-grouping-backslash)))
+    (should (memq (triangle-test-face-at "n:") '(font-lock-property-name-face font-lock-variable-name-face)))
     ;; brackets inside strings don't count for indentation
     (should (equal (triangle-test-reindent "a: {\ns: #\"{ \\\"#\nn: 1\n}\n")
                    "a: {\n    s: #\"{ \\\"#\n    n: 1\n}\n"))))
+
+(ert-deftest triangle-test-regex ()
+  (triangle-test-with "#C: { label: =~#\"^[a-z]+-\\d+$\"# & !~\"9\" }\n"
+    (should (memq (triangle-test-face-at "=~") '(font-lock-operator-face font-lock-keyword-face)))
+    (should (memq (triangle-test-face-at "!~") '(font-lock-operator-face font-lock-keyword-face)))
+    (should (eq (triangle-test-face-at "a-z") 'font-lock-string-face))
+    (should (eq (triangle-test-face-at "\\d") 'font-lock-string-face))))
 
 (defun triangle-test-reindent (text)
   "Return TEXT with every line's indentation removed, then reindented."

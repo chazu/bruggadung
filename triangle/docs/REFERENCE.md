@@ -12,6 +12,7 @@ reference is a bug.
 - [Expressions](#expressions)
 - [Built-in types](#built-in-types)
 - [Quantities and units](#quantities-and-units)
+- [Regular expressions](#regular-expressions)
 - [Attributes](#attributes)
 - [Defaults](#defaults)
 - [Disjunction and variation](#disjunction-and-variation)
@@ -76,6 +77,7 @@ sum         = product { ("+" | "-") product }
 product     = unary { ("*" | "/") unary }
 unary       = "*" unary                          (default)
             | (">=" | "<=" | ">" | "<") NUMBER   (bound)
+            | ("=~" | "!~") STRING               (regex)
             | primary
 primary     = "_" | "true" | "false"
             | "ref" "(" NUMBER ")"
@@ -164,7 +166,7 @@ file without one is in the root. Many files may declare the same package.
 | 2 | `&` conjunction (unification) |
 | 3 | `+` `-` |
 | 4 | `*` `/` (between operands) |
-| 5 | `*` default, `>=` `<=` `>` `<` bounds (prefix) |
+| 5 | `*` default, `>=` `<=` `>` `<` bounds, `=~` `!~` regexes (prefix) |
 
 | Construct | Meaning |
 | --- | --- |
@@ -186,6 +188,7 @@ file without one is in the root. Many files may declare the same package.
 | `ref(12)` | A referent handle. It unifies only with itself. |
 | `true`, `false` | The two atoms of `bool`. |
 | `$a + $b`, `$f * $a` | Arithmetic: a constraint between tagged values. |
+| `=~"^ab"`, `!~#"\d"#` | A string that matches, or doesn't match, a regular expression ([below](#regular-expressions)). |
 
 ## Built-in types
 
@@ -232,6 +235,55 @@ intervals, and different kinds never unify.
   torque.
 - The table lives in `src/units.c`. It is the one source of the kinds; the
   generated component structs and the engine's unit types come from it.
+
+## Regular expressions
+
+`=~"re"` is a string that matches `re` somewhere in it, and `!~"re"` one that
+doesn't, as in CUE. Write the expression as a raw string when it has
+backslashes: `=~#"^\d+$"#`, not `=~"^\\d+$"`.
+
+```cue
+#Coded: #Thing & { label: =~#"^[a-z]+-\d+$"# }
+tagged: #Coded & { label: "ab-12" }            // ok
+```
+
+**On text**, a regex is a constraint the value carries until it is concrete.
+Constraints conjoin: `=~"^ab" & !~"9"` is a value that must meet both, and
+unifying it with `"abc"` gives `"abc"`, with `"ab9"` fails. Constraints
+print sorted and read back as the same value, and saves, migration and the
+content hash keep them. Generalisation keeps the constraints both sides meet;
+memory decay forgets a field's constraints down to those its type declares.
+
+**On atoms**, a regex tests the atom's name: `"steel" & =~"^s"` is the atom
+`"steel"`. Against an enum such as `#Material`, the result is the type whose
+atoms are exactly those that match: none is a conflict, all is the enum, and
+`=~"^(steel|brass|iron)$"` is `"metal"` when that enum lists just those. When
+no type is exactly the atoms that match (`=~"^s"` allows `"steel"` and
+`"stone"`), content is an error that asks for such an enum: a pattern widened
+to all of `#Material` would match what it shouldn't. At runtime, a description
+keeps the most specific type covering them instead: less precise, never wrong.
+
+**Matching.** A pattern's regex entails a concrete string or atom that meets
+it, and is incompatible with one that doesn't. Against a description that is
+itself only constrained, it is entailed when the description carries all of
+the pattern's constraints, and otherwise **unknown**: Triangle doesn't prove
+that one regex implies another. An agent may then go and look at what it
+could have deduced, but it never concludes something false.
+
+**The syntax is RE2's**, as CUE and Go use it, matched over UTF-8 code points
+in time linear in the text, with no backtracking:
+
+| Supported | |
+| --- | --- |
+| Literals, `.` (no newline unless `(?s)`), `\|`, groups `(…)`, `(?:…)`, `(?P<name>…)` | |
+| `*` `+` `?` `{n}` `{n,}` `{n,m}` (counts up to 1000), and their lazy forms | Lazy forms match the same strings. |
+| Classes `[a-z]`, `[^…]`, `\d` `\w` `\s` `\D` `\W` `\S`, `[[:alpha:]]` and the other POSIX classes | ASCII, as in RE2. |
+| `^` `$` (lines with `(?m)`), `\A` `\z`, `\b` `\B` | Without `(?m)`, `$` is the end of the text. |
+| Flags `(?i)` `(?s)` `(?m)`, scoped `(?i:…)` | `(?i)` folds ASCII letters only. |
+| Escapes `\n` `\t` `\x41` `\x{263a}`, `\Q…\E`, punctuation `\.` | |
+
+Not supported: backreferences and lookaround (RE2 has neither), Unicode
+classes such as `\pL`, and case folding beyond ASCII.
 
 ## Attributes
 
@@ -419,6 +471,10 @@ location of the other declaration where there is one.
 | `unknown escape in a string; …`, `\u takes four hex digits`, `\U takes eight hex digits` | An escape not in the table, or a short code. |
 | `not a Unicode scalar value`, `a string may not contain U+0000` | A `\u`/`\U` code that is a surrogate, past U+10FFFF, or zero. |
 | `string interpolation is not supported` | `\(` in a string. |
+| `… (in a regex, write a raw string such as #"\d+"#, or double the backslash)` | A regex escape such as `\d` in an ordinary string. |
+| `bad regular expression: …` | The expression doesn't parse: `missing )`, `lookaround is not supported (RE2 syntax)`, and so on. |
+| `expected a string after =~ or !~` | |
+| `unexpected '='; did you mean ':' or '=~'?` | A lone `=` or `!`. |
 | `expected a declaration`, `expected a field label`, `expected a value`, `expected ':' after …` | A malformed declaration or structure. |
 | `expected a number after a bound` | A bound needs a number: `>=10mm`, not `>= $x`. |
 | `expected a referent number in ref(...)`, `a referent number has no unit` | `ref` takes a plain whole number. |
@@ -426,6 +482,13 @@ location of the other declaration where there is one.
 | `unknown unit: 3furlong` | A unit not in the table. |
 | `literal is not a whole number of quanta: 0.05mm` | The value can't be represented exactly. |
 | `malformed number`, `number out of range`, `quantity out of range` | |
+
+**Regular expressions**
+
+| Message | Cause |
+| --- | --- |
+| `conflict at f: =~"re" vs "value"` | A string or atom that doesn't match. |
+| `conflict at f: =~"^s" (allows only "steel" and "stone", and no enum is exactly those: declare one) vs #Material` | A regex that narrows an enum to atoms no type is exactly. |
 
 **Names and the hierarchy**
 

@@ -20,6 +20,10 @@ void x_print(Buf *b, const X *x)
                     x->u.bound.op == B_GT ? ">" : "<");
         units_format(b, x->u.bound.dim, x->u.bound.q);
         break;
+    case X_REGEX:
+        buf_puts(b, x->u.rx.neg ? "!~" : "=~");
+        buf_puts(b, x->u.rx.pat);
+        break;
     case X_STRUCT:
         buf_puts(b, "{ ");
         for (int i = 0; i < x->u.st.n; i++) {

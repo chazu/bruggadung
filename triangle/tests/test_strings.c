@@ -131,3 +131,181 @@ void test_string_errors(void)
     CHECK(line == 2);
     tri_content_free(c);
 }
+
+/* --- regex constraints ----------------------------------------------------------------- */
+
+static const char *rx_content =
+    "#Material: \"metal\" | \"stone\" | \"oak\"\n"
+    "\"metal\": \"steel\" | \"brass\" | \"iron\"\n"
+    "#Thing: { material: #Material, label: text, code: _ }\n"
+    "#Coded: #Thing & { label: =~\"^[a-z]+-\\\\d+$\" }\n"
+    "tagged: #Coded & { material: \"steel\", label: \"ab-12\", code: \"x\" }\n"
+    "p_label: #Thing & { label: =~\"^ab\" & !~\"9\" }\n"
+    "p_metal: #Thing & { material: =~\"^(steel|brass|iron)$\" }\n"
+    "p_steel: #Thing & { material: \"steel\" & =~\"^s\" }\n"
+    "p_code: #Thing & { code: =~\"^s\" }\n";
+
+void test_regex_on_text(void)
+{
+    TriContent *c = load1_ok(rx_content);
+    /* a type's regex constrains its instances; the spec keeps the concrete value */
+    CHECK_STR(text_of(c, tri_at(c, tri_spec(c, "tagged"), "label")), "ab-12");
+    /* constraints conjoin, printed sorted, and read back */
+    const char *lab = printed(c, tri_at(c, tri_pattern(c, "p_label"), "label"));
+    CHECK_STR(lab, "!~\"9\" & =~\"^ab\"");
+    TriArena *a = tri_arena_new();
+    char err[256] = "";
+    const TriNode *v = tri_value(c, "#Thing & { label: =~\"^ab\" & !~\"9\" }", a, err, sizeof err);
+    CHECK(v != NULL);
+    CHECK_STR(printed(c, tri_at(c, v, "label")), lab);
+    /* unification: a concrete string must meet every constraint */
+    const TriNode *ok = tri_value(c, "#Thing & { label: \"abc\" }", a, err, sizeof err);
+    const TriNode *bad = tri_value(c, "#Thing & { label: \"ab9\" }", a, err, sizeof err);
+    TriFailure f;
+    const TriNode *u = tri_unify(c, v, ok, a, &f);
+    CHECK(u && !strcmp(text_of(c, tri_at(c, u, "label")), "abc"));
+    CHECK(tri_unify(c, v, bad, a, &f) == NULL);
+    CHECK_STR(f.path, "label");
+    /* two constrained values: the union of their constraints */
+    const TriNode *w = tri_value(c, "#Thing & { label: =~\"c$\" & =~\"^ab\" }", a, err, sizeof err);
+    u = tri_unify(c, v, w, a, &f);
+    CHECK_STR(printed(c, tri_at(c, u, "label")), "!~\"9\" & =~\"^ab\" & =~\"c$\"");
+    /* a regex on a number is a conflict of kinds */
+    CHECK(tri_value(c, "#Thing & { code: 3 & =~\"3\" }", a, err, sizeof err) == NULL);
+    tri_arena_free(a);
+    tri_content_free(c);
+}
+
+void test_regex_on_atoms(void)
+{
+    TriContent *c = load1_ok(rx_content);
+    /* a regex tests an atom's name and keeps the atom */
+    const TriNode *m = tri_at(c, tri_pattern(c, "p_steel"), "material");
+    CHECK(tri_node_type(m) == tri_type_named(c, "\"steel\""));
+    /* narrowing an enum to exactly a sub-enum's atoms gives the sub-enum */
+    CHECK(tri_node_type(tri_at(c, tri_pattern(c, "p_metal"), "material")) == tri_type_named(c, "\"metal\""));
+    TriArena *a = tri_arena_new();
+    char err[256] = "";
+    /* none, one, all */
+    CHECK(tri_value(c, "#Thing & { material: =~\"^z\" }", a, err, sizeof err) == NULL);
+    const TriNode *one = tri_value(c, "#Thing & { material: =~\"^st[e]\" }", a, err, sizeof err);
+    CHECK(one && tri_node_type(tri_at(c, one, "material")) == tri_type_named(c, "\"steel\""));
+    const TriNode *all = tri_value(c, "#Thing & { material: =~\".\" }", a, err, sizeof err);
+    CHECK(all && tri_node_type(tri_at(c, all, "material")) == tri_type_named(c, "#Material"));
+    /* at runtime, some that no enum is exactly: the covering enum, never a failure */
+    const TriNode *some = tri_value(c, "#Thing & { material: =~\"^s\" }", a, err, sizeof err);
+    CHECK(some && tri_node_type(tri_at(c, some, "material")) == tri_type_named(c, "#Material"));
+    tri_arena_free(a);
+    tri_content_free(c);
+
+    /* at load, the same is an error that says what to do */
+    const char *names[] = { "s.tri" };
+    char src[2048];
+    snprintf(src, sizeof src, "%sbad: #Thing & { material: =~\"^s\" }\n", rx_content);
+    const char *srcs[] = { src };
+    c = load(names, srcs, 1);
+    CHECK(!tri_content_ok(c));
+    CHECK(has_diag(c, "=~\"^s\" (allows only \"steel\" and \"stone\", and no enum is exactly those: declare one) vs #Material", 1));
+    tri_content_free(c);
+    snprintf(src, sizeof src, "%sbad: #Thing & { material: \"oak\" & =~\"^s\" }\n", rx_content);
+    c = load(names, srcs, 1);
+    CHECK(has_diag(c, "conflict at material: =~\"^s\" vs \"oak\"", 1));
+    tri_content_free(c);
+}
+
+void test_regex_matching(void)
+{
+    TriContent *c = load1_ok(rx_content);
+    TriArena *a = tri_arena_new();
+    char err[256] = "";
+    const TriNode *pat = tri_pattern(c, "p_label");
+    static const struct { const char *desc; TriMatch want; } rows[] = {
+        { "#Thing & { label: \"abc\" }", TRI_ENTAILED },
+        { "#Thing & { label: \"ab9\" }", TRI_INCOMPATIBLE },
+        { "#Thing & { label: \"xbc\" }", TRI_INCOMPATIBLE },
+        { "#Thing", TRI_UNKNOWN },
+        /* constraints that include the pattern's: entailed without a string */
+        { "#Thing & { label: =~\"^ab\" & !~\"9\" & =~\"c$\" }", TRI_ENTAILED },
+        /* a different regex that happens to imply it: unknown, not proved */
+        { "#Thing & { label: =~\"^abc\" & !~\"[0-9]\" }", TRI_UNKNOWN },
+    };
+    for (size_t i = 0; i < sizeof rows / sizeof *rows; i++) {
+        const TriNode *d = tri_value(c, rows[i].desc, a, err, sizeof err);
+        TriMatchResult r;
+        TriMatch m = tri_match(c, pat, d, &r);
+        if (m != rows[i].want) fprintf(stderr, "    row %zu: got %d\n", i, (int) m);
+        CHECK(m == rows[i].want);
+        if (m == TRI_UNKNOWN) CHECK(r.nresidual == 1 && !strcmp(r.residual[0], "label"));
+    }
+    /* a regex in a pattern against an atom: by its name */
+    const TriNode *code = tri_pattern(c, "p_code");
+    TriMatchResult r;
+    CHECK(tri_match(c, code, tri_value(c, "#Thing & { code: \"steel\" }", a, err, sizeof err), &r) == TRI_ENTAILED);
+    CHECK(tri_match(c, code, tri_value(c, "#Thing & { code: \"oak\" }", a, err, sizeof err), &r) == TRI_INCOMPATIBLE);
+    CHECK(tri_match(c, code, tri_value(c, "#Thing & { code: \"sunny\" }", a, err, sizeof err), &r) == TRI_ENTAILED);
+    tri_arena_free(a);
+    tri_content_free(c);
+}
+
+void test_regex_generalise_save_and_migrate(void)
+{
+    TriContent *c = load1_ok(rx_content);
+    TriArena *a = tri_arena_new();
+    char err[256] = "";
+    const TriNode *x = tri_value(c, "#Thing & { label: =~\"^ab\" & =~\"c$\" }", a, err, sizeof err);
+    const TriNode *y = tri_value(c, "#Thing & { label: \"abd\" }", a, err, sizeof err);
+    const TriNode *z = tri_value(c, "#Thing & { label: \"abc\" }", a, err, sizeof err);
+    /* the generalisation keeps the constraints both meet */
+    CHECK_STR(printed(c, tri_at(c, tri_lgg(c, x, y, a), "label")), "=~\"^ab\"");
+    CHECK_STR(printed(c, tri_at(c, tri_lgg(c, x, z, a), "label")), "=~\"^ab\" & =~\"c$\"");
+    CHECK_STR(printed(c, tri_at(c, tri_lgg(c, y, z, a), "label")), "text");
+    const TriNode *w = tri_value(c, "#Thing & { label: =~\"^ab\" & !~\"x\" }", a, err, sizeof err);
+    CHECK_STR(printed(c, tri_at(c, tri_lgg(c, x, w, a), "label")), "=~\"^ab\"");
+    int fwd, bwd;
+    tri_subsumes(c, tri_lgg(c, x, y, a), x, &fwd, &bwd);
+    CHECK(fwd && !bwd);
+    /* memory decay forgets a field's constraints down to its type's own */
+    const TriNode *coded = tri_value(c, "#Coded & { label: \"ab-12\" }", a, err, sizeof err);
+    CHECK_STR(printed(c, tri_at(c, tri_generalize(c, coded, "label", 1, a), "label")), "=~\"^[a-z]+-\\\\d+$\"");
+    /* saves keep constraints, by name and by ID */
+    for (int by_id = 0; by_id <= 1; by_id++) {
+        char *saved = tri_save(c, x, by_id);
+        const TriNode *back = tri_restore(c, saved, a, err, sizeof err);
+        CHECK(back != NULL);
+        CHECK_STR(printed(c, tri_at(c, back, "label")), "=~\"^ab\" & =~\"c$\"");
+        free(saved);
+    }
+    /* and moving to another build of the content compiles them there */
+    const char *names[] = { "s.tri" };
+    const char *srcs[] = { rx_content };
+    TriContent *c2 = load(names, srcs, 1);
+    TriArena *a2 = tri_arena_new();
+    const TriNode *moved = tri_migrate(c, c2, x, a2, err, sizeof err);
+    CHECK(moved != NULL);
+    CHECK_STR(printed(c2, tri_at(c2, moved, "label")), "=~\"^ab\" & =~\"c$\"");
+    /* the content hash depends on constraints' contents, not their addresses */
+    CHECK(tri_content_hash(c) == tri_content_hash(c2));
+    tri_arena_free(a2);
+    tri_content_free(c2);
+    tri_arena_free(a);
+    tri_content_free(c);
+}
+
+void test_regex_errors(void)
+{
+    static const struct { const char *src, *diag; } cases[] = {
+        { "#N: { s: text }\nn: #N & { s: =~\"(ab\" }\n", "s.tri:2:16: error: bad regular expression: missing )" },
+        { "#N: { s: text }\nn: #N & { s: =~\"\\d\" }\n", "(in a regex, write a raw string such as #\"\\d+\"#" },
+        { "#N: { s: text }\nn: #N & { s: =~ 5 }\n", "expected a string after =~ or !~" },
+        { "#N: { s: text }\nn: #N & { s: = \"x\" }\n", "unexpected '='; did you mean ':' or '=~'?" },
+        { "#N: { s: text }\nn: #N & { s: =~#\"(?=a)\"# }\n", "lookaround is not supported" },
+        { "#N: { s: text }\nn: #N & { s: \"abc\" & !~\"b\" }\n", "conflict at s: \"abc\" vs !~\"b\"" },
+    };
+    for (size_t i = 0; i < sizeof cases / sizeof *cases; i++) {
+        TriContent *c = load1(cases[i].src);
+        CHECK(!tri_content_ok(c));
+        if (!has_diag(c, cases[i].diag, 1)) { fprintf(stderr, "    case %zu:\n", i); dump_diags(c); }
+        CHECK(has_diag(c, cases[i].diag, 1));
+        tri_content_free(c);
+    }
+}

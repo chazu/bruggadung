@@ -223,6 +223,15 @@ def main(exe):
     r = s.request("textDocument/hover", {"textDocument": {"uri": suri},
                                          "position": pos(STRINGS, "wrench")})["result"]
     check(r is None, "a quote escaped in a string doesn't end it")
+    BADRX = STRINGS + 't3: #Tag & { note: =~#"(ab"# , mark: "plain" }\n'
+    s.notify("textDocument/didChange", {"textDocument": {"uri": suri, "version": 2},
+                                        "contentChanges": [{"text": BADRX}]})
+    dg = s.diagnostics(suri)
+    check(len(dg) == 1 and "missing )" in dg[0]["message"] and dg[0]["range"]["start"] == pos(BADRX, '#"(ab'),
+          "a bad regex is reported on its pattern")
+    s.notify("textDocument/didChange", {"textDocument": {"uri": suri, "version": 3},
+                                        "contentChanges": [{"text": STRINGS}]})
+    check(s.diagnostics(suri) == [], "and cleared when fixed")
     r = s.request("textDocument/definition", {"textDocument": {"uri": suri},
                                               "position": pos(STRINGS, "mark: \"plain", 1)})["result"]
     check(len(r) == 0, "a field label is not a declaration")

@@ -6,6 +6,7 @@ typedef enum {
     T_EOF, T_IDENT, T_DEF, T_STRING, T_NUMBER, T_TAG, T_ATTR,
     T_COLON, T_COMMA, T_LBRACE, T_RBRACE, T_LBRACK, T_RBRACK, T_LPAREN, T_RPAREN,
     T_AND, T_OR, T_STAR, T_GE, T_LE, T_GT, T_LT, T_ELLIPSIS, T_PLUS, T_MINUS, T_SLASH,
+    T_MATCH, T_NMATCH,
 } TokKind;
 
 typedef struct {
@@ -185,7 +186,16 @@ static bool lex(Parser *p, const char *src)
                 for (int k = 0; k < hashes; k++) ADV();
                 const char *before = s;
                 const char *err = string_escape(&s, &raw);
-                if (err) { buf_free(&raw); perr(p, eloc, err); return false; }
+                if (err) {
+                    buf_free(&raw);
+                    TokKind before_tok = p->toks.n ? p->toks.v[p->toks.n - 1].k : T_EOF;
+                    if (before_tok == T_MATCH || before_tok == T_NMATCH) {
+                        char msg[200];
+                        snprintf(msg, sizeof msg, "%s (in a regex, write a raw string such as #\"\\d+\"#, or double the backslash)", err);
+                        perr(p, eloc, msg);
+                    } else perr(p, eloc, err);
+                    return false;
+                }
                 col += (int) (s - before);      /* an escape never spans lines */
             }
             t.str = string_canonical(p->c, raw.s, raw.len);
@@ -232,6 +242,10 @@ static bool lex(Parser *p, const char *src)
             case '/': t.k = T_SLASH; break;
             case '>': if (*s == '=') { ADV(); t.k = T_GE; } else t.k = T_GT; break;
             case '<': if (*s == '=') { ADV(); t.k = T_LE; } else t.k = T_LT; break;
+            case '=': case '!':
+                if (*s == '~') { ADV(); t.k = ch == '=' ? T_MATCH : T_NMATCH; break; }
+                perr(p, t.loc, ch == '=' ? "unexpected '='; did you mean ':' or '=~'?" : "unexpected '!'; did you mean '!~'?");
+                return false;
             case '.':
                 if (s[0] == '.' && s[1] == '.') { ADV(); ADV(); t.k = T_ELLIPSIS; break; }
                 /* fallthrough */
@@ -530,6 +544,23 @@ static X *parse_unary(Parser *p)
         X *x = xnew(p, X_BOUND, t->loc);
         x->u.bound.op = t->k == T_GE ? B_GE : t->k == T_LE ? B_LE : t->k == T_GT ? B_GT : B_LT;
         if (!number(p, n, &x->u.bound.dim, &x->u.bound.q)) return NULL;
+        return x;
+    }
+    if (t->k == T_MATCH || t->k == T_NMATCH) {
+        next(p);
+        Tok *str = peek(p, 0);
+        if (str->k != T_STRING) { perr(p, str->loc, "expected a string after =~ or !~"); return NULL; }
+        next(p);
+        char err[160];
+        if (!rx_single(p->c, str->str, t->k == T_NMATCH, err, sizeof err)) {
+            char msg[200];
+            snprintf(msg, sizeof msg, "bad regular expression: %s", err);
+            perr(p, str->loc, msg);
+            return NULL;
+        }
+        X *x = xnew(p, X_REGEX, t->loc);
+        x->u.rx.pat = str->str;
+        x->u.rx.neg = t->k == T_NMATCH;
         return x;
     }
     return parse_primary(p);

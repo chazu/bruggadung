@@ -125,6 +125,8 @@ fences and the backslashes inside become punctuation."
     ;; field labels, including path shorthand a: b: c
     (,(concat "\\_<\\(" triangle--name "\\)\\s-*:") 1 ',(triangle--face 'font-lock-property-name-face
                                                                      'font-lock-variable-name-face))
+    ;; regex constraints: =~ and !~
+    ("[=!]~" . ',(triangle--face 'font-lock-operator-face 'font-lock-keyword-face))
     ;; attributes and tags
     (,(concat "@" triangle--name) . font-lock-preprocessor-face)
     (,(concat "\\$" "[A-Za-z0-9_]+") . font-lock-variable-name-face)
