@@ -1,0 +1,20 @@
+// Patterns: operations that match a situation, with tags that share a
+// value (GUIDE.md section 8).
+//
+// Generated from docs/GUIDE.md: edit the guide, then rerun
+// `make examples`. test_docs_guide checks these files mean the same content.
+
+// 8. Patterns and tags
+
+#Roles: { instrument: #Tool, target: #Fastener }
+
+// Turn a tight nut loose with a wrench that fits it.
+loosen: #Roles & {
+    instrument: #Wrench & { size: $s }
+    target:     #Nut    & { size: $s, state: "tight" }
+} @family(operations) @quickcheck(target.state)
+
+tighten: #Roles & {
+    instrument: #Wrench & { size: $s }
+    target:     #Nut    & { size: $s, state: "loose" }
+} @family(operations)

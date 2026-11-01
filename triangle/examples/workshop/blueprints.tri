@@ -1,0 +1,40 @@
+// Blueprints: specific tools and fasteners, with defaults, variation and
+// alternatives (GUIDE.md sections 4 to 7).
+//
+// Generated from docs/GUIDE.md: edit the guide, then rerun
+// `make examples`. test_docs_guide checks these files mean the same content.
+
+// 4. A blueprint
+
+wrench_19: #Wrench & {
+    material: "steel"
+    size:     19mm
+    mass:     0.85kg
+}
+
+// 5. Defaults and specificity
+
+#Metal:   #Physical & { material: *"steel" }
+#Wooden:  #Physical & { material: *"oak" }
+#Handled: #Wooden & { mass: <=2kg }
+
+hammer: #Tool & #Metal & #Handled & { size: 30cm, mass: 1.2kg }
+mallet: #Tool & #Handled & #Metal & { material: *"ash", size: 25cm, mass: 0.9kg }
+
+// 6. Variation
+
+nut: #Nut & {
+    material: "brass" | "steel" @vary(3, 1)
+    size:     >=10mm & <=24mm @vary(mode: 13mm)
+    mass:     >=5g & <=40g
+    state:    *"loose" | "tight"
+}
+
+// 7. Alternatives of structures
+
+spanner: #Wrench & { material: "steel" } &
+    ({ size: 13mm, mass: 0.2kg } | { size: 17mm, mass: 0.3kg } | { size: 19mm, mass: 0.35kg }) @vary(1, 2, 1)
+
+#Gripped: { grip: { kind: "bare" } | { kind: "wrapped", wraps: int & >=1 & <=6 } }
+
+file_tool: #Tool & #Gripped & { material: "steel", size: 20cm, mass: 0.3kg }

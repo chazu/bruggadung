@@ -1,0 +1,14 @@
+// Arithmetic: a lever's torque from its force and arm (GUIDE.md section 9).
+//
+// Generated from docs/GUIDE.md: edit the guide, then rerun
+// `make examples`. test_docs_guide checks these files mean the same content.
+
+// 9. Arithmetic
+
+#Lever: #Tool & {
+    force:  $f & force & >=1N & <=500N
+    arm:    $a & length
+    torque: $f * $a
+}
+
+breaker: #Lever & { material: "steel", size: 60cm, mass: 2kg, arm: 0.5m, force: 80N }

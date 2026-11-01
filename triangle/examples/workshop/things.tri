@@ -1,0 +1,39 @@
+// The things of the workshop: the types, enums and hierarchy of GUIDE.md
+// sections 1 to 3.
+//
+// Generated from docs/GUIDE.md: edit the guide, then rerun
+// `make examples`. test_docs_guide checks these files mean the same content.
+
+// 1. Types and fields
+
+// Anything with mass and a material.
+#Physical: {
+    @component(Physical)
+    mass:     mass      @field(content, saved)
+    material: #Material @field(content, saved)
+}
+
+#Sized: {
+    @component(Sized)
+    size: length @field(content, saved)
+}
+
+// 2. Enums
+
+#Material: "steel" | "brass" | "oak" | "ash"
+"steel": "mild" | "forged"
+
+// 3. A hierarchy
+
+#Tool: #Physical & #Sized & {
+    @component(Tool)
+    wear: *0 | >=0 & <=1000 @field(saved)
+}
+
+#Fastener: #Physical & #Sized & {
+    @component(Fastener)
+    state: "loose" | "tight" @field(content, saved)
+}
+
+#Wrench: #Tool
+#Nut:    #Fastener

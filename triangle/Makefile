@@ -32,6 +32,10 @@ lsp-test: build/triangle
 emacs-test:
 	emacs -Q --batch -L emacs -l emacs/triangle-mode-test.el -f ert-run-tests-batch-and-exit
 
+# The guide's content as files, by topic: examples/workshop.
+examples:
+	python3 tools/guide-examples.py
+
 PREFIX ?= $(HOME)/.local
 
 install: build/triangle
@@ -83,4 +87,4 @@ objc: build/libtriangle.a
 clean:
 	rm -rf build
 
-.PHONY: all test asan objc leakcheck game clean lsp-test emacs-test install
+.PHONY: all test asan objc leakcheck game clean lsp-test emacs-test install examples

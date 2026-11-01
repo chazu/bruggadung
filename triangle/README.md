@@ -25,6 +25,7 @@ make game       # build/libtriangle-game.a, without the TDL front end
 make install    # build/triangle into ~/.local/bin (PREFIX=... to change)
 make lsp-test   # drive the language server over stdio
 make emacs-test # the Emacs mode's tests
+make examples   # regenerate examples/workshop from docs/GUIDE.md
 ./build/tri-components BG content/*.tri > components.h   # C structs for the components
 TRI_PROPS_SCALE=10 ./build/test properties     # ten times the randomised cases
 ```
@@ -48,6 +49,8 @@ TRI_PROPS_SCALE=10 ./build/test properties     # ten times the randomised cases
 | `tools/triangle.c` | The `triangle` command: check, inspect, components, and the language server |
 | `tools/lsp.c`, `tools/json.c` | The language server, and the JSON it speaks |
 | `emacs/` | `triangle-mode`, the Emacs major mode, with its tests |
+| `examples/workshop/` | The guide's content as `.tri` files, by topic |
+| `tools/guide-examples.py` | Writes `examples/workshop` from the guide (`make examples`) |
 | `src/xtree.c` | Syntax tree printing and construction |
 | `src/util.c` | Arenas, symbols, maps, diagnostics |
 | `objc/` | `BGContent`, the Objective-C wrapper, with its test; runs under Apple's runtime and mulle-objc |
@@ -63,12 +66,18 @@ TRI_PROPS_SCALE=10 ./build/test properties     # ten times the randomised cases
 the `.tri` files in them (the current directory by default):
 
 ```sh
-triangle check ../lab/content              # diagnostics, or a summary and the content hash
-triangle inspect iron_nail ../lab/content  # an instance's spec, each value with its origin
-triangle inspect '#Agent' ../lab/content   # a type's docstring, supertypes and components
-triangle components BG ../lab/content      # what tri-components prints
-triangle lsp                               # the language server, over stdio
+triangle check examples/workshop             # diagnostics, or a summary and the content hash
+triangle inspect mallet examples/workshop    # an instance's spec, each value with its origin
+triangle inspect '#Wrench' examples/workshop # a type's docstring, supertypes and components
+triangle components BG examples/workshop     # what tri-components prints
+triangle lsp                                 # the language server, over stdio
 ```
+
+`examples/workshop` is the content [docs/GUIDE.md](docs/GUIDE.md) builds,
+as files split by topic: open one in Emacs to try the mode and the server.
+The guide is its source: `make examples` regenerates the files, and
+`test_docs_guide` fails if they drift. bruggadung's own content is in
+[../lab/content](../lab/content).
 
 `check` exits 1 when there are errors. Its diagnostics have the
 `file:line:col:` form that compilation buffers and editors parse.

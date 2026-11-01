@@ -731,6 +731,19 @@ void test_docs_guide(void)
     if (!tri_content_ok(c)) { dump_diags(c); tri_content_free(c); return; }
     CHECK(has_diag(c, "warning: hammer: conflicting defaults for material from #Wooden, #Metal; both dropped", 0));
     CHECK_STR(tri_doc(c, "#Physical"), "Anything with mass and a material.");
+    /* examples/workshop is the same content, split by topic (make examples) */
+    {
+        const char *files[] = { "examples/workshop/blueprints.tri", "examples/workshop/levers.tri",
+                                "examples/workshop/operations.tri", "examples/workshop/rooms.tri",
+                                "examples/workshop/things.tri" };
+        TriContent *ex = tri_content_load(files, sizeof files / sizeof *files);
+        CHECK(tri_content_ok(ex));
+        CHECK(tri_content_hash(ex) == tri_content_hash(c));
+        if (tri_content_hash(ex) != tri_content_hash(c))
+            fprintf(stderr, "    examples/workshop differs from docs/GUIDE.md: run make examples\n");
+        CHECK_STR(tri_doc(ex, "loosen"), "Turn a tight nut loose with a wrench that fits it.");
+        tri_content_free(ex);
+    }
     /* §4–5: specs, defaults, the inspector */
     CHECK_STR(printed(c, tri_spec(c, "wrench_19")), "#Wrench & { mass: 850g, material: \"steel\", size: 19mm, wear: 0 }");
     CHECK_STR(printed(c, tri_at(c, tri_spec(c, "hammer"), "material")), "#Material");
