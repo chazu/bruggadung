@@ -20,6 +20,17 @@ void x_print(Buf *b, const X *x)
                     x->u.bound.op == B_GT ? ">" : "<");
         units_format(b, x->u.bound.dim, x->u.bound.q);
         break;
+    case X_INTERP:
+        buf_putc(b, '"');
+        for (int i = 0; i <= x->u.in.n; i++) {
+            string_escape_into(b, x->u.in.lits[i], strlen(x->u.in.lits[i]));
+            if (i == x->u.in.n) break;
+            buf_puts(b, "\\(");
+            x_print(b, x->u.in.parts[i]);
+            buf_putc(b, ')');
+        }
+        buf_putc(b, '"');
+        break;
     case X_REGEX:
         buf_puts(b, x->u.rx.neg ? "!~" : "=~");
         buf_puts(b, x->u.rx.pat);

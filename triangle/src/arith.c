@@ -302,5 +302,7 @@ void arith_tags(const X *x, SymVec *out)
     } else if (x->k == X_ARITH) {
         arith_tags(x->u.ar.a, out);
         arith_tags(x->u.ar.b, out);
+    } else if (x->k == X_INTERP) {
+        for (int i = 0; i < x->u.in.n; i++) arith_tags(x->u.in.parts[i], out);
     }
 }

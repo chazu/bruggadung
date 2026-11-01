@@ -237,6 +237,34 @@ void test_regex_matching(void)
         CHECK(m == rows[i].want);
         if (m == TRI_UNKNOWN) CHECK(r.nresidual == 1 && !strcmp(r.residual[0], "label"));
     }
+    /* residuals don't depend on where constraint sets happen to be in memory:
+     * many sets, made before and after the pattern's, all leave label open */
+    for (int i = 0; i < 40; i++) {
+        char d[128];
+        snprintf(d, sizeof d, "#Thing & { label: =~\"^ab%c\" & !~\"[0-9]\" }", 'a' + i % 26);
+        TriMatchResult rr;
+        const TriNode *dn = tri_value(c, d, a, err, sizeof err);
+        CHECK(tri_match(c, pat, dn, &rr) == TRI_UNKNOWN);
+        CHECK(rr.nresidual == 1 && !strcmp(rr.residual[0], "label"));
+    }
+    /* the same, with the description's set interned before the pattern's */
+    {
+        const char *names[] = { "s.tri" };
+        const char *srcs[] = {
+            "#Thing: { label: text }\n"
+            "early: #Thing & { label: =~\"^abc\" & !~\"[0-9]\" }\n"
+            "late: #Thing & { label: =~\"^ab\" & !~\"9\" }\n" };
+        TriContent *c2 = load(names, srcs, 1);
+        TriArena *a2 = tri_arena_new();
+        TriMatchResult rr;
+        const TriNode *dn = tri_value(c2, "#Thing & { label: =~\"^abc\" & !~\"[0-9]\" }", a2, err, sizeof err);
+        CHECK(tri_match(c2, tri_pattern(c2, "late"), dn, &rr) == TRI_UNKNOWN);
+        CHECK(rr.nresidual == 1 && !strcmp(rr.residual[0], "label"));
+        CHECK(tri_match(c2, tri_pattern(c2, "early"), tri_value(c2, "#Thing & { label: =~\"^ab\" & !~\"9\" }", a2, err, sizeof err), &rr) == TRI_UNKNOWN);
+        CHECK(rr.nresidual == 1 && !strcmp(rr.residual[0], "label"));
+        tri_arena_free(a2);
+        tri_content_free(c2);
+    }
     /* a regex in a pattern against an atom: by its name */
     const TriNode *code = tri_pattern(c, "p_code");
     TriMatchResult r;
@@ -300,6 +328,93 @@ void test_regex_errors(void)
         { "#N: { s: text }\nn: #N & { s: = \"x\" }\n", "unexpected '='; did you mean ':' or '=~'?" },
         { "#N: { s: text }\nn: #N & { s: =~#\"(?=a)\"# }\n", "lookaround is not supported" },
         { "#N: { s: text }\nn: #N & { s: \"abc\" & !~\"b\" }\n", "conflict at s: \"abc\" vs !~\"b\"" },
+    };
+    for (size_t i = 0; i < sizeof cases / sizeof *cases; i++) {
+        TriContent *c = load1(cases[i].src);
+        CHECK(!tri_content_ok(c));
+        if (!has_diag(c, cases[i].diag, 1)) { fprintf(stderr, "    case %zu:\n", i); dump_diags(c); }
+        CHECK(has_diag(c, cases[i].diag, 1));
+        tri_content_free(c);
+    }
+}
+
+/* --- interpolation ---------------------------------------------------------------------- */
+
+static const char *in_content =
+    "#Tone: \"dark\" | \"light\"\n"
+    "#Shade: \"dark_red\" | \"light_red\"\n"
+    "#Person: { given: text & $f, family: text & $l, full: \"\\($f) \\($l)\" }\n"
+    "#Bolt: { size: length & $s, count: int & $n, label: \"M\\($s) x\\($n * 2)\" }\n"
+    "#Paint: { tone: #Tone & $t, shade: #Shade & \"\\($t)_red\" }\n"
+    "ada: #Person & { given: \"Ada\", family: \"Lovelace\" }\n"
+    "bolt: #Bolt & { size: 19mm, count: 3 }\n"
+    "paint: #Paint & { tone: \"dark\" }\n"
+    "any_paint: #Paint\n"
+    "#Note: { says: text }\n"
+    "constant: #Note & { says: \"a\\(1 + 2)b \\(\"(x)\")\" }\n"
+    "raw: #Note & { says: #\"\\(not this) but \\#(\"this\")\"# }\n"
+    "escaped: #Note & { says: \"\\\\(not interpolated)\" }\n";
+
+void test_interpolation(void)
+{
+    TriContent *c = load1_ok(in_content);
+    CHECK_STR(text_of(c, tri_at(c, tri_spec(c, "ada"), "full")), "Ada Lovelace");
+    CHECK_STR(text_of(c, tri_at(c, tri_spec(c, "bolt"), "label")), "M19mm x6");
+    /* a result some enum lists is its atom */
+    const TriNode *shade = tri_at(c, tri_spec(c, "paint"), "shade");
+    CHECK(tri_node_type(shade) == tri_type_named(c, "\"dark_red\""));
+    /* constants, strings with parentheses inside, raw strings, and \\( escaped */
+    CHECK_STR(text_of(c, tri_at(c, tri_spec(c, "constant"), "says")), "a3b (x)");
+    CHECK_STR(text_of(c, tri_at(c, tri_spec(c, "raw"), "says")), "\\(not this) but this");
+    CHECK_STR(text_of(c, tri_at(c, tri_spec(c, "escaped"), "says")), "\\(not interpolated)");
+    /* construction from a seed: the shade follows whichever tone is drawn */
+    TriArena *a = tri_arena_new();
+    for (uint64_t seed = 1; seed <= 6; seed++) {
+        const TriNode *p = tri_construct(c, "any_paint", seed, a);
+        CHECK(p != NULL);
+        char tone[32], sh[32];
+        tri_text(c, tri_at(c, p, "tone"), tone, sizeof tone);
+        tri_text(c, tri_at(c, p, "shade"), sh, sizeof sh);
+        char want[40];
+        snprintf(want, sizeof want, "%s_red", tone);
+        CHECK_STR(sh, want);
+    }
+    /* runtime values, and unification that makes the parts concrete */
+    char err[256] = "";
+    const TriNode *v = tri_value(c, "#Person & { given: \"A\", family: \"B\" }", a, err, sizeof err);
+    CHECK_STR(text_of(c, tri_at(c, v, "full")), "A B");
+    const TriNode *half = tri_value(c, "#Person & { given: \"Grace\" }", a, err, sizeof err);
+    CHECK(half && tri_text(c, tri_at(c, half, "full"), NULL, 0) == (size_t) -1);
+    TriFailure f;
+    const TriNode *u = tri_unify(c, half, tri_value(c, "#Person & { family: \"Hopper\" }", a, err, sizeof err), a, &f);
+    CHECK(u != NULL);
+    CHECK_STR(text_of(c, tri_at(c, u, "full")), "Grace Hopper");
+    /* and a conflict with what it gives */
+    CHECK(tri_unify(c, u, tri_value(c, "#Person & { full: \"Grace Brewster\" }", a, err, sizeof err), a, &f) == NULL);
+    tri_arena_free(a);
+    tri_content_free(c);
+
+    /* content that contradicts what an interpolation gives */
+    char src[2048];
+    snprintf(src, sizeof src, "%swrong: #Person & { given: \"Ada\", family: \"Byron\", full: \"Ada Lovelace\" }\n", in_content);
+    c = load1(src);
+    CHECK(!tri_content_ok(c));
+    CHECK(has_diag(c, "full", 1));
+    tri_content_free(c);
+}
+
+void test_interpolation_errors(void)
+{
+    static const struct { const char *src, *diag; } cases[] = {
+        { "#N: { s: text }\nn: #N & { s: \"a\\(1 + )b\" }\n", "s.tri:2:22: error: expected a value" },
+        { "#N: { s: text }\nn: #N & { s: \"a\\(1 b\" }\n", "s.tri:2:16: error: unterminated interpolation" },
+        { "#N: { s: text }\nn: #N & { s: \"a\\()b\" }\n", "an empty interpolation" },
+        { "#N: { s: text }\nn: #N & { s: \"a\\(1) \\(2 3)\" }\n", "s.tri:2:25: error: unexpected input in an interpolation" },
+        { "#N: { s: text }\nn: #N & { s: \"\\($x)\" }\n", "the tag $x in an interpolation is not bound to a field" },
+        { "#N: { s: text, t: _ & $t }\nn: #N & { t: $t & { s: \"x\" }, s: \"\\($t)\" }\n", "a structure can't be interpolated" },
+        { "#N: { s: text }\nn: #N & { s: =~\"\\(1)\" }\n", "a regex can't be interpolated" },
+        { "#E: \"x\" | \"y\"\n\"\\(1)\": \"z\"\n", "a declaration's label can't be interpolated" },
+        { "#N: { s: text }\nn: #N & { s: \"\\({ a: 1 })\" }\n", "only tags, strings, numbers and arithmetic can be interpolated" },
     };
     for (size_t i = 0; i < sizeof cases / sizeof *cases; i++) {
         TriContent *c = load1(cases[i].src);

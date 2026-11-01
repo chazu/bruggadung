@@ -414,6 +414,23 @@ static Tok lex_one(const char *s, size_t i, int *depth)
         j++;
         while (s[j] && s[j] != '\n') {
             if (s[j] == '"' && hashes_at(s + j + 1, hashes)) { j += 1 + hashes; break; }
+            if (s[j] == '\\' && hashes_at(s + j + 1, hashes) && s[j + 1 + hashes] == '(') {
+                /* \(expr): to its ')', over any strings inside */
+                j += 2 + hashes;
+                int d = 1;
+                while (s[j] && s[j] != '\n' && d) {
+                    if (s[j] == '"') {
+                        j++;
+                        while (s[j] && s[j] != '"' && s[j] != '\n') { if (s[j] == '\\' && s[j + 1]) j++; j++; }
+                        if (s[j] == '"') j++;
+                        continue;
+                    }
+                    if (s[j] == '(') d++;
+                    else if (s[j] == ')') d--;
+                    j++;
+                }
+                continue;
+            }
             if (s[j] == '\\' && hashes_at(s + j + 1, hashes) && s[j + 1 + hashes] && s[j + 1 + hashes] != '\n')
                 j += 1 + hashes;
             j++;

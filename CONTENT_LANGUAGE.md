@@ -193,15 +193,19 @@ Three constructs look like CUE but mean something else:
    specific type wins. Only defaults from incomparable types that conflict
    are dropped, with a warning.
 
-**Not adopted from CUE:** comprehensions, string interpolation, field
-references, and `let`. Arithmetic is adopted, but between tags rather than
-field references (§5). Packages are adopted for names only (decision 12):
-a `package` scopes types, instances, and components, and features stay
-global; files are otherwise simply included.
+**Not adopted from CUE:** comprehensions, field references, and `let`.
+Arithmetic is adopted, but between tags rather than field references (§5).
+Packages are adopted for names only (decision 12): a `package` scopes
+types, instances, and components, and features stay global; files are
+otherwise simply included.
 
 **Adopted later from CUE, for usability:** string escapes and raw strings
-(`#"..."#`), and regex constraints (`=~`, `!~`, RE2 syntax). They change
-nothing for content without them. A string means its contents, so every
+(`#"..."#`), regex constraints (`=~`, `!~`, RE2 syntax), and string
+interpolation (`"\($g) \($f)"`). They change nothing for content without
+them. Interpolation is arithmetic's mechanism with a string for a result: a
+constraint between tagged values, made concrete when they are, so it never
+needs references between fields; its result is an atom when an enum lists
+it, as any string is. A string means its contents, so every
 spelling of the same contents is one atom or text, interned in one canonical
 spelling that reads back as itself; that also lets runtime text with quotes
 or newlines survive printing and parsing. A regex is a constraint carried by

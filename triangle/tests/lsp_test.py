@@ -223,6 +223,13 @@ def main(exe):
     r = s.request("textDocument/hover", {"textDocument": {"uri": suri},
                                          "position": pos(STRINGS, "wrench")})["result"]
     check(r is None, "a quote escaped in a string doesn't end it")
+    INTERP = STRINGS + 't4: #Tag & { note: "a \\(" #Tag ") b", mark: "plain" }\n'
+    s.notify("textDocument/didChange", {"textDocument": {"uri": suri, "version": 2},
+                                        "contentChanges": [{"text": INTERP}]})
+    check(s.diagnostics(suri) == [], "an interpolation with a string inside loads")
+    r = s.request("textDocument/references", {"textDocument": {"uri": suri}, "position": pos(INTERP, "#Tag"),
+                                              "context": {"includeDeclaration": True}})["result"]
+    check(len(r) == 4, "a name inside an interpolation's string is not a reference (%d)" % len(r))
     BADRX = STRINGS + 't3: #Tag & { note: =~#"(ab"# , mark: "plain" }\n'
     s.notify("textDocument/didChange", {"textDocument": {"uri": suri, "version": 2},
                                         "contentChanges": [{"text": BADRX}]})

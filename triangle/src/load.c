@@ -40,6 +40,9 @@ typedef struct {
     ArithVec ariths; /* arithmetic met while building; tags resolved afterwards */
 } Build;
 
+static const char *interp_eval(Content *c, const X *x, void *lookup, Buf *out);
+static TriNode *string_node(Content *c, TriArena *a, const char *bytes, size_t n);
+
 static void free_ariths(ArithVec *v)
 {
     for (size_t i = 0; i < v->n; i++) {
@@ -292,6 +295,29 @@ static TriNode *build_raw(Build *b, X *x)
         int64_t lo, hi;
         numeric_interval(b, x, &dim, &lo, &hi);
         return leaf_new(c, c->scratch, c->dimtype[dim], lo, hi);
+    }
+    case X_INTERP: {
+        SymVec names = { 0 };
+        arith_tags(x, &names);
+        bool tagged = names.n > 0;
+        VEC_FREE(names);
+        if (!tagged) {                       /* nothing to wait for: the string now */
+            Buf sb = { 0 };
+            const char *err = interp_eval(c, x, NULL, &sb);
+            if (err) {
+                build_error(b, x->loc, "%s", err == ARITH_UNKNOWN ? "an interpolation that is not concrete" : err);
+                buf_free(&sb);
+                return NULL;
+            }
+            TriNode *n = string_node(c, c->scratch, sb.s ? sb.s : "", sb.len);
+            buf_free(&sb);
+            return n;
+        }
+        /* like arithmetic: a constraint on this field, once its tags are concrete */
+        ArithRec r = { { 0 }, x, { 0 } };
+        for (size_t i = 0; i < b->path.n; i++) VEC_PUSH(r.path, b->path.v[i]);
+        VEC_PUSH(b->ariths, r);
+        return node_new(c, c->scratch, c->top);
     }
     case X_REGEX: {
         const RxSet *set = rx_single(c, x->u.rx.pat, x->u.rx.neg, NULL, 0);
@@ -937,7 +963,8 @@ static bool resolve_ariths(Content *c, Build *b, TriNode *out, ArithVec *dst, Lo
                 found = tp.path.n > 0 && !(tp.path.n == 1 && tp.path.v[0] == TRI_BOTTOM);
             }
             if (!found) {
-                diag(c, true, loc, "%s: the tag %s in arithmetic is not bound to a field", who, names.v[t]);
+                diag(c, true, loc, "%s: the tag %s in %s is not bound to a field", who, names.v[t],
+                     r.expr->k == X_INTERP ? "an interpolation" : "arithmetic");
                 ok = false;
             }
             VEC_PUSH(r.tags, tp);
@@ -1002,6 +1029,84 @@ static bool arith_lookup(void *ctx, Sym tag, Quantity *q)
         return true;
     }
     return false;
+}
+
+/* --- interpolation --------------------------------------------------------------------------- */
+
+/* A string's value as content would write it: an atom if some enum lists it,
+ * else text. */
+static TriNode *string_node(Content *c, TriArena *a, const char *bytes, size_t n)
+{
+    Sym v = string_canonical(c, bytes, n);
+    uint32_t t = type_lookup(c, v);
+    if (!c->tdl && (t == TRI_BOTTOM || (c->types.v[t].kind == TK_ATOM && c->types.v[t].parents.n == 1 &&
+                                        c->types.v[t].parents.v[0] == c->atomroot)))
+        return leaf_new(c, a, c->dimtype[DIM_TEXT], (int64_t) (intptr_t) v, (int64_t) (intptr_t) v);
+    return node_new(c, a, t);
+}
+
+static TriNode *tag_node(ALookup *l, Sym tag)
+{
+    for (size_t i = 0; i < l->use->rec->tags.n; i++)
+        if (l->use->rec->tags.v[i].name == tag)
+            return node_at_prefixed(l->root, &l->use->prefix, &l->use->rec->tags.v[i].path);
+    return NULL;
+}
+
+/* Writes a value's text: a string's contents, an atom's name, a number as
+ * content writes it. ARITH_UNKNOWN while it isn't concrete. */
+static const char *node_text(Content *c, TriNode *n, Buf *out)
+{
+    if (n->flags & NF_DIM) {
+        if (n->lo != n->hi) return ARITH_UNKNOWN;
+        int dim = c->types.v[n->type].dim;
+        if (dim == DIM_TEXT) string_decode((const char *) (intptr_t) n->lo, out);
+        else units_format(out, dim, n->lo);
+        return NULL;
+    }
+    TypeInfo *ti = &c->types.v[n->type];
+    if (n->narcs || ti->feats.n) return "a structure can't be interpolated into a string";
+    if (ti->kind == TK_ATOM && is_leaf(c, n->type)) { string_decode(ti->name, out); return NULL; }
+    if (n->type == c->top) return ARITH_UNKNOWN;
+    const U32Vec *leaves = enum_leaves(c, n->type);
+    for (size_t i = 0; i < leaves->n; i++)
+        if (c->types.v[leaves->v[i]].kind != TK_ATOM) return "only strings, atoms and numbers can be interpolated";
+    return ARITH_UNKNOWN;                    /* an enum: an atom of it, once known */
+}
+
+static bool arith_lookup(void *ctx, Sym tag, Quantity *q);
+
+/* Writes an interpolated string. lookup is an ALookup, or NULL when it has
+ * no tags. Returns NULL, ARITH_UNKNOWN until every part is concrete, or what
+ * is wrong. */
+static const char *interp_eval(Content *c, const X *x, void *lookup, Buf *out)
+{
+    ALookup *l = lookup;
+    buf_puts(out, "");
+    for (int i = 0; i <= x->u.in.n; i++) {
+        buf_puts(out, x->u.in.lits[i]);
+        if (i == x->u.in.n) break;
+        const X *e = x->u.in.parts[i];
+        const char *err = NULL;
+        if (e->k == X_ATOM) string_decode(e->u.name, out);
+        else if (e->k == X_INTERP) err = interp_eval(c, e, lookup, out);
+        else if (e->k == X_TAG) {
+            TriNode *n = l ? tag_node(l, e->u.name) : NULL;
+            err = n ? node_text(c, n, out) : ARITH_UNKNOWN;
+        } else if (e->k == X_NUM || e->k == X_ARITH) {
+            Quantity q;
+            err = arith_eval(e, arith_lookup, l, &q);
+            if (!err && q.lo != q.hi) err = ARITH_UNKNOWN;
+            if (!err) {
+                int dim = q.dim >= 0 ? q.dim : quantity_kind_for(&q);
+                Quantity conv;
+                if (dim < 0 || quantity_to(&q, dim, &conv)) err = "no quantity has this dimension";
+                else units_format(out, dim, conv.lo);
+            }
+        } else err = "only tags, strings, numbers and arithmetic can be interpolated";
+        if (err) return err;
+    }
+    return NULL;
 }
 
 /* Backward narrowings found while settling: each tag's new interval. The
@@ -1070,6 +1175,25 @@ static TriNode *settle_arith(Content *c, TriNode *root, const ArithVec *extra, T
         for (size_t i = 0; i < uses.n && ok; i++) {
             ArithUse *u = &uses.v[i];
             ALookup l = { root, u, c };
+            if (u->rec->expr->k == X_INTERP) {
+                Buf sb = { 0 };
+                const char *ierr = interp_eval(c, u->rec->expr, &l, &sb);
+                if (ierr == ARITH_UNKNOWN) { buf_free(&sb); continue; }
+                if (ierr) { set_arith_failure(c, fail, &u->prefix, &u->rec->path, u->rec, ierr); buf_free(&sb); ok = false; break; }
+                TriNode *val = string_node(c, c->scratch, sb.s ? sb.s : "", sb.len);
+                buf_free(&sb);
+                TriNode *t = node_at_prefixed(root, &u->prefix, &u->rec->path);
+                if (!t) continue;
+                bool same = (val->flags & NF_DIM) ? ((t->flags & NF_DIM) && t->lo == t->hi && t->lo == val->lo)
+                                                  : (!(t->flags & NF_DIM) && t->type == val->type);
+                if (same) continue;
+                U32Vec full = { 0 };
+                for (size_t k = 0; k < u->prefix.n; k++) VEC_PUSH(full, u->prefix.v[k]);
+                for (size_t k = 0; k < u->rec->path.n; k++) VEC_PUSH(full, u->rec->path.v[k]);
+                VEC_PUSH(where, full);
+                VEC_PUSH(vals, val);
+                continue;
+            }
             Quantity q;
             const char *err = arith_eval(u->rec->expr, arith_lookup, &l, &q);
             if (err == ARITH_UNKNOWN) continue;
@@ -1641,11 +1765,13 @@ static bool collect_variation(Content *c, TriNode *n, U32Vec *path, PathVec *out
     if (n->flags & NF_DIM) return ok;
     for (uint32_t i = 0; i < n->narcs; i++) {
         TriNode *v = n->arcs[i].val;
-        /* a derived number (@fn, or arithmetic) is computed, not drawn */
-        if ((v->flags & NF_DIM) && v->lo != v->hi &&
-            (field_attr(c, n->type, n->arcs[i].feat, "fn") || arith_target(c, n->type, n->arcs[i].feat)))
+        /* a derived value (@fn, arithmetic, or an interpolation, which may be an
+         * enum's atom) is computed, not drawn */
+        bool open = !(v->flags & NF_DIM) || v->lo != v->hi;
+        if (open && (((v->flags & NF_DIM) && field_attr(c, n->type, n->arcs[i].feat, "fn")) ||
+                     arith_target(c, n->type, n->arcs[i].feat)))
             continue;
-        if ((v->flags & NF_DIM) && v->lo != v->hi && c->varskip) {
+        if (open && c->varskip) {
             bool skip = false;
             for (size_t q = 0; q < c->varskip->n && !skip; q++) {
                 const U32Vec *tp = &c->varskip->v[q].path;
@@ -2648,7 +2774,9 @@ static void residuals(Content *c, TriNode *pattern, TriNode *desc, TriMatchResul
     for (size_t i = 0; i < occ.n; i++) {
         Occ *o = &occ.v[i];
         bool open;
-        if (o->p->flags & NF_DIM)
+        if ((o->p->flags & NF_DIM) && c->types.v[o->p->type].dim == DIM_TEXT)
+            open = !below(c, o->d, o->p);      /* text compares by its constraints, never by address */
+        else if (o->p->flags & NF_DIM)
             open = !((o->d->flags & NF_DIM) && o->d->lo >= o->p->lo && o->d->hi <= o->p->hi);
         else
             open = !is_subtype(c, o->d->type, o->p->type);

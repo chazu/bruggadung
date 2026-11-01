@@ -94,6 +94,33 @@ fences and the backslashes inside become punctuation."
               (while (search-forward "\\" quote-end t)
                 (put-text-property (1- (point)) (point) 'syntax-table (string-to-syntax "."))))))))))
 
+(defun triangle--syntax-propertize-interpolations (start end)
+  "Keep strings inside \\(...) interpolations between START and END.
+Their quotes become punctuation, so the enclosing string goes on."
+  (goto-char start)
+  (while (re-search-forward "\\\\#*(" end t)
+    (when (save-excursion (nth 3 (syntax-ppss (match-beginning 0))))
+      (let ((depth 1))
+        (while (and (> depth 0) (not (eolp)) (< (point) (point-max)))
+          (let ((ch (char-after)))
+            (cond
+             ((eq ch ?\")
+              (put-text-property (point) (1+ (point)) 'syntax-table (string-to-syntax "."))
+              (forward-char)
+              (while (and (not (eolp)) (not (eq (char-after) ?\")))
+                (forward-char (if (eq (char-after) ?\\) 2 1)))
+              (when (eq (char-after) ?\")
+                (put-text-property (point) (1+ (point)) 'syntax-table (string-to-syntax "."))
+                (forward-char)))
+             ((eq ch ?\() (setq depth (1+ depth)) (forward-char))
+             ((eq ch ?\)) (setq depth (1- depth)) (forward-char))
+             (t (forward-char)))))))))
+
+(defun triangle--syntax-propertize-all (start end)
+  "Mark raw strings, then interpolations, between START and END."
+  (triangle--syntax-propertize start end)
+  (triangle--syntax-propertize-interpolations start end))
+
 ;;; Highlighting
 
 (defconst triangle-builtin-types
@@ -137,8 +164,8 @@ fences and the backslashes inside become punctuation."
     ;; quantities: 19mm, 0.85kg, -3
     ("\\(?:^\\|[^A-Za-z0-9_.#$]\\)\\(-?[0-9]+\\(?:\\.[0-9]+\\)?[A-Za-z0-9]*\\)"
      1 ',(triangle--face 'font-lock-number-face 'font-lock-constant-face))
-    ;; escapes inside strings: \n, \", \u00e9, and in raw strings \#n
-    ("\\\\#*\\(?:[abfnrtv\\\\/\"]\\|u[0-9A-Fa-f]\\{4\\}\\|U[0-9A-Fa-f]\\{8\\}\\)"
+    ;; escapes inside strings: \n, \", \u00e9, \( for interpolation, and in raw strings \#n
+    ("\\\\#*\\(?:[abfnrtv\\\\/\"(]\\|u[0-9A-Fa-f]\\{4\\}\\|U[0-9A-Fa-f]\\{8\\}\\)"
      0 (when (save-excursion (nth 3 (syntax-ppss (match-beginning 0))))
          ',(triangle--face 'font-lock-escape-face 'font-lock-regexp-grouping-backslash))
      prepend)
@@ -249,7 +276,7 @@ Diagnostics appear in a compilation buffer, where \\[next-error] visits them."
   (setq-local comment-end "")
   (setq-local comment-start-skip "//+\\s-*")
   (setq-local font-lock-defaults '(triangle-font-lock-keywords))
-  (setq-local syntax-propertize-function #'triangle--syntax-propertize)
+  (setq-local syntax-propertize-function #'triangle--syntax-propertize-all)
   (setq-local indent-line-function #'triangle-indent-line)
   (setq-local indent-tabs-mode nil)     ; content aligns columns
   (setq-local electric-indent-chars (append "{}[]()" electric-indent-chars))

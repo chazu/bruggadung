@@ -247,23 +247,28 @@ void u64map_free(U64Map *m)
 
 /* --- strings ---------------------------------------------------------------------- */
 
+void string_escape_into(Buf *b, const char *bytes, size_t n)
+{
+    for (size_t i = 0; i < n; i++) {
+        unsigned char ch = (unsigned char) bytes[i];
+        switch (ch) {
+        case '"':  buf_puts(b, "\\\""); break;
+        case '\\': buf_puts(b, "\\\\"); break;
+        case '\n': buf_puts(b, "\\n"); break;
+        case '\t': buf_puts(b, "\\t"); break;
+        case '\r': buf_puts(b, "\\r"); break;
+        default:
+            if (ch < 0x20 || ch == 0x7f) buf_printf(b, "\\u%04x", ch);
+            else buf_putc(b, (char) ch);
+        }
+    }
+}
+
 Sym string_canonical(Content *c, const char *bytes, size_t n)
 {
     Buf b = { 0 };
     buf_putc(&b, '"');
-    for (size_t i = 0; i < n; i++) {
-        unsigned char ch = (unsigned char) bytes[i];
-        switch (ch) {
-        case '"':  buf_puts(&b, "\\\""); break;
-        case '\\': buf_puts(&b, "\\\\"); break;
-        case '\n': buf_puts(&b, "\\n"); break;
-        case '\t': buf_puts(&b, "\\t"); break;
-        case '\r': buf_puts(&b, "\\r"); break;
-        default:
-            if (ch < 0x20 || ch == 0x7f) buf_printf(&b, "\\u%04x", ch);
-            else buf_putc(&b, (char) ch);
-        }
-    }
+    string_escape_into(&b, bytes, n);
     buf_putc(&b, '"');
     Sym r = sym_intern(&c->syms, b.s, b.len);
     buf_free(&b);

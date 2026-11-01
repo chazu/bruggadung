@@ -18,6 +18,7 @@ reference is a bug.
 - [Disjunction and variation](#disjunction-and-variation)
 - [Tags](#tags)
 - [Arithmetic](#arithmetic)
+- [Interpolation](#interpolation)
 - [Definite clauses](#definite-clauses)
 - [Runtime values](#runtime-values)
 - [Loading](#loading)
@@ -43,7 +44,8 @@ Source files have the extension `.tri` and are read as bytes.
 | Punctuation | `: , { } [ ] ( ) & \| * + / - ... >= <= > <` | |
 | Comment | `//` to the end of the line | |
 
-**Escapes.** In a string, `\a` `\b` `\f` `\n` `\r` `\t` `\v` are the control
+**Escapes.** In a string, `\(…)` interpolates ([below](#interpolation)),
+`\a` `\b` `\f` `\n` `\r` `\t` `\v` are the control
 characters, `\\` `\/` `\"` are themselves, `\u` takes four hex digits, and `\U`
 eight; both name a Unicode scalar value, written to the string as UTF-8. Any
 other escape is an error, and so is U+0000.
@@ -188,6 +190,7 @@ file without one is in the root. Many files may declare the same package.
 | `ref(12)` | A referent handle. It unifies only with itself. |
 | `true`, `false` | The two atoms of `bool`. |
 | `$a + $b`, `$f * $a` | Arithmetic: a constraint between tagged values. |
+| `"\($given) \($family)"` | Interpolation: a string made from tagged values once they are concrete. |
 | `=~"^ab"`, `!~#"\d"#` | A string that matches, or doesn't match, a regular expression ([below](#regular-expressions)). |
 
 ## Built-in types
@@ -389,6 +392,39 @@ exempt.
 - It applies everywhere structures are made: type expansions, patterns,
   specs, construction, runtime values, unification, and clause resolution.
 
+## Interpolation
+
+`\(expr)` in a string puts a value's text there, as in CUE. It works like
+arithmetic: a constraint on its field, made concrete once its tags are.
+
+```cue
+#Person: { given: text & $g, family: text & $f, full: "\($g) \($f)" }
+#Bolt:   { size: length & $s, count: int & $n, label: "M\($s) x\($n * 2)" }
+#Paint:  { tone: #Tone & $t, shade: #Shade & "\($t)_red" }
+
+ada:  #Person & { given: "Ada", family: "Lovelace" }   // full: "Ada Lovelace"
+bolt: #Bolt & { size: 19mm, count: 3 }                // label: "M19mm x6"
+```
+
+- An interpolated expression is a tag, a string, a number, or arithmetic
+  (`\($n * 2)`). Every tag must also be bound to a field of the same
+  declaration.
+- A value's text is a string's contents, an atom's name, or a number as
+  content writes it (`19mm`, `3`, `ref(12)`). A structure is an error.
+- The result is a string like any other: an atom if some enum lists it, so
+  `"\($t)_red"` is the atom `"dark_red"` of `#Shade`, and otherwise `text`.
+- While a part isn't concrete, the field stays as it is: open `text`, or the
+  enum it is declared as. A field computed by interpolation is never a
+  variation point. Construction draws the parts, then the string follows.
+- With no tags, it is made at load: `"a\(1 + 2)b"` is `"a3b"`.
+- It applies where arithmetic does: type expansions, patterns, specs,
+  construction, runtime values, and unification. A value that contradicts
+  what an interpolation gives is a conflict.
+- In a raw string, `\#(…)` interpolates (as many `#`s as opened it), and
+  `\(` is ordinary text. In an ordinary string, `\\(` is a backslash and a
+  parenthesis.
+- A regex and a declaration's label can't be interpolated.
+
 ## Definite clauses
 
 When a source mentions `#Clause` or `#Fact`, the loader adds:
@@ -470,7 +506,8 @@ location of the other declaration where there is one.
 | `unterminated string`, `unterminated struct`, `unterminated attribute` | A missing closing `"`, `}`, or `)`. |
 | `unknown escape in a string; …`, `\u takes four hex digits`, `\U takes eight hex digits` | An escape not in the table, or a short code. |
 | `not a Unicode scalar value`, `a string may not contain U+0000` | A `\u`/`\U` code that is a surrogate, past U+10FFFF, or zero. |
-| `string interpolation is not supported` | `\(` in a string. |
+| `unterminated interpolation: \( without its )`, `an empty interpolation: \()`, `unexpected input in an interpolation` | A malformed `\(…)`. Errors inside one point into it. |
+| `a regex can't be interpolated`, `a declaration's label can't be interpolated` | |
 | `… (in a regex, write a raw string such as #"\d+"#, or double the backslash)` | A regex escape such as `\d` in an ordinary string. |
 | `bad regular expression: …` | The expression doesn't parse: `missing )`, `lookaround is not supported (RE2 syntax)`, and so on. |
 | `expected a string after =~ or !~` | |
@@ -482,6 +519,13 @@ location of the other declaration where there is one.
 | `unknown unit: 3furlong` | A unit not in the table. |
 | `literal is not a whole number of quanta: 0.05mm` | The value can't be represented exactly. |
 | `malformed number`, `number out of range`, `quantity out of range` | |
+
+**Interpolation**
+
+| Message | Cause |
+| --- | --- |
+| `the tag $t in an interpolation is not bound to a field` | A tag only the string uses. |
+| `a structure can't be interpolated into a string`, `only tags, strings, numbers and arithmetic can be interpolated` | |
 
 **Regular expressions**
 

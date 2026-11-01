@@ -16,8 +16,13 @@ typedef struct {
     Loc loc;
     Sym attr_name;     /* T_ATTR */
     char *attr_args;
-    Sym str;           /* T_STRING: its canonical spelling (string_canonical) */
+    Sym str;           /* T_STRING: its canonical spelling (string_canonical); NULL if interpolated */
+    int ninterp;       /* T_STRING: its \(...) parts, between ninterp + 1 literal pieces */
+    const char **ilits;
+    struct IPart *iparts;
 } Tok;
+
+struct IPart { const char *src; size_t len; Loc loc; };   /* an interpolation's source, where it starts */
 
 typedef struct { int line; const char *s; size_t len; } Comment;   /* a comment alone on its line */
 
@@ -28,6 +33,8 @@ typedef struct {
     size_t pos;
     bool error;
     VEC(Comment) comments;
+    struct { const char **v; size_t n, cap; } ilits;     /* scratch while lexing an interpolated string */
+    struct { struct IPart *v; size_t n, cap; } iparts;
 } Parser;
 
 static void perr(Parser *p, Loc loc, const char *msg)
@@ -42,6 +49,15 @@ static bool operand_end(TokKind k)
 {
     return k == T_NUMBER || k == T_IDENT || k == T_DEF || k == T_TAG || k == T_STRING || k == T_RPAREN ||
            k == T_RBRACE || k == T_RBRACK;
+}
+
+/* A literal piece of an interpolated string, kept with the content. */
+static const char *piece(Parser *p, const char *s, size_t n)
+{
+    char *r = arena_alloc(p->c->load, n + 1);
+    if (n) memcpy(r, s, n);
+    r[n] = 0;
+    return r;
 }
 
 /* #"..."#: one or more #s, then a quote */
@@ -108,9 +124,15 @@ static const char *string_escape(const char **sp, Buf *out)
     return NULL;
 }
 
+static bool lex_at(Parser *p, const char *src, int line, int col);
+
 static bool lex(Parser *p, const char *src)
 {
-    int line = 1, col = 1;
+    return lex_at(p, src, 1, 1);
+}
+
+static bool lex_at(Parser *p, const char *src, int line, int col)
+{
     const char *s = src;
 #define ADV() do { if (*s == '\n') { line++; col = 1; } else col++; s++; } while (0)
     while (*s) {
@@ -184,6 +206,31 @@ static bool lex(Parser *p, const char *src)
                 Loc eloc = { p->file, line, col };
                 ADV();
                 for (int k = 0; k < hashes; k++) ADV();
+                if (*s == '(') {
+                    /* \(expr): the literal so far is a piece; the expression runs to its ')' */
+                    ADV();
+                    VEC_PUSH(p->ilits, piece(p, raw.s, raw.len));
+                    raw.len = 0;
+                    raw.s[0] = 0;
+                    struct IPart part = { s, 0, { p->file, line, col } };
+                    int depth = 1;
+                    while (*s && *s != '\n' && depth) {
+                        if (*s == '"') {                        /* a string inside: skip it whole */
+                            ADV();
+                            while (*s && *s != '"' && *s != '\n') { if (*s == '\\' && s[1]) ADV(); ADV(); }
+                            if (*s == '"') ADV();
+                            continue;
+                        }
+                        if (*s == '(') depth++;
+                        if (*s == ')' && --depth == 0) break;
+                        ADV();
+                    }
+                    if (*s != ')') { buf_free(&raw); perr(p, eloc, "unterminated interpolation: \\( without its )"); return false; }
+                    part.len = (size_t) (s - part.src);
+                    ADV();
+                    VEC_PUSH(p->iparts, part);
+                    continue;
+                }
                 const char *before = s;
                 const char *err = string_escape(&s, &raw);
                 if (err) {
@@ -198,7 +245,15 @@ static bool lex(Parser *p, const char *src)
                 }
                 col += (int) (s - before);      /* an escape never spans lines */
             }
-            t.str = string_canonical(p->c, raw.s, raw.len);
+            if (p->iparts.n) {
+                VEC_PUSH(p->ilits, piece(p, raw.s, raw.len));
+                t.ninterp = (int) p->iparts.n;
+                t.ilits = arena_alloc(p->c->load, (p->iparts.n + 1) * sizeof *t.ilits);
+                memcpy(t.ilits, p->ilits.v, (p->iparts.n + 1) * sizeof *t.ilits);
+                t.iparts = arena_alloc(p->c->load, p->iparts.n * sizeof *t.iparts);
+                memcpy(t.iparts, p->iparts.v, p->iparts.n * sizeof *t.iparts);
+                p->ilits.n = p->iparts.n = 0;
+            } else t.str = string_canonical(p->c, raw.s, raw.len);
             buf_free(&raw);
         } else if (ch == '@') {
             t.k = T_ATTR;
@@ -454,6 +509,39 @@ static bool number(Parser *p, Tok *t, int *dim, int64_t *q)
     return true;
 }
 
+static void parser_free(Parser *p);
+
+/* An interpolated string: each \(...) is parsed as an expression where it
+ * stands in the source, so its diagnostics point there. */
+static X *parse_interpolation(Parser *p, Tok *t)
+{
+    X *x = xnew(p, X_INTERP, t->loc);
+    x->u.in.n = t->ninterp;
+    x->u.in.lits = t->ilits;
+    x->u.in.parts = arena_alloc(p->c->load, (size_t) t->ninterp * sizeof(X *));
+    for (int i = 0; i < t->ninterp; i++) {
+        struct IPart *ip = &t->iparts[i];
+        char *src = malloc(ip->len + 1);
+        memcpy(src, ip->src, ip->len);
+        src[ip->len] = 0;
+        Parser q = { .c = p->c, .file = p->file };
+        X *e = NULL;
+        if (lex_at(&q, src, ip->loc.line, ip->loc.col)) {
+            if (peek(&q, 0)->k == T_EOF) perr(&q, ip->loc, "an empty interpolation: \\()");
+            else {
+                e = parse_expr(&q);
+                if (e && peek(&q, 0)->k != T_EOF) { perr(&q, peek(&q, 0)->loc, "unexpected input in an interpolation"); e = NULL; }
+            }
+        }
+        bool bad = q.error;
+        parser_free(&q);
+        free(src);
+        if (bad || !e) { p->error = true; return NULL; }
+        x->u.in.parts[i] = e;
+    }
+    return x;
+}
+
 static X *parse_primary(Parser *p)
 {
     Tok *t = peek(p, 0);
@@ -495,6 +583,7 @@ static X *parse_primary(Parser *p)
     }
     case T_STRING: {
         next(p);
+        if (t->ninterp) return parse_interpolation(p, t);
         X *x = xnew(p, X_ATOM, t->loc);
         x->u.name = tok_sym(p, t);
         return x;
@@ -550,6 +639,7 @@ static X *parse_unary(Parser *p)
         next(p);
         Tok *str = peek(p, 0);
         if (str->k != T_STRING) { perr(p, str->loc, "expected a string after =~ or !~"); return NULL; }
+        if (str->ninterp) { perr(p, str->loc, "a regex can't be interpolated"); return NULL; }
         next(p);
         char err[160];
         if (!rx_single(p->c, str->str, t->k == T_NMATCH, err, sizeof err)) {
@@ -634,6 +724,8 @@ static void parser_free(Parser *p)
 {
     VEC_FREE(p->toks);
     VEC_FREE(p->comments);
+    free(p->ilits.v);
+    free(p->iparts.v);
 }
 
 /* The comment lines directly above line `line`, joined: a docstring. */
@@ -662,7 +754,7 @@ static const char *doc_above(Parser *p, int line)
 
 bool parse_source(Content *c, Sym file, const char *src, DeclVec *out)
 {
-    Parser p = { c, file, { 0 }, 0, false, { 0 } };
+    Parser p = { .c = c, .file = file };
     Sym pkg = NULL;
     if (!lex(&p, src)) { parser_free(&p); return false; }
     /* `package name`, first: the file's declarations are in it */
@@ -683,6 +775,7 @@ bool parse_source(Content *c, Sym file, const char *src, DeclVec *out)
         Decl d = { 0 };
         d.pkg = pkg;
         if (lab->k == T_DEF) d.kind = L_DEF;
+        else if (lab->k == T_STRING && lab->ninterp) { perr(&p, lab->loc, "a declaration's label can't be interpolated"); break; }
         else if (lab->k == T_STRING) d.kind = L_ATOM;
         else if (lab->k == T_IDENT) d.kind = L_INST;
         else { perr(&p, lab->loc, "expected a declaration"); break; }
@@ -702,7 +795,7 @@ bool parse_source(Content *c, Sym file, const char *src, DeclVec *out)
 
 X *parse_expr_string(Content *c, Sym file, const char *src)
 {
-    Parser p = { c, file, { 0 }, 0, false, { 0 } };
+    Parser p = { .c = c, .file = file };
     X *x = NULL;
     if (lex(&p, src)) {
         x = parse_expr(&p);

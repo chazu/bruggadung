@@ -103,7 +103,7 @@ typedef struct { Sym file; int line, col; } Loc;
 typedef struct { Sym name; char *args; } Attr;
 
 typedef enum { X_TOP, X_NAME, X_ATOM, X_NUM, X_BOUND, X_TAG, X_STRUCT, X_LIST,
-               X_AND, X_OR, X_DEFAULT, X_ARITH, X_REGEX } XKind;
+               X_AND, X_OR, X_DEFAULT, X_ARITH, X_REGEX, X_INTERP } XKind;
 
 typedef struct X X;
 typedef struct TriContent Content;
@@ -133,6 +133,7 @@ struct X {
         X *sub;                                           /* DEFAULT */
         struct { X *a, *b; int op; } ar;                  /* ARITH: '+', '-', '*', '/' */
         struct { Sym pat; bool neg; } rx;                 /* REGEX: =~ or !~ a pattern */
+        struct { int n; const char **lits; X **parts; } in;  /* INTERP: lits[0] part[0] lits[1] ... lits[n] */
     } u;
 };
 
@@ -425,6 +426,7 @@ struct TriContent {
  * "a\u0022b"). string_canonical makes it from the bytes a literal denotes;
  * string_decode gives those bytes back. */
 Sym  string_canonical(Content *c, const char *bytes, size_t n);
+void string_escape_into(Buf *b, const char *bytes, size_t n);   /* the canonical escapes, unquoted */
 void string_decode(const char *quoted, Buf *out);
 
 void diag(Content *c, bool error, Loc loc, const char *fmt, ...) __attribute__((format(printf, 4, 5)));

@@ -81,6 +81,15 @@
     (should (eq (triangle-test-face-at "a-z") 'font-lock-string-face))
     (should (eq (triangle-test-face-at "\\d") 'font-lock-string-face))))
 
+(ert-deftest triangle-test-interpolation ()
+  (triangle-test-with "#P: { full: \"\\($g) \\(\"(x)\") end\", n: 1 }\n"
+    (should (eq (triangle-test-face-at " end") 'font-lock-string-face))
+    (should (memq (triangle-test-face-at "n:") '(font-lock-property-name-face font-lock-variable-name-face)))
+    (should (memq (triangle-test-face-at "\\($g")
+                  '(font-lock-escape-face font-lock-regexp-grouping-backslash)))
+    (should (equal (triangle-test-reindent "a: {\ns: \"\\(\"{\")\"\nn: 1\n}\n")
+                   "a: {\n    s: \"\\(\"{\")\"\n    n: 1\n}\n"))))
+
 (defun triangle-test-reindent (text)
   "Return TEXT with every line's indentation removed, then reindented."
   (with-temp-buffer
