@@ -26,21 +26,32 @@ reference is a bug.
 
 ## Lexical structure
 
-Source files have the extension `.tri` and are read as bytes. Strings may
-hold any bytes except a newline and `"`.
+Source files have the extension `.tri` and are read as bytes.
 
 | Token | Form | Notes |
 | --- | --- | --- |
 | Identifier | `[A-Za-z_][A-Za-z0-9_]*` | Instance names, feature labels. `_` alone is the top type. |
 | Type name | `#` then an identifier | `#Wrench` |
 | Qualified name | an identifier, `.`, then an identifier or a type name | `tools.wrench_250`, `tools.#Wrench`: a name in another package (see [Packages](#packages)) |
-| String | `"` … `"` | No escapes, no newlines. |
+| String | `"` … `"` | One line. Escapes as in CUE (below). |
+| Raw string | `#"` … `"#` | A backslash is an ordinary character, so `#"\d+"#` is `\d+`. An escape needs the opening's `#`s after its backslash: `\#n`. With more `#`s, a quote followed by fewer doesn't close: `##"say "#hi"#"##`. |
 | Number | digits with an optional `.` and fraction, then an optional unit | `19`, `0.85kg`, `2m3`. No exponent form; no leading `.`. The unit follows with no space. |
 | Negative number | `-` directly before a digit | Only where an operand is expected. After an operand, `-` subtracts. |
 | Tag | `$` then letters, digits, `_` | `$s`, `$room` |
 | Attribute | `@` name, then optionally `(` raw text `)` | Parentheses inside must balance. The text is passed to the attribute unparsed. |
 | Punctuation | `: , { } [ ] ( ) & \| * + / - ... >= <= > <` | |
 | Comment | `//` to the end of the line | |
+
+**Escapes.** In a string, `\a` `\b` `\f` `\n` `\r` `\t` `\v` are the control
+characters, `\\` `\/` `\"` are themselves, `\u` takes four hex digits, and `\U`
+eight; both name a Unicode scalar value, written to the string as UTF-8. Any
+other escape is an error, and so is U+0000.
+
+A string means its contents, not its spelling: `"a\"b"`, `"a\u0022b"` and
+`#"a"b"#` are the same atom or text. Strings print in one canonical spelling,
+which reads back as the same value: quotes, backslashes and control
+characters escaped (`\n`, `\t`, `\r`, else `\u00XX`), everything else as it
+is. `tri_text` gives a string's contents, decoded.
 
 Whitespace and newlines separate tokens and are otherwise insignificant.
 Commas between fields and between top-level declarations are optional. Inside
@@ -405,6 +416,9 @@ location of the other declaration where there is one.
 | --- | --- |
 | `unexpected character 'c'` | A character outside the language. |
 | `unterminated string`, `unterminated struct`, `unterminated attribute` | A missing closing `"`, `}`, or `)`. |
+| `unknown escape in a string; …`, `\u takes four hex digits`, `\U takes eight hex digits` | An escape not in the table, or a short code. |
+| `not a Unicode scalar value`, `a string may not contain U+0000` | A `\u`/`\U` code that is a surrogate, past U+10FFFF, or zero. |
+| `string interpolation is not supported` | `\(` in a string. |
 | `expected a declaration`, `expected a field label`, `expected a value`, `expected ':' after …` | A malformed declaration or structure. |
 | `expected a number after a bound` | A bound needs a number: `>=10mm`, not `>= $x`. |
 | `expected a referent number in ref(...)`, `a referent number has no unit` | `ref` takes a plain whole number. |

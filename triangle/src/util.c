@@ -245,6 +245,59 @@ void u64map_free(U64Map *m)
     memset(m, 0, sizeof *m);
 }
 
+/* --- strings ---------------------------------------------------------------------- */
+
+Sym string_canonical(Content *c, const char *bytes, size_t n)
+{
+    Buf b = { 0 };
+    buf_putc(&b, '"');
+    for (size_t i = 0; i < n; i++) {
+        unsigned char ch = (unsigned char) bytes[i];
+        switch (ch) {
+        case '"':  buf_puts(&b, "\\\""); break;
+        case '\\': buf_puts(&b, "\\\\"); break;
+        case '\n': buf_puts(&b, "\\n"); break;
+        case '\t': buf_puts(&b, "\\t"); break;
+        case '\r': buf_puts(&b, "\\r"); break;
+        default:
+            if (ch < 0x20 || ch == 0x7f) buf_printf(&b, "\\u%04x", ch);
+            else buf_putc(&b, (char) ch);
+        }
+    }
+    buf_putc(&b, '"');
+    Sym r = sym_intern(&c->syms, b.s, b.len);
+    buf_free(&b);
+    return r;
+}
+
+/* Decodes a canonical string (the only escapes are those string_canonical
+ * writes); a name without quotes, such as true, is copied as it is. */
+void string_decode(const char *q, Buf *out)
+{
+    buf_puts(out, "");
+    if (*q != '"') { buf_puts(out, q); return; }
+    for (q++; *q && !(q[0] == '"' && q[1] == 0); q++) {
+        if (*q != '\\' || !q[1]) { buf_putc(out, *q); continue; }
+        q++;
+        switch (*q) {
+        case 'n': buf_putc(out, '\n'); break;
+        case 't': buf_putc(out, '\t'); break;
+        case 'r': buf_putc(out, '\r'); break;
+        case 'u': {
+            unsigned v = 0;
+            for (int k = 1; k <= 4 && q[k]; k++) {
+                char h = q[k];
+                v = v * 16 + (unsigned) (h <= '9' ? h - '0' : (h | 0x20) - 'a' + 10);
+            }
+            buf_putc(out, (char) v);       /* canonical \u escapes are control bytes only */
+            q += 4;
+            break;
+        }
+        default: buf_putc(out, *q);        /* \" and \\ */
+        }
+    }
+}
+
 /* --- diagnostics ------------------------------------------------------------------- */
 
 void diag(Content *c, bool error, Loc loc, const char *fmt, ...)

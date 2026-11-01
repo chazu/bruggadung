@@ -658,6 +658,28 @@ void fs_print(Content *c, Buf *b, TriNode *n)
     u64map_free(&ps.tags);
 }
 
+size_t tri_text(TriContent *c, const TriNode *n, char *buf, size_t len)
+{
+    const char *q;
+    if (!n) return (size_t) -1;
+    if (n->flags & NF_DIM) {
+        if (c->types.v[n->type].dim != DIM_TEXT || n->lo != n->hi) return (size_t) -1;
+        q = (const char *) (intptr_t) n->lo;
+    } else if (c->types.v[n->type].kind == TK_ATOM) {
+        q = c->types.v[n->type].name;
+    } else return (size_t) -1;
+    Buf b = { 0 };
+    string_decode(q, &b);
+    if (len) {
+        size_t k = b.len < len - 1 ? b.len : len - 1;
+        memcpy(buf, b.s, k);
+        buf[k] = 0;
+    }
+    size_t r = b.len;
+    buf_free(&b);
+    return r;
+}
+
 size_t tri_print(TriContent *c, const TriNode *node, char *buf, size_t len)
 {
     Buf b = { 0 };

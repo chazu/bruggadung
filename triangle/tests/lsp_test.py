@@ -204,6 +204,29 @@ def main(exe):
                                               "position": {"line": 4, "character": 0}})["result"]
     check("shop.bench" in {i["label"] for i in r["items"]}, "completion qualifies another package's names")
 
+    # strings: escapes and raw strings lex as one token, and resolve by meaning
+    STRINGS = ('#Mark: "a\\"b" | "plain"\n'
+               '"a\\"b": "a\\"b c" | "a\\"b d"\n'
+               '#Tag: { mark: #Mark, note: text }\n'
+               't1: #Tag & { note: #"x\\"# , mark: "a\\u0022b" }\n'
+               't2: #Tag & { note: "say \\"wrench\\"", mark: "plain" }\n')
+    suri = "file://" + os.path.join(d, "strings.tri")
+    s.notify("textDocument/didOpen", {"textDocument": {"uri": suri, "languageId": "triangle",
+                                                       "version": 1, "text": STRINGS}})
+    check(s.diagnostics(suri) == [], "escapes and raw strings load")
+    r = s.request("textDocument/definition", {"textDocument": {"uri": suri},
+                                              "position": pos(STRINGS, "a\\u0022b")})["result"]
+    check(len(r) == 1 and r[0]["range"]["start"] == {"line": 1, "character": 0}, "an escaped spelling finds its atom")
+    r = s.request("textDocument/references", {"textDocument": {"uri": suri}, "position": pos(STRINGS, "a\\\"b"),
+                                              "context": {"includeDeclaration": True}})["result"]
+    check(len(r) == 3, "references to an atom across spellings (%d)" % len(r))
+    r = s.request("textDocument/hover", {"textDocument": {"uri": suri},
+                                         "position": pos(STRINGS, "wrench")})["result"]
+    check(r is None, "a quote escaped in a string doesn't end it")
+    r = s.request("textDocument/definition", {"textDocument": {"uri": suri},
+                                              "position": pos(STRINGS, "mark: \"plain", 1)})["result"]
+    check(len(r) == 0, "a field label is not a declaration")
+
     r = s.request("textDocument/hover", {"textDocument": {"uri": uri["instances.tri"]},
                                          "position": {"line": 0, "character": 3}})
     check(r["result"] is None, "hover in a comment is empty")

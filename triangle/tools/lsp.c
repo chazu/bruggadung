@@ -316,6 +316,80 @@ typedef struct { Tok *v; size_t n, cap; } Toks;
 
 static int name_char(char c) { return isalnum((unsigned char) c) || c == '_'; }
 
+static int raw_start(const char *s)
+{
+    while (*s == '#') s++;
+    return *s == '"';
+}
+
+static int hashes_at(const char *s, size_t n)
+{
+    for (size_t k = 0; k < n; k++) if (s[k] != '#') return 0;
+    return 1;
+}
+
+static void put_utf8(Str *b, unsigned long cp)
+{
+    if (cp < 0x80) str_putc(b, (char) cp);
+    else if (cp < 0x800) { str_putc(b, (char) (0xC0 | cp >> 6)); str_putc(b, (char) (0x80 | (cp & 0x3F))); }
+    else if (cp < 0x10000) {
+        str_putc(b, (char) (0xE0 | cp >> 12));
+        str_putc(b, (char) (0x80 | ((cp >> 6) & 0x3F)));
+        str_putc(b, (char) (0x80 | (cp & 0x3F)));
+    } else {
+        str_putc(b, (char) (0xF0 | cp >> 18));
+        str_putc(b, (char) (0x80 | ((cp >> 12) & 0x3F)));
+        str_putc(b, (char) (0x80 | ((cp >> 6) & 0x3F)));
+        str_putc(b, (char) (0x80 | (cp & 0x3F)));
+    }
+}
+
+/* What a string token denotes, decoded (as the loader decodes it). */
+static char *string_value(const char *tok, size_t n)
+{
+    size_t hashes = 0, i = 0;
+    while (i < n && tok[i] == '#') { hashes++; i++; }
+    i++;
+    size_t end = n >= 1 + hashes ? n - 1 - hashes : i;
+    Str b = { 0 };
+    str_puts(&b, "");
+    while (i < end) {
+        if (tok[i] != '\\' || !hashes_at(tok + i + 1, hashes) || i + 1 + hashes >= end) { str_putc(&b, tok[i++]); continue; }
+        i += 1 + hashes;
+        char e = tok[i++];
+        const char *simple = strchr("abfnrtv", e);
+        if (simple) str_putc(&b, "\a\b\f\n\r\t\v"[simple - "abfnrtv"]);
+        else if (e == 'u' || e == 'U') {
+            size_t k = e == 'u' ? 4 : 8;
+            char hex[9] = { 0 };
+            for (size_t q = 0; q < k && i < end; q++) hex[q] = tok[i++];
+            put_utf8(&b, strtoul(hex, NULL, 16));
+        } else str_putc(&b, e);
+    }
+    return b.s;
+}
+
+/* The canonical spelling of a string, as declarations name atoms. */
+static char *string_canonical(const char *v)
+{
+    Str b = { 0 };
+    str_putc(&b, '"');
+    for (const unsigned char *s = (const unsigned char *) v; *s; s++) {
+        switch (*s) {
+        case '"':  str_puts(&b, "\\\""); break;
+        case '\\': str_puts(&b, "\\\\"); break;
+        case '\n': str_puts(&b, "\\n"); break;
+        case '\t': str_puts(&b, "\\t"); break;
+        case '\r': str_puts(&b, "\\r"); break;
+        default:
+            if (*s < 0x20 || *s == 0x7f) str_printf(&b, "\\u%04x", *s);
+            else str_putc(&b, (char) *s);
+        }
+    }
+    str_putc(&b, '"');
+    return b.s;
+}
+
 /* The token starting at s[i] (not whitespace or a comment); *depth tracks nesting. */
 static Tok lex_one(const char *s, size_t i, int *depth)
 {
@@ -331,11 +405,20 @@ static Tok lex_one(const char *s, size_t i, int *depth)
             while (name_char(s[j])) j++;
         }
         t.end = j;
-    } else if (c == '"') {
+    } else if (c == '"' || (c == '#' && raw_start(s + i))) {
+        /* "..." with escapes, or #"..."# raw: \ escapes only when followed by
+         * as many #s as opened it, and "#..# with that many closes */
         t.k = K_STRING;
-        size_t j = i + 1;
-        while (s[j] && s[j] != '"' && s[j] != '\n') j++;
-        t.end = s[j] == '"' ? j + 1 : j;
+        size_t j = i, hashes = 0;
+        while (s[j] == '#') { hashes++; j++; }
+        j++;
+        while (s[j] && s[j] != '\n') {
+            if (s[j] == '"' && hashes_at(s + j + 1, hashes)) { j += 1 + hashes; break; }
+            if (s[j] == '\\' && hashes_at(s + j + 1, hashes) && s[j + 1 + hashes] && s[j + 1 + hashes] != '\n')
+                j += 1 + hashes;
+            j++;
+        }
+        t.end = j;
     } else if (c == '$' || c == '@') {
         t.k = c == '$' ? K_TAG : K_ATTR;
         size_t j = i + 1;
@@ -397,13 +480,18 @@ static char *resolve(const Build *b, const char *pkg, const char *tok, size_t n)
 {
     char buf[512];
     if (n + (pkg ? strlen(pkg) : 0) + 2 >= sizeof buf) return NULL;
-    if (tok[0] == '"') {
-        snprintf(buf, sizeof buf, "%.*s", (int) n, tok);
-        if (declared(b, buf)) return xstrdup(buf);
-        if (n < 2) return NULL;
-        tok++;
-        n -= 2;
+    if (tok[0] == '"' || tok[0] == '#' ) {
+        if (tok[0] == '#' && !raw_start(tok)) goto name;    /* a type name */
+        char *v = string_value(tok, n);
+        char *canon = string_canonical(v);
+        char *r = NULL;
+        if (declared(b, canon)) r = xstrdup(canon);
+        else if (strlen(v) + (pkg ? strlen(pkg) : 0) + 2 < sizeof buf) r = resolve(b, pkg, v, strlen(v));
+        free(canon);
+        free(v);
+        return r;
     }
+name:
     if (!memchr(tok, '.', n) && pkg) {
         snprintf(buf, sizeof buf, "%s.%.*s", pkg, (int) n, tok);
         if (declared(b, buf)) return xstrdup(buf);

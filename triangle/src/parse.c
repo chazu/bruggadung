@@ -15,6 +15,7 @@ typedef struct {
     Loc loc;
     Sym attr_name;     /* T_ATTR */
     char *attr_args;
+    Sym str;           /* T_STRING: its canonical spelling (string_canonical) */
 } Tok;
 
 typedef struct { int line; const char *s; size_t len; } Comment;   /* a comment alone on its line */
@@ -40,6 +41,70 @@ static bool operand_end(TokKind k)
 {
     return k == T_NUMBER || k == T_IDENT || k == T_DEF || k == T_TAG || k == T_STRING || k == T_RPAREN ||
            k == T_RBRACE || k == T_RBRACK;
+}
+
+/* #"..."#: one or more #s, then a quote */
+static bool raw_start(const char *s)
+{
+    while (*s == '#') s++;
+    return *s == '"';
+}
+
+static bool hashes_at(const char *s, int n)
+{
+    for (int k = 0; k < n; k++) if (s[k] != '#') return false;
+    return true;
+}
+
+static void put_utf8(Buf *b, uint32_t cp)
+{
+    if (cp < 0x80) buf_putc(b, (char) cp);
+    else if (cp < 0x800) { buf_putc(b, (char) (0xC0 | cp >> 6)); buf_putc(b, (char) (0x80 | (cp & 0x3F))); }
+    else if (cp < 0x10000) {
+        buf_putc(b, (char) (0xE0 | cp >> 12));
+        buf_putc(b, (char) (0x80 | ((cp >> 6) & 0x3F)));
+        buf_putc(b, (char) (0x80 | (cp & 0x3F)));
+    } else {
+        buf_putc(b, (char) (0xF0 | cp >> 18));
+        buf_putc(b, (char) (0x80 | ((cp >> 12) & 0x3F)));
+        buf_putc(b, (char) (0x80 | ((cp >> 6) & 0x3F)));
+        buf_putc(b, (char) (0x80 | (cp & 0x3F)));
+    }
+}
+
+/* Decodes the escape whose letter *s points at (past the backslash) into
+ * out, advancing *s past it. Returns NULL, or an error message. CUE's escapes
+ * for strings: \a \b \f \n \r \t \v \\ \/ \" \uXXXX \UXXXXXXXX. */
+static const char *string_escape(const char **sp, Buf *out)
+{
+    const char *s = *sp;
+    char e = *s++;
+    uint32_t cp = 0;
+    switch (e) {
+    case 'a': buf_putc(out, '\a'); break;
+    case 'b': buf_putc(out, '\b'); break;
+    case 'f': buf_putc(out, '\f'); break;
+    case 'n': buf_putc(out, '\n'); break;
+    case 'r': buf_putc(out, '\r'); break;
+    case 't': buf_putc(out, '\t'); break;
+    case 'v': buf_putc(out, '\v'); break;
+    case '\\': case '/': case '"': buf_putc(out, e); break;
+    case 'u': case 'U': {
+        int n = e == 'u' ? 4 : 8;
+        for (int k = 0; k < n; k++, s++) {
+            if (!isxdigit((unsigned char) *s)) return e == 'u' ? "\\u takes four hex digits" : "\\U takes eight hex digits";
+            cp = cp * 16 + (uint32_t) (isdigit((unsigned char) *s) ? *s - '0' : (*s | 0x20) - 'a' + 10);
+        }
+        if (cp == 0) return "a string may not contain U+0000";
+        if (cp > 0x10FFFF || (cp >= 0xD800 && cp < 0xE000)) return "not a Unicode scalar value";
+        put_utf8(out, cp);
+        break;
+    }
+    case '(': return "string interpolation is not supported";
+    default: return "unknown escape in a string; the escapes are \\a \\b \\f \\n \\r \\t \\v \\\\ \\/ \\\" \\u \\U";
+    }
+    *sp = s;
+    return NULL;
 }
 
 static bool lex(Parser *p, const char *src)
@@ -98,15 +163,33 @@ static bool lex(Parser *p, const char *src)
             /* a unit suffix starts with a letter and may end in digits (m3) */
             if (isalpha((unsigned char) *s))
                 while (isalnum((unsigned char) *s)) ADV();
-        } else if (ch == '"') {
+        } else if (ch == '"' || (ch == '#' && raw_start(s))) {
+            /* "..." with escapes, or #"..."# raw, as in CUE: with n #s, only
+             * \ followed by n #s escapes, and "#...# (n of them) closes */
             t.k = T_STRING;
+            int hashes = 0;
+            while (*s == '#') { hashes++; ADV(); }
             ADV();
-            while (*s && *s != '"') {
-                if (*s == '\n') { perr(p, t.loc, "unterminated string"); return false; }
+            Buf raw = { 0 };
+            buf_puts(&raw, "");
+            for (;;) {
+                if (!*s || *s == '\n') { buf_free(&raw); perr(p, t.loc, "unterminated string"); return false; }
+                if (*s == '"' && hashes_at(s + 1, hashes)) {
+                    ADV();
+                    for (int k = 0; k < hashes; k++) ADV();
+                    break;
+                }
+                if (*s != '\\' || !hashes_at(s + 1, hashes)) { buf_putc(&raw, *s); ADV(); continue; }
+                Loc eloc = { p->file, line, col };
                 ADV();
+                for (int k = 0; k < hashes; k++) ADV();
+                const char *before = s;
+                const char *err = string_escape(&s, &raw);
+                if (err) { buf_free(&raw); perr(p, eloc, err); return false; }
+                col += (int) (s - before);      /* an escape never spans lines */
             }
-            if (!*s) { perr(p, t.loc, "unterminated string"); return false; }
-            ADV();
+            t.str = string_canonical(p->c, raw.s, raw.len);
+            buf_free(&raw);
         } else if (ch == '@') {
             t.k = T_ATTR;
             ADV();
@@ -209,6 +292,7 @@ static X *xnew(Parser *p, XKind k, Loc loc)
 
 static Sym tok_sym(Parser *p, Tok *t)
 {
+    if (t->k == T_STRING) return t->str;
     return sym_intern(&p->c->syms, t->s, t->len);
 }
 

@@ -57,6 +57,22 @@
     (should (memq (triangle-test-face-at "#Tool")
                   '(font-lock-comment-face font-lock-comment-delimiter-face)))))
 
+;; escapes and raw strings: what is inside a string stays inside it
+(ert-deftest triangle-test-strings ()
+  (triangle-test-with
+      "a: { s: \"say \\\"hi\\\" x\", n: 1 }\nb: { s: #\"ends \\\"#, m: 2 }\nc: { s: ##\"q\"#q\"##, k: 3 }\n"
+    (should (eq (triangle-test-face-at "hi") 'font-lock-string-face))
+    (should (eq (triangle-test-face-at " x") 'font-lock-string-face))
+    (should (memq (triangle-test-face-at "n:") '(font-lock-property-name-face font-lock-variable-name-face)))
+    (should (memq (triangle-test-face-at "m:") '(font-lock-property-name-face font-lock-variable-name-face)))
+    (should (eq (triangle-test-face-at "#q" 1) 'font-lock-string-face))
+    (should (memq (triangle-test-face-at "k:") '(font-lock-property-name-face font-lock-variable-name-face)))
+    (should (memq (triangle-test-face-at "\\\"hi")
+                  '(font-lock-escape-face font-lock-regexp-grouping-backslash)))
+    ;; brackets inside strings don't count for indentation
+    (should (equal (triangle-test-reindent "a: {\ns: #\"{ \\\"#\nn: 1\n}\n")
+                   "a: {\n    s: #\"{ \\\"#\n    n: 1\n}\n"))))
+
 (defun triangle-test-reindent (text)
   "Return TEXT with every line's indentation removed, then reindented."
   (with-temp-buffer

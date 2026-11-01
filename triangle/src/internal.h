@@ -391,6 +391,13 @@ struct TriContent {
     bool cyclic;                 /* set when sharing meets a cycle during copy_out */
 };
 
+/* Strings are interned in one canonical spelling, quotes included: what a
+ * literal means, re-escaped so it reads back the same ("a\"b", never
+ * "a\u0022b"). string_canonical makes it from the bytes a literal denotes;
+ * string_decode gives those bytes back. */
+Sym  string_canonical(Content *c, const char *bytes, size_t n);
+void string_decode(const char *quoted, Buf *out);
+
 void diag(Content *c, bool error, Loc loc, const char *fmt, ...) __attribute__((format(printf, 4, 5)));
 Sym  intern(Content *c, const char *s);
 

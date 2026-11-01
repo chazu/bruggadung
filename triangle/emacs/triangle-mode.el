@@ -53,7 +53,7 @@
     (modify-syntax-entry ?/ ". 12" st)
     (modify-syntax-entry ?\n ">" st)
     (modify-syntax-entry ?\" "\"" st)
-    (modify-syntax-entry ?\\ "." st)    ; strings have no escapes
+    (modify-syntax-entry ?\\ "\\" st)
     (modify-syntax-entry ?' "." st)
     (modify-syntax-entry ?_ "_" st)
     (modify-syntax-entry ?# "_" st)
@@ -71,6 +71,28 @@
     (modify-syntax-entry ?. "." st)
     st)
   "Syntax table for `triangle-mode'.")
+
+;;; Raw strings
+
+(defun triangle--syntax-propertize (start end)
+  "Mark raw strings between START and END.
+In #\"...\"# a backslash escapes only when followed by the opening's #s,
+and only a quote followed by them closes, so the quotes become string
+fences and the backslashes inside become punctuation."
+  (goto-char start)
+  (while (re-search-forward "\\(#+\\)\"" end t)
+    (let* ((open (1- (point)))
+           (hashes (match-string 1))
+           (close (concat "\"" (regexp-quote hashes))))
+      (unless (nth 8 (save-excursion (syntax-ppss (match-beginning 0))))
+        (when (re-search-forward close (line-end-position) t)
+          (let ((quote-end (- (point) (length hashes) 1)))
+            (put-text-property open (1+ open) 'syntax-table (string-to-syntax "|"))
+            (put-text-property quote-end (1+ quote-end) 'syntax-table (string-to-syntax "|"))
+            (save-excursion
+              (goto-char (1+ open))
+              (while (search-forward "\\" quote-end t)
+                (put-text-property (1- (point)) (point) 'syntax-table (string-to-syntax "."))))))))))
 
 ;;; Highlighting
 
@@ -113,6 +135,11 @@
     ;; quantities: 19mm, 0.85kg, -3
     ("\\(?:^\\|[^A-Za-z0-9_.#$]\\)\\(-?[0-9]+\\(?:\\.[0-9]+\\)?[A-Za-z0-9]*\\)"
      1 ',(triangle--face 'font-lock-number-face 'font-lock-constant-face))
+    ;; escapes inside strings: \n, \", \u00e9, and in raw strings \#n
+    ("\\\\#*\\(?:[abfnrtv\\\\/\"]\\|u[0-9A-Fa-f]\\{4\\}\\|U[0-9A-Fa-f]\\{8\\}\\)"
+     0 (when (save-excursion (nth 3 (syntax-ppss (match-beginning 0))))
+         ',(triangle--face 'font-lock-escape-face 'font-lock-regexp-grouping-backslash))
+     prepend)
     ;; a default: * at the start of a term
     ("\\(?:^\\|[:|&(,[]\\)\\s-*\\(\\*\\)" 1 font-lock-negation-char-face))
   "Highlighting for `triangle-mode'.")
@@ -220,6 +247,7 @@ Diagnostics appear in a compilation buffer, where \\[next-error] visits them."
   (setq-local comment-end "")
   (setq-local comment-start-skip "//+\\s-*")
   (setq-local font-lock-defaults '(triangle-font-lock-keywords))
+  (setq-local syntax-propertize-function #'triangle--syntax-propertize)
   (setq-local indent-line-function #'triangle-indent-line)
   (setq-local indent-tabs-mode nil)     ; content aligns columns
   (setq-local electric-indent-chars (append "{}[]()" electric-indent-chars))

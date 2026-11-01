@@ -152,6 +152,11 @@ tri_print(c, d, buf, sizeof buf);    /* #Nut & { mass: mass, material: #Material
   number. Open ends are `INT64_MIN` and `INT64_MAX`.
 - `tri_print` prints a structure in Triangle syntax. Shared nodes print as
   tags (`$1`).
+- `tri_text` gives the contents of a string value, decoded: a concrete text
+  node's text, or an atom's name (`"steel"` gives `steel`). It returns the
+  full length, writing as much as fits, or `(size_t) -1` for any other node.
+  Use it instead of stripping the quotes from `tri_print`, which prints
+  strings escaped.
 
 ## Blueprints: specs and construction
 

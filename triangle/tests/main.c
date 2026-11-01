@@ -39,7 +39,7 @@ int has_diag(const TriContent *c, const char *needle, int errors_only)
     X(test_blueprints_resolve_at_load) X(test_registry_content_fields) X(test_defaults_with_type_alternatives) \
     X(test_type_disjunctions) X(test_instance_variants) X(test_vary_weights) X(test_typed_lists) \
     X(test_recursive_types) X(test_text_values) X(test_generalize_numbers) X(test_conflict_locations) \
-    X(test_explain_and_inspect) X(test_docstrings) X(test_declarations_and_locations) X(test_families) X(test_derived_fields) X(test_saves) \
+    X(test_explain_and_inspect) X(test_docstrings) X(test_declarations_and_locations) X(test_string_escapes) X(test_string_spellings_are_one_value) X(test_string_errors) X(test_families) X(test_derived_fields) X(test_saves) \
     X(test_lgg) X(test_hypothesis_residuals) X(test_example_file) X(test_docs_guide) \
     X(test_tag_residuals_and_bindings) X(test_alternative_chosen_by_value) X(test_all_conflicts) X(test_compaction) \
     X(test_fixed_and_int) X(test_runtime_is_strict) X(test_build_log_and_clash_hint) X(test_previously_untested) \

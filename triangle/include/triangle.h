@@ -116,6 +116,10 @@ TriType        tri_node_type(const TriNode *node);
 int            tri_node_interval(const TriNode *node, int64_t *lo, int64_t *hi);
 const TriNode *tri_at(const TriContent *content, const TriNode *node, const char *path);
 size_t         tri_print(TriContent *content, const TriNode *node, char *buf, size_t len);
+/* The contents of a string value, decoded: the text of a concrete text node,
+ * or the name of an atom ("steel" gives steel; true gives true). Returns the
+ * full length, writing as much as fits; (size_t) -1 if the node is neither. */
+size_t         tri_text(TriContent *content, const TriNode *node, char *buf, size_t len);
 
 /* Builds a description from an expression, e.g. "#Nut & { size: 19mm }". */
 const TriNode *tri_value(TriContent *content, const char *expr, TriArena *out,
