@@ -1,6 +1,7 @@
 #define BG_COMPONENT_REGISTRY
 #import "BGWorld.h"
 #import "BGIndex.h"
+#import "BGReality.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -311,6 +312,7 @@ static NSUInteger   stocks_wet( struct BGTileStocks *s, int32_t (*out)[ 3], NSUI
    _watching       = BGIndexNew();
    _touching       = BGIndexNew();
    _creations      = BGIndexNew();
+   _reality        = BGRealityNew( [content content]);
    _arena      = tri_arena_new();
    _tilesWide  = 32;
    _tilesHigh  = 32;
@@ -356,6 +358,7 @@ static NSUInteger   stocks_wet( struct BGTileStocks *s, int32_t (*out)[ 3], NSUI
    BGIndexFree( _watching);
    BGIndexFree( _touching);
    BGIndexFree( _creations);
+   BGRealityFree( _reality);
    free( _checkedOut);
    tri_arena_free( _arena);
    [_content release];
@@ -1290,6 +1293,117 @@ static void   file_location( BGWorld *self, BGEntityID entity, const BGLocation 
                         for:entity];
    file_location( self, entity, [_locations recordFor:entity], YES);
    touch( self, entity);
+}
+
+
+/* --- the reality bubble ----------------------------------------------------------- */
+
+- (struct BGReality *) reality
+{
+   return( _reality);
+}
+
+
+/* Where a thing stands on the ground, through what holds it. */
+static BOOL   standing( BGWorld *self, BGEntityID e, BGLocation *tile)
+{
+   BGLocation   at;
+   NSUInteger   guard;
+
+   for( guard = 0; e && guard < 64; guard++)
+   {
+      at = [self locationOf:e];
+      if( at.form == BGLocationOnTile)
+      {
+         *tile = at;
+         return( YES);
+      }
+      if( at.form == BGLocationNone || ! at.place)
+         return( NO);
+      e = at.place;
+   }
+   return( NO);
+}
+
+
+- (BOOL) setAnchor:(BGEntityID) entity
+              kind:(const char *) kind
+{
+   return( BGRealitySetAnchor( _reality, entity, BGRealityKindNamed( _reality, kind)));
+}
+
+
+- (void) removeAnchor:(BGEntityID) entity
+{
+   BGRealityRemoveAnchor( _reality, entity);
+}
+
+
+- (void) settleAnchors
+{
+   BGLocation   tile;
+   BGEntityID   e;
+   NSUInteger   i;
+
+   for( i = 0; i < BGRealityAnchorCount( _reality); i++)
+   {
+      e = BGRealityAnchorAt( _reality, i, NULL, NULL, NULL, NULL, NULL);
+      if( standing( self, e, &tile))
+         BGRealityCentre( _reality, e, tile.x, tile.y, tile.level);
+   }
+   BGRealityPrune( _reality, _time.ms);
+}
+
+
+- (int) detailAt:(BGLocation) tile
+{
+   if( tile.form != BGLocationOnTile)
+      return( BGDetailFull);
+   return( BGRealityDetailAt( _reality, tile.x, tile.y, tile.level));
+}
+
+
+- (int) detailOf:(BGEntityID) entity
+{
+   BGLocation   tile;
+
+   if( ! BGRealityAnchorCount( _reality) || BGRealityLeaseOf( _reality, entity) > _time.ms ||
+       ! standing( self, entity, &tile))
+      return( BGDetailFull);
+   return( BGRealityDetailAt( _reality, tile.x, tile.y, tile.level));
+}
+
+
+- (void) leaseContactsFrom:(NSUInteger) first
+{
+   const BGEvent   *ev;
+   BGEntityID      party[ 3];
+   int             detail[ 3];
+   int64_t         until;
+   NSUInteger      i;
+   int             k;
+   int             j;
+
+   if( ! BGRealityAnchorCount( _reality))
+      return;
+   until = _time.ms + BGRealityContactLease( _reality);
+   for( i = first; i < _nevents; i++)
+   {
+      ev = &_events[ i];
+      if( ! BGRealityIsContact( _reality, ev->kind))
+         continue;
+      party[ 0] = ev->actor;
+      party[ 1] = ev->subject;
+      party[ 2] = ev->other;
+      for( k = 0; k < 3; k++)
+         detail[ k] = party[ k] ? [self detailOf:party[ k]] : BGDetailFrozen;
+      /* one at full detail: the others, raised */
+      for( k = 0; k < 3; k++)
+         if( party[ k] && detail[ k] == BGDetailFull)
+            for( j = 0; j < 3; j++)
+               if( party[ j] && detail[ j] != BGDetailFull)
+                  BGRealityLease( _reality, party[ j], until);
+   }
 }
 
 
@@ -2344,6 +2458,7 @@ static uint64_t   hash_record( uint64_t h, const BGComponentInfo *info, const vo
    }
    if( _terrain)
       h = BGMix( h ^ BGTerrainHash( _terrain));
+   h = BGRealityHash( _reality, h);
    for( i = 0; i < _nevents; i++)
    {
       ev = &_events[ i];

@@ -1,0 +1,26 @@
+// The reality bubble (REALITY.md): how exactly each part of the world is
+// simulated, by how far it is from what anchors it. Four levels of detail:
+// full, reduced, abstract, and, beyond them all, frozen. With no anchors at
+// all, the whole world is full.
+//
+// A kind of anchor says, for each level, how far it reaches: `across`, in
+// chunks (32 tiles) on its own level, any direction; `up` and `down`, in
+// levels. An anchor's centre is the chunk it stands in, and moves only
+// when it has gone `margin` tiles past that chunk's edge, so an anchor
+// walking along an edge doesn't bring the world up and down with each step.
+#Reach:      { across: int & >=0 & <=4096, up: *0 | int & >=0 & <=63, down: *0 | int & >=0 & <=63 }
+#AnchorKind: { full: #Reach, reduced: #Reach, abstract: #Reach, margin: *4 | int & >=0 & <=31 }
+
+// A player, or whatever the game follows as closely.
+player:  #AnchorKind & { full: { across: 1, up: 1, down: 1 }, reduced: { across: 4, up: 2, down: 2 },
+                         abstract: { across: 16, up: 4, down: 4 } } @family(anchors)
+// Something watched from afar: a siege, a story's other thread.
+distant: #AnchorKind & { full: { across: 0 }, reduced: { across: 2 }, abstract: { across: 8, up: 1, down: 1 } }
+@family(anchors)
+
+// Contact: an event between something at full detail and something not
+// raises the other to full, while the lease it gives runs; the events that
+// count, and how long after the last of them.
+#Contact: { kinds: [...text], lease: time & >=0ms & <=1d }
+
+contact: #Contact & { kinds: ["said", "struck", "arrested", "moved"], lease: 60s } @family(contact)

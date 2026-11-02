@@ -1258,6 +1258,8 @@ static void   air_before( BGWorld *world, BGLocation at, BGAirBefore *before)
             position:_position];
    for( i = first; ! _untraced && i < [_world eventCount]; i++)
       [self note:[self describeEvent:[_world eventAt:i]]];
+   /* contact raises what is touched to full detail (REALITY.md decision 10) */
+   [_world leaseContactsFrom:first];
 }
 
 

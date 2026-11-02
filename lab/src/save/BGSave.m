@@ -1,4 +1,5 @@
 #import "BGSave.h"
+#import "BGReality.h"
 
 #import "BGProposalGroup.h"
 #import "BGScheduler.h"
@@ -168,6 +169,31 @@ NSString   *BGSave( BGWorld *world, BGCommitter *committer, NSArray *domains)
          [out appendString:@"\n"];
       }
       free( corners);
+   }
+
+   /* the reality bubble's anchors, centres and all, and its leases */
+   {
+      struct BGReality   *reality;
+      BGEntityID         e;
+      int64_t            until;
+      int32_t            cx;
+      int32_t            cy;
+      int32_t            cz;
+      BOOL               centred;
+      int                kind;
+
+      reality = [world reality];
+      for( i = 0; i < BGRealityAnchorCount( reality); i++)
+      {
+         e = BGRealityAnchorAt( reality, i, &kind, &cx, &cy, &cz, &centred);
+         [out appendFormat:@"anchor %llu %s %d %d %d %d\n", (unsigned long long) e, BGRealityKindName( reality, kind),
+                           cx, cy, cz, centred ? 1 : 0];
+      }
+      for( i = 0; i < BGRealityLeaseCount( reality); i++)
+      {
+         e = BGRealityLeaseAt( reality, i, &until);
+         [out appendFormat:@"lease %llu %lld\n", (unsigned long long) e, (long long) until];
+      }
    }
 
    store = [world entities];
@@ -604,6 +630,18 @@ BGWorld   *BGRestore( NSString *text,
          if( ! problem && at != BG_CHUNK * BG_CHUNK)
             problem = @"a malformed terrain chunk";
       }
+      else if( ! strcmp( s, "anchor"))
+      {
+         if( line.n < 7 || BGRealityKindNamed( [world reality], token_string( &line, 2)) < 0)
+            problem = @"an anchor of no kind";
+         else
+            BGRealityRestoreAnchor( [world reality], token_u64( &line, 1),
+                                    BGRealityKindNamed( [world reality], token_string( &line, 2)),
+                                    (int32_t) token_i64( &line, 3), (int32_t) token_i64( &line, 4),
+                                    (int32_t) token_i64( &line, 5), token_i64( &line, 6) != 0);
+      }
+      else if( ! strcmp( s, "lease"))
+         BGRealityLease( [world reality], token_u64( &line, 1), token_i64( &line, 2));
       else if( ! strcmp( s, "tile"))
       {
          if( line.n < 6 || strcmp( line.tokens[ 4], "water"))

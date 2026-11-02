@@ -11,7 +11,9 @@ for a workshop and fatal for a large roguelike or simulation.
 This document is a draft. Step 1 is built: perception and decision are
 done when something happens, and what falls due comes from queues of wakes
 (lab/src/know/BGKnowledge, lab/src/agency/BGAgency, lab/src/core/BGWakes),
-measured by `lab bench crowd` and `lab bench spread`.
+measured by `lab bench crowd` and `lab bench spread`. Step 2 is built: the
+levels are found and shown (lab/content/reality.tri, lab/src/core/
+BGReality), and nothing yet runs differently by them.
 
 The aim is a world simulated exactly where it matters, and less exactly, by
 degrees, further away, with the degrees, their reach, and what each thing
@@ -203,6 +205,22 @@ full.
    up and down; the cadences; what counts as contact, and its lease),
    anchors, the chunk level map with hysteresis, leases, and the developer's view of it (a
    Tessera overlay once Tessera draws).
+   **Built.** Content (lab/content/reality.tri): `#AnchorKind`s in the
+   `anchors` family, each a `#Reach` (across, in chunks; up and down, in
+   levels) for full, reduced and abstract, and a margin in tiles; `player`
+   and `distant` to start; and `contact`: the event kinds that count
+   (said, struck, arrested, moved) and the lease, 60 s. In the world
+   (`BGReality`): anchors by entity, each with a centre chunk, moved to
+   where it stands at each boundary (`settleAnchors`) only once it is past
+   its chunk by the margin; the level of a tile (`detailAt:`), the highest
+   any anchor's centre gives it, full with no anchors; of an entity
+   (`detailOf:`), where it stands, or full while a lease runs, or with no
+   place on the ground. A group committed leases the other parties of each
+   contact event in it that one party at full detail took part in. Anchors
+   and leases are saved and in the state hash. In play, `anchor <kind>` and
+   `anchor off`, and `reality`: the anchors, the leases, and a chunk a
+   character around the actor (F, R, A, . frozen). Not yet: anything
+   reading the levels; a lease for what a full agent only perceives.
 3. **Reduced detail.** Agents' coarser cadence and narrower perception;
    the domains' longer steps.
 4. **Frozen, and catching up** (decision 6). A chunk's clock; catch-up on
@@ -213,6 +231,27 @@ full.
    activities handed over on falling.
 6. **Threads** (decision 8). The audit of shared state; perception and
    decision across workers; a fixed commit order.
+
+   **Audited** (what stands in the way, hardest first):
+   - **Triangle** is single-threaded per content: lookups intern symbols
+     (and may rehash), operations share a scratch arena and generation
+     counter, patterns and type expansions are built lazily, and matching
+     writes scratch fields into shared pattern nodes. One content per
+     worker (with a process-wide atomic generation) is the smallest way;
+     a frozen content plus per-thread sessions the thorough one.
+   - **Lazy world caches read in perception**: room labels found when
+     asked (`BGTerrainRoomAt`, through light and air), the room-to-air
+     table. Fill them in a serial pass before the workers.
+   - **Per-call state on shared objects**: BGAgency's `_deciding`,
+     `_unknown`, `_lastResidual`; the static `ranking`; BGPath's static
+     buffers; BGKnowledge's `_short` and caches; `intern:`. A context per
+     call or per worker, a lock on interning.
+   - **What decisions submit**: the committer's queue, whose order the
+     contest shuffle starts from; nudges. An outbox per agent, merged in
+     entity order.
+   - **mulle-objc**: a pool per worker; thread-affinity checks on shared
+     objects in debug builds.
+   No direct world writes from either phase were found.
 7. **Outdoor plumes** (decision 9), with their first scenario.
 
 ## Open questions

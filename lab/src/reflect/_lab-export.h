@@ -21,6 +21,7 @@
 #import "BGProposalGroup.h"
 #import "BGIndex.h"
 #import "BGPath.h"
+#import "BGReality.h"
 #import "BGStore.h"
 #import "BGTerrain.h"
 #import "BGTypes.h"

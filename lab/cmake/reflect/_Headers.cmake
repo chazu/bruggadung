@@ -78,6 +78,7 @@ src/commit/BGCommitter.h
 src/commit/BGProposalGroup.h
 src/core/BGIndex.h
 src/core/BGPath.h
+src/core/BGReality.h
 src/core/BGStore.h
 src/core/BGTerrain.h
 src/core/BGTypes.h

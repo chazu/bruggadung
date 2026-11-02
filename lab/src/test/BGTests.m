@@ -10,6 +10,7 @@
 #import "BGPlay.h"
 #import "BGKnowledge.h"
 #import "BGPath.h"
+#import "BGReality.h"
 #import "BGWorlds.h"
 #import "BGAgency.h"
 #import "BGTraces.h"
@@ -8142,6 +8143,103 @@ static void   test_work_when_touched( void)
 }
 
 
+/* REALITY.md step 2: the reality bubble. No anchors, all is full. A
+ * player anchors it: full a chunk round, reduced four, abstract sixteen,
+ * frozen past, levels up and down as content says. Its centre stays
+ * while it is within its margin of its chunk, and follows past it. A word
+ * from it to someone at reduced detail leases them full, until the lease
+ * runs out. Anchors and leases are saved. */
+static void   test_reality_bubble( void)
+{
+   BGStage            st;
+   BGProposalGroup    *g;
+   BGEntityID         player;
+   BGEntityID         far;
+   BGWorld            *w2;
+   NSArray            *deferred;
+   NSString           *error;
+   NSString           *text;
+   uint64_t           position;
+   int32_t            cx;
+   int32_t            cy;
+   int32_t            cz;
+
+   st.w = BGTestWorld( 199);
+   BG_CHECK( [st.w setTerrainMap:"plain_map" error:NULL]);
+   st.c = BGTestCommitter( st.w);
+   st.s = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   g      = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: a player, and someone further off"];
+   player = [g create:"worker" key:"player" at:BGOnTile( 100, 100, 0)];
+   far    = [g create:"worker" key:"far off" at:BGOnTile( 100 + 2 * 32, 100, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   player = [g idFor:player];
+   far    = [g idFor:far];
+
+   /* no anchors: everything is full */
+   BG_CHECK( [st.w detailAt:BGOnTile( 1000, 1000, 0)] == BGDetailFull && [st.w detailOf:far] == BGDetailFull);
+
+   /* the player anchors it, centred on its chunk, (3, 3), at the next boundary */
+   BG_CHECK( [st.w setAnchor:player kind:"player"] && ! [st.w setAnchor:player kind:"nonesuch"]);
+   [st.s runUntil:BGTimeMake( 2)];
+   BG_CHECK( BGRealityAnchorAt( [st.w reality], 0, NULL, &cx, &cy, &cz, NULL) == player && cx == 3 && cy == 3 && cz == 0);
+   BG_CHECK( [st.w detailAt:BGOnTile( 100, 100, 0)] == BGDetailFull &&
+             [st.w detailAt:BGOnTile( 100 + 32, 100 - 32, 0)] == BGDetailFull &&
+             [st.w detailAt:BGOnTile( 100 + 2 * 32, 100, 0)] == BGDetailReduced &&
+             [st.w detailAt:BGOnTile( 100, 100 + 4 * 32, 0)] == BGDetailReduced &&
+             [st.w detailAt:BGOnTile( 100 + 5 * 32, 100, 0)] == BGDetailAbstract &&
+             [st.w detailAt:BGOnTile( 100 + 16 * 32, 100, 0)] == BGDetailAbstract &&
+             [st.w detailAt:BGOnTile( 100 + 17 * 32, 100, 0)] == BGDetailFrozen);
+   /* a level up: full; three up, reduced past its two; five, abstract past four */
+   BG_CHECK( [st.w detailAt:BGOnTile( 100, 100, 1)] == BGDetailFull && [st.w detailAt:BGOnTile( 100, 100, 3)] == BGDetailAbstract &&
+             [st.w detailAt:BGOnTile( 100, 100, 5)] == BGDetailFrozen);
+   BG_CHECK( [st.w detailOf:far] == BGDetailReduced && [st.w detailOf:player] == BGDetailFull);
+
+   /* across its chunk's edge, within the margin (4 tiles): the centre stays */
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the player steps out of its chunk"];
+   [g move:BGWhole( player) to:BGOnTile( 4 * 32 + 3, 100, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 3)];
+   BGRealityAnchorAt( [st.w reality], 0, NULL, &cx, &cy, &cz, NULL);
+   BG_CHECK( cx == 3 && [st.w detailOf:far] == BGDetailReduced);
+   /* past it: the centre follows, and the one further off is nearer now */
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the player goes on"];
+   [g move:BGWhole( player) to:BGOnTile( 4 * 32 + 5, 100, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 4)];
+   BGRealityAnchorAt( [st.w reality], 0, NULL, &cx, &cy, &cz, NULL);
+   BG_CHECK( cx == 4 && cy == 3 && [st.w detailOf:far] == BGDetailFull);
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: back again"];
+   [g move:BGWhole( player) to:BGOnTile( 100, 100, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 5)];
+   BG_CHECK( [st.w detailOf:far] == BGDetailReduced);
+
+   /* a word from the player to the one further off: contact, a lease */
+   g = [BGProposalGroup groupWithPhase:BGPhaseAction source:@"the player calls out"];
+   [g setActor:player];
+   [g emit:"said" subject:BGWhole( player) other:BGWhole( far)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 6)];
+   BG_CHECK( [st.w detailOf:far] == BGDetailFull && BGRealityLeaseOf( [st.w reality], far) == 6 + 60000);
+   /* not every event is contact: a look isn't */
+   BG_CHECK( ! BGRealityIsContact( [st.w reality], "looked") && BGRealityIsContact( [st.w reality], "struck"));
+
+   /* saved, and restored, the same */
+   text = BGSave( st.w, st.c, [NSArray array]);
+   BG_CHECK( [text rangeOfString:@"\nanchor "].location != NSNotFound && [text rangeOfString:@"\nlease "].location != NSNotFound);
+   w2 = BGRestore( text, [st.w contentBuild], &deferred, &position, &error);
+   BG_CHECK( w2 && [w2 stateHash] == [st.w stateHash] && [w2 detailOf:far] == BGDetailFull);
+
+   /* the lease runs out: reduced again, and let go */
+   [st.s runUntil:BGTimeMake( 70000)];
+   BG_CHECK( [st.w detailOf:far] == BGDetailReduced && BGRealityLeaseCount( [st.w reality]) == 0);
+   /* no anchor left: all full again */
+   [st.w removeAnchor:player];
+   BG_CHECK( [st.w detailOf:far] == BGDetailFull && [st.w detailAt:BGOnTile( 1000, 1000, 0)] == BGDetailFull);
+}
+
+
 /* A grid for BGPath, from rows of '#' (walls) and anything else. */
 typedef struct
 {
@@ -11430,6 +11528,7 @@ const BGTestCase   BGAllTests[] =
    { "spatial_index",                 test_spatial_index },
    { "water_at_scale",                test_water_at_scale },
    { "work_when_touched",             test_work_when_touched },
+   { "reality_bubble",                test_reality_bubble },
    { "recipe_autopilot",              test_recipe_autopilot },
    { "resume_recheck",                test_resume_recheck },
    { "interrupted_repair",            test_interrupted_repair },

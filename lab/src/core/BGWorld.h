@@ -146,6 +146,7 @@ typedef struct
    struct BGIndex *_watching;        /* activities with a watch, under one key */
    struct BGIndex *_touching;        /* activities, by actor, item and destination */
    struct BGIndex *_creations;       /* the "created" events' indices, by what they created */
+   struct BGReality *_reality;       /* anchors, levels of detail, leases (REALITY.md) */
    id <BGRecordObserver> _activityObserver;   /* not retained */
    BGEntityID     *_touched;         /* entities changed since the mark, unsorted, maybe twice */
    BGLocation     *_vacated;         /* ground tiles left since the mark */
@@ -292,6 +293,27 @@ typedef struct
 - (NSUInteger) watchingActivities:(BGEntityID *) out
                               max:(NSUInteger) max;
 - (BGEntityID *) copyWatchingActivities:(NSUInteger *) n;
+/* --- the reality bubble (REALITY.md) ---------------------------------------- */
+
+/* The bubble's anchors, levels, and leases. */
+- (struct BGReality *) reality;
+/* An entity anchors the bubble, of a kind from content (the `anchors`
+ * family); NO if there is none of that name. Its centre is where it stands
+ * at the next boundary (settleAnchors). */
+- (BOOL) setAnchor:(BGEntityID) entity
+              kind:(const char *) kind;
+- (void) removeAnchor:(BGEntityID) entity;
+/* Each anchor's centre moved to where it stands, past its margin; leases
+ * ended let go. Once a boundary. */
+- (void) settleAnchors;
+/* The level of detail (a BGDetail) at a tile; of an entity, where it
+ * stands, or full while a lease runs, or with no place on the ground. */
+- (int) detailAt:(BGLocation) tile;
+- (int) detailOf:(BGEntityID) entity;
+/* Contact (content's `contact`): each event from `first` between something
+ * at full detail and something not leases the other to full. */
+- (void) leaseContactsFrom:(NSUInteger) first;
+
 /* One observer of the Activity records, told of every change (activities'
  * timers); not retained, so it unsets itself as it goes. */
 - (void) setActivityObserver:(id <BGRecordObserver>) observer;

@@ -200,6 +200,7 @@ static uint64_t   now_ns( void)
                          world:_world
                      committer:_committer];
    groups = [_committer commitBoundary];
+   [_world settleAnchors];
    _stats.commitNs += now_ns() - mark;
    mark             = now_ns();
    [_perception perceiveBoundary:[_world boundary]];

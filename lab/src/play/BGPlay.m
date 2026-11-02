@@ -1,4 +1,5 @@
 #import "BGPlay.h"
+#import "BGReality.h"
 
 #import "BGTest.h"
 #import "BGView.h"
@@ -815,6 +816,63 @@ static char   glyph_of_kind( const char *kind)
 }
 
 
+/* The developer's view of the reality bubble (REALITY.md): the anchors,
+ * and the level of detail of the chunks around the actor, a character a
+ * chunk: F full, R reduced, A abstract, . frozen; @ where the actor is. */
+- (void) showReality
+{
+   struct BGReality   *reality;
+   BGLocation         here;
+   BGLocation         tile;
+   BGEntityID         e;
+   int32_t            cx;
+   int32_t            cy;
+   int32_t            cz;
+   int32_t            dx;
+   int32_t            dy;
+   BOOL               centred;
+   NSUInteger         i;
+   int                kind;
+
+   reality = [_world reality];
+   if( ! BGRealityAnchorCount( reality))
+   {
+      [_out appendString:@"No anchors: the whole world is at full detail.\n"];
+      return;
+   }
+   for( i = 0; i < BGRealityAnchorCount( reality); i++)
+   {
+      e = BGRealityAnchorAt( reality, i, &kind, &cx, &cy, &cz, &centred);
+      [_out appendFormat:@"anchor %llu, a %s, centred %@\n", (unsigned long long) e, BGRealityKindName( reality, kind),
+                         centred ? [NSString stringWithFormat:@"on chunk (%d, %d) level %d", cx, cy, cz] : @"nowhere yet"];
+   }
+   for( i = 0; i < BGRealityLeaseCount( reality); i++)
+   {
+      int64_t   until;
+
+      e = BGRealityLeaseAt( reality, i, &until);
+      [_out appendFormat:@"%llu held at full detail by contact until %lldms\n", (unsigned long long) e, (long long) until];
+   }
+   here = [_world locationOf:_actor];
+   if( here.form != BGLocationOnTile)
+      return;
+   for( dy = -8; dy <= 8; dy++)
+   {
+      for( dx = -8; dx <= 8; dx++)
+      {
+         tile = BGOnTile( here.x + dx * 32, here.y + dy * 32, here.level);
+         if( ! dx && ! dy)
+            [_out appendString:@"@"];
+         else if( ! [_world isTileX:tile.x y:tile.y level:tile.level])
+            [_out appendString:@" "];         /* off the map */
+         else
+            [_out appendString:[@[ @".", @"A", @"R", @"F"] objectAtIndex:(NSUInteger) [_world detailAt:tile]]];
+      }
+      [_out appendString:@"\n"];
+   }
+}
+
+
 - (BOOL) command:(NSString *) line
 {
    NSMutableArray   *words;
@@ -852,9 +910,27 @@ static char   glyph_of_kind( const char *kind)
                          @"notebook, write <R>, read <R>, note <text>, notes, autopilot <goal> [n],\n"
                          @"wait <ms>, step, idle, as <id>,\n"
                          @"activities, suspend <id>, resume <id>, knows [id], inspect <id>, why <id>, trace [n],\n"
+                         @"reality, anchor <kind>|off,\n"
                          @"save <file>, load <file>, time, hash, quit\n"];
    else if( [verb isEqualToString:@"look"])
       [self look];
+   else if( [verb isEqualToString:@"reality"])
+      [self showReality];
+   else if( [verb isEqualToString:@"anchor"] && [words count] > 1)
+   {
+      if( [[words objectAtIndex:1] isEqualToString:@"off"])
+      {
+         [_world removeAnchor:_actor];
+         [_out appendString:@"You no longer anchor the world.\n"];
+      }
+      else if( [_world setAnchor:_actor kind:[[words objectAtIndex:1] UTF8String]])
+      {
+         [_world settleAnchors];
+         [_out appendFormat:@"You anchor the world, as a %@.\n", [words objectAtIndex:1]];
+      }
+      else
+         [_out appendFormat:@"There is no kind of anchor called %@.\n", [words objectAtIndex:1]];
+   }
    else if( [verb isEqualToString:@"menu"])
       [self showMenu];
    else if( [verb isEqualToString:@"do"])

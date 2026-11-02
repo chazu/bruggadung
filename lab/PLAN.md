@@ -4269,3 +4269,27 @@ Wall time a world second: spread 100 → 9 ms, 400 → 39 ms, 1600 → 181 ms
 (linear in the agents); crowd 80 → 14 ms (394 ms before step 1).
 
 109 tests, 3447 checks, under both compilers, UBSan, and leak-free.
+
+
+### After the slice: the reality bubble, anchors and levels (REALITY.md step 2)
+
+- `content/reality.tri`: `#Reach`, `#AnchorKind` (family `anchors`:
+  `player`, `distant`), `#Contact` (`contact`: said, struck, arrested,
+  moved; 60 s).
+- `BGReality` (lab/src/core): anchor kinds from content; anchors in entity
+  order, each centred on a chunk with a margin of hysteresis; the level of
+  a tile, the highest any anchor gives; leases, the later end kept, ended
+  ones let go each boundary.
+- `BGWorld`: `setAnchor:kind:`, `removeAnchor:`, `settleAnchors` (the
+  scheduler, after commitment), `detailAt:`, `detailOf:`,
+  `leaseContactsFrom:` (the committer, after each group); anchors and
+  leases saved and hashed.
+- Play: `anchor <kind>|off`, `reality` (a chunk map around the actor).
+- Nothing reads the levels yet. The audit of what stands in the way of
+  threads is in REALITY.md step 6.
+
+Checked besides: no anchors, all full; levels across, up and down; the
+centre staying within its margin and following past it; a word to someone
+at reduced detail leasing them full, saved and restored, and running out.
+
+110 tests, 3463 checks, under both compilers, UBSan, and leak-free.
