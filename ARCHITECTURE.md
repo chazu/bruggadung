@@ -26,6 +26,7 @@ proven on COMPONENTS.md's first scenario.
 | [AGENCY.md](AGENCY.md) | §5: goals, methods, needs, commitments, habits, dispositions, salience | Contract proposed, 3 scenarios; all run in [lab/](lab/README.md), Scenario 1 adapted, its step 5 (loyalty) aside |
 | [INSTITUTIONS.md](INSTITUTIONS.md) | §6: institutions | Decisions being made |
 | [LATENT_ASSEMBLY.md](LATENT_ASSEMBLY.md) | Latent physical assembly | The lab's rules adopted; culprits by history and wear by use still to design |
+| [TESSERA.md](TESSERA.md) | Tessera, the visual engine: scenes from the two views, appearance in content, terminal and GPU backends | Draft; nothing built |
 | [CONTENT_LANGUAGE.md](CONTENT_LANGUAGE.md) | Triangle, the content language: typed feature structures, TDL semantics, CUE-style syntax, the engine | Contract proposed, 3 scenarios; Scenario 1 runs in triangle/, 2 and 3 in [lab/](lab/README.md) |
 | [CHAT.md](CHAT.md) | Original brainstorm. The setting is discarded. | Reference |
 
