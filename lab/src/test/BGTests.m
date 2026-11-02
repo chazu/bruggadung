@@ -4661,8 +4661,8 @@ static void   test_sight_and_memory( void)
 
 
 /* TERRAIN.md step 3: rooms from terrain. In rooms_map, the room, the back
- * room and the corridor are rooms; walls and doorways are in none; the
- * ground outdoors is a room with no air of its own. */
+ * room and the corridor are rooms; walls and doorways are in none, and so
+ * is the ground outdoors, open to the world's edge. */
 static void   test_rooms( void)
 {
    BGStage            st;
@@ -4670,18 +4670,32 @@ static void   test_rooms( void)
    BGEntityID         room;
    BGEntityID         back;
    BGEntityID         corridor;
+   BGEntityID         door;
+   BGAirOpening       o[ 8];
    BGTerrain          *t;
+   int32_t            cells[ 4][ 3];
+   int32_t            x;
+   int32_t            y;
+   int32_t            z;
+   uint32_t           r;
 
    st.w = BGTestWorld( 7);
    BG_CHECK( [st.w setTerrainMap:"rooms_map" error:NULL]);
    BG_CHECK( [st.w tilesWide] == 32 && [st.w tilesHigh] == 32);
-   t = (BGTerrain *) [st.w terrain];
+   t = [st.w terrain];
    BG_CHECK( BGTerrainRoomAt( t, 1, 1, 0) && BGTerrainRoomAt( t, 1, 1, 0) == BGTerrainRoomAt( t, 4, 5, 0));
    BG_CHECK( BGTerrainRoomAt( t, 6, 1, 0) && BGTerrainRoomAt( t, 6, 1, 0) != BGTerrainRoomAt( t, 1, 1, 0));
-   BG_CHECK( BGTerrainRoomAt( t, 0, 7, 0) && BGTerrainRoomAt( t, 0, 7, 0) == BGTerrainRoomAt( t, 20, 8, 0) &&
-             BGTerrainRoomAt( t, 0, 7, 0) != BGTerrainRoomAt( t, 1, 1, 0));
-   BG_CHECK( BGTerrainRoomAt( t, 4, 6, 0) == 0 && BGTerrainRoomAt( t, 0, 0, 0) == 0 && BGTerrainRoomAt( t, 32, 0, 0) == 0);
-   BG_CHECK( BGTerrainRoomAt( t, 15, 15, 0) && BGTerrainRoomAt( t, 15, 15, 0) == BGTerrainRoomAt( t, 11, 0, 0));
+   BG_CHECK( BGTerrainRoomAt( t, 1, 7, 0) && BGTerrainRoomAt( t, 1, 7, 0) == BGTerrainRoomAt( t, 20, 8, 0) &&
+             BGTerrainRoomAt( t, 1, 7, 0) != BGTerrainRoomAt( t, 1, 1, 0));
+   BG_CHECK( BGTerrainRoomAt( t, 4, 6, 0) == 0 && BGTerrainRoomAt( t, 0, 7, 0) == 0 && BGTerrainRoomAt( t, 32, 0, 0) == 0);
+   BG_CHECK( BGTerrainRoomAt( t, 15, 15, 0) == 0 && BGTerrainRoomAt( t, 11, 0, 0) == 0);
+
+   /* a room's size, its first cell, and the doorways at its side */
+   r = BGTerrainRoomAt( t, 3, 4, 0);
+   BG_CHECK( BGTerrainRoomSize( t, r) == 20 && BGTerrainRoomCorner( t, r, &x, &y, &z) && x == 1 && y == 1 && z == 0);
+   BG_CHECK( BGTerrainRoomDoorways( t, r, cells, 4) == 1 && cells[ 0][ 0] == 4 && cells[ 0][ 1] == 6);
+   r = BGTerrainRoomAt( t, 12, 8, 0);
+   BG_CHECK( BGTerrainRoomDoorways( t, r, cells, 4) == 2 && cells[ 0][ 0] == 4 && cells[ 1][ 0] == 8);
 
    /* the air over a tile is the region whose tile is in its room */
    st.c = BGTestCommitter( st.w);
@@ -4699,12 +4713,209 @@ static void   test_rooms( void)
              [st.w airRegionAt:BGOnTile( 12, 8, 0)] == corridor);
    BG_CHECK( ! [st.w airRegionAt:BGOnTile( 4, 6, 0)] && ! [st.w airRegionAt:BGOnTile( 15, 15, 0)]);
 
-   /* a wall knocked through joins the rooms: found again, they are one */
-   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the wall between knocked through"];
-   [g setTerrain:"plank_floor" at:BGOnTile( 5, 3, 0)];
+   /* the ways air opens, from the doorways: the room's to the corridor,
+    * passing the doorway's draught; the corridor's to both rooms */
+   BG_CHECK( [st.w airOpeningsOf:room into:o max:8] == 1 && o[ 0].at.x == 4 && o[ 0].at.y == 6 &&
+             o[ 0].beyond == corridor && ! o[ 0].door && o[ 0].flow == 200 && o[ 0].open);
+   BG_CHECK( [st.w airOpeningsOf:corridor into:o max:8] == 2 && o[ 0].beyond == room && o[ 1].beyond == back);
+   /* a door in the doorway: shut, it passes nothing; ajar, its width */
+   g    = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the room's door"];
+   door = [g create:"room_door" key:"the room's door" at:BGOnTile( 4, 6, 0)];
    [st.c submit:g];
    [st.s runUntil:BGTimeMake( 2)];
-   BG_CHECK( [g applied] && BGTerrainRoomAt( t, 1, 1, 0) == BGTerrainRoomAt( t, 6, 1, 0) && BGTerrainRoomAt( t, 5, 3, 0));
+   door = [g idFor:door];
+   BG_CHECK( [st.w airOpeningsOf:room into:o max:8] == 1 && o[ 0].door == door && o[ 0].flow == 0 && ! o[ 0].open);
+   BG_CHECK( [st.w setField:"Door.ajar" of:door value:1]);
+   BG_CHECK( [st.w airOpeningsOf:room into:o max:8] == 1 && o[ 0].flow == 5000 && o[ 0].open);
+   /* the back room's doorway, to the corridor */
+   BG_CHECK( [st.w airOpeningsOf:back into:o max:8] == 1 && o[ 0].beyond == corridor && o[ 0].at.x == 8);
+}
+
+
+/* The stocks of a region of air: oxygen, carbon dioxide, heat, total. */
+static void   air_stocks( BGWorld *w, BGEntityID air, int64_t *v)
+{
+   if( ! [w getField:"GasStore.oxygen" of:air value:&v[ 0]] || ! [w getField:"GasStore.dioxide" of:air value:&v[ 1]] ||
+       ! [w getField:"GasStore.gasHeat" of:air value:&v[ 2]] || ! [w getField:"GasStore.total" of:air value:&v[ 3]])
+      memset( v, 0, 4 * sizeof( int64_t));
+}
+
+
+/* TERRAIN.md step 3: air follows terrain. A wall knocked through joins two
+ * rooms' air into the first's, every stock kept; one built back parts it
+ * by tiles; a group refused undoes both; a hole to the outdoors leaves the
+ * air in no room, and it airs out. The atmosphere balances throughout. */
+static void   test_air_follows_terrain( void)
+{
+   BGStage            st;
+   BGAtmosphere       *air;
+   BGAtmosphere       *copy;
+   BGProposalGroup    *g;
+   BGEntityID         room;
+   BGEntityID         back;
+   BGEntityID         parted;
+   BGEntityID         doors[ 2];
+   int64_t            a[ 4];
+   int64_t            b[ 4];
+   int64_t            sum[ 4];
+   BOOL               balanced;
+   int                q;
+
+   st.w = BGTestWorld( 11);
+   BG_CHECK( [st.w setTerrainMap:"rooms_map" error:NULL]);
+   st.c = BGTestCommitter( st.w);
+   air  = [[[BGAtmosphere alloc] initWithWorld:st.w] autorelease];
+   st.s = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [st.s addDomain:air];
+   g    = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: two rooms"];
+   room = [g create:"room_air" key:"the room's air" at:BGLocationMakeNone()];
+   back = [g create:"back_room" key:"the back room's air" at:BGLocationMakeNone()];
+   doors[ 0] = [g create:"room_door" key:"the room's door" at:BGOnTile( 4, 6, 0)];
+   doors[ 1] = [g create:"room_door" key:"the back room's door" at:BGOnTile( 8, 6, 0)];
+   [g set:"GasStore.dioxide" of:BGWhole( room) to:4800];        /* stale */
+   [g set:"Door.ajar" of:BGWhole( doors[ 0]) to:1];
+   [g set:"Door.ajar" of:BGWhole( doors[ 1]) to:1];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   room      = [g idFor:room];
+   back      = [g idFor:back];
+   doors[ 0] = [g idFor:doors[ 0]];
+   doors[ 1] = [g idFor:doors[ 1]];
+   balanced = YES;
+   while( [st.s stepUntil:BGTimeMake( 590000)])
+      balanced = balanced && [air balanced];
+   BG_CHECK( [air steps] > 0);
+   /* the doors shut, the air is still: what it holds is what joins */
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"the doors shut"];
+   [g set:"Door.ajar" of:BGWhole( doors[ 0]) to:0];
+   [g set:"Door.ajar" of:BGWhole( doors[ 1]) to:0];
+   [st.c submit:g];
+   while( [st.s stepUntil:BGTimeMake( 600000)])
+      balanced = balanced && [air balanced];
+   air_stocks( st.w, room, a);
+   air_stocks( st.w, back, b);
+   for( q = 0; q < 4; q++)
+      sum[ q] = a[ q] + b[ q];
+
+   /* the wall between knocked through: one air, the room's, all of both */
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"the wall between knocked through"];
+   [g setTerrain:"plank_floor" at:BGOnTile( 5, 3, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 600001)];
+   air_stocks( st.w, room, a);
+   BG_CHECK( [g applied] && ! [st.w isLive:back] && [st.w resolve:back] == room);
+   BG_CHECK( [st.w airRegionAt:BGOnTile( 9, 5, 0)] == room && [st.w airRegionAt:BGOnTile( 5, 3, 0)] == room);
+   BG_CHECK( a[ 0] == sum[ 0] && a[ 1] == sum[ 1] && a[ 2] == sum[ 2] && a[ 3] == 4000000);
+   while( [st.s stepUntil:BGTimeMake( 1200000)])
+      balanced = balanced && [air balanced];
+
+   /* built back: the side cut off gets its share, by tiles, half */
+   air_stocks( st.w, room, sum);
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"the wall built back"];
+   [g setTerrain:"stone_wall" at:BGOnTile( 5, 3, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1200001)];
+   parted = [st.w airRegionAt:BGOnTile( 9, 5, 0)];
+   BG_CHECK( [g applied] && parted && parted != room && [st.w airRegionAt:BGOnTile( 2, 2, 0)] == room);
+   air_stocks( st.w, room, a);
+   air_stocks( st.w, parted, b);
+   BG_CHECK( b[ 3] == 2000000 && a[ 3] == 2000000 && b[ 0] == sum[ 0] / 2);
+   for( q = 0; q < 4; q++)
+      BG_CHECK( a[ q] + b[ q] == sum[ q]);
+   /* the doors opened: the two airs move again, each its own way */
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"the doors opened"];
+   [g set:"Door.ajar" of:BGWhole( doors[ 0]) to:1];
+   [g set:"Door.ajar" of:BGWhole( doors[ 1]) to:1];
+   [st.c submit:g];
+   while( [st.s stepUntil:BGTimeMake( 1800000)])
+      balanced = balanced && [air balanced];
+   BG_CHECK( [air isActive]);
+   /* saved mid-flow, its links' carries with it */
+   copy = [[[BGAtmosphere alloc] initWithWorld:st.w] autorelease];
+   [copy restoreSavedState:[air savedState]];
+   BG_CHECK( [[copy savedState] isEqualToArray:[air savedState]] &&
+             [[[air savedState] componentsJoinedByString:@"\n"] rangeOfString:@"link "].location != NSNotFound);
+
+   /* a group refused undoes the join with it */
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"a knock refused"];
+   [g setTerrain:"plank_floor" at:BGOnTile( 5, 3, 0)];
+   [g set:"Door.ajar" of:BGWhole( room) to:1];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1800001)];
+   BG_CHECK( ! [g applied] && [st.w isLive:parted] && [st.w airRegionAt:BGOnTile( 9, 5, 0)] == parted &&
+             ! BGTerrainRoomy( [st.w terrain], 5, 3, 0));
+
+   /* a hole to the outdoors: the parted air is in no room, and airs out */
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"a hole in the back wall"];
+   [g setTerrain:"plank_floor" at:BGOnTile( 7, 0, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1800002)];
+   BG_CHECK( [g applied] && ! [st.w roomOfAir:parted] && ! [st.w airRegionAt:BGOnTile( 9, 5, 0)]);
+   while( [st.s stepUntil:BGTimeMake( 3600000)])
+      balanced = balanced && [air balanced];
+   air_stocks( st.w, parted, b);
+   BG_CHECK( b[ 1] >= 800 && b[ 1] <= 900);       /* the outdoors' 0.04%, within the 100 mmol it rests at */
+   BG_CHECK( balanced);
+}
+
+
+/* Rooms in a large world (TERRAIN.md step 3): a 1024 by 1024 plain of open
+ * floor is in no room, found by a flood stopped at BG_ROOM_MAX; a hut walled
+ * on it is a room, found when its last wall closes it; one too large to be
+ * a room is open ground. */
+static void   test_rooms_at_scale( void)
+{
+   BGWorld       *w;
+   BGTerrain     *t;
+   char          why[ 256];
+   int32_t       i;
+   BGTerrainKind wall;
+   BGTerrainKind floor;
+
+   w = BGTestWorld( 13);
+   t = BGTerrainNew( [w tri], 1024, 1024, 1, "open_floor", why, sizeof( why));
+   BG_CHECK( t != NULL);
+   if( ! t)
+      return;
+   wall  = BGTerrainKindNamed( t, "stone_wall");
+   floor = BGTerrainKindNamed( t, "open_floor");
+   BG_CHECK( BGTerrainRoomAt( t, 500, 500, 0) == 0 && BGTerrainRoomAt( t, 10, 1000, 0) == 0);
+
+   /* a hut, 3 by 3 inside, walled one wall at a time */
+   for( i = 0; i < 5; i++)
+   {
+      BGTerrainSet( t, 499 + i, 499, 0, wall);
+      BGTerrainSet( t, 499 + i, 503, 0, wall);
+   }
+   BGTerrainSet( t, 499, 500, 0, wall);
+   BGTerrainSet( t, 499, 501, 0, wall);
+   BGTerrainSet( t, 499, 502, 0, wall);
+   BGTerrainSet( t, 503, 500, 0, wall);
+   BGTerrainSet( t, 503, 501, 0, wall);
+   BG_CHECK( BGTerrainRoomAt( t, 501, 501, 0) == 0);           /* one wall short: open */
+   BGTerrainSet( t, 503, 502, 0, wall);
+   BG_CHECK( BGTerrainRoomAt( t, 501, 501, 0) && BGTerrainRoomSize( t, BGTerrainRoomAt( t, 501, 501, 0)) == 9);
+   BG_CHECK( BGTerrainRoomAt( t, 500, 500, 0) == BGTerrainRoomAt( t, 502, 502, 0) && BGTerrainRoomAt( t, 498, 498, 0) == 0);
+   /* a wall knocked out: open again */
+   BGTerrainSet( t, 503, 501, 0, floor);
+   BG_CHECK( BGTerrainRoomAt( t, 501, 501, 0) == 0);
+
+   /* a hall 70 by 70 inside is more than a room can be: open */
+   for( i = 0; i < 72; i++)
+   {
+      BGTerrainSet( t, 100 + i, 100, 0, wall);
+      BGTerrainSet( t, 100 + i, 171, 0, wall);
+      BGTerrainSet( t, 100, 100 + i, 0, wall);
+      BGTerrainSet( t, 171, 100 + i, 0, wall);
+   }
+   BG_CHECK( BGTerrainRoomAt( t, 130, 130, 0) == 0);
+   /* parted in two by a wall down it, each side is a room */
+   for( i = 101; i < 171; i++)
+      BGTerrainSet( t, 135, i, 0, wall);
+   BG_CHECK( BGTerrainRoomAt( t, 130, 130, 0) && BGTerrainRoomAt( t, 140, 130, 0) &&
+             BGTerrainRoomAt( t, 130, 130, 0) != BGTerrainRoomAt( t, 140, 130, 0) &&
+             BGTerrainRoomSize( t, BGTerrainRoomAt( t, 130, 130, 0)) == 34 * 70);
+   BGTerrainFree( t);
 }
 
 
@@ -8837,11 +9048,8 @@ static void   test_local_wake( void)
    door     = [g idFor:door];
    worker   = [g idFor:worker];
    g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the doors, and a night's stale air"];
-   [g set:"GasStore.opensTo" of:BGWhole( room) to:(int64_t) corridor];
-   [g set:"GasStore.door" of:BGWhole( room) to:(int64_t) door];
    [g set:"GasStore.gap" of:BGWhole( room) to:0];
    [g set:"GasStore.dioxide" of:BGWhole( room) to:1600];
-   [g set:"GasStore.opensTo" of:BGWhole( back) to:(int64_t) corridor];
    [g set:"ThermalBody.bounds" of:BGWhole( shell) to:(int64_t) room];
    [c submit:g];
    [s runUntil:BGTimeMake( 2)];
@@ -9063,8 +9271,6 @@ static BOOL   stuffy_lodger( int64_t dioxide, int32_t *felt, BGAgency **minds, B
    door     = [g idFor:door];
    lodger   = [g idFor:lodger];
    g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the door"];
-   [g set:"GasStore.opensTo" of:BGWhole( room) to:(int64_t) corridor];
-   [g set:"GasStore.door" of:BGWhole( room) to:(int64_t) door];
    [st.c submit:g];
    [st.s runUntil:BGTimeMake( 2)];
    *felt  = [[knowledge storeOf:lodger] feels:"stuffy"];
@@ -10136,7 +10342,6 @@ static void   test_light( void)
    worker = [g idFor:worker];
    crate  = [g idFor:crate];
    g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the room's door"];
-   [g set:"GasStore.door" of:BGWhole( room) to:(int64_t) door];
    [st.c submit:g];
    [st.s runUntil:BGTimeMake( 2)];
    yard   = BGOnTile( 10, 10, 0);
@@ -10195,8 +10400,6 @@ static BOOL   hears_clatter( BOOL open, BOOL clang, BGLocation listener)
    door     = [g idFor:door];
    hearer   = [g idFor:hearer];
    g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the door, and the sounds"];
-   [g set:"GasStore.opensTo" of:BGWhole( room) to:(int64_t) corridor];
-   [g set:"GasStore.door" of:BGWhole( room) to:(int64_t) door];
    if( open)
       [g set:"Door.ajar" of:BGWhole( door) to:1];
    BGMakeTrace( st.w, g, "clatter", BGNoEntity, BGOnTile( 2, 3, 0), 60, "the test");
@@ -10784,6 +10987,8 @@ const BGTestCase   BGAllTests[] =
    { "terrain",                       test_terrain },
    { "sight_and_memory",              test_sight_and_memory },
    { "rooms",                         test_rooms },
+   { "air_follows_terrain",           test_air_follows_terrain },
+   { "rooms_at_scale",                test_rooms_at_scale },
    { "pump_heat",                     test_pump_heat },
    { "pump_heat_running",             test_pump_heat_running },
    { "component_pump",                test_component_pump },

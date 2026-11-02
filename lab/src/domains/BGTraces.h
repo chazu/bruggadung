@@ -21,8 +21,9 @@ int64_t   BGTraceGone( BGWorld *world, const BGTrace *trace);
 
 /* Sound (KNOWLEDGE.md decision 14): how loud a sound of `strength` made at
  * `from` is at `to`: less BG_SOUND_FALLOFF a tile, and, from another room
- * (air region), BG_SOUND_DOOR through an open door between them, or
- * BG_SOUND_WALL through a wall or a shut one. Another level: silent. */
+ * (air region), BG_SOUND_DOOR through a doorway open between them (no
+ * door, or its door ajar), or BG_SOUND_WALL through a wall or a shut door.
+ * Another level: silent. */
 #define BG_SOUND_FALLOFF   3
 #define BG_SOUND_DOOR     10
 #define BG_SOUND_WALL     30

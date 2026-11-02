@@ -2,8 +2,8 @@
  * BGLight — light as a domain (KNOWLEDGE.md decision 14), giving perception
  * its conditions (§5). Daylight follows the clock: day from `dawn` to
  * `nightfall` (content/workshop.tri's `daylight`), twilight `twilight`
- * either side, night between. Indoors, in a room with a door (an air
- * region, content/air.tri), it is a step darker, unless the door is open.
+ * either side, night between. Indoors, in a room with air (content/air.tri)
+ * none of whose doorways stands open, it is a step darker.
  * A lamp shining lights its `reach`, burning its oil down as it does (as
  * of `oilAt`, computed when read); spent, it goes out. A lit fire glows a
  * tile round. Nothing is stepped between: the horizon is the next change

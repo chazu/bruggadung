@@ -5,13 +5,16 @@
 // A kind is `solid` when nothing walks into it, `opaque` when sight stops at
 // it, `floored` when there is something to stand on (without, the level
 // below shows, and things fall), and `divides` where a room ends without
-// a wall (a doorway: it belongs to neither room it joins). Its `look` is its appearance key for
-// Tessera. `madeOf` is its material (`material` is a body's).
+// a wall (a doorway: it belongs to neither room it joins, and links them).
+// A doorway's `draught` is the air it passes with no door shut in it, mmol
+// a second each way. Its `look` is its appearance key for Tessera. `madeOf`
+// is its material (`material` is a body's).
 #Terrain: {
     solid:   *false | true
     opaque:  *false | true
     floored: *true | false
     divides: *false | true
+    draught: *0 | int & >=0 & <=1000000
     madeOf:  #Material
     look:    text
 }
@@ -21,7 +24,7 @@ open_floor:  #Terrain & { madeOf: "stone", look: "floor.stone" } @family(terrain
 plank_floor: #Terrain & { madeOf: "wood", look: "floor.plank" } @family(terrain)
 stone_wall:  #Terrain & { solid: true, opaque: true, madeOf: "stone", look: "wall.stone" } @family(terrain)
 // where a door stands, or would: floor, the door an entity on it
-doorway:     #Terrain & { divides: true, madeOf: "stone", look: "doorway" } @family(terrain)
+doorway:     #Terrain & { divides: true, draught: 200, madeOf: "stone", look: "doorway" } @family(terrain)
 // nothing to stand on: the level below shows through
 open_air:    #Terrain & { floored: false, madeOf: "stone", look: "air" } @family(terrain)
 
@@ -48,8 +51,8 @@ shed_map: #Map & {
 
 // The rooms of the air scenarios (DOMAIN_SIMULATION.md Scenario 1, air.tri):
 // a room and a back room, 4 by 5, side by side, their doorways onto a
-// corridor below, open to the outdoors along its length; the rest of a 32
-// by 32 world, open ground outdoors.
+// corridor below, walled at its ends; the rest of a 32 by 32 world, open
+// ground outdoors.
 rooms_map: #Map & {
     legend: [{ glyph: "#", terrain: "stone_wall" },
              { glyph: ".", terrain: "plank_floor" },

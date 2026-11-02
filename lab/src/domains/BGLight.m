@@ -76,13 +76,24 @@ static int   outdoors( BGWorld *world, int64_t t)
 }
 
 
-/* The room over a tile: an air region with a door; none outdoors. */
-static const BGGasStore   *room_at( BGWorld *world, BGLocation tile)
+/* Whether a tile is shut in: in a room with air (TERRAIN.md step 3) none
+ * of whose ways out stands open, a doorway with no door or its door ajar. */
+static BOOL   shut_in( BGWorld *world, BGLocation tile)
 {
-   const BGGasStore   *air;
+   BGAirOpening   openings[ 16];
+   BGEntityID     air;
+   NSUInteger     n;
+   NSUInteger     i;
 
-   air = [world record:[world kindNamed:"GasStore"] for:[world airRegionAt:tile]];
-   return( air && air->door ? air : NULL);
+   if( ! (air = [world airRegionAt:tile]))
+      return( NO);
+   n = [world airOpeningsOf:air
+                       into:openings
+                        max:16];
+   for( i = 0; i < n && i < 16; i++)
+      if( openings[ i].open)
+         return( NO);
+   return( YES);
 }
 
 
@@ -99,19 +110,16 @@ int64_t   BGLampOil( const BGLamp *lamp, int64_t t)
 
 int   BGLightAt( BGWorld *world, BGLocation tile, int64_t t)
 {
-   const BGGasStore   *room;
    const BGLamp       *lamp;
    const BGCombustor  *fire;
    BGStore            *store;
    BGLocation         at;
    NSUInteger         i;
-   int64_t            ajar;
    int                light;
 
-   /* the day, shaded indoors unless the door is open */
+   /* the day, shaded in a room shut in */
    light = outdoors( world, t);
-   if( light > 0 && (room = room_at( world, tile)) &&
-       ! ([world getField:"Door.ajar" of:(BGEntityID) room->door value:&ajar] && ajar))
+   if( light > 0 && shut_in( world, tile))
       light--;
    /* lamps with oil left, shining */
    store = [world storeForKind:[world kindNamed:"Lamp"]];

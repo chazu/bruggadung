@@ -48,23 +48,24 @@ static BGEntityID   region_at( BGWorld *world, BGLocation tile)
 }
 
 
-/* Whether one region opens to the other through a door ajar. */
+/* Whether one region opens to the other (none: the outdoors) through a
+ * doorway standing open: no door in it, or its door ajar. */
 static BOOL   open_between( BGWorld *world, BGEntityID a, BGEntityID b)
 {
-   const BGGasStore   *air;
-   BGEntityID         pair[ 2];
-   int64_t            ajar;
-   int                k;
+   BGAirOpening   openings[ 16];
+   BGEntityID     from;
+   BGEntityID     to;
+   NSUInteger     n;
+   NSUInteger     i;
 
-   pair[ 0] = a;
-   pair[ 1] = b;
-   for( k = 0; k < 2; k++)
-   {
-      air = pair[ k] ? [world record:[world kindNamed:"GasStore"] for:pair[ k]] : NULL;
-      if( air && (BGEntityID) air->opensTo == pair[ 1 - k] && air->door &&
-          [world getField:"Door.ajar" of:(BGEntityID) air->door value:&ajar] && ajar)
+   from = a ? a : b;
+   to   = a ? b : a;
+   n    = [world airOpeningsOf:from
+                          into:openings
+                           max:16];
+   for( i = 0; i < n && i < 16; i++)
+      if( openings[ i].beyond == to && openings[ i].open)
          return( YES);
-   }
    return( NO);
 }
 

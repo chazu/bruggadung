@@ -8,10 +8,14 @@
  *
  * Per step, in whole quanta, with carries for what is fractional:
  *
- *   - each region's link mixes it with the region it opens to, or with the
- *     outdoors, a reservoir at 275 K of fixed composition: its gap's flow
- *     of air each way a second, or its door's while ajar, carrying gas and
- *     heat in proportion;
+ *   - each link mixes a region with the region it opens to, or with the
+ *     outdoors, a reservoir at 275 K of fixed composition: a doorway at its
+ *     room's side (TERRAIN.md step 3), passing the doorway's draught, or
+ *     its door's width while ajar and nothing while shut; the region's leak
+ *     to the outdoors (its gap); or, its room opened to the outdoors, its
+ *     airing out, a hundredth of it a second. Links are found from the
+ *     terrain each time the domain reads the world, and carry gas and heat
+ *     in proportion, measured from the smaller side;
  *   - a lit stove burns up to its rate (mg a second) of wood; each gram
  *     consumes 33 mmol of oxygen, produces 33 of carbon dioxide and 15 kJ of
  *     heat. Damper open, the firebox draws from the outdoors and vents up
@@ -59,6 +63,7 @@
 #define BG_ATMOS_STOVES    8
 #define BG_ATMOS_SURFACES  16
 #define BG_ATMOS_BREATHERS 8
+#define BG_ATMOS_LINKS     32
 
 
 typedef struct
@@ -68,16 +73,29 @@ typedef struct
    int64_t      dioxide;
    int64_t      heat;            /* J */
    int64_t      total;           /* mmol */
-   int64_t      carryAir;        /* the door's flow, in mmol·ms */
-   int64_t      carryIn[ 3];     /* what comes in from outdoors, numerators */
-   int64_t      carryOut[ 3];    /* what goes out, numerators over the total */
    int64_t      carryBurn[ 3];   /* combustion into the region, in mmol·mg, J·mg */
    int64_t      pending;         /* heat in transit to it, J */
-   int          link;            /* the region it opens to, or -1, the outdoors */
-   int64_t      flow;            /* mmol of air a second, each way */
-   int          doorSeen;        /* its door, ajar or not, at the last step; -1 not yet seen */
    NSUInteger   steps;           /* steps it was awake for */
 } BGAirRegion;
+
+
+/* A way air moves between a region and what it opens to: kept by the two
+ * sides and the doorway, from read to read, for its carries. */
+typedef struct
+{
+   BGEntityID   from;            /* the smaller side, whose air it is measured by */
+   BGEntityID   to;              /* the other, or BGNoEntity: the outdoors */
+   BGLocation   at;              /* the doorway; none: a leak, or airing out */
+   int          a;               /* their regions, as read; b -1: the outdoors */
+   int          b;
+   BGEntityID   door;            /* the door in it, or none */
+   int64_t      flow;            /* mmol of air a second, each way */
+   int          doorSeen;        /* its door, ajar or not, at the last step; -1 not yet seen */
+   int64_t      carryAir;        /* mmol·ms */
+   int64_t      carryIn[ 3];     /* what comes in from the other side, numerators */
+   int64_t      carryOut[ 3];    /* what goes out, numerators over the total */
+   BOOL         found;
+} BGAirLink;
 
 
 typedef struct
@@ -133,6 +151,8 @@ typedef struct
    BOOL           _ledgered;
    BGAirRegion    _regions[ BG_ATMOS_REGIONS];
    int            _nregions;
+   BGAirLink      _links[ BG_ATMOS_LINKS];
+   int            _nlinks;
    BGStoveState   _stoves[ BG_ATMOS_STOVES];
    int            _nstoves;
    BGAirSurface   _surfaces[ BG_ATMOS_SURFACES];

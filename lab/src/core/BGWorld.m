@@ -156,6 +156,7 @@ void   BGLocationFormat( BGLocation loc, char *buf, size_t len)
    free( _tileWater);
    free( _tileOut);
    BGTerrainFree( _terrain);
+   free( _roomAir);
    free( _checkedOut);
    tri_arena_free( _arena);
    [_content release];
@@ -1120,7 +1121,7 @@ static void   edge_remove_raw( BGWorld *self, BGEdge e)
 
 /* --- terrain --------------------------------------------------------------- */
 
-- (const BGTerrain *) terrain
+- (BGTerrain *) terrain
 {
    return( _terrain);
 }
@@ -1154,8 +1155,9 @@ static void   edge_remove_raw( BGWorld *self, BGEdge e)
       return( NO);
    }
    BGTerrainFree( _terrain);
-   _terrain   = t;
-   _tilesWide = BGTerrainWide( t);
+   _terrain      = t;
+   _roomAirKnown = NO;
+   _tilesWide    = BGTerrainWide( t);
    _tilesHigh = BGTerrainHigh( t);
    _levels    = BGTerrainLevels( t);
    free( _tileWater);
@@ -1168,22 +1170,134 @@ static void   edge_remove_raw( BGWorld *self, BGEdge e)
 
 - (BGEntityID) airRegionAt:(BGLocation) tile
 {
+   if( (tile.form != BGLocationOnTile && tile.form != BGLocationNone) || ! _terrain)
+      return( BGNoEntity);
+   return( [self airOfRoom:BGTerrainRoomAt( _terrain, tile.x, tile.y, tile.level)]);
+}
+
+
+/* Each room's air, kept while neither the regions of air nor the rooms have
+ * changed: a region's room is found again, and any other room has none. */
+- (BGEntityID) airOfRoom:(uint32_t) room
+{
    const BGGasStore   *gas;
    BGStore            *stores;
    NSUInteger         i;
-   uint32_t           room;
+   uint32_t           r;
 
-   if( (tile.form != BGLocationOnTile && tile.form != BGLocationNone) || ! _terrain ||
-       ! (room = BGTerrainRoomAt( _terrain, tile.x, tile.y, tile.level)))
+   if( ! room || ! _terrain)
       return( BGNoEntity);
    stores = [self storeForKind:[self kindNamed:"GasStore"]];
-   for( i = 0; i < [stores count]; i++)
+   if( ! _roomAirKnown || _roomAirChanges != [stores changes] || _roomAirDropped != BGTerrainRoomsDropped( _terrain))
    {
-      gas = [stores recordAtIndex:i];
-      if( BGTerrainRoomAt( _terrain, (int32_t) gas->atX, (int32_t) gas->atY, (int32_t) gas->atLevel) == room)
-         return( [stores entityAtIndex:i]);
+      memset( _roomAir, 0, _nroomAir * sizeof( BGEntityID));
+      for( i = 0; i < [stores count]; i++)
+      {
+         gas = [stores recordAtIndex:i];
+         if( ! (r = BGTerrainRoomAt( _terrain, (int32_t) gas->atX, (int32_t) gas->atY, (int32_t) gas->atLevel)))
+            continue;
+         if( r > _nroomAir)
+         {
+            _roomAir = realloc( _roomAir, r * sizeof( BGEntityID));
+            memset( &_roomAir[ _nroomAir], 0, (r - _nroomAir) * sizeof( BGEntityID));
+            _nroomAir = r;
+         }
+         if( ! _roomAir[ r - 1])
+            _roomAir[ r - 1] = [stores entityAtIndex:i];
+      }
+      _roomAirChanges = [stores changes];
+      _roomAirDropped = BGTerrainRoomsDropped( _terrain);
+      _roomAirKnown   = YES;
+   }
+   return( room <= _nroomAir ? _roomAir[ room - 1] : BGNoEntity);
+}
+
+
+- (uint32_t) roomOfAir:(BGEntityID) region
+{
+   const BGGasStore   *gas;
+
+   gas = [self record:[self kindNamed:"GasStore"] for:region];
+   if( ! gas || ! _terrain)
+      return( 0);
+   return( BGTerrainRoomAt( _terrain, (int32_t) gas->atX, (int32_t) gas->atY, (int32_t) gas->atLevel));
+}
+
+
+/* The door standing on a tile, or none. */
+- (BGEntityID) doorOnTile:(BGLocation) tile
+{
+   BGStore      *doors;
+   BGLocation   at;
+   NSUInteger   i;
+
+   doors = [self storeForKind:[self kindNamed:"Door"]];
+   for( i = 0; i < [doors count]; i++)
+   {
+      at = [self locationOf:[doors entityAtIndex:i]];
+      if( at.form == BGLocationOnTile && at.x == tile.x && at.y == tile.y && at.level == tile.level)
+         return( [doors entityAtIndex:i]);
    }
    return( BGNoEntity);
+}
+
+
+- (NSUInteger) airOpeningsOf:(BGEntityID) region
+                        into:(BGAirOpening *) out
+                         max:(NSUInteger) max
+{
+   static const int      dx[ 4] = { 1, -1, 0, 0 };
+   static const int      dy[ 4] = { 0, 0, 1, -1 };
+   const BGTerrainInfo   *kind;
+   const BGDoor          *door;
+   BGAirOpening          o;
+   int32_t               cells[ 64][ 3];
+   NSUInteger            ndoors;
+   NSUInteger            i;
+   NSUInteger            j;
+   NSUInteger            n;
+   NSUInteger            first;
+   uint32_t              room;
+   uint32_t              side;
+   int32_t               u;
+   int32_t               v;
+   int                   d;
+
+   if( ! (room = [self roomOfAir:region]))
+      return( 0);
+   ndoors = BGTerrainRoomDoorways( _terrain, room, cells, 64);
+   if( ndoors > 64)
+      ndoors = 64;
+   n = 0;
+   for( i = 0; i < ndoors; i++)
+   {
+      memset( &o, 0, sizeof( o));
+      o.at   = BGOnTile( cells[ i][ 0], cells[ i][ 1], cells[ i][ 2]);
+      o.door = [self doorOnTile:o.at];
+      kind   = BGTerrainKindInfo( _terrain, BGTerrainAt( _terrain, o.at.x, o.at.y, o.at.level));
+      door   = o.door ? [self record:[self kindNamed:"Door"] for:o.door] : NULL;
+      o.open = ! door || door->ajar;
+      o.flow = door ? (door->ajar ? door->wide : 0) : (kind ? kind->draught : 0);
+      first  = n;
+      for( d = 0; d < 4; d++)
+      {
+         u = o.at.x + dx[ d];
+         v = o.at.y + dy[ d];
+         if( u >= 0 && v >= 0 && u < _tilesWide && v < _tilesHigh && ! BGTerrainRoomy( _terrain, u, v, o.at.level))
+            continue;
+         if( (side = BGTerrainRoomAt( _terrain, u, v, o.at.level)) == room)
+            continue;
+         o.beyond = [self airOfRoom:side];
+         for( j = first; j < n && j < max && out[ j].beyond != o.beyond; j++)
+            ;
+         if( j < n)
+            continue;
+         if( n < max)
+            out[ n] = o;
+         n++;
+      }
+   }
+   return( n);
 }
 
 

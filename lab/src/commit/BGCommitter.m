@@ -511,6 +511,208 @@ static BOOL   bears_trace( BGWorld *world, BGEntityID e)
 }
 
 
+/* --- air follows terrain (TERRAIN.md step 3) ------------------------------ */
+
+/* What a terrain change may part or join: the cell's room's air, and the
+ * air of the rooms beside it, before. */
+typedef struct
+{
+   BOOL         roomy;
+   BGEntityID   air;
+   BGEntityID   beside[ 4];
+} BGAirBefore;
+
+static const int   side_dx[ 4] = { 1, -1, 0, 0 };
+static const int   side_dy[ 4] = { 0, 0, 1, -1 };
+
+static const char   *air_fields[ 5] = { "GasStore.oxygen", "GasStore.dioxide", "GasStore.gasHeat", "GasStore.total",
+                                         "GasStore.gap" };
+
+
+static void   air_before( BGWorld *world, BGLocation at, BGAirBefore *before)
+{
+   int   d;
+
+   memset( before, 0, sizeof( *before));
+   before->roomy = BGTerrainRoomy( [world terrain], at.x, at.y, at.level);
+   before->air   = [world airRegionAt:at];
+   for( d = 0; d < 4; d++)
+      before->beside[ d] = [world airRegionAt:BGOnTile( at.x + side_dx[ d], at.y + side_dy[ d], at.level)];
+}
+
+
+/* A wall built across a room's air parts it: each side it cut off gets air
+ * of its own (parted_air), as much of each stock as its share of the
+ * sides' tiles; the air keeps the rest, and the side its tile is on, or,
+ * the wall on its tile, the largest side. */
+- (NSString *) partAir:(BGEntityID) air
+                    at:(BGLocation) at
+                 group:(BGProposalGroup *) g
+{
+   BGTerrain     *t;
+   NSString      *error;
+   BGEntityID    e;
+   uint32_t      parts[ 4];
+   uint32_t      keep;
+   uint32_t      room;
+   int64_t       stock[ 5];
+   int64_t       share;
+   int64_t       left[ 5];
+   int64_t       sum;
+   int32_t       x;
+   int32_t       y;
+   int32_t       z;
+   int           nparts;
+   int           d;
+   int           i;
+   int           q;
+
+   t      = [_world terrain];
+   nparts = 0;
+   for( d = 0; d < 4; d++)
+   {
+      room = BGTerrainRoomAt( t, at.x + side_dx[ d], at.y + side_dy[ d], at.level);
+      for( i = 0; i < nparts && parts[ i] != room; i++)
+         ;
+      if( room && i == nparts && (! [_world airOfRoom:room] || [_world airOfRoom:room] == air))
+         parts[ nparts++] = room;
+   }
+   if( ! nparts)
+      return( nil);                      /* the room was this one tile: its air is in no room now */
+   keep = [_world roomOfAir:air];
+   for( i = 0; i < nparts && parts[ i] != keep; i++)
+      ;
+   if( i == nparts)
+   {
+      /* its tile walled: it moves to the largest side */
+      if( keep)
+         return( nil);
+      for( keep = parts[ 0], i = 1; i < nparts; i++)
+         if( BGTerrainRoomSize( t, parts[ i]) > BGTerrainRoomSize( t, keep))
+            keep = parts[ i];
+      BGTerrainRoomCorner( t, keep, &x, &y, &z);
+      [_world setField:"GasStore.atX" of:air value:x];
+      [_world setField:"GasStore.atY" of:air value:y];
+      [_world setField:"GasStore.atLevel" of:air value:z];
+   }
+   if( nparts == 1)
+      return( nil);
+   for( sum = 0, i = 0; i < nparts; i++)
+      sum += BGTerrainRoomSize( t, parts[ i]);
+   for( q = 0; q < 5; q++)
+   {
+      [_world getField:air_fields[ q] of:air value:&stock[ q]];
+      left[ q] = stock[ q];
+   }
+   for( i = 0; i < nparts; i++)
+   {
+      if( parts[ i] == keep)
+         continue;
+      e = [_world allocateID];
+      [_world addEntity:e
+              blueprint:"parted_air"
+                   seed:BGMix( BGMix( [_world seed] ^ 0x7061727465640000ULL) ^ e)];
+      error = nil;
+      if( ! [_world construct:e
+                        error:&error])
+         return( error ? error : @"cannot build parted_air");
+      BGTerrainRoomCorner( t, parts[ i], &x, &y, &z);
+      [_world setField:"GasStore.atX" of:e value:x];
+      [_world setField:"GasStore.atY" of:e value:y];
+      [_world setField:"GasStore.atLevel" of:e value:z];
+      for( q = 0; q < 5; q++)
+      {
+         share = stock[ q] * (int64_t) BGTerrainRoomSize( t, parts[ i]) / sum;
+         if( q == 3 && share < 1)
+            share = 1;                   /* a total is at least a millimole */
+         if( q == 3 && left[ q] - share < 1)
+            return( @"too little air to part");
+         [_world setField:air_fields[ q] of:e value:share];
+         left[ q] -= share;
+      }
+      [self emit:"created" subject:e other:air amount:0 detail:"parted_air" location:BGLocationMakeNone() group:g];
+   }
+   for( q = 0; q < 5; q++)
+      [_world setField:air_fields[ q] of:air value:left[ q]];
+   return( nil);
+}
+
+
+/* A wall knocked through joins rooms: the air of each that had it is one,
+ * the first's, holding all of each stock; the others end in it. Joined to
+ * open ground, the rooms are none, and their air airs out. */
+- (NSString *) joinAirAt:(BGLocation) at
+                  before:(const BGAirBefore *) before
+                   group:(BGProposalGroup *) g
+{
+   BGEntityID   airs[ 4];
+   BGEntityID   keep;
+   uint64_t     ev;
+   uint32_t     room;
+   int64_t      sum[ 5];
+   int64_t      v;
+   int          n;
+   int          d;
+   int          i;
+   int          q;
+
+   if( ! (room = BGTerrainRoomAt( [_world terrain], at.x, at.y, at.level)))
+      return( nil);
+   n = 0;
+   for( d = 0; d < 4; d++)
+   {
+      for( i = 0; i < n && airs[ i] != before->beside[ d]; i++)
+         ;
+      if( before->beside[ d] && i == n && [_world roomOfAir:before->beside[ d]] == room)
+         airs[ n++] = before->beside[ d];
+   }
+   if( n < 2)
+      return( nil);
+   for( keep = airs[ 0], i = 1; i < n; i++)
+      if( airs[ i] < keep)
+         keep = airs[ i];
+   memset( sum, 0, sizeof( sum));
+   for( i = 0; i < n; i++)
+      for( q = 0; q < 5; q++)
+         if( [_world getField:air_fields[ q] of:airs[ i] value:&v])
+            sum[ q] += v;
+   for( q = 0; q < 5; q++)
+      if( ! [_world setField:air_fields[ q] of:keep value:sum[ q]])
+         return( @"too much air to join");
+   for( i = 0; i < n; i++)
+   {
+      if( airs[ i] == keep)
+         continue;
+      ev = [self emit:"destroyed" subject:airs[ i] other:keep amount:0 detail:"joined" location:BGLocationMakeNone()
+                group:g];
+      [_world destroy:airs[ i]
+            successor:keep
+                cause:ev
+               reason:"joined"];
+   }
+   return( nil);
+}
+
+
+- (NSString *) airFollowsTerrainAt:(BGLocation) at
+                            before:(const BGAirBefore *) before
+                             group:(BGProposalGroup *) g
+{
+   BOOL   roomy;
+
+   roomy = BGTerrainRoomy( [_world terrain], at.x, at.y, at.level);
+   if( before->roomy && ! roomy && before->air)
+      return( [self partAir:before->air
+                         at:at
+                      group:g]);
+   if( ! before->roomy && roomy)
+      return( [self joinAirAt:at
+                       before:before
+                        group:g]);
+   return( nil);
+}
+
+
 - (NSString *) apply:(BGProposal *) p
                group:(BGProposalGroup *) g
                tally:(BGTally *) tally
@@ -783,15 +985,22 @@ static BOOL   bears_trace( BGWorld *world, BGEntityID e)
       return( nil);
 
    case BGProposeSetTerrain:
+   {
+      BGAirBefore   before;
+
       loc = p->location;
       if( ! [_world terrain] || ! BGTerrainKindNamed( [_world terrain], p->name))
          return( [NSString stringWithFormat:@"no terrain kind named %s", p->name ? p->name : ""]);
       if( loc.form != BGLocationOnTile || ! [_world isTileX:loc.x y:loc.y level:loc.level])
          return( @"terrain is set on a tile of the map");
       value = BGTerrainAt( [_world terrain], loc.x, loc.y, loc.level);
+      air_before( _world, loc, &before);
       [_world setTerrain:p->name atX:loc.x y:loc.y level:loc.level];
       [self emit:"terrain" subject:BGNoEntity other:BGNoEntity amount:value detail:p->name location:loc group:g];
-      return( nil);
+      return( [self airFollowsTerrainAt:loc
+                                 before:&before
+                                  group:g]);
+   }
 
    case BGProposeEvent:
       a = resolve_ref( g, p->target);

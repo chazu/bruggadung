@@ -69,6 +69,20 @@ typedef struct
 extern const char   *BGEdgeKindNames[ BGEdgeKindCount];
 
 
+/* A way a region of air opens: a doorway at its room's side, the region
+ * beyond (none: the outdoors), the door standing in it, if any, and the air
+ * it passes now, mmol a second each way: the door's width while it is ajar,
+ * nothing while it is shut, the doorway's draught with no door. */
+typedef struct
+{
+   BGLocation   at;
+   BGEntityID   beyond;
+   BGEntityID   door;
+   int64_t      flow;
+   BOOL         open;            /* no door, or its door ajar */
+} BGAirOpening;
+
+
 @interface BGWorld : NSObject
 {
    BGContent      *_content;
@@ -110,6 +124,11 @@ extern const char   *BGEdgeKindNames[ BGEdgeKindCount];
    int64_t        *_tileWater;       /* a stock per tile, in mL */
    BGTerrain      *_terrain;         /* what each tile is (TERRAIN.md); NULL: content has no kinds, all open */
    uint8_t        *_tileOut;         /* checked out by a domain; not saved */
+   BGEntityID     *_roomAir;         /* each room's air, by room number; a cache */
+   uint32_t       _nroomAir;
+   uint64_t       _roomAirChanges;   /* the GasStore store's changes, when it was made */
+   uint64_t       _roomAirDropped;   /* the terrain's rooms dropped, then */
+   BOOL           _roomAirKnown;
 
    BGEntityID     *_checkedOut;      /* sorted; not saved: saves check everything in */
    NSUInteger     _ncheckedOut;
@@ -264,7 +283,7 @@ extern const char   *BGEdgeKindNames[ BGEdgeKindCount];
 
 /* What each tile is: open floor, unless a map was set. NULL if content
  * declares no terrain kinds. */
-- (const BGTerrain *) terrain;
+- (BGTerrain *) terrain;
 /* Draws the world from a map in content: its terrain, and the world's extent
  * from the drawing. Only before any tile holds a stock (at setup, or
  * restoring); NO with the reason otherwise, or if the map is malformed. */
@@ -283,6 +302,17 @@ extern const char   *BGEdgeKindNames[ BGEdgeKindCount];
 /* The region of air over a tile (air.tri, TERRAIN.md step 3): the GasStore
  * whose tile is in the tile's room; none outdoors, or on a wall or doorway. */
 - (BGEntityID) airRegionAt:(BGLocation) tile;
+/* A room's air, by its number (BGTerrainRoomAt); none if it has none. */
+- (BGEntityID) airOfRoom:(uint32_t) room;
+/* The room a region of air fills: its tile's; 0 if that is in none (a
+ * room opened to the outdoors). */
+- (uint32_t) roomOfAir:(BGEntityID) region;
+/* The ways a region of air opens (TERRAIN.md step 3): one for each doorway
+ * at its room's side and each room beyond it. Returns how many; fills up to
+ * max. */
+- (NSUInteger) airOpeningsOf:(BGEntityID) region
+                        into:(BGAirOpening *) out
+                         max:(NSUInteger) max;
 
 /* --- checkout --------------------------------------------------------------- */
 

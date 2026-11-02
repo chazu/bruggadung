@@ -13,6 +13,7 @@
    NSUInteger   _capacity;
    BGEntityID   *_ids;
    uint8_t      *_records;
+   uint64_t     _changes;
 }
 
 - (id) initWithRecordSize:(size_t) size;
@@ -28,5 +29,8 @@
 - (void) setRecord:(const void *) record
                for:(BGEntityID) entity;
 - (void) removeRecordFor:(BGEntityID) entity;
+/* How many times a record was set or removed: a cache over the store is good
+ * while this is as it was. */
+- (uint64_t) changes;
 
 @end

@@ -1,4 +1,4 @@
-/* Generated from Triangle content 4f957cac62493cf2: do not edit. Type IDs are valid
+/* Generated from Triangle content b5d19f558a6165a3: do not edit. Type IDs are valid
  * only for this content; regenerate when it changes. */
 #ifndef BG_COMPONENTS_H
 #define BG_COMPONENTS_H
@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BG_CONTENT_HASH 0x4f957cac62493cf2ULL
+#define BG_CONTENT_HASH 0xb5d19f558a6165a3ULL
 
 typedef struct TriNode TriNode;
 
@@ -28,10 +28,8 @@ typedef struct {
     int64_t         atX;    /* int, in quanta of 1; content, saved, inspect */
     int64_t         atY;    /* int, in quanta of 1; content, saved, inspect */
     int64_t         dioxide;    /* int, in quanta of 1; content, saved, proposable, inspect */
-    uint64_t        door;    /* a referent; saved, proposable, inspect */
     int64_t         gap;    /* int, in quanta of 1; content, saved, proposable, inspect */
     int64_t         gasHeat;    /* int, in quanta of 1; content, saved, proposable, inspect */
-    uint64_t        opensTo;    /* a referent; saved, proposable, inspect */
     int64_t         oxygen;    /* int, in quanta of 1; content, saved, proposable, inspect */
     int64_t         total;    /* int, in quanta of 1; content, saved, inspect */
 } BGGasStore;
@@ -445,10 +443,8 @@ static const BGFieldInfo BGGasStore_fields[] = {
     { "atX", offsetof(BGGasStore, atX), BG_VALUE_QUANTITY, "int", "content, saved, inspect" },
     { "atY", offsetof(BGGasStore, atY), BG_VALUE_QUANTITY, "int", "content, saved, inspect" },
     { "dioxide", offsetof(BGGasStore, dioxide), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
-    { "door", offsetof(BGGasStore, door), BG_VALUE_REF, "ref", "saved, proposable, inspect" },
     { "gap", offsetof(BGGasStore, gap), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "gasHeat", offsetof(BGGasStore, gasHeat), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
-    { "opensTo", offsetof(BGGasStore, opensTo), BG_VALUE_REF, "ref", "saved, proposable, inspect" },
     { "oxygen", offsetof(BGGasStore, oxygen), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "total", offsetof(BGGasStore, total), BG_VALUE_QUANTITY, "int", "content, saved, inspect" },
 };
@@ -710,7 +706,7 @@ static const BGFieldInfo BGFastener_fields[] = {
 static const BGComponentInfo BGComponents[BG_COMPONENT_COUNT + 1] = {
     { "Combustor", "#Combustor", sizeof(BGCombustor), 3, BGCombustor_fields },
     { "FuelContainer", "#FuelContainer", sizeof(BGFuelContainer), 1, BGFuelContainer_fields },
-    { "GasStore", "#GasStore", sizeof(BGGasStore), 10, BGGasStore_fields },
+    { "GasStore", "#GasStore", sizeof(BGGasStore), 8, BGGasStore_fields },
     { "Lever", "#Lever", sizeof(BGLever), 3, BGLever_fields },
     { "OfficeHolder", "#OfficeHolder", sizeof(BGOfficeHolder), 2, BGOfficeHolder_fields },
     { "Respirator", "#Respirator", sizeof(BGRespirator), 4, BGRespirator_fields },

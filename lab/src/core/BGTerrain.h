@@ -10,6 +10,7 @@
 
 #define BG_CHUNK         32               /* a chunk is BG_CHUNK x BG_CHUNK tiles of one level */
 #define BG_MAX_TERRAIN   1024             /* kinds in content, at most */
+#define BG_ROOM_MAX      4096             /* a room's cells, at most: past it, ground is open */
 
 typedef uint16_t   BGTerrainKind;           /* a kind's index in the world's table; 0: no tile */
 
@@ -21,6 +22,7 @@ typedef struct
    BOOL         opaque;                      /* sight stops at it */
    BOOL         floored;                     /* something to stand on */
    BOOL         divides;                     /* a room ends here without a wall: a doorway */
+   int64_t      draught;                     /* air it passes with no door shut in it, mmol a second each way */
 } BGTerrainInfo;
 
 typedef struct BGTerrain   BGTerrain;
@@ -67,8 +69,24 @@ BGTerrainKind    BGTerrainSource( const BGTerrain *t, int32_t x, int32_t y, int3
 /* A hash of the terrain: its source and what has changed. */
 uint64_t         BGTerrainHash( const BGTerrain *t);
 
-/* Rooms (TERRAIN.md step 3): a cell's room, the cells of its level joined
- * side by side that are neither solid nor dividing; 0 for a cell in none (a
- * wall, a doorway, outside the extent). Numbered when first asked, and again
- * after terrain changes; a number means nothing across a change. */
+/* Whether a cell is roomy: neither solid nor dividing, so part of a room or
+ * of open ground. */
+BOOL             BGTerrainRoomy( const BGTerrain *t, int32_t x, int32_t y, int32_t z);
+
+/* Rooms (TERRAIN.md step 3): a cell's room, the roomy cells of its level
+ * joined side by side, when they are enclosed: no more than BG_ROOM_MAX of
+ * them, none at the world's edge. 0 for a cell in none: a wall, a doorway,
+ * open ground, outside the extent. A room is found from the cell asked out,
+ * when first asked, and kept; a change finds again only the rooms beside it.
+ * A number means nothing across a change. */
 uint32_t         BGTerrainRoomAt( BGTerrain *t, int32_t x, int32_t y, int32_t z);
+/* A room's size in cells, and its first cell (the least y, then x); 0 and
+ * nothing for no room. */
+uint32_t         BGTerrainRoomSize( const BGTerrain *t, uint32_t room);
+BOOL             BGTerrainRoomCorner( const BGTerrain *t, uint32_t room, int32_t *x, int32_t *y, int32_t *z);
+/* The doorways at a room's side, in the order found; returns how many, and
+ * fills up to max. */
+NSUInteger       BGTerrainRoomDoorways( const BGTerrain *t, uint32_t room, int32_t (*cells)[ 3], NSUInteger max);
+/* Counts rooms let go, after changes: what is cached by room number is good
+ * while this is as it was. */
+uint64_t         BGTerrainRoomsDropped( const BGTerrain *t);

@@ -14,7 +14,8 @@ has none:
 
 This document is a draft. Steps 1 to 3 are built (lab/src/core/BGTerrain,
 lab/content/terrain.tri; sight and memory in lab/src/know/BGKnowledge;
-rooms in BGTerrain and `-[BGWorld airRegionAt:]`).
+rooms in BGTerrain and `-[BGWorld airRegionAt:]`; links from doorways in
+`-[BGWorld airOpeningsOf:]`; air following terrain in BGCommitter).
 
 The world is meant to grow to large roguelike and simulation games, with
 maps generated as they are explored. Every decision here keeps that open,
@@ -102,34 +103,71 @@ floor.
 3. **Rooms from terrain** (built).
    - **What a room is:** the cells of a level joined side by side that are
      neither solid nor `divides` (a doorway: it belongs to neither room it
-     joins). Rooms are numbered by flood fill when first asked, and again
-     after terrain changes.
+     joins), and are enclosed: at most `BG_ROOM_MAX` (4096) of them, none
+     at the world's edge. Ground that isn't enclosed is open: in no room. A
+     world with no map, open floor to its edges, has no rooms.
+   - **Found from a cell out, and kept per chunk.** A room is flooded from
+     the cell asked, when first asked, and its cells labelled in their
+     chunk (a label table per chunk, kept only once something in it was
+     asked of). A flood stops at the edge, past `BG_ROOM_MAX`, or on ground
+     already known open, and labels what it reached open. Nothing is ever
+     found over the whole world, so a world generated as it is explored
+     costs only what is asked of it.
+   - **A change finds again only what is beside it.** A cell changing
+     whether it is solid or divides lets go of the rooms of it and its four
+     neighbours (each at most `BG_ROOM_MAX` cells), found again when next
+     asked. A wall that parts open ground floods each side, as far as
+     `BG_ROOM_MAX`, for one it has enclosed.
    - **The air over a tile** is the region (a GasStore) whose tile (`atX`,
      `atY`, `atLevel`) is in the tile's room; a tile in a room with no air
-     of its own is outdoors. Light, sound and the atmosphere read it, and
-     the rectangles written by hand are gone.
+     of its own is outdoors. The world keeps each room's air by room
+     number, made again when the regions or the rooms change. Light, sound
+     and the atmosphere read it, and the rectangles written by hand are
+     gone.
+   - **Links from doorways.** A region opens through each doorway at its
+     room's side (a room keeps its doorways, found by its flood) to the
+     region beyond, or the outdoors (open ground, a room with no air, the
+     world's edge). A door standing in the doorway passes its `wide` while
+     ajar and nothing while shut; with no door, the doorway's kind passes
+     its `draught` (a terrain property; a doorway, 200 mmol a second). A
+     region's `gap` is now its leak to the outdoors, through walls and
+     windows. `opensTo` and `door` are gone. The atmosphere keeps a list
+     of links, each measured from its smaller side, found again each time
+     it reads the world and keeping its carries by its two sides and
+     doorway. Light's "shut in" and sound's "through an open door" read the
+     same openings.
+   - **Air follows terrain**, in the commit that changes it, journaled with
+     it:
+     - **A wall knocked through** joining rooms with air of their own
+       joins their air into the first's (the least id), every stock and
+       total summed; the others end with it as their successor.
+     - **A wall built across** a room's air parts it: each side cut off
+       gets air of its own (`parted_air`), each stock and total shared by
+       the sides' tiles; the air keeps the rest, and the side its tile is
+       on (the largest, if the wall is on its tile).
+     - **A room opened to the outdoors** leaves its air in no room: the
+       atmosphere links it to the outdoors at a hundredth of its total a
+       second, and it airs out. If the room is closed again, the air is
+       its room's again.
+     The atmosphere's ledger balances through each: a join or a part moves
+     stock between regions, and airing out is inflow.
    - **The scenarios:** every air scenario draws `rooms_map`, the room and
      back room where they were, a wall row with their doorways below, and
-     the corridor a row lower. They give the results they gave, the
-     corridor's listener a tile further from the clatter.
-   - **Doors stay links, not geometry.** Which regions open to which, and
-     through what door, is still the region's `opensTo` and `door`.
+     the corridor a row lower, walled at its ends. They give the results
+     they gave, the corridor's listener a tile further from the clatter.
 4. **Levels.** Floors, open air, stairs or ladders; water falling through
    what has no floor.
 
 ## Open questions
 
-- **Rooms joined, or split.** A wall knocked through joins two rooms with
-  air of their own; the tile answers with one region, where their air
-  should merge. A wall built across a room splits it, leaving one side
-  without air. Both want the atmosphere to follow terrain changes.
-- **Links from doorways.** Which regions open to which could be found from
-  the doorways between rooms, and the door standing in one, instead of
-  written as `opensTo`.
-- **Rooms in a large world.** Numbering the whole extent at every change
-  doesn't scale to a world generated as it is explored; rooms will want to
-  be found per chunk, or from the changed cells out.
-
+- **Rooms larger than `BG_ROOM_MAX`** are open ground: a great hall wants
+  the bound raised, or the outdoors told apart another way (with levels,
+  open to the sky).
+- **What step 3 still scans:** finding the door in a doorway goes through
+  every door; the atmosphere holds at most 8 regions and 32 links, as
+  before. Both want the spatial index perception wants.
+- **Doorways one tile thick.** A link is found across one doorway cell; two
+  doorway cells in a row join nothing.
 - **The world's extent past 32 x 32.** The fluid domain, the explorer and
   the tile memory loop over a 32 x 32 grid. Step 1 sizes the world from its
   map; maps larger than that work for terrain and walking, but water there

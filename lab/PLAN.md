@@ -4115,3 +4115,44 @@ Not yet: air merging when rooms join, or a room split; regions' links
 found from doorways; rooms found per chunk for large worlds.
 
 102 tests, 3366 checks, under both compilers, UBSan, and leak-free.
+
+
+### After the slice: terrain, step 3's open questions
+
+TERRAIN.md step 3, finished: rooms that scale, regions' links from
+doorways, and air that follows terrain.
+
+- **Rooms found from a cell out** (`BGTerrainRoomAt`): enclosed, at most
+  `BG_ROOM_MAX` (4096) cells, none at the world's edge; else open ground,
+  in no room. Labelled per chunk, only where asked; a change lets go of
+  the rooms beside it alone, and a wall parting open ground floods each
+  side for one it enclosed. A room's size, first cell and doorways
+  (`BGTerrainRoomSize`, `BGTerrainRoomCorner`, `BGTerrainRoomDoorways`).
+- **The air over a tile**: each room's air kept by room number in the
+  world (`-[BGWorld airOfRoom:]`), made again when the GasStore store
+  changes (a change count on `BGStore`) or rooms are let go.
+- **Links from doorways** (`-[BGWorld airOpeningsOf:]`): a doorway at a
+  region's room's side, the region beyond or the outdoors, the door in it
+  (its `wide` ajar, nothing shut), or the doorway's `draught` (a new
+  terrain property). `opensTo` and `door` gone; `gap` the leak to the
+  outdoors. The atmosphere keeps a list of links, measured from the
+  smaller side, its carries per link, saved per link. Light's "shut in"
+  and sound's "open between" read the openings.
+- **Air follows terrain**, in the committer, in the commit that changes
+  it: joined rooms' air summed into the first's, the others ended with it
+  as successor (the atmosphere passes their heat in transit on); a room
+  parted gives each side cut off `parted_air`, its share by tiles; a room
+  opened to the outdoors airs out, a hundredth of its total a second.
+- **`rooms_map`**: the corridor walled at its west end, since a room
+  reaching the edge is open.
+- `-[BGAtmosphere balanced]` is true before the domain's first step.
+
+Checked besides: rooms, sizes, first cells, doorways; openings with no
+door, a door shut, and ajar; a join with every stock kept and the joined
+air ended into the first; a part, half and half; a group refused undoing a
+join; a hole to the outdoors, the air airing out to within the domain's
+rest; the ledger balanced throughout; the atmosphere saved mid-flow with
+its links. At scale: a 1024 x 1024 plain in no room; a hut a room when its
+last wall closes; a hall past `BG_ROOM_MAX` open, parted into two rooms.
+
+104 tests, 3399 checks, under both compilers, UBSan, and leak-free.

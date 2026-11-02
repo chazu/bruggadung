@@ -7,10 +7,15 @@
 
 // A region of air: the room (TERRAIN.md, step 3) of the tile at (`atX`,
 // `atY`, `atLevel`), its tiles found from the terrain, bounded by what is
-// solid and by doorways. A tile in no room with air is outdoors. It opens
-// to another region (`opensTo`), or to the outdoors, at 275 K and of fixed
-// composition: through a gap that passes `gap` mmol of air a second each
-// way, or, while its door is ajar, the door's `wide`.
+// solid and by doorways. A tile in no room with air is outdoors, at 275 K
+// and of fixed composition. The region opens through each doorway at its
+// room's side to the region beyond, or the outdoors: as much as the
+// doorway's draught a second each way, or, a door standing in it, the
+// door's `wide` while it is ajar and nothing while it is shut. It leaks to
+// the outdoors besides, through walls and windows: `gap` mmol a second each
+// way. A wall built across it parts its air between the sides, by their
+// tiles; a wall knocked through to another room's air joins them; a room
+// opened to the outdoors airs out.
 #GasStore: {
     @component(GasStore)
     oxygen:  int & >=0 & <=100000000           @field(content, saved, proposable, inspect)
@@ -20,9 +25,7 @@
     atX:     int & >=0 & <=100000              @field(content, saved, inspect)
     atY:     int & >=0 & <=100000              @field(content, saved, inspect)
     atLevel: *0 | int & >=0 & <=63             @field(content, saved, inspect)
-    opensTo: ref                               @field(saved, proposable, inspect)
-    door:    ref                               @field(saved, proposable, inspect)
-    gap:     *200 | int & >=0 & <=1000000      @field(content, saved, proposable, inspect)
+    gap:     *0 | int & >=0 & <=1000000        @field(content, saved, proposable, inspect)
 }
 
 // A door between two regions of air.
@@ -89,9 +92,11 @@ room_air:   #GasStore & { oxygen: 420000, dioxide: 800, gasHeat: 15950000, total
 // another room like it, beside it
 back_room:  #GasStore & { oxygen: 420000, dioxide: 800, gasHeat: 15950000, total: 2000000,
                           atX: 6, atY: 1 }
-// a corridor ten times the room, open to the outdoors along its length
+// a corridor ten times the room, leaking to the outdoors along its length
 corridor:   #GasStore & { oxygen: 4200000, dioxide: 8000, gasHeat: 159500000, total: 20000000,
-                          atX: 0, atY: 7, gap: 2000 }
+                          atX: 1, atY: 7, gap: 2000 }
+// air a wall has parted from a room's: its share, set as it parts
+parted_air: #GasStore & { oxygen: 0, dioxide: 0, gasHeat: 0, total: 1, atX: 0, atY: 0 }
 // a room's door, open: a cubic metre a minute or so
 room_door:  #Door & { material: "oak", mass: 30kg, wide: 5000 }
 stove:      #Stove & { material: "iron", mass: 120kg, burnRate: 250, fuel: 3kg,

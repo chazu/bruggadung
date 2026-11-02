@@ -134,7 +134,7 @@ hand_saw: #HandSaw & { material: "steel", mass: 700g }
 
 // Daylight (KNOWLEDGE.md decision 14): day from `dawn` to `nightfall`,
 // twilight for `twilight` either side, night between, each day of the
-// clock. Indoors it is a step darker, unless the room's door is open.
+// clock. Indoors it is a step darker, in a room with no doorway open.
 #Daylight: { dawn: time, nightfall: time, twilight: time }
 
 daylight: #Daylight & { dawn: 6h, nightfall: 18h, twilight: 1h } @family(light)

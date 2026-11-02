@@ -98,6 +98,7 @@ static NSUInteger   position( BGStore *self, BGEntityID entity, BOOL *found)
       _count++;
    }
    memcpy( _records + i * _size, record, _size);
+   _changes++;
 }
 
 
@@ -112,6 +113,13 @@ static NSUInteger   position( BGStore *self, BGEntityID entity, BOOL *found)
    memmove( &_ids[ i], &_ids[ i + 1], sizeof( BGEntityID) * (_count - i - 1));
    memmove( _records + i * _size, _records + (i + 1) * _size, _size * (_count - i - 1));
    _count--;
+   _changes++;
+}
+
+
+- (uint64_t) changes
+{
+   return( _changes);
 }
 
 @end

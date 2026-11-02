@@ -69,9 +69,7 @@
    if( _nregions == BG_ATMOS_REGIONS || ! [_world record:[_world kindNamed:"GasStore"] for:entity])
       return( -1);
    memset( &_regions[ _nregions], 0, sizeof( BGAirRegion));
-   _regions[ _nregions].entity   = entity;
-   _regions[ _nregions].link     = -1;
-   _regions[ _nregions].doorSeen = -1;
+   _regions[ _nregions].entity = entity;
    return( _nregions++);
 }
 
@@ -125,16 +123,144 @@
 /* The regions' and stoves' values from their records, which mirror ours;
  * a stove not burning takes its fuel from its record. A solid's surface is
  * to the air over it, or, with no place, the air it bounds. */
+/* A link found reading the world, measured from its smaller side: its
+ * carries are kept if it was there before; found again from the other side,
+ * it is the same link. */
+- (void) link:(int) a
+           to:(int) b
+           at:(BGLocation) at
+         door:(BGEntityID) door
+         flow:(int64_t) flow
+{
+   BGAirLink    *l;
+   BGEntityID   from;
+   BGEntityID   to;
+   int          i;
+
+   if( b >= 0 && (_regions[ b].total < _regions[ a].total ||
+                  (_regions[ b].total == _regions[ a].total && _regions[ b].entity < _regions[ a].entity)))
+   {
+      i = a;
+      a = b;
+      b = i;
+   }
+   from = _regions[ a].entity;
+   to   = b >= 0 ? _regions[ b].entity : BGNoEntity;
+   for( i = 0; i < _nlinks; i++)
+   {
+      l = &_links[ i];
+      if( l->from == from && l->to == to && l->at.form == at.form &&
+          (at.form == BGLocationNone || (l->at.x == at.x && l->at.y == at.y && l->at.level == at.level)))
+         break;
+   }
+   if( i == _nlinks)
+   {
+      if( _nlinks == BG_ATMOS_LINKS)
+         return;
+      l = &_links[ _nlinks++];
+      memset( l, 0, sizeof( *l));
+      l->from     = from;
+      l->to       = to;
+      l->at       = at;
+      l->doorSeen = -1;
+   }
+   else if( l->found)
+      return;
+   l->a     = a;
+   l->b     = b;
+   l->door  = door;
+   l->flow  = flow;
+   l->found = YES;
+}
+
+
+/* The links, from the terrain and the regions as they are now. */
+- (void) loadLinks
+{
+   const BGGasStore   *air;
+   const BGDoor       *door;
+   BGAirOpening       openings[ 16];
+   NSUInteger         n;
+   NSUInteger         i;
+   int                k;
+   int                j;
+
+   for( j = 0; j < _nlinks; j++)
+      _links[ j].found = NO;
+   for( k = 0; k < _nregions; k++)
+   {
+      air = [_world record:[_world kindNamed:"GasStore"] for:_regions[ k].entity];
+      if( ! air)
+         continue;
+      if( ! [_world roomOfAir:_regions[ k].entity])
+      {
+         /* its room opened to the outdoors: it airs out */
+         [self link:k
+                 to:-1
+                 at:BGLocationMakeNone()
+               door:BGNoEntity
+               flow:air->gap > air->total / 100 ? air->gap : air->total / 100];
+         continue;
+      }
+      if( air->gap)
+         [self link:k
+                 to:-1
+                 at:BGLocationMakeNone()
+               door:BGNoEntity
+               flow:air->gap];
+      n = [_world airOpeningsOf:_regions[ k].entity
+                           into:openings
+                            max:16];
+      for( i = 0; i < n && i < 16; i++)
+      {
+         j = openings[ i].beyond ? [self regionOf:openings[ i].beyond] : -1;
+         if( openings[ i].beyond && j < 0)
+            continue;
+         [self link:k
+                 to:j
+                 at:openings[ i].at
+               door:openings[ i].door
+               flow:openings[ i].flow];
+      }
+   }
+   for( n = 0, j = 0; j < _nlinks; j++)
+      if( _links[ j].found)
+         _links[ n++] = _links[ j];
+   _nlinks = (int) n;
+   for( j = 0; j < _nlinks; j++)
+      if( _links[ j].doorSeen < 0)
+      {
+         door = _links[ j].door ? [_world record:[_world kindNamed:"Door"] for:_links[ j].door] : NULL;
+         _links[ j].doorSeen = door ? door->ajar : 0;
+      }
+}
+
+
 - (void) load
 {
    const BGGasStore        *air;
    const BGCombustor       *combustor;
    const BGFuelContainer   *fuel;
    const BGThermalBody     *body;
-   const BGDoor            *door;
    BGStore                 *stores;
+   BGEntityID              gone[ BG_ATMOS_REGIONS];
+   int64_t                 goneHeat[ BG_ATMOS_REGIONS];
    NSUInteger              i;
+   int                     ngone;
+   int                     n;
    int                     k;
+
+   /* a region ended, joined into another: its heat in transit goes on to
+    * the air it joined */
+   for( ngone = 0, n = 0, k = 0; k < _nregions; k++)
+      if( [_world record:[_world kindNamed:"GasStore"] for:_regions[ k].entity])
+         _regions[ n++] = _regions[ k];
+      else if( _regions[ k].pending)
+      {
+         gone[ ngone]       = [_world resolve:_regions[ k].entity];
+         goneHeat[ ngone++] = _regions[ k].pending;
+      }
+   _nregions = n;
 
    stores = [_world storeForKind:[_world kindNamed:"GasStore"]];
    for( i = 0; i < [stores count]; i++)
@@ -147,20 +273,10 @@
       _regions[ k].heat    = air->gasHeat;
       _regions[ k].total   = air->total;
    }
-   /* the links: a gap, or a door's width while it is ajar */
-   for( i = 0; i < [stores count]; i++)
-   {
-      air = [stores recordAtIndex:i];
-      if( (k = [self regionOf:[stores entityAtIndex:i]]) < 0)
-         continue;
-      _regions[ k].link = air->opensTo ? [self regionOf:(BGEntityID) air->opensTo] : -1;
-      _regions[ k].flow = air->gap;
-      door              = air->door ? [_world record:[_world kindNamed:"Door"] for:(BGEntityID) air->door] : NULL;
-      if( door && door->ajar)
-         _regions[ k].flow = door->wide;
-      if( _regions[ k].doorSeen < 0)
-         _regions[ k].doorSeen = door ? door->ajar : 0;
-   }
+   for( k = 0; k < ngone; k++)
+      if( gone[ k] && (n = [self regionOf:gone[ k]]) >= 0)
+         _regions[ n].pending += goneHeat[ k];
+   [self loadLinks];
    stores = [_world storeForKind:[_world kindNamed:"Combustor"]];
    for( i = 0; i < [stores count]; i++)
    {
@@ -179,7 +295,7 @@
       if( ! body->toAir || (k = [self surfaceOf:[stores entityAtIndex:i]]) < 0)
          continue;
       _surfaces[ k].conductance = body->toAir;
-      _surfaces[ k].region      = [self regionOf:body->bounds ? (BGEntityID) body->bounds
+      _surfaces[ k].region      = [self regionOf:body->bounds ? [_world resolve:(BGEntityID) body->bounds]
                                                                : BGAirOver( _world, [stores entityAtIndex:i])];
    }
    stores = [_world storeForKind:[_world kindNamed:"Respirator"]];
@@ -280,48 +396,50 @@ static int64_t   quantity( const BGAirRegion *r, int q)
 }
 
 
-/* What a mmol of air across a region's link carries, as a fraction: the
+/* What a mmol of air from a link's far side carries, as a fraction: the
  * outdoors' fixed air, or the other region's. */
-static void   across( const BGAirRegion *regions, int k, int q, int64_t *num, int64_t *den)
+static void   across( const BGAirRegion *regions, const BGAirLink *l, int q, int64_t *num, int64_t *den)
 {
    static const int64_t   outNum[ 3] = { BG_OUT_OXYGEN, BG_OUT_DIOXIDE, BG_OUT_HEAT };
    static const int64_t   outDen[ 3] = { 1000, 10000, 1000 };
 
-   if( regions[ k].link < 0)
+   if( l->b < 0)
    {
       *num = outNum[ q];
       *den = outDen[ q];
       return;
    }
-   *num = quantity( &regions[ regions[ k].link], q);
-   *den = regions[ regions[ k].link].total;
+   *num = quantity( &regions[ l->b], q);
+   *den = regions[ l->b].total;
 }
 
 
-/* Whether a region's link rests: nothing flows, or what it would carry is
- * within the settle tolerances, and its door is as it was. */
-- (BOOL) linkQuiet:(int) k
+/* Whether a link rests: nothing flows, or what it would carry is within the
+ * settle tolerances of its smaller side, and its door is as it was. */
+- (BOOL) linkQuiet:(int) l
             values:(const BGAirRegion *) v
 {
-   const BGGasStore   *air;
+   const BGAirLink    *link;
    const BGDoor       *door;
    int64_t            num;
    int64_t            den;
    int64_t            tolerance[ 3];
    int                q;
+   int                k;
 
-   air  = [_world record:[_world kindNamed:"GasStore"] for:v[ k].entity];
-   door = air && air->door ? [_world record:[_world kindNamed:"Door"] for:(BGEntityID) air->door] : NULL;
-   if( door && door->ajar != v[ k].doorSeen)
+   link = &_links[ l];
+   door = link->door ? [_world record:[_world kindNamed:"Door"] for:link->door] : NULL;
+   if( door && door->ajar != link->doorSeen)
       return( NO);
-   if( ! v[ k].flow)
+   if( ! link->flow)
       return( YES);
+   k = link->a;
    tolerance[ 0] = v[ k].total / 1000;
    tolerance[ 1] = 100;
    tolerance[ 2] = v[ k].total * BG_GAS_CAPACITY / 2000;
    for( q = 0; q < 3; q++)
    {
-      across( v, k, q, &num, &den);
+      across( v, link, q, &num, &den);
       if( llabs( quantity( &v[ k], q) - v[ k].total * num / den) > tolerance[ q])
          return( NO);
    }
@@ -338,10 +456,10 @@ static void   across( const BGAirRegion *regions, int k, int q, int64_t *num, in
    NSUInteger   i;
    int          j;
 
-   if( v[ k].pending || ! [self linkQuiet:k values:v])
+   if( v[ k].pending)
       return( YES);
-   for( j = 0; j < _nregions; j++)
-      if( v[ j].link == k && ! [self linkQuiet:j values:v])
+   for( j = 0; j < _nlinks; j++)
+      if( (_links[ j].a == k || _links[ j].b == k) && ! [self linkQuiet:j values:v])
          return( YES);
    for( j = 0; j < _nstoves; j++)
       if( _stoves[ j].region == k && [self lit:j])
@@ -367,21 +485,23 @@ static void   across( const BGAirRegion *regions, int k, int q, int64_t *num, in
                 quantity:(int) q
                     unit:(int64_t) unit
 {
+   const BGAirLink   *l;
    int64_t   num;
    int64_t   den;
    int64_t   sum;
    int       j;
 
    sum = 0;
-   for( j = 0; j < _nregions; j++)
+   for( j = 0; j < _nlinks; j++)
    {
-      if( (j != k && _regions[ j].link != k) || [self linkQuiet:j values:_regions])
+      l = &_links[ j];
+      if( (l->a != k && l->b != k) || [self linkQuiet:j values:_regions])
          continue;
-      across( _regions, j, q, &num, &den);
-      if( j == k)
-         sum += _regions[ k].flow * (num * unit / den - quantity( &_regions[ k], q) * unit / _regions[ k].total);
+      across( _regions, l, q, &num, &den);
+      if( l->a == k)
+         sum += l->flow * (num * unit / den - quantity( &_regions[ k], q) * unit / _regions[ k].total);
       else
-         sum += _regions[ j].flow * (quantity( &_regions[ j], q) * unit / _regions[ j].total - num * unit / den);
+         sum += l->flow * (quantity( &_regions[ l->a], q) * unit / _regions[ l->a].total - num * unit / den);
    }
    return( sum);
 }
@@ -448,9 +568,11 @@ static void   across( const BGAirRegion *regions, int k, int q, int64_t *num, in
 
 - (int) regionWatchedBy:(const BGActivity *) record
 {
-   int   k;
+   BGEntityID   holder;
+   int          k;
 
-   for( k = 0; k < _nregions && _regions[ k].entity != (BGEntityID) record->watchHolder; k++)
+   holder = [_world resolve:(BGEntityID) record->watchHolder];
+   for( k = 0; k < _nregions && _regions[ k].entity != holder; k++)
       ;
    return( k == _nregions ? -1 : k);
 }
@@ -627,16 +749,16 @@ static void   across( const BGAirRegion *regions, int k, int q, int64_t *num, in
 
    /* a moving link is explicit: a step carries no more than an eighth of
     * the smaller side's air */
-   for( k = 0; k < _nregions; k++)
+   for( k = 0; k < _nlinks; k++)
    {
       int64_t   total;
 
-      if( ! _regions[ k].flow || [self linkQuiet:k values:_regions])
+      if( ! _links[ k].flow || [self linkQuiet:k values:_regions])
          continue;
-      total = _regions[ k].total;
-      if( _regions[ k].link >= 0 && _regions[ _regions[ k].link].total < total)
-         total = _regions[ _regions[ k].link].total;
-      when = total * 1000 / (8 * _regions[ k].flow);
+      total = _regions[ _links[ k].a].total;
+      if( _links[ k].b >= 0 && _regions[ _links[ k].b].total < total)
+         total = _regions[ _links[ k].b].total;
+      when = total * 1000 / (8 * _links[ k].flow);
       if( when < h.safeStep.ms)
          h.safeStep = BGTimeMake( when < 1 ? 1 : when);
    }
@@ -765,9 +887,9 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
    int64_t            breath;
    int64_t            num;
    int64_t            den;
-   const BGGasStore   *store;
    const BGDoor       *door;
-   BOOL               quiet[ BG_ATMOS_REGIONS];
+   BGAirLink          *l;
+   BOOL               quiet[ BG_ATMOS_LINKS];
    int                c;
    NSString           *why;
    int64_t            q;
@@ -796,12 +918,11 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
    memcpy( before, _regions, sizeof( before));
    for( s = 0; s < _nstoves; s++)
       rates[ s] = [self rateOf:s];          /* from step-start values */
-   for( k = 0; k < _nregions; k++)
-   {
+   for( k = 0; k < _nlinks; k++)
       quiet[ k] = [self linkQuiet:k values:before];
+   for( k = 0; k < _nregions; k++)
       if( [self awake:k values:before])
          _regions[ k].steps++;
-   }
 
    /* what was in transit to the gas */
    for( k = 0; k < _nregions; k++)
@@ -835,23 +956,24 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
    /* the links: each moving one mixes its region with what it opens to,
     * from step-start values; between regions, what one gains the other
     * loses */
-   for( k = 0; k < _nregions; k++)
+   for( k = 0; k < _nlinks; k++)
    {
       if( quiet[ k])
          continue;
-      r            = &_regions[ k];
-      r->carryAir += before[ k].flow * dt;
-      air          = r->carryAir / 1000;
-      r->carryAir %= 1000;
+      l            = &_links[ k];
+      r            = &_regions[ l->a];
+      l->carryAir += l->flow * dt;
+      air          = l->carryAir / 1000;
+      l->carryAir %= 1000;
       for( c = 0; c < 3; c++)
       {
-         across( before, k, c, &num, &den);
-         d[ c] = exchange( air, quantity( &before[ k], c), r->total, num, den, &r->carryIn[ c], &r->carryOut[ c]);
+         across( before, l, c, &num, &den);
+         d[ c] = exchange( air, quantity( &before[ l->a], c), r->total, num, den, &l->carryIn[ c], &l->carryOut[ c]);
       }
       r->oxygen  += d[ 0];
       r->dioxide += d[ 1];
       r->heat    += d[ 2];
-      if( r->link < 0)
+      if( l->b < 0)
       {
          _ledger.inflow[ 0] += d[ 0];
          _ledger.inflow[ 1] += d[ 1];
@@ -859,9 +981,9 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
       }
       else
       {
-         _regions[ r->link].oxygen  -= d[ 0];
-         _regions[ r->link].dioxide -= d[ 1];
-         _regions[ r->link].heat    -= d[ 2];
+         _regions[ l->b].oxygen  -= d[ 0];
+         _regions[ l->b].dioxide -= d[ 1];
+         _regions[ l->b].heat    -= d[ 2];
       }
    }
 
@@ -960,11 +1082,10 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
    }
 
    /* the doors as they are now */
-   for( k = 0; k < _nregions; k++)
+   for( k = 0; k < _nlinks; k++)
    {
-      store = [_world record:[_world kindNamed:"GasStore"] for:_regions[ k].entity];
-      door  = store && store->door ? [_world record:[_world kindNamed:"Door"] for:(BGEntityID) store->door] : NULL;
-      _regions[ k].doorSeen = door ? door->ajar : 0;
+      door = _links[ k].door ? [_world record:[_world kindNamed:"Door"] for:_links[ k].door] : NULL;
+      _links[ k].doorSeen = door ? door->ajar : 0;
    }
 
    /* the records mirror the domain */
@@ -1020,6 +1141,8 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
    int64_t   fuel;
    int       k;
 
+   if( ! _ledgered)
+      return( YES);                    /* nothing has moved yet */
    memset( sum, 0, sizeof( sum));
    for( k = 0; k < _nregions; k++)
    {
@@ -1033,7 +1156,7 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
       if( sum[ k] != _ledger.initial[ k] + _ledger.inflow[ k] + _ledger.produced[ k] - _ledger.consumed[ k] +
                      (k == 2 ? _ledger.received - _ledger.exchanged : 0))
          return( NO);
-   return( ! _ledgered || fuel + _ledger.burned == _ledger.fuel);
+   return( fuel + _ledger.burned == _ledger.fuel);
 }
 
 
@@ -1048,6 +1171,7 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
 {
    NSMutableArray   *lines;
    BGAirRegion      *r;
+   BGAirLink        *l;
    int              k;
 
    lines = [NSMutableArray array];
@@ -1064,12 +1188,19 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
    for( k = 0; k < _nregions; k++)
    {
       r = &_regions[ k];
-      [lines addObject:[NSString stringWithFormat:@"region %llu %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld",
-                                                  (unsigned long long) r->entity, r->carryAir,
-                                                  r->carryIn[ 0], r->carryIn[ 1], r->carryIn[ 2],
-                                                  r->carryOut[ 0], r->carryOut[ 1], r->carryOut[ 2],
+      [lines addObject:[NSString stringWithFormat:@"region %llu %lld %lld %lld %lld %lld",
+                                                  (unsigned long long) r->entity,
                                                   r->carryBurn[ 0], r->carryBurn[ 1], r->carryBurn[ 2],
-                                                  r->pending, (long long) r->doorSeen, (long long) r->steps]];
+                                                  r->pending, (long long) r->steps]];
+   }
+   for( k = 0; k < _nlinks; k++)
+   {
+      l = &_links[ k];
+      [lines addObject:[NSString stringWithFormat:@"link %llu %llu %d %d %d %d %lld %lld %lld %lld %lld %lld %lld %d",
+                                                  (unsigned long long) l->from, (unsigned long long) l->to,
+                                                  l->at.form == BGLocationOnTile, l->at.x, l->at.y, l->at.level,
+                                                  l->carryAir, l->carryIn[ 0], l->carryIn[ 1], l->carryIn[ 2],
+                                                  l->carryOut[ 0], l->carryOut[ 1], l->carryOut[ 2], l->doorSeen]];
    }
    for( k = 0; k < _nstoves; k++)
       [lines addObject:[NSString stringWithFormat:@"stove %llu %lld %lld %lld", (unsigned long long) _stoves[ k].entity,
@@ -1089,7 +1220,13 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
 - (void) restoreSavedState:(NSArray *) lines
 {
    unsigned long long   e;
+   unsigned long long   to;
    unsigned long long   steps;
+   BGAirLink            *l;
+   int                  x;
+   int                  y;
+   int                  level;
+   int                  seen;
    long long            v[ 17];
    NSUInteger           i;
    BGAirRegion          *r;
@@ -1098,6 +1235,7 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
    int                  k;
 
    _nregions = 0;
+   _nlinks   = 0;
    _nstoves  = 0;
    _nfired   = 0;
    _nsurfaces  = 0;
@@ -1128,25 +1266,37 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
          _ledger.toSolids  = v[ 15];
          _ledger.received  = v[ 16];
       }
-      else if( sscanf( text, "region %llu %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld", &e, &v[ 0], &v[ 1],
-                       &v[ 2], &v[ 3], &v[ 4], &v[ 5], &v[ 6], &v[ 7], &v[ 8], &v[ 9], &v[ 10], &v[ 11], &v[ 12]) == 14)
+      else if( sscanf( text, "region %llu %lld %lld %lld %lld %lld", &e, &v[ 0], &v[ 1], &v[ 2], &v[ 3], &v[ 4]) == 6)
       {
          if( (k = [self regionOf:(BGEntityID) e]) < 0)
             continue;
-         r           = &_regions[ k];
-         r->carryAir = v[ 0];
-         r->carryIn[ 0]  = v[ 1];
-         r->carryIn[ 1]  = v[ 2];
-         r->carryIn[ 2]  = v[ 3];
-         r->carryOut[ 0] = v[ 4];
-         r->carryOut[ 1] = v[ 5];
-         r->carryOut[ 2] = v[ 6];
-         r->carryBurn[ 0] = v[ 7];
-         r->carryBurn[ 1] = v[ 8];
-         r->carryBurn[ 2] = v[ 9];
-         r->pending       = v[ 10];
-         r->doorSeen      = (int) v[ 11];
-         r->steps         = (NSUInteger) v[ 12];
+         r                = &_regions[ k];
+         r->carryBurn[ 0] = v[ 0];
+         r->carryBurn[ 1] = v[ 1];
+         r->carryBurn[ 2] = v[ 2];
+         r->pending       = v[ 3];
+         r->steps         = (NSUInteger) v[ 4];
+      }
+      else if( sscanf( text, "link %llu %llu %d %d %d %d %lld %lld %lld %lld %lld %lld %lld %d", &e, &to, &flag, &x, &y,
+                       &level, &v[ 0], &v[ 1], &v[ 2], &v[ 3], &v[ 4], &v[ 5], &v[ 6], &seen) == 14)
+      {
+         if( _nlinks == BG_ATMOS_LINKS)
+            continue;
+         l = &_links[ _nlinks++];
+         memset( l, 0, sizeof( *l));
+         l->from        = (BGEntityID) e;
+         l->to          = (BGEntityID) to;
+         l->at          = flag ? BGOnTile( x, y, level) : BGLocationMakeNone();
+         l->carryAir    = v[ 0];
+         l->carryIn[ 0] = v[ 1];
+         l->carryIn[ 1] = v[ 2];
+         l->carryIn[ 2] = v[ 3];
+         l->carryOut[ 0] = v[ 4];
+         l->carryOut[ 1] = v[ 5];
+         l->carryOut[ 2] = v[ 6];
+         l->doorSeen    = seen;
+         l->a           = -1;
+         l->b           = -1;
       }
       else if( sscanf( text, "stove %llu %lld %lld %lld", &e, &v[ 0], &v[ 1], &v[ 2]) == 4)
       {
