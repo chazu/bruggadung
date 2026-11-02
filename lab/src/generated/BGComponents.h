@@ -1,4 +1,4 @@
-/* Generated from Triangle content 1c27b8927e22129e: do not edit. Type IDs are valid
+/* Generated from Triangle content 2554f8de3bc9d9ff: do not edit. Type IDs are valid
  * only for this content; regenerate when it changes. */
 #ifndef BG_COMPONENTS_H
 #define BG_COMPONENTS_H
@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BG_CONTENT_HASH 0x1c27b8927e22129eULL
+#define BG_CONTENT_HASH 0x2554f8de3bc9d9ffULL
 
 typedef struct TriNode TriNode;
 
@@ -159,6 +159,7 @@ typedef struct {
     int64_t         adrenaline;    /* int, in quanta of 1; content, saved, proposable, inspect */
     uint32_t        coat;    /* #Colour: a type ID; content, saved, proposable, inspect, perceive(sight) */
     int64_t         curious;    /* int, in quanta of 1; content, saved, proposable, inspect */
+    int64_t         diligent;    /* int, in quanta of 1; content, saved, proposable, inspect */
     int64_t         fatigue;    /* int, in quanta of 1; content, saved, proposable, inspect */
     int64_t         fed;    /* int, in quanta of 1; content, saved, proposable, inspect */
     int64_t         fedAt;    /* time, in quanta of 1ms; content, saved, proposable, inspect */
@@ -327,80 +328,80 @@ typedef struct {
 
 /* #ActivityStatus */
 enum {
-    BG_ACTIVITYSTATUS_ABORTED = 400,
-    BG_ACTIVITYSTATUS_COMPLETED = 401,
-    BG_ACTIVITYSTATUS_EXHAUSTED = 402,
-    BG_ACTIVITYSTATUS_FAILED = 403,
-    BG_ACTIVITYSTATUS_RUNNING = 404,
-    BG_ACTIVITYSTATUS_SUSPENDED = 405,
+    BG_ACTIVITYSTATUS_ABORTED = 408,
+    BG_ACTIVITYSTATUS_COMPLETED = 409,
+    BG_ACTIVITYSTATUS_EXHAUSTED = 410,
+    BG_ACTIVITYSTATUS_FAILED = 411,
+    BG_ACTIVITYSTATUS_RUNNING = 412,
+    BG_ACTIVITYSTATUS_SUSPENDED = 413,
 };
 
 /* #Tie */
 enum {
-    BG_TIE_EMPLOY = 489,
-    BG_TIE_FRIEND = 490,
-    BG_TIE_KIN = 491,
-    BG_TIE_SWORN = 492,
+    BG_TIE_EMPLOY = 497,
+    BG_TIE_FRIEND = 498,
+    BG_TIE_KIN = 499,
+    BG_TIE_SWORN = 500,
 };
 
 /* #ClaimKind */
 enum {
-    BG_CLAIMKIND_CUSTODY = 407,
-    BG_CLAIMKIND_OWNERSHIP = 408,
-    BG_CLAIMKIND_RESERVATION = 409,
+    BG_CLAIMKIND_CUSTODY = 415,
+    BG_CLAIMKIND_OWNERSHIP = 416,
+    BG_CLAIMKIND_RESERVATION = 417,
 };
 
 /* #Penalty */
 enum {
-    BG_PENALTY_FINE = 477,
-    BG_PENALTY_ARREST = 508,
-    BG_PENALTY_CONFISCATE = 509,
+    BG_PENALTY_FINE = 485,
+    BG_PENALTY_ARREST = 516,
+    BG_PENALTY_CONFISCATE = 517,
 };
 
 /* #Wrong */
 enum {
-    BG_WRONG_ANOTHERS = 500,
-    BG_WRONG_UNAUTHORIZED = 501,
+    BG_WRONG_ANOTHERS = 508,
+    BG_WRONG_UNAUTHORIZED = 509,
 };
 
 /* #Material */
 enum {
-    BG_MATERIAL_CLOTH = 464,
-    BG_MATERIAL_FOOD = 465,
-    BG_MATERIAL_LEATHER = 466,
-    BG_MATERIAL_RUBBER = 467,
-    BG_MATERIAL_STONE = 468,
-    BG_MATERIAL_FLESH = 511,
-    BG_MATERIAL_BRASS = 513,
-    BG_MATERIAL_IRON = 514,
-    BG_MATERIAL_PAPER = 515,
-    BG_MATERIAL_STEEL = 516,
-    BG_MATERIAL_OAK = 518,
+    BG_MATERIAL_CLOTH = 472,
+    BG_MATERIAL_FOOD = 473,
+    BG_MATERIAL_LEATHER = 474,
+    BG_MATERIAL_RUBBER = 475,
+    BG_MATERIAL_STONE = 476,
+    BG_MATERIAL_FLESH = 519,
+    BG_MATERIAL_BRASS = 521,
+    BG_MATERIAL_IRON = 522,
+    BG_MATERIAL_PAPER = 523,
+    BG_MATERIAL_STEEL = 524,
+    BG_MATERIAL_OAK = 526,
 };
 
 /* "flesh" | "metal" | "natural" | "paper" | "wood" */
 enum {
-    BG_BODY_SURFACE_NATURAL = 314,
-    BG_BODY_SURFACE_FLESH = 511,
-    BG_BODY_SURFACE_BRASS = 513,
-    BG_BODY_SURFACE_IRON = 514,
-    BG_BODY_SURFACE_PAPER = 515,
-    BG_BODY_SURFACE_STEEL = 516,
-    BG_BODY_SURFACE_OAK = 518,
+    BG_BODY_SURFACE_NATURAL = 318,
+    BG_BODY_SURFACE_FLESH = 519,
+    BG_BODY_SURFACE_BRASS = 521,
+    BG_BODY_SURFACE_IRON = 522,
+    BG_BODY_SURFACE_PAPER = 523,
+    BG_BODY_SURFACE_STEEL = 524,
+    BG_BODY_SURFACE_OAK = 526,
 };
 
 /* #Colour */
 enum {
-    BG_COLOUR_BLUE = 412,
-    BG_COLOUR_BLACK = 414,
-    BG_COLOUR_BROWN = 415,
-    BG_COLOUR_GREEN = 416,
-    BG_COLOUR_GREY = 417,
-    BG_COLOUR_NAVY = 418,
-    BG_COLOUR_RED = 419,
-    BG_COLOUR_YELLOW = 420,
-    BG_COLOUR_BEIGE = 437,
-    BG_COLOUR_WHITE = 460,
+    BG_COLOUR_BLUE = 420,
+    BG_COLOUR_BLACK = 422,
+    BG_COLOUR_BROWN = 423,
+    BG_COLOUR_GREEN = 424,
+    BG_COLOUR_GREY = 425,
+    BG_COLOUR_NAVY = 426,
+    BG_COLOUR_RED = 427,
+    BG_COLOUR_YELLOW = 428,
+    BG_COLOUR_BEIGE = 445,
+    BG_COLOUR_WHITE = 468,
 };
 
 /* The field registry: what code needs to read and write any component
@@ -561,6 +562,7 @@ static const BGFieldInfo BGAgent_fields[] = {
     { "adrenaline", offsetof(BGAgent, adrenaline), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "coat", offsetof(BGAgent, coat), BG_VALUE_TYPE, "#Colour", "content, saved, proposable, inspect, perceive(sight)" },
     { "curious", offsetof(BGAgent, curious), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
+    { "diligent", offsetof(BGAgent, diligent), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "fatigue", offsetof(BGAgent, fatigue), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "fed", offsetof(BGAgent, fed), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "fedAt", offsetof(BGAgent, fedAt), BG_VALUE_QUANTITY, "time", "content, saved, proposable, inspect" },
@@ -725,7 +727,7 @@ static const BGComponentInfo BGComponents[BG_COMPONENT_COUNT + 1] = {
     { "Law", "#Law", sizeof(BGLaw), 6, BGLaw_fields },
     { "Organization", "#Organization", sizeof(BGOrganization), 1, BGOrganization_fields },
     { "Body", "#Body", sizeof(BGBody), 5, BGBody_fields },
-    { "Agent", "#Agent", sizeof(BGAgent), 25, BGAgent_fields },
+    { "Agent", "#Agent", sizeof(BGAgent), 26, BGAgent_fields },
     { "Assembly", "#Assembly", sizeof(BGAssembly), 1, BGAssembly_fields },
     { "Cock", "#Cock", sizeof(BGCock), 2, BGCock_fields },
     { "Container", "#Container", sizeof(BGContainer), 1, BGContainer_fields },

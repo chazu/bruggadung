@@ -3972,3 +3972,38 @@ refusing work with a role empty.
 
 98 tests, 3282 checks, under both compilers, UBSan (ASan can't start with
 this machine's clang), and leak-free.
+
+### After the slice: servicing of one's own accord
+
+AGENCY.md decision 19: an agent who sees a part worn may service it of its
+own accord, as diligent as it is.
+
+- **Diligence** (`Agent.diligent`, new; 50 by default): how readily an
+  agent does work nothing makes it do.
+- **Seeing wear** (`wearing_part`, a rule; the `#Wearing` premise and the
+  `#Worn` finding, new): a part seen worn 20 or more is drawn as #Worn,
+  and weighed again as it is seen, so a part serviced stops being so.
+- **The goal** (`service_worn`, arising from #Worn; method `service_it`):
+  worth -10, and 4 tenths of a point for each point of diligence; the part
+  it can service is a path to what `service_part` takes
+  (`service_part.roles.item`), so the threshold stays in one place.
+- **Arising again:** a goal that arose and was settled arises again about
+  the same referent only from a finding drawn since (the settled record
+  keeps when, in seconds; settled again, it is moved on). Before, a goal
+  settled about something never arose about it again; no existing goal
+  re-draws its finding, so nothing else changes.
+- **Free, it looks again:** an agent whose last intention is done decides
+  again at once, weighing what arose meanwhile, rather than waiting for
+  the next thing to happen.
+
+Checked: by a pump 600 hours used, an agent of the usual diligence weighs
+servicing the worn seal at +10 against nothing, and does it, 60 per cent of
+its wear undone; a lazy one (10) weighs it at -6 and lets it be. A diligent
+one (90) services the seal, then both valves, which look worn too, one
+after the other; the seal worn again, it services it once more, and only
+once. The lazy one leaves the reworn seal too.
+
+Not yet: servicing using up grease or tallow; agents working pumps of their
+own accord; diligence weighing other unbidden work (tidying, mending).
+
+99 tests, 3300 checks, under both compilers, UBSan, and leak-free.

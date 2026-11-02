@@ -78,6 +78,9 @@
     honesty:       *50 | int & >=0 & <=100          @field(content, saved, proposable, inspect)
     curious:       *0 | int & >=0 & <=100           @field(content, saved, proposable, inspect)
     scruples:      *20 | int & >=0 & <=100          @field(content, saved, proposable, inspect)
+    // how readily it does work nothing makes it do, such as keeping a
+    // machine in order (AGENCY.md §9), 0 to 100: low, it is lazy
+    diligent:      *50 | int & >=0 & <=100          @field(content, saved, proposable, inspect)
     // respect for reservations (AGENCY.md §9, ACTIONS.md §7), 0 to 100
     respectful:    *50 | int & >=0 & <=100          @field(content, saved, proposable, inspect)
     // the disposition to abide by the rules (INSTITUTIONS.md decision 5), 0 to 100

@@ -4316,6 +4316,116 @@ static void   test_servicing( void)
 }
 
 
+/* Agents keeping machines in order of their own accord, as inclined
+ * (AGENCY.md §9's dispositions; LATENT_ASSEMBLY.md decision 8): each by an
+ * opened crank pump 600 hours used, far apart, left to themselves for an
+ * hour. The agent's diligence `diligent`; if `rewear`, its seal worn again
+ * to 30 after the hour, and another hour. */
+typedef struct
+{
+   BGAgency     *agency;
+   BGEntityID   agent;
+   int64_t      seal;            /* the seal's attrition, opened */
+   int64_t      sealAfter;       /* after the first hour */
+   int64_t      sealLast;        /* after the second, if rewear */
+   int          serviced;        /* parts it serviced */
+} BGDiligence;
+
+
+static BGDiligence   diligence_run( int64_t diligent, BOOL rewear)
+{
+   BGStage            st;
+   BGActivities       *activities;
+   BGKnowledge        *knowledge;
+   BGProposalGroup    *g;
+   BGDiligence        run;
+   BGEntityID         pump;
+   BGEntityID         wrench;
+   BGEntityID         seal;
+   NSString           *error;
+   NSUInteger         i;
+
+   memset( &run, 0, sizeof( run));
+   st.w       = BGTestWorld( 157);
+   st.c       = BGTestCommitter( st.w);
+   activities = [BGActivities activitiesWithWorld:st.w committer:st.c];
+   knowledge  = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+   run.agency = [[[BGAgency alloc] initWithWorld:st.w committer:st.c knowledge:knowledge] autorelease];
+   st.s       = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [run.agency setActivities:activities];
+   [st.s setActivities:activities];
+   [st.s setPerception:knowledge];
+   [st.s setDecision:run.agency];
+
+   g         = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: a pump, used, and someone by it"];
+   pump      = [g create:"crank_pump" key:"pump 2" at:BGOnTile( 5, 5, 0)];
+   run.agent = [g create:"worker" key:"worker" at:BGOnTile( 4, 5, 0)];
+   wrench    = [g create:"wrench_250" key:"wrench" at:BGHeldBy( run.agent, 0)];
+   [g set:"Latent.used" of:BGWhole( pump) to:600 * 3600000LL];
+   [g set:"Agent.diligent" of:BGWhole( run.agent) to:diligent];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   pump      = [g idFor:pump];
+   run.agent = [g idFor:run.agent];
+   wrench    = [g idFor:wrench];
+   error     = nil;
+   BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "open_up", run.agent, wrench, pump), 0, &error) != nil);
+   [st.s runUntil:BGTimeMake( 1000)];
+   BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "open_up", run.agent, wrench, pump), 0, &error) != nil);
+   [st.s runUntil:BGTimeMake( 2000)];
+   seal = part_in( st, pump, "piston_seal");
+   [st.w getField:"Part.attrition" of:seal value:&run.seal];
+
+   [run.agency control:run.agent];
+   [st.s runUntil:BGTimeMake( 3600000LL)];
+   [st.w getField:"Part.attrition" of:seal value:&run.sealAfter];
+   if( rewear)
+   {
+      g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the seal worn again"];
+      [g set:"Part.attrition" of:BGWhole( seal) to:300000];
+      [g set:"Part.wear" of:BGWhole( seal) to:30];
+      [st.c submit:g];
+      [st.s runUntil:BGTimeMake( 2 * 3600000LL)];
+      [st.w getField:"Part.attrition" of:seal value:&run.sealLast];
+   }
+   for( i = 0; i < [st.w eventCount]; i++)
+      run.serviced += ! strcmp( [st.w eventAt:i]->kind, "serviced") && [st.w eventAt:i]->other == run.agent;
+   return( run);
+}
+
+
+static void   test_diligence( void)
+{
+   BGDiligence   lazy;
+   BGDiligence   usual;
+   BGDiligence   keen;
+
+   /* seen worn a fifth of the way, the seal wants servicing; at the usual
+    * diligence that is worth doing with nothing better to do, and it is
+    * done: 60 per cent of its wear undone */
+   usual = diligence_run( 50, NO);
+   BG_CHECK( usual.seal >= 200000 && usual.seal < 600000);
+   BG_CHECK( logged_by( usual.agency, usual.agent, @"weighing service the worn part (R"));
+   BG_CHECK( logged_by( usual.agency, usual.agent, @"+10 (-10, diligent +20) against nothing: switching"));
+   BG_CHECK( logged_by( usual.agency, usual.agent, @"[service the worn part] service it: service_part R"));
+   BG_CHECK( usual.serviced >= 1 && usual.sealAfter == usual.seal - usual.seal * 60 / 100);
+
+   /* a lazy one sees the same, and lets it be */
+   lazy = diligence_run( 10, NO);
+   BG_CHECK( logged_by( lazy.agency, lazy.agent, @"-6 (-10, diligent +4) against nothing: staying"));
+   BG_CHECK( lazy.serviced == 0 && lazy.sealAfter == lazy.seal);
+
+   /* a diligent one keeps at it: the seal, then the valves, which look worn
+    * too; serviced, the seal stops looking worn; seen worn again, it is
+    * serviced again, once: 60 per cent of its wear since */
+   keen = diligence_run( 90, YES);
+   BG_CHECK( keen.sealAfter < keen.seal);
+   BG_CHECK( keen.sealLast == 300000 - (300000 - keen.sealAfter) * 60 / 100 && keen.serviced == 4);
+   lazy = diligence_run( 10, YES);
+   BG_CHECK( lazy.serviced == 0 && lazy.sealLast == 300000);
+}
+
+
 /* DOMAIN_SIMULATION.md Scenario 2's drain: the pump `key` under its header
  * tank (100 L), opened, and its piston taken out: through a leaky outlet
  * valve the tank drains onto the floor; an hour on, how much left the tank,
@@ -10380,6 +10490,7 @@ const BGTestCase   BGAllTests[] =
    { "pump_wear",                     test_pump_wear },
    { "part_condition",                test_part_condition },
    { "servicing",                     test_servicing },
+   { "diligence",                     test_diligence },
    { "pump_heat",                     test_pump_heat },
    { "pump_heat_running",             test_pump_heat_running },
    { "component_pump",                test_component_pump },

@@ -94,6 +94,15 @@ Out of scope here, except where they touch agency:
 18. **A loan's terms are part of the deal**, said or written when lending
     (when it is due, any interest), as employment's are; with none said, a
     default by relationship (between friends: a week, no interest).
+19. **Upkeep is done of the agent's own accord, as it is inclined.** Seeing
+    a part worn (a #Worn finding, from what it sees), an agent may take up
+    servicing it, a reactive goal whose only recommendation is the
+    agent's diligence: worth nothing at 25, something to do when idle at
+    the default 50, enough to break off lesser things near 100. A lazy
+    agent sees the same wear and lets it be. A goal that arose and was
+    settled arises again about the same thing only from a finding drawn
+    since: a part serviced stops looking worn, and seen worn again, it is
+    seen to again.
 
 ## Terms
 
@@ -203,7 +212,7 @@ The initial set:
 | Needs | eat, rest, get warm, get air | Interoceptive beliefs (§6) |
 | Routine | work shift, go home | Commitments and habits with time windows (§8) |
 | Commitments | keep a promise, pay a debt | Commitment deadlines (§7) |
-| Reactive | investigate disturbance, protect possession | Salient beliefs: an anomaly, a threat to something believed owned |
+| Reactive | investigate disturbance, protect possession, service a worn part | Salient beliefs: an anomaly, a threat to something believed owned, wear seen |
 | Instrumental | seek missing tool | A method precondition the agent believes has failed |
 | Social | request help, answer when addressed, comply with or refuse a request | Being addressed; needing a capability or knowledge someone else holds |
 
@@ -285,7 +294,8 @@ a disturbance generates no goal to investigate it.
 ### 9. Dispositions and internal norms
 
 - **Dispositions** are fixed-point weights: honesty, respect for
-  reservations, risk tolerance, curiosity, loyalty, and others as scenarios
+  reservations, risk tolerance, curiosity, loyalty, diligence (how readily
+  it does work nothing makes it do: decision 19), and others as scenarios
   need them.
 - **Internal norms** weight kinds of action, such as taking what is believed
   to be owned by someone else, lying, breaking a promise, or harming

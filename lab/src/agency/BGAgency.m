@@ -2502,12 +2502,13 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
 - (void) settle:(BGMotivation *) m
       intention:(BGIntention *) intention
 {
+   int   k;
+
    if( intention->commitment > 0 && intention->commitment <= m->ncommitments)
       m->commitments[ intention->commitment - 1].settled = YES;
    if( intention->pressed)
    {
       char   need[ 32];
-      int    k;
 
       if( ! text_at( [_world tri], tri_pattern( [_world tri], intention->goal), "pressed.need", need, sizeof( need)))
          return;
@@ -2523,12 +2524,20 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
       }
       return;
    }
-   if( ! intention->arose || m->nsettled == BG_MAX_SETTLED ||
-       [self has:m->settled count:m->nsettled goal:intention->goal about:intention->arose verdict:NULL])
+   if( ! intention->arose)
+      return;
+   /* settled again (it arose again, from a finding drawn since): as of now */
+   for( k = 0; k < m->nsettled; k++)
+      if( m->settled[ k].goal == intention->goal && m->settled[ k].about == intention->arose)
+      {
+         m->settled[ k].verdict = (int) ([_world time].ms / 1000);
+         return;
+      }
+   if( m->nsettled == BG_MAX_SETTLED)
       return;
    m->settled[ m->nsettled].goal    = intention->goal;
    m->settled[ m->nsettled].about   = intention->arose;
-   m->settled[ m->nsettled].verdict = 0;
+   m->settled[ m->nsettled].verdict = (int) ([_world time].ms / 1000);
    m->nsettled++;
 }
 
@@ -2604,8 +2613,13 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
       }
       for( j = 0; j < [store findingCount]; j++)
       {
+         int   when;
+
+         /* settled about it, unless the finding was drawn again since (a
+          * part serviced, seen wearing again) */
          f = [store findingAt:j];
-         if( strcmp( f->kind, finding) || [self has:m->settled count:m->nsettled goal:goal about:f->about verdict:NULL])
+         if( strcmp( f->kind, finding) ||
+             ([self has:m->settled count:m->nsettled goal:goal about:f->about verdict:&when] && f->time / 1000 <= when))
             continue;
          if( tri_at( tri, tri_pattern( tri, goal), "arises.lapse") &&
              [_world time].ms - f->time > int_at( tri, tri_pattern( tri, goal), "arises.lapse", 0))
@@ -2894,7 +2908,7 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
                                                        goal_title( [_world tri], top->goal, title, sizeof( title))]];
          return( NO);
       }
-      return( YES);
+      return( NO);      /* free now: weigh what has arisen meanwhile */
    }
 
    /* the method that scores best (AGENCY.md §5), then by rank, that hasn't

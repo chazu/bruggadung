@@ -160,7 +160,8 @@ typedef struct
 {
    const char      *goal;        /* interned */
    uint32_t        about;        /* referent */
-   int             verdict;      /* weighed: 1 switch, 0 stay */
+   int             verdict;      /* weighed: 1 switch, 0 stay; settled, a goal pressed: what was felt; one
+                                    that arose: when, in seconds */
 } BGArisen;
 
 

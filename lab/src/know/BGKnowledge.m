@@ -3399,8 +3399,8 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
       repeated = NO;
       for( list = tri_at( tri, rule, "premises"); list && (premise = tri_at( tri, list, "first"));
            list = tri_at( tri, list, "rest"))
-         if( tri_at( tri, premise, "repeated"))
-            repeated = YES;
+         if( tri_at( tri, premise, "repeated") || tri_at( tri, premise, "wearing"))
+            repeated = YES;      /* and how worn a part is seen to be: serviced, it is less */
       for( j = 0; j < [store count]; j++)
       {
          r = [store referentAt:j];
@@ -3442,6 +3442,12 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
             }
             else if( (v = tri_at( tri, premise, "repeated")) && tri_node_interval( v, &lo, &hi) && lo == hi)
                holds = (choice = usual_place( store, r->id, lo)) != 0;
+            else if( (v = tri_at( tri, premise, "wearing")) && tri_node_interval( v, &lo, &hi) && lo == hi)
+            {
+               int64_t   worn;
+
+               holds = r->features && int_feature( r->features, "wear", &worn) && worn >= lo;
+            }
             else if( (v = tri_at( tri, premise, "near")) && tri_print( tri, v, text, sizeof( text)) > 2)
             {
                text[ strlen( text) - 1] = 0;

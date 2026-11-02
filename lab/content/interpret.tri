@@ -35,6 +35,8 @@
 #Replaced:    #Finding & {}
 // It is a forgery.
 #Forged:      #Finding & {}
+// It is wearing: a part that wants servicing.
+#Worn:        #Finding & {}
 
 // A rule's premises, over the body it is about.
 #Premise:    {}
@@ -52,6 +54,9 @@
 // a copy whose impression is not that of the seal the agent has seen of the
 // issuer it claims
 #Misprinted: #Premise & { misprinted: *true | false }
+// it is seen worn at least this much (a part's `wear`); weighed again as
+// it is seen, so a part serviced stops being so
+#Wearing:    #Premise & { wearing: int }
 
 #Skill: "painting"
 
@@ -112,6 +117,15 @@ forged_seal: #Rule & {
     mastery:   0
     concludes: "#Forged"
     weight:    20
+} @family(rules)
+
+// A part seen worn a fifth of the way through: it wants servicing. Seen
+// serviced, it stops; seen wearing again, it is drawn again.
+wearing_part: #Rule & {
+    premises:  [#Wearing & { wearing: 20 }]
+    mastery:   0
+    concludes: "#Worn"
+    weight:    10
 } @family(rules)
 
 // Seen putting things in the same place three times: they usually do.

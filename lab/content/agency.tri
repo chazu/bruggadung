@@ -889,6 +889,30 @@ open_it_further: #Method & {
 } @family(methods)
 
 
+// --- keeping a machine in order (LATENT_ASSEMBLY.md decision 8) ---------------------
+
+// Seeing a part wearing, service it, if the agent is so inclined: nothing
+// but diligence recommends it. At the default 50 it is worth doing when
+// there is nothing better; a lazy agent (25 or less) lets it be; a diligent
+// one breaks off lesser things for it. The part it can service is the one
+// service_part takes: in place, short of worn through.
+
+service_worn: #Goal & {
+    title:  "service the worn part"
+    done:   #Did & { did: "service_part" }
+    arises: { finding: "#Worn", slot: "worn", lapse: 1h, of: #Part }
+    worth:  [#Flat & { value: -10 }, #Trait & { trait: "diligent", per: 4 }]
+} @family(goals)
+
+service_it: #Method & {
+    title: "service it"
+    goal:  "service_worn"
+    rank:  1
+    pre:   { find: ["worn"], match: #Mending & { worn: service_part.roles.item } }
+    steps: [#Do & { op: "service_part", object: "worn" }]
+} @family(methods)
+
+
 // --- ACTIONS.md Scenario 3, "the interrupted repair" ------------------------------
 
 repair_pump: #Goal & {
