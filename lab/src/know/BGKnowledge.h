@@ -313,8 +313,16 @@ typedef struct
 
 @interface BGKnowledgeStore : NSObject
 {
-   BGWorld          *_world;         /* not retained: for the time memory decays by */
+@public
+   /* when it perceives (REALITY.md decision 7): not saved, a game resumed
+    * perceives everything once */
+   int64_t          _perceivedAt;    /* the time it last perceived; -1 never */
+   int64_t          _perceiveBy;     /* it perceives again by then, nothing happening: a trace fading */
+   int              _daylightSeen;   /* the daylight it last perceived in */
+   int64_t          _forgetBy;       /* the next time it forgets something; -2 not known */
    BGEntityID       _agent;
+@protected
+   BGWorld          *_world;         /* not retained: for the time memory decays by */
    uint32_t         _self;
    BGReferent       *_referents;
    NSUInteger       _count;
@@ -578,6 +586,10 @@ typedef struct
    BGWorld          *_world;
    NSMutableArray   *_stores;          /* sorted by agent */
    NSUInteger       _eventsSeen;
+   uint64_t         _perceptions;      /* an agent's perceiving, counted, for measuring */
+   BGEntityID       *_touched;         /* what changed by this boundary, sorted */
+   BOOL             _short;            /* the agent perceiving ran out of attention */
+   NSUInteger       _ntouched;
    BOOL             _omniscient;
    int              _ambient;          /* the light where no lamp shines: 2 day, 1 dusk, 0 night */
    id               _light;            /* the light domain, if light is simulated (KNOWLEDGE.md decision 14) */
@@ -586,6 +598,13 @@ typedef struct
    NSUInteger       _nancestry;
    NSUInteger       _acapacity;
 }
+
+/* Whether the agent perceived at this boundary; whether an entity changed
+ * by it (REALITY.md decision 7). */
+- (BOOL) perceivedNow:(BGEntityID) agent;
+- (BOOL) touchedNow:(BGEntityID) entity;
+/* How many times an agent has perceived a boundary, all told: for measuring. */
+- (uint64_t) perceptions;
 
 - (id) initWithWorld:(BGWorld *) world;
 

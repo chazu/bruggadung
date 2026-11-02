@@ -130,8 +130,22 @@ typedef struct
 @end
 
 
+/* Where a scheduler's time went: boundaries run, and the wall time (ns) of
+ * each phase of them. For measuring, not for the simulation. */
+typedef struct
+{
+   uint64_t   boundaries;
+   uint64_t   horizonNs;      /* finding the next boundary */
+   uint64_t   domainsNs;
+   uint64_t   commitNs;       /* activities, inputs, commitment */
+   uint64_t   perceptionNs;
+   uint64_t   decisionNs;
+} BGSchedulerStats;
+
+
 @interface BGScheduler : NSObject
 {
+   BGSchedulerStats             _stats;
    BGWorld                      *_world;
    BGCommitter                  *_committer;
    NSMutableArray               *_domains;
@@ -156,6 +170,7 @@ typedef struct
 
 /* The time the next boundary would be at, if nothing stops it first. */
 - (BGTime) nextBoundaryTime;
+- (BGSchedulerStats) stats;
 /* Runs one boundary, at most at `stop`. NO when there is nothing to do
  * before `stop`. */
 - (BOOL) stepUntil:(BGTime) stop;

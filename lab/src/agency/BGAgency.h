@@ -179,6 +179,7 @@ typedef struct
 {
 @public
    BGEntityID       agent;
+   int64_t          decidedAt;         /* when it last decided (ms); -1 never (REALITY.md decision 7) */
    BGIntention      intentions[ BG_MAX_INTENTIONS];     /* the commitment first, the current intention last */
    int              nintentions;
    uint64_t         decisions;
@@ -219,11 +220,15 @@ typedef struct
    NSMutableArray   *_notices;         /* control returned, for the player */
    NSMutableArray   *_former;          /* pairs: an agent let go, its log */
    BGMotivation     *_deciding;        /* whose decision this is, for its habits */
+   uint64_t         _decisions;        /* a mind's deciding, counted, for measuring */
    BGSlotBinding    _unknown[ BG_MAX_SLOTS];   /* the last condition's first unknown match: its bindings */
    int              _nunknown;
    char             _residual[ 128];   /* and the first path left unknown */
    char             _lastResidual[ 128];   /* the last match's */
 }
+
+/* How many times a mind has decided, all told: for measuring. */
+- (uint64_t) decisions;
 
 - (id) initWithWorld:(BGWorld *) world
            committer:(BGCommitter *) committer

@@ -43,6 +43,7 @@
 #import "BGWorlds.h"
 #import "BGCoupling.h"
 #import "BGScheduler.h"
+#import "BGBench.h"
 #import "BGTest.h"
 #import "BGContent.h"
 

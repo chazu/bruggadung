@@ -86,6 +86,12 @@ static BOOL   shut_in( BGWorld *world, BGLocation tile)
 }
 
 
+int   BGDaylight( BGWorld *world, int64_t t)
+{
+   return( outdoors( world, t));
+}
+
+
 int64_t   BGLampOil( const BGLamp *lamp, int64_t t)
 {
    int64_t   left;

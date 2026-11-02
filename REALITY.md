@@ -8,7 +8,9 @@ makes a boundary at which every agent perceives and every mind decides: the
 cost of a simulated second grows with the square of the agents. That is fine
 for a workshop and fatal for a large roguelike or simulation.
 
-This document is a draft. Nothing in it is built yet.
+This document is a draft. Step 1 is begun: perception and decision are
+done when something happens (lab/src/know/BGKnowledge, lab/src/agency/
+BGAgency), measured by `lab bench crowd`.
 
 The aim is a world simulated exactly where it matters, and less exactly, by
 degrees, further away, with the degrees, their reach, and what each thing
@@ -131,6 +133,46 @@ full.
    whose inputs changed; needs that rise with time predicted as wakes.
    Measured: boundaries and agents worked per simulated second, before and
    after, on a crowd.
+
+   **Begun.** The world notes what changes each boundary (records and
+   locations: `takeTouched:`) and what was left (`takeVacated:`). An agent
+   perceives when it, or what it takes part in, changed; when something
+   changed, an event was, or something left, within its sight (a sound
+   within `BG_SOUND_REACH`; a lamp or door further, for the light they
+   shed); when its air changed; when a terrain change was where it had
+   seen; when it hasn't yet; and when, with nothing happening, a wake falls
+   due: a belief fading past belief, a promise falling due, its hunger
+   reaching its next band, a trace it knows fading, the daylight turning.
+   Short of attention, or having learnt something, it looks again at the
+   next boundary. A mind decides when its agent perceived, a wake it set is
+   due, the answer it awaits is late, or a commitment's window opened or
+   closed. Ended activities are let go in the round they end, per actor.
+   Both schedules are saved.
+
+   Measured (`lab bench crowd N 60`: N agents on a 96 by 64 yard, half
+   exploring, starting through the first second), wall time a world second:
+
+   | agents | before | after |
+   | --- | --- | --- |
+   | 20 | 17 ms | 3 ms |
+   | 40 | 76 ms | 8 ms |
+   | 80 | 394 ms | 25 ms |
+   | 160 | | 103 ms |
+
+   Perceptions fell from one per agent per boundary to two or three per
+   boundary. Still to do, for a cost that grows with what happens and not
+   with the agents:
+   - **A queue of wakes.** Finding the next boundary, and what falls due
+     at it (an activity's stage, a mind's wake, a store's forgetting), still
+     reads every agent, activity and store each boundary; boundaries
+     themselves grow with the agents. One ordered queue of wakes, every
+     system's, read from the front.
+   - **Perception's own cost.** An agent's every perception reads all its
+     referents (absence, forgetting, interpretation), and an agent
+     remembers everyone it has seen; describing what it sees (appearance,
+     through Triangle) is most of the rest. Referents by believed place,
+     forgetting that lets go, and descriptions kept while nothing about
+     what is described changes.
 2. **Anchors, levels and leases** (decisions 2, 3, 5, 10, 12). The
    content (`#Reality`: per kind of anchor and level, the reach across and
    up and down; the cadences; what counts as contact, and its lease),

@@ -665,5 +665,12 @@ BGWorld   *BGRestore( NSString *text,
    }
    if( deferred)
       *deferred = groups;
+   /* restoring wrote every record; nothing has happened since the save */
+   {
+      NSUInteger   n;
+
+      free( [world takeTouched:&n]);
+      free( [world takeVacated:&n]);
+   }
    return( world);
 }

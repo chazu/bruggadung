@@ -40,6 +40,7 @@ src/scenario/BGMarkedNail.m
 src/scenario/BGWorlds.m
 src/sched/BGCoupling.m
 src/sched/BGScheduler.m
+src/test/BGBench.m
 src/test/BGTest.m
 src/test/BGTests.m
 src/triangle/BGContent.m

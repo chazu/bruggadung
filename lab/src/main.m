@@ -20,6 +20,7 @@
 #import "BGView.h"
 #import "BGCistern.h"
 #import "BGPlay.h"
+#import "BGBench.h"
 
 #include <unistd.h>
 
@@ -36,7 +37,8 @@ static int   usage( void)
    fprintf( stderr, "usage: lab [-C contentdir] test [name]\n"
                     "       lab [-C contentdir] run|save marked-nail|marked-nail-a|marked-nail-b\n"
                     "       lab [-C contentdir] menu marked-nail|marked-nail-a|marked-nail-b <ms>\n"
-                    "       lab [-C contentdir] play workshop|cistern|shed [--seed n] [--log file]\n");
+                    "       lab [-C contentdir] play workshop|cistern|shed [--seed n] [--log file]\n"
+                    "       lab [-C contentdir] bench crowd [agents] [seconds]\n");
    return( 2);
 }
 
@@ -243,6 +245,8 @@ int   main( int argc, char *argv[])
       status = run_scenario( argv[ i + 1], YES, -1);
    else if( ! strcmp( argv[ i], "play") && i + 1 < argc)
       status = play( argc, argv, i);
+   else if( ! strcmp( argv[ i], "bench") && i + 1 < argc && ! strcmp( argv[ i + 1], "crowd"))
+      status = BGBenchCrowd( i + 2 < argc ? atoi( argv[ i + 2]) : 100, i + 3 < argc ? atoll( argv[ i + 3]) : 60);
    else if( ! strcmp( argv[ i], "menu") && i + 2 < argc)
       status = run_scenario( argv[ i + 1], NO, strtoll( argv[ i + 2], NULL, 10));
    else

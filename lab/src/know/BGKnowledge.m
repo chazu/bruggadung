@@ -122,6 +122,10 @@ static NSUInteger   feature_keys( const char *features, char (*keys)[ 32], NSUIn
    _world  = world;
    _agent  = agent;
    _feltAt = -1;
+   _perceivedAt  = -1;
+   _perceiveBy   = INT64_MAX;
+   _daylightSeen = -1;
+   _forgetBy     = -2;
    _next  = 1;
    _news  = [NSMutableArray new];
    [self learnCommonLaws];
@@ -1733,6 +1737,7 @@ static NSString   *known_features( const BGReferent *r)
 {
    [_world release];
    [_stores release];
+   free( _touched);
    [_light release];
    free( _ancestry);
    [super dealloc];
@@ -2205,18 +2210,25 @@ static BOOL   line_clear( const BGTerrain *t, int32_t x0, int32_t y0, int32_t x1
 - (BGKnowledgeStore *) storeOf:(BGEntityID) agent
 {
    BGKnowledgeStore   *store;
+   NSUInteger         lo;
+   NSUInteger         hi;
    NSUInteger         i;
 
-   for( i = 0; i < [_stores count]; i++)
+   /* by halving: the stores are in agent order */
+   lo = 0;
+   hi = [_stores count];
+   while( lo < hi)
    {
-      store = [_stores objectAtIndex:i];
-      if( [store agent] == agent)
-         return( store);
-      if( [store agent] > agent)
-         break;
+      i = (lo + hi) / 2;
+      if( ((BGKnowledgeStore *) [_stores objectAtIndex:i])->_agent < agent)
+         lo = i + 1;
+      else
+         hi = i;
    }
+   if( lo < [_stores count] && (store = [_stores objectAtIndex:lo])->_agent == agent)
+      return( store);
    store = [[[BGKnowledgeStore alloc] initWithAgent:agent world:_world] autorelease];
-   [_stores insertObject:store atIndex:i];
+   [_stores insertObject:store atIndex:lo];
    return( store);
 }
 
@@ -3348,6 +3360,7 @@ static int   cmp_fresh( const void *a, const void *b)
       if( ! closely && (*budget)-- <= 0)
       {
          [news addObject:[NSString stringWithFormat:@"no attention left for the %s", t.kind]];
+         _short = YES;      /* attended to later: it perceives again next */
          continue;
       }
       [store noteTrace:t];
@@ -3767,6 +3780,7 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
          if( ! deliberately && budget-- <= 0)
          {
             [news addObject:[NSString stringWithFormat:@"no attention left to think R%u over", r->id]];
+            _short = YES;      /* attended to later: it perceives again next */
             continue;
          }
          memset( &f, 0, sizeof( f));
@@ -3829,6 +3843,12 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
          [news addObject:[NSString stringWithFormat:@"R%u looks new: its %s is gone", r->id, field + 1]];
       }
    }
+}
+
+
+- (uint64_t) perceptions
+{
+   return( _perceptions);
 }
 
 
@@ -3895,6 +3915,8 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
    NSUInteger         ncandidates;
    NSInteger          budget;
    NSInteger          left;
+
+   _perceptions++;
 
    agent       = [store agent];
    news        = [store mutableNews];
@@ -4560,6 +4582,7 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
       {
          [news addObject:[NSString stringWithFormat:@"no attention left for event %llu",
                                                     (unsigned long long) [_world eventAt:candidates[ i].event]->index]];
+         _short = YES;
          continue;
       }
       o  = candidates[ i].o;
@@ -4749,24 +4772,274 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
    next = INT64_MAX;
    for( i = 0; i < [_stores count]; i++)
    {
+      /* each store's, kept from when it last perceived: only perceiving
+       * changes what it would forget */
       store = [_stores objectAtIndex:i];
-      for( j = 0; j < [store count]; j++)
+      if( store->_forgetBy == -2 || (store->_forgetBy != INT64_MAX && store->_forgetBy <= now))
       {
-         when = [store forgettingOf:[store referentAt:j]->id];
-         if( when > now && when < next)
-            next = when;
+         store->_forgetBy = INT64_MAX;
+         for( j = 0; j < [store count]; j++)
+         {
+            when = [store forgettingOf:[store referentAt:j]->id];
+            if( when > now && when < store->_forgetBy)
+               store->_forgetBy = when;
+         }
       }
+      if( store->_forgetBy < next)
+         next = store->_forgetBy;
    }
    return( next == INT64_MAX ? BGTimeNever : BGTimeMake( next));
 }
 
 
+/* Marks the agents within `radius` of a tile (on the ground, or in what
+ * stands there), as concerned. */
+static void   mark_near( BGWorld *world, BGLocation tile, int32_t radius, NSUInteger kagent,
+                         BGEntityID **marked, NSUInteger *n, NSUInteger *cap)
+{
+   BGEntityID   *near;
+   NSUInteger   count;
+   NSUInteger   i;
+
+   count = [world thingsNear:tile radius:radius into:&near];
+   for( i = 0; i < count; i++)
+      if( [world record:kagent for:near[ i]])
+      {
+         if( *n == *cap)
+            *marked = realloc( *marked, (*cap = *cap ? *cap * 2 : 64) * sizeof( BGEntityID));
+         (*marked)[ (*n)++] = near[ i];
+      }
+   free( near);
+}
+
+
+static void   mark( BGEntityID e, BGEntityID **marked, NSUInteger *n, NSUInteger *cap)
+{
+   if( ! e)
+      return;
+   if( *n == *cap)
+      *marked = realloc( *marked, (*cap = *cap ? *cap * 2 : 64) * sizeof( BGEntityID));
+   (*marked)[ (*n)++] = e;
+}
+
+
+static int   cmp_entity_id( const void *a, const void *b)
+{
+   BGEntityID   x;
+   BGEntityID   y;
+
+   x = *(const BGEntityID *) a;
+   y = *(const BGEntityID *) b;
+   return( x < y ? -1 : x > y);
+}
+
+
+/* The agents this boundary concerns (REALITY.md decision 7): those that
+ * changed, or took part in an event; those within their senses of what
+ * changed, or of where an event was; those whose air changed. Sorted, maybe
+ * twice. */
+- (BGEntityID *) concernedFrom:(NSUInteger) first
+                            to:(NSUInteger) last
+                         count:(NSUInteger *) count
+{
+   const BGEvent      *ev;
+   const BGActivity   *activity;
+   const BGTrace      *trace;
+   BGEntityID         *marked;
+   BGEntityID         *gas;
+   BGStore            *agents;
+   BGLocation         tile;
+   NSUInteger         kagent;
+   NSUInteger         kgas;
+   NSUInteger         ngas;
+   NSUInteger         n;
+   NSUInteger         cap;
+   NSUInteger         i;
+   NSUInteger         k;
+   int32_t            radius;
+
+   kagent = [_world kindNamed:"Agent"];
+   kgas   = [_world kindNamed:"GasStore"];
+   marked = NULL;
+   n      = 0;
+   cap    = 0;
+   gas    = malloc( (_ntouched + 1) * sizeof( BGEntityID));
+   ngas   = 0;
+   for( i = 0; i < _ntouched; i++)
+   {
+      BGEntityID   e;
+
+      e = _touched[ i];
+      if( [_world record:kagent for:e])
+         mark( e, &marked, &n, &cap);
+      if( (activity = [_world record:[_world kindNamed:"Activity"] for:e]))
+         mark( (BGEntityID) activity->actorRef, &marked, &n, &cap);
+      if( [_world record:kgas for:e])
+         gas[ ngas++] = e;
+      radius = BG_SIGHT + 1;
+      if( (trace = [_world record:[_world kindNamed:"Trace"] for:e]))
+      {
+         radius = BG_SOUND_REACH;
+         if( trace->bearer ? ! ground_tile( _world, (BGEntityID) trace->bearer, &tile) : NO)
+            continue;
+         if( ! trace->bearer)
+            tile = BGOnTile( (int32_t) trace->tileX, (int32_t) trace->tileY, (int32_t) trace->tileLevel);
+      }
+      else if( ! ground_tile( _world, e, &tile))
+         continue;
+      if( [_world record:[_world kindNamed:"Lamp"] for:e])
+         radius = BG_SIGHT + 11;          /* a lamp lights its reach, ten at most */
+      else if( [_world record:[_world kindNamed:"Door"] for:e])
+         radius = BG_SIGHT + 16;          /* a door shades the room behind it */
+      mark_near( _world, tile, radius, kagent, &marked, &n, &cap);
+   }
+   for( i = first; i < last; i++)
+   {
+      ev = [_world eventAt:i];
+      mark( [_world record:kagent for:ev->subject] ? ev->subject : BGNoEntity, &marked, &n, &cap);
+      mark( [_world record:kagent for:ev->other] ? ev->other : BGNoEntity, &marked, &n, &cap);
+      mark( [_world record:kagent for:ev->actor] ? ev->actor : BGNoEntity, &marked, &n, &cap);
+      if( ev->location.form == BGLocationOnTile)
+         mark_near( _world, ev->location, BG_SIGHT + 1, kagent, &marked, &n, &cap);
+      if( ev->subject && ground_tile( _world, ev->subject, &tile))
+         mark_near( _world, tile, BG_SIGHT + 1, kagent, &marked, &n, &cap);
+      if( ev->actor && ev->actor != ev->subject && ground_tile( _world, ev->actor, &tile))
+         mark_near( _world, tile, BG_SIGHT + 1, kagent, &marked, &n, &cap);
+      /* terrain changed: whoever saw the tile, however far, recalls what was
+       * there (TERRAIN.md decision 7) */
+      if( ! strcmp( ev->kind, "terrain") && ev->location.form == BGLocationOnTile)
+         for( k = 0; k < [_stores count]; k++)
+            if( [[_stores objectAtIndex:k] hasSeenX:ev->location.x y:ev->location.y level:ev->location.level])
+               mark( [[_stores objectAtIndex:k] agent], &marked, &n, &cap);
+   }
+   /* where things were: who saw them there sees them gone */
+   {
+      BGLocation   *vacated;
+      NSUInteger   nvacated;
+
+      vacated = [_world takeVacated:&nvacated];
+      for( i = 0; i < nvacated; i++)
+         mark_near( _world, vacated[ i], BG_SIGHT + 1, kagent, &marked, &n, &cap);
+      free( vacated);
+   }
+   /* the air they breathe */
+   if( ngas)
+   {
+      agents = [_world storeForKind:kagent];
+      for( i = 0; i < [agents count]; i++)
+         if( bsearch( &(BGEntityID){ BGAirOver( _world, [agents entityAtIndex:i]) }, gas, ngas, sizeof( BGEntityID),
+                      cmp_entity_id))
+            mark( [agents entityAtIndex:i], &marked, &n, &cap);
+   }
+   free( gas);
+   if( n)
+      qsort( marked, n, sizeof( BGEntityID), cmp_entity_id);
+   *count = n;
+   return( marked);
+}
+
+
+/* The hunger an agent feels at t, to its band (as perception has it). */
+- (int64_t) hungerOf:(BGEntityID) agent
+              memory:(const BGAgent *) memory
+                  at:(int64_t) t
+{
+   int64_t   band;
+   int64_t   hunger;
+
+   band   = memory->fatigue >= 80 ? 2 * BG_HUNGER_BAND : BG_HUNGER_BAND;
+   hunger = 100 - BGSatiety( memory, t) - 2 * [self attentionOf:agent];
+   return( hunger < 0 ? 0 : (hunger / band) * band);
+}
+
+
+/* When a store perceives again with nothing happening (REALITY.md decision
+ * 7): what it believes fading past belief; a promise falling due; its
+ * hunger reaching its next band; a trace it knows of fading past what it
+ * notices. */
+- (int64_t) perceiveByOf:(BGKnowledgeStore *) store
+{
+   const BGTraceSeen   *t;
+   const BGTrace       *trace;
+   const BGTestimony   *pledge;
+   const BGReferent    *r;
+   const BGAgent       *memory;
+   NSUInteger          i;
+   int64_t             by;
+   int64_t             gone;
+   int64_t             now;
+   int64_t             lo;
+   int64_t             hi;
+   int64_t             mid;
+   int64_t             felt;
+
+   now = [_world time].ms;
+   by  = INT64_MAX;
+   for( i = 0; i < [store count]; i++)
+   {
+      r = [store referentAt:i];
+      if( ! r->present || r->id == [store selfReferent])
+         continue;
+      gone = [store forgettingOf:r->id];
+      if( gone > now && gone < by)
+         by = gone;
+   }
+   for( i = 0; i < [store testimonyCount]; i++)
+   {
+      pledge = [store testimonyAt:i];
+      if( ! pledge->settled && pledge->attribution == BGPledged && pledge->when > now && pledge->when < by)
+         by = pledge->when;
+   }
+   /* hunger rises with time alone: the first moment, within a day, its band
+    * changes, found by halving (it only rises) */
+   if( (memory = [_world record:[_world kindNamed:"Agent"] for:[store agent]]))
+   {
+      felt = [self hungerOf:[store agent] memory:memory at:now];
+      lo   = now;
+      hi   = now + 86400000LL;          /* a day */
+      if( [self hungerOf:[store agent] memory:memory at:hi] == felt)
+         mid = hi;
+      else
+      {
+         while( hi - lo > 1)
+         {
+            mid = lo + (hi - lo) / 2;
+            if( [self hungerOf:[store agent] memory:memory at:mid] == felt)
+               lo = mid;
+            else
+               hi = mid;
+         }
+         mid = hi;
+      }
+      if( mid < by)
+         by = mid;
+   }
+   for( i = 0; i < [store traceCount]; i++)
+   {
+      t = [store traceAt:i];
+      if( ! t->present || ! t->truth || ! (trace = [_world record:[_world kindNamed:"Trace"] for:t->truth]))
+         continue;
+      gone = BGTraceGone( _world, trace);
+      if( gone > [_world time].ms && gone < by)
+         by = gone;
+   }
+   return( by);
+}
+
+
 - (void) perceiveBoundary:(uint64_t) boundary
 {
-   const BGEvent   *ev;
-   BGStore         *agents;
-   NSUInteger      i;
-   NSUInteger      last;
+   const BGEvent      *ev;
+   BGKnowledgeStore   *store;
+   BGStore            *agents;
+   BGEntityID         *concerned;
+   BGEntityID         agent;
+   NSUInteger         nconcerned;
+   NSUInteger         i;
+   NSUInteger         k;
+   NSUInteger         last;
+   int64_t            now;
+   int                daylight;
 
    last   = [_world eventCount];
    /* claims said, traced first, by what their speakers knew when they spoke */
@@ -4776,17 +5049,59 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
       if( ! strcmp( ev->kind, "said") && ev->actor && ev->detail)
          [self trace:ev];
    }
-   agents = [_world storeForKind:[_world kindNamed:"Agent"]];
-   /* in stable ID order; each depends only on the world and its own store */
-   for( i = 0; i < [agents count]; i++)
+   free( _touched);
+   _touched   = [_world takeTouched:&_ntouched];
+   concerned  = [self concernedFrom:_eventsSeen to:last count:&nconcerned];
+   now        = [_world time].ms;
+   daylight   = BGDaylight( _world, now);
+   agents     = [_world storeForKind:[_world kindNamed:"Agent"]];
+   /* in stable ID order; each depends only on the world and its own store.
+    * An agent perceives when something concerns it, when it hasn't yet,
+    * when a trace it knows fades, or the daylight turns; else it rests */
+   for( k = 0, i = 0; i < [agents count]; i++)
    {
-      [self perceive:[self storeOf:[agents entityAtIndex:i]]
+      agent = [agents entityAtIndex:i];
+      while( k < nconcerned && concerned[ k] < agent)
+         k++;
+      store = [self storeOf:agent];
+      if( ! _omniscient && ! (k < nconcerned && concerned[ k] == agent) && store->_perceivedAt >= 0 &&
+          store->_perceiveBy > now && store->_daylightSeen == daylight)
+      {
+         if( _compactAlways)
+            [store compact:YES];       /* a test's: compaction changes nothing, at every boundary */
+         continue;
+      }
+      _short = NO;
+      [self perceive:store
                 from:_eventsSeen
                   to:last];
+      store->_perceivedAt  = now;
+      store->_daylightSeen = daylight;
+      /* short of attention, or it learnt something: it looks again next
+       * boundary, what it learnt checked against what it sees (told that
+       * Kasimir has the purse, it sees whether he does) */
+      store->_perceiveBy   = _short || [[store news] count] ? now + 1 : [self perceiveByOf:store];
+      store->_forgetBy     = -2;
       /* housekeeping: the knowledge arena, compacted when half garbage */
-      [[self storeOf:[agents entityAtIndex:i]] compact:_compactAlways];
+      [store compact:_compactAlways];
    }
+   free( concerned);
    _eventsSeen = last;
+}
+
+
+- (BOOL) perceivedNow:(BGEntityID) agent
+{
+   BGKnowledgeStore   *store;
+
+   store = [self storeOf:agent];
+   return( store && store->_perceivedAt == [_world time].ms);
+}
+
+
+- (BOOL) touchedNow:(BGEntityID) entity
+{
+   return( _touched && bsearch( &entity, _touched, _ntouched, sizeof( BGEntityID), cmp_entity_id) != NULL);
 }
 
 
@@ -5079,6 +5394,10 @@ char   *BGDecodeWord( const char *s)
       [lines addObject:[NSString stringWithFormat:@"store %llu %u %u %llu", (unsigned long long) [store agent],
                                                   [store nextID], [store selfReferent],
                                                   (unsigned long long) [store nextSerial]]];
+      /* when it perceives: last, and next with nothing happening */
+      [lines addObject:[NSString stringWithFormat:@"perceives %llu %lld %lld %d", (unsigned long long) [store agent],
+                                                  (long long) store->_perceivedAt, (long long) store->_perceiveBy,
+                                                  store->_daylightSeen]];
       /* the terrain seen: a chunk a line, its bits in hex; then what it recalls */
       {
          BGSeenChunk       *chunks;
@@ -5197,6 +5516,10 @@ char   *BGDecodeWord( const char *s)
 - (void) restoreSavedState:(NSArray *) lines
 {
    BGKnowledgeStore     *store;
+   BGKnowledgeStore     *restoring;
+   long long            perceivedAt;
+   long long            perceiveBy;
+   int                  daylight;
    BGReferent           *r;
    unsigned long long   agent;
    unsigned long long   truth;
@@ -5240,6 +5563,13 @@ char   *BGDecodeWord( const char *s)
       {
          [[self storeOf:(BGEntityID) agent] setNextID:next self:me];
          [[self storeOf:(BGEntityID) agent] setNextSerial:parent];
+      }
+      else if( sscanf( text, "perceives %llu %lld %lld %d", &agent, &perceivedAt, &perceiveBy, &daylight) == 4)
+      {
+         restoring = [self storeOf:(BGEntityID) agent];
+         restoring->_perceivedAt  = perceivedAt;
+         restoring->_perceiveBy   = perceiveBy;
+         restoring->_daylightSeen = daylight;
       }
       else if( ! strncmp( text, "seenchunk ", 10))
       {

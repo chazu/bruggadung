@@ -137,6 +137,12 @@ typedef struct
    struct BGIndex *_activitiesOf;    /* activities, by actor */
    struct BGIndex *_watching;        /* activities with a watch, under one key */
    struct BGIndex *_touching;        /* activities, by actor, item and destination */
+   BGEntityID     *_touched;         /* entities changed since the mark, unsorted, maybe twice */
+   BGLocation     *_vacated;         /* ground tiles left since the mark */
+   NSUInteger     _nvacated;
+   NSUInteger     _vacatedcap;
+   NSUInteger     _ntouched;
+   NSUInteger     _touchedcap;
    NSUInteger     _kindTrace;
    NSUInteger     _kindGas;
    NSUInteger     _kindActivity;
@@ -275,6 +281,13 @@ typedef struct
 - (NSUInteger) watchingActivities:(BGEntityID *) out
                               max:(NSUInteger) max;
 - (BGEntityID *) copyWatchingActivities:(NSUInteger *) n;
+/* The entities whose records or location changed since the last call, in
+ * entity order, each once (REALITY.md decision 7: work when something
+ * happens): malloc'd, *n of them; the record starts again. */
+- (BGEntityID *) takeTouched:(NSUInteger *) n;
+/* The ground tiles things left since the last call (moved off, or out of
+ * what stood there), each as often as left: malloc'd, *n of them. */
+- (BGLocation *) takeVacated:(NSUInteger *) n;
 /* What is in, on, held by or part of a thing, any way, in entity order. */
 - (NSUInteger) entitiesIn:(BGEntityID) place
                      into:(BGEntityID *) out

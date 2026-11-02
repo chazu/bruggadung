@@ -4219,3 +4219,32 @@ Checked besides: an explorer's dozens of walks leave five activities at
 most, and the index agrees with the store.
 
 108 tests, 3431 checks, under both compilers, UBSan, and leak-free.
+
+
+### After the slice: work when something happens (REALITY.md step 1, begun)
+
+- `lab bench crowd [agents] [seconds]`: a crowd on the yard, half
+  exploring, starting through the first second; boundaries, perceptions,
+  decisions, and each phase's wall time (`-[BGScheduler stats]`).
+- **What changed, noted**: `-[BGWorld takeTouched:]` (records and
+  locations changed) and `takeVacated:` (ground tiles left), taken by
+  perception each boundary, let go by the scheduler after.
+- **Perception when concerned**: the agents that changed or took part;
+  within sight of what changed, of an event, of what left (further for
+  sounds, lamps, doors); breathing air that changed; who saw a tile whose
+  terrain changed. With nothing happening, at a wake: a belief fading, a
+  promise due, hunger's next band, a trace fading, the daylight turning.
+  Again next boundary when short of attention or having learnt something.
+  Each store's last perception and next wake are saved; a store's next
+  forgetting is kept between perceptions.
+- **Decision when due**: perceived, a wake due, an answer late, a
+  commitment's window crossed; `decidedAt` saved.
+- **Ended activities let go per round**, per actor, a group each.
+- `storeOf:` and `mindOf:` by halving.
+- Tests that read "seen" as "now" read it as "when it last looked";
+  compaction at every boundary is a test's (`compactAlways`) alone.
+
+Measured, wall time a world second: 20 agents 17 → 3 ms, 40 76 → 8 ms, 80
+394 → 25 ms. Next: a queue of wakes, and perception's own cost.
+
+109 tests, 3447 checks, under both compilers, UBSan, and leak-free.

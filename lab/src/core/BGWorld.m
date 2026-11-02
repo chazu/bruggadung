@@ -345,6 +345,8 @@ static NSUInteger   stocks_wet( struct BGTileStocks *s, int32_t (*out)[ 3], NSUI
    stocks_free( _stocks);
    BGTerrainFree( _terrain);
    free( _roomAir);
+   free( _touched);
+   free( _vacated);
    BGIndexFree( _onGround);
    BGIndexFree( _inPlace);
    BGIndexFree( _tracesOnGround);
@@ -737,9 +739,46 @@ static void   file_activity( BGWorld *self, BGEntityID entity, const BGActivity 
 }
 
 
+/* A thing is leaving where it was: the ground tile under it, noted. */
+static void   vacate( BGWorld *self, const BGLocation *was)
+{
+   BGLocation   at;
+   NSUInteger   guard;
+
+   if( ! was)
+      return;
+   for( at = *was, guard = 0; at.form != BGLocationOnTile && at.form != BGLocationNone && at.place && guard < 64; guard++)
+      at = [self locationOf:at.place];
+   if( at.form != BGLocationOnTile)
+      return;
+   if( self->_nvacated == self->_vacatedcap)
+   {
+      self->_vacatedcap = self->_vacatedcap ? self->_vacatedcap * 2 : 64;
+      self->_vacated    = realloc( self->_vacated, self->_vacatedcap * sizeof( BGLocation));
+   }
+   self->_vacated[ self->_nvacated++] = at;
+}
+
+
+/* An entity changed: noted for those who work when something happens. */
+static void   touch( BGWorld *self, BGEntityID entity)
+{
+   if( self->_ntouched && self->_touched[ self->_ntouched - 1] == entity)
+      return;
+   if( self->_ntouched == self->_touchedcap)
+   {
+      self->_touchedcap = self->_touchedcap ? self->_touchedcap * 2 : 256;
+      self->_touched    = realloc( self->_touched, self->_touchedcap * sizeof( BGEntityID));
+   }
+   self->_touched[ self->_ntouched++] = entity;
+}
+
+
 /* Files or unfiles a record in what the world indexes of its kind. */
 static void   file_record( BGWorld *self, NSUInteger kind, BGEntityID entity, BOOL add)
 {
+   if( add)
+      touch( self, entity);
    if( kind == self->_kindTrace)
       file_trace( self, entity, [self->_kinds[ kind] recordFor:entity], add);
    else if( kind == self->_kindActivity)
@@ -767,6 +806,7 @@ static void   file_record( BGWorld *self, NSUInteger kind, BGEntityID entity, BO
    journal_record( self, _kinds[ kind], kind, entity);
    file_record( self, kind, entity, NO);
    [_kinds[ kind] removeRecordFor:entity];
+   touch( self, entity);
 }
 
 
@@ -1222,12 +1262,46 @@ static void   file_location( BGWorld *self, BGEntityID entity, const BGLocation 
       return;
    journal_record( self, _locations, BGKindLocations, entity);
    file_location( self, entity, [_locations recordFor:entity], NO);
+   vacate( self, [_locations recordFor:entity]);
    if( location.form == BGLocationNone)
       [_locations removeRecordFor:entity];
    else
       [_locations setRecord:&location
                         for:entity];
    file_location( self, entity, [_locations recordFor:entity], YES);
+   touch( self, entity);
+}
+
+
+- (BGLocation *) takeVacated:(NSUInteger *) n
+{
+   BGLocation   *list;
+
+   list        = _vacated ? _vacated : calloc( 1, sizeof( BGLocation));
+   *n          = _nvacated;
+   _vacated    = NULL;
+   _nvacated   = 0;
+   _vacatedcap = 0;
+   return( list);
+}
+
+
+- (BGEntityID *) takeTouched:(NSUInteger *) n
+{
+   BGEntityID   *list;
+   NSUInteger   i;
+   NSUInteger   k;
+
+   list = _touched;
+   qsort( list, _ntouched, sizeof( BGEntityID), cmp_id);
+   for( k = 0, i = 0; i < _ntouched; i++)
+      if( ! k || list[ k - 1] != list[ i])
+         list[ k++] = list[ i];
+   *n          = k;
+   _touched    = NULL;
+   _ntouched   = 0;
+   _touchedcap = 0;
+   return( list ? list : calloc( 1, sizeof( BGEntityID)));
 }
 
 

@@ -382,17 +382,26 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    BGMotivation   *m;
    NSUInteger     i;
 
-   for( i = 0; i < [_minds count]; i++)
+   NSUInteger     lo;
+   NSUInteger     hi;
+
+   /* by halving: the minds are in agent order */
+   lo = 0;
+   hi = [_minds count];
+   while( lo < hi)
    {
-      m = [_minds objectAtIndex:i];
-      if( m->agent == agent)
-         return( m);
-      if( m->agent > agent)
-         break;
+      i = (lo + hi) / 2;
+      if( ((BGMotivation *) [_minds objectAtIndex:i])->agent < agent)
+         lo = i + 1;
+      else
+         hi = i;
    }
-   m        = [[BGMotivation new] autorelease];
-   m->agent = agent;
-   [_minds insertObject:m atIndex:i];
+   if( lo < [_minds count] && (m = [_minds objectAtIndex:lo])->agent == agent)
+      return( m);
+   m            = [[BGMotivation new] autorelease];
+   m->agent     = agent;
+   m->decidedAt = -1;
+   [_minds insertObject:m atIndex:lo];
    return( m);
 }
 
@@ -2944,6 +2953,12 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
 
 /* One decision, for the current intention. YES when it acted or settled into
  * waiting; NO when it only changed its intentions, so it decides again. */
+- (uint64_t) decisions
+{
+   return( _decisions);
+}
+
+
 - (BOOL) decide:(BGMotivation *) m
 {
    BGKnowledgeStore   *store;
@@ -2971,6 +2986,8 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
    BOOL               busy;
    int                n;
    int                k;
+
+   _decisions++;
 
    store     = [_knowledge storeOf:m->agent];
    me        = [store referent:[store selfReferent]];
@@ -3155,6 +3172,29 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
 }
 
 
+/* Whether a mind decides at this boundary (REALITY.md decision 7): it never
+ * has; its agent perceived something; a wake it set is due, or the answer
+ * it waits for is late; a commitment's window opened or closed since it
+ * last decided. Nothing of these, it decides as it did. */
+- (BOOL) isDue:(BGMotivation *) m
+{
+   int64_t   now;
+   int64_t   since;
+   int       k;
+
+   now   = [_world time].ms;
+   since = m->decidedAt;
+   if( since < 0 || [_knowledge perceivedNow:m->agent] || (m->wake && m->wake <= now) ||
+       (m->awaiting && m->awaitUntil <= now))
+      return( YES);
+   for( k = 0; k < m->ncommitments; k++)
+      if( (m->commitments[ k].from > since && m->commitments[ k].from <= now) ||
+          (m->commitments[ k].until > since && m->commitments[ k].until <= now))
+         return( YES);
+   return( NO);
+}
+
+
 - (void) decideBoundary:(uint64_t) boundary
 {
    BGMotivation   *m;
@@ -3163,8 +3203,14 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
 
    /* in stable ID order; each reads only its own stores and committed state */
    for( i = 0; i < [_minds count]; i++)
-      for( k = 0; k < 2 * BG_MAX_INTENTIONS && ! [self decide:[_minds objectAtIndex:i]]; k++)
+   {
+      m = [_minds objectAtIndex:i];
+      if( ! [self isDue:m])
+         continue;
+      for( k = 0; k < 2 * BG_MAX_INTENTIONS && ! [self decide:m]; k++)
          ;
+      m->decidedAt = [_world time].ms;
+   }
    /* the player's: with nothing left to do, or handed back */
    for( i = 0; i < [_minds count]; i++)
    {
@@ -3230,6 +3276,8 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
    for( i = 0; i < [_minds count]; i++)
    {
       m    = [_minds objectAtIndex:i];
+      [lines addObject:[NSString stringWithFormat:@"decided %llu %lld", (unsigned long long) m->agent,
+                                                  (long long) m->decidedAt]];
       line = [NSMutableString stringWithFormat:@"mind %llu %llu %d %llu %u %lld %lld %d", (unsigned long long) m->agent,
                                                (unsigned long long) m->decisions, m->waiting ? 1 : 0,
                                                (unsigned long long) m->heard, m->awaiting, (long long) m->awaitSince,
@@ -3404,6 +3452,11 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
          m->questions[ m->nquestions].content  = [_world intern:text];
          m->nquestions++;
          free( text);
+         continue;
+      }
+      if( [words count] == 3 && [[words objectAtIndex:0] isEqualToString:@"decided"])
+      {
+         [self mindOf:(BGEntityID) [[words objectAtIndex:1] longLongValue]]->decidedAt = [[words objectAtIndex:2] longLongValue];
          continue;
       }
       if( [words count] < 9 || ! [[words objectAtIndex:0] isEqualToString:@"mind"])

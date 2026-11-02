@@ -192,52 +192,64 @@ static int   cmp_actor( const void *a, const void *b)
 }
 
 
-/* Lets go of the activities that have ended and that nothing asks of any
- * more, in one group: the Activity store holds what is under way, and what
- * is still asked of, not all that ever was. Read from the world alone, so a
- * game saved and resumed lets go of the same. */
-- (void) letGo
+/* Lets go of an actor's activities that have ended and that nothing asks
+ * of any more, in a group of its own: the Activity store holds what is
+ * under way, and what is still asked of, not all that ever was. Done in the
+ * round its activities ended, read from the world then; the group, if not
+ * yet committed, is saved with the deferred, so a game saved and resumed
+ * lets go of the same. */
+- (void) letGoOf:(BGEntityID) actor
 {
    const BGActivity   *record;
    BGProposalGroup    *group;
-   BGStore            *store;
-   BGEntityID         *actors;
    BGEntityID         *mine;
-   NSUInteger         nactors;
    NSUInteger         n;
-   NSUInteger         i;
    NSUInteger         j;
 
-   store   = [_world storeForKind:[_world kindNamed:"Activity"]];
-   actors  = malloc( ([store count] + 1) * sizeof( BGEntityID));
-   nactors = 0;
-   for( i = 0; i < [store count]; i++)
-   {
-      record = [store recordAtIndex:i];
-      if( has_ended( record))
-         actors[ nactors++] = (BGEntityID) record->actorRef;
-   }
-   qsort( actors, nactors, sizeof( BGEntityID), cmp_actor);
    group = nil;
-   for( i = 0; i < nactors; i++)
+   mine  = [_world copyActivitiesOf:actor count:&n];
+   for( j = 0; j < n; j++)
    {
-      if( i && actors[ i] == actors[ i - 1])
+      record = [_world record:[_world kindNamed:"Activity"] for:mine[ j]];
+      if( ! has_ended( record) || [self keeps:mine[ j] among:mine count:n])
          continue;
-      mine = [_world copyActivitiesOf:actors[ i] count:&n];
-      for( j = 0; j < n; j++)
-      {
-         record = [_world record:[_world kindNamed:"Activity"] for:mine[ j]];
-         if( ! has_ended( record) || [self keeps:mine[ j] among:mine count:n])
-            continue;
-         if( ! group)
-            group = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"activities: the ended let go"];
-         [group destroy:BGWhole( mine[ j]) reason:"ended"];
-      }
-      free( mine);
+      if( ! group)
+         group = [BGProposalGroup groupWithPhase:BGPhaseSystem
+                                          source:[NSString stringWithFormat:@"activities: %llu's ended let go",
+                                                                            (unsigned long long) actor]];
+      [group destroy:BGWhole( mine[ j]) reason:"ended"];
    }
-   free( actors);
+   free( mine);
    if( group)
       [_committer submit:group];
+}
+
+
+/* The actors whose activities ended in a round's events, each once. */
+- (void) letGoAfter:(NSUInteger) first
+                 to:(NSUInteger) last
+{
+   const BGActivity   *record;
+   const BGEvent      *ev;
+   BGEntityID         *actors;
+   NSUInteger         nactors;
+   NSUInteger         i;
+
+   actors  = malloc( (last - first + 1) * sizeof( BGEntityID));
+   nactors = 0;
+   for( i = first; i < last; i++)
+   {
+      ev = [_world eventAt:i];
+      if( strcmp( ev->kind, "changed") || ! ev->detail || strcmp( ev->detail, "Activity.status") ||
+          ! (record = [_world record:[_world kindNamed:"Activity"] for:ev->subject]) || ! has_ended( record))
+         continue;
+      actors[ nactors++] = (BGEntityID) record->actorRef;
+   }
+   qsort( actors, nactors, sizeof( BGEntityID), cmp_actor);
+   for( i = 0; i < nactors; i++)
+      if( ! i || actors[ i] != actors[ i - 1])
+         [self letGoOf:actors[ i]];
+   free( actors);
 }
 
 
@@ -255,7 +267,6 @@ static int   cmp_actor( const void *a, const void *b)
    int64_t            rate;
    BOOL               more;
 
-   [self letGo];
    store = [_world storeForKind:[_world kindNamed:"Activity"]];
    for( i = 0; i < [store count]; i++)
    {
@@ -739,6 +750,8 @@ static BGEntityID   *remember_ended( BGEntityID *ended, NSUInteger *n, NSUIntege
       ntouching = 0;
    }
    free( ended);
+   /* what ended in the round, let go of */
+   [self letGoAfter:first to:last];
 }
 
 @end

@@ -14,6 +14,8 @@
 
 /* The light at a tile at t: 2 day, 1 dusk, 0 night. */
 int   BGLightAt( BGWorld *world, BGLocation tile, int64_t t);
+/* Daylight outdoors at t: 2 day, 1 twilight, 0 night. */
+int   BGDaylight( BGWorld *world, int64_t t);
 /* What oil a lamp has left to burn at t (ms). */
 int64_t   BGLampOil( const BGLamp *lamp, int64_t t);
 

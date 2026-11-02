@@ -101,6 +101,7 @@ src/scenario/BGMarkedNail.h
 src/scenario/BGWorlds.h
 src/sched/BGCoupling.h
 src/sched/BGScheduler.h
+src/test/BGBench.h
 src/test/BGTest.h
 src/triangle/BGContent.h
 src/triangle/include/triangle.h

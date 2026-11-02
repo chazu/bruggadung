@@ -1,5 +1,7 @@
 #import "BGScheduler.h"
 
+#include <time.h>
+
 
 static BGTime   earlier( BGTime a, BGTime b)
 {
@@ -66,6 +68,21 @@ static BGTime   earlier( BGTime a, BGTime b)
 }
 
 
+static uint64_t   now_ns( void)
+{
+   struct timespec   ts;
+
+   clock_gettime( CLOCK_MONOTONIC, &ts);
+   return( (uint64_t) ts.tv_sec * 1000000000ULL + (uint64_t) ts.tv_nsec);
+}
+
+
+- (BGSchedulerStats) stats
+{
+   return( _stats);
+}
+
+
 - (BGTime) nextBoundaryTime
 {
    id <BGDomain>   d;
@@ -120,8 +137,10 @@ static BGTime   earlier( BGTime a, BGTime b)
    NSUInteger        i;
    NSUInteger        k;
    NSUInteger        j;
+   uint64_t          mark;
 
-   t = [_world time];
+   t    = [_world time];
+   mark = now_ns();
 
    /* the coupled domains' values at step start */
    snapshot = [[BGSnapshot new] autorelease];
@@ -169,6 +188,9 @@ static BGTime   earlier( BGTime a, BGTime b)
       }
    }
 
+   _stats.domainsNs += now_ns() - mark;
+   mark              = now_ns();
+
    /* commit at the bound, with the inputs due then */
    [_world setTime:bound];
    [_world setBoundary:[_world boundary] + 1];
@@ -178,8 +200,21 @@ static BGTime   earlier( BGTime a, BGTime b)
                          world:_world
                      committer:_committer];
    groups = [_committer commitBoundary];
+   _stats.commitNs += now_ns() - mark;
+   mark             = now_ns();
    [_perception perceiveBoundary:[_world boundary]];
+   _stats.perceptionNs += now_ns() - mark;
+   mark                 = now_ns();
    [_decision decideBoundary:[_world boundary]];
+   _stats.decisionNs += now_ns() - mark;
+   /* what changed, read by perception if it ran: let go */
+   {
+      NSUInteger   n;
+
+      free( [_world takeTouched:&n]);
+      free( [_world takeVacated:&n]);
+   }
+   _stats.boundaries++;
    [_observer scheduler:self
       didCommitBoundary:[_world boundary]
                  groups:groups];
@@ -188,9 +223,12 @@ static BGTime   earlier( BGTime a, BGTime b)
 
 - (BOOL) stepUntil:(BGTime) stop
 {
-   BGTime   bound;
+   BGTime     bound;
+   uint64_t   mark;
 
+   mark  = now_ns();
    bound = [self nextBoundaryTime];
+   _stats.horizonNs += now_ns() - mark;
    if( bound.ms > stop.ms || bound.ms == BGTimeNever.ms)
       return( NO);
    [self boundaryAt:bound];

@@ -2851,7 +2851,9 @@ static void   test_appearance( void)
    [g move:BGWhole( foreman) to:BGOnTile( 3, 4, 0)];
    [c submit:g];
    [s runUntil:BGTimeMake( 6000)];
-   BG_CHECK( [store referentAt:0] && [store referent:r]->seen == 6000);
+   /* seen again as it stepped back: nothing has happened since
+    * (REALITY.md decision 7) */
+   BG_CHECK( [store referentAt:0] && [store referent:r]->seen > 5000);
    BG_CHECK( [[store describeReferent:r] rangeOfString:@"material: \"steel\""].location != NSNotFound);
    /* the smith, who watched, sees the scratch, and still brass */
    BG_CHECK( traced( [knowledge storeOf:smith], "scratch"));
@@ -4604,7 +4606,9 @@ static void   test_sight_and_memory( void)
    /* the wall it sees, and believes a wall; what is behind, it hasn't seen */
    BG_CHECK( [store hasSeenX:11 y:2 level:0] && [believed_kind( st.w, store, 11, 2) isEqualToString:@"stone_wall"]);
    BG_CHECK( ! [store hasSeenX:12 y:1 level:0] && [believed_kind( st.w, store, 12, 1) isEqualToString:@"-"]);
-   BG_CHECK( [store chunkSeenAtX:11 y:2 level:0] == [st.w time].ms);
+   /* last seen when it last looked, which is not at every boundary: when
+    * something happened, or it learnt something (REALITY.md decision 7) */
+   BG_CHECK( [store chunkSeenAtX:11 y:2 level:0] == store->_perceivedAt && store->_perceivedAt > 0);
    /* the whole shed is one chunk: 128 bytes of bits, not a copy of the map */
    BG_CHECK( [store seenChunks:&chunks] == 1);
    free( chunks);
@@ -8069,6 +8073,75 @@ static void   test_water_at_scale( void)
 }
 
 
+/* REALITY.md decision 7: work when something happens. On the yard, a
+ * worker walks east; a watcher beside its path perceives it as it passes,
+ * and decides; one far off, nothing concerning it, perceives once (to
+ * begin) and rests, and its mind with it. A sound loud enough to carry
+ * reaches it, and it looks. */
+static void   test_work_when_touched( void)
+{
+   BGStage            st;
+   BGActivities       *activities;
+   BGKnowledge        *knowledge;
+   BGAgency           *agency;
+   BGProposalGroup    *g;
+   BGEntityID         walker;
+   BGEntityID         near;
+   BGEntityID         far;
+   NSString           *error;
+   int64_t            farSeen;
+   uint64_t           farDecided;
+   int                i;
+
+   st.w = BGTestWorld( 197);
+   BG_CHECK( [st.w setTerrainMap:"yard_map" error:NULL]);
+   st.c       = BGTestCommitter( st.w);
+   activities = [BGActivities activitiesWithWorld:st.w committer:st.c];
+   knowledge  = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+   agency     = [[[BGAgency alloc] initWithWorld:st.w committer:st.c knowledge:knowledge] autorelease];
+   st.s       = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [agency setActivities:activities];
+   [st.s setActivities:activities];
+   [st.s setPerception:knowledge];
+   [st.s setDecision:agency];
+   g      = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: a walker, a watcher, one far off"];
+   walker = [g create:"worker" key:"walker" at:BGOnTile( 5, 10, 0)];
+   near   = [g create:"watchman" key:"watcher" at:BGOnTile( 10, 12, 0)];
+   far    = [g create:"watchman" key:"far off" at:BGOnTile( 80, 50, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   walker = [g idFor:walker];
+   near   = [g idFor:near];
+   far    = [g idFor:far];
+   [agency control:near];
+   [agency control:far];
+   [st.s runUntil:BGTimeMake( 1000)];
+   farSeen    = [knowledge storeOf:far]->_perceivedAt;
+   farDecided = [agency mindOf:far]->decisions;
+   BG_CHECK( farSeen >= 0);
+
+   for( i = 0; i < 10; i++)
+   {
+      error = nil;
+      BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "walk_east", walker, BGNoEntity, BGNoEntity), 0, &error) != nil);
+      [st.s runUntil:BGTimeMake( [st.w time].ms + 1500)];
+   }
+   BG_CHECK( [st.w locationOf:walker].x == 15);
+   /* the watcher saw it go by, as far as it could see: four tiles, to 14 */
+   BG_CHECK( [knowledge storeOf:near]->_perceivedAt > 10000 &&
+             [[knowledge storeOf:near] referent:referent_of( [knowledge storeOf:near], walker)]->x == 14);
+   /* the one far off rested throughout */
+   BG_CHECK( [knowledge storeOf:far]->_perceivedAt == farSeen && [agency mindOf:far]->decisions == farDecided);
+
+   /* a clatter loud enough to carry thirty tiles reaches it */
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: something falls, far off"];
+   BGMakeTrace( st.w, g, "clatter", BGNoEntity, BGOnTile( 80, 30, 0), 100, "a falling tin");
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( [st.w time].ms + 100)];
+   BG_CHECK( [knowledge storeOf:far]->_perceivedAt > farSeen);
+}
+
+
 /* A grid for BGPath, from rows of '#' (walls) and anything else. */
 typedef struct
 {
@@ -11356,6 +11429,7 @@ const BGTestCase   BGAllTests[] =
    { "paths",                         test_paths },
    { "spatial_index",                 test_spatial_index },
    { "water_at_scale",                test_water_at_scale },
+   { "work_when_touched",             test_work_when_touched },
    { "recipe_autopilot",              test_recipe_autopilot },
    { "resume_recheck",                test_resume_recheck },
    { "interrupted_repair",            test_interrupted_repair },
