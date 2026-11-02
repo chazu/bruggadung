@@ -209,7 +209,8 @@ TriMatch tri_match(TriContent *content, const TriNode *pattern, const TriNode *d
 TriMatch tri_match_instance(TriContent *content, const char *instance, const TriNode *description,
                             TriMatchResult *result);
 
-/* The node in `description` bound to `tag` of the named pattern instance. */
+/* The node in `description` bound to `tag` of the named pattern instance:
+ * a tag ("s" or "$s"), or a reference as written (".tool.size"). */
 const TriNode *tri_binding(TriContent *content, const char *instance, const char *tag,
                            const TriNode *description);
 

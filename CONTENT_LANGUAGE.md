@@ -61,10 +61,14 @@ Out of scope here:
    generated where missing. Every feature is introduced by exactly one type.
    Types marked `@component` group the features they introduce into a
    component kind, so the field registry is generated from content.
-5. **Names copy, tags share.** A reference to a top-level name (a type or an
-   instance) unifies a copy of its constraints, as in CUE. Sharing a node
-   between paths, so that information flows both ways, needs an explicit tag:
-   `$s`. There are no references between fields.
+5. **Names copy; references and tags share.** A reference to a top-level
+   name (a type or an instance), or to a path into one (`wrench_19.size`),
+   unifies a copy of its constraints, as in CUE. Within a top-level
+   definition, sharing a node between paths, so that information flows both
+   ways, is written as a reference to the other field (`.instrument.size`,
+   its path from the definition's root) or as a tag (`$s`). A reference is a
+   tag named by its path. A `let` names an expression; each use copies it.
+   *Revised:* field references and `let` were first left out (§2).
 6. **No general disjunction at runtime.**
    - In types, a disjunction of atoms is an enum and becomes subtypes.
    - In blueprints, whatever a spec leaves open (alternatives or ranges) is
@@ -143,6 +147,9 @@ the parts listed in §2.
 | Conjunction | `#Nut & { state: "loose" }` | Unification |
 | Disjunction | `"steel" \| "brass"` | Enum in a type; variation in an instance |
 | Tag | `size: $s` | Shared node, within one top-level definition |
+| Reference | `size: .instrument.size` | Shared node with the field at that path from the definition's root |
+| Path | `size: wrench_19.size`, `#Wrench.size` | A copy of another declaration's field |
+| Let | `let socket = 30mm`, then `socket` | A named expression, in a file or a struct; each use copies it |
 | Bounds | `>=0 & <=1000`, `>=40Nm` | Interval constraints |
 | Quantity literal | `0.85kg`, `19mm`, `2.5s` | Exact conversion to quanta |
 | Default | `wear: *0 \| >=0 & <=1000` | Default 0 within the range |
@@ -182,10 +189,12 @@ the parts listed in §2.
 Three constructs look like CUE but mean something else:
 
 1. **References.** CUE's `x: y` passes constraints one way only. Here,
-   naming a *top-level* definition copies it the same way. Sharing within a
-   structure uses a tag, and a tag is two-way: anything learned at one path
-   is known at the other. Field-to-field references (`result: size:
-   instrument.size`) are not allowed.
+   naming a *top-level* definition, or a path into one, copies it the same
+   way. A field reference inside a definition (`.instrument.size`) shares,
+   as a tag does: anything learned at one path is known at the other, and
+   `x: .y & >5` constrains `y` too, where CUE would leave `y` alone. It is
+   written with a leading dot, as a path from the definition's root, rather
+   than as CUE's bare name resolved by scope.
 2. **Types.** In CUE, `#Wrench: #Tool & {...}` merges two structs. Here it
    declares a named type `wrench` with supertype `tool`. Two types with the
    same features are still different types.
@@ -193,8 +202,8 @@ Three constructs look like CUE but mean something else:
    specific type wins. Only defaults from incomparable types that conflict
    are dropped, with a warning.
 
-**Not adopted from CUE:** comprehensions, field references, and `let`.
-Arithmetic is adopted, but between tags rather than field references (§5).
+**Not adopted from CUE:** comprehensions.
+Arithmetic is adopted, between tags and references (§5).
 Packages are adopted for names only (decision 12): a `package` scopes
 types, instances, and components, and features stay global; files are
 otherwise simply included.
@@ -215,6 +224,21 @@ atoms a regex tests names and must narrow an enum to a type that exists,
 since widening a pattern would make it match too much; at runtime a
 description may be widened instead, as that only loses information. Matching
 doesn't prove that one regex implies another, so it answers unknown there.
+
+Field references and `let` came later still. A one-way reference has no
+meaning in a feature structure: it would have to be resolved and dropped at
+load, so it couldn't appear in patterns, which are where references are most
+wanted, and matching needs information to flow both ways (learn the nut's
+size and the pattern constrains the wrench). So a reference is a tag named by
+its path, and every part of the engine that handles tags handles it
+unchanged. It is written `.a.b`, from the definition's root, instead of CUE's
+bare `a.b` resolved by lexical scope: a bare name would silently change the
+meaning of the few names that are both a field and an instance, and of any
+field moved into a nested struct, and tools could not tell a reference from a
+name without resolving scope. A `let` copies, as names do; if it shared, it
+would be a tag spelled differently. Its name may not be an instance's or a
+built-in type's, so it never hides one. Both are resolved by the parser,
+before anything else sees the content.
 
 ### 3. The type hierarchy
 
@@ -275,6 +299,8 @@ doesn't prove that one regex implies another, so it answers unknown there.
   node updates every path at once.
 - Tags are scoped to one top-level definition. Two different operations both
   using `$s` share nothing.
+- A reference `.a.b` is a tag whose name is its path. The parser adds the
+  conjunct `{ a: { b: .a.b } }` to its definition, which puts the tag there.
 - **Failure is reported with its path and both sources.** At load it is an
   error. At runtime it is a result the caller handles (§9, §11).
 
@@ -292,7 +318,7 @@ doesn't prove that one regex implies another, so it answers unknown there.
   interval [28, 32] °C in quanta, so imprecise perception produces "unknown"
   matches naturally (§9).
 - **Arithmetic** relates fields through tags: `torque: $f * $a` with
-  `force: $f, arm: $a`. There are still no field references, only tags.
+  `force: $f, arm: $a`, or through references: `reach: .arm + 30mm`.
   - Operators are `+ - * /` over numbers, tags, and parenthesised
     expressions, binding tighter than `&`.
   - Values carry their exponents over the base units (m, kg, s, K, mol)

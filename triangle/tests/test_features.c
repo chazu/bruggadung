@@ -787,7 +787,7 @@ void test_docs_guide(void)
         }
         if (i == 1) {
             tri_explain_instance(c, "loosen", d, buf, sizeof buf);
-            CHECK_CONTAINS(buf, "result: unknown\nbindings:\n  $s at instrument.size = 19mm\nresiduals: target.size");
+            CHECK_CONTAINS(buf, "result: unknown\nbindings:\n  .instrument.size = 19mm\nresiduals: target.size");
         }
     }
     TriIndex *ix = tri_family_index(c, "operations");
@@ -798,6 +798,7 @@ void test_docs_guide(void)
     if (ix) CHECK_STR((const char *) tri_index_tag(ix, out[0]), "tighten");
     /* §9–10: arithmetic and clauses */
     CHECK_STR(printed(c, tri_at(c, tri_spec(c, "breaker"), "torque")), "40Nm");
+    CHECK_STR(printed(c, tri_at(c, tri_spec(c, "ratchet"), "reach")), "280mm");
     const TriNode *sol[8];
     int trunc;
     CHECK(tri_solve(c, tri_value(c, "#Way & { from: \"kitchen\" }", a, NULL, 0), 10, sol, 8, a, &trunc) == 3 && !trunc);

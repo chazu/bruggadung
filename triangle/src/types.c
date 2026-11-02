@@ -1374,7 +1374,7 @@ bool types_build(Content *c)
             conjuncts(ti->decls.v[k]->value, &cj);
             for (size_t j = 0; j < cj.n; j++) {
                 X *x = cj.v[j];
-                if (x->k != X_STRUCT) continue;
+                if (x->k != X_STRUCT || x->u.st.refs) continue;     /* a reference's place introduces nothing */
                 if (pass) {
                     for (int f = 0; f < x->u.st.n; f++) {
                         Sym lab = x->u.st.fields[f].label;

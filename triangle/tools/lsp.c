@@ -310,7 +310,7 @@ static void put_location(Str *out, const char *path, const char *text, size_t st
 
 /* --- a lexical scan of sources ---------------------------------------------------------------- */
 
-typedef enum { K_NAME, K_STRING, K_TAG, K_ATTR, K_NUMBER, K_PUNCT } Kind;
+typedef enum { K_NAME, K_STRING, K_TAG, K_ATTR, K_NUMBER, K_PUNCT, K_REF } Kind;   /* K_REF: .a.b */
 typedef struct { Kind k; size_t start, end; int depth; } Tok;   /* depth: brace and bracket nesting */
 typedef struct { Tok *v; size_t n, cap; } Toks;
 
@@ -391,6 +391,23 @@ static char *string_canonical(const char *v)
 }
 
 /* The token starting at s[i] (not whitespace or a comment); *depth tracks nesting. */
+/* The end of the path segments at j: .name and [n], as many as follow. */
+static size_t path_end(const char *s, size_t j)
+{
+    for (;;) {
+        if (s[j] == '.' && (isalpha((unsigned char) s[j + 1]) || s[j + 1] == '_')) {
+            j++;
+            while (name_char(s[j])) j++;
+        } else if (s[j] == '[' && isdigit((unsigned char) s[j + 1])) {
+            size_t k = j + 1;
+            while (isdigit((unsigned char) s[k])) k++;
+            if (s[k] != ']') break;
+            j = k + 1;
+        } else break;
+    }
+    return j;
+}
+
 static Tok lex_one(const char *s, size_t i, int *depth)
 {
     char c = s[i];
@@ -399,12 +416,14 @@ static Tok lex_one(const char *s, size_t i, int *depth)
         t.k = K_NAME;
         size_t j = i + 1;
         while (name_char(s[j])) j++;
-        if (c != '#' && s[j] == '.' && (s[j + 1] == '#' || isalpha((unsigned char) s[j + 1]) || s[j + 1] == '_')) {
-            j++;
-            if (s[j] == '#') j++;
+        if (c != '#' && s[j] == '.' && s[j + 1] == '#') {
+            j += 2;
             while (name_char(s[j])) j++;
         }
-        t.end = j;
+        t.end = path_end(s, j);
+    } else if (c == '.' && (isalpha((unsigned char) s[i + 1]) || s[i + 1] == '_')) {
+        t.k = K_REF;
+        t.end = path_end(s, i);
     } else if (c == '"' || (c == '#' && raw_start(s + i))) {
         /* "..." with escapes, or #"..."# raw: \ escapes only when followed by
          * as many #s as opened it, and "#..# with that many closes */
@@ -509,12 +528,28 @@ static char *resolve(const Build *b, const char *pkg, const char *tok, size_t n)
         return r;
     }
 name:
-    if (!memchr(tok, '.', n) && pkg) {
-        snprintf(buf, sizeof buf, "%s.%.*s", pkg, (int) n, tok);
+    if (!memchr(tok, '.', n) && !memchr(tok, '[', n)) {
+        if (pkg) {
+            snprintf(buf, sizeof buf, "%s.%.*s", pkg, (int) n, tok);
+            if (declared(b, buf)) return xstrdup(buf);
+        }
+        snprintf(buf, sizeof buf, "%.*s", (int) n, tok);
+        return declared(b, buf) ? xstrdup(buf) : NULL;
+    }
+    /* a path, wrench_19.size: the longest prefix that is declared, the
+     * package's own first */
+    for (size_t end = n; end > 0; end--) {
+        if (end < n && tok[end] != '.' && tok[end] != '[') continue;
+        if (end < n && tok[end] == '.' && tok[end + 1] == '#') continue;
+        snprintf(buf, sizeof buf, "%.*s", (int) end, tok);
         if (declared(b, buf)) return xstrdup(buf);
     }
-    snprintf(buf, sizeof buf, "%.*s", (int) n, tok);
-    return declared(b, buf) ? xstrdup(buf) : NULL;
+    size_t first = strcspn(tok, ".[");
+    if (pkg && first < n && !(tok[first] == '.' && tok[first + 1] == '#')) {
+        snprintf(buf, sizeof buf, "%s.%.*s", pkg, (int) first, tok);
+        if (declared(b, buf)) return xstrdup(buf);
+    }
+    return NULL;
 }
 
 /* The token under an offset (or just before it, at its end). */
@@ -530,6 +565,94 @@ static int token_at(const char *text, size_t off, Tok *out)
         }
     free(t.v);
     return found;
+}
+
+/* --- fields and lets ---------------------------------------------------------------------------- */
+
+static int punct_is(const char *text, const Tok *t, char ch) { return t->k == K_PUNCT && text[t->start] == ch; }
+
+/* Finds the label of the field at `path` ("instrument.size"; list indexes
+ * dropped) among the tokens of a declaration, [first, last). A label's path
+ * follows its nesting: the fields of a struct are one deeper than the label
+ * the struct is the value of, and `a: b: c` nests too. Returns the token of
+ * the deepest label along the path, or -1. */
+static long find_field(const char *text, const Toks *t, size_t first, size_t last, const char *path)
+{
+    enum { MAXD = 64 };
+    const char *want[MAXD];
+    size_t wlen[MAXD];
+    int nwant = 0;
+    for (const char *p = path; *p && nwant < MAXD;) {
+        if (*p == '.') p++;
+        if (*p == '[') { while (*p && *p != ']') p++; if (*p) p++; continue; }
+        size_t n = strcspn(p, ".[");
+        if (!n) break;
+        want[nwant] = p;
+        wlen[nwant++] = n;
+        p += n;
+    }
+    int base = t->v[first].depth;
+    int fields_level[MAXD], last_label[MAXD];
+    int matched[MAXD + 1];               /* matched[l]: labels at levels < l are on the path */
+    for (int d = 0; d < MAXD; d++) { fields_level[d] = 0; last_label[d] = -1; }
+    for (int l = 0; l <= MAXD; l++) matched[l] = 0;
+    matched[0] = 1;
+    long best = -1;
+    int bestlevel = -1;
+    for (size_t i = first + 1; i < last; i++) {
+        Tok *k = &t->v[i];
+        int d = k->depth - base;
+        if (d < 0 || d >= MAXD - 1) continue;
+        if ((punct_is(text, k, '{') || punct_is(text, k, '[') || punct_is(text, k, '('))) {
+            /* a struct's fields are one below the label it is the value of */
+            fields_level[d + 1] = last_label[d] >= 0 ? last_label[d] + 1 : fields_level[d];
+            last_label[d + 1] = -1;
+            continue;
+        }
+        if (!(k->k == K_NAME && i + 1 < last && punct_is(text, &t->v[i + 1], ':'))) continue;
+        /* a: b: shorthand nests b under a */
+        int shorthand = i >= first + 2 && punct_is(text, &t->v[i - 1], ':') && t->v[i - 2].k == K_NAME &&
+                        t->v[i - 2].depth == k->depth;
+        int level = shorthand ? (i - 2 == first ? 0 : last_label[d] + 1) : fields_level[d];
+        if (level >= MAXD) continue;
+        last_label[d] = level;
+        int on = level < nwant && matched[level] && k->end - k->start == wlen[level] &&
+                 !strncmp(text + k->start, want[level], wlen[level]);
+        matched[level + 1] = on;
+        for (int l = level + 2; l <= MAXD; l++) matched[l] = 0;
+        if (on && level > bestlevel) { best = (long) i; bestlevel = level; }
+    }
+    return best;
+}
+
+/* The let binding `name` that a use at token `use` means: the one in the
+ * innermost bracket that holds the use, or the file's. Returns the token of
+ * the bound name, or -1. */
+static long find_let(const char *text, const Toks *t, size_t use)
+{
+    const Tok *u = &t->v[use];
+    long best = -1;
+    int bestdepth = -1;
+    for (size_t i = 0; i + 2 < t->n; i++) {
+        const Tok *k = &t->v[i];
+        if (!(k->k == K_NAME && k->end - k->start == 3 && !strncmp(text + k->start, "let", 3))) continue;
+        const Tok *n = &t->v[i + 1];
+        if (n->k != K_NAME || !punct_is(text, &t->v[i + 2], '=')) continue;
+        if (n->end - n->start != u->end - u->start || strncmp(text + n->start, text + u->start, u->end - u->start)) continue;
+        /* the let's bracket: back to its opening, forward to its closing */
+        size_t open = 0, close = t->n;
+        if (k->depth > 0) {
+            long j = (long) i;
+            while (j >= 0 && !(t->v[j].depth == k->depth - 1 && punct_is(text, &t->v[j], '{'))) j--;
+            size_t e = i;
+            while (e < t->n && !(t->v[e].depth == k->depth - 1 && punct_is(text, &t->v[e], '}'))) e++;
+            if (j < 0) continue;
+            open = (size_t) j;
+            close = e;
+        }
+        if (use > open && use < close && k->depth > bestdepth) { best = (long) i + 1; bestdepth = k->depth; }
+    }
+    return best;
 }
 
 /* --- declarations -------------------------------------------------------------------------------- */
@@ -695,6 +818,118 @@ static char *name_at(const At *at, Tok *tok)
     return name;
 }
 
+/* A reference (.a.b) or a let's name at the position: what it means inside
+ * its file. Fills the use, the declaration it is in (for a reference), and
+ * the token it refers to (start == end when none is written). Returns 0 when
+ * the token is neither. */
+typedef struct { Tok use, target; int is_let; TriDecl decl; } Local;
+
+static int local_at(const At *at, Local *l)
+{
+    Toks t = { 0 };
+    lex(at->text, &t);
+    long ui = -1;
+    for (size_t i = 0; i < t.n && ui < 0; i++)
+        if (t.v[i].start <= at->off && at->off <= t.v[i].end && t.v[i].k != K_PUNCT) ui = (long) i;
+    int ok = 0;
+    if (ui >= 0) {
+        Tok *u = &t.v[ui];
+        l->use = *u;
+        l->target.start = l->target.end = 0;
+        if (u->k == K_REF) {
+            /* the declaration it is in */
+            for (size_t i = 0; i < at->b->ndecls && !ok; i++) {
+                TriDecl d = at->b->decls[i];
+                if (strcmp(d.file, at->path)) continue;
+                size_t s, le, e;
+                decl_span(at->b, &d, at->text, &s, &le, &e);
+                if (u->start < s || u->start >= e) continue;
+                size_t first = 0, last = t.n;
+                while (first < t.n && t.v[first].start < s) first++;
+                for (last = first; last < t.n && t.v[last].start < e; last++) {}
+                char *path = xstrndup(at->text + u->start + 1, u->end - u->start - 1);
+                long f = first < t.n ? find_field(at->text, &t, first, last, path) : -1;
+                free(path);
+                if (f >= 0) l->target = t.v[f];
+                l->decl = d;
+                l->is_let = 0;
+                ok = 1;
+            }
+        } else if (u->k == K_NAME && !memchr(at->text + u->start, '.', u->end - u->start)) {
+            long f = find_let(at->text, &t, (size_t) ui);
+            if (f >= 0) {
+                l->target = t.v[f];
+                l->is_let = 1;
+                ok = 1;
+            }
+        }
+    }
+    free(t.v);
+    return ok;
+}
+
+/* "steps[1].tool" as tri_at takes it: "steps.rest.first.tool" */
+static char *at_path(const char *ref, size_t n)
+{
+    Str b = { 0 };
+    str_puts(&b, "");
+    for (size_t i = 0; i < n;) {
+        if (ref[i] == '[') {
+            long k = strtol(ref + i + 1, NULL, 10);
+            while (i < n && ref[i] != ']') i++;
+            i++;
+            if (b.len) str_putc(&b, '.');
+            for (long r = 0; r < k; r++) str_puts(&b, "rest.");
+            str_puts(&b, "first");
+        } else {
+            str_putc(&b, ref[i]);
+            i++;
+        }
+    }
+    return b.s;
+}
+
+static void hover_local(const J *id, const At *at, const Local *l)
+{
+    Str md = { 0 };
+    const char *text = at->text;
+    if (l->is_let) {
+        str_printf(&md, "**let** `%.*s`\n\n", (int) (l->use.end - l->use.start), text + l->use.start);
+        size_t ls = l->target.start;
+        while (ls > 0 && text[ls - 1] != '\n') ls--;
+        size_t le = l->target.end;
+        while (text[le] && text[le] != '\n') le++;
+        str_puts(&md, "```triangle\n");
+        str_putn(&md, text + ls, le - ls);
+        str_puts(&md, "\n```\n");
+    } else {
+        str_printf(&md, "**reference** `%.*s` in `%s`\n", (int) (l->use.end - l->use.start), text + l->use.start,
+                   l->decl.name);
+        TriContent *g = at->b->good;
+        const TriNode *spec = g && l->decl.kind == TRI_DECL_INSTANCE ? tri_spec(g, l->decl.name) : NULL;
+        char *path = at_path(text + l->use.start + 1, l->use.end - l->use.start - 1);
+        const TriNode *v = spec ? tri_at(g, spec, path) : NULL;
+        free(path);
+        if (v) {
+            size_t n = tri_print(g, v, NULL, 0);
+            char *buf = malloc(n + 1);
+            tri_print(g, v, buf, n + 1);
+            str_printf(&md, "\n```\n%s\n```\n", buf);
+            free(buf);
+        }
+        if (l->target.end == l->target.start) str_puts(&md, "\nNot written in this declaration: its type gives it.\n");
+    }
+    Str r = { 0 };
+    str_puts(&r, "{\"contents\":{\"kind\":\"markdown\",\"value\":");
+    str_json(&r, md.s);
+    str_puts(&r, "},\"range\":");
+    put_range(&r, text, l->use.start, l->use.end);
+    str_putc(&r, '}');
+    reply(id, r.s);
+    str_free(&r);
+    str_free(&md);
+}
+
 static void put_excerpt(Str *md, const Build *b, const TriDecl *d)
 {
     const char *text = build_text(b, d->file);
@@ -714,6 +949,8 @@ static void hover(const J *id, const J *params)
 {
     At at;
     if (!at_position(params, &at)) { reply(id, NULL); return; }
+    Local l;
+    if (local_at(&at, &l)) { hover_local(id, &at, &l); free(at.path); return; }
     Tok tok;
     char *name = name_at(&at, &tok);
     if (!name) { free(at.path); reply(id, NULL); return; }
@@ -783,6 +1020,17 @@ static void definition(const J *id, const J *params)
 {
     At at;
     if (!at_position(params, &at)) { reply(id, "[]"); return; }
+    Local l;
+    if (local_at(&at, &l)) {
+        Str r = { 0 };
+        str_putc(&r, '[');
+        if (l.target.end > l.target.start) put_location(&r, at.path, at.text, l.target.start, l.target.end);
+        str_putc(&r, ']');
+        reply(id, r.s);
+        str_free(&r);
+        free(at.path);
+        return;
+    }
     char *name = name_at(&at, NULL);
     Str r = { 0 };
     str_putc(&r, '[');

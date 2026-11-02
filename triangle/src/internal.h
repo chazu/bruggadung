@@ -103,7 +103,7 @@ typedef struct { Sym file; int line, col; } Loc;
 typedef struct { Sym name; char *args; } Attr;
 
 typedef enum { X_TOP, X_NAME, X_ATOM, X_NUM, X_BOUND, X_TAG, X_STRUCT, X_LIST,
-               X_AND, X_OR, X_DEFAULT, X_ARITH, X_REGEX, X_INTERP } XKind;
+               X_AND, X_OR, X_DEFAULT, X_ARITH, X_REGEX, X_INTERP, X_LET } XKind;
 
 typedef struct X X;
 typedef struct TriContent Content;
@@ -127,13 +127,14 @@ struct X {
         Sym name;                                         /* NAME, ATOM, TAG */
         struct { int dim; int64_t q; } num;
         struct { int op; int dim; int64_t q; } bound;
-        struct { XField *fields; int n; Attr *attrs; int nattrs; } st;
+        struct { XField *fields; int n; Attr *attrs; int nattrs; bool refs; } st;   /* refs: made for references */
         struct { X **items; int n; bool open; X *tail; X *elem; } list;   /* elem: [...X] */
         struct { X *a, *b; } bin;
         X *sub;                                           /* DEFAULT */
         struct { X *a, *b; int op; } ar;                  /* ARITH: '+', '-', '*', '/' */
         struct { Sym pat; bool neg; } rx;                 /* REGEX: =~ or !~ a pattern */
         struct { int n; const char **lits; X **parts; } in;  /* INTERP: lits[0] part[0] lits[1] ... lits[n] */
+        struct LetBind *let;                              /* LET: a use of a let's name, until the parser replaces it */
     } u;
 };
 
@@ -153,6 +154,8 @@ typedef struct {
 } Decl;
 
 typedef VEC(Decl) DeclVec;
+
+typedef struct { Sym name; Sym pkg; Loc loc; } LetName;
 
 /* xtree.c */
 void  x_print(Buf *b, const X *x);
@@ -414,6 +417,7 @@ struct TriContent {
     int faildepth;
     struct { const char *why; uint32_t ltype, rtype; int64_t llo, lhi, rlo, rhi; bool hasr; } failraw;
     char failwhy[256];           /* a failure's reason, when it is made up on the spot */
+    VEC(LetName) lets;           /* the names lets bind, checked against declarations */
 
     uint64_t hash;
     bool loaded;                 /* load is over: the rest are runtime operations */

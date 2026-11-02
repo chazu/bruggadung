@@ -90,6 +90,17 @@
     (should (equal (triangle-test-reindent "a: {\ns: \"\\(\"{\")\"\nn: 1\n}\n")
                    "a: {\n    s: \"\\(\"{\")\"\n    n: 1\n}\n"))))
 
+(ert-deftest triangle-test-references-and-let ()
+  (triangle-test-with "let gap = 1mm\nfit: #Fit & {\n    let twice = .instrument.size * 2\n    steps: [twice, .steps[0] + gap]\n}\n"
+    (should (eq (triangle-test-face-at "let gap") 'font-lock-keyword-face))
+    (should (eq (triangle-test-face-at "gap =") 'font-lock-variable-name-face))
+    (should (eq (triangle-test-face-at "let twice") 'font-lock-keyword-face))
+    (should (eq (triangle-test-face-at ".instrument.size") 'font-lock-variable-name-face))
+    (should (eq (triangle-test-face-at ".instrument.size" 12) 'font-lock-variable-name-face))
+    (should (eq (triangle-test-face-at ".steps[0]" 7) 'font-lock-variable-name-face))
+    (should (memq (triangle-test-face-at "steps:") '(font-lock-property-name-face font-lock-variable-name-face)))
+    (should (equal (triangle-test-reindent "a: {\nlet x = 1\nb: .c\n}\n") "a: {\n    let x = 1\n    b: .c\n}\n"))))
+
 (defun triangle-test-reindent (text)
   "Return TEXT with every line's indentation removed, then reindented."
   (with-temp-buffer

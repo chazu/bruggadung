@@ -10,8 +10,8 @@
 
 // Turn a tight nut loose with a wrench that fits it.
 loosen: #Roles & {
-    instrument: #Wrench & { size: $s }
-    target:     #Nut    & { size: $s, state: "tight" }
+    instrument: #Wrench
+    target:     #Nut & { size: .instrument.size, state: "tight" }
 } @family(operations) @quickcheck(target.state)
 
 tighten: #Roles & {

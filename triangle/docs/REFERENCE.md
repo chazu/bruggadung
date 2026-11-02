@@ -17,6 +17,8 @@ reference is a bug.
 - [Defaults](#defaults)
 - [Disjunction and variation](#disjunction-and-variation)
 - [Tags](#tags)
+- [References](#references)
+- [Let](#let)
 - [Arithmetic](#arithmetic)
 - [Interpolation](#interpolation)
 - [Definite clauses](#definite-clauses)
@@ -35,13 +37,15 @@ Source files have the extension `.tri` and are read as bytes.
 | Identifier | `[A-Za-z_][A-Za-z0-9_]*` | Instance names, feature labels. `_` alone is the top type. |
 | Type name | `#` then an identifier | `#Wrench` |
 | Qualified name | an identifier, `.`, then an identifier or a type name | `tools.wrench_250`, `tools.#Wrench`: a name in another package (see [Packages](#packages)) |
+| Path | a name (plain, qualified, or a type's), then `.name` and `[n]` segments | `wrench_19.size`, `#Wrench.size`, `tools.wrench_250.head.size`, `recipe.steps[0]`: a field of another declaration (see [References](#references)) |
+| Reference | `.` then a name, then `.name` and `[n]` segments | `.instrument.size`, `.steps[0].tool`: a field of the declaration it is in |
 | String | `"` … `"` | One line. Escapes as in CUE (below). |
 | Raw string | `#"` … `"#` | A backslash is an ordinary character, so `#"\d+"#` is `\d+`. An escape needs the opening's `#`s after its backslash: `\#n`. With more `#`s, a quote followed by fewer doesn't close: `##"say "#hi"#"##`. |
 | Number | digits with an optional `.` and fraction, then an optional unit | `19`, `0.85kg`, `2m3`. No exponent form; no leading `.`. The unit follows with no space. |
 | Negative number | `-` directly before a digit | Only where an operand is expected. After an operand, `-` subtracts. |
 | Tag | `$` then letters, digits, `_` | `$s`, `$room` |
 | Attribute | `@` name, then optionally `(` raw text `)` | Parentheses inside must balance. The text is passed to the attribute unparsed. |
-| Punctuation | `: , { } [ ] ( ) & \| * + / - ... >= <= > <` | |
+| Punctuation | `: , { } [ ] ( ) & \| * + / - ... >= <= > < =` | `=` only in `let name = …` |
 | Comment | `//` to the end of the line | |
 
 **Escapes.** In a string, `\(…)` interpolates ([below](#interpolation)),
@@ -56,6 +60,9 @@ which reads back as the same value: quotes, backslashes and control
 characters escaped (`\n`, `\t`, `\r`, else `\u00XX`), everything else as it
 is. `tri_text` gives a string's contents, decoded.
 
+`let` is a keyword only where it starts `let name =`. Elsewhere it is an
+ordinary name, so a field may still be called `let`.
+
 Whitespace and newlines separate tokens and are otherwise insignificant.
 Commas between fields and between top-level declarations are optional. Inside
 a list they are required.
@@ -68,8 +75,9 @@ leading space is removed from each.
 ## Grammar
 
 ```text
-file        = [ "package" IDENT ] { decl [ "," ] }
+file        = [ "package" IDENT ] { ( decl | let ) [ "," ] }
 decl        = label ":" fieldvalue
+let         = "let" IDENT "=" expr
 label       = TYPENAME | STRING | IDENT          (type, atom enum, instance)
 fieldvalue  = IDENT ":" fieldvalue               (path shorthand: a: b: c)
             | expr { ATTR }
@@ -83,10 +91,10 @@ unary       = "*" unary                          (default)
             | primary
 primary     = "_" | "true" | "false"
             | "ref" "(" NUMBER ")"
-            | IDENT | TYPENAME | QUALIFIED | STRING | NUMBER | TAG
+            | IDENT | TYPENAME | QUALIFIED | PATH | REF | STRING | NUMBER | TAG
             | struct | list
             | "(" expr ")"
-struct      = "{" { field | ATTR | "," } "}"
+struct      = "{" { field | let | ATTR | "," } "}"
 field       = IDENT ":" fieldvalue
 list        = "[" [ expr { "," expr } [ "," ] ] [ "..." [ expr ] ] "]"
 ```
@@ -183,6 +191,9 @@ file without one is in the root. Many files may declare the same package.
 | `{ f: v, … }` | A structure. Its type is the most general type that has all its features. |
 | `a: b: c` | Path shorthand for `a: { b: c }`. |
 | `$t` | A tag: every occurrence in one top-level declaration is one node. |
+| `.a.b` | A reference: the field at `a.b` of this declaration, one node with it. |
+| `inst.a.b`, `#T.a.b` | A copy of another declaration's field. |
+| `n` (a let's name) | A copy of the expression `let n = …` binds. |
 | `[a, b]` | A closed list. |
 | `[a, ...]` | An open list: `a`, then anything. |
 | `[...#I]` | A list of any length whose items are all `#I`. |
@@ -368,14 +379,80 @@ exempt.
 - In matching, a pattern's tags bind to nodes of the description. A tag
   whose positions disagree makes the match incompatible. One that is open at
   some positions makes it unknown, with those positions as residuals.
-- There are no field references. Sharing is always written with tags.
+- A [reference](#references) is a tag whose name is its path: `.a.b` shares
+  the node at `a.b`.
+
+## References
+
+A reference names a field of the declaration it's written in, by its path
+from the declaration's root:
+
+```cue
+loosen: #Roles & {
+    instrument: #Wrench
+    target:     #Nut & { size: .instrument.size, state: "tight" }
+}
+```
+
+- **A reference shares.** `.instrument.size` and the field it names are one
+  node, exactly as if both carried one tag. A constraint at either end holds
+  at both: `size: .instrument.size & >=15mm` narrows the wrench too. (CUE's
+  references pass constraints one way only; see CONTENT_LANGUAGE.md §2.)
+- **The path is from the declaration's root,** wherever the reference
+  stands, so moving a field into a nested struct doesn't change what a
+  reference means. `[n]` is a list's item: `.steps[0]` is `steps.first`,
+  `.steps[1]` is `steps.rest.first`.
+- **The field needn't be written.** `.instrument.size` may name a field that
+  only the type declares. Each feature along the path must belong to the type
+  at that point.
+- A reference may not name a field that contains it (`a: { b: .a }`): the
+  structure would be cyclic.
+- **In types,** a reference holds in every subtype: with
+  `#Matched: #Op & { target: { bore: .instrument.size } }`, any `#Matched`
+  has one size for both.
+- **References work wherever tags do:** in arithmetic and interpolation, in
+  patterns and matching (a binding is asked for by the reference as written:
+  `tri_binding(c, "loosen", ".instrument.size", d)`), and in runtime values.
+  A spec prints the shared node as a numbered tag, as it does any tag.
+- **A path into another declaration copies:** `wrench_19.size` is a copy of
+  that instance's `size`; `#Wrench.size` is the constraint the type gives it.
+  The longest prefix that names a type or an instance is the declaration, so
+  `tools.wrench_250.size` is a field of the package's blueprint. Inside a
+  package, a path starts from the package's own name if it declares one.
+
+## Let
+
+`let name = expr` names an expression, in a file or in a struct:
+
+```cue
+let socket = 30mm
+
+#Ratchet: #Lever & {
+    let reach_of_arm = .arm
+    reach: reach_of_arm + socket
+}
+```
+
+- **A use is a copy:** each use of the name is the expression afresh, as
+  naming an instance is. Two uses of `let r = >=10 & <=30` are two values. A
+  reference or tag in the expression still shares, wherever it's used: tags
+  and references belong to the declaration the use is in.
+- **Scope:** a file's lets are visible in all of that file; a struct's lets
+  in all of that struct, including inside nested structs. A use may come
+  before its let.
+- **A let's name may not hide anything:** not an instance's, a built-in
+  type's, or an enclosing let's. `_`, `true`, `false`, `ref`, `let` and
+  `package` can't be bound.
+- A let that refers to itself, directly or through other lets, is an error.
+- A let is not a declaration. It makes no instance, and the game can't look
+  it up.
 
 ## Arithmetic
 
-- Operands are numbers, tags, and parenthesised arithmetic. Operators are
-  `+ - * /`.
+- Operands are numbers, tags, references, and parenthesised arithmetic.
+  Operators are `+ - * /`.
 - Every tag in an arithmetic expression must also be bound to a field of the
-  same declaration.
+  same declaration. A reference always is.
 - Values carry exponents over m, kg, s, K and mol. Sums and differences need
   equal exponents. Products and quotients combine them. An intermediate
   result needs no kind of its own. The final result must convert to its
@@ -406,9 +483,9 @@ ada:  #Person & { given: "Ada", family: "Lovelace" }   // full: "Ada Lovelace"
 bolt: #Bolt & { size: 19mm, count: 3 }                // label: "M19mm x6"
 ```
 
-- An interpolated expression is a tag, a string, a number, or arithmetic
-  (`\($n * 2)`). Every tag must also be bound to a field of the same
-  declaration.
+- An interpolated expression is a tag, a reference, a string, a number, or
+  arithmetic (`\($n * 2)`, `\(.size)`). Every tag must also be bound to a
+  field of the same declaration.
 - A value's text is a string's contents, an atom's name, or a number as
   content writes it (`19mm`, `3`, `ref(12)`). A structure is an error.
 - The result is a string like any other: an atom if some enum lists it, so
@@ -511,7 +588,8 @@ location of the other declaration where there is one.
 | `… (in a regex, write a raw string such as #"\d+"#, or double the backslash)` | A regex escape such as `\d` in an ordinary string. |
 | `bad regular expression: …` | The expression doesn't parse: `missing )`, `lookaround is not supported (RE2 syntax)`, and so on. |
 | `expected a string after =~ or !~` | |
-| `unexpected '='; did you mean ':' or '=~'?` | A lone `=` or `!`. |
+| `unexpected '='; did you mean ':' or '=~'?`, `unexpected '!'; did you mean '!~'?` | A lone `=` where a value belongs, or a lone `!`. |
+| `expected ':' after field label ('=' only binds a let)` | `size = 3` instead of `size: 3`. |
 | `expected a declaration`, `expected a field label`, `expected a value`, `expected ':' after …` | A malformed declaration or structure. |
 | `expected a number after a bound` | A bound needs a number: `>=10mm`, not `>= $x`. |
 | `expected a referent number in ref(...)`, `a referent number has no unit` | `ref` takes a plain whole number. |
@@ -519,6 +597,21 @@ location of the other declaration where there is one.
 | `unknown unit: 3furlong` | A unit not in the table. |
 | `literal is not a whole number of quanta: 0.05mm` | The value can't be represented exactly. |
 | `malformed number`, `number out of range`, `quantity out of range` | |
+
+**References and let**
+
+| Message | Cause |
+| --- | --- |
+| `unknown feature 'f'` | A reference through a feature no type introduces. |
+| `the reference .a.b: a is #T, which has no field b` | A path through a field whose type lacks the next feature. |
+| `the reference .a.b: conflict at a.b: x vs y` | The value where the reference stands contradicts the field it names. |
+| `.a refers to a field that contains it (.a.b), which would make the structure cyclic` | |
+| `a field's label is a plain name; a reference (.a.b) is a value` | `.a: 3`. |
+| `X has no field f (in X.f)`, `X has no item n (in X[n])` | A path into another declaration that it doesn't have. |
+| `let x: an instance has this name, and a let may not hide it`, `let x: a built-in type has this name, …` | |
+| `let x: the name is already bound, by the let at line:col` | Two lets of one name in a scope, or in nested scopes. |
+| `let x refers to itself` | A cycle among lets. |
+| `'true' can't be a let's name` | A reserved name. |
 
 **Interpolation**
 

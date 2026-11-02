@@ -140,8 +140,15 @@ static bool unify_at_other(Build *b, TriNode *x, TriNode *y, Loc loc, const char
                 if (find_field_loc(c, c->types.v[b->owner].decls.v[k]->value, c->failpath, (size_t) c->faildepth, &ol))
                     buf_printf(&where, ", with the declaration at %s:%d", ol.file, ol.line);
         TriFailure *fl = fail_info(c);
-        diag(c, true, loc, "%s: conflict at %s: %s vs %s%s", what, fl->path, fl->left,
-             fl->right[0] ? fl->right : "(missing)", where.s ? where.s : "");
+        size_t pl = strlen(fl->path);
+        if (what[0] == '.' && !strncmp(what + 1, fl->path, pl) && what[1 + pl] == '.') {
+            /* a reference whose path goes through a field without its next name */
+            const char *nx = what + 2 + pl;
+            diag(c, true, loc, "the reference %s: %s is %s, which has no field %.*s", what, fl->path, fl->left,
+                 (int) strcspn(nx, ".["), nx);
+        } else
+        diag(c, true, loc, "%s%s: conflict at %s: %s vs %s%s", what[0] == '.' ? "the reference " : "", what, fl->path,
+             fl->left, fl->right[0] ? fl->right : "(missing)", where.s ? where.s : "");
         buf_free(&where);
     }
     b->ok = false;
@@ -205,6 +212,74 @@ static void record_vary(Build *b, X *value, const char *weights, Loc loc)
 }
 
 static TriNode *build_raw(Build *b, X *x);
+
+/* A path into another declaration, as in wrench_19.size or #Wrench.size: a
+ * copy of the declaration, at the path. The longest prefix that names a type
+ * or an instance is the declaration, so a package's names come first. */
+static TriNode *name_path(Build *b, X *x)
+{
+    Content *c = b->c;
+    const char *s = x->u.name;
+    size_t n = strlen(s);
+    for (size_t end = n; end-- > 1;) {
+        if (s[end] != '.' && s[end] != '[') continue;
+        if (s[end] == '.' && s[end + 1] == '#') continue;           /* pkg.#Type is one name */
+        char *pre = malloc(end + 1);
+        memcpy(pre, s, end);
+        pre[end] = 0;
+        Sym name = intern(c, pre);
+        free(pre);
+        TriNode *node = NULL;
+        uint32_t t = type_lookup(c, name);
+        uint64_t v;
+        if (t != TRI_BOTTOM && c->types.v[t].kind != TK_ATOM) {
+            TriNode *e = type_expansion(c, t);
+            if (!e) { build_error(b, x->loc, "cannot expand %s", name); return NULL; }
+            node = copy_raw(c, c->scratch, e);
+        } else if (u64map_get(&c->instidx, (uint64_t) (uintptr_t) name, &v)) {
+            if (!inst_pattern(c, (uint32_t) v - 1)) {
+                build_error(b, x->loc, "instance %s could not be resolved", name);
+                return NULL;
+            }
+            node = copy_raw(c, c->scratch, c->insts.v[v - 1].pattern);
+        } else continue;
+        /* the rest: .name and [k] */
+        for (const char *p = s + end; *p && node;) {
+            char seg[256];
+            if (*p == '.') {
+                const char *e = ++p;
+                while (*e && *e != '.' && *e != '[') e++;
+                snprintf(seg, sizeof seg, "%.*s", (int) (e - p), p);
+                p = e;
+                uint32_t f = feat_lookup(c, intern(c, seg));
+                TriNode *next = f == TRI_BOTTOM ? NULL : node_arc(deref(c, node), f);
+                if (!next) {
+                    char msg[600];
+                    snprintf(msg, sizeof msg, "%s has no field %s (in %s)", name, seg, s);
+                    build_error(b, x->loc, "%s", msg);
+                    return NULL;
+                }
+                node = next;
+            } else {
+                long k = strtol(p + 1, NULL, 10);
+                while (*p && *p != ']') p++;
+                if (*p) p++;
+                for (long i = 0; i <= k; i++) {
+                    TriNode *next = node_arc(deref(c, node), i == k ? c->ffirst : c->frest);
+                    if (!next) {
+                        char msg[600];
+                        snprintf(msg, sizeof msg, "%s has no item %ld (in %s)", name, k, s);
+                        build_error(b, x->loc, "%s", msg);
+                        return NULL;
+                    }
+                    node = next;
+                }
+            }
+        }
+        return node;
+    }
+    return NULL;
+}
 
 static TriNode *build_struct_into(Build *b, TriNode *r, X *x)
 {
@@ -273,6 +348,10 @@ static TriNode *build_raw(Build *b, X *x)
                 return NULL;
             }
             return copy_raw(c, c->scratch, c->insts.v[v - 1].pattern);
+        }
+        if (strchr(x->u.name, '.') || strchr(x->u.name, '[')) {
+            TriNode *n = name_path(b, x);
+            if (n || !b->ok) return n;
         }
         build_error(b, x->loc, "unknown name %s", x->u.name);
         return NULL;
@@ -346,12 +425,18 @@ static TriNode *build_raw(Build *b, X *x)
         TriNode *r = node_new(c, c->scratch, t);
         build_struct_into(b, r, x);
         if (!b->ok) return NULL;
+        const char *what = "struct";
+        if (x->u.st.refs) {                  /* a reference's place: name the reference */
+            X *tag = x;
+            while (tag->k == X_STRUCT) tag = tag->u.st.fields[0].value;
+            what = tag->u.name;
+        }
         if (t != c->top && c->types.v[t].xstate == 1) {
             r->flags |= NF_LAZY;             /* inside t's own constraint */
         } else if (t != c->top) {
             TriNode *e = type_expansion(c, t);
             if (!e) { build_error(b, x->loc, "cannot expand %s", c->types.v[t].name); return NULL; }
-            unify_at(b, r, copy_raw(c, c->scratch, e), x->loc, "struct");
+            unify_at(b, r, copy_raw(c, c->scratch, e), x->loc, what);
         }
         return b->ok ? r : NULL;
     }
@@ -359,6 +444,12 @@ static TriNode *build_raw(Build *b, X *x)
         TriNode *l = build_raw(b, x->u.bin.a);
         TriNode *r = l ? build_raw(b, x->u.bin.b) : NULL;
         if (!r) return NULL;
+        X *rb = x->u.bin.b;
+        if (rb->k == X_STRUCT && rb->u.st.refs) {      /* a reference's place: name the reference */
+            X *tag = rb;
+            while (tag->k == X_STRUCT) tag = tag->u.st.fields[0].value;
+            unify_at(b, l, r, tag->loc, tag->u.name);
+        } else
         unify_at(b, l, r, x->loc, "conjunction");
         return b->ok ? l : NULL;
     }
@@ -372,6 +463,9 @@ static TriNode *build_raw(Build *b, X *x)
         VEC_PUSH(b->ariths, r);
         return node_new(c, c->scratch, c->top);
     }
+    case X_LET:                              /* the parser replaces every use */
+        build_error(b, x->loc, "%s", "a let's use was not resolved");
+        return NULL;
     case X_DEFAULT:
         if (b->runtime) { build_error(b, x->loc, "%s", "a default (*) has no meaning in a runtime value"); return NULL; }
         record_default(b, x->u.sub);
@@ -2646,7 +2740,7 @@ const TriNode *tri_binding(TriContent *c, const char *instance, const char *tag,
     uint32_t i = inst_index(c, instance);
     if (i == TRI_BOTTOM || !inst_pattern(c, i)) return NULL;
     Buf b = { 0 };
-    buf_printf(&b, "%s%s", tag[0] == '$' ? "" : "$", tag);
+    buf_printf(&b, "%s%s", tag[0] == '$' || tag[0] == '.' ? "" : "$", tag);   /* a tag, or a reference */
     Sym t = intern(c, b.s);
     buf_free(&b);
     InstInfo *in = &c->insts.v[i];
@@ -2868,7 +2962,8 @@ static void binding_line(Content *c, Buf *b, const char *name, const U32Vec *pat
 {
     Buf p = { 0 };
     path_format(c, &p, path->v, path->n);
-    buf_printf(b, "  %s at %s = ", name, p.s);
+    if (name[0] == '.') buf_printf(b, "  %s = ", name);      /* a reference names its own path */
+    else buf_printf(b, "  %s at %s = ", name, p.s);
     TriNode *v = node_at((TriNode *) d, path->v, path->n);
     if (v) fs_print(c, b, v);
     else buf_puts(b, "(not in the description)");
@@ -3294,12 +3389,35 @@ static void resolve_names(Content *c, X *x, Sym pkg, const U64Map *declared)
 {
     if (!x) return;
     switch (x->k) {
-    case X_NAME:
-        if (pkg && !strchr(x->u.name, '.')) {
-            Sym q = qualify(c, pkg, x->u.name);
+    case X_NAME: {
+        if (!pkg) break;
+        const char *s = x->u.name;
+        size_t first = strcspn(s, ".[");
+        if (!s[first]) {
+            Sym q = qualify(c, pkg, s);
             if (u64map_get(declared, (uint64_t) (uintptr_t) q, NULL)) x->u.name = q;
+            break;
         }
+        /* a path, wrench_19.size: the package's own wrench_19 if it has one,
+         * unless the name already starts with another package's name */
+        if (s[first] == '.' && s[first + 1] == '#') break;
+        for (size_t end = strlen(s); end > first; end--) {
+            if (s[end] && s[end] != '.' && s[end] != '[') continue;
+            char *pre = malloc(end + 1);
+            memcpy(pre, s, end);
+            pre[end] = 0;
+            bool other = u64map_get(declared, (uint64_t) (uintptr_t) intern(c, pre), NULL);
+            free(pre);
+            if (other) return;
+        }
+        char *head = malloc(first + 1);
+        memcpy(head, s, first);
+        head[first] = 0;
+        Sym q = qualify(c, pkg, intern(c, head));
+        free(head);
+        if (u64map_get(declared, (uint64_t) (uintptr_t) q, NULL)) x->u.name = qualify(c, pkg, s);
         break;
+    }
     case X_STRUCT:
         for (int i = 0; i < x->u.st.n; i++) resolve_names(c, x->u.st.fields[i].value, pkg, declared);
         break;
@@ -3320,9 +3438,34 @@ static void resolve_names(Content *c, X *x, Sym pkg, const U64Map *declared)
         resolve_names(c, x->u.ar.a, pkg, declared);
         resolve_names(c, x->u.ar.b, pkg, declared);
         break;
+    case X_INTERP:
+        for (int i = 0; i < x->u.in.n; i++) resolve_names(c, x->u.in.parts[i], pkg, declared);
+        break;
     default:
         break;
     }
+}
+
+/* A let's name may not be a type's or an instance's: inside its scope, it
+ * would hide that one without a word. */
+static bool check_lets(Content *c)
+{
+    bool ok = true;
+    for (size_t i = 0; i < c->lets.n; i++) {
+        LetName *l = &c->lets.v[i];
+        Sym q = l->pkg ? qualify(c, l->pkg, l->name) : NULL;
+        const char *what = NULL;
+        uint32_t t = type_lookup(c, l->name);
+        if (t != TRI_BOTTOM && c->types.v[t].kind != TK_ATOM) what = "a built-in type";
+        else if (u64map_get(&c->instidx, (uint64_t) (uintptr_t) l->name, NULL) ||
+                 (q && u64map_get(&c->instidx, (uint64_t) (uintptr_t) q, NULL)))
+            what = "an instance";
+        if (what) {
+            diag(c, true, l->loc, "let %s: %s has this name, and a let may not hide it", l->name, what);
+            ok = false;
+        }
+    }
+    return ok;
 }
 
 /* Types and blueprints declared in a package take its name; references to
@@ -3350,7 +3493,7 @@ static void finish_load(Content *c, bool ok, double t0)
     c->stats.parse_ms = t1 - t0;
     if (ok && !c->tdl)
         resolve_packages(c);
-    if (ok && types_build(c)) {
+    if (ok && types_build(c) && check_lets(c)) {
         double t2 = now_ms();
         c->stats.hierarchy_ms = t2 - t1;
         for (uint32_t t = 0; t < c->types.n; t++) type_expansion(c, t);
@@ -3488,6 +3631,7 @@ void tri_content_free(TriContent *c)
     rx_free_all(c);
     VEC_FREE(c->feats);
     VEC_FREE(c->decls);
+    VEC_FREE(c->lets);
     u64map_free(&c->typeidx);
     u64map_free(&c->codeidx);
     u64map_free(&c->meetmemo);

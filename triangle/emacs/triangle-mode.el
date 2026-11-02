@@ -152,6 +152,13 @@ Their quotes become punctuation, so the enclosing string goes on."
     ;; field labels, including path shorthand a: b: c
     (,(concat "\\_<\\(" triangle--name "\\)\\s-*:") 1 ',(triangle--face 'font-lock-property-name-face
                                                                      'font-lock-variable-name-face))
+    ;; let name = expr
+    (,(concat "\\_<\\(let\\)\\s-+\\(" triangle--name "\\)\\s-*=[^~]")
+     (1 font-lock-keyword-face) (2 font-lock-variable-name-face))
+    ;; references: .instrument.size, .steps[0].tool
+    (,(concat "\\(?:^\\|[^A-Za-z0-9_.#$]\\)\\(\\." triangle--name
+              "\\(?:\\." triangle--name "\\|\\[[0-9]+\\]\\)*\\)")
+     1 font-lock-variable-name-face)
     ;; regex constraints: =~ and !~
     ("[=!]~" . ',(triangle--face 'font-lock-operator-face 'font-lock-keyword-face))
     ;; attributes and tags

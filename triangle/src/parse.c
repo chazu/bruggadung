@@ -6,7 +6,7 @@ typedef enum {
     T_EOF, T_IDENT, T_DEF, T_STRING, T_NUMBER, T_TAG, T_ATTR,
     T_COLON, T_COMMA, T_LBRACE, T_RBRACE, T_LBRACK, T_RBRACK, T_LPAREN, T_RPAREN,
     T_AND, T_OR, T_STAR, T_GE, T_LE, T_GT, T_LT, T_ELLIPSIS, T_PLUS, T_MINUS, T_SLASH,
-    T_MATCH, T_NMATCH,
+    T_MATCH, T_NMATCH, T_REF, T_ASSIGN,
 } TokKind;
 
 typedef struct {
@@ -26,16 +26,32 @@ struct IPart { const char *src; size_t len; Loc loc; };   /* an interpolation's 
 
 typedef struct { int line; const char *s; size_t len; } Comment;   /* a comment alone on its line */
 
-typedef struct {
+/* A let's binding. Its uses are X_LET nodes until the parser replaces each
+ * with the bound expression (resolve_lets). */
+struct LetBind {
+    Sym name;
+    X *value;            /* NULL until its expression is parsed */
+    Loc loc;
+    int state;           /* 0, 1 while being resolved, 2 resolved */
+};
+
+typedef VEC(struct LetBind *) Scope;   /* the lets of one struct, or of a file */
+
+typedef struct Parser Parser;
+struct Parser {
     Content *c;
     Sym file;
+    Sym pkg;
     VEC(Tok) toks;
     size_t pos;
     bool error;
     VEC(Comment) comments;
     struct { const char **v; size_t n, cap; } ilits;     /* scratch while lexing an interpolated string */
     struct { struct IPart *v; size_t n, cap; } iparts;
-} Parser;
+    VEC(Scope *) scopes;                                 /* the lets in scope, innermost last; NULL for none */
+    Parser *outer;                                       /* an interpolation's parser: the string's */
+    bool has_let, has_ref;                               /* the source has a let, a reference: work to do */
+};
 
 static void perr(Parser *p, Loc loc, const char *msg)
 {
@@ -48,7 +64,7 @@ static void perr(Parser *p, Loc loc, const char *msg)
 static bool operand_end(TokKind k)
 {
     return k == T_NUMBER || k == T_IDENT || k == T_DEF || k == T_TAG || k == T_STRING || k == T_RPAREN ||
-           k == T_RBRACE || k == T_RBRACK;
+           k == T_RBRACE || k == T_RBRACK || k == T_REF;
 }
 
 /* A literal piece of an interpolated string, kept with the content. */
@@ -126,6 +142,26 @@ static const char *string_escape(const char **sp, Buf *out)
 
 static bool lex_at(Parser *p, const char *src, int line, int col);
 
+static bool name_start(char ch) { return isalpha((unsigned char) ch) || ch == '_'; }
+
+/* The length of the path segments at s: .name and [n], as many as follow. */
+static size_t path_segments(const char *s)
+{
+    const char *t = s;
+    for (;;) {
+        if (t[0] == '.' && name_start(t[1])) {
+            t++;
+            while (isalnum((unsigned char) *t) || *t == '_') t++;
+        } else if (t[0] == '[' && isdigit((unsigned char) t[1])) {
+            const char *u = t + 1;
+            while (isdigit((unsigned char) *u)) u++;
+            if (*u != ']') break;
+            t = u + 1;
+        } else break;
+    }
+    return (size_t) (t - s);
+}
+
 static bool lex(Parser *p, const char *src)
 {
     return lex_at(p, src, 1, 1);
@@ -155,15 +191,23 @@ static bool lex_at(Parser *p, const char *src, int line, int col)
             ADV();
             while (isalnum((unsigned char) *s) || *s == '_') ADV();
             /* a qualified name, one package deep: pkg.#Type, pkg.blueprint */
-            if (ch != '#' && *s == '.' && (s[1] == '#' || isalpha((unsigned char) s[1]) || s[1] == '_')) {
+            if (ch != '#' && *s == '.' && s[1] == '#') {
                 ADV();
-                if (*s == '#') { t.k = T_DEF; ADV(); }
-                if (!isalpha((unsigned char) *s) && *s != '_') {
+                t.k = T_DEF;
+                ADV();
+                if (!name_start(*s)) {
                     perr(p, t.loc, "expected a name after the package");
                     return false;
                 }
                 while (isalnum((unsigned char) *s) || *s == '_') ADV();
             }
+            /* then a path into it: wrench_19.size, tools.wrench_250.head.size, steps[0] */
+            for (size_t n = path_segments(s); n; n--) ADV();
+        } else if (ch == '.' && name_start(s[1])) {
+            /* a reference: a path from the root of the declaration it is in */
+            t.k = T_REF;
+            p->has_ref = true;
+            for (size_t n = path_segments(s); n; n--) ADV();
         } else if (ch == '$') {
             t.k = T_TAG;
             ADV();
@@ -299,7 +343,8 @@ static bool lex_at(Parser *p, const char *src, int line, int col)
             case '<': if (*s == '=') { ADV(); t.k = T_LE; } else t.k = T_LT; break;
             case '=': case '!':
                 if (*s == '~') { ADV(); t.k = ch == '=' ? T_MATCH : T_NMATCH; break; }
-                perr(p, t.loc, ch == '=' ? "unexpected '='; did you mean ':' or '=~'?" : "unexpected '!'; did you mean '!~'?");
+                if (ch == '=') { t.k = T_ASSIGN; break; }
+                perr(p, t.loc, "unexpected '!'; did you mean '!~'?");
                 return false;
             case '.':
                 if (s[0] == '.' && s[1] == '.') { ADV(); ADV(); t.k = T_ELLIPSIS; break; }
@@ -319,6 +364,10 @@ static bool lex_at(Parser *p, const char *src, int line, int col)
     e.k = T_EOF;
     e.loc = (Loc) { p->file, line, col };
     VEC_PUSH(p->toks, e);
+    for (size_t i = 0; i + 2 < p->toks.n && !p->has_let; i++)
+        if (p->toks.v[i].k == T_IDENT && p->toks.v[i].len == 3 && !memcmp(p->toks.v[i].s, "let", 3) &&
+            p->toks.v[i + 1].k == T_IDENT && p->toks.v[i + 2].k == T_ASSIGN)
+            p->has_let = true;
     return true;
 #undef ADV
 }
@@ -367,7 +416,279 @@ static Sym tok_sym(Parser *p, Tok *t)
 
 static bool qualified(Tok *t)
 {
-    return memchr(t->s, '.', t->len) != NULL;
+    return memchr(t->s, '.', t->len) != NULL || memchr(t->s, '[', t->len) != NULL;
+}
+
+static bool tok_is(const Tok *t, const char *word)
+{
+    size_t n = strlen(word);
+    return t->k == T_IDENT && t->len == n && memcmp(t->s, word, n) == 0;
+}
+
+/* --- lets ------------------------------------------------------------------------ */
+
+static struct LetBind *let_lookup(Parser *p, Sym name)
+{
+    for (Parser *q = p; q; q = q->outer)
+        for (size_t i = q->scopes.n; i-- > 0;)
+            for (size_t k = 0; k < q->scopes.v[i]->n; k++)
+                if (q->scopes.v[i]->v[k]->name == name) return q->scopes.v[i]->v[k];
+    return NULL;
+}
+
+static bool let_at(Parser *p, size_t i)
+{
+    return i + 2 < p->toks.n && tok_is(&p->toks.v[i], "let") && p->toks.v[i + 1].k == T_IDENT &&
+           p->toks.v[i + 2].k == T_ASSIGN;
+}
+
+/* A scope's lets are known before any of it is parsed, so a use may come
+ * before its let, as fields may. `from` is the scope's first token. */
+static Scope *open_scope(Parser *p, size_t from)
+{
+    if (!p->has_let) return NULL;            /* nothing to bind, as in most sources */
+    Scope *sc = calloc(1, sizeof *sc);
+    int depth = 0;
+    for (size_t i = from; i < p->toks.n && !p->error; i++) {
+        TokKind k = p->toks.v[i].k;
+        if (k == T_EOF) break;
+        if (k == T_LBRACE || k == T_LBRACK || k == T_LPAREN) depth++;
+        else if (k == T_RBRACE || k == T_RBRACK || k == T_RPAREN) { if (depth-- == 0) break; }
+        else if (depth == 0 && let_at(p, i)) {
+            Tok *n = &p->toks.v[i + 1];
+            if (qualified(n)) { perr(p, n->loc, "a let binds a plain name"); break; }
+            Sym name = tok_sym(p, n);
+            static const char *const reserved[] = { "_", "true", "false", "ref", "let", "package" };
+            for (size_t r = 0; r < sizeof reserved / sizeof *reserved; r++)
+                if (!strcmp(name, reserved[r])) {
+                    char msg[96];
+                    snprintf(msg, sizeof msg, "'%s' can't be a let's name", name);
+                    perr(p, n->loc, msg);
+                }
+            struct LetBind *other = NULL;
+            for (size_t k2 = 0; k2 < sc->n && !other; k2++) if (sc->v[k2]->name == name) other = sc->v[k2];
+            if (!other) other = let_lookup(p, name);
+            if (other) {
+                char msg[200];
+                snprintf(msg, sizeof msg, "let %s: the name is already bound, by the let at %d:%d", name,
+                         other->loc.line, other->loc.col);
+                perr(p, n->loc, msg);
+                break;
+            }
+            struct LetBind *lb = arena_alloc(p->c->load, sizeof *lb);
+            memset(lb, 0, sizeof *lb);
+            lb->name = name;
+            lb->loc = n->loc;
+            VEC_PUSH(*sc, lb);
+            LetName ln = { name, p->pkg, n->loc };
+            VEC_PUSH(p->c->lets, ln);
+            i += 2;
+        }
+    }
+    VEC_PUSH(p->scopes, sc);
+    return sc;
+}
+
+static void close_scope(Parser *p, Scope *sc)
+{
+    if (!sc) return;
+    p->scopes.n--;
+    VEC_FREE(*sc);
+    free(sc);
+}
+
+static X *parse_expr(Parser *p);
+
+/* let name = expr, its binding already made by open_scope. */
+static bool parse_let(Parser *p)
+{
+    next(p);
+    Tok *n = next(p);
+    next(p);
+    struct LetBind *lb = let_lookup(p, tok_sym(p, n));
+    X *v = parse_expr(p);
+    if (!v) return false;
+    if (lb) lb->value = v;
+    return true;
+}
+
+/* Replaces each use of a let with a copy of the expression it binds. The copy
+ * shares the expression's parts: it is built afresh wherever it stands, so
+ * values copy, while its tags and references, like any, share. */
+static bool resolve_lets(Parser *p, X *x)
+{
+    if (!x || p->error) return !p->error;
+    switch (x->k) {
+    case X_LET: {
+        struct LetBind *lb = x->u.let;
+        if (lb->state == 1) {
+            char msg[128];
+            snprintf(msg, sizeof msg, "let %s refers to itself", lb->name);
+            perr(p, lb->loc, msg);
+            return false;
+        }
+        if (lb->state == 0) {
+            lb->state = 1;
+            if (!resolve_lets(p, lb->value)) return false;
+            lb->state = 2;
+        }
+        *x = *lb->value;
+        return true;
+    }
+    case X_STRUCT:
+        for (int i = 0; i < x->u.st.n; i++) if (!resolve_lets(p, x->u.st.fields[i].value)) return false;
+        return true;
+    case X_LIST:
+        for (int i = 0; i < x->u.list.n; i++) if (!resolve_lets(p, x->u.list.items[i])) return false;
+        return resolve_lets(p, x->u.list.tail) && resolve_lets(p, x->u.list.elem);
+    case X_AND: case X_OR:
+        return resolve_lets(p, x->u.bin.a) && resolve_lets(p, x->u.bin.b);
+    case X_DEFAULT:
+        return resolve_lets(p, x->u.sub);
+    case X_ARITH:
+        return resolve_lets(p, x->u.ar.a) && resolve_lets(p, x->u.ar.b);
+    case X_INTERP:
+        for (int i = 0; i < x->u.in.n; i++) if (!resolve_lets(p, x->u.in.parts[i])) return false;
+        return true;
+    default:
+        return true;
+    }
+}
+
+/* --- references ------------------------------------------------------------------ */
+
+/* A reference .a.b is a tag named ".a.b" (no tag a user writes starts with
+ * '.'), and the declaration gains the conjunct { a: { b: .a.b } }, which puts
+ * that tag at the path. The conjunct's structs are marked, so a type's
+ * declaration introduces no features through them. */
+
+typedef struct { Parser *p; Buf path; XPtrVec refs; } RefWalk;
+
+static void collect_refs(RefWalk *w, X *x)
+{
+    if (!x || w->p->error) return;
+    size_t keep = w->path.len;
+    switch (x->k) {
+    case X_TAG: {
+        if (x->u.name[0] != '.') return;
+        size_t n = strlen(x->u.name);
+        const char *at = w->path.s ? w->path.s : "";
+        if (w->path.len > n && !memcmp(at, x->u.name, n) && (at[n] == '.' || at[n] == '[')) {
+            char msg[300];
+            snprintf(msg, sizeof msg, "%s refers to a field that contains it (%s), which would make the structure cyclic",
+                     x->u.name, at);
+            perr(w->p, x->loc, msg);
+            return;
+        }
+        for (size_t i = 0; i < w->refs.n; i++) if (w->refs.v[i]->u.name == x->u.name) return;
+        VEC_PUSH(w->refs, x);
+        return;
+    }
+    case X_STRUCT:
+        for (int i = 0; i < x->u.st.n; i++) {
+            buf_printf(&w->path, ".%s", x->u.st.fields[i].label);
+            collect_refs(w, x->u.st.fields[i].value);
+            w->path.len = keep;
+            if (w->path.s) w->path.s[keep] = 0;
+        }
+        return;
+    case X_LIST:
+        for (int i = 0; i < x->u.list.n; i++) {
+            buf_printf(&w->path, "[%d]", i);
+            collect_refs(w, x->u.list.items[i]);
+            w->path.len = keep;
+            if (w->path.s) w->path.s[keep] = 0;
+        }
+        collect_refs(w, x->u.list.tail);
+        collect_refs(w, x->u.list.elem);
+        return;
+    case X_AND: case X_OR:
+        collect_refs(w, x->u.bin.a);
+        collect_refs(w, x->u.bin.b);
+        return;
+    case X_DEFAULT:
+        collect_refs(w, x->u.sub);
+        return;
+    case X_ARITH:
+        collect_refs(w, x->u.ar.a);
+        collect_refs(w, x->u.ar.b);
+        return;
+    case X_INTERP:
+        for (int i = 0; i < x->u.in.n; i++) collect_refs(w, x->u.in.parts[i]);
+        return;
+    default:
+        return;
+    }
+}
+
+static X *one_field(Parser *p, const char *label, size_t n, X *value, Loc loc)
+{
+    X *s = xnew(p, X_STRUCT, loc);
+    s->u.st.fields = arena_alloc(p->c->load, sizeof(XField));
+    memset(s->u.st.fields, 0, sizeof(XField));
+    s->u.st.fields[0].label = sym_intern(&p->c->syms, label, n);
+    s->u.st.fields[0].value = value;
+    s->u.st.fields[0].loc = loc;
+    s->u.st.n = 1;
+    s->u.st.refs = true;
+    return s;
+}
+
+/* { a: { b: <tag> } } for the tag .a.b; a list index [n] is n rests, then first. */
+static X *ref_conjunct(Parser *p, X *tag)
+{
+    const char *segs[64];
+    size_t lens[64];
+    int nseg = 0;
+    for (const char *s = tag->u.name; *s && nseg < 64;) {
+        if (*s == '.') {
+            const char *e = ++s;
+            while (isalnum((unsigned char) *e) || *e == '_') e++;
+            segs[nseg] = s;
+            lens[nseg++] = (size_t) (e - s);
+            s = e;
+        } else if (*s == '[') {
+            const char *e = ++s;
+            while (isdigit((unsigned char) *e)) e++;
+            segs[nseg] = s - 1;               /* starts with '[' */
+            lens[nseg++] = (size_t) (e - s);
+            s = e + 1;
+        } else break;
+    }
+    if (nseg == 64) { perr(p, tag->loc, "a reference's path is too long"); return NULL; }
+    X *inner = xnew(p, X_TAG, tag->loc);
+    inner->u.name = tag->u.name;
+    for (int i = nseg - 1; i >= 0; i--) {
+        if (segs[i][0] != '[') { inner = one_field(p, segs[i], lens[i], inner, tag->loc); continue; }
+        long k = strtol(segs[i] + 1, NULL, 10);
+        if (lens[i] > 6 || k > 100000) { perr(p, tag->loc, "a list index in a reference is too large"); return NULL; }
+        inner = one_field(p, "first", 5, inner, tag->loc);
+        while (k-- > 0) inner = one_field(p, "rest", 4, inner, tag->loc);
+    }
+    return inner;
+}
+
+/* Finishes a declaration's or a runtime value's expression: lets replaced by
+ * what they bind, and each reference given its place. */
+static X *finish_expr(Parser *p, X *x)
+{
+    if (!x) return NULL;
+    if (!p->has_ref && !p->has_let) return x;
+    if (!resolve_lets(p, x)) return NULL;
+    if (!p->has_ref) return x;
+    RefWalk w = { p, { 0 }, { 0 } };
+    collect_refs(&w, x);
+    for (size_t i = 0; i < w.refs.n && !p->error; i++) {
+        X *cj = ref_conjunct(p, w.refs.v[i]);
+        if (!cj) break;
+        X *a = xnew(p, X_AND, x->loc);
+        a->u.bin.a = x;
+        a->u.bin.b = cj;
+        x = a;
+    }
+    buf_free(&w.path);
+    VEC_FREE(w.refs);
+    return p->error ? NULL : x;
 }
 
 /* Features are global (CONTENT_LANGUAGE.md decision 12): a label takes no package. */
@@ -377,8 +698,6 @@ static bool plain_label(Parser *p, Tok *t)
     perr(p, t->loc, "a feature name takes no package: features are global");
     return false;
 }
-
-static X *parse_expr(Parser *p);
 
 static void parse_attrs(Parser *p, Attr **attrs, int *n)
 {
@@ -428,8 +747,13 @@ static X *parse_struct(Parser *p)
     X *x = xnew(p, X_STRUCT, open->loc);
     VEC(XField) fields = { 0 };
     VEC(Attr) dattrs = { 0 };
-    while (peek(p, 0)->k != T_RBRACE) {
-        if (peek(p, 0)->k == T_EOF) { perr(p, open->loc, "unterminated struct"); return NULL; }
+    Scope *scope = open_scope(p, p->pos);
+    while (peek(p, 0)->k != T_RBRACE && !p->error) {
+        if (peek(p, 0)->k == T_EOF) { perr(p, open->loc, "unterminated struct"); break; }
+        if (let_at(p, p->pos)) {
+            if (!parse_let(p)) break;
+            continue;
+        }
         if (peek(p, 0)->k == T_ATTR) {
             Tok *t = next(p);
             Attr a = { t->attr_name, t->attr_args };
@@ -438,17 +762,21 @@ static X *parse_struct(Parser *p)
         }
         if (peek(p, 0)->k == T_COMMA) { next(p); continue; }
         Tok *lab = peek(p, 0);
-        if (lab->k != T_IDENT) { perr(p, lab->loc, "expected a field label"); return NULL; }
-        if (!plain_label(p, lab)) return NULL;
+        if (lab->k == T_REF) { perr(p, lab->loc, "a field's label is a plain name; a reference (.a.b) is a value"); break; }
+        if (lab->k != T_IDENT) { perr(p, lab->loc, "expected a field label"); break; }
+        if (!plain_label(p, lab)) break;
         next(p);
-        if (!expect(p, T_COLON, "':' after field label")) return NULL;
+        if (peek(p, 0)->k == T_ASSIGN) { perr(p, peek(p, 0)->loc, "expected ':' after field label ('=' only binds a let)"); break; }
+        if (!expect(p, T_COLON, "':' after field label")) break;
         XField f = { 0 };
         f.label = tok_sym(p, lab);
         f.loc = lab->loc;
         f.value = parse_field_value(p, &f.attrs, &f.nattrs);
-        if (!f.value) return NULL;
+        if (!f.value) break;
         VEC_PUSH(fields, f);
     }
+    close_scope(p, scope);
+    if (p->error) { VEC_FREE(fields); VEC_FREE(dattrs); return NULL; }
     next(p);
     x->u.st.n = (int) fields.n;
     if (fields.n) {
@@ -476,17 +804,17 @@ static X *parse_list(Parser *p)
             x->u.list.open = true;
             if (peek(p, 0)->k != T_RBRACK) {          /* [...X]: the rest are all X */
                 x->u.list.elem = parse_expr(p);
-                if (!x->u.list.elem) return NULL;
+                if (!x->u.list.elem) goto fail;
             }
             break;
         }
         X *item = parse_expr(p);
-        if (!item) return NULL;
+        if (!item) goto fail;
         VEC_PUSH(items, item);
         if (peek(p, 0)->k == T_COMMA) next(p);
-        else if (peek(p, 0)->k != T_RBRACK) { perr(p, peek(p, 0)->loc, "expected ',' or ']'"); return NULL; }
+        else if (peek(p, 0)->k != T_RBRACK) { perr(p, peek(p, 0)->loc, "expected ',' or ']'"); goto fail; }
     }
-    if (!expect(p, T_RBRACK, "']'")) return NULL;
+    if (!expect(p, T_RBRACK, "']'")) goto fail;
     x->u.list.n = (int) items.n;
     if (items.n) {
         x->u.list.items = arena_alloc(p->c->load, items.n * sizeof(X *));
@@ -494,6 +822,9 @@ static X *parse_list(Parser *p)
     }
     VEC_FREE(items);
     return x;
+fail:
+    VEC_FREE(items);
+    return NULL;
 }
 
 static bool number(Parser *p, Tok *t, int *dim, int64_t *q)
@@ -524,7 +855,7 @@ static X *parse_interpolation(Parser *p, Tok *t)
         char *src = malloc(ip->len + 1);
         memcpy(src, ip->src, ip->len);
         src[ip->len] = 0;
-        Parser q = { .c = p->c, .file = p->file };
+        Parser q = { .c = p->c, .file = p->file, .pkg = p->pkg, .outer = p };
         X *e = NULL;
         if (lex_at(&q, src, ip->loc.line, ip->loc.col)) {
             if (peek(&q, 0)->k == T_EOF) perr(&q, ip->loc, "an empty interpolation: \\()");
@@ -534,6 +865,7 @@ static X *parse_interpolation(Parser *p, Tok *t)
             }
         }
         bool bad = q.error;
+        if (q.has_ref) p->has_ref = true;
         parser_free(&q);
         free(src);
         if (bad || !e) { p->error = true; return NULL; }
@@ -571,7 +903,16 @@ static X *parse_primary(Parser *p)
             if (!expect(p, T_RPAREN, "')' after the referent number")) return NULL;
             return x;
         }
-        X *x = xnew(p, X_NAME, t->loc);
+        Sym name = tok_sym(p, t);
+        struct LetBind *lb = qualified(t) ? NULL : let_lookup(p, name);
+        X *x = xnew(p, lb ? X_LET : X_NAME, t->loc);
+        if (lb) x->u.let = lb;
+        else x->u.name = name;
+        return x;
+    }
+    case T_REF: {
+        next(p);
+        X *x = xnew(p, X_TAG, t->loc);
         x->u.name = tok_sym(p, t);
         return x;
     }
@@ -609,7 +950,7 @@ static X *parse_primary(Parser *p)
         return x;
     }
     default:
-        perr(p, t->loc, "expected a value");
+        perr(p, t->loc, t->k == T_ASSIGN ? "unexpected '='; did you mean ':' or '=~'?" : "expected a value");
         return NULL;
     }
 }
@@ -722,6 +1063,8 @@ static X *parse_expr(Parser *p)
 
 static void parser_free(Parser *p)
 {
+    while (p->scopes.n) close_scope(p, p->scopes.v[p->scopes.n - 1]);
+    VEC_FREE(p->scopes);
     VEC_FREE(p->toks);
     VEC_FREE(p->comments);
     free(p->ilits.v);
@@ -756,6 +1099,7 @@ bool parse_source(Content *c, Sym file, const char *src, DeclVec *out)
 {
     Parser p = { .c = c, .file = file };
     Sym pkg = NULL;
+    size_t first = out->n;
     if (!lex(&p, src)) { parser_free(&p); return false; }
     /* `package name`, first: the file's declarations are in it */
     if (peek(&p, 0)->k == T_IDENT && peek(&p, 0)->len == 7 && memcmp(peek(&p, 0)->s, "package", 7) == 0 &&
@@ -765,9 +1109,15 @@ bool parse_source(Content *c, Sym file, const char *src, DeclVec *out)
         if (qualified(name)) perr(&p, name->loc, "a package name is one name");
         pkg = tok_sym(&p, name);
     }
+    p.pkg = pkg;
+    open_scope(&p, p.pos);                         /* the file's lets */
     while (peek(&p, 0)->k != T_EOF && !p.error) {
         Tok *lab = peek(&p, 0);
         if (lab->k == T_COMMA) { next(&p); continue; }
+        if (let_at(&p, p.pos)) {
+            if (!parse_let(&p)) break;
+            continue;
+        }
         if ((lab->k == T_IDENT || lab->k == T_DEF) && qualified(lab)) {
             perr(&p, lab->loc, "a declaration's name is its own: declare it in its package's files, unqualified");
             break;
@@ -783,11 +1133,13 @@ bool parse_source(Content *c, Sym file, const char *src, DeclVec *out)
         d.label = tok_sym(&p, lab);
         d.loc = lab->loc;
         d.doc = doc_above(&p, lab->loc.line);
+        if (peek(&p, 0)->k == T_ASSIGN) { perr(&p, peek(&p, 0)->loc, "expected ':' after declaration label ('=' only binds a let)"); break; }
         if (!expect(&p, T_COLON, "':' after declaration label")) break;
         d.value = parse_field_value(&p, &d.attrs, &d.nattrs);
         if (!d.value) break;
         VEC_PUSH(*out, d);
     }
+    for (size_t i = first; i < out->n && !p.error; i++) out->v[i].value = finish_expr(&p, out->v[i].value);
     bool ok = !p.error;
     parser_free(&p);
     return ok;
@@ -803,6 +1155,7 @@ X *parse_expr_string(Content *c, Sym file, const char *src)
             perr(&p, peek(&p, 0)->loc, "unexpected input after expression");
             x = NULL;
         }
+        x = finish_expr(&p, x);
     }
     parser_free(&p);
     return p.error ? NULL : x;

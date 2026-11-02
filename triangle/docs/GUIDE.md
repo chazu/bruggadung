@@ -249,8 +249,8 @@ The game matches them against what an agent knows.
 
 // Turn a tight nut loose with a wrench that fits it.
 loosen: #Roles & {
-    instrument: #Wrench & { size: $s }
-    target:     #Nut    & { size: $s, state: "tight" }
+    instrument: #Wrench
+    target:     #Nut & { size: .instrument.size, state: "tight" }
 } @family(operations) @quickcheck(target.state)
 
 tighten: #Roles & {
@@ -259,9 +259,15 @@ tighten: #Roles & {
 } @family(operations)
 ```
 
-`$s` is a **tag**. Both paths share one node, so the wrench and the nut
-have the same size, whatever it turns out to be. A tag is scoped to its
-top-level declaration: the `$s` in `tighten` is a different node.
+`.instrument.size` is a **reference**: a path from the root of the
+declaration it's written in. The two fields are one node, so the wrench and
+the nut have the same size, whatever it turns out to be. Information flows
+both ways: learn the nut's size and you know the wrench's.
+
+`$s` in `tighten` is a **tag**, the same sharing under a name you choose.
+Every `$s` in one top-level declaration is one node. A tag suits a value no
+field is the obvious home of, and arithmetic between several fields. The
+`$s` in another declaration is a different node.
 
 Matching has three results. Here is `loosen` against four descriptions of a
 wrench and a nut (the wrench is always 19 mm):
@@ -282,7 +288,7 @@ The match explainer (`tri_explain_instance`) prints this for a person:
 ```text
 result: unknown
 bindings:
-  $s at instrument.size = 19mm
+  .instrument.size = 19mm
 residuals: target.size
 ```
 
@@ -320,6 +326,21 @@ backwards through sums, differences and scaling by a constant: if a total and
 one part are known, so is the other part. A result that contradicts its field
 is a failure like any other. Construction never draws a computed field; it
 computes it.
+
+References work in arithmetic like tags, and a `let` names a value for the
+file (or for the struct it's in) without declaring an instance:
+
+```cue
+let socket = 30mm
+
+#Ratchet: #Lever & { reach: .arm + socket }
+
+ratchet: #Ratchet & { material: "steel", size: 30cm, mass: 1kg, arm: 0.25m, force: 60N }
+```
+
+`ratchet`'s reach is `280mm`. A `let` copies, as naming an instance does:
+each use is its value afresh. Its name may not be an instance's or a built-in
+type's, so it never hides one.
 
 ## 10. Definite clauses
 
@@ -398,9 +419,11 @@ the truth. Two operations matter:
 1. **A feature has one introducing type.** Two unrelated types that both
    declare `from` are an error. The message names both, and suggests a
    common supertype: declare the field there and inherit it.
-2. **Naming copies; only tags share.** `size: $s` in two places is one node.
-   There are no references from one field to another, as CUE's
-   `result: instrument.size` would be.
+2. **Naming copies; references and tags share.** `wrench_19.size` copies
+   another declaration's field, as CUE's references do. Within a declaration,
+   `.instrument.size` and `$s` make one node, so a constraint at either end
+   holds at both. In CUE, `x: y & >5` leaves `y` alone; here `x: .y & >5`
+   constrains `y` too.
 3. **Types are nominal and closed.** A structure may only use features its
    type has, and `#Wrench: #Tool` is a different type from `#Tool`.
 4. **Specific defaults win.** CUE drops conflicting defaults. Triangle keeps

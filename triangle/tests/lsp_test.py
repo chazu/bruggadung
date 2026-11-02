@@ -243,6 +243,48 @@ def main(exe):
                                               "position": pos(STRINGS, "mark: \"plain", 1)})["result"]
     check(len(r) == 0, "a field label is not a declaration")
 
+    # references, paths into other declarations, and lets
+    REFS = ('#Fit: { instrument: #Tool, steps: [...length] }\n'
+            'let gap = 1mm\n'
+            'fit: #Fit & {\n'
+            '    let twice = .instrument.size * 2\n'
+            '    instrument: { size: 19mm, wear: 1 }\n'
+            '    steps: [twice, .steps[0] + gap]\n'
+            '}\n'
+            'other: #Fit & { instrument: { size: fit.instrument.size } }\n'
+            'nested: #Fit & { instrument: { size: .instrument.wear } }\n')
+    ruri = "file://" + os.path.join(d, "refs.tri")
+    s.notify("textDocument/didOpen", {"textDocument": {"uri": ruri, "languageId": "triangle",
+                                                       "version": 1, "text": REFS}})
+    dg = s.diagnostics(ruri)
+    check(len(dg) == 1 and "the reference .instrument.wear" in dg[0]["message"] and
+          dg[0]["range"]["start"] == pos(REFS, ".instrument.wear"), "a reference's conflict is reported on it")
+    REFS = REFS.replace("nested: #Fit & { instrument: { size: .instrument.wear } }\n", "")
+    s.notify("textDocument/didChange", {"textDocument": {"uri": ruri, "version": 2},
+                                        "contentChanges": [{"text": REFS}]})
+    check(s.diagnostics(ruri) == [], "references and lets load")
+    r = s.request("textDocument/definition", {"textDocument": {"uri": ruri},
+                                              "position": pos(REFS, ".instrument.size", 3)})["result"]
+    check(len(r) == 1 and r[0]["range"]["start"] == pos(REFS, "size: 19mm"), "a reference goes to its field")
+    r = s.request("textDocument/definition", {"textDocument": {"uri": ruri},
+                                              "position": pos(REFS, ".steps[0]", 2)})["result"]
+    check(len(r) == 1 and r[0]["range"]["start"] == pos(REFS, "steps: [t"), "and through a list index to its list")
+    h = s.request("textDocument/hover", {"textDocument": {"uri": ruri},
+                                         "position": pos(REFS, ".instrument.size", 3)})["result"]
+    check("**reference** `.instrument.size` in `fit`" in h["contents"]["value"] and "19mm" in h["contents"]["value"],
+          "hover on a reference shows its value")
+    r = s.request("textDocument/definition", {"textDocument": {"uri": ruri},
+                                              "position": pos(REFS, "twice,", 1)})["result"]
+    check(len(r) == 1 and r[0]["range"]["start"] == pos(REFS, "twice ="), "a let's use goes to its let")
+    r = s.request("textDocument/definition", {"textDocument": {"uri": ruri},
+                                              "position": pos(REFS, "+ gap", 3)})["result"]
+    check(len(r) == 1 and r[0]["range"]["start"] == pos(REFS, "gap ="), "and to the file's let")
+    h = s.request("textDocument/hover", {"textDocument": {"uri": ruri}, "position": pos(REFS, "+ gap", 3)})["result"]
+    check("**let** `gap`" in h["contents"]["value"] and "let gap = 1mm" in h["contents"]["value"], "hover on a let")
+    r = s.request("textDocument/definition", {"textDocument": {"uri": ruri},
+                                              "position": pos(REFS, "fit.instrument", 1)})["result"]
+    check(len(r) == 1 and r[0]["range"]["start"] == pos(REFS, "fit: #Fit"), "a path goes to its declaration")
+
     r = s.request("textDocument/hover", {"textDocument": {"uri": uri["instances.tri"]},
                                          "position": {"line": 0, "character": 3}})
     check(r["result"] is None, "hover in a comment is empty")

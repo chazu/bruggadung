@@ -14,6 +14,7 @@ void x_print(Buf *b, const X *x)
     switch (x->k) {
     case X_TOP: buf_putc(b, '_'); break;
     case X_NAME: case X_ATOM: case X_TAG: buf_puts(b, x->u.name); break;
+    case X_LET: buf_puts(b, x->u.let ? "let" : "?"); break;     /* the parser replaces every one */
     case X_NUM: units_format(b, x->u.num.dim, x->u.num.q); break;
     case X_BOUND:
         buf_puts(b, x->u.bound.op == B_GE ? ">=" : x->u.bound.op == B_LE ? "<=" :

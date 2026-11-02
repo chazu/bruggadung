@@ -12,3 +12,9 @@
 }
 
 breaker: #Lever & { material: "steel", size: 60cm, mass: 2kg, arm: 0.5m, force: 80N }
+
+let socket = 30mm
+
+#Ratchet: #Lever & { reach: .arm + socket }
+
+ratchet: #Ratchet & { material: "steel", size: 30cm, mass: 1kg, arm: 0.25m, force: 60N }
