@@ -709,6 +709,7 @@ BGWorld   *BGRestore( NSString *text,
 
       free( [world takeTouched:&n]);
       free( [world takeVacated:&n]);
+      [world markAnchorsSettled];
    }
    return( world);
 }

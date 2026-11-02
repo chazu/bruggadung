@@ -22,11 +22,11 @@ static double   ms_of( uint64_t ns)
 
 int   BGBenchCrowd( int agents, int64_t seconds)
 {
-   return( BGBenchCrowdSpread( agents, seconds, NO, NO));
+   return( BGBenchCrowdSpread( agents, seconds, NO, NULL));
 }
 
 
-int   BGBenchCrowdSpread( int agents, int64_t seconds, BOOL spread, BOOL anchored)
+int   BGBenchCrowdSpread( int agents, int64_t seconds, BOOL spread, const char *anchored)
 {
    int32_t            side;
    BGWorld            *w;
@@ -91,7 +91,11 @@ int   BGBenchCrowdSpread( int agents, int64_t seconds, BOOL spread, BOOL anchore
    /* the first anchors the reality bubble: the rest further off, less exactly */
    if( anchored)
    {
-      [w setAnchor:ids[ 0] kind:"player"];
+      if( ! [w setAnchor:ids[ 0] kind:anchored])
+      {
+         fprintf( stderr, "bench: no kind of anchor called %s\n", anchored);
+         return( 1);
+      }
       [w settleAnchors];
    }
    st0 = [s stats];
@@ -111,8 +115,8 @@ int   BGBenchCrowdSpread( int agents, int64_t seconds, BOOL spread, BOOL anchore
    st.commitNs     -= st0.commitNs;
    st.perceptionNs -= st0.perceptionNs;
    st.decisionNs   -= st0.decisionNs;
-   printf( "crowd%s%s: %d agents (%d exploring), %lld s of world time\n", spread ? " spread" : "",
-           anchored ? ", anchored" : "", agents, (agents + 1) / 2, (long long) seconds);
+   printf( "crowd%s%s%s: %d agents (%d exploring), %lld s of world time\n", spread ? " spread" : "",
+           anchored ? ", anchored by a " : "", anchored ? anchored : "", agents, (agents + 1) / 2, (long long) seconds);
    if( anchored)
    {
       int   levels[ 4];

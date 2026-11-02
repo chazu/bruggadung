@@ -14,7 +14,9 @@ done when something happens, and what falls due comes from queues of wakes
 measured by `lab bench crowd` and `lab bench spread`. Step 2 is built: the
 levels are found and shown (lab/content/reality.tri, lab/src/core/
 BGReality). Step 3 is built: below full detail, agents sense only what
-they take part in, and their own wakes fall on a cadence.
+they take part in, and their own wakes fall on a cadence. Step 4 is built
+for agents: frozen, nothing of theirs runs, and they catch up as they
+rise.
 
 The aim is a world simulated exactly where it matters, and less exactly, by
 degrees, further away, with the degrees, their reach, and what each thing
@@ -246,6 +248,29 @@ full.
 4. **Frozen, and catching up** (decision 6). A chunk's clock; catch-up on
    rising: the domains in closed form, activities finished or failed as
    they would have.
+   **Built, for agents.** Frozen, an agent doesn't perceive, nor decide,
+   and its activities wait: their timers drop out (`dueOf:` is never for a
+   frozen actor's). What rises is found as the anchors settle: the world
+   keeps the anchors as they last settled (`BGRealityKeepAnchors`), and
+   over the chunks a moved, new or gone anchor's reach covered, before or
+   now, each chunk that was frozen and isn't gives up all that stands
+   there and all it holds (`takeRisen:`); with no anchors left, whatever
+   was frozen. Contact raises a frozen party too. Risen, an agent's
+   activities are told (their timers come back, a stage long due ending at
+   once), it looks at once, and so decides. Its hunger, and its memory's
+   fading, were always reckoned from times, so they are caught up as they
+   are read. A restored save takes its anchors as settled.
+
+   Crude still: a stage overdue ends when it rises, not when it would have,
+   and a checkpoint passed while frozen is skipped. The domains (air,
+   heat, water) still step the whole world, frozen or not: freezing them
+   wants domains stepped by region.
+
+   Measured, 1,600 spread over the plain, wall time a world second: no
+   anchor 180 ms; a `player` anchor (none frozen) 179 ms; a `distant`
+   anchor (7 full, 69 reduced, 653 abstract, 871 frozen) 83 ms, half the
+   boundaries.
+
 5. **Abstract progression** (decision 4). Authored progression in content,
    applied in bulk, deterministic by seed; summaries settled on rising;
    activities handed over on falling.

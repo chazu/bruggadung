@@ -301,6 +301,7 @@ static NSUInteger   stocks_wet( struct BGTileStocks *s, int32_t (*out)[ 3], NSUI
    _kindTrace    = [self kindNamed:"Trace"];
    _kindGas      = [self kindNamed:"GasStore"];
    _kindActivity = [self kindNamed:"Activity"];
+   _kindAgent    = [self kindNamed:"Agent"];
    _entities   = [[BGStore alloc] initWithRecordSize:sizeof( BGEntityInfo)];
    _locations  = [[BGStore alloc] initWithRecordSize:sizeof( BGLocation)];
    _tombstones = [[BGStore alloc] initWithRecordSize:sizeof( BGTombstone)];
@@ -359,6 +360,8 @@ static NSUInteger   stocks_wet( struct BGTileStocks *s, int32_t (*out)[ 3], NSUI
    BGIndexFree( _touching);
    BGIndexFree( _creations);
    BGRealityFree( _reality);
+   free( _settled);
+   free( _risen);
    free( _checkedOut);
    tri_arena_free( _arena);
    [_content release];
@@ -1339,6 +1342,95 @@ static BOOL   standing( BGWorld *self, BGEntityID e, BGLocation *tile)
 }
 
 
+/* Something rose from frozen (REALITY.md step 4): noted, with what it
+ * holds, and its activities' timers told to look again. */
+static void   rise( BGWorld *self, BGEntityID e, NSUInteger depth)
+{
+   BGEntityID   *mine;
+   BGEntityID   *inside;
+   NSUInteger   n;
+   NSUInteger   i;
+
+   if( ! e || depth > 64)
+      return;
+   if( self->_nrisen == self->_risencap)
+      self->_risen = realloc( self->_risen, (self->_risencap = self->_risencap ? self->_risencap * 2 : 64) *
+                                            sizeof( BGEntityID));
+   self->_risen[ self->_nrisen++] = e;
+   if( self->_activityObserver && [self record:self->_kindAgent for:e])
+   {
+      mine = [self copyActivitiesOf:e count:&n];
+      for( i = 0; i < n; i++)
+         [self->_activityObserver world:self changedRecord:mine[ i] kind:self->_kindActivity];
+      free( mine);
+   }
+   n      = [self entitiesIn:e into:NULL max:0];
+   inside = malloc( (n + 1) * sizeof( BGEntityID));
+   [self entitiesIn:e into:inside max:n];
+   for( i = 0; i < n; i++)
+      rise( self, inside[ i], depth + 1);
+   free( inside);
+}
+
+
+/* What rose from frozen as the anchors went from as they were to as they
+ * are: over the chunks the moved anchors' reach covered, before or now,
+ * each that was frozen and isn't, all that stands there. */
+static void   rise_from( BGWorld *self, struct BGAnchorsKept *before)
+{
+   const BGEntityID   *ids;
+   BGLocation         *loc;
+   BGEntityID         e;
+   NSUInteger         i;
+   NSUInteger         k;
+   NSUInteger         count;
+   int32_t            lo[ 3];
+   int32_t            hi[ 3];
+   int32_t            cx;
+   int32_t            cy;
+   int32_t            z;
+   int                pass;
+   BOOL               same;
+
+   if( ! BGRealityKeptCount( before))
+      return;                                   /* all was full */
+   if( ! BGRealityAnchorCount( self->_reality))
+   {
+      /* no anchors now: all is full; whatever was frozen rose */
+      for( i = 0; i < [self->_locations count]; i++)
+      {
+         loc = [self->_locations recordAtIndex:i];
+         if( loc->form == BGLocationOnTile &&
+             BGRealityDetailKept( self->_reality, before, loc->x, loc->y, loc->level) == BGDetailFrozen)
+            rise( self, [self->_locations entityAtIndex:i], 0);
+      }
+      return;
+   }
+   for( pass = 0; pass < 2; pass++)
+      for( k = 0; k < (pass ? BGRealityAnchorCount( self->_reality) : BGRealityKeptCount( before)); k++)
+      {
+         if( ! BGRealityKeptBox( self->_reality, pass ? NULL : before, k, &e, lo, hi, &same))
+            continue;
+         if( pass)
+            same = BGRealityKeptSame( self->_reality, before, k);
+         if( same)
+            continue;
+         for( z = lo[ 2] < 0 ? 0 : lo[ 2]; z <= hi[ 2] && z < self->_levels; z++)
+            for( cy = lo[ 1]; cy <= hi[ 1]; cy++)
+               for( cx = lo[ 0]; cx <= hi[ 0]; cx++)
+               {
+                  if( cx < 0 || cy < 0 || cx * 32 >= self->_tilesWide || cy * 32 >= self->_tilesHigh ||
+                      BGRealityDetailKept( self->_reality, before, cx * 32, cy * 32, z) != BGDetailFrozen ||
+                      BGRealityDetailAt( self->_reality, cx * 32, cy * 32, z) == BGDetailFrozen)
+                     continue;
+                  ids = BGIndexGet( self->_onGround, ground_key( cx * 32, cy * 32, z), &count);
+                  for( i = 0; i < count; i++)
+                     rise( self, ids[ i], 0);
+               }
+      }
+}
+
+
 - (void) settleAnchors
 {
    BGLocation   tile;
@@ -1352,6 +1444,35 @@ static BOOL   standing( BGWorld *self, BGEntityID e, BGLocation *tile)
          BGRealityCentre( _reality, e, tile.x, tile.y, tile.level);
    }
    BGRealityPrune( _reality, _time.ms);
+   rise_from( self, _settled);
+   free( _settled);
+   _settled = BGRealityKeepAnchors( _reality);
+}
+
+
+- (void) markAnchorsSettled
+{
+   free( _settled);
+   _settled = BGRealityKeepAnchors( _reality);
+}
+
+
+- (BGEntityID *) takeRisen:(NSUInteger *) n
+{
+   BGEntityID   *list;
+   NSUInteger   i;
+   NSUInteger   k;
+
+   list = _risen ? _risen : calloc( 1, sizeof( BGEntityID));
+   qsort( list, _nrisen, sizeof( BGEntityID), cmp_id);
+   for( k = 0, i = 0; i < _nrisen; i++)
+      if( ! k || list[ k - 1] != list[ i])
+         list[ k++] = list[ i];
+   *n        = k;
+   _risen    = NULL;
+   _nrisen   = 0;
+   _risencap = 0;
+   return( list);
 }
 
 
@@ -1397,12 +1518,17 @@ static BOOL   standing( BGWorld *self, BGEntityID e, BGLocation *tile)
       party[ 2] = ev->other;
       for( k = 0; k < 3; k++)
          detail[ k] = party[ k] ? [self detailOf:party[ k]] : BGDetailFrozen;
-      /* one at full detail: the others, raised */
+      /* one at full detail: the others, raised; from frozen, risen */
       for( k = 0; k < 3; k++)
          if( party[ k] && detail[ k] == BGDetailFull)
             for( j = 0; j < 3; j++)
                if( party[ j] && detail[ j] != BGDetailFull)
+               {
                   BGRealityLease( _reality, party[ j], until);
+                  if( detail[ j] == BGDetailFrozen)
+                     rise( self, party[ j], 0);
+                  detail[ j] = BGDetailFull;
+               }
    }
 }
 

@@ -4842,7 +4842,9 @@ static int64_t   forget_by_now( void *context, BGEntityID agent)
 
    self  = context;
    store = [self existingStoreOf:agent];
-   return( store ? [self forgetByOf:store] : INT64_MAX);
+   if( ! store || [self->_world detailOf:agent] == BGDetailFrozen)
+      return( INT64_MAX);                  /* frozen: it forgets when it rises */
+   return( [self forgetByOf:store]);
 }
 
 
@@ -4853,7 +4855,10 @@ static int64_t   perceive_by_now( void *context, BGEntityID agent)
 
    self  = context;
    store = [self existingStoreOf:agent];
-   return( store && [self->_world record:[self->_world kindNamed:"Agent"] for:agent] ? store->_perceiveBy : INT64_MAX);
+   if( ! store || ! [self->_world record:[self->_world kindNamed:"Agent"] for:agent] ||
+       [self->_world detailOf:agent] == BGDetailFrozen)
+      return( INT64_MAX);                  /* frozen: it looks when it rises */
+   return( store->_perceiveBy);
 }
 
 
@@ -5151,6 +5156,8 @@ static int   cmp_entity_id( const void *a, const void *b)
    BGStore            *agents;
    BGEntityID         *concerned;
    BGEntityID         *woken;
+   BGEntityID         *risen;
+   NSUInteger         nrisen;
    BGEntityID         *due;
    BGEntityID         agent;
    NSUInteger         nconcerned;
@@ -5187,6 +5194,12 @@ static int   cmp_entity_id( const void *a, const void *b)
     * or to an omniscient eye. Else they rest, and no one reads them */
    [self wake];
    woken  = BGWakesTake( _perceiveWakes, now, perceive_by_now, self, &nwoken);
+   /* risen from frozen: they look at once (REALITY.md step 4) */
+   risen  = [_world takeRisen:&nrisen];
+   woken  = realloc( woken, (nwoken + nrisen + 1) * sizeof( BGEntityID));
+   memcpy( woken + nwoken, risen, nrisen * sizeof( BGEntityID));
+   nwoken += nrisen;
+   free( risen);
    if( _omniscient || daylight != _daylight)
    {
       ndue = [agents count];
@@ -5213,8 +5226,9 @@ static int   cmp_entity_id( const void *a, const void *b)
    for( i = 0; i < ndue; i++)
    {
       agent = due[ i];
-      if( (i && agent == due[ i - 1]) || ! [_world record:[_world kindNamed:"Agent"] for:agent])
-         continue;
+      if( (i && agent == due[ i - 1]) || ! [_world record:[_world kindNamed:"Agent"] for:agent] ||
+          [_world detailOf:agent] == BGDetailFrozen)
+         continue;                         /* frozen: nothing runs */
       store  = [self storeOf:agent];
       _short = NO;
       [self perceive:store

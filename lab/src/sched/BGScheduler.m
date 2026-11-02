@@ -214,6 +214,7 @@ static uint64_t   now_ns( void)
 
       free( [_world takeTouched:&n]);
       free( [_world takeVacated:&n]);
+      free( [_world takeRisen:&n]);
    }
    _stats.boundaries++;
    [_observer scheduler:self

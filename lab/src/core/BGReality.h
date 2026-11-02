@@ -55,6 +55,20 @@ BOOL          BGRealityCentre( BGReality *r, BGEntityID entity, int32_t x, int32
  * full with no anchors at all. */
 BGDetail      BGRealityDetailAt( const BGReality *r, int32_t x, int32_t y, int32_t z);
 
+/* The anchors as they are, kept to compare with later (what rose from
+ * frozen when they moved, REALITY.md step 4): malloc'd; free() it. */
+typedef struct BGAnchorsKept   BGAnchorsKept;
+BGAnchorsKept *BGRealityKeepAnchors( const BGReality *r);
+/* The level of a chunk's tiles by the anchors kept. */
+BGDetail      BGRealityDetailKept( const BGReality *r, const BGAnchorsKept *kept, int32_t x, int32_t y, int32_t z);
+NSUInteger    BGRealityKeptCount( const BGAnchorsKept *kept);
+/* The box of chunks an anchor's abstract reach covers (kept, or now): its
+ * corners; NO if it is not centred. */
+BOOL          BGRealityKeptBox( const BGReality *r, const BGAnchorsKept *kept, NSUInteger i, BGEntityID *entity,
+                                int32_t *lo, int32_t *hi, BOOL *same);
+/* Whether anchor i, as it is now, is as it was kept. */
+BOOL          BGRealityKeptSame( const BGReality *r, const BGAnchorsKept *kept, NSUInteger i);
+
 /* Leases: full detail until a time. A lease again keeps the later end. */
 void          BGRealityLease( BGReality *r, BGEntityID entity, int64_t until);
 int64_t       BGRealityLeaseOf( const BGReality *r, BGEntityID entity);

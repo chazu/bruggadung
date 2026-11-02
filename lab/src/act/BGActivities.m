@@ -1,4 +1,5 @@
 #import "BGActivities.h"
+#import "BGReality.h"
 
 #import "BGActions.h"
 #import "BGProposalGroup.h"
@@ -247,6 +248,9 @@ static int   cmp_actor( const void *a, const void *b)
 
    record = [_world record:[_world kindNamed:"Activity"] for:a];
    if( ! running( _world, a, record))
+      return( BGTimeNever.ms);
+   /* its actor frozen (REALITY.md step 4): it waits, and is told when it rises */
+   if( [_world detailOf:(BGEntityID) record->actorRef] == BGDetailFrozen)
       return( BGTimeNever.ms);
    at    = record->due > 0 ? record->due : BGTimeNever.ms;
    check = next_checkpoint( _world, a, record, t);

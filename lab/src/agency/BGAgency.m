@@ -3233,7 +3233,9 @@ static int64_t   mind_due_now( void *context, BGEntityID agent)
 
    self = context;
    m    = [self existingMindOf:agent];
-   return( m ? due_on_beat( self->_world, m) : INT64_MAX);
+   if( ! m || [self->_world detailOf:agent] == BGDetailFrozen)
+      return( INT64_MAX);
+   return( due_on_beat( self->_world, m));
 }
 
 
@@ -3265,6 +3267,8 @@ static int64_t   mind_due_now( void *context, BGEntityID agent)
  * or it is due of itself. */
 - (BOOL) isDue:(BGMotivation *) m
 {
+   if( [_world detailOf:m->agent] == BGDetailFrozen)
+      return( NO);                         /* frozen: it decides when it rises */
    return( [_knowledge perceivedNow:m->agent] || due_of( m) <= [_world time].ms);
 }
 

@@ -38,7 +38,7 @@ static int   usage( void)
                     "       lab [-C contentdir] run|save marked-nail|marked-nail-a|marked-nail-b\n"
                     "       lab [-C contentdir] menu marked-nail|marked-nail-a|marked-nail-b <ms>\n"
                     "       lab [-C contentdir] play workshop|cistern|shed [--seed n] [--log file]\n"
-                    "       lab [-C contentdir] bench crowd|spread [agents] [seconds] [anchor]\n");
+                    "       lab [-C contentdir] bench crowd|spread [agents] [seconds] [anchor[=kind]]\n");
    return( 2);
 }
 
@@ -218,6 +218,19 @@ static int   run_scenario( const char *name, BOOL save, int64_t menuAt)
 }
 
 
+/* `anchor` (a player) or `anchor=<kind>`, or none. */
+static const char   *bench_anchor( int argc, char *argv[], int k)
+{
+   if( k >= argc)
+      return( NULL);
+   if( ! strcmp( argv[ k], "anchor"))
+      return( "player");
+   if( ! strncmp( argv[ k], "anchor=", 7))
+      return( argv[ k] + 7);
+   return( NULL);
+}
+
+
 int   main( int argc, char *argv[])
 {
    NSAutoreleasePool   *pool;
@@ -247,10 +260,10 @@ int   main( int argc, char *argv[])
       status = play( argc, argv, i);
    else if( ! strcmp( argv[ i], "bench") && i + 1 < argc && ! strcmp( argv[ i + 1], "crowd"))
       status = BGBenchCrowdSpread( i + 2 < argc ? atoi( argv[ i + 2]) : 100, i + 3 < argc ? atoll( argv[ i + 3]) : 60, NO,
-                                   i + 4 < argc && ! strcmp( argv[ i + 4], "anchor"));
+                                   bench_anchor( argc, argv, i + 4));
    else if( ! strcmp( argv[ i], "bench") && i + 1 < argc && ! strcmp( argv[ i + 1], "spread"))
       status = BGBenchCrowdSpread( i + 2 < argc ? atoi( argv[ i + 2]) : 100, i + 3 < argc ? atoll( argv[ i + 3]) : 60, YES,
-                                   i + 4 < argc && ! strcmp( argv[ i + 4], "anchor"));
+                                   bench_anchor( argc, argv, i + 4));
    else if( ! strcmp( argv[ i], "menu") && i + 2 < argc)
       status = run_scenario( argv[ i + 1], NO, strtoll( argv[ i + 2], NULL, 10));
    else

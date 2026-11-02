@@ -12,4 +12,4 @@
 int   BGBenchCrowd( int agents, int64_t seconds);
 /* The same, spread: on plain_map (1024 x 1024), ten tiles apart, so each
  * has as many near it however many there are. */
-int   BGBenchCrowdSpread( int agents, int64_t seconds, BOOL spread, BOOL anchored);
+int   BGBenchCrowdSpread( int agents, int64_t seconds, BOOL spread, const char *anchored);

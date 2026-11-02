@@ -52,6 +52,9 @@ struct BGReality
 };
 
 
+static BGDetail   detail_by( const BGReality *r, const BGAnchor *anchors, NSUInteger n, int32_t x, int32_t y, int32_t z);
+
+
 static int64_t   int_at( TriContent *tri, const TriNode *node, const char *path, int64_t otherwise)
 {
    int64_t   lo;
@@ -354,6 +357,14 @@ BOOL   BGRealityCentre( BGReality *r, BGEntityID entity, int32_t x, int32_t y, i
 
 BGDetail   BGRealityDetailAt( const BGReality *r, int32_t x, int32_t y, int32_t z)
 {
+   if( ! r)
+      return( BGDetailFull);
+   return( detail_by( r, r->anchors, r->nanchors, x, y, z));
+}
+
+
+static BGDetail   detail_by( const BGReality *r, const BGAnchor *anchors, NSUInteger n, int32_t x, int32_t y, int32_t z)
+{
    const BGAnchor   *a;
    const BGReach    *reach;
    BGDetail         best;
@@ -364,12 +375,12 @@ BGDetail   BGRealityDetailAt( const BGReality *r, int32_t x, int32_t y, int32_t 
    int32_t          dz;
    int              k;
 
-   if( ! r || ! r->nanchors)
+   if( ! n)
       return( BGDetailFull);
    best = BGDetailFrozen;
-   for( i = 0; i < r->nanchors && best < BGDetailFull; i++)
+   for( i = 0; i < n && best < BGDetailFull; i++)
    {
-      a = &r->anchors[ i];
+      a = &anchors[ i];
       if( ! a->centred)
          continue;
       dx = chunk_of( x) - a->cx;
@@ -387,6 +398,88 @@ BGDetail   BGRealityDetailAt( const BGReality *r, int32_t x, int32_t y, int32_t 
       }
    }
    return( best);
+}
+
+
+/* --- anchors kept ------------------------------------------------------------------- */
+
+struct BGAnchorsKept
+{
+   NSUInteger   n;
+   BGAnchor     anchors[];
+};
+
+
+BGAnchorsKept   *BGRealityKeepAnchors( const BGReality *r)
+{
+   BGAnchorsKept   *kept;
+
+   kept    = malloc( sizeof( BGAnchorsKept) + (r->nanchors + 1) * sizeof( BGAnchor));
+   kept->n = r->nanchors;
+   memcpy( kept->anchors, r->anchors, r->nanchors * sizeof( BGAnchor));
+   return( kept);
+}
+
+
+NSUInteger   BGRealityKeptCount( const BGAnchorsKept *kept)
+{
+   return( kept ? kept->n : 0);
+}
+
+
+BGDetail   BGRealityDetailKept( const BGReality *r, const BGAnchorsKept *kept, int32_t x, int32_t y, int32_t z)
+{
+   return( kept ? detail_by( r, kept->anchors, kept->n, x, y, z) : BGDetailFull);
+}
+
+
+/* An anchor's box, the chunks its abstract reach covers: (cx, cy, z) low
+ * and high. `same`: the anchor is as it is now, same kind, same centre. */
+BOOL   BGRealityKeptBox( const BGReality *r, const BGAnchorsKept *kept, NSUInteger i, BGEntityID *entity,
+                         int32_t *lo, int32_t *hi, BOOL *same)
+{
+   const BGAnchor   *a;
+   const BGAnchor   *now;
+   const BGReach    *reach;
+   NSUInteger       k;
+   BOOL             found;
+
+   a = kept ? (i < kept->n ? &kept->anchors[ i] : NULL) : (i < r->nanchors ? &r->anchors[ i] : NULL);
+   if( ! a || ! a->centred)
+      return( NO);
+   reach   = &r->kinds[ a->kind].reach[ 0];        /* abstract reaches furthest */
+   lo[ 0]  = a->cx - reach->across;
+   lo[ 1]  = a->cy - reach->across;
+   lo[ 2]  = a->z - reach->down;
+   hi[ 0]  = a->cx + reach->across;
+   hi[ 1]  = a->cy + reach->across;
+   hi[ 2]  = a->z + reach->up;
+   *entity = a->entity;
+   if( same && kept)
+   {
+      /* kept: is it as it is now? */
+      k   = anchor_index( r, a->entity, &found);
+      now = found ? &r->anchors[ k] : NULL;
+      *same = now && now->kind == a->kind && now->centred == a->centred && now->cx == a->cx && now->cy == a->cy &&
+              now->z == a->z;
+   }
+   return( YES);
+}
+
+
+BOOL   BGRealityKeptSame( const BGReality *r, const BGAnchorsKept *kept, NSUInteger i)
+{
+   const BGAnchor   *now;
+   NSUInteger       k;
+
+   if( i >= r->nanchors)
+      return( NO);
+   now = &r->anchors[ i];
+   for( k = 0; kept && k < kept->n; k++)
+      if( kept->anchors[ k].entity == now->entity)
+         return( kept->anchors[ k].kind == now->kind && kept->anchors[ k].centred == now->centred &&
+                 kept->anchors[ k].cx == now->cx && kept->anchors[ k].cy == now->cy && kept->anchors[ k].z == now->z);
+   return( NO);
 }
 
 

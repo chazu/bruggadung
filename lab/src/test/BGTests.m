@@ -8321,6 +8321,86 @@ static void   test_reduced_detail( void)
 }
 
 
+/* REALITY.md step 4: frozen. A distant anchor (full nowhere but its chunk,
+ * abstract eight chunks round) on the plain; a worker ten chunks off sets
+ * out to walk a tile. Frozen, nothing runs: a minute on, it hasn't moved,
+ * nor looked, nor decided. The anchor comes nearer, and it rises: its walk,
+ * long due, ends at once, and it looks. Another, frozen, hears a word from
+ * the anchor: contact raises it, and it looks. */
+static void   test_frozen_detail( void)
+{
+   BGStage            st;
+   BGActivities       *activities;
+   BGKnowledge        *knowledge;
+   BGAgency           *agency;
+   BGProposalGroup    *g;
+   BGEntityID         anchor;
+   BGEntityID         walker;
+   BGEntityID         sleeper;
+   NSString           *error;
+   int64_t            seen;
+   int64_t            sleeperSeen;
+   uint64_t           decided;
+
+   st.w = BGTestWorld( 227);
+   BG_CHECK( [st.w setTerrainMap:"plain_map" error:NULL]);
+   st.c       = BGTestCommitter( st.w);
+   activities = [BGActivities activitiesWithWorld:st.w committer:st.c];
+   knowledge  = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+   agency     = [[[BGAgency alloc] initWithWorld:st.w committer:st.c knowledge:knowledge] autorelease];
+   st.s       = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [agency setActivities:activities];
+   [st.s setActivities:activities];
+   [st.s setPerception:knowledge];
+   [st.s setDecision:agency];
+   g       = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: an anchor, and two far off"];
+   anchor  = [g create:"worker" key:"anchor" at:BGOnTile( 100, 100, 0)];
+   walker  = [g create:"worker" key:"walker" at:BGOnTile( 100 + 10 * 32, 100, 0)];
+   sleeper = [g create:"watchman" key:"sleeper" at:BGOnTile( 100 + 20 * 32, 100, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   anchor  = [g idFor:anchor];
+   walker  = [g idFor:walker];
+   sleeper = [g idFor:sleeper];
+   [agency control:walker];
+   [st.s runUntil:BGTimeMake( 500)];
+   BG_CHECK( [st.w setAnchor:anchor kind:"distant"]);
+   [st.s runUntil:BGTimeMake( 1000)];
+   BG_CHECK( [st.w detailOf:walker] == BGDetailFrozen && [st.w detailOf:sleeper] == BGDetailFrozen &&
+             [st.w detailOf:anchor] == BGDetailFull);
+
+   /* frozen, it sets out, and nothing runs: a minute on, where it was */
+   error = nil;
+   BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "walk_east", walker, BGNoEntity, BGNoEntity), 0, &error) != nil);
+   [st.s runUntil:BGTimeMake( 2000)];
+   seen    = [knowledge storeOf:walker]->_perceivedAt;
+   decided = [agency mindOf:walker]->decisions;
+   [st.s runUntil:BGTimeMake( 62000)];
+   BG_CHECK( [st.w locationOf:walker].x == 100 + 10 * 32);
+   BG_CHECK( [knowledge storeOf:walker]->_perceivedAt == seen && [agency mindOf:walker]->decisions == decided);
+
+   /* the anchor comes within eight chunks: it rises, its walk ends, it looks */
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the anchor comes nearer"];
+   [g move:BGWhole( anchor) to:BGOnTile( 100 + 4 * 32, 100, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 62100)];
+   BG_CHECK( [st.w detailOf:walker] != BGDetailFrozen);
+   BG_CHECK( [knowledge storeOf:walker]->_perceivedAt > seen);
+   [st.s runUntil:BGTimeMake( 62500)];
+   BG_CHECK( [st.w locationOf:walker].x == 100 + 10 * 32 + 1);
+
+   /* the sleeper, still frozen, hears a word from the anchor: it rises */
+   BG_CHECK( [st.w detailOf:sleeper] == BGDetailFrozen);
+   sleeperSeen = [knowledge storeOf:sleeper]->_perceivedAt;
+   g = [BGProposalGroup groupWithPhase:BGPhaseAction source:@"the anchor calls out"];
+   [g setActor:anchor];
+   [g emit:"said" subject:BGWhole( anchor) other:BGWhole( sleeper)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 62600)];
+   BG_CHECK( [st.w detailOf:sleeper] == BGDetailFull && [knowledge storeOf:sleeper]->_perceivedAt > sleeperSeen);
+}
+
+
 /* A grid for BGPath, from rows of '#' (walls) and anything else. */
 typedef struct
 {
@@ -11611,6 +11691,7 @@ const BGTestCase   BGAllTests[] =
    { "work_when_touched",             test_work_when_touched },
    { "reality_bubble",                test_reality_bubble },
    { "reduced_detail",                test_reduced_detail },
+   { "frozen_detail",                 test_frozen_detail },
    { "recipe_autopilot",              test_recipe_autopilot },
    { "resume_recheck",                test_resume_recheck },
    { "interrupted_repair",            test_interrupted_repair },

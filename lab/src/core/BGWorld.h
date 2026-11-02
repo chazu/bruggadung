@@ -147,6 +147,10 @@ typedef struct
    struct BGIndex *_touching;        /* activities, by actor, item and destination */
    struct BGIndex *_creations;       /* the "created" events' indices, by what they created */
    struct BGReality *_reality;       /* anchors, levels of detail, leases (REALITY.md) */
+   struct BGAnchorsKept *_settled;   /* the anchors as last settled, to tell what rose */
+   BGEntityID     *_risen;           /* what rose from frozen since it was last taken */
+   NSUInteger     _nrisen;
+   NSUInteger     _risencap;
    id <BGRecordObserver> _activityObserver;   /* not retained */
    BGEntityID     *_touched;         /* entities changed since the mark, unsorted, maybe twice */
    BGLocation     *_vacated;         /* ground tiles left since the mark */
@@ -158,6 +162,7 @@ typedef struct
    NSUInteger     _kindTrace;
    NSUInteger     _kindGas;
    NSUInteger     _kindActivity;
+   NSUInteger     _kindAgent;
    BGEntityID     *_checkedOut;      /* sorted; not saved: saves check everything in */
    NSUInteger     _ncheckedOut;
 }
@@ -313,6 +318,12 @@ typedef struct
 /* Contact (content's `contact`): each event from `first` between something
  * at full detail and something not leases the other to full. */
 - (void) leaseContactsFrom:(NSUInteger) first;
+/* What rose from frozen since the last call (the anchors moved, a lease
+ * began), and what it holds: malloc'd, in entity order, each once. Its
+ * activities have been told (the activity observer). */
+- (BGEntityID *) takeRisen:(NSUInteger *) n;
+/* The anchors as they are, taken as settled: a save restored. */
+- (void) markAnchorsSettled;
 
 /* One observer of the Activity records, told of every change (activities'
  * timers); not retained, so it unsets itself as it goes. */

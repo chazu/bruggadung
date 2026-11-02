@@ -4310,3 +4310,22 @@ Measured: crowd 160 47.8 → 37.8 ms a world second; spread 1,600 unchanged
 (each agent's own loop, kept at reduced, is the cost: steps 4 and 5).
 
 111 tests, 3487 checks, under both compilers, UBSan, and leak-free.
+
+
+### After the slice: frozen, and catching up (REALITY.md step 4, for agents)
+
+- Frozen agents: no perception (`perceive_by_now`, `forget_by_now`, the
+  due loop), no decision (`isDue:`, `mind_due_now`), activities waiting
+  (`dueOf:` never).
+- What rose: `BGRealityKeepAnchors`, `BGRealityKeptBox`,
+  `BGRealityKeptSame`, `BGRealityDetailKept`; the world compares the
+  anchors as last settled with as they are, over the moved anchors' reach;
+  contact raises a frozen party; `takeRisen:` (perception), the activity
+  observer told of each risen agent's activities; `markAnchorsSettled` on
+  restore.
+- `lab bench ... anchor=<kind>`.
+
+Measured: 1,600 spread, `distant` anchor (871 frozen): 180 → 83 ms a
+world second.
+
+112 tests, 3498 checks, under both compilers, UBSan, and leak-free.
