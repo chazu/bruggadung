@@ -190,3 +190,46 @@ void test_builtins(void)
         tri_content_free(c);
     }
 }
+
+/* A bound by a value named: a let, a field of this declaration or another,
+ * a sum of those; read when content loads, as comprehensions read data. */
+void test_named_bounds(void)
+{
+    static const char *src =
+        "let worn = 60\n"
+        "let lo = 2mm\n"
+        "#R: { a: int, b: length, c: int, d: int }\n"
+        "#Fresh: #R & { a: <worn }\n"
+        "r: #R & { a: <worn, b: >=lo & <=(lo * 3), c: >.d, d: 5 }\n"
+        "s: #R & { a: >=r.d & <=worn, b: 1mm, c: 1, d: 1 }\n"
+        "t: #Fresh & { a: 59, b: 1mm, c: 1, d: 1 }\n";
+    TriContent *c = load1(src);
+    CHECK(tri_content_ok(c));
+    if (!tri_content_ok(c)) { dump_diags(c); tri_content_free(c); return; }
+    TriArena *a = tri_arena_new();
+    const TriNode *r = tri_value(c, "r", a, NULL, 0);
+    CHECK_STR(printed(c, tri_at(c, r, "a")), "<=59");
+    CHECK_STR(printed(c, tri_at(c, r, "b")), ">=2mm & <=6mm");
+    CHECK_STR(printed(c, tri_at(c, r, "c")), ">=6");
+    const TriNode *s = tri_value(c, "s", a, NULL, 0);
+    CHECK_STR(printed(c, tri_at(c, s, "a")), ">=5 & <=60");
+    CHECK(tri_spec(c, "t") != NULL);
+    tri_arena_free(a);
+    tri_content_free(c);
+
+    static const struct { const char *src, *diag; } cases[] = {
+        { "let x = \"s\"\nr: #R & { a: <x }\n", "a bound's value must be a number written in the content, and \"s\" is not one" },
+        { "r: #R & { a: <nope }\n", "and nope is not one" },
+        { "r: #R & { a: <.b, b: 1mm }\n", "conflict" },
+        { "r: #R & { a: < }\n", "expected a number after a bound" },
+    };
+    for (size_t i = 0; i < sizeof cases / sizeof *cases; i++) {
+        char buf[512];
+        snprintf(buf, sizeof buf, "#R: { a: int, b: length }\n%s", cases[i].src);
+        TriContent *e = load1(buf);
+        CHECK(!tri_content_ok(e));
+        if (!has_diag(e, cases[i].diag, 1)) { fprintf(stderr, "    case %zu:\n", i); dump_diags(e); }
+        CHECK(has_diag(e, cases[i].diag, 1));
+        tri_content_free(e);
+    }
+}

@@ -95,7 +95,7 @@ sum         = product { ("+" | "-") product }
 product     = unary { ("*" | "/") unary }
 unary       = "*" unary                          (default)
             | "!" unary                          (not)
-            | (">=" | "<=" | ">" | "<") NUMBER   (bound)
+            | (">=" | "<=" | ">" | "<") (NUMBER | IDENT | REF | "(" expr ")")   (bound)
             | ("=~" | "!~") STRING               (regex)
             | primary
 primary     = "_" | "true" | "false"
@@ -205,6 +205,7 @@ is a bound; between two operands `a >= b` compares them.
 | `"text"` | The atom, if an enum lists it; otherwise a `text` value. |
 | `19mm`, `7`, `2.5` | A number: an exact interval of width zero. |
 | `>=10mm`, `<20mm` | A bound. `>` and `<` are strict: one quantum inside. `>10mm & <20mm` is 10.1 mm to 19.9 mm. |
+| `<worn`, `>=.lead`, `<=(lo * 3)` | A bound by a value named: a `let`, a field of this declaration or another, or a sum in parentheses. It is read when content loads, as comprehensions read data, and must be a number written in the content. |
 | `a & b` | Unification. Fails if `a` and `b` are incompatible. |
 | `a \| b` | Disjunction: an enum, a disjunction type, variation, or variants, depending on where it appears. |
 | `*a` | A default among alternatives. |
@@ -711,7 +712,8 @@ location of the other declaration where there is one.
 | `unexpected '='; did you mean ':' or '=~'?`, `unexpected '!'; did you mean '!~'?` | A lone `=` where a value belongs, or a lone `!`. |
 | `expected ':' after field label ('=' only binds a let)` | `size = 3` instead of `size: 3`. |
 | `expected a declaration`, `expected a field label`, `expected a value`, `expected ':' after …` | A malformed declaration or structure. |
-| `expected a number after a bound` | A bound needs a number: `>=10mm`, not `>= $x`. |
+| `expected a number after a bound` | A bound needs a number or a value named: `>=10mm`, `>=lead`, not `>= $x` (a tag's value isn't known at load; use arithmetic). |
+| `a bound's value must be a number written in the content, and x is not one` | The name in `>=x` doesn't give a number when content loads: a string, an open value, or no such name. |
 | `expected a referent number in ref(...)`, `a referent number has no unit` | `ref` takes a plain whole number. |
 | `expected a tag name after '$'`, `expected an attribute name after '@'` | A bare `$` or `@`. |
 | `unknown unit: 3furlong` | A unit not in the table. |

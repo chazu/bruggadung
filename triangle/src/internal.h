@@ -134,7 +134,7 @@ struct X {
     union {
         Sym name;                                         /* NAME, ATOM, TAG */
         struct { int dim; int64_t q; } num;
-        struct { int op; int dim; int64_t q; } bound;
+        struct { int op; int dim; int64_t q; struct X *of; } bound;   /* of: a named value, until load reads it */
         struct { XField *fields; int n; Attr *attrs; int nattrs; bool refs; } st;   /* refs: made for references */
         struct { X **items; int n; bool open; X *tail; X *elem; } list;   /* elem: [...X] */
         struct { X *a, *b; } bin;

@@ -27,7 +27,8 @@ void x_print(Buf *b, const X *x)
     case X_BOUND:
         buf_puts(b, x->u.bound.op == B_GE ? ">=" : x->u.bound.op == B_LE ? "<=" :
                     x->u.bound.op == B_GT ? ">" : "<");
-        units_format(b, x->u.bound.dim, x->u.bound.q);
+        if (x->u.bound.of) x_print(b, x->u.bound.of);
+        else units_format(b, x->u.bound.dim, x->u.bound.q);
         break;
     case X_INTERP:
         buf_putc(b, '"');

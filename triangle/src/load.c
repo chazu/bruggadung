@@ -3450,6 +3450,9 @@ static void resolve_names(Content *c, X *x, Sym pkg, const U64Map *declared)
     case X_CALL:
         for (int i = 0; i < x->u.call.n; i++) resolve_names(c, x->u.call.args[i], pkg, declared);
         break;
+    case X_BOUND:
+        resolve_names(c, x->u.bound.of, pkg, declared);
+        break;
     case X_LIST:
         for (int i = 0; i < x->u.list.n; i++) resolve_names(c, x->u.list.items[i], pkg, declared);
         resolve_names(c, x->u.list.tail, pkg, declared);
@@ -4000,6 +4003,28 @@ static X *expand(Exp *e, X *x, const Env *env)
         X *n = x_copy(e, x);
         n->u.in.parts = arena_alloc(e->c->load, (size_t) (x->u.in.n ? x->u.in.n : 1) * sizeof(X *));
         for (int i = 0; i < x->u.in.n; i++) n->u.in.parts[i] = expand(e, x->u.in.parts[i], env);
+        return n;
+    }
+    case X_BOUND: {                                /* a bound by a value named: the number now */
+        if (!x->u.bound.of) return x;
+        X *v = data_of(e, expand(e, x->u.bound.of, env), 0);
+        if (!e->ok) return x;
+        int dim;
+        int64_t lo, hi;
+        if (!v || !x_interval(v, &dim, &lo, &hi) || lo != hi || lo == TRI_NINF || lo == TRI_INF) {
+            Buf w = { 0 };
+            x_print(&w, x->u.bound.of);
+            char msg[300];
+            snprintf(msg, sizeof msg, "a bound's value must be a number written in the content, and %s is not one",
+                     w.s ? w.s : "it");
+            buf_free(&w);
+            exp_error(e, x->loc, msg);
+            return x;
+        }
+        X *n = x_copy(e, x);
+        n->u.bound.dim = dim;
+        n->u.bound.q = lo;
+        n->u.bound.of = NULL;
         return n;
     }
     case X_COMP:

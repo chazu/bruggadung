@@ -567,6 +567,8 @@ static bool resolve_lets(Parser *p, X *x)
     case X_CALL:
         for (int i = 0; i < x->u.call.n; i++) if (!resolve_lets(p, x->u.call.args[i])) return false;
         return true;
+    case X_BOUND:
+        return resolve_lets(p, x->u.bound.of);
     case X_LIST:
         for (int i = 0; i < x->u.list.n; i++) if (!resolve_lets(p, x->u.list.items[i])) return false;
         return resolve_lets(p, x->u.list.tail) && resolve_lets(p, x->u.list.elem);
@@ -653,6 +655,9 @@ static void collect_refs(RefWalk *w, X *x)
         return;
     case X_CALL:
         for (int i = 0; i < x->u.call.n; i++) collect_refs(w, x->u.call.args[i]);
+        return;
+    case X_BOUND:
+        collect_refs(w, x->u.bound.of);
         return;
     case X_LIST:
         for (int i = 0; i < x->u.list.n; i++) {
@@ -751,6 +756,7 @@ static bool x_has_comp(const X *x)
         for (int i = 0; i < x->u.in.n; i++) if (x_has_comp(x->u.in.parts[i])) return true;
         return false;
     case X_CALL: return true;
+    case X_BOUND: return x->u.bound.of != NULL;
     default: return false;
     }
 }
@@ -1333,10 +1339,22 @@ static X *parse_unary(Parser *p)
     if (t->k == T_GE || t->k == T_LE || t->k == T_GT || t->k == T_LT) {
         next(p);
         Tok *n = peek(p, 0);
+        int op = t->k == T_GE ? B_GE : t->k == T_LE ? B_LE : t->k == T_GT ? B_GT : B_LT;
+        if (n->k == T_IDENT || n->k == T_REF || n->k == T_LPAREN) {
+            /* a bound by a value named (a let, a field, a path, a sum): read
+             * when content loads, as comprehensions read data */
+            X *of = parse_primary(p);
+            if (!of) return NULL;
+            X *x = xnew(p, X_BOUND, t->loc);
+            x->u.bound.op = op;
+            x->u.bound.of = of;
+            p->has_comp = true;
+            return x;
+        }
         if (n->k != T_NUMBER) { perr(p, n->loc, "expected a number after a bound"); return NULL; }
         next(p);
         X *x = xnew(p, X_BOUND, t->loc);
-        x->u.bound.op = t->k == T_GE ? B_GE : t->k == T_LE ? B_LE : t->k == T_GT ? B_GT : B_LT;
+        x->u.bound.op = op;
         if (!number(p, n, &x->u.bound.dim, &x->u.bound.q)) return NULL;
         return x;
     }

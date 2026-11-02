@@ -261,6 +261,11 @@ here, as it would be in CUE; arithmetic and tags already relate fields, and
 a third mechanism would reach the matcher. CUE's hidden fields (`_x: v`)
 are lets: Triangle's structures are closed by their types, so a field
 outside the type has nowhere to be, and a let is what a hidden field is for.
+A bound may name its value (`wear: <worn_through`, `>=.lead`), as in CUE,
+by the same rule: the name is read when content loads, so it must give a
+number written in the content. Writing the bound with a literal everywhere
+the threshold appears was the first gap writing new content in the new
+syntax found (lab/content/latent.tri, servicing).
 `triangle export` writes instances as JSON or YAML, as `cue export` does;
 a value a spec leaves open is written as its constraint, since open values
 are the point of a blueprint.
