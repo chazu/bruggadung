@@ -206,6 +206,18 @@ static BGProposal   proposal( BGProposalKind kind, BGRef target)
 }
 
 
+- (void) setTerrain:(const char *) kind
+                 at:(BGLocation) tile
+{
+   BGProposal   p;
+
+   p          = proposal( BGProposeSetTerrain, BGWhole( BGNoEntity));
+   p.name     = kind;
+   p.location = tile;
+   [self addProposal:p];
+}
+
+
 - (void) move:(BGRef) target
            to:(BGLocation) location
 {

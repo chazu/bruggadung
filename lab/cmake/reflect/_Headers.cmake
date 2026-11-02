@@ -77,6 +77,7 @@ src/agency/BGAgency.h
 src/commit/BGCommitter.h
 src/commit/BGProposalGroup.h
 src/core/BGStore.h
+src/core/BGTerrain.h
 src/core/BGTypes.h
 src/core/BGWorld.h
 src/domains/BGAtmosphere.h

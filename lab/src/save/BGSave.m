@@ -137,6 +137,38 @@ NSString   *BGSave( BGWorld *world, BGCommitter *committer, NSArray *domains)
    [out appendFormat:@"world %llu %lld %llu %llu %llu\n", (unsigned long long) [world seed], (long long) [world time].ms,
                      (unsigned long long) [world boundary], (unsigned long long) [world nextID],
                      (unsigned long long) [committer position]];
+   /* terrain (TERRAIN.md): its map, then the chunks that differ from it,
+    * each cell by kind, in runs */
+   if( [world terrain])
+   {
+      const BGTerrain   *terrain;
+      BGTerrainKind     cells[ BG_CHUNK * BG_CHUNK];
+      int32_t           (*corners)[ 3];
+      NSUInteger        nchunks;
+      NSUInteger        c;
+      NSUInteger        cell;
+      NSUInteger        run;
+
+      terrain = [world terrain];
+      [out appendFormat:@"terrain %s\n", BGTerrainMap( terrain) ? BGTerrainMap( terrain) : "-"];
+      nchunks = BGTerrainChanged( terrain, NULL, 0);
+      corners = malloc( (nchunks ? nchunks : 1) * sizeof( *corners));
+      BGTerrainChanged( terrain, corners, nchunks);
+      for( c = 0; c < nchunks; c++)
+      {
+         BGTerrainChunkCells( terrain, corners[ c][ 0], corners[ c][ 1], corners[ c][ 2], cells);
+         [out appendFormat:@"terrain-chunk %d %d %d", corners[ c][ 0], corners[ c][ 1], corners[ c][ 2]];
+         for( cell = 0; cell < BG_CHUNK * BG_CHUNK; cell += run)
+         {
+            for( run = 1; cell + run < BG_CHUNK * BG_CHUNK && cells[ cell + run] == cells[ cell]; run++)
+               ;
+            [out appendFormat:@" %s*%lu", cells[ cell] ? BGTerrainKindInfo( terrain, cells[ cell])->name : "-",
+                              (unsigned long) run];
+         }
+         [out appendString:@"\n"];
+      }
+      free( corners);
+   }
 
    store = [world entities];
    for( i = 0; i < [store count]; i++)
@@ -187,11 +219,12 @@ NSString   *BGSave( BGWorld *world, BGCommitter *committer, NSArray *domains)
       put_location( out, ev->location);
       [out appendFormat:@" %llu\n", (unsigned long long) ev->actor];
    }
-   for( j = 0; j < 32; j++)
-      for( i = 0; i < 32; i++)
-         if( [world waterAtX:(int32_t) i y:(int32_t) j level:0])
-            [out appendFormat:@"tile %lu %lu 0 water %lld\n", (unsigned long) i, (unsigned long) j,
-                              (long long) [world waterAtX:(int32_t) i y:(int32_t) j level:0]];
+   for( k = 0; k < (NSUInteger) [world levels]; k++)
+      for( j = 0; j < (NSUInteger) [world tilesHigh]; j++)
+         for( i = 0; i < (NSUInteger) [world tilesWide]; i++)
+            if( [world waterAtX:(int32_t) i y:(int32_t) j level:(int32_t) k])
+               [out appendFormat:@"tile %lu %lu %lu water %lld\n", (unsigned long) i, (unsigned long) j,
+                                 (unsigned long) k, (long long) [world waterAtX:(int32_t) i y:(int32_t) j level:(int32_t) k]];
    deferred = [committer deferredGroups];
    for( i = 0; i < [deferred count]; i++)
    {
@@ -245,7 +278,7 @@ NSArray   *BGSavedDomainState( NSString *text, NSString *domain)
 
 /* --- reading ----------------------------------------------------------------- */
 
-#define BG_MAX_TOKENS   128
+#define BG_MAX_TOKENS   1100     /* a terrain chunk: up to 1024 runs */
 
 typedef struct
 {
@@ -525,6 +558,45 @@ BGWorld   *BGRestore( NSString *text,
          ev.actor    = token_u64( &line, 18);
          if( [world emit:ev] != token_u64( &line, 1))
             problem = @"events out of order";
+      }
+      else if( ! strcmp( s, "terrain"))
+      {
+         if( token_string( &line, 1))
+            [world setTerrainMap:token_string( &line, 1) error:&problem];
+      }
+      else if( ! strcmp( s, "terrain-chunk"))
+      {
+         int32_t   x0;
+         int32_t   y0;
+         int32_t   z;
+         int       t;
+         long      at;
+         long      run;
+         long      r;
+         char      *star;
+
+         x0 = (int32_t) token_i64( &line, 1);
+         y0 = (int32_t) token_i64( &line, 2);
+         z  = (int32_t) token_i64( &line, 3);
+         at = 0;
+         for( t = 4; t < line.n && ! problem; t++)
+         {
+            star = strrchr( line.tokens[ t], '*');
+            run  = star ? strtol( star + 1, NULL, 10) : 0;
+            if( ! star || run <= 0 || at + run > BG_CHUNK * BG_CHUNK)
+            {
+               problem = @"a malformed terrain chunk";
+               break;
+            }
+            *star = 0;
+            for( r = 0; r < run; r++, at++)
+               if( strcmp( line.tokens[ t], "-") &&
+                   ! [world setTerrain:line.tokens[ t] atX:x0 + (int32_t) (at % BG_CHUNK) y:y0 + (int32_t) (at / BG_CHUNK)
+                                 level:z])
+                  problem = [NSString stringWithFormat:@"no terrain kind %s, or a chunk off the map", line.tokens[ t]];
+         }
+         if( ! problem && at != BG_CHUNK * BG_CHUNK)
+            problem = @"a malformed terrain chunk";
       }
       else if( ! strcmp( s, "tile"))
       {

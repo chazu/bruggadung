@@ -4007,3 +4007,44 @@ Not yet: servicing using up grease or tallow; agents working pumps of their
 own accord; diligence weighing other unbidden work (tidying, mending).
 
 99 tests, 3300 checks, under both compilers, UBSan, and leak-free.
+
+### After the slice: terrain, step 1
+
+TERRAIN.md: what each tile at each level is, a terrain kind per cell, so
+walking, sight, sound, light, air, water and Tessera can read one
+structure. Step 1: kinds, maps, changes, and walls that stop things.
+
+- **Kinds in content** (`terrain.tri`, the `terrain` family): `solid`,
+  `opaque`, `floored`, `madeOf`, and a `look` for Tessera. Five so far:
+  open floor (a world with no map), plank floor, stone wall, a doorway,
+  open air.
+- **Maps** (`#Map`): a legend of characters to kinds, a fill, and levels
+  drawn in characters, each embedded from a file
+  (`rows: _ @embed(file="maps/shed.0.map", type=text)`, Triangle's new
+  `@embed`, as CUE's). The world's extent is the drawing's
+  (`-[BGWorld setTerrainMap:error:]`, before any tile holds a stock).
+- **The store** (`BGTerrain`, plain C): a kind index per cell, from the
+  source (the drawing, or a fill), with a 32 x 32 chunk stored only once
+  something in it changes. Asking a cell is an array lookup while nothing
+  has changed.
+- **Changes by commitment** (`-[BGProposalGroup setTerrain:at:]`):
+  journaled, so a rejected group leaves terrain as it was; emitted as a
+  `terrain` event; saved as the map's name and the chunks that differ from
+  it; part of the state hash.
+- **Solid terrain takes nothing in:** change commitment rejects a move or
+  a creation onto a solid tile, as it does one off the map, so walls stop
+  walkers and everything else.
+
+Checked: a world with no map is open floor, 32 x 32, nothing past it. The
+shed's drawing gives the extent (16 x 7) and the kinds, the fill past a
+short row. A worker can't walk into the wall, walks out through the
+doorway; nothing is put into a wall. The doorway walled up by commitment is
+an event, and stops the worker; a group with an unknown kind is rejected
+whole. Saved, the map and only the chunk changed; restored, the same state
+hash; set back as drawn, no chunk differs.
+
+Not yet: line of sight and agents' memory of terrain (step 2); rooms from
+terrain (step 3); levels and falling (step 4); the fluid domain and the
+explorer past 32 x 32; pathfinding around walls.
+
+100 tests, 3323 checks, under both compilers, UBSan, and leak-free.

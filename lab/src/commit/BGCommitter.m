@@ -782,6 +782,17 @@ static BOOL   bears_trace( BGWorld *world, BGEntityID e)
         location:BGLocationMakeNone() group:g];
       return( nil);
 
+   case BGProposeSetTerrain:
+      loc = p->location;
+      if( ! [_world terrain] || ! BGTerrainKindNamed( [_world terrain], p->name))
+         return( [NSString stringWithFormat:@"no terrain kind named %s", p->name ? p->name : ""]);
+      if( loc.form != BGLocationOnTile || ! [_world isTileX:loc.x y:loc.y level:loc.level])
+         return( @"terrain is set on a tile of the map");
+      value = BGTerrainAt( [_world terrain], loc.x, loc.y, loc.level);
+      [_world setTerrain:p->name atX:loc.x y:loc.y level:loc.level];
+      [self emit:"terrain" subject:BGNoEntity other:BGNoEntity amount:value detail:p->name location:loc group:g];
+      return( nil);
+
    case BGProposeEvent:
       a = resolve_ref( g, p->target);
       b = resolve_ref( g, p->other);
@@ -811,8 +822,16 @@ static BOOL   bears_trace( BGWorld *world, BGEntityID e)
    NSUInteger          n;
 
    if( loc.form == BGLocationOnTile)
-      return( [_world isTileX:loc.x y:loc.y level:loc.level]
-              ? nil : [NSString stringWithFormat:@"(%d, %d) is off the map", loc.x, loc.y]);
+   {
+      if( ! [_world isTileX:loc.x y:loc.y level:loc.level])
+         return( [NSString stringWithFormat:@"(%d, %d) is off the map", loc.x, loc.y]);
+      /* terrain that fills its tile takes nothing in (TERRAIN.md) */
+      if( [_world terrain] && BGTerrainSolid( [_world terrain], loc.x, loc.y, loc.level))
+         return( [NSString stringWithFormat:@"(%d, %d) is %s, solid", loc.x, loc.y,
+                                            BGTerrainKindInfo( [_world terrain],
+                                                               BGTerrainAt( [_world terrain], loc.x, loc.y, loc.level))->name]);
+      return( nil);
+   }
    if( ! [_world isLive:loc.place])
       return( [NSString stringWithFormat:@"%llu is in %llu, which does not exist",
                                          (unsigned long long) e, (unsigned long long) loc.place]);

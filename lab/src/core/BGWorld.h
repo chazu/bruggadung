@@ -11,6 +11,7 @@
 #import "BGStore.h"
 #import "BGContent.h"
 #import "BGComponents.h"
+#import "BGTerrain.h"
 
 
 /* What the entity table records for each live entity. */
@@ -107,6 +108,7 @@ extern const char   *BGEdgeKindNames[ BGEdgeKindCount];
    int32_t        _tilesHigh;
    int32_t        _levels;
    int64_t        *_tileWater;       /* a stock per tile, in mL */
+   BGTerrain      *_terrain;         /* what each tile is (TERRAIN.md); NULL: content has no kinds, all open */
    uint8_t        *_tileOut;         /* checked out by a domain; not saved */
 
    BGEntityID     *_checkedOut;      /* sorted; not saved: saves check everything in */
@@ -233,8 +235,9 @@ extern const char   *BGEdgeKindNames[ BGEdgeKindCount];
 
 /* --- tiles ---------------------------------------------------------------- */
 
-/* The map: 32 × 32 tiles on one level, for now. Tiles hold stocks; water is
- * the first. A tile outside the map holds nothing and takes nothing. */
+/* The map: 32 × 32 tiles on one level, unless a terrain map says otherwise.
+ * Tiles hold stocks; water is the first. A tile outside the map holds
+ * nothing and takes nothing. */
 - (BOOL) isTileX:(int32_t) x
                y:(int32_t) y
            level:(int32_t) level;
@@ -256,6 +259,27 @@ extern const char   *BGEdgeKindNames[ BGEdgeKindCount];
                          x:(int32_t) x
                          y:(int32_t) y
                      level:(int32_t) level;
+
+/* --- terrain (TERRAIN.md) ---------------------------------------------------- */
+
+/* What each tile is: open floor, unless a map was set. NULL if content
+ * declares no terrain kinds. */
+- (const BGTerrain *) terrain;
+/* Draws the world from a map in content: its terrain, and the world's extent
+ * from the drawing. Only before any tile holds a stock (at setup, or
+ * restoring); NO with the reason otherwise, or if the map is malformed. */
+- (BOOL) setTerrainMap:(const char *) map
+                 error:(NSString **) error;
+/* A cell's kind by name, journaled like any change while a group is open:
+ * change commitment's, or a save restoring. NO for an unknown kind or a
+ * cell outside the map. */
+- (BOOL) setTerrain:(const char *) kind
+                atX:(int32_t) x
+                  y:(int32_t) y
+              level:(int32_t) level;
+- (int32_t) tilesWide;
+- (int32_t) tilesHigh;
+- (int32_t) levels;
 
 /* --- checkout --------------------------------------------------------------- */
 

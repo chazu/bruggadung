@@ -55,7 +55,8 @@ typedef enum
    BGProposeMerge,
    BGProposeAddEdge,
    BGProposeRemoveEdge,
-   BGProposeEvent
+   BGProposeEvent,
+   BGProposeSetTerrain          /* a cell's terrain kind (TERRAIN.md): name is the kind, location the cell */
 } BGProposalKind;
 
 typedef struct
@@ -136,6 +137,9 @@ extern const char   *BGPhaseNames[ BGPhaseCount];
       toText:(const char *) text;
 - (void) move:(BGRef) target
            to:(BGLocation) location;
+/* A cell's terrain: the kind by name, the cell a tile */
+- (void) setTerrain:(const char *) kind
+                 at:(BGLocation) tile;
 /* A move that holds only if the target is still where it was: taking it
  * from there (ACTIONS.md Scenario 2, two hands, one seal). */
 - (void) move:(BGRef) target

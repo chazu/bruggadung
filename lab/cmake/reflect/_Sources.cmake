@@ -18,6 +18,7 @@ src/agency/BGAgency.m
 src/commit/BGCommitter.m
 src/commit/BGProposalGroup.m
 src/core/BGStore.m
+src/core/BGTerrain.m
 src/core/BGWorld.m
 src/domains/BGAtmosphere.m
 src/domains/BGBodies.m

@@ -20,6 +20,7 @@
 #import "BGCommitter.h"
 #import "BGProposalGroup.h"
 #import "BGStore.h"
+#import "BGTerrain.h"
 #import "BGTypes.h"
 #import "BGWorld.h"
 #import "BGAtmosphere.h"

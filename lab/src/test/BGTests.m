@@ -4426,6 +4426,130 @@ static void   test_diligence( void)
 }
 
 
+/* TERRAIN.md step 1: what each tile is. */
+static NSString   *terrain_kind( BGWorld *w, int32_t x, int32_t y, int32_t z)
+{
+   const BGTerrainInfo   *info;
+
+   info = BGTerrainKindInfo( [w terrain], BGTerrainAt( [w terrain], x, y, z));
+   return( info ? [NSString stringWithUTF8String:(char *) info->name] : @"-");
+}
+
+
+static BGLocation   walk_once( BGStage st, BGEntityID who, const char *op)
+{
+   NSString   *error;
+
+   error = nil;
+   BGPerform( st.w, st.c, BGActionMake( op, who, BGNoEntity, BGNoEntity), 0, &error);
+   [st.s runUntil:BGTimeMake( [st.w time].ms + 2000)];
+   return( [st.w locationOf:who]);
+}
+
+
+static void   test_terrain( void)
+{
+   BGStage            st;
+   BGProposalGroup    *g;
+   BGEntityID         worker;
+   BGLocation         at;
+   NSString           *error;
+   NSString           *text;
+   const BGTerrain    *t;
+   uint64_t           hash;
+   int                i;
+
+   /* a world with no map: open floor, 32 x 32, one level; nothing past it */
+   st.w = BGTestWorld( 7);
+   t    = [st.w terrain];
+   BG_CHECK( t && BGTerrainKindCount( t) == 5 && [terrain_kind( st.w, 0, 0, 0) isEqualToString:@"open_floor"]);
+   BG_CHECK( [st.w tilesWide] == 32 && [st.w tilesHigh] == 32 && [st.w levels] == 1);
+   BG_CHECK( BGTerrainAt( t, 32, 0, 0) == 0 && BGTerrainSolid( t, -1, 0, 0) && ! BGTerrainSolid( t, 5, 5, 0));
+   BG_CHECK( BGTerrainChanged( t, NULL, 0) == 0);
+   BG_CHECK( ! [st.w setTerrainMap:"no_such_map" error:&error] && [error rangeOfString:@"no map named"].location != NSNotFound);
+
+   /* the shed, drawn: its extent the drawing's; the legend's kinds; past
+    * a short row, the fill */
+   st.w = BGTestWorld( 7);
+   error = nil;
+   BG_CHECK( [st.w setTerrainMap:"shed_map" error:&error]);
+   t = [st.w terrain];
+   BG_CHECK( [st.w tilesWide] == 16 && [st.w tilesHigh] == 7 && [st.w levels] == 1);
+   BG_CHECK( [terrain_kind( st.w, 0, 0, 0) isEqualToString:@"stone_wall"] &&
+             [terrain_kind( st.w, 1, 1, 0) isEqualToString:@"plank_floor"] &&
+             [terrain_kind( st.w, 11, 3, 0) isEqualToString:@"doorway"] &&
+             [terrain_kind( st.w, 13, 3, 0) isEqualToString:@"open_floor"] &&
+             [terrain_kind( st.w, 14, 0, 0) isEqualToString:@"open_floor"]);
+   BG_CHECK( BGTerrainSolid( t, 0, 0, 0) && BGTerrainOpaque( t, 0, 0, 0) && BGTerrainFloored( t, 1, 1, 0));
+   BG_CHECK( ! strcmp( BGTerrainKindInfo( t, BGTerrainAt( t, 0, 0, 0))->look, "wall.stone"));
+
+   /* walls stop a walker; the doorway lets it out */
+   st.c = BGTestCommitter( st.w);
+   st.s = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [st.s setActivities:[BGActivities activitiesWithWorld:st.w committer:st.c]];
+   g      = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: a worker in the shed"];
+   worker = [g create:"worker" key:"worker" at:BGOnTile( 1, 3, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   worker = [g idFor:worker];
+   at = walk_once( st, worker, "walk_west");
+   BG_CHECK( at.x == 1 && at.y == 3);
+   for( i = 0; i < 12; i++)
+      at = walk_once( st, worker, "walk_east");
+   BG_CHECK( at.x == 13 && at.y == 3);
+   /* nothing is put into a wall, either */
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: a bucket in the wall"];
+   [g create:"bucket" key:"bucket" at:BGOnTile( 0, 3, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( [st.w time].ms + 1)];
+   BG_CHECK( ! [g applied] && [[g rejection] rangeOfString:@"is stone_wall, solid"].location != NSNotFound);
+
+   /* terrain changes by commitment: the doorway walled up, an event; a
+    * group rejected leaves terrain as it was */
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the doorway walled up"];
+   [g setTerrain:"stone_wall" at:BGOnTile( 11, 3, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( [st.w time].ms + 1)];
+   BG_CHECK( [g applied] && [terrain_kind( st.w, 11, 3, 0) isEqualToString:@"stone_wall"]);
+   BG_CHECK( ! strcmp( [st.w eventAt:[st.w eventCount] - 1]->kind, "terrain") &&
+             ! strcmp( [st.w eventAt:[st.w eventCount] - 1]->detail, "stone_wall"));
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: opened, and a kind that isn't"];
+   [g setTerrain:"doorway" at:BGOnTile( 11, 3, 0)];
+   [g setTerrain:"marble" at:BGOnTile( 10, 3, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( [st.w time].ms + 1)];
+   BG_CHECK( ! [g applied] && [[g rejection] rangeOfString:@"no terrain kind named marble"].location != NSNotFound);
+   BG_CHECK( [terrain_kind( st.w, 11, 3, 0) isEqualToString:@"stone_wall"]);
+   at = walk_once( st, worker, "walk_west");
+   at = walk_once( st, worker, "walk_west");
+   BG_CHECK( at.x == 12);
+
+   /* saved: the map, and only the chunk that changed; restored, the same */
+   hash = [st.w stateHash];
+   text = BGSave( st.w, st.c, [NSArray array]);
+   BG_CHECK( [text rangeOfString:@"terrain shed_map\n"].location != NSNotFound);
+   BG_CHECK( [[text componentsSeparatedByString:@"terrain-chunk "] count] == 2 &&
+             [text rangeOfString:@"terrain-chunk 0 0 0 "].location != NSNotFound);
+   error = nil;
+   st.w = restore( text, [st.w contentBuild], &st.c, &error);
+   BG_CHECK( st.w && [st.w stateHash] == hash && [terrain_kind( st.w, 11, 3, 0) isEqualToString:@"stone_wall"] &&
+             [st.w tilesWide] == 16);
+   /* set back as the map has it, the chunk is no longer a change */
+   st.s = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the doorway again"];
+   [g setTerrain:"doorway" at:BGOnTile( 11, 3, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( [st.w time].ms + 1)];
+   BG_CHECK( [g applied] && BGTerrainChanged( [st.w terrain], NULL, 0) == 0);
+
+   /* a map is drawn only before a tile holds a stock */
+   st.w = BGTestWorld( 7);
+   [st.w setWater:100 atX:2 y:2 level:0];
+   BG_CHECK( ! [st.w setTerrainMap:"shed_map" error:&error] &&
+             [error rangeOfString:@"before any tile holds a stock"].location != NSNotFound);
+}
+
+
 /* DOMAIN_SIMULATION.md Scenario 2's drain: the pump `key` under its header
  * tank (100 L), opened, and its piston taken out: through a leaky outlet
  * valve the tank drains onto the floor; an hour on, how much left the tank,
@@ -10491,6 +10615,7 @@ const BGTestCase   BGAllTests[] =
    { "part_condition",                test_part_condition },
    { "servicing",                     test_servicing },
    { "diligence",                     test_diligence },
+   { "terrain",                       test_terrain },
    { "pump_heat",                     test_pump_heat },
    { "pump_heat_running",             test_pump_heat_running },
    { "component_pump",                test_component_pump },

@@ -24,7 +24,8 @@ typedef enum
    BGJournalEdgeAdd,
    BGJournalEdgeRemove,
    BGJournalNextID,
-   BGJournalEvents
+   BGJournalEvents,
+   BGJournalTerrain
 } BGJournalOp;
 
 typedef struct
@@ -36,7 +37,8 @@ typedef struct
    BOOL          had;
    void          *old;
    BGEdge        edge;
-   uint64_t      value;
+   uint64_t      value;         /* terrain: the kind it was */
+   BGLocation    tile;          /* terrain: the cell */
 } BGJournalEntry;
 
 /* kind codes for the stores that aren't component kinds */
@@ -124,6 +126,11 @@ void   BGLocationFormat( BGLocation loc, char *buf, size_t len)
    _levels     = 1;
    _tileWater  = calloc( (size_t) (_tilesWide * _tilesHigh * _levels), sizeof( int64_t));
    _tileOut    = calloc( (size_t) (_tilesWide * _tilesHigh * _levels), 1);
+   {
+      char   why[ 256];
+
+      _terrain = BGTerrainNew( [content content], _tilesWide, _tilesHigh, _levels, NULL, why, sizeof( why));
+   }
    return( self);
 }
 
@@ -148,6 +155,7 @@ void   BGLocationFormat( BGLocation loc, char *buf, size_t len)
    free( _journal);
    free( _tileWater);
    free( _tileOut);
+   BGTerrainFree( _terrain);
    free( _checkedOut);
    tri_arena_free( _arena);
    [_content release];
@@ -339,6 +347,10 @@ static void   edge_remove_raw( BGWorld *self, BGEdge e);
 
       case BGJournalEvents:
          _nevents = (NSUInteger) j->value;
+         break;
+
+      case BGJournalTerrain:
+         BGTerrainSet( _terrain, j->tile.x, j->tile.y, j->tile.level, (BGTerrainKind) j->value);
          break;
       }
    }
@@ -1106,6 +1118,77 @@ static void   edge_remove_raw( BGWorld *self, BGEdge e)
 
 /* --- tiles ----------------------------------------------------------------- */
 
+/* --- terrain --------------------------------------------------------------- */
+
+- (const BGTerrain *) terrain
+{
+   return( _terrain);
+}
+
+
+- (int32_t) tilesWide  { return( _tilesWide); }
+- (int32_t) tilesHigh  { return( _tilesHigh); }
+- (int32_t) levels     { return( _levels); }
+
+
+- (BOOL) setTerrainMap:(const char *) map
+                 error:(NSString **) error
+{
+   BGTerrain    *t;
+   NSUInteger   i;
+   NSUInteger   n;
+   char         why[ 256];
+
+   n = (NSUInteger) (_tilesWide * _tilesHigh * _levels);
+   for( i = 0; i < n; i++)
+      if( _tileWater[ i] || _tileOut[ i])
+      {
+         if( error)
+            *error = @"a map is drawn before any tile holds a stock";
+         return( NO);
+      }
+   if( ! (t = BGTerrainFromMap( [_content content], map, why, sizeof( why))))
+   {
+      if( error)
+         *error = [NSString stringWithUTF8String:why];
+      return( NO);
+   }
+   BGTerrainFree( _terrain);
+   _terrain   = t;
+   _tilesWide = BGTerrainWide( t);
+   _tilesHigh = BGTerrainHigh( t);
+   _levels    = BGTerrainLevels( t);
+   free( _tileWater);
+   free( _tileOut);
+   _tileWater = calloc( (size_t) _tilesWide * (size_t) _tilesHigh * (size_t) _levels, sizeof( int64_t));
+   _tileOut   = calloc( (size_t) _tilesWide * (size_t) _tilesHigh * (size_t) _levels, 1);
+   return( YES);
+}
+
+
+- (BOOL) setTerrain:(const char *) kind
+                atX:(int32_t) x
+                  y:(int32_t) y
+              level:(int32_t) level
+{
+   BGJournalEntry   *j;
+   BGTerrainKind    k;
+   BGTerrainKind    was;
+
+   if( ! _terrain || ! (k = BGTerrainKindNamed( _terrain, kind)) || ! [self isTileX:x y:y level:level])
+      return( NO);
+   was = BGTerrainSet( _terrain, x, y, level, k);
+   if( _open && was != k)
+   {
+      j        = journal_push( self);
+      j->op    = BGJournalTerrain;
+      j->value = was;
+      j->tile  = BGOnTile( x, y, level);
+   }
+   return( YES);
+}
+
+
 - (BOOL) isTileX:(int32_t) x
                y:(int32_t) y
            level:(int32_t) level
@@ -1406,6 +1489,8 @@ static uint64_t   hash_record( uint64_t h, const BGComponentInfo *info, const vo
    for( i = 0; i < (NSUInteger) (_tilesWide * _tilesHigh * _levels); i++)
       if( _tileWater[ i])
          h = BGMix( h ^ (uint64_t) i ^ ((uint64_t) _tileWater[ i] << 20));
+   if( _terrain)
+      h = BGMix( h ^ BGTerrainHash( _terrain));
    for( i = 0; i < _nevents; i++)
    {
       ev = &_events[ i];
