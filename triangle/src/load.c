@@ -1,5 +1,6 @@
 #include "internal.h"
 
+#include <ctype.h>
 #include <time.h>
 
 /* Loading: building feature structures from the syntax tree, type expansions,
@@ -463,6 +464,12 @@ static TriNode *build_raw(Build *b, X *x)
         VEC_PUSH(b->ariths, r);
         return node_new(c, c->scratch, c->top);
     }
+    case X_COMP: case X_VAR:                 /* expanded when content loads */
+        build_error(b, x->loc, "%s", "a comprehension or its variable outside one, not expanded");
+        return NULL;
+    case X_CMP: case X_LOGIC: case X_NOT:
+        build_error(b, x->loc, "%s", "a comparison (==, !=, <, &&, ...) belongs only in an if");
+        return NULL;
     case X_LET:                              /* the parser replaces every use */
         build_error(b, x->loc, "%s", "a let's use was not resolved");
         return NULL;
@@ -2762,6 +2769,11 @@ const TriNode *tri_value(TriContent *c, const char *expr, TriArena *out, char *e
     size_t ndiag = c->diags.n;
     int nerr = c->nerrors;
     X *x = parse_expr_string(c, intern(c, "<value>"), expr);
+    if (x && c->parsed_comp) {
+        bool ok;
+        x = expand_value(c, x, &ok);
+        if (!ok) x = NULL;
+    }
     const TriNode *r = NULL;
     if (x) {
         TriMark m = tri_arena_mark(c->scratch);
@@ -3419,7 +3431,22 @@ static void resolve_names(Content *c, X *x, Sym pkg, const U64Map *declared)
         break;
     }
     case X_STRUCT:
-        for (int i = 0; i < x->u.st.n; i++) resolve_names(c, x->u.st.fields[i].value, pkg, declared);
+        for (int i = 0; i < x->u.st.n; i++) {
+            resolve_names(c, x->u.st.fields[i].value, pkg, declared);
+            resolve_names(c, x->u.st.fields[i].dlabel, pkg, declared);
+            resolve_names(c, x->u.st.fields[i].comp, pkg, declared);
+        }
+        break;
+    case X_COMP:
+        for (int i = 0; i < x->u.comp.n; i++) resolve_names(c, x->u.comp.clauses[i].expr, pkg, declared);
+        resolve_names(c, x->u.comp.body, pkg, declared);
+        break;
+    case X_CMP: case X_LOGIC:
+        resolve_names(c, x->u.ar.a, pkg, declared);
+        resolve_names(c, x->u.ar.b, pkg, declared);
+        break;
+    case X_NOT:
+        resolve_names(c, x->u.sub, pkg, declared);
         break;
     case X_LIST:
         for (int i = 0; i < x->u.list.n; i++) resolve_names(c, x->u.list.items[i], pkg, declared);
@@ -3461,7 +3488,8 @@ static bool check_lets(Content *c)
                  (q && u64map_get(&c->instidx, (uint64_t) (uintptr_t) q, NULL)))
             what = "an instance";
         if (what) {
-            diag(c, true, l->loc, "let %s: %s has this name, and a let may not hide it", l->name, what);
+            diag(c, true, l->loc, "%s %s: %s has this name, and %s may not hide it", l->var ? "for" : "let", l->name, what,
+                 l->var ? "a for's variable" : "a let");
             ok = false;
         }
     }
@@ -3487,12 +3515,513 @@ static void resolve_packages(Content *c)
 }
 
 
+/* --- comprehensions (REFERENCE.md, Comprehensions) ------------------------------- */
+
+/* A comprehension is expanded when content loads, into what it stands for:
+ * a list's items, or a struct's fields. Its sources and conditions must be
+ * known by then: data written in the content (a list, a struct, a let's
+ * value, a field of this or another declaration), or an enum's atoms. The
+ * rest of the engine never sees one. */
+
+typedef struct Env { const CompVar *var; X *value; const struct Env *up; } Env;
+typedef struct { Content *c; X *root; bool ok; size_t made; } Exp;
+typedef VEC(XField) FieldVec;
+
+enum { EXPAND_MAX = 100000 };      /* items and fields a declaration's comprehensions may make */
+
+static void exp_error(Exp *e, Loc loc, const char *msg)
+{
+    if (e->ok) diag(e->c, true, loc, "%s", msg);
+    e->ok = false;
+}
+
+static void build_declidx(Content *c)
+{
+    if (c->declidx_built) return;
+    for (size_t i = 0; i < c->decls.n; i++)
+        if (!u64map_get(&c->declidx, (uint64_t) (uintptr_t) c->decls.v[i].label, NULL))
+            u64map_put(&c->declidx, (uint64_t) (uintptr_t) c->decls.v[i].label, i + 1);
+    c->declidx_built = true;
+}
+
+/* A field written in a literal: through conjunctions, not the structs that
+ * place references. */
+static X *data_field(X *x, Sym label)
+{
+    if (!x) return NULL;
+    if (x->k == X_AND) {
+        X *a = data_field(x->u.bin.a, label);
+        return a ? a : data_field(x->u.bin.b, label);
+    }
+    if (x->k != X_STRUCT || x->u.st.refs) return NULL;
+    for (int i = 0; i < x->u.st.n; i++)
+        if (x->u.st.fields[i].label == label) return x->u.st.fields[i].value;
+    return NULL;
+}
+
+static X *data_item(X *x, long k)
+{
+    if (!x) return NULL;
+    if (x->k == X_AND) {
+        X *a = data_item(x->u.bin.a, k);
+        return a ? a : data_item(x->u.bin.b, k);
+    }
+    return x->k == X_LIST && k >= 0 && k < x->u.list.n ? x->u.list.items[k] : NULL;
+}
+
+static X *data_of(Exp *e, X *x, int depth);
+
+/* The literal at a path, ".a[0].b" (or "a[0].b"), in x. */
+static X *data_at(Exp *e, X *x, const char *path, int depth)
+{
+    const char *s = path;
+    while (x && *s) {
+        x = data_of(e, x, depth + 1);
+        if (*s == '.') s++;
+        if (*s == '[') {
+            long k = strtol(s + 1, NULL, 10);
+            while (*s && *s != ']') s++;
+            if (*s) s++;
+            x = data_item(x, k);
+        } else {
+            size_t n = strcspn(s, ".[");
+            char *seg = malloc(n + 1);
+            memcpy(seg, s, n);
+            seg[n] = 0;
+            x = data_field(x, intern(e->c, seg));
+            free(seg);
+            s += n;
+        }
+    }
+    return x;
+}
+
+/* The atoms an enum lists, as written, as a list; NULL if t isn't an enum. */
+static X *enum_list(Exp *e, const Decl *d, Loc loc)
+{
+    if (d->kind != L_DEF && d->kind != L_ATOM) return NULL;
+    XPtrVec ds = { 0 };
+    x_flatten(d->value, X_OR, &ds);
+    bool atoms = ds.n > 1;
+    for (size_t i = 0; i < ds.n && atoms; i++) {
+        X *a = ds.v[i]->k == X_DEFAULT ? ds.v[i]->u.sub : ds.v[i];
+        if (a->k != X_ATOM) atoms = false;
+        ds.v[i] = a;
+    }
+    X *l = NULL;
+    if (atoms) {
+        l = x_new(e->c, X_LIST, loc);
+        l->u.list.n = (int) ds.n;
+        l->u.list.items = arena_alloc(e->c->load, ds.n * sizeof(X *));
+        memcpy(l->u.list.items, ds.v, ds.n * sizeof(X *));
+    }
+    VEC_FREE(ds);
+    return l;
+}
+
+static bool expand_decl(Content *c, Decl *d, Loc from);
+
+/* A tag or reference anywhere in x, or NULL. */
+static const char *x_tag_in(const X *x)
+{
+    if (!x) return NULL;
+    const char *t = NULL;
+    switch (x->k) {
+    case X_TAG: return x->u.name;
+    case X_STRUCT:
+        for (int i = 0; i < x->u.st.n && !t; i++) t = x_tag_in(x->u.st.fields[i].value);
+        return t;
+    case X_LIST:
+        for (int i = 0; i < x->u.list.n && !t; i++) t = x_tag_in(x->u.list.items[i]);
+        return t ? t : x->u.list.elem ? x_tag_in(x->u.list.elem) : x_tag_in(x->u.list.tail);
+    case X_AND: case X_OR: return (t = x_tag_in(x->u.bin.a)) ? t : x_tag_in(x->u.bin.b);
+    case X_ARITH: return (t = x_tag_in(x->u.ar.a)) ? t : x_tag_in(x->u.ar.b);
+    case X_DEFAULT: return x_tag_in(x->u.sub);
+    case X_INTERP:
+        for (int i = 0; i < x->u.in.n && !t; i++) t = x_tag_in(x->u.in.parts[i]);
+        return t;
+    default: return NULL;
+    }
+}
+
+/* What x stands for as data: a reference's or a name's literal, an enum's
+ * atoms; else x itself. */
+static X *data_of(Exp *e, X *x, int depth)
+{
+    if (!x || depth > 64) return x;
+    if (x->k == X_TAG && x->u.name[0] == '.') {
+        X *v = data_at(e, e->root, x->u.name, depth + 1);
+        if (!v) {
+            char msg[300];
+            snprintf(msg, sizeof msg, "%s is not written in this declaration, so a comprehension can't read it", x->u.name);
+            exp_error(e, x->loc, msg);
+            return x;
+        }
+        return data_of(e, v, depth + 1);
+    }
+    if (x->k == X_NAME) {
+        build_declidx(e->c);
+        const char *s = x->u.name;
+        size_t n = strlen(s);
+        for (size_t end = n; end > 0; end--) {
+            if (end < n && s[end] != '.' && s[end] != '[') continue;
+            if (end < n && s[end] == '.' && s[end + 1] == '#') continue;
+            char *pre = malloc(end + 1);
+            memcpy(pre, s, end);
+            pre[end] = 0;
+            uint64_t di;
+            bool found = u64map_get(&e->c->declidx, (uint64_t) (uintptr_t) intern(e->c, pre), &di);
+            free(pre);
+            if (!found) continue;
+            Decl *d = &e->c->decls.v[di - 1];
+            if (d->comp && d->expstate != 2 && !expand_decl(e->c, d, x->loc)) { e->ok = false; return x; }
+            if (end == n) {
+                X *l = enum_list(e, d, x->loc);
+                if (l || d->kind != L_INST) return l ? l : x;
+            }
+            X *root = e->root;                       /* its references are its own */
+            e->root = d->value;
+            X *v = end == n ? data_of(e, d->value, depth + 1) : data_at(e, d->value, s + end, depth + 1);
+            if (v && end < n) v = data_of(e, v, depth + 1);
+            e->root = root;
+            const char *tag = v ? x_tag_in(v) : NULL;
+            if (tag) {
+                char msg[400];
+                snprintf(msg, sizeof msg, "%s holds %s, which belongs to %s: a comprehension reads values as written, "
+                         "so another declaration's must be plain values", x->u.name, tag, d->label);
+                exp_error(e, x->loc, msg);
+                return x;
+            }
+            return v ? v : x;
+        }
+    }
+    return x;
+}
+
+static X *atom_of(Exp *e, const char *s, size_t n, Loc loc)
+{
+    X *a = x_new(e->c, X_ATOM, loc);
+    a->u.name = string_canonical(e->c, s, n);
+    return a;
+}
+
+/* The keys and values a source gives: a list's indexes and items, a struct's
+ * labels and values. */
+static X *expand(Exp *e, X *x, const Env *env);
+
+static bool comp_items(Exp *e, X *src, Loc loc, XPtrVec *keys, XPtrVec *vals)
+{
+    /* expanded: another declaration's data may have comprehensions of its own */
+    X *x = expand(e, data_of(e, src, 0), NULL);
+    if (!e->ok) return false;
+    XPtrVec cj = { 0 };
+    x_flatten(x, X_AND, &cj);
+    X *list = NULL;
+    bool structs = false;
+    for (size_t i = 0; i < cj.n; i++) {
+        X *k = data_of(e, cj.v[i], 0);
+        if (k->k == X_LIST) list = k;
+        else if (k->k == X_STRUCT && !k->u.st.refs) structs = true;
+    }
+    if (list) {
+        if (list->u.list.open || list->u.list.tail || list->u.list.elem) {
+            exp_error(e, loc, "a comprehension can't go through an open list: its items aren't all written");
+            VEC_FREE(cj);
+            return false;
+        }
+        for (int i = 0; i < list->u.list.n; i++) {
+            X *k = x_new(e->c, X_NUM, loc);
+            k->u.num.dim = DIM_INT;
+            k->u.num.q = i;
+            VEC_PUSH(*keys, k);
+            VEC_PUSH(*vals, list->u.list.items[i]);
+        }
+    } else if (structs) {
+        for (size_t i = 0; i < cj.n; i++) {
+            X *k = data_of(e, cj.v[i], 0);
+            if (k->k != X_STRUCT || k->u.st.refs) continue;
+            for (int f = 0; f < k->u.st.n; f++) {
+                XField *fl = &k->u.st.fields[f];
+                if (!fl->label) continue;
+                VEC_PUSH(*keys, atom_of(e, fl->label, strlen(fl->label), loc));
+                VEC_PUSH(*vals, fl->value);
+            }
+        }
+    } else {
+        char *t = x_text(src);
+        char msg[300];
+        snprintf(msg, sizeof msg, "a comprehension goes through a list, a struct, or an enum, written in the content: not %s", t);
+        free(t);
+        exp_error(e, loc, msg);
+    }
+    VEC_FREE(cj);
+    return e->ok;
+}
+
+static bool concrete_number(X *x, int *dim, int64_t *q)
+{
+    int64_t lo, hi;
+    if (!x_interval(x, dim, &lo, &hi) || lo != hi) return false;
+    *q = lo;
+    return true;
+}
+
+/* An if's condition: 1 or 0; -1 after an error. */
+static int cond_eval(Exp *e, X *x)
+{
+    if (!e->ok) return -1;
+    switch (x->k) {
+    case X_LOGIC: {
+        int a = cond_eval(e, x->u.ar.a);
+        if (a < 0) return -1;
+        if (x->u.ar.op == '&' ? !a : a) return a;
+        return cond_eval(e, x->u.ar.b);
+    }
+    case X_NOT: {
+        int a = cond_eval(e, x->u.sub);
+        return a < 0 ? -1 : !a;
+    }
+    case X_CMP: {
+        X *a = data_of(e, x->u.ar.a, 0), *b = data_of(e, x->u.ar.b, 0);
+        int op = x->u.ar.op;
+        int da, db;
+        int64_t qa, qb;
+        if (concrete_number(a, &da, &qa) && concrete_number(b, &db, &qb)) {
+            if (da != db) {
+                exp_error(e, x->loc, "an if compares numbers of different kinds");
+                return -1;
+            }
+            switch (op) {
+            case 'e': return qa == qb;
+            case 'n': return qa != qb;
+            case '<': return qa < qb;
+            case 'l': return qa <= qb;
+            case '>': return qa > qb;
+            default:  return qa >= qb;
+            }
+        }
+        if (a->k == X_ATOM && b->k == X_ATOM && (op == 'e' || op == 'n')) return (a->u.name == b->u.name) == (op == 'e');
+        char *ta = x_text(a), *tb = x_text(b);
+        char msg[400];
+        snprintf(msg, sizeof msg, "an if compares values known when content loads: numbers, or strings with == and != (not %s and %s)",
+                 ta, tb);
+        free(ta);
+        free(tb);
+        exp_error(e, x->loc, msg);
+        return -1;
+    }
+    default: {
+        X *v = data_of(e, x, 0);
+        if (v->k == X_ATOM && !strcmp(v->u.name, "true")) return 1;
+        if (v->k == X_ATOM && !strcmp(v->u.name, "false")) return 0;
+        char *t = x_text(v);
+        char msg[300];
+        snprintf(msg, sizeof msg, "an if's condition is true or false, known when content loads: not %s", t);
+        free(t);
+        exp_error(e, x->loc, msg);
+        return -1;
+    }
+    }
+}
+
+/* A computed label: a name, from a string or a string's interpolation. */
+static Sym label_of(Exp *e, X *x, Loc loc)
+{
+    Buf b = { 0 };
+    X *v = x->k == X_INTERP ? x : data_of(e, x, 0);
+    const char *err = NULL;
+    if (v->k == X_INTERP) err = interp_eval(e->c, v, NULL, &b);
+    else if (v->k == X_ATOM && v->u.name[0] == '"') string_decode(v->u.name, &b);
+    else {
+        char *t = x_text(v);
+        snprintf(e->c->failwhy, sizeof e->c->failwhy, "a computed label is a string: not %s", t);
+        free(t);
+        err = e->c->failwhy;
+    }
+    if (err == ARITH_UNKNOWN) err = "a computed label must be known when content loads";
+    bool name = !err && b.len && (isalpha((unsigned char) b.s[0]) || b.s[0] == '_');
+    for (size_t i = 0; name && i < b.len; i++) name = isalnum((unsigned char) b.s[i]) || b.s[i] == '_';
+    Sym r = NULL;
+    if (err) exp_error(e, loc, err);
+    else if (!name) {
+        char msg[300];
+        snprintf(msg, sizeof msg, "a computed label must be a field's name: not \"%.*s\"", (int) b.len, b.s ? b.s : "");
+        exp_error(e, loc, msg);
+    } else r = intern(e->c, b.s);
+    buf_free(&b);
+    return r;
+}
+
+static void comp_run(Exp *e, X *comp, int i, const Env *env, XPtrVec *items, FieldVec *fields)
+{
+    if (!e->ok) return;
+    if (i == comp->u.comp.n) {
+        if (++e->made > EXPAND_MAX) {
+            char msg[128];
+            snprintf(msg, sizeof msg, "comprehensions here make more than %d items or fields", EXPAND_MAX);
+            exp_error(e, comp->loc, msg);
+            return;
+        }
+        X *b = expand(e, comp->u.comp.body, env);
+        if (!e->ok) return;
+        if (comp->u.comp.list) { VEC_PUSH(*items, b); return; }
+        if (b->u.st.nattrs) { exp_error(e, b->loc, "a comprehension's fields can't carry a struct's attributes"); return; }
+        for (int f = 0; f < b->u.st.n; f++) VEC_PUSH(*fields, b->u.st.fields[f]);
+        return;
+    }
+    CompClause *cl = &comp->u.comp.clauses[i];
+    if (cl->kind == C_IF) {
+        int v = cond_eval(e, expand(e, cl->expr, env));
+        if (v > 0) comp_run(e, comp, i + 1, env, items, fields);
+        return;
+    }
+    XPtrVec keys = { 0 }, vals = { 0 };
+    if (comp_items(e, expand(e, cl->expr, env), cl->loc, &keys, &vals))
+        for (size_t k = 0; k < vals.n && e->ok; k++) {
+            Env ke = { cl->key, keys.v[k], env };
+            Env ve = { cl->val, vals.v[k], cl->key ? &ke : env };
+            comp_run(e, comp, i + 1, &ve, items, fields);
+        }
+    VEC_FREE(keys);
+    VEC_FREE(vals);
+}
+
+static X *x_copy(Exp *e, X *x)
+{
+    X *n = x_new(e->c, x->k, x->loc);
+    *n = *x;
+    return n;
+}
+
+/* x with its comprehensions expanded, its computed labels made names, and
+ * the variables in env replaced by their values. x itself is left alone:
+ * its parts may be shared (a let's value, one comprehension's body). */
+static X *expand(Exp *e, X *x, const Env *env)
+{
+    if (!x || !e->ok) return x;
+    switch (x->k) {
+    case X_VAR: {
+        const Env *b = env;
+        while (b && b->var != x->u.var.var) b = b->up;
+        if (!b) { exp_error(e, x->loc, "a comprehension's variable outside its comprehension"); return x; }
+        if (!x->u.var.path) return b->value;
+        X *v = data_at(e, b->value, x->u.var.path, 0);
+        if (!v) {
+            char msg[300];
+            snprintf(msg, sizeof msg, "%s%s: its value has no such field or item", x->u.var.var->name, x->u.var.path);
+            exp_error(e, x->loc, msg);
+            return x;
+        }
+        return v;
+    }
+    case X_STRUCT: {
+        FieldVec out = { 0 };
+        for (int i = 0; i < x->u.st.n && e->ok; i++) {
+            XField *f = &x->u.st.fields[i];
+            if (f->comp) { comp_run(e, f->comp, 0, env, NULL, &out); continue; }
+            XField g = *f;
+            if (f->dlabel) {
+                g.label = label_of(e, expand(e, f->dlabel, env), f->loc);
+                g.dlabel = NULL;
+            }
+            g.value = expand(e, f->value, env);
+            VEC_PUSH(out, g);
+        }
+        X *n = x_copy(e, x);
+        n->u.st.n = (int) out.n;
+        n->u.st.fields = arena_alloc(e->c->load, (out.n ? out.n : 1) * sizeof(XField));
+        if (out.n) memcpy(n->u.st.fields, out.v, out.n * sizeof(XField));
+        VEC_FREE(out);
+        return n;
+    }
+    case X_LIST: {
+        XPtrVec out = { 0 };
+        for (int i = 0; i < x->u.list.n && e->ok; i++) {
+            X *it = x->u.list.items[i];
+            if (it->k == X_COMP) comp_run(e, it, 0, env, &out, NULL);
+            else VEC_PUSH(out, expand(e, it, env));
+        }
+        X *n = x_copy(e, x);
+        n->u.list.n = (int) out.n;
+        n->u.list.items = arena_alloc(e->c->load, (out.n ? out.n : 1) * sizeof(X *));
+        if (out.n) memcpy(n->u.list.items, out.v, out.n * sizeof(X *));
+        n->u.list.tail = expand(e, x->u.list.tail, env);
+        n->u.list.elem = expand(e, x->u.list.elem, env);
+        VEC_FREE(out);
+        return n;
+    }
+    case X_AND: case X_OR: {
+        X *n = x_copy(e, x);
+        n->u.bin.a = expand(e, x->u.bin.a, env);
+        n->u.bin.b = expand(e, x->u.bin.b, env);
+        return n;
+    }
+    case X_ARITH: case X_CMP: case X_LOGIC: {
+        X *n = x_copy(e, x);
+        n->u.ar.a = expand(e, x->u.ar.a, env);
+        n->u.ar.b = expand(e, x->u.ar.b, env);
+        return n;
+    }
+    case X_DEFAULT: case X_NOT: {
+        X *n = x_copy(e, x);
+        n->u.sub = expand(e, x->u.sub, env);
+        return n;
+    }
+    case X_INTERP: {
+        X *n = x_copy(e, x);
+        n->u.in.parts = arena_alloc(e->c->load, (size_t) (x->u.in.n ? x->u.in.n : 1) * sizeof(X *));
+        for (int i = 0; i < x->u.in.n; i++) n->u.in.parts[i] = expand(e, x->u.in.parts[i], env);
+        return n;
+    }
+    case X_COMP:
+        exp_error(e, x->loc, "a comprehension stands in a list, or among a struct's fields");
+        return x;
+    default:
+        return x;
+    }
+}
+
+/* Expands a declaration, once; one a comprehension reads is expanded first. */
+static bool expand_decl(Content *c, Decl *d, Loc from)
+{
+    if (d->expstate == 2) return true;
+    if (d->expstate == 1) {
+        diag(c, true, from, "%s: its comprehensions read %s, whose comprehensions read it back", d->label, d->label);
+        return false;
+    }
+    d->expstate = 1;
+    Exp e = { c, d->value, true, 0 };
+    X *v = expand(&e, d->value, NULL);
+    d->value = v;                            /* the decls vector doesn't move here */
+    d->expstate = 2;
+    return e.ok;
+}
+
+/* Expands the declarations that have comprehensions or computed labels. */
+static bool expand_all(Content *c)
+{
+    bool ok = true;
+    for (size_t i = 0; i < c->decls.n; i++)
+        if (c->decls.v[i].comp) ok &= expand_decl(c, &c->decls.v[i], c->decls.v[i].loc);
+    return ok;
+}
+
+X *expand_value(Content *c, X *x, bool *ok)
+{
+    Exp e = { c, x, true, 0 };
+    X *r = expand(&e, x, NULL);
+    *ok = e.ok;
+    return r;
+}
+
+
 static void finish_load(Content *c, bool ok, double t0)
 {
     double t1 = now_ms();
     c->stats.parse_ms = t1 - t0;
     if (ok && !c->tdl)
         resolve_packages(c);
+    if (ok && !c->tdl) ok = expand_all(c);
     if (ok && types_build(c) && check_lets(c)) {
         double t2 = now_ms();
         c->stats.hierarchy_ms = t2 - t1;
@@ -3632,6 +4161,7 @@ void tri_content_free(TriContent *c)
     VEC_FREE(c->feats);
     VEC_FREE(c->decls);
     VEC_FREE(c->lets);
+    u64map_free(&c->declidx);
     u64map_free(&c->typeidx);
     u64map_free(&c->codeidx);
     u64map_free(&c->meetmemo);

@@ -19,6 +19,7 @@ reference is a bug.
 - [Tags](#tags)
 - [References](#references)
 - [Let](#let)
+- [Comprehensions](#comprehensions)
 - [Arithmetic](#arithmetic)
 - [Interpolation](#interpolation)
 - [Definite clauses](#definite-clauses)
@@ -46,6 +47,7 @@ Source files have the extension `.tri` and are read as bytes.
 | Tag | `$` then letters, digits, `_` | `$s`, `$room` |
 | Attribute | `@` name, then optionally `(` raw text `)` | Parentheses inside must balance. The text is passed to the attribute unparsed. |
 | Punctuation | `: , { } [ ] ( ) & \| * + / - ... >= <= > < =` | `=` only in `let name = …` |
+| Condition operators | `== != && \|\| !` | Only in an `if`'s condition |
 | Comment | `//` to the end of the line | |
 
 **Escapes.** In a string, `\(…)` interpolates ([below](#interpolation)),
@@ -60,8 +62,10 @@ which reads back as the same value: quotes, backslashes and control
 characters escaped (`\n`, `\t`, `\r`, else `\u00XX`), everything else as it
 is. `tri_text` gives a string's contents, decoded.
 
-`let` is a keyword only where it starts `let name =`. Elsewhere it is an
-ordinary name, so a field may still be called `let`.
+`let` is a keyword only where it starts `let name =`; `for` only where it
+starts `for x in` or `for k, v in`; `in` only there; `if` only where a
+condition follows it. Elsewhere they are ordinary names, so a field may still
+be called `let`, `for` or `if`.
 
 Whitespace and newlines separate tokens and are otherwise insignificant.
 Commas between fields and between top-level declarations are optional. Inside
@@ -94,9 +98,16 @@ primary     = "_" | "true" | "false"
             | IDENT | TYPENAME | QUALIFIED | PATH | REF | STRING | NUMBER | TAG
             | struct | list
             | "(" expr ")"
-struct      = "{" { field | let | ATTR | "," } "}"
-field       = IDENT ":" fieldvalue
-list        = "[" [ expr { "," expr } [ "," ] ] [ "..." [ expr ] ] "]"
+struct      = "{" { field | let | comprehension | ATTR | "," } "}"
+field       = ( IDENT | "(" expr ")" | INTERPOLATED ) ":" fieldvalue
+list        = "[" [ item { "," item } [ "," ] ] [ "..." [ expr ] ] "]"
+item        = expr | comprehension
+comprehension = clause { clause } "{" body "}"
+clause      = "for" IDENT [ "," IDENT ] "in" expr
+            | "if" cond
+cond        = cand { "||" cand }
+cand        = cnot { "&&" cnot }
+cnot        = "!" cnot | "(" cond ")" | sum [ ("==" | "!=" | "<" | "<=" | ">" | ">=") sum ]
 ```
 
 A `*` at the start of a term marks a default. After an operand it multiplies.
@@ -447,6 +458,57 @@ let socket = 30mm
 - A let is not a declaration. It makes no instance, and the game can't look
   it up.
 
+## Comprehensions
+
+`for` and `if` make a list's items and a struct's fields from data, as in
+CUE. They are expanded when content loads, so the rest of the engine (and
+the game) only ever sees what they make.
+
+```cue
+let table = [[30, 10], [60, 40], [100, 60]]
+warm: #Curve & { points: [for p in table { input: p[0], output: p[1] }] }
+
+let sizes = [13mm, 17mm, 19mm, 24mm]
+let counted = true
+shelf: #Shelf & {
+    sizes:  [for s in sizes if s >= 17mm { s }]          // [17mm, 19mm, 24mm]
+    labels: [for i, s in sizes { "\(i): \(s)" }]        // ["0: 13mm", ...]
+    stock:  { for m in #Material { (m): 0 }, if counted { note: "counted" } }
+}
+
+#Stock: { for m in #Material { (m): int & >=0 } }      // a field per material
+```
+
+- **In a list**, a comprehension stands for items: the body `{ … }` is one
+  item, a struct, or a single value in braces (`{ s }`, `{ x * 2 }`). **In a
+  struct**, it stands for fields: the body's fields join the struct's.
+- **`for v in src`** goes through a source's values; `for k, v in src` also
+  binds the key: a list's index (from 0), or a struct's label as a string.
+  Clauses chain, left to right: `for i in xs for j in ys if i != j { … }`.
+- **A source is data written in the content, known when content loads:** a
+  list or struct literal, a `let`'s value, a reference to a field of this
+  declaration (`.points`), a path into another declaration
+  (`table.rows`), or an enum, which gives the atoms it lists, in order. A
+  closed list only: an open one's items aren't all written. Data from
+  another declaration must be plain values, without its own references or
+  tags; a declaration whose comprehensions it reads is expanded first.
+- **`if cond`** keeps what follows when the condition holds. A condition
+  compares numbers (`== != < <= > >=`, of one kind), compares strings and
+  atoms (`==`, `!=`), or is `true` or `false`; `&&`, `||`, `!` and
+  parentheses combine them. Everything in it must be known when content
+  loads.
+- **Computed labels:** `(expr): value` or `"\(k)_x": value`, a string that is
+  a field's name. A computed field is like any written one: its feature must
+  belong to the struct's type, and in a type's body it introduces the
+  feature, as `#Stock`'s do.
+- **A variable is a copy of its value,** as a `let` is; its name follows the
+  `let` rule (it may not hide an instance, a built-in type, a `let`, or an
+  enclosing comprehension's variable). A variable's path reads into its
+  value: `p[0]`, `row.size`. References in the body (`.lead`) are this
+  declaration's, and share as usual.
+- Comprehensions make at most 100,000 items or fields per declaration.
+  Comprehensions that make declarations are not supported.
+
 ## Arithmetic
 
 - Operands are numbers, tags, references, and parenthesised arithmetic.
@@ -612,6 +674,23 @@ location of the other declaration where there is one.
 | `let x: the name is already bound, by the let at line:col` | Two lets of one name in a scope, or in nested scopes. |
 | `let x refers to itself` | A cycle among lets. |
 | `'true' can't be a let's name` | A reserved name. |
+
+**Comprehensions**
+
+| Message | Cause |
+| --- | --- |
+| `a comprehension goes through a list, a struct, or an enum, written in the content: not X` | A source that isn't data known at load, such as a type or an open range. |
+| `.x is not written in this declaration, so a comprehension can't read it` | A reference to a field only a type gives. |
+| `a comprehension can't go through an open list: its items aren't all written` | |
+| `x.f holds .r, which belongs to x: a comprehension reads values as written, …` | Data from another declaration that has its own references or tags. |
+| `x: its comprehensions read y, whose comprehensions read it back` | A cycle between declarations' comprehensions. |
+| `an if's condition is true or false, known when content loads: not X` | |
+| `an if compares values known when content loads: …`, `an if compares numbers of different kinds` | |
+| `a comparison (==, !=, &&, \|\|) belongs only in an if` | |
+| `a computed label is a string: not X`, `a computed label must be a field's name: not "…"` | |
+| `x.f: its value has no such field or item` | A variable's path its value doesn't have. |
+| `for x: an instance has this name, and a for's variable may not hide it`, `x: the name is already bound, by the for at line:col` | |
+| `expected 'in' after for's variables`, `expected '{' after a comprehension's clauses` | |
 
 **Interpolation**
 

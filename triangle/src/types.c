@@ -927,8 +927,8 @@ static void make_list_types(Content *c)
         X *body = x_new(c, X_STRUCT, elem->loc);
         body->u.st.n = 2;
         body->u.st.fields = arena_alloc(c->load, 2 * sizeof(XField));
-        body->u.st.fields[0] = (XField) { intern(c, "first"), elem, NULL, 0, elem->loc };
-        body->u.st.fields[1] = (XField) { intern(c, "rest"), x_name(c, ln, elem->loc), NULL, 0, elem->loc };
+        body->u.st.fields[0] = (XField) { intern(c, "first"), elem, NULL, 0, elem->loc, NULL, NULL };
+        body->u.st.fields[1] = (XField) { intern(c, "rest"), x_name(c, ln, elem->loc), NULL, 0, elem->loc, NULL, NULL };
         Decl *sd = arena_alloc(c->load, sizeof(Decl));
         sd->label = c->types.v[ct].name;
         sd->kind = L_DEF;

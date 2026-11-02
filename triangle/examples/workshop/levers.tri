@@ -18,3 +18,9 @@ let socket = 30mm
 #Ratchet: #Lever & { reach: .arm + socket }
 
 ratchet: #Ratchet & { material: "steel", size: 30cm, mass: 1kg, arm: 0.25m, force: 60N }
+
+let ratios = [1, 2, 4]
+
+#Gearbox: #Tool & { teeth: [...int] }
+
+gearbox: #Gearbox & { material: "steel", size: 20cm, mass: 3kg, teeth: [for r in ratios if r > 1 { r * 12 }] }

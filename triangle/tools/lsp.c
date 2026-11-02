@@ -652,6 +652,8 @@ static long find_field(const Labels *ls, const char *path)
 static long find_let(const char *text, const Toks *t, size_t use)
 {
     const Tok *u = &t->v[use];
+    size_t uh = 0;                       /* x.size: the variable is the name's first part */
+    while (u->start + uh < u->end && text[u->start + uh] != '.' && text[u->start + uh] != '[') uh++;
     long best = -1;
     int bestdepth = -1;
     for (size_t i = 0; i + 2 < t->n; i++) {
@@ -659,7 +661,7 @@ static long find_let(const char *text, const Toks *t, size_t use)
         if (!(k->k == K_NAME && k->end - k->start == 3 && !strncmp(text + k->start, "let", 3))) continue;
         const Tok *n = &t->v[i + 1];
         if (n->k != K_NAME || !punct_is(text, &t->v[i + 2], '=')) continue;
-        if (n->end - n->start != u->end - u->start || strncmp(text + n->start, text + u->start, u->end - u->start)) continue;
+        if (uh != u->end - u->start || n->end - n->start != uh || strncmp(text + n->start, text + u->start, uh)) continue;
         /* the let's bracket: back to its opening, forward to its closing */
         size_t open = 0, close = t->n;
         if (k->depth > 0) {
@@ -672,6 +674,25 @@ static long find_let(const char *text, const Toks *t, size_t use)
             close = e;
         }
         if (use > open && use < close && k->depth > bestdepth) { best = (long) i + 1; bestdepth = k->depth; }
+    }
+    /* a comprehension's variables: for k, v in src { body }, from the for to
+     * the end of its body; the innermost wins */
+    for (size_t i = 0; i + 2 < t->n; i++) {
+        const Tok *k = &t->v[i];
+        if (!(k->k == K_NAME && k->end - k->start == 3 && !strncmp(text + k->start, "for", 3))) continue;
+        size_t names[2] = { i + 1, 0 };
+        size_t nn = 1;
+        if (punct_is(text, &t->v[i + 2], ',') && i + 3 < t->n) names[nn++] = i + 3;
+        size_t open = i + 1;
+        while (open < t->n && !(t->v[open].depth == k->depth && punct_is(text, &t->v[open], '{'))) open++;
+        size_t close = open + 1;
+        while (close < t->n && !(t->v[close].depth == k->depth && punct_is(text, &t->v[close], '}'))) close++;
+        if (use <= i || use >= close) continue;
+        for (size_t q = 0; q < nn; q++) {
+            const Tok *n = &t->v[names[q]];
+            if (n->k != K_NAME || n->end - n->start != uh || strncmp(text + n->start, text + u->start, uh)) continue;
+            if (k->depth + 1 > bestdepth) { best = (long) names[q]; bestdepth = k->depth + 1; }
+        }
     }
     return best;
 }
@@ -917,11 +938,13 @@ static int local_at(const At *at, Local *l)
             if (f >= 0) l->target = t.v[f];
             l->is_let = 0;
             ok = 1;
-        } else if (u->k == K_NAME && !memchr(at->text + u->start, '.', u->end - u->start)) {
+        } else if (u->k == K_NAME) {
             long f = find_let(at->text, &t, (size_t) ui);
             if (f >= 0) {
                 l->target = t.v[f];
-                l->is_let = 1;
+                /* bound by let, or by for */
+                l->is_let = f >= 1 && t.v[f - 1].end - t.v[f - 1].start == 3 && !strncmp(at->text + t.v[f - 1].start, "let", 3)
+                                ? 1 : 2;
                 ok = 1;
             }
         }
@@ -956,7 +979,8 @@ static void hover_local(const J *id, const At *at, const Local *l)
     Str md = { 0 };
     const char *text = at->text;
     if (l->is_let) {
-        str_printf(&md, "**let** `%.*s`\n\n", (int) (l->use.end - l->use.start), text + l->use.start);
+        str_printf(&md, "**%s** `%.*s`\n\n", l->is_let == 1 ? "let" : "for", (int) (l->target.end - l->target.start),
+                   text + l->target.start);
         size_t ls = l->target.start;
         while (ls > 0 && text[ls - 1] != '\n') ls--;
         size_t le = l->target.end;

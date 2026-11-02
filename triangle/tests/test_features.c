@@ -799,6 +799,7 @@ void test_docs_guide(void)
     /* §9–10: arithmetic and clauses */
     CHECK_STR(printed(c, tri_at(c, tri_spec(c, "breaker"), "torque")), "40Nm");
     CHECK_STR(printed(c, tri_at(c, tri_spec(c, "ratchet"), "reach")), "280mm");
+    CHECK_STR(printed(c, tri_at(c, tri_spec(c, "gearbox"), "teeth.rest.first")), "48");
     const TriNode *sol[8];
     int trunc;
     CHECK(tri_solve(c, tri_value(c, "#Way & { from: \"kitchen\" }", a, NULL, 0), 10, sol, 8, a, &trunc) == 3 && !trunc);

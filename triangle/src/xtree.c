@@ -15,6 +15,9 @@ void x_print(Buf *b, const X *x)
     case X_TOP: buf_putc(b, '_'); break;
     case X_NAME: case X_ATOM: case X_TAG: buf_puts(b, x->u.name); break;
     case X_LET: buf_puts(b, x->u.let ? "let" : "?"); break;     /* the parser replaces every one */
+    case X_COMP: buf_puts(b, "for …"); break;                   /* expanded at load */
+    case X_VAR: buf_puts(b, x->u.var.var->name); if (x->u.var.path) buf_puts(b, x->u.var.path); break;
+    case X_CMP: case X_LOGIC: case X_NOT: buf_puts(b, "(a condition)"); break;
     case X_NUM: units_format(b, x->u.num.dim, x->u.num.q); break;
     case X_BOUND:
         buf_puts(b, x->u.bound.op == B_GE ? ">=" : x->u.bound.op == B_LE ? "<=" :

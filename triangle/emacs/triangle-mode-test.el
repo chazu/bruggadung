@@ -101,6 +101,17 @@
     (should (memq (triangle-test-face-at "steps:") '(font-lock-property-name-face font-lock-variable-name-face)))
     (should (equal (triangle-test-reindent "a: {\nlet x = 1\nb: .c\n}\n") "a: {\n    let x = 1\n    b: .c\n}\n"))))
 
+(ert-deftest triangle-test-comprehensions ()
+  (triangle-test-with "c: #Cv & { points: [for i, p in table if i >= 0 && p != 1 { input: p }], if: 3 }\n"
+    (should (eq (triangle-test-face-at "for i") 'font-lock-keyword-face))
+    (should (eq (triangle-test-face-at "i, p") 'font-lock-variable-name-face))
+    (should (eq (triangle-test-face-at "p in") 'font-lock-variable-name-face))
+    (should (eq (triangle-test-face-at "in table") 'font-lock-keyword-face))
+    (should (eq (triangle-test-face-at "if i") 'font-lock-keyword-face))
+    (should (memq (triangle-test-face-at "&&") '(font-lock-operator-face font-lock-keyword-face)))
+    (should (memq (triangle-test-face-at "if:") '(font-lock-property-name-face font-lock-variable-name-face)))
+    (should (equal (triangle-test-reindent "a: [\nfor x in xs {\nb: x\n}\n]\n") "a: [\n    for x in xs {\n        b: x\n    }\n]\n"))))
+
 (defun triangle-test-reindent (text)
   "Return TEXT with every line's indentation removed, then reindented."
   (with-temp-buffer

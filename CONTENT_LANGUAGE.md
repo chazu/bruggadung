@@ -150,6 +150,7 @@ the parts listed in §2.
 | Reference | `size: .instrument.size` | Shared node with the field at that path from the definition's root |
 | Path | `size: wrench_19.size`, `#Wrench.size` | A copy of another declaration's field |
 | Let | `let socket = 30mm`, then `socket` | A named expression, in a file or a struct; each use copies it |
+| Comprehension | `[for s in sizes if s > 12mm { s }]`, `{ for m in #Material { (m): 0 } }` | Items or fields made from data known at load, expanded before anything else sees them |
 | Bounds | `>=0 & <=1000`, `>=40Nm` | Interval constraints |
 | Quantity literal | `0.85kg`, `19mm`, `2.5s` | Exact conversion to quanta |
 | Default | `wear: *0 \| >=0 & <=1000` | Default 0 within the range |
@@ -202,7 +203,7 @@ Three constructs look like CUE but mean something else:
    specific type wins. Only defaults from incomparable types that conflict
    are dropped, with a warning.
 
-**Not adopted from CUE:** comprehensions.
+**Not adopted from CUE:** comprehensions that make declarations.
 Arithmetic is adopted, between tags and references (§5).
 Packages are adopted for names only (decision 12): a `package` scopes
 types, instances, and components, and features stay global; files are
@@ -239,6 +240,18 @@ name without resolving scope. A `let` copies, as names do; if it shared, it
 would be a tag spelled differently. Its name may not be an instance's or a
 built-in type's, so it never hides one. Both are resolved by the parser,
 before anything else sees the content.
+
+Comprehensions in lists and structs (`for`, `if`, computed labels) came with
+them. They are expanded when content loads, after packages resolve and
+before the hierarchy is built, so they cost nothing at runtime and nothing
+downstream knows them. That fixes what they may read: data written in the
+content (literals, lets, fields of this or another declaration as written,
+an enum's atoms), never a computed value, since nothing is computed yet.
+Data read from another declaration must be plain values, not its references
+or tags, which mean nothing elsewhere. What they make is checked like
+anything written: a computed field must still belong to its struct's type,
+so closedness still catches mistakes, and a type's comprehension introduces
+its features as written fields would.
 
 ### 3. The type hierarchy
 

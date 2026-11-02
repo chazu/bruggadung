@@ -155,6 +155,12 @@ Their quotes become punctuation, so the enclosing string goes on."
     ;; let name = expr
     (,(concat "\\_<\\(let\\)\\s-+\\(" triangle--name "\\)\\s-*=[^~]")
      (1 font-lock-keyword-face) (2 font-lock-variable-name-face))
+    ;; comprehensions: for k, v in src, if cond
+    (,(concat "\\_<\\(for\\)\\s-+\\(" triangle--name "\\)\\(?:\\s-*,\\s-*\\(" triangle--name "\\)\\)?\\s-+\\(in\\)\\_>")
+     (1 font-lock-keyword-face) (2 font-lock-variable-name-face) (3 font-lock-variable-name-face nil t)
+     (4 font-lock-keyword-face))
+    ("\\_<\\(if\\)\\_>\\s-*[^:[:space:]]" 1 font-lock-keyword-face)
+    ("==\\|!=\\|&&\\|||" . ',(triangle--face 'font-lock-operator-face 'font-lock-keyword-face))
     ;; references: .instrument.size, .steps[0].tool
     (,(concat "\\(?:^\\|[^A-Za-z0-9_.#$]\\)\\(\\." triangle--name
               "\\(?:\\." triangle--name "\\|\\[[0-9]+\\]\\)*\\)")

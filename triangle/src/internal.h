@@ -103,7 +103,8 @@ typedef struct { Sym file; int line, col; } Loc;
 typedef struct { Sym name; char *args; } Attr;
 
 typedef enum { X_TOP, X_NAME, X_ATOM, X_NUM, X_BOUND, X_TAG, X_STRUCT, X_LIST,
-               X_AND, X_OR, X_DEFAULT, X_ARITH, X_REGEX, X_INTERP, X_LET } XKind;
+               X_AND, X_OR, X_DEFAULT, X_ARITH, X_REGEX, X_INTERP, X_LET,
+               X_COMP, X_VAR, X_CMP, X_LOGIC, X_NOT } XKind;
 
 typedef struct X X;
 typedef struct TriContent Content;
@@ -116,7 +117,14 @@ typedef struct {
     Attr *attrs;
     int   nattrs;
     Loc   loc;
+    X    *dlabel;        /* a computed label, (expr) or "\(k)_x", until expanded; label is NULL */
+    X    *comp;          /* instead of a field: a comprehension (for, if) whose fields go here */
 } XField;
+
+/* Comprehensions (for, if), expanded when content loads (load.c, expand). */
+typedef struct CompVar { Sym name; Loc loc; } CompVar;
+enum { C_FOR, C_IF };
+typedef struct { int kind; CompVar *key, *val; X *expr; Loc loc; } CompClause;
 
 enum { B_GE, B_LE, B_GT, B_LT };
 
@@ -135,6 +143,8 @@ struct X {
         struct { Sym pat; bool neg; } rx;                 /* REGEX: =~ or !~ a pattern */
         struct { int n; const char **lits; X **parts; } in;  /* INTERP: lits[0] part[0] lits[1] ... lits[n] */
         struct LetBind *let;                              /* LET: a use of a let's name, until the parser replaces it */
+        struct { CompClause *clauses; int n; X *body; bool list; } comp;   /* COMP: in a list, body is one item */
+        struct { CompVar *var; Sym path; } var;           /* VAR: a comprehension's variable, then .a[0] or NULL */
     } u;
 };
 
@@ -151,11 +161,13 @@ typedef struct {
     Sym   status;        /* TDL instance status, e.g. lex-entry */
     const char *doc;     /* the comment directly above, or NULL */
     Sym   pkg;           /* the package its file declares, or NULL (the root) */
+    bool  comp;          /* has comprehensions or computed labels, to expand */
+    int   expstate;      /* 1 while being expanded, 2 when done */
 } Decl;
 
 typedef VEC(Decl) DeclVec;
 
-typedef struct { Sym name; Sym pkg; Loc loc; } LetName;
+typedef struct { Sym name; Sym pkg; Loc loc; bool var; } LetName;   /* var: a for's variable */
 
 /* xtree.c */
 void  x_print(Buf *b, const X *x);
@@ -206,6 +218,7 @@ void         rx_free_all(Content *c);
 bool parse_source(Content *c, Sym file, const char *src, DeclVec *out);
 /* Parses a single expression. */
 X   *parse_expr_string(Content *c, Sym file, const char *src);
+X   *expand_value(Content *c, X *x, bool *ok);   /* load.c: a runtime value's comprehensions */
 
 /* --- types ------------------------------------------------------------------------ */
 
@@ -417,7 +430,10 @@ struct TriContent {
     int faildepth;
     struct { const char *why; uint32_t ltype, rtype; int64_t llo, lhi, rlo, rhi; bool hasr; } failraw;
     char failwhy[256];           /* a failure's reason, when it is made up on the spot */
-    VEC(LetName) lets;           /* the names lets bind, checked against declarations */
+    VEC(LetName) lets;           /* the names lets and comprehensions bind, checked against declarations */
+    bool parsed_comp;            /* the last parse_expr_string had comprehensions */
+    U64Map declidx;              /* declaration label → first index + 1, for comprehensions' sources */
+    bool declidx_built;
 
     uint64_t hash;
     bool loaded;                 /* load is over: the rest are runtime operations */

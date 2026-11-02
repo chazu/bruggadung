@@ -320,6 +320,27 @@ def main(exe):
                                         "contentChanges": [{"text": REFS}]})
     check(s.diagnostics(ruri) == [], "back to clean")
 
+    # comprehensions: a variable goes to its for, and its path's head counts
+    COMP = ('#Pt: { input: int, output: int }\n'
+            '#Cv: { points: [...#Pt] }\n'
+            'let table = [[1, 2], [3, 4]]\n'
+            'cv: #Cv & { points: [for i, p in table if i >= 0 { input: p[0], output: p[1] }] }\n')
+    curi = "file://" + os.path.join(d, "comp.tri")
+    s.notify("textDocument/didOpen", {"textDocument": {"uri": curi, "languageId": "triangle",
+                                                       "version": 1, "text": COMP}})
+    check(s.diagnostics(curi) == [], "comprehensions load")
+    r = s.request("textDocument/definition", {"textDocument": {"uri": curi},
+                                              "position": pos(COMP, "p[0]")})["result"]
+    check(len(r) == 1 and r[0]["range"]["start"] == pos(COMP, "p in"), "a variable goes to its for")
+    r = s.request("textDocument/definition", {"textDocument": {"uri": curi},
+                                              "position": pos(COMP, "i >=")})["result"]
+    check(len(r) == 1 and r[0]["range"]["start"] == pos(COMP, "i, p"), "and its key to the same for")
+    h = s.request("textDocument/hover", {"textDocument": {"uri": curi}, "position": pos(COMP, "p[1]")})["result"]
+    check("**for** `p`" in h["contents"]["value"], "hover on a variable names its for")
+    r = s.request("textDocument/definition", {"textDocument": {"uri": curi},
+                                              "position": pos(COMP, "table if", 1)})["result"]
+    check(len(r) == 1 and r[0]["range"]["start"] == pos(COMP, "table ="), "a for's source can be a let")
+
     r = s.request("textDocument/hover", {"textDocument": {"uri": uri["instances.tri"]},
                                          "position": {"line": 0, "character": 3}})
     check(r["result"] is None, "hover in a comment is empty")

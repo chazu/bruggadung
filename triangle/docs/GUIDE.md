@@ -342,6 +342,21 @@ ratchet: #Ratchet & { material: "steel", size: 30cm, mass: 1kg, arm: 0.25m, forc
 each use is its value afresh. Its name may not be an instance's or a built-in
 type's, so it never hides one.
 
+`for` and `if` make a list's items, or a struct's fields, from data written
+in the content:
+
+```cue
+let ratios = [1, 2, 4]
+
+#Gearbox: #Tool & { teeth: [...int] }
+
+gearbox: #Gearbox & { material: "steel", size: 20cm, mass: 3kg, teeth: [for r in ratios if r > 1 { r * 12 }] }
+```
+
+`gearbox`'s teeth are `[24, 48]`. Comprehensions are expanded when content
+loads, so nothing else ever sees one; their sources and conditions must be
+known by then (REFERENCE.md, Comprehensions).
+
 ## 10. Definite clauses
 
 Some questions need recursion, such as which rooms you can reach. Clauses are
