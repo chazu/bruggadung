@@ -675,6 +675,23 @@ static long find_let(const char *text, const Toks *t, size_t use)
         }
         if (use > open && use < close && k->depth > bestdepth) { best = (long) i + 1; bestdepth = k->depth; }
     }
+    /* hidden fields, _x: v, which are lets: in their bracket */
+    for (size_t i = 0; i + 1 < t->n; i++) {
+        const Tok *n = &t->v[i];
+        if (n->k != K_NAME || n->end - n->start < 2 || text[n->start] != '_' || !punct_is(text, &t->v[i + 1], ':')) continue;
+        if (uh != u->end - u->start || n->end - n->start != uh || strncmp(text + n->start, text + u->start, uh)) continue;
+        size_t open = 0, close = t->n;
+        if (n->depth > 0) {
+            long j = (long) i;
+            while (j >= 0 && !(t->v[j].depth == n->depth - 1 && punct_is(text, &t->v[j], '{'))) j--;
+            size_t e = i;
+            while (e < t->n && !(t->v[e].depth == n->depth - 1 && punct_is(text, &t->v[e], '}'))) e++;
+            if (j < 0) continue;
+            open = (size_t) j;
+            close = e;
+        }
+        if (use >= i && use < close && use > open && n->depth > bestdepth) { best = (long) i; bestdepth = n->depth; }
+    }
     /* a comprehension's variables: for k, v in src { body }, from the for to
      * the end of its body; the innermost wins */
     for (size_t i = 0; i + 2 < t->n; i++) {
@@ -942,9 +959,11 @@ static int local_at(const At *at, Local *l)
             long f = find_let(at->text, &t, (size_t) ui);
             if (f >= 0) {
                 l->target = t.v[f];
-                /* bound by let, or by for */
+                /* bound by let, by for, or as a hidden field (_x:) */
                 l->is_let = f >= 1 && t.v[f - 1].end - t.v[f - 1].start == 3 && !strncmp(at->text + t.v[f - 1].start, "let", 3)
-                                ? 1 : 2;
+                                ? 1
+                                : at->text[t.v[f].start] == '_' && (size_t) f + 1 < t.n && punct_is(at->text, &t.v[f + 1], ':') ? 3
+                                : 2;
                 ok = 1;
             }
         }
@@ -979,7 +998,8 @@ static void hover_local(const J *id, const At *at, const Local *l)
     Str md = { 0 };
     const char *text = at->text;
     if (l->is_let) {
-        str_printf(&md, "**%s** `%.*s`\n\n", l->is_let == 1 ? "let" : "for", (int) (l->target.end - l->target.start),
+        str_printf(&md, "**%s** `%.*s`\n\n", l->is_let == 1 ? "let" : l->is_let == 3 ? "hidden field" : "for",
+                   (int) (l->target.end - l->target.start),
                    text + l->target.start);
         size_t ls = l->target.start;
         while (ls > 0 && text[ls - 1] != '\n') ls--;
@@ -1037,6 +1057,29 @@ static void hover(const J *id, const J *params)
     if (!at_position(params, &at)) { reply(id, NULL); return; }
     Local l;
     if (local_at(&at, &l)) { hover_local(id, &at, &l); free(at.path); return; }
+    {
+        /* a built-in function: name( */
+        Tok ft;
+        if (token_at(at.text, at.off, &ft) && ft.k == K_NAME && at.text[ft.end] == '(') {
+            for (size_t i = 0; i < tri_function_count(); i++) {
+                const char *sig;
+                const char *fn = tri_function(i, &sig);
+                if (strlen(fn) != ft.end - ft.start || strncmp(fn, at.text + ft.start, ft.end - ft.start)) continue;
+                Str md = { 0 }, r = { 0 };
+                str_printf(&md, "**function** `%s`\n\nEvaluated when content loads (REFERENCE.md, Built-in functions).", sig);
+                str_puts(&r, "{\"contents\":{\"kind\":\"markdown\",\"value\":");
+                str_json(&r, md.s);
+                str_puts(&r, "},\"range\":");
+                put_range(&r, at.text, ft.start, ft.end);
+                str_putc(&r, '}');
+                reply(id, r.s);
+                str_free(&r);
+                str_free(&md);
+                free(at.path);
+                return;
+            }
+        }
+    }
     Tok tok;
     char *name = name_at(&at, &tok);
     if (!name) { free(at.path); reply(id, NULL); return; }
@@ -1453,6 +1496,11 @@ static void completion(const J *id, const J *params)
             }
             if (!dup) item(&it, label, d.kind == TRI_DECL_TYPE ? 7 : 6, kind_word(d.kind), d.doc);
             free(label);
+        }
+        for (size_t i = 0; i < tri_function_count(); i++) {
+            const char *sig;
+            const char *fn = tri_function(i, &sig);
+            item(&it, fn, 3, sig, NULL);              /* the client filters by what is typed */
         }
         if (!qualified_word) {
             for (size_t i = 0; i < sizeof builtins / sizeof *builtins; i++)

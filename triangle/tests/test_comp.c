@@ -87,16 +87,17 @@ void test_comprehension_errors(void)
           "c.tri:2:32: error: .nope is not written in this declaration, so a comprehension can't read it" },
         { "x: #Shelf & { sizes: [for s in [1, ...] { s }] }\n", "a comprehension can't go through an open list" },
         { "x: #Shelf & { sizes: [for s in [1, 2] if s { s }] }\n",
-          "an if's condition is true or false, known when content loads: not 1" },
+          "a condition is true or false, known when content loads: not 1" },
         { "x: #Shelf & { for i, s in [1] { \"\\(i)\": s } }\n", "a computed label must be a field's name: not \"0\"" },
         { "x: #Shelf & { (1): 2 }\n", "a computed label is a string: not 1" },
         { "shelf: #Shelf\nx: #Shelf & { sizes: [for shelf in [1] { shelf }] }\n",
           "for shelf: an instance has this name, and a for's variable may not hide it" },
-        { "x: #Shelf & { note: 1 == 2 }\n", "a comparison (==, !=, &&, ||) belongs only in an if" },
+        { "x: #Shelf & { steel: 1 == 2 }\n", "conflict at steel: int vs false" },
+        { "x: #Shelf & { steel: 2, note: .steel == \"a\" }\n", "a comparison is of values known when content loads" },
         { "x: #Shelf & { sizes: [for s in [1] for s in [2] { s }] }\n", "s: the name is already bound, by the for at 2:27" },
         { "x: #Shelf & { sizes: [for s of [1] { s }] }\n", "expected 'in' after for's variables" },
-        { "x: #Shelf & { sizes: [for s in [1] if s == \"a\" { s }] }\n", "an if compares values known when content loads" },
-        { "x: #Shelf & { sizes: [for s in [1mm] if s > 1 { 1 }] }\n", "an if compares numbers of different kinds" },
+        { "x: #Shelf & { sizes: [for s in [1] if s == \"a\" { s }] }\n", "a comparison is of values known when content loads" },
+        { "x: #Shelf & { sizes: [for s in [1mm] if s > 1 { 1 }] }\n", "a comparison of numbers of different kinds" },
         { "x: #Shelf & { sizes: [for s in [1] { s.size }] }\n", "s.size: its value has no such field or item" },
         { "x: #Shelf & { sizes: [for s in #Shelf { 1 }] }\n",
           "a comprehension goes through a list, a struct, or an enum, written in the content: not #Shelf" },
@@ -112,6 +113,71 @@ void test_comprehension_errors(void)
         char src[1024];
         snprintf(src, sizeof src, "%s%s", base, cases[i].src);
         TriContent *c = load1(src);
+        CHECK(!tri_content_ok(c));
+        if (!has_diag(c, cases[i].diag, 1)) { fprintf(stderr, "    case %zu:\n", i); dump_diags(c); }
+        CHECK(has_diag(c, cases[i].diag, 1));
+        tri_content_free(c);
+    }
+}
+
+/* Built-in functions, comparisons as values, and hidden fields. */
+void test_builtins(void)
+{
+    TriContent *c = load1(
+        "#R: { n: int, s: text, ok: bool, no: bool, l: [...int], ts: [...text], f: int, len: length, i: int, x: fixed }\n"
+        "let names = [\"oak\", \"Ash \", \"elm\"]\n"
+        "r: #R & {\n"
+        "    _base: 10\n"
+        "    n: len(names) * _base + div(-7, 2) + mod(-7, 2)\n"
+        "    s: strings.Join([for x in names { strings.ToUpper(strings.TrimSpace(x)) }], \"-\")\n"
+        "    ok: strings.HasPrefix(\"wrench\", \"wr\") && !strings.Contains(\"oak\", \"z\") && len(\"héllo\") == 6\n"
+        "    no: list.Contains([1, 2], 3) || 2 < 1\n"
+        "    l: list.Range(0, 10, 3)\n"
+        "    ts: list.SortStrings(strings.Split(\"c,a,b\", \",\"))\n"
+        "    f: math.Round(2.5) + list.Sum([1, 2, 3]) + list.Max([4, 9, 2]) + len({ a: 1, b: 2 })\n"
+        "    len: list.Sum([1mm, 2.5mm]) + math.Abs(-1mm)\n"
+        "    i: quo(-7, 2) * 10 + rem(-7, 2) + strings.Index(\"spanner\", \"ann\") + len(list.Concat([[1], [2, 3]]))\n"
+        "    x: 0.5\n"
+        "}\n"
+        /* a hidden field is a let: it is no feature, and each use copies it */
+        "#P: { a: int, b: int }\n"
+        "_range: >=1 & <=5\n"
+        "p: #P & { a: _range, b: _range & 3 }\n");
+    CHECK(tri_content_ok(c));
+    if (!tri_content_ok(c)) { dump_diags(c); tri_content_free(c); return; }
+    const TriNode *r = tri_spec(c, "r");
+    CHECK(num(c, r, "n") == 27);
+    CHECK_STR(printed(c, tri_at(c, r, "s")), "\"OAK-ASH-ELM\"");
+    CHECK_STR(printed(c, tri_at(c, r, "ok")), "true");
+    CHECK_STR(printed(c, tri_at(c, r, "no")), "false");
+    CHECK(num(c, r, "l.rest.rest.rest.first") == 9 && tri_node_type(tri_at(c, r, "l.rest.rest.rest.rest")) == tri_type_named(c, "#Null"));
+    CHECK_STR(printed(c, tri_at(c, r, "ts.first")), "\"a\"");
+    CHECK_STR(printed(c, tri_at(c, r, "ts.rest.rest.first")), "\"c\"");
+    CHECK(num(c, r, "f") == 20);
+    CHECK_STR(printed(c, tri_at(c, r, "len")), "4.5mm");
+    CHECK(num(c, r, "i") == -30 - 1 + 2 + 3);      /* quo, rem truncate; "ann" is at 2 */
+    const TriNode *p = tri_spec(c, "p");
+    CHECK_STR(printed(c, tri_at(c, p, "a")), ">=1 & <=5");
+    CHECK(num(c, p, "b") == 3);
+    CHECK(tri_type_feature_count(c, tri_type_named(c, "#P")) == 2);
+    tri_content_free(c);
+
+    static const char *base = "#R: { n: int, s: text }\n";
+    static const struct { const char *src, *diag; } cases[] = {
+        { "r: #R & { n: lenn([1]) }\n", "unknown function lenn: the built-ins are len, div, mod, quo, rem" },
+        { "r: #R & { n: div(1) }\n", "div takes 2 arguments: div(int, int)" },
+        { "r: #R & { n: div(1, 0) }\n", "div: division by zero" },
+        { "r: #R & { n: len(3) }\n", "len: takes a closed list, a struct, or a string" },
+        { "r: #R & { n: list.Max([]) }\n", "list.Max: of an empty list" },
+        { "r: #R & { n: list.Sum([1, 1mm]) }\n", "list.Sum: takes numbers of one kind" },
+        { "r: #R & { n: len(.s) }\n", ".s is not written in this declaration" },
+        { "r: #R & { n: list.Range(0, 5, 0) }\n", "list.Range: takes whole numbers start, limit, and a step that isn't 0" },
+        { "_x: 1\n_x: 2\n", "_x: the name is already bound" },
+    };
+    for (size_t i = 0; i < sizeof cases / sizeof *cases; i++) {
+        char src[1024];
+        snprintf(src, sizeof src, "%s%s", base, cases[i].src);
+        c = load1(src);
         CHECK(!tri_content_ok(c));
         if (!has_diag(c, cases[i].diag, 1)) { fprintf(stderr, "    case %zu:\n", i); dump_diags(c); }
         CHECK(has_diag(c, cases[i].diag, 1));

@@ -464,11 +464,11 @@ static TriNode *build_raw(Build *b, X *x)
         VEC_PUSH(b->ariths, r);
         return node_new(c, c->scratch, c->top);
     }
-    case X_COMP: case X_VAR:                 /* expanded when content loads */
+    case X_COMP: case X_VAR: case X_CALL:    /* expanded when content loads */
         build_error(b, x->loc, "%s", "a comprehension or its variable outside one, not expanded");
         return NULL;
     case X_CMP: case X_LOGIC: case X_NOT:
-        build_error(b, x->loc, "%s", "a comparison (==, !=, <, &&, ...) belongs only in an if");
+        build_error(b, x->loc, "%s", "a comparison not expanded");
         return NULL;
     case X_LET:                              /* the parser replaces every use */
         build_error(b, x->loc, "%s", "a let's use was not resolved");
@@ -3434,7 +3434,6 @@ static void resolve_names(Content *c, X *x, Sym pkg, const U64Map *declared)
         for (int i = 0; i < x->u.st.n; i++) {
             resolve_names(c, x->u.st.fields[i].value, pkg, declared);
             resolve_names(c, x->u.st.fields[i].dlabel, pkg, declared);
-            resolve_names(c, x->u.st.fields[i].comp, pkg, declared);
         }
         break;
     case X_COMP:
@@ -3447,6 +3446,9 @@ static void resolve_names(Content *c, X *x, Sym pkg, const U64Map *declared)
         break;
     case X_NOT:
         resolve_names(c, x->u.sub, pkg, declared);
+        break;
+    case X_CALL:
+        for (int i = 0; i < x->u.call.n; i++) resolve_names(c, x->u.call.args[i], pkg, declared);
         break;
     case X_LIST:
         for (int i = 0; i < x->u.list.n; i++) resolve_names(c, x->u.list.items[i], pkg, declared);
@@ -3788,7 +3790,7 @@ static int cond_eval(Exp *e, X *x)
         int64_t qa, qb;
         if (concrete_number(a, &da, &qa) && concrete_number(b, &db, &qb)) {
             if (da != db) {
-                exp_error(e, x->loc, "an if compares numbers of different kinds");
+                exp_error(e, x->loc, "a comparison of numbers of different kinds");
                 return -1;
             }
             switch (op) {
@@ -3803,7 +3805,7 @@ static int cond_eval(Exp *e, X *x)
         if (a->k == X_ATOM && b->k == X_ATOM && (op == 'e' || op == 'n')) return (a->u.name == b->u.name) == (op == 'e');
         char *ta = x_text(a), *tb = x_text(b);
         char msg[400];
-        snprintf(msg, sizeof msg, "an if compares values known when content loads: numbers, or strings with == and != (not %s and %s)",
+        snprintf(msg, sizeof msg, "a comparison is of values known when content loads: numbers, or strings with == and != (not %s and %s)",
                  ta, tb);
         free(ta);
         free(tb);
@@ -3816,7 +3818,7 @@ static int cond_eval(Exp *e, X *x)
         if (v->k == X_ATOM && !strcmp(v->u.name, "false")) return 0;
         char *t = x_text(v);
         char msg[300];
-        snprintf(msg, sizeof msg, "an if's condition is true or false, known when content loads: not %s", t);
+        snprintf(msg, sizeof msg, "a condition is true or false, known when content loads: not %s", t);
         free(t);
         exp_error(e, x->loc, msg);
         return -1;
@@ -3850,6 +3852,13 @@ static Sym label_of(Exp *e, X *x, Loc loc)
     } else r = intern(e->c, b.s);
     buf_free(&b);
     return r;
+}
+
+/* For builtin_call: an argument as data. */
+static X *call_data(void *ctx, X *x)
+{
+    Exp *e = ctx;
+    return data_of(e, x, 0);
 }
 
 static void comp_run(Exp *e, X *comp, int i, const Env *env, XPtrVec *items, FieldVec *fields)
@@ -3918,7 +3927,8 @@ static X *expand(Exp *e, X *x, const Env *env)
         FieldVec out = { 0 };
         for (int i = 0; i < x->u.st.n && e->ok; i++) {
             XField *f = &x->u.st.fields[i];
-            if (f->comp) { comp_run(e, f->comp, 0, env, NULL, &out); continue; }
+            X *fc = field_comp(f);
+            if (fc) { comp_run(e, fc, 0, env, NULL, &out); continue; }
             XField g = *f;
             if (f->dlabel) {
                 g.label = label_of(e, expand(e, f->dlabel, env), f->loc);
@@ -3956,13 +3966,26 @@ static X *expand(Exp *e, X *x, const Env *env)
         n->u.bin.b = expand(e, x->u.bin.b, env);
         return n;
     }
-    case X_ARITH: case X_CMP: case X_LOGIC: {
+    case X_ARITH: {
         X *n = x_copy(e, x);
         n->u.ar.a = expand(e, x->u.ar.a, env);
         n->u.ar.b = expand(e, x->u.ar.b, env);
         return n;
     }
-    case X_DEFAULT: case X_NOT: {
+    case X_CMP: case X_LOGIC: case X_NOT: {        /* true or false, now */
+        X *n = x_copy(e, x);
+        if (x->k == X_NOT) n->u.sub = expand(e, x->u.sub, env);
+        else {
+            n->u.ar.a = expand(e, x->u.ar.a, env);
+            n->u.ar.b = expand(e, x->u.ar.b, env);
+        }
+        int v = cond_eval(e, n);
+        if (v < 0) return x;
+        X *r = x_new(e->c, X_ATOM, x->loc);
+        r->u.name = intern(e->c, v ? "true" : "false");
+        return r;
+    }
+    case X_DEFAULT: {
         X *n = x_copy(e, x);
         n->u.sub = expand(e, x->u.sub, env);
         return n;
@@ -3976,6 +3999,15 @@ static X *expand(Exp *e, X *x, const Env *env)
     case X_COMP:
         exp_error(e, x->loc, "a comprehension stands in a list, or among a struct's fields");
         return x;
+    case X_CALL: {
+        X *args[8];
+        for (int i = 0; i < x->u.call.n && i < 8; i++) args[i] = expand(e, x->u.call.args[i], env);
+        if (!e->ok) return x;
+        char err[400];
+        X *r = builtin_call(e->c, x, args, call_data, e, err, sizeof err);
+        if (!r) exp_error(e, x->loc, err);
+        return r ? r : x;
+    }
     default:
         return x;
     }

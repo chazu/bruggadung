@@ -341,6 +341,28 @@ def main(exe):
                                               "position": pos(COMP, "table if", 1)})["result"]
     check(len(r) == 1 and r[0]["range"]["start"] == pos(COMP, "table ="), "a for's source can be a let")
 
+    # built-in functions and hidden fields
+    FN = ('#Fn: { n: int, s: text }\n'
+          'fn: #Fn & {\n'
+          '    _base: 3\n'
+          '    n: len([1, 2]) + _base\n'
+          '    s: strings.ToUpper("a")\n'
+          '}\n')
+    furi = "file://" + os.path.join(d, "fn.tri")
+    s.notify("textDocument/didOpen", {"textDocument": {"uri": furi, "languageId": "triangle",
+                                                       "version": 1, "text": FN}})
+    check(s.diagnostics(furi) == [], "built-ins and hidden fields load")
+    h = s.request("textDocument/hover", {"textDocument": {"uri": furi}, "position": pos(FN, "strings.ToUpper", 9)})["result"]
+    check(h and "**function** `strings.ToUpper(string)`" in h["contents"]["value"], "hover on a built-in function")
+    r = s.request("textDocument/definition", {"textDocument": {"uri": furi},
+                                              "position": pos(FN, "+ _base", 3)})["result"]
+    check(len(r) == 1 and r[0]["range"]["start"] == pos(FN, "_base:"), "a hidden field's use goes to it")
+    h = s.request("textDocument/hover", {"textDocument": {"uri": furi}, "position": pos(FN, "+ _base", 3)})["result"]
+    check("**hidden field** `_base`" in h["contents"]["value"], "and hovers as one")
+    items = s.request("textDocument/completion", {"textDocument": {"uri": furi},
+                                                  "position": pos(FN, "len(")})["result"]["items"]
+    check("strings.ToUpper" in {i["label"] for i in items}, "completion offers the built-in functions")
+
     r = s.request("textDocument/hover", {"textDocument": {"uri": uri["instances.tri"]},
                                          "position": {"line": 0, "character": 3}})
     check(r["result"] is None, "hover in a comment is empty")

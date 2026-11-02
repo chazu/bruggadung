@@ -155,6 +155,9 @@ Their quotes become punctuation, so the enclosing string goes on."
     ;; let name = expr
     (,(concat "\\_<\\(let\\)\\s-+\\(" triangle--name "\\)\\s-*=[^~]")
      (1 font-lock-keyword-face) (2 font-lock-variable-name-face))
+    ;; built-in functions: len(x), strings.ToUpper(s)
+    ("\\_<\\(\\(?:len\\|div\\|mod\\|quo\\|rem\\)\\|\\(?:strings\\|list\\|math\\)\\.[A-Za-z]+\\)("
+     1 font-lock-builtin-face)
     ;; comprehensions: for k, v in src, if cond
     (,(concat "\\_<\\(for\\)\\s-+\\(" triangle--name "\\)\\(?:\\s-*,\\s-*\\(" triangle--name "\\)\\)?\\s-+\\(in\\)\\_>")
      (1 font-lock-keyword-face) (2 font-lock-variable-name-face) (3 font-lock-variable-name-face nil t)

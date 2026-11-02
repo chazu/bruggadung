@@ -368,8 +368,9 @@ static bool lex_at(Parser *p, const char *src, int line, int col)
     e.loc = (Loc) { p->file, line, col };
     VEC_PUSH(p->toks, e);
     for (size_t i = 0; i + 2 < p->toks.n && !p->has_let; i++)
-        if (p->toks.v[i].k == T_IDENT && p->toks.v[i].len == 3 && !memcmp(p->toks.v[i].s, "let", 3) &&
-            p->toks.v[i + 1].k == T_IDENT && p->toks.v[i + 2].k == T_ASSIGN)
+        if ((p->toks.v[i].k == T_IDENT && p->toks.v[i].len == 3 && !memcmp(p->toks.v[i].s, "let", 3) &&
+             p->toks.v[i + 1].k == T_IDENT && p->toks.v[i + 2].k == T_ASSIGN) ||
+            (p->toks.v[i].k == T_IDENT && p->toks.v[i].len > 1 && p->toks.v[i].s[0] == '_' && p->toks.v[i + 1].k == T_COLON))
             p->has_let = true;
     return true;
 #undef ADV
@@ -439,9 +440,19 @@ static struct LetBind *let_lookup(Parser *p, Sym name)
     return NULL;
 }
 
+/* A hidden field, _name: (CUE's) is a let by another spelling. */
+static bool hidden_at(Parser *p, size_t i)
+{
+    Tok *t = &p->toks.v[i];
+    return i + 1 < p->toks.n && t->k == T_IDENT && t->len > 1 && t->s[0] == '_' && !qualified(t) &&
+           p->toks.v[i + 1].k == T_COLON;
+}
+
 static bool let_at(Parser *p, size_t i)
 {
-    return p->has_let && i + 2 < p->toks.n && tok_is(&p->toks.v[i], "let") && p->toks.v[i + 1].k == T_IDENT &&
+    if (!p->has_let) return false;
+    if (hidden_at(p, i)) return true;
+    return i + 2 < p->toks.n && tok_is(&p->toks.v[i], "let") && p->toks.v[i + 1].k == T_IDENT &&
            p->toks.v[i + 2].k == T_ASSIGN;
 }
 
@@ -458,7 +469,8 @@ static Scope *open_scope(Parser *p, size_t from)
         if (k == T_LBRACE || k == T_LBRACK || k == T_LPAREN) depth++;
         else if (k == T_RBRACE || k == T_RBRACK || k == T_RPAREN) { if (depth-- == 0) break; }
         else if (depth == 0 && let_at(p, i)) {
-            Tok *n = &p->toks.v[i + 1];
+            bool hidden = hidden_at(p, i);
+            Tok *n = &p->toks.v[hidden ? i : i + 1];
             if (qualified(n)) { perr(p, n->loc, "a let binds a plain name"); break; }
             Sym name = tok_sym(p, n);
             static const char *const reserved[] = { "_", "true", "false", "ref", "let", "package" };
@@ -485,7 +497,7 @@ static Scope *open_scope(Parser *p, size_t from)
             VEC_PUSH(*sc, lb);
             LetName ln = { name, p->pkg, n->loc, false };
             VEC_PUSH(p->c->lets, ln);
-            i += 2;
+            i += hidden ? 1 : 2;
         }
     }
     VEC_PUSH(p->scopes, sc);
@@ -505,7 +517,8 @@ static X *parse_expr(Parser *p);
 /* let name = expr, its binding already made by open_scope. */
 static bool parse_let(Parser *p)
 {
-    next(p);
+    bool hidden = hidden_at(p, p->pos);
+    if (!hidden) next(p);
     Tok *n = next(p);
     next(p);
     struct LetBind *lb = let_lookup(p, tok_sym(p, n));
@@ -541,7 +554,7 @@ static bool resolve_lets(Parser *p, X *x)
     case X_STRUCT:
         for (int i = 0; i < x->u.st.n; i++) {
             XField *f = &x->u.st.fields[i];
-            if (!resolve_lets(p, f->value) || !resolve_lets(p, f->dlabel) || !resolve_lets(p, f->comp)) return false;
+            if (!resolve_lets(p, f->value) || !resolve_lets(p, f->dlabel)) return false;
         }
         return true;
     case X_COMP:
@@ -551,6 +564,9 @@ static bool resolve_lets(Parser *p, X *x)
         return resolve_lets(p, x->u.ar.a) && resolve_lets(p, x->u.ar.b);
     case X_NOT:
         return resolve_lets(p, x->u.sub);
+    case X_CALL:
+        for (int i = 0; i < x->u.call.n; i++) if (!resolve_lets(p, x->u.call.args[i])) return false;
+        return true;
     case X_LIST:
         for (int i = 0; i < x->u.list.n; i++) if (!resolve_lets(p, x->u.list.items[i])) return false;
         return resolve_lets(p, x->u.list.tail) && resolve_lets(p, x->u.list.elem);
@@ -600,9 +616,8 @@ static void collect_refs(RefWalk *w, X *x)
     case X_STRUCT:
         for (int i = 0; i < x->u.st.n; i++) {
             XField *f = &x->u.st.fields[i];
-            collect_refs(w, f->comp);           /* a comprehension's fields are this struct's */
             collect_refs(w, f->dlabel);
-            if (f->comp) continue;
+            if (field_comp(f)) { collect_refs(w, f->value); continue; }   /* its fields are this struct's */
             buf_printf(&w->path, ".%s", f->label ? f->label : "*");
             collect_refs(w, f->value);
             w->path.len = keep;
@@ -618,9 +633,8 @@ static void collect_refs(RefWalk *w, X *x)
             for (int i = 0; i < b->u.st.n; i++) {
                 XField *f = &b->u.st.fields[i];
                 size_t k2 = w->path.len;
-                collect_refs(w, f->comp);
                 collect_refs(w, f->dlabel);
-                if (f->comp) continue;
+                if (field_comp(f)) { collect_refs(w, f->value); continue; }
                 buf_printf(&w->path, ".%s", f->label ? f->label : "*");
                 collect_refs(w, f->value);
                 w->path.len = k2;
@@ -636,6 +650,9 @@ static void collect_refs(RefWalk *w, X *x)
         return;
     case X_NOT:
         collect_refs(w, x->u.sub);
+        return;
+    case X_CALL:
+        for (int i = 0; i < x->u.call.n; i++) collect_refs(w, x->u.call.args[i]);
         return;
     case X_LIST:
         for (int i = 0; i < x->u.list.n; i++) {
@@ -721,13 +738,19 @@ static bool x_has_comp(const X *x)
     case X_COMP: return true;
     case X_STRUCT:
         for (int i = 0; i < x->u.st.n; i++)
-            if (x->u.st.fields[i].comp || x->u.st.fields[i].dlabel || x_has_comp(x->u.st.fields[i].value)) return true;
+            if (x->u.st.fields[i].dlabel || x_has_comp(x->u.st.fields[i].value)) return true;
         return false;
     case X_LIST:
         for (int i = 0; i < x->u.list.n; i++) if (x_has_comp(x->u.list.items[i])) return true;
         return x_has_comp(x->u.list.tail) || x_has_comp(x->u.list.elem);
     case X_AND: case X_OR: return x_has_comp(x->u.bin.a) || x_has_comp(x->u.bin.b);
     case X_DEFAULT: return x_has_comp(x->u.sub);
+    case X_ARITH: return x_has_comp(x->u.ar.a) || x_has_comp(x->u.ar.b);
+    case X_CMP: case X_LOGIC: case X_NOT: return true;     /* evaluated at load */
+    case X_INTERP:
+        for (int i = 0; i < x->u.in.n; i++) if (x_has_comp(x->u.in.parts[i])) return true;
+        return false;
+    case X_CALL: return true;
     default: return false;
     }
 }
@@ -864,7 +887,6 @@ static CompVar *bind_var(Parser *p, Tok *n)
 }
 
 /* An if's condition: || over && over !, over comparisons of sums. */
-static X *parse_cond(Parser *p);
 static X *parse_sum(Parser *p);
 
 static X *cond_binary(Parser *p, XKind k, int op, Loc loc, X *a, X *b)
@@ -876,57 +898,51 @@ static X *cond_binary(Parser *p, XKind k, int op, Loc loc, X *a, X *b)
     return x;
 }
 
-static X *parse_cmp(Parser *p)
+/* Comparisons and logic: CUE's, between arithmetic and &. They are
+ * evaluated when content loads, like built-in functions. The parser enters
+ * them only when one of their tokens follows a sum, so other content parses
+ * as it always did. */
+static bool cond_tok(TokKind k)
 {
-    Tok *t = peek(p, 0);
-    if (t->k == T_NOT) {
-        next(p);
-        X *sub = parse_cmp(p);
-        if (!sub) return NULL;
-        X *x = xnew(p, X_NOT, t->loc);
-        x->u.sub = sub;
-        return x;
-    }
-    X *a;
-    if (t->k == T_LPAREN) {                   /* (cond), or a parenthesised sum compared */
-        next(p);
-        a = parse_cond(p);
-        if (!a || !expect(p, T_RPAREN, "')'")) return NULL;
-    } else {
-        a = parse_sum(p);
-        if (!a) return NULL;
-    }
+    return k == T_EQ || k == T_NE || k == T_LT || k == T_LE || k == T_GT || k == T_GE || k == T_ANDAND || k == T_OROR;
+}
+
+/* A comparison, given its left side. */
+static X *cmp_after(Parser *p, X *a)
+{
     Tok *op = peek(p, 0);
     int o = op->k == T_EQ ? 'e' : op->k == T_NE ? 'n' : op->k == T_LT ? '<' : op->k == T_LE ? 'l'
           : op->k == T_GT ? '>' : op->k == T_GE ? 'g' : 0;
-    if (!o) return a;
-    if (a->k == X_CMP || a->k == X_LOGIC || a->k == X_NOT) { perr(p, op->loc, "a comparison can't be compared"); return NULL; }
+    if (!a || !o) return a;
     next(p);
     X *b = parse_sum(p);
     if (!b) return NULL;
+    p->has_comp = true;
     return cond_binary(p, X_CMP, o, op->loc, a, b);
 }
 
-static X *parse_cond_and(Parser *p)
+static X *parse_cmp(Parser *p) { return cmp_after(p, parse_sum(p)); }
+
+/* && over comparisons, then || over those, given the first sum. */
+static X *cond_after(Parser *p, X *a)
 {
-    X *a = parse_cmp(p);
+    a = cmp_after(p, a);
+    if (!a || (peek(p, 0)->k != T_ANDAND && peek(p, 0)->k != T_OROR)) return a;
+    p->has_comp = true;
     while (a && peek(p, 0)->k == T_ANDAND) {
         Tok *op = next(p);
         X *b = parse_cmp(p);
-        if (!b) return NULL;
-        a = cond_binary(p, X_LOGIC, '&', op->loc, a, b);
+        a = b ? cond_binary(p, X_LOGIC, '&', op->loc, a, b) : NULL;
     }
-    return a;
-}
-
-static X *parse_cond(Parser *p)
-{
-    X *a = parse_cond_and(p);
     while (a && peek(p, 0)->k == T_OROR) {
         Tok *op = next(p);
-        X *b = parse_cond_and(p);
-        if (!b) return NULL;
-        a = cond_binary(p, X_LOGIC, '|', op->loc, a, b);
+        X *b = parse_cmp(p);
+        while (b && peek(p, 0)->k == T_ANDAND) {
+            Tok *op2 = next(p);
+            X *c = parse_cmp(p);
+            b = c ? cond_binary(p, X_LOGIC, '&', op2->loc, b, c) : NULL;
+        }
+        a = b ? cond_binary(p, X_LOGIC, '|', op->loc, a, b) : NULL;
     }
     return a;
 }
@@ -984,7 +1000,7 @@ static X *parse_comprehension(Parser *p, bool in_list)
             VEC_PUSH(p->vars, c.val);
         } else {
             c.kind = C_IF;
-            c.expr = parse_cond(p);
+            c.expr = parse_expr(p);
             if (!c.expr) break;
         }
         VEC_PUSH(cl, c);
@@ -1033,8 +1049,8 @@ static X *parse_struct(Parser *p)
         if (comp_at(p, p->pos)) {
             XField f = { 0 };
             f.loc = peek(p, 0)->loc;
-            f.comp = parse_comprehension(p, false);
-            if (!f.comp) break;
+            f.value = parse_comprehension(p, false);
+            if (!f.value) break;
             VEC_PUSH(fields, f);
             continue;
         }
@@ -1060,10 +1076,6 @@ static X *parse_struct(Parser *p)
         }
         Tok *lab = peek(p, 0);
         if (lab->k == T_REF) { perr(p, lab->loc, "a field's label is a plain name; a reference (.a.b) is a value"); break; }
-        if (lab->k == T_EQ || lab->k == T_NE || lab->k == T_ANDAND || lab->k == T_OROR) {
-            perr(p, lab->loc, "a comparison (==, !=, &&, ||) belongs only in an if");
-            break;
-        }
         if (lab->k != T_IDENT) { perr(p, lab->loc, "expected a field label"); break; }
         if (!plain_label(p, lab)) break;
         next(p);
@@ -1205,6 +1217,34 @@ static X *parse_primary(Parser *p)
             if (!expect(p, T_RPAREN, "')' after the referent number")) return NULL;
             return x;
         }
+        if (peek(p, 0)->k == T_LPAREN && peek(p, 0)->s == t->s + t->len) {
+            /* a built-in function: len(xs), strings.ToUpper(s) */
+            Tok *open = next(p);
+            XPtrVec args = { 0 };
+            while (peek(p, 0)->k != T_RPAREN) {
+                X *a = parse_expr(p);
+                if (!a) { VEC_FREE(args); return NULL; }
+                VEC_PUSH(args, a);
+                if (peek(p, 0)->k == T_COMMA) next(p);
+                else if (peek(p, 0)->k != T_RPAREN) { perr(p, peek(p, 0)->loc, "expected ',' or ')'"); VEC_FREE(args); return NULL; }
+            }
+            next(p);
+            char *nm = malloc(t->len + 1);
+            memcpy(nm, t->s, t->len);
+            nm[t->len] = 0;
+            const char *err = builtin_check(p->c, nm, (int) args.n);
+            free(nm);
+            if (err) { perr(p, t->loc, err); VEC_FREE(args); return NULL; }
+            X *x = xnew(p, X_CALL, t->loc);
+            x->u.call.name = tok_sym(p, t);
+            x->u.call.n = (int) args.n;
+            x->u.call.args = arena_alloc(p->c->load, (args.n ? args.n : 1) * sizeof(X *));
+            if (args.n) memcpy(x->u.call.args, args.v, args.n * sizeof(X *));
+            VEC_FREE(args);
+            (void) open;
+            p->has_comp = true;                 /* evaluated with comprehensions, when content loads */
+            return x;
+        }
         Sym name = tok_sym(p, t);
         size_t head = 0;
         CompVar *cv = NULL;
@@ -1265,11 +1305,7 @@ static X *parse_primary(Parser *p)
         return x;
     }
     default:
-        perr(p, t->loc, t->k == T_ASSIGN ? "unexpected '='; did you mean ':' or '=~'?"
-                        : t->k == T_NOT ? "unexpected '!'; did you mean '!~'?"
-                        : t->k == T_EQ || t->k == T_NE || t->k == T_ANDAND || t->k == T_OROR
-                            ? "a comparison (==, !=, &&, ||) belongs only in an if"
-                            : "expected a value");
+        perr(p, t->loc, t->k == T_ASSIGN ? "unexpected '='; did you mean ':' or '=~'?" : "expected a value");
         return NULL;
     }
 }
@@ -1277,6 +1313,15 @@ static X *parse_primary(Parser *p)
 static X *parse_unary(Parser *p)
 {
     Tok *t = peek(p, 0);
+    if (t->k == T_NOT) {
+        next(p);
+        X *sub = parse_unary(p);
+        if (!sub) return NULL;
+        X *x = xnew(p, X_NOT, t->loc);
+        x->u.sub = sub;
+        p->has_comp = true;
+        return x;
+    }
     if (t->k == T_STAR) {
         next(p);
         X *sub = parse_unary(p);
@@ -1353,9 +1398,11 @@ static X *parse_sum(Parser *p)
 static X *parse_conj(Parser *p)
 {
     X *a = parse_sum(p);
+    if (a && cond_tok(peek(p, 0)->k)) a = cond_after(p, a);
     while (a && peek(p, 0)->k == T_AND) {
         Tok *op = next(p);
         X *b = parse_sum(p);
+        if (b && cond_tok(peek(p, 0)->k)) b = cond_after(p, b);
         if (!b) return NULL;
         X *x = xnew(p, X_AND, op->loc);
         x->u.bin.a = a;

@@ -253,6 +253,18 @@ anything written: a computed field must still belong to its struct's type,
 so closedness still catches mistakes, and a type's comprehension introduces
 its features as written fields would.
 
+Built-in functions (`len`, `div`, `mod`, and parts of `strings`, `list` and
+`math`), comparisons and logic (`==`, `<`, `&&`, `!`) follow the same rule:
+evaluated with comprehensions, over data known at load, and replaced by
+what they give. A comparison between fields still open is not a constraint
+here, as it would be in CUE; arithmetic and tags already relate fields, and
+a third mechanism would reach the matcher. CUE's hidden fields (`_x: v`)
+are lets: Triangle's structures are closed by their types, so a field
+outside the type has nowhere to be, and a let is what a hidden field is for.
+`triangle export` writes instances as JSON or YAML, as `cue export` does;
+a value a spec leaves open is written as its constraint, since open values
+are the point of a blueprint.
+
 ### 3. The type hierarchy
 
 - **Declaration order never matters.** All files are read before anything is

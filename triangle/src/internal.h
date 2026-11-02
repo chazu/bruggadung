@@ -104,7 +104,7 @@ typedef struct { Sym name; char *args; } Attr;
 
 typedef enum { X_TOP, X_NAME, X_ATOM, X_NUM, X_BOUND, X_TAG, X_STRUCT, X_LIST,
                X_AND, X_OR, X_DEFAULT, X_ARITH, X_REGEX, X_INTERP, X_LET,
-               X_COMP, X_VAR, X_CMP, X_LOGIC, X_NOT } XKind;
+               X_COMP, X_VAR, X_CMP, X_LOGIC, X_NOT, X_CALL } XKind;
 
 typedef struct X X;
 typedef struct TriContent Content;
@@ -118,8 +118,8 @@ typedef struct {
     int   nattrs;
     Loc   loc;
     X    *dlabel;        /* a computed label, (expr) or "\(k)_x", until expanded; label is NULL */
-    X    *comp;          /* instead of a field: a comprehension (for, if) whose fields go here */
 } XField;
+
 
 /* Comprehensions (for, if), expanded when content loads (load.c, expand). */
 typedef struct CompVar { Sym name; Loc loc; } CompVar;
@@ -145,8 +145,13 @@ struct X {
         struct LetBind *let;                              /* LET: a use of a let's name, until the parser replaces it */
         struct { CompClause *clauses; int n; X *body; bool list; } comp;   /* COMP: in a list, body is one item */
         struct { CompVar *var; Sym path; } var;           /* VAR: a comprehension's variable, then .a[0] or NULL */
+        struct { Sym name; X **args; int n; } call;       /* CALL: a built-in function, evaluated at load */
     } u;
 };
+
+/* Instead of a field, a comprehension (for, if) whose fields go here: no
+ * label, and the comprehension for a value. */
+static inline X *field_comp(const XField *f) { return !f->label && !f->dlabel && f->value && f->value->k == X_COMP ? f->value : NULL; }
 
 enum { L_DEF, L_ATOM, L_INST };
 
@@ -219,6 +224,11 @@ bool parse_source(Content *c, Sym file, const char *src, DeclVec *out);
 /* Parses a single expression. */
 X   *parse_expr_string(Content *c, Sym file, const char *src);
 X   *expand_value(Content *c, X *x, bool *ok);   /* load.c: a runtime value's comprehensions */
+
+/* builtins.c: built-in functions, evaluated at load over literals */
+const char *builtin_check(Content *c, const char *name, int nargs);      /* NULL when callable */
+X          *builtin_call(Content *c, const X *call, X **args, X *(*data)(void *ctx, X *x), void *ctx,
+                         char *err, size_t errlen);                     /* NULL with err on failure */
 
 /* --- types ------------------------------------------------------------------------ */
 

@@ -20,14 +20,17 @@ build/tri-components: tools/tri-components.c build/libtriangle.a
 	$(CC) $(CPPFLAGS) $(CFLAGS) $< build/libtriangle.a -o $@
 
 # The command-line tool, with the language server.
-TOOLSRC = tools/triangle.c tools/lsp.c tools/json.c
+TOOLSRC = tools/triangle.c tools/lsp.c tools/json.c tools/export.c
 
-build/triangle: $(TOOLSRC) tools/json.h build/libtriangle.a
+build/triangle: $(TOOLSRC) tools/json.h tools/export.h build/libtriangle.a
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TOOLSRC) build/libtriangle.a -o $@
 
-# The language server driven over stdio, and the Emacs mode's tests.
+# The language server driven over stdio, the command line, and the Emacs mode's tests.
 lsp-test: build/triangle
 	python3 tests/lsp_test.py build/triangle
+
+cli-test: build/triangle
+	python3 tests/cli_test.py build/triangle
 
 emacs-test:
 	emacs -Q --batch -L emacs -l emacs/triangle-mode-test.el -f ert-run-tests-batch-and-exit
@@ -87,4 +90,4 @@ objc: build/libtriangle.a
 clean:
 	rm -rf build
 
-.PHONY: all test asan objc leakcheck game clean lsp-test emacs-test install examples
+.PHONY: cli-test all test asan objc leakcheck game clean lsp-test emacs-test install examples

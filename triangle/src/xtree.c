@@ -18,6 +18,11 @@ void x_print(Buf *b, const X *x)
     case X_COMP: buf_puts(b, "for …"); break;                   /* expanded at load */
     case X_VAR: buf_puts(b, x->u.var.var->name); if (x->u.var.path) buf_puts(b, x->u.var.path); break;
     case X_CMP: case X_LOGIC: case X_NOT: buf_puts(b, "(a condition)"); break;
+    case X_CALL:
+        buf_printf(b, "%s(", x->u.call.name);
+        for (int i = 0; i < x->u.call.n; i++) { if (i) buf_puts(b, ", "); x_print(b, x->u.call.args[i]); }
+        buf_putc(b, ')');
+        break;
     case X_NUM: units_format(b, x->u.num.dim, x->u.num.q); break;
     case X_BOUND:
         buf_puts(b, x->u.bound.op == B_GE ? ">=" : x->u.bound.op == B_LE ? "<=" :

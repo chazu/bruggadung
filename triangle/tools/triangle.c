@@ -3,11 +3,13 @@
  *   triangle check [PATH...]              load content and report its diagnostics
  *   triangle inspect NAME [PATH...]       a type, or an instance's spec with origins
  *   triangle components PREFIX [PATH...]  the C structs for the content's components
+ *   triangle export [OPTIONS] [PATH...]   instances as JSON or YAML
  *   triangle lsp                          the language server, over stdio
  *
  * A PATH is a .tri file or a directory, which stands for the .tri files in it;
  * with none, the current directory. */
 #include "triangle.h"
+#include "export.h"
 
 #include <dirent.h>
 #include <stdio.h>
@@ -97,6 +99,7 @@ static int cmd_inspect(char **args, int n)
     const char *doc = tri_doc(c, name);
     if (doc) printf("%s\n\n", doc);
     TriType t = tri_type_named(c, name);
+    size_t d0 = tri_diag_count(c);
     if (t != TRI_BOTTOM) {
         found = 1;
         printf("type %s", name);
@@ -118,10 +121,51 @@ static int cmd_inspect(char **args, int n)
         fputs(buf, stdout);
         free(buf);
         for (size_t i = 0; i < tri_spec_note_count(c, name); i++) printf("note: %s\n", tri_spec_note(c, name, i));
+    } else {
+        /* an instance without a spec (a pattern with open fields, say): say why */
+        for (size_t i = 0; i < tri_instance_count(c) && !found; i++) found = !strcmp(tri_instance_name(c, i), name);
+        if (found) {
+            fprintf(stderr, "triangle: %s has no spec (`triangle export -e %s` shows it as written):\n", name, name);
+            for (size_t i = d0; i < tri_diag_count(c); i++) fprintf(stderr, "%s\n", tri_diag_message(c, i));
+            tri_content_free(c);
+            return 1;
+        }
     }
     tri_content_free(c);
     if (!found) { fprintf(stderr, "triangle: no type or instance named %s\n", name); return 1; }
     return 0;
+}
+
+static int cmd_export(char **args, int n)
+{
+    ExportOptions o = { 0 };
+    const char **names = malloc((size_t) (n ? n : 1) * sizeof *names);
+    size_t nn = 0;
+    char **paths = malloc((size_t) (n ? n : 1) * sizeof *paths);
+    int np = 0;
+    for (int i = 0; i < n; i++) {
+        const char *a = args[i];
+        if (!strcmp(a, "--yaml")) o.yaml = 1;
+        else if (!strcmp(a, "--json")) o.yaml = 0;
+        else if (!strcmp(a, "--types")) o.types = 1;
+        else if (!strcmp(a, "--concrete")) o.concrete = 1;
+        else if (!strcmp(a, "--seed") && i + 1 < n) { o.seeded = 1; o.seed = strtoull(args[++i], NULL, 10); }
+        else if (!strcmp(a, "-e") && i + 1 < n) names[nn++] = args[++i];
+        else if (a[0] == '-') {
+            fprintf(stderr, "usage: triangle export [--yaml] [--types] [--concrete] [--seed N] [-e NAME]... [PATH...]\n");
+            free(names);
+            free(paths);
+            return 2;
+        } else paths[np++] = args[i];
+    }
+    TriContent *c = load(paths, np, 1);
+    free(paths);
+    if (!c) { free(names); return 2; }
+    if (!tri_content_ok(c)) { tri_content_free(c); free(names); return 1; }
+    int r = export_content(c, names, nn, &o, stdout);
+    tri_content_free(c);
+    free(names);
+    return r;
 }
 
 static int cmd_components(char **args, int n)
@@ -145,6 +189,10 @@ static void usage(FILE *f)
           "  check [PATH...]              load content and report its diagnostics\n"
           "  inspect NAME [PATH...]       a type, or an instance's spec with the origin of each value\n"
           "  components PREFIX [PATH...]  the C structs for the content's components\n"
+          "  export [OPTIONS] [PATH...]   instances as JSON (or --yaml): blueprints as their specs\n"
+          "                               (--seed N: one entity each), patterns as they are;\n"
+          "                               -e NAME for some, --types for #type, --concrete to\n"
+          "                               refuse values still open\n"
           "  lsp                          run the language server over stdio\n"
           "  version                      print the version\n\n"
           "A PATH is a .tri file or a directory of them; the default is the current directory.\n",
@@ -160,6 +208,7 @@ int main(int argc, char **argv)
     if (!strcmp(cmd, "check")) return cmd_check(rest, n);
     if (!strcmp(cmd, "inspect")) return cmd_inspect(rest, n);
     if (!strcmp(cmd, "components")) return cmd_components(rest, n);
+    if (!strcmp(cmd, "export")) return cmd_export(rest, n);
     if (!strcmp(cmd, "lsp") || !strcmp(cmd, "--lsp")) return lsp_main();
     if (!strcmp(cmd, "version") || !strcmp(cmd, "--version")) { printf("triangle %s\n", TRIANGLE_VERSION); return 0; }
     if (!strcmp(cmd, "help") || !strcmp(cmd, "--help") || !strcmp(cmd, "-h")) { usage(stdout); return 0; }

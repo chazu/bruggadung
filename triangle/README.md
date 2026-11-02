@@ -70,8 +70,19 @@ triangle check examples/workshop             # diagnostics, or a summary and the
 triangle inspect mallet examples/workshop    # an instance's spec, each value with its origin
 triangle inspect '#Wrench' examples/workshop # a type's docstring, supertypes and components
 triangle components BG examples/workshop     # what tri-components prints
+triangle export examples/workshop            # every instance as JSON (--yaml for YAML)
+triangle export --seed 7 -e nut examples/workshop   # one entity, constructed from a seed
 triangle lsp                                 # the language server, over stdio
 ```
+
+`export` writes what `cue export` would: a blueprint as its spec (or, with
+`--seed N`, the entity construction makes from that seed), a pattern as it
+is written. Whole and fixed-point numbers are JSON numbers; quantities keep
+their units, as strings (`"19mm"`); atoms and text are strings, lists arrays,
+structures objects (`--types` adds each one's `"#type"`). A value still open,
+such as a range a spec varies over, is written as its constraint in a string
+(`">=10mm & <=24mm"`); `--concrete` makes that an error instead. `-e NAME`,
+repeated, picks instances.
 
 `examples/workshop` is the content [docs/GUIDE.md](docs/GUIDE.md) builds,
 as files split by topic: open one in Emacs to try the mode and the server.

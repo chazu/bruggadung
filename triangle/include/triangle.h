@@ -102,6 +102,10 @@ TriType     tri_primary_parent(const TriContent *content, TriType t);
  * count, and the name of the i-th. */
 size_t      tri_type_feature_count(const TriContent *content, TriType t);
 const char *tri_type_feature(const TriContent *content, TriType t, size_t i);
+/* The built-in functions content may call (len, strings.ToUpper, ...): the
+ * count, and the name of the i-th, with its signature. */
+size_t      tri_function_count(void);
+const char *tri_function(size_t i, const char **signature);
 
 /* Component kinds declared with @component, and their fields' @field flags. */
 size_t      tri_component_count(const TriContent *content);

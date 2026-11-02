@@ -181,7 +181,7 @@ static X *parse_avm(TP *t)
             s->u.st.n = 1;
             v = s;
         }
-        XField fl = { path.v[0], v, NULL, 0, floc, NULL, NULL };
+        XField fl = { path.v[0], v, NULL, 0, floc, NULL };
         VEC_PUSH(fields, fl);
         VEC_FREE(path);
         skip_ws_doc(t);
@@ -269,8 +269,8 @@ static X *parse_difflist(TP *t)
     X *list = finish_list(t, &items, false, tag_node(t, last));
     X *x = xnew(t, X_STRUCT);
     x->u.st.fields = arena_alloc(t->c->load, 2 * sizeof(XField));
-    x->u.st.fields[0] = (XField) { intern(t->c, "list"), list, NULL, 0, tloc(t), NULL, NULL };
-    x->u.st.fields[1] = (XField) { intern(t->c, "last"), tag_node(t, last), NULL, 0, tloc(t), NULL, NULL };
+    x->u.st.fields[0] = (XField) { intern(t->c, "list"), list, NULL, 0, tloc(t), NULL };
+    x->u.st.fields[1] = (XField) { intern(t->c, "last"), tag_node(t, last), NULL, 0, tloc(t), NULL };
     x->u.st.n = 2;
     return x;
 }

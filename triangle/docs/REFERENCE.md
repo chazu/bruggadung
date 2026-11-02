@@ -20,6 +20,7 @@ reference is a bug.
 - [References](#references)
 - [Let](#let)
 - [Comprehensions](#comprehensions)
+- [Built-in functions](#built-in-functions)
 - [Arithmetic](#arithmetic)
 - [Interpolation](#interpolation)
 - [Definite clauses](#definite-clauses)
@@ -47,7 +48,7 @@ Source files have the extension `.tri` and are read as bytes.
 | Tag | `$` then letters, digits, `_` | `$s`, `$room` |
 | Attribute | `@` name, then optionally `(` raw text `)` | Parentheses inside must balance. The text is passed to the attribute unparsed. |
 | Punctuation | `: , { } [ ] ( ) & \| * + / - ... >= <= > < =` | `=` only in `let name = …` |
-| Condition operators | `== != && \|\| !` | Only in an `if`'s condition |
+| Comparison and logic | `== != && \|\| !` | Evaluated when content loads (see [Built-in functions](#built-in-functions)) |
 | Comment | `//` to the end of the line | |
 
 **Escapes.** In a string, `\(…)` interpolates ([below](#interpolation)),
@@ -86,16 +87,21 @@ label       = TYPENAME | STRING | IDENT          (type, atom enum, instance)
 fieldvalue  = IDENT ":" fieldvalue               (path shorthand: a: b: c)
             | expr { ATTR }
 expr        = conj { "|" conj }
-conj        = sum { "&" sum }
+conj        = or { "&" or }
+or          = and { "||" and }
+and         = cmp { "&&" cmp }
+cmp         = sum [ ("==" | "!=" | "<" | "<=" | ">" | ">=") sum ]
 sum         = product { ("+" | "-") product }
 product     = unary { ("*" | "/") unary }
 unary       = "*" unary                          (default)
+            | "!" unary                          (not)
             | (">=" | "<=" | ">" | "<") NUMBER   (bound)
             | ("=~" | "!~") STRING               (regex)
             | primary
 primary     = "_" | "true" | "false"
             | "ref" "(" NUMBER ")"
             | IDENT | TYPENAME | QUALIFIED | PATH | REF | STRING | NUMBER | TAG
+            | FUNCTION "(" [ expr { "," expr } ] ")"   (built-in, no space before "(")
             | struct | list
             | "(" expr ")"
 struct      = "{" { field | let | comprehension | ATTR | "," } "}"
@@ -104,10 +110,7 @@ list        = "[" [ item { "," item } [ "," ] ] [ "..." [ expr ] ] "]"
 item        = expr | comprehension
 comprehension = clause { clause } "{" body "}"
 clause      = "for" IDENT [ "," IDENT ] "in" expr
-            | "if" cond
-cond        = cand { "||" cand }
-cand        = cnot { "&&" cnot }
-cnot        = "!" cnot | "(" cond ")" | sum [ ("==" | "!=" | "<" | "<=" | ">" | ">=") sum ]
+            | "if" expr
 ```
 
 A `*` at the start of a term marks a default. After an operand it multiplies.
@@ -185,9 +188,15 @@ file without one is in the root. Many files may declare the same package.
 | --- | --- |
 | 1 | `\|` disjunction |
 | 2 | `&` conjunction (unification) |
-| 3 | `+` `-` |
-| 4 | `*` `/` (between operands) |
-| 5 | `*` default, `>=` `<=` `>` `<` bounds, `=~` `!~` regexes (prefix) |
+| 3 | `\|\|` or |
+| 4 | `&&` and |
+| 5 | `==` `!=` `<` `<=` `>` `>=` comparison (between operands) |
+| 6 | `+` `-` |
+| 7 | `*` `/` (between operands) |
+| 8 | `*` default, `>=` `<=` `>` `<` bounds, `=~` `!~` regexes, `!` not (prefix) |
+
+A bound and a comparison share their symbols: at the start of a term `>=10mm`
+is a bound; between two operands `a >= b` compares them.
 
 | Construct | Meaning |
 | --- | --- |
@@ -492,11 +501,9 @@ shelf: #Shelf & {
   closed list only: an open one's items aren't all written. Data from
   another declaration must be plain values, without its own references or
   tags; a declaration whose comprehensions it reads is expanded first.
-- **`if cond`** keeps what follows when the condition holds. A condition
-  compares numbers (`== != < <= > >=`, of one kind), compares strings and
-  atoms (`==`, `!=`), or is `true` or `false`; `&&`, `||`, `!` and
-  parentheses combine them. Everything in it must be known when content
-  loads.
+- **`if cond`** keeps what follows when the condition holds: an expression
+  that is `true` or `false` when content loads, such as a comparison (see
+  [Built-in functions](#built-in-functions)).
 - **Computed labels:** `(expr): value` or `"\(k)_x": value`, a string that is
   a field's name. A computed field is like any written one: its feature must
   belong to the struct's type, and in a type's body it introduces the
@@ -508,6 +515,57 @@ shelf: #Shelf & {
   declaration's, and share as usual.
 - Comprehensions make at most 100,000 items or fields per declaration.
   Comprehensions that make declarations are not supported.
+
+## Built-in functions
+
+CUE's `len`, `div`, `mod`, `quo` and `rem`, a part of its `strings`, `list`
+and `math` packages, and its comparisons and logic. Like comprehensions,
+they are evaluated when content loads, over data written in the content
+(literals, lets, fields of this or another declaration, comprehensions'
+variables), and become the value they give. Nothing at runtime calls them,
+and an argument not known by then is an error. No `import` is needed.
+
+```cue
+let names = ["oak", "Ash ", "elm"]
+r: #R & {
+    n:  len(names) * 10                                    // 30
+    s:  strings.Join([for x in names { strings.ToUpper(strings.TrimSpace(x)) }], "-")   // "OAK-ASH-ELM"
+    ok: strings.HasPrefix("wrench", "wr") && len(names) > 2  // true
+    l:  list.Range(0, 10, 3)                               // [0, 3, 6, 9]
+}
+```
+
+| Function | Gives |
+| --- | --- |
+| `len(x)` | Items of a closed list, fields of a struct, bytes of a string. |
+| `div(a, b)`, `mod(a, b)` | Euclidean quotient and remainder: `0 <= mod < \|b\|`. |
+| `quo(a, b)`, `rem(a, b)` | Quotient and remainder truncated toward zero. |
+| `math.Abs(x)` | Any number, in its kind. |
+| `math.Floor`, `math.Ceil`, `math.Round`, `math.Trunc` | A whole number, from `int` or `fixed`. `Round` is half away from zero. |
+| `strings.ToUpper`, `strings.ToLower` | ASCII letters only. |
+| `strings.TrimSpace(s)` | Without leading and trailing white space. |
+| `strings.Contains`, `strings.HasPrefix`, `strings.HasSuffix` | `true` or `false`. |
+| `strings.Index(s, sub)` | The first byte offset of `sub`, or -1. |
+| `strings.Join(list, sep)`, `strings.Split(s, sep)` | `Split` with `""` splits into characters. |
+| `strings.Replace(s, old, new, n)` | At most `n` replacements; -1 for all. |
+| `strings.Repeat(s, n)` | |
+| `list.Sum`, `list.Max`, `list.Min` | Numbers of one kind, in that kind. `Sum` of `[]` is 0. |
+| `list.Product` | Whole numbers. |
+| `list.Contains(list, v)` | Equal numbers of a kind, or equal strings and atoms. |
+| `list.Concat(lists)`, `list.Range(start, limit, step)` | `Range` counts from `start` toward `limit`, excluding it. |
+| `list.Slice(l, i, j)`, `list.Take(l, n)`, `list.Drop(l, n)`, `list.Repeat(l, n)` | |
+| `list.SortStrings(l)` | Strings, in byte order. |
+
+**Comparisons and logic** are expressions too, also evaluated at load:
+`==` `!=` `<` `<=` `>` `>=` compare numbers of one kind; `==` and `!=`
+compare strings and atoms; `&&`, `||` and `!` combine `true` and `false`.
+`ok: .count > 2` is `true` or `false` once content loads, never a
+constraint between fields, since that is what arithmetic and tags are for.
+
+**Hidden fields.** CUE's `_name: value` is a [let](#let): in a struct or a
+file, `_base: 10` names a value for the struct's fields to use, and is not a
+feature, so closedness, specs and exports never see it. Declared twice, it
+is an error rather than unified.
 
 ## Arithmetic
 
@@ -660,6 +718,14 @@ location of the other declaration where there is one.
 | `literal is not a whole number of quanta: 0.05mm` | The value can't be represented exactly. |
 | `malformed number`, `number out of range`, `quantity out of range` | |
 
+**Built-in functions**
+
+| Message | Cause |
+| --- | --- |
+| `unknown function f: the built-ins are …` | A name followed directly by `(` that isn't a built-in. |
+| `f takes n arguments: signature` | |
+| `f: takes …`, `f: division by zero`, `f: of an empty list`, … | An argument of the wrong kind, or not known when content loads. |
+
 **References and let**
 
 | Message | Cause |
@@ -684,9 +750,8 @@ location of the other declaration where there is one.
 | `a comprehension can't go through an open list: its items aren't all written` | |
 | `x.f holds .r, which belongs to x: a comprehension reads values as written, …` | Data from another declaration that has its own references or tags. |
 | `x: its comprehensions read y, whose comprehensions read it back` | A cycle between declarations' comprehensions. |
-| `an if's condition is true or false, known when content loads: not X` | |
-| `an if compares values known when content loads: …`, `an if compares numbers of different kinds` | |
-| `a comparison (==, !=, &&, \|\|) belongs only in an if` | |
+| `a condition is true or false, known when content loads: not X` | |
+| `a comparison is of values known when content loads: …`, `a comparison of numbers of different kinds` | |
 | `a computed label is a string: not X`, `a computed label must be a field's name: not "…"` | |
 | `x.f: its value has no such field or item` | A variable's path its value doesn't have. |
 | `for x: an instance has this name, and a for's variable may not hide it`, `x: the name is already bound, by the for at line:col` | |

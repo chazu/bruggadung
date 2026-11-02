@@ -112,6 +112,13 @@
     (should (memq (triangle-test-face-at "if:") '(font-lock-property-name-face font-lock-variable-name-face)))
     (should (equal (triangle-test-reindent "a: [\nfor x in xs {\nb: x\n}\n]\n") "a: [\n    for x in xs {\n        b: x\n    }\n]\n"))))
 
+(ert-deftest triangle-test-builtins ()
+  (triangle-test-with "r: #R & { n: len(xs) + list.Sum(ys), s: strings.ToUpper(\"a\"), _base: 1, len: 2 }\n"
+    (should (eq (triangle-test-face-at "len(") 'font-lock-builtin-face))
+    (should (eq (triangle-test-face-at "list.Sum") 'font-lock-builtin-face))
+    (should (eq (triangle-test-face-at "strings.ToUpper") 'font-lock-builtin-face))
+    (should (memq (triangle-test-face-at "len:") '(font-lock-property-name-face font-lock-variable-name-face)))))
+
 (defun triangle-test-reindent (text)
   "Return TEXT with every line's indentation removed, then reindented."
   (with-temp-buffer
