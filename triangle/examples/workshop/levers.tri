@@ -1,4 +1,5 @@
-// Arithmetic: a lever's torque from its force and arm (GUIDE.md section 9).
+// Arithmetic: a lever's torque from its force and arm, and a ratchet's reach
+// (GUIDE.md section 9).
 //
 // Generated from docs/GUIDE.md: edit the guide, then rerun
 // `make examples`. test_docs_guide checks these files mean the same content.
@@ -18,9 +19,3 @@ let socket = 30mm
 #Ratchet: #Lever & { reach: .arm + socket }
 
 ratchet: #Ratchet & { material: "steel", size: 30cm, mass: 1kg, arm: 0.25m, force: 60N }
-
-let ratios = [1, 2, 4]
-
-#Gearbox: #Tool & { teeth: [...int] }
-
-gearbox: #Gearbox & { material: "steel", size: 20cm, mass: 3kg, teeth: [for r in ratios if r > 1 { r * 12 }] }

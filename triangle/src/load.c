@@ -3526,7 +3526,7 @@ static void resolve_packages(Content *c)
  * rest of the engine never sees one. */
 
 typedef struct Env { const CompVar *var; X *value; const struct Env *up; } Env;
-typedef struct { Content *c; X *root; bool ok; size_t made; } Exp;
+typedef struct { Content *c; X *root; bool ok; size_t made; int refdepth; } Exp;
 typedef VEC(XField) FieldVec;
 
 enum { EXPAND_MAX = 100000 };      /* items and fields a declaration's comprehensions may make */
@@ -3622,6 +3622,7 @@ static X *enum_list(Exp *e, const Decl *d, Loc loc)
 }
 
 static bool expand_decl(Content *c, Decl *d, Loc from);
+static X *expand(Exp *e, X *x, const Env *env);
 
 /* A tag or reference anywhere in x, or NULL. */
 static const char *x_tag_in(const X *x)
@@ -3659,6 +3660,13 @@ static X *data_of(Exp *e, X *x, int depth)
             exp_error(e, x->loc, msg);
             return x;
         }
+        /* the field as it will be: its own comprehensions expanded */
+        if (++e->refdepth > 32) {
+            exp_error(e, x->loc, "references that comprehensions read go around in a circle");
+            return x;
+        }
+        v = expand(e, v, NULL);
+        e->refdepth--;
         return data_of(e, v, depth + 1);
     }
     if (x->k == X_NAME) {
@@ -3709,8 +3717,6 @@ static X *atom_of(Exp *e, const char *s, size_t n, Loc loc)
 
 /* The keys and values a source gives: a list's indexes and items, a struct's
  * labels and values. */
-static X *expand(Exp *e, X *x, const Env *env);
-
 static bool comp_items(Exp *e, X *src, Loc loc, XPtrVec *keys, XPtrVec *vals)
 {
     /* expanded: another declaration's data may have comprehensions of its own */
@@ -4022,7 +4028,7 @@ static bool expand_decl(Content *c, Decl *d, Loc from)
         return false;
     }
     d->expstate = 1;
-    Exp e = { c, d->value, true, 0 };
+    Exp e = { c, d->value, true, 0, 0 };
     X *v = expand(&e, d->value, NULL);
     d->value = v;                            /* the decls vector doesn't move here */
     d->expstate = 2;
@@ -4040,7 +4046,7 @@ static bool expand_all(Content *c)
 
 X *expand_value(Content *c, X *x, bool *ok)
 {
-    Exp e = { c, x, true, 0 };
+    Exp e = { c, x, true, 0, 0 };
     X *r = expand(&e, x, NULL);
     *ok = e.ok;
     return r;

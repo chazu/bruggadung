@@ -1,0 +1,25 @@
+// Text: escapes, raw strings, regular expressions and interpolation
+// (GUIDE.md section 11).
+//
+// Generated from docs/GUIDE.md: edit the guide, then rerun
+// `make examples`. test_docs_guide checks these files mean the same content.
+
+// 11. Text
+
+#Labelled: {
+    label: text & =~#"^[A-Z][a-z]+-\d+$"#
+    note:  text
+}
+
+#Tin: #Physical & #Labelled & {
+    @component(Tin)
+    count: int & >=1 & <=500 @field(content)
+}
+
+tin_of_nails: #Tin & {
+    material: "steel"
+    mass:     400g
+    count:    120
+    label:    "Nails-\(.count)"
+    note:     "for \"soft\" wood\tonly"
+}

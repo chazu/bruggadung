@@ -1,0 +1,32 @@
+// Data: comprehensions, built-in functions and hidden fields (GUIDE.md
+// section 10).
+//
+// Generated from docs/GUIDE.md: edit the guide, then rerun
+// `make examples`. test_docs_guide checks these files mean the same content.
+
+// 10. Data: comprehensions and functions
+
+let ratios = [1, 2, 4]
+
+#Gearbox: #Tool & { teeth: [...int] }
+
+gearbox: #Gearbox & { material: "steel", size: 20cm, mass: 3kg, teeth: [for r in ratios if r > 1 { r * 12 }] }
+
+let sizes = [10mm, 13mm, 17mm, 19mm, 24mm]
+
+// How many of each material a rack holds.
+#Stock: { for m in #Material { (m): int & >=0 & <=50 } }
+
+#Rack: #Physical & {
+    @component(Rack)
+    slots: [...length] @field(content)
+    stock: #Stock      @field(content)
+}
+
+rack: #Rack & {
+    _spare:   2
+    material: "oak"
+    mass:     12kg
+    slots:    [for s in sizes if s > 12mm { s }]
+    stock:    { steel: len(.slots) + _spare, brass: 0, oak: 0, ash: list.Sum([1, 2]) }
+}

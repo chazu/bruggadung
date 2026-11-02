@@ -733,8 +733,9 @@ void test_docs_guide(void)
     CHECK_STR(tri_doc(c, "#Physical"), "Anything with mass and a material.");
     /* examples/workshop is the same content, split by topic (make examples) */
     {
-        const char *files[] = { "examples/workshop/blueprints.tri", "examples/workshop/levers.tri",
-                                "examples/workshop/operations.tri", "examples/workshop/rooms.tri",
+        const char *files[] = { "examples/workshop/blueprints.tri", "examples/workshop/data.tri",
+                                "examples/workshop/levers.tri", "examples/workshop/operations.tri",
+                                "examples/workshop/rooms.tri", "examples/workshop/text.tri",
                                 "examples/workshop/things.tri" };
         TriContent *ex = tri_content_load(files, sizeof files / sizeof *files);
         CHECK(tri_content_ok(ex));
@@ -800,6 +801,17 @@ void test_docs_guide(void)
     CHECK_STR(printed(c, tri_at(c, tri_spec(c, "breaker"), "torque")), "40Nm");
     CHECK_STR(printed(c, tri_at(c, tri_spec(c, "ratchet"), "reach")), "280mm");
     CHECK_STR(printed(c, tri_at(c, tri_spec(c, "gearbox"), "teeth.rest.first")), "48");
+    /* §10–11: data and text */
+    const TriNode *rack = tri_spec(c, "rack");
+    CHECK_STR(printed(c, tri_at(c, rack, "slots.first")), "13mm");
+    CHECK_STR(printed(c, tri_at(c, rack, "stock.steel")), "6");
+    CHECK_STR(printed(c, tri_at(c, rack, "stock.ash")), "3");
+    CHECK(tri_type_feature_count(c, tri_type_named(c, "#Stock")) == 4);
+    const TriNode *tin = tri_spec(c, "tin_of_nails");
+    CHECK_STR(printed(c, tri_at(c, tin, "label")), "\"Nails-120\"");
+    char note[64];
+    tri_text(c, tri_at(c, tin, "note"), note, sizeof note);
+    CHECK_STR(note, "for \"soft\" wood\tonly");
     const TriNode *sol[8];
     int trunc;
     CHECK(tri_solve(c, tri_value(c, "#Way & { from: \"kitchen\" }", a, NULL, 0), 10, sol, 8, a, &trunc) == 3 && !trunc);

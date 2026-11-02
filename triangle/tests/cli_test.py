@@ -41,7 +41,7 @@ def main(exe):
     rc, out, _ = run(exe, "export", "--yaml", "-e", "gearbox", ws)
     check(rc == 0 and out.startswith("gearbox:\n") and "  teeth:\n    - 24\n    - 48\n" in out, "YAML")
     rc, out, _ = run(exe, "export", ws)
-    check(rc == 0 and len(json.loads(out)) == 16, "every instance by default")
+    check(rc == 0 and len(json.loads(out)) == 18, "every instance by default")
     rc, _, err = run(exe, "export", "-e", "nonesuch", ws)
     check(rc == 1 and "no instance named nonesuch" in err, "an unknown name is an error")
     rc, _, err = run(exe, "inspect", "loosen", ws)

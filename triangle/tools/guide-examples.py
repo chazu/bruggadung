@@ -16,9 +16,14 @@ FILES = {
                                      "// alternatives (GUIDE.md sections 4 to 7)."),
     "operations.tri": ([8], "Patterns: operations that match a situation, with tags that share a\n"
                             "// value (GUIDE.md section 8)."),
-    "levers.tri": ([9], "Arithmetic: a lever's torque from its force and arm (GUIDE.md section 9)."),
-    "rooms.tri": ([10], "Definite clauses: doors between rooms, and the ways through them\n"
-                        "// (GUIDE.md section 10)."),
+    "levers.tri": ([9], "Arithmetic: a lever's torque from its force and arm, and a ratchet's reach\n"
+                        "// (GUIDE.md section 9)."),
+    "data.tri": ([10], "Data: comprehensions, built-in functions and hidden fields (GUIDE.md\n"
+                       "// section 10)."),
+    "text.tri": ([11], "Text: escapes, raw strings, regular expressions and interpolation\n"
+                       "// (GUIDE.md section 11)."),
+    "rooms.tri": ([12], "Definite clauses: doors between rooms, and the ways through them\n"
+                        "// (GUIDE.md section 12)."),
 }
 
 

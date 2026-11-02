@@ -70,7 +70,7 @@ mild and forged steel. That matters later, when entities are constructed.
 ## 3. A hierarchy
 
 Types inherit by conjunction. The first conjunct is the **primary parent**,
-which memory decay follows (§12):
+which memory decay follows (§14):
 
 ```cue
 #Tool: #Physical & #Sized & {
@@ -342,6 +342,8 @@ ratchet: #Ratchet & { material: "steel", size: 30cm, mass: 1kg, arm: 0.25m, forc
 each use is its value afresh. Its name may not be an instance's or a built-in
 type's, so it never hides one.
 
+## 10. Data: comprehensions and functions
+
 `for` and `if` make a list's items, or a struct's fields, from data written
 in the content:
 
@@ -353,11 +355,85 @@ let ratios = [1, 2, 4]
 gearbox: #Gearbox & { material: "steel", size: 20cm, mass: 3kg, teeth: [for r in ratios if r > 1 { r * 12 }] }
 ```
 
-`gearbox`'s teeth are `[24, 48]`. Comprehensions are expanded when content
-loads, so nothing else ever sees one; their sources and conditions must be
-known by then (REFERENCE.md, Comprehensions).
+`gearbox`'s teeth are `[24, 48]`. `r * 12` is ordinary arithmetic, made once
+per ratio.
 
-## 10. Definite clauses
+A comprehension can also make a type's fields, one per member of an enum,
+and CUE's built-in functions work on the data:
+
+```cue
+let sizes = [10mm, 13mm, 17mm, 19mm, 24mm]
+
+// How many of each material a rack holds.
+#Stock: { for m in #Material { (m): int & >=0 & <=50 } }
+
+#Rack: #Physical & {
+    @component(Rack)
+    slots: [...length] @field(content)
+    stock: #Stock      @field(content)
+}
+
+rack: #Rack & {
+    _spare:   2
+    material: "oak"
+    mass:     12kg
+    slots:    [for s in sizes if s > 12mm { s }]
+    stock:    { steel: len(.slots) + _spare, brass: 0, oak: 0, ash: list.Sum([1, 2]) }
+}
+```
+
+- `(m): int …` is a **computed label**: `#Stock` gets the fields `steel`,
+  `brass`, `oak` and `ash`, introduced as if written one by one.
+- `rack`'s slots are `[13mm, 17mm, 19mm, 24mm]`, and it holds 6 steel things:
+  `len(.slots)` counts the slots the comprehension made, and `_spare` adds 2.
+- `_spare` is a **hidden field**, CUE's spelling of a `let`. It isn't a
+  feature of `#Rack`, so specs and exports never show it.
+- `len`, `list.Sum`, `strings.Join` and the other built-ins (REFERENCE.md,
+  Built-in functions) take values known when content loads, like
+  comprehensions, and become the value they give.
+
+All of this is expanded when content loads, so nothing else ever sees a
+comprehension or a call. Their sources and arguments must be known by then:
+`for s in .slots` reads the slots as written in this declaration, not values
+that unification computes later. That is the one place they differ from CUE.
+
+## 11. Text
+
+Strings take CUE's escapes, and raw strings take none:
+
+```cue
+#Labelled: {
+    label: text & =~#"^[A-Z][a-z]+-\d+$"#
+    note:  text
+}
+
+#Tin: #Physical & #Labelled & {
+    @component(Tin)
+    count: int & >=1 & <=500 @field(content)
+}
+
+tin_of_nails: #Tin & {
+    material: "steel"
+    mass:     400g
+    count:    120
+    label:    "Nails-\(.count)"
+    note:     "for \"soft\" wood\tonly"
+}
+```
+
+- `#"…"#` is a **raw string**: `\d` stays a backslash and a `d`, as a regular
+  expression wants. In an ordinary string `\d` is an error, and the message
+  suggests the raw form.
+- `=~` constrains text by a regular expression (RE2's syntax, as in CUE), and
+  `!~` by its negation. The constraint waits until the text is concrete:
+  `label: "nails"` would fail, with `conflict at label`.
+- `"Nails-\(.count)"` is an **interpolation**: it becomes `"Nails-120"` once
+  `count` is known. Like arithmetic, it is a constraint, so it also works in
+  types and at runtime, and waits while a part is open.
+- `note` holds a quote and a tab. A string means its contents, however it is
+  spelled, and prints back in one canonical spelling that parses as itself.
+
+## 12. Definite clauses
 
 Some questions need recursion, such as which rooms you can reach. Clauses are
 ordinary instances of two built-in types, `#Fact` and `#Clause`:
@@ -404,7 +480,7 @@ caller learns if it cut any short.
 Clauses suit short relational inferences. Search over the map, such as
 pathfinding, belongs in engine code.
 
-## 11. Runtime values
+## 13. Runtime values
 
 The game builds descriptions at runtime from the same syntax:
 
@@ -417,7 +493,11 @@ it, and neither does a choice between separate numbers. Both are errors.
 Free text and referents are welcome: `name: "the miller's wrench"` is a
 `text` value, and `owner: ref(12)` is a handle to entity 12.
 
-## 12. Knowledge and memory decay
+References, lets and comprehensions work in runtime values too:
+`#Roles & { instrument: { size: 19mm }, target: { size: .instrument.size } }`
+describes a nut that fits the wrench.
+
+## 14. Knowledge and memory decay
 
 An agent's knowledge of a thing is a description, usually less specific than
 the truth. Two operations matter:
@@ -428,6 +508,31 @@ the truth. Two operations matter:
   `"forged"` becomes `"steel"`, then `#Material`. A number widens by its
   field's `@widen` step, such as `height: length @widen(5cm)`; a number
   without one is forgotten in one step.
+
+## 15. Checking and exporting
+
+The `triangle` command loads content from files or directories:
+
+```text
+$ triangle check examples/workshop
+examples/workshop/blueprints.tri:21:1: warning: hammer: conflicting defaults for material from #Wooden, #Metal; both dropped
+ok: 72 types, 18 instances, 6 components, 1 warning; hash …
+$ triangle inspect rack examples/workshop        # the spec, and where each value came from
+$ triangle export -e wrench_19 examples/workshop
+{
+  "wrench_19": {
+    "mass": "850g",
+    "material": "steel",
+    "size": "19mm",
+    "wear": 0
+  }
+}
+```
+
+`export` writes JSON, or YAML with `--yaml`, as `cue export` does. A
+blueprint is written as its spec, or with `--seed N` as the entity
+construction makes from that seed. A value a spec leaves open is written as
+its constraint, such as `">=10mm & <=24mm"` for the nut's size.
 
 ## Five things that surprise
 

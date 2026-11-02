@@ -108,6 +108,8 @@ void test_comprehension_errors(void)
           "y.sizes holds .steel, which belongs to y: a comprehension reads values as written" },
         { "y: #Shelf & { sizes: [for s in x.sizes { s }] }\nx: #Shelf & { sizes: [for s in y.sizes { s }] }\n",
           "its comprehensions read y, whose comprehensions read it back" },
+        { "#T: { a: [...int], b: [...int] }\nt: #T & { a: [for x in .b { x }], b: [for x in .a { x }] }\n",
+          "references that comprehensions read go around in a circle" },
     };
     for (size_t i = 0; i < sizeof cases / sizeof *cases; i++) {
         char src[1024];
@@ -124,7 +126,8 @@ void test_comprehension_errors(void)
 void test_builtins(void)
 {
     TriContent *c = load1(
-        "#R: { n: int, s: text, ok: bool, no: bool, l: [...int], ts: [...text], f: int, len: length, i: int, x: fixed }\n"
+        "#R: { n: int, s: text, ok: bool, no: bool, l: [...int], ts: [...text], f: int, len: length, i: int, x: fixed,\n"
+        "      odd: [...int], counted: int }\n"
         "let names = [\"oak\", \"Ash \", \"elm\"]\n"
         "r: #R & {\n"
         "    _base: 10\n"
@@ -138,6 +141,8 @@ void test_builtins(void)
         "    len: list.Sum([1mm, 2.5mm]) + math.Abs(-1mm)\n"
         "    i: quo(-7, 2) * 10 + rem(-7, 2) + strings.Index(\"spanner\", \"ann\") + len(list.Concat([[1], [2, 3]]))\n"
         "    x: 0.5\n"
+        "    odd: [for v in [1, 2, 3] if mod(v, 2) == 1 { v }]\n"
+        "    counted: len(.odd)\n"
         "}\n"
         /* a hidden field is a let: it is no feature, and each use copies it */
         "#P: { a: int, b: int }\n"
@@ -154,6 +159,7 @@ void test_builtins(void)
     CHECK_STR(printed(c, tri_at(c, r, "ts.first")), "\"a\"");
     CHECK_STR(printed(c, tri_at(c, r, "ts.rest.rest.first")), "\"c\"");
     CHECK(num(c, r, "f") == 20);
+    CHECK(num(c, r, "counted") == 2);           /* len of a field that a comprehension makes: its items */
     CHECK_STR(printed(c, tri_at(c, r, "len")), "4.5mm");
     CHECK(num(c, r, "i") == -30 - 1 + 2 + 3);      /* quo, rem truncate; "ann" is at 2 */
     const TriNode *p = tri_spec(c, "p");

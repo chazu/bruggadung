@@ -1,10 +1,10 @@
 // Definite clauses: doors between rooms, and the ways through them
-// (GUIDE.md section 10).
+// (GUIDE.md section 12).
 //
 // Generated from docs/GUIDE.md: edit the guide, then rerun
 // `make examples`. test_docs_guide checks these files mean the same content.
 
-// 10. Definite clauses
+// 12. Definite clauses
 
 #Room: "kitchen" | "hall" | "cellar" | "yard"
 #Link: { from: #Room, to: #Room }
