@@ -274,6 +274,9 @@ full.
 5. **Abstract progression** (decision 4). Authored progression in content,
    applied in bulk, deterministic by seed; summaries settled on rising;
    activities handed over on falling.
+   Designed in DETAIL_REGIMES.md: regimes per kind and level, the systems
+   level by level, the forms of progression and what Triangle can compute
+   of each, and the steps.
 6. **Threads** (decision 8). The audit of shared state; perception and
    decision across workers; a fixed commit order.
 
