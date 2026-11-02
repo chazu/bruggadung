@@ -285,6 +285,41 @@ def main(exe):
                                               "position": pos(REFS, "fit.instrument", 1)})["result"]
     check(len(r) == 1 and r[0]["range"]["start"] == pos(REFS, "fit: #Fit"), "a path goes to its declaration")
 
+    # references to a field, from a reference or from its label
+    ctx = {"includeDeclaration": True}
+    r = s.request("textDocument/references", {"textDocument": {"uri": ruri}, "position": pos(REFS, ".instrument.size", 3),
+                                              "context": ctx})["result"]
+    check(sorted(x["range"]["start"]["line"] for x in r) == [3, 4], "references to a field, from a reference")
+    r = s.request("textDocument/references", {"textDocument": {"uri": ruri}, "position": pos(REFS, "size: 19mm"),
+                                              "context": ctx})["result"]
+    check(sorted(x["range"]["start"]["line"] for x in r) == [3, 4], "and from its label")
+    r = s.request("textDocument/references", {"textDocument": {"uri": ruri}, "position": pos(REFS, "size: 19mm"),
+                                              "context": {"includeDeclaration": False}})["result"]
+    check([x["range"]["start"]["line"] for x in r] == [3], "without the label itself")
+    r = s.request("textDocument/references", {"textDocument": {"uri": ruri}, "position": pos(REFS, ".steps[0]", 2),
+                                              "context": ctx})["result"]
+    check(len(r) == 2, "a list's references count its items as the list (%d)" % len(r))
+
+    # completion of a reference: the fields at the path written so far
+    def complete(text, at):
+        s.notify("textDocument/didChange", {"textDocument": {"uri": ruri, "version": 9},
+                                            "contentChanges": [{"text": text}]})
+        s.diagnostics(ruri)
+        res = s.request("textDocument/completion", {"textDocument": {"uri": ruri}, "position": pos(text, at, len(at))})
+        return res["result"]["items"]
+    typing = REFS.replace("steps: [twice,", "steps: [.instrument.w,")
+    items = complete(typing, ".instrument.w")
+    labels = sorted(i["label"] for i in items)
+    check(labels == ["size", "wear"], "completion after .instrument. offers its type's fields (%s)" % labels)
+    check(items and items[0]["textEdit"]["range"]["start"] == pos(typing, ".instrument.w", 12),
+          "and replaces only the last segment")
+    typing = REFS.replace("steps: [twice,", "steps: [.,")
+    labels = sorted(i["label"] for i in complete(typing, "[."))
+    check(labels == ["instrument", "steps"], "after a lone . the declaration's fields (%s)" % labels)
+    s.notify("textDocument/didChange", {"textDocument": {"uri": ruri, "version": 10},
+                                        "contentChanges": [{"text": REFS}]})
+    check(s.diagnostics(ruri) == [], "back to clean")
+
     r = s.request("textDocument/hover", {"textDocument": {"uri": uri["instances.tri"]},
                                          "position": {"line": 0, "character": 3}})
     check(r["result"] is None, "hover in a comment is empty")

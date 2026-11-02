@@ -3749,6 +3749,17 @@ const char *tri_component_name(const TriContent *c, size_t i)
 
 TriType tri_component_type(const TriContent *c, size_t i) { return component_type_at(c, i); }
 
+size_t tri_type_feature_count(const TriContent *c, TriType t)
+{
+    return t < c->types.n ? c->types.v[t].feats.n : 0;
+}
+
+const char *tri_type_feature(const TriContent *c, TriType t, size_t i)
+{
+    if (t >= c->types.n || i >= c->types.v[t].feats.n) return NULL;
+    return c->feats.v[c->types.v[t].feats.v[i]].name;
+}
+
 size_t tri_type_components(const TriContent *c, TriType t, size_t *out, size_t max)
 {
     size_t n = 0, k = 0;

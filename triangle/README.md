@@ -94,7 +94,13 @@ milliseconds. It provides:
 - **Go to definition** (every declaration of a name, in any file),
   **references**, **document symbols** and **workspace symbols**.
 - **Completion** of type and instance names (qualified where the package
-  requires it), features, built-in types, and attributes after `@`.
+  requires it), features, built-in types, and attributes after `@`. After a
+  reference's dot (`.instrument.`), the fields at that path: its type's, and
+  those the declaration writes.
+- **References within a declaration**: on a reference (`.instrument.size`),
+  go to definition finds the field's label, hover shows its value, and
+  references lists the other references to it, as it does from a field's
+  label. Go to definition and hover work on a `let`'s name too.
 
 Names resolve by the package rules: inside a package, a plain name is the
 package's own if it declares one, else the root's. A string resolves to an

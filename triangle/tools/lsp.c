@@ -571,34 +571,22 @@ static int token_at(const char *text, size_t off, Tok *out)
 
 static int punct_is(const char *text, const Tok *t, char ch) { return t->k == K_PUNCT && text[t->start] == ch; }
 
-/* Finds the label of the field at `path` ("instrument.size"; list indexes
- * dropped) among the tokens of a declaration, [first, last). A label's path
- * follows its nesting: the fields of a struct are one deeper than the label
- * the struct is the value of, and `a: b: c` nests too. Returns the token of
- * the deepest label along the path, or -1. */
-static long find_field(const char *text, const Toks *t, size_t first, size_t last, const char *path)
+/* A field label in a declaration, with its path ("instrument.size"). */
+typedef struct { size_t tok; char path[256]; } Label;
+typedef struct { Label *v; size_t n, cap; } Labels;
+
+/* The field labels among the tokens of a declaration, [first, last), with
+ * their paths. A label's path follows its nesting: the fields of a struct are
+ * one deeper than the label the struct is the value of, and `a: b: c` nests
+ * too. List items add nothing: their fields are the list's. */
+static void decl_labels(const char *text, const Toks *t, size_t first, size_t last, Labels *out)
 {
     enum { MAXD = 64 };
-    const char *want[MAXD];
-    size_t wlen[MAXD];
-    int nwant = 0;
-    for (const char *p = path; *p && nwant < MAXD;) {
-        if (*p == '.') p++;
-        if (*p == '[') { while (*p && *p != ']') p++; if (*p) p++; continue; }
-        size_t n = strcspn(p, ".[");
-        if (!n) break;
-        want[nwant] = p;
-        wlen[nwant++] = n;
-        p += n;
-    }
+    out->n = 0;
     int base = t->v[first].depth;
     int fields_level[MAXD], last_label[MAXD];
-    int matched[MAXD + 1];               /* matched[l]: labels at levels < l are on the path */
+    size_t at_level[MAXD];               /* the label token at each level of the current path */
     for (int d = 0; d < MAXD; d++) { fields_level[d] = 0; last_label[d] = -1; }
-    for (int l = 0; l <= MAXD; l++) matched[l] = 0;
-    matched[0] = 1;
-    long best = -1;
-    int bestlevel = -1;
     for (size_t i = first + 1; i < last; i++) {
         Tok *k = &t->v[i];
         int d = k->depth - base;
@@ -616,11 +604,44 @@ static long find_field(const char *text, const Toks *t, size_t first, size_t las
         int level = shorthand ? (i - 2 == first ? 0 : last_label[d] + 1) : fields_level[d];
         if (level >= MAXD) continue;
         last_label[d] = level;
-        int on = level < nwant && matched[level] && k->end - k->start == wlen[level] &&
-                 !strncmp(text + k->start, want[level], wlen[level]);
-        matched[level + 1] = on;
-        for (int l = level + 2; l <= MAXD; l++) matched[l] = 0;
-        if (on && level > bestlevel) { best = (long) i; bestlevel = level; }
+        at_level[level] = i;
+        if (out->n == out->cap) out->v = realloc(out->v, (out->cap = out->cap ? out->cap * 2 : 32) * sizeof *out->v);
+        Label *l = &out->v[out->n++];
+        l->tok = i;
+        size_t len = 0;
+        l->path[0] = 0;
+        for (int v = 0; v <= level; v++) {
+            const Tok *a = &t->v[at_level[v]];
+            int n = snprintf(l->path + len, sizeof l->path - len, "%s%.*s", v ? "." : "", (int) (a->end - a->start),
+                             text + a->start);
+            if (n < 0 || (size_t) n >= sizeof l->path - len) break;
+            len += (size_t) n;
+        }
+    }
+}
+
+/* A reference's path as labels have it: no leading dot, no list indexes. */
+static void field_path(const char *ref, size_t n, char *out, size_t cap)
+{
+    size_t o = 0;
+    if (n && *ref == '.') { ref++; n--; }
+    for (size_t i = 0; i < n && o + 1 < cap; i++) {
+        if (ref[i] == '[') { while (i < n && ref[i] != ']') i++; continue; }
+        out[o++] = ref[i];
+    }
+    out[o] = 0;
+}
+
+/* The label of the field at `path` (as field_path gives it), or else of its
+ * deepest written ancestor; -1 when none is written. */
+static long find_field(const Labels *ls, const char *path)
+{
+    long best = -1;
+    size_t bestlen = 0;
+    for (size_t i = 0; i < ls->n; i++) {
+        size_t n = strlen(ls->v[i].path);
+        if (strncmp(path, ls->v[i].path, n) || (path[n] && path[n] != '.')) continue;
+        if (best < 0 || n > bestlen) { best = (long) ls->v[i].tok; bestlen = n; }
     }
     return best;
 }
@@ -818,6 +839,55 @@ static char *name_at(const At *at, Tok *tok)
     return name;
 }
 
+/* The declaration holding offset `off` of the document, and its tokens
+ * [first, last) among t. */
+static int decl_at(const At *at, const Toks *t, size_t off, TriDecl *decl, size_t *first, size_t *last)
+{
+    for (size_t i = 0; i < at->b->ndecls; i++) {
+        TriDecl d = at->b->decls[i];
+        if (strcmp(d.file, at->path)) continue;
+        size_t s, le, e;
+        decl_span(at->b, &d, at->text, &s, &le, &e);
+        if (off < s || off > e) continue;
+        size_t f = 0;
+        while (f < t->n && t->v[f].start < s) f++;
+        if (f >= t->n) return 0;
+        size_t l = f;
+        while (l < t->n && t->v[l].start < e) l++;
+        *decl = d;
+        *first = f;
+        *last = l;
+        return 1;
+    }
+    /* None recorded, as while a file doesn't lex: the declaration from the
+     * tokens, a name at the start of a line followed by ':', to the next one. */
+    static char name[512];
+    long f = -1;
+    for (size_t i = 0; i + 1 < t->n && t->v[i].start <= off; i++)
+        if (t->v[i].depth == 0 && (t->v[i].k == K_NAME || t->v[i].k == K_STRING) && punct_is(at->text, &t->v[i + 1], ':') &&
+            (t->v[i].start == 0 || at->text[t->v[i].start - 1] == '\n'))
+            f = (long) i;
+    if (f < 0) return 0;
+    size_t l = (size_t) f + 2;
+    while (l + 1 < t->n && !(t->v[l].depth == 0 && t->v[l].k == K_NAME && punct_is(at->text, &t->v[l + 1], ':') &&
+                             at->text[t->v[l].start - 1] == '\n'))
+        l++;
+    if (l + 1 >= t->n) l = t->n;
+    char *pkg = source_package(at->text);
+    char *q = resolve(at->b, pkg, at->text + t->v[f].start, t->v[f].end - t->v[f].start);
+    snprintf(name, sizeof name, "%.*s", (int) (t->v[f].end - t->v[f].start), at->text + t->v[f].start);
+    if (q) snprintf(name, sizeof name, "%s", q);
+    free(q);
+    free(pkg);
+    memset(decl, 0, sizeof *decl);
+    decl->name = name;
+    decl->kind = name[0] == '#' ? TRI_DECL_TYPE : TRI_DECL_INSTANCE;
+    decl->file = at->path;
+    *first = (size_t) f;
+    *last = l;
+    return 1;
+}
+
 /* A reference (.a.b) or a let's name at the position: what it means inside
  * its file. Fills the use, the declaration it is in (for a reference), and
  * the token it refers to (start == end when none is written). Returns 0 when
@@ -836,25 +906,17 @@ static int local_at(const At *at, Local *l)
         Tok *u = &t.v[ui];
         l->use = *u;
         l->target.start = l->target.end = 0;
-        if (u->k == K_REF) {
-            /* the declaration it is in */
-            for (size_t i = 0; i < at->b->ndecls && !ok; i++) {
-                TriDecl d = at->b->decls[i];
-                if (strcmp(d.file, at->path)) continue;
-                size_t s, le, e;
-                decl_span(at->b, &d, at->text, &s, &le, &e);
-                if (u->start < s || u->start >= e) continue;
-                size_t first = 0, last = t.n;
-                while (first < t.n && t.v[first].start < s) first++;
-                for (last = first; last < t.n && t.v[last].start < e; last++) {}
-                char *path = xstrndup(at->text + u->start + 1, u->end - u->start - 1);
-                long f = first < t.n ? find_field(at->text, &t, first, last, path) : -1;
-                free(path);
-                if (f >= 0) l->target = t.v[f];
-                l->decl = d;
-                l->is_let = 0;
-                ok = 1;
-            }
+        size_t first, last;
+        if (u->k == K_REF && decl_at(at, &t, u->start, &l->decl, &first, &last)) {
+            Labels ls = { 0 };
+            decl_labels(at->text, &t, first, last, &ls);
+            char path[256];
+            field_path(at->text + u->start, u->end - u->start, path, sizeof path);
+            long f = find_field(&ls, path);
+            free(ls.v);
+            if (f >= 0) l->target = t.v[f];
+            l->is_let = 0;
+            ok = 1;
         } else if (u->k == K_NAME && !memchr(at->text + u->start, '.', u->end - u->start)) {
             long f = find_let(at->text, &t, (size_t) ui);
             if (f >= 0) {
@@ -1052,13 +1114,69 @@ static void definition(const J *id, const J *params)
     free(at.path);
 }
 
+/* References to a field of a declaration, from a reference to it or from its
+ * label: the references in that declaration with its path, and its label.
+ * Returns 0 when the position is neither. */
+static int field_references(const At *at, int with_decl, Str *r)
+{
+    Toks t = { 0 };
+    lex(at->text, &t);
+    long ui = -1;
+    for (size_t i = 0; i < t.n && ui < 0; i++)
+        if (t.v[i].start <= at->off && at->off <= t.v[i].end && t.v[i].k != K_PUNCT) ui = (long) i;
+    TriDecl d;
+    size_t first, last;
+    int ok = 0;
+    if (ui >= 0 && decl_at(at, &t, t.v[ui].start, &d, &first, &last) && (size_t) ui != first) {
+        Labels ls = { 0 };
+        decl_labels(at->text, &t, first, last, &ls);
+        char path[256] = "";
+        const Tok *u = &t.v[ui];
+        if (u->k == K_REF) {
+            field_path(at->text + u->start, u->end - u->start, path, sizeof path);
+            ok = 1;
+        } else
+            for (size_t i = 0; i < ls.n && !ok; i++)
+                if (ls.v[i].tok == (size_t) ui) { snprintf(path, sizeof path, "%s", ls.v[i].path); ok = 1; }
+        int any = 0;
+        for (size_t i = first; ok && i < last; i++) {
+            int hit = 0;
+            if (t.v[i].k == K_REF) {
+                char p[256];
+                field_path(at->text + t.v[i].start, t.v[i].end - t.v[i].start, p, sizeof p);
+                hit = !strcmp(p, path);
+            } else if (with_decl)
+                for (size_t k = 0; k < ls.n && !hit; k++) hit = ls.v[k].tok == i && !strcmp(ls.v[k].path, path);
+            if (!hit) continue;
+            if (any) str_putc(r, ',');
+            any = 1;
+            put_location(r, at->path, at->text, t.v[i].start, t.v[i].end);
+        }
+        free(ls.v);
+    }
+    free(t.v);
+    return ok;
+}
+
 static void references(const J *id, const J *params)
 {
     At at;
     if (!at_position(params, &at)) { reply(id, "[]"); return; }
-    char *name = name_at(&at, NULL);
     int with_decl = !json_path(params, "context.includeDeclaration") ||
                     json_path(params, "context.includeDeclaration")->k == J_TRUE;
+    {
+        Str fr = { 0 };
+        str_putc(&fr, '[');
+        if (field_references(&at, with_decl, &fr)) {
+            str_putc(&fr, ']');
+            reply(id, fr.s);
+            str_free(&fr);
+            free(at.path);
+            return;
+        }
+        str_free(&fr);
+    }
+    char *name = name_at(&at, NULL);
     Str r = { 0 };
     str_putc(&r, '[');
     int first = 1;
@@ -1209,6 +1327,60 @@ static void item(Items *it, const char *label, int kind, const char *detail, con
     str_puts(it->r, "}}");
 }
 
+/* The fields a reference can name next: those of the type at the path
+ * written so far, from the last good build, and those the declaration
+ * writes there. Only the last segment is replaced. */
+static void complete_reference(const At *at, Items *it, size_t rs)
+{
+    const char *text = at->text;
+    size_t dot = at->off;
+    while (dot > rs && text[dot - 1] != '.') dot--;
+    it->start = dot;                                 /* after the last '.' */
+    char parent[256];
+    field_path(text + rs, dot - 1 - rs, parent, sizeof parent);
+    char **names = NULL;
+    size_t n = 0, cap = 0;
+    Toks t = { 0 };
+    lex(text, &t);
+    TriDecl d;
+    size_t first, last;
+    if (decl_at(at, &t, rs, &d, &first, &last)) {
+        /* written in the declaration */
+        Labels ls = { 0 };
+        decl_labels(text, &t, first, last, &ls);
+        size_t pl = strlen(parent);
+        for (size_t i = 0; i < ls.n; i++) {
+            const char *p = ls.v[i].path;
+            const char *leaf = strrchr(p, '.');
+            size_t ppl = leaf ? (size_t) (leaf - p) : 0;
+            if (ppl != pl || strncmp(p, parent, pl)) continue;
+            if (n == cap) names = realloc(names, (cap = cap ? cap * 2 : 32) * sizeof *names);
+            names[n++] = xstrdup(leaf ? leaf + 1 : p);
+        }
+        free(ls.v);
+        /* the type's, from the last good build */
+        TriContent *g = at->b->good;
+        if (g) {
+            TriArena *a = tri_arena_new();
+            const TriNode *root = tri_value(g, d.name, a, NULL, 0);
+            char *ap = at_path(text + rs + 1, dot > rs + 1 ? dot - 2 - rs : 0);
+            const TriNode *node = root && *ap ? tri_at(g, root, ap) : root;
+            free(ap);
+            TriType ty = node ? tri_node_type(node) : TRI_BOTTOM;
+            for (size_t i = 0; ty != TRI_BOTTOM && i < tri_type_feature_count(g, ty); i++) {
+                if (n == cap) names = realloc(names, (cap = cap ? cap * 2 : 32) * sizeof *names);
+                names[n++] = xstrdup(tri_type_feature(g, ty, i));
+            }
+            tri_arena_free(a);
+        }
+    }
+    free(t.v);
+    qsort(names, n, sizeof *names, cmp_str);
+    for (size_t i = 0; i < n; i++)
+        if (!i || strcmp(names[i], names[i - 1])) item(it, names[i], 5, "field", NULL);
+    free_strings(names, n);
+}
+
 static void completion(const J *id, const J *params)
 {
     At at;
@@ -1217,10 +1389,17 @@ static void completion(const J *id, const J *params)
     size_t start = at.off;
     while (start > 0 && (name_char(text[start - 1]) || text[start - 1] == '#' || text[start - 1] == '.')) start--;
     int attr = start > 0 && text[start - 1] == '@';
+    /* a reference being written: .instrument.si */
+    size_t rs = at.off;
+    while (rs > 0 && (name_char(text[rs - 1]) || text[rs - 1] == '.' || text[rs - 1] == '[' || text[rs - 1] == ']')) rs--;
+    while (rs < at.off && text[rs] == '[') rs++;    /* [.a: a list's first item */
+    int ref = rs < at.off && text[rs] == '.' && (rs == 0 || !name_char(text[rs - 1]));
     Str r = { 0 };
     Items it = { &r, 1, start, at.off, text };
     str_puts(&r, "{\"isIncomplete\":false,\"items\":[");
-    if (attr) {
+    if (ref) {
+        complete_reference(&at, &it, rs);
+    } else if (attr) {
         for (size_t i = 0; i < sizeof attributes / sizeof *attributes; i++)
             item(&it, attributes[i][0], 14, NULL, attributes[i][1]);
     } else {

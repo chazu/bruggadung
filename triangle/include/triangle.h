@@ -98,6 +98,10 @@ const char *tri_type_name(const TriContent *content, TriType t);
 TriType     tri_meet(TriContent *content, TriType a, TriType b);
 int         tri_subtype(const TriContent *content, TriType a, TriType b); /* a ⊑ b */
 TriType     tri_primary_parent(const TriContent *content, TriType t);
+/* The features a type has (its own and inherited), in a fixed order: the
+ * count, and the name of the i-th. */
+size_t      tri_type_feature_count(const TriContent *content, TriType t);
+const char *tri_type_feature(const TriContent *content, TriType t, size_t i);
 
 /* Component kinds declared with @component, and their fields' @field flags. */
 size_t      tri_component_count(const TriContent *content);

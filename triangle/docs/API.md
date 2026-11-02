@@ -124,6 +124,8 @@ TriType m = tri_meet(c, wrench, tool);             /* the most general common su
 ```
 
 - `tri_type_count`, `tri_type_name`, `tri_primary_parent`.
+- `tri_type_feature_count` and `tri_type_feature` list the features a type
+  has, its own and inherited.
 - Type IDs are dense and deterministic for a given content hash. They change
   when content changes.
 - Components: `tri_component_count`, `tri_component_name`, and
