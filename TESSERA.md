@@ -8,8 +8,9 @@ window. It is an engine, not a game. It knows tiles, levels, layers,
 appearances, cameras and views. It does not know pumps, agents or water.
 Whatever it shows, it is told about in a **scene**.
 
-This document is a draft. Nothing is built yet. Tessera lives in
-`tessera/`, written in C11 like `triangle/`, with the prefix `tess_`.
+This document is a draft. Slice 1, the scene core, is built in
+[tessera/](tessera/README.md): C11 like `triangle/`, with the prefix
+`tess_`. Nothing draws yet.
 
 Two things in the repository shape it:
 
@@ -138,7 +139,12 @@ typedef struct {
 
 - **Appearance keys are small integers.** A scene carries the table from
   key to name (`"#Pump"`, `"wall.stone"`), so a recording keeps its meaning
-  after content changes, and a theme matches keys by name.
+  after content changes, and a theme matches keys by name. Keys are made in
+  order and kept: a producer copies the last scene to build the next, and a
+  diff carries only the keys added. Keys made in another order make a frame.
+- **Marks are kept by id, overlays by name.** A scene's order never depends
+  on the order it was built in, so two scenes that show the same thing are
+  the same, and print the same (`tess_scene_text`).
 - **Things held or inside** are marks with no cell of their own: in a
   frame they hang off their holder's mark. A backend lists them (in an
   inspector, a tooltip), and the map shows the holder.
@@ -198,9 +204,9 @@ isometric later.
 
 ## The plan, in slices
 
-1. **Core.** `tessera/`: the scene structures, a builder API, frame and
-   diff encoding (a compact binary form, plus a text form for tests),
-   and tests.
+1. **Core** (built). `tessera/`: the scene structures, a builder API,
+   frame and diff encoding (a compact binary form, plus a text form for
+   tests), and tests, including truncated and corrupted input.
 2. **Producers in the lab.** `BGScene` for both views, and BGPlay's `look`
    drawn through tess-term, with the same output.
 3. **Appearance in content.** A look declared beside blueprints, keys
