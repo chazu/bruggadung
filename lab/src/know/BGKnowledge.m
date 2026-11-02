@@ -117,8 +117,6 @@ static NSUInteger   feature_keys( const char *features, char (*keys)[ 32], NSUIn
 - (id) initWithAgent:(BGEntityID) agent
                world:(BGWorld *) world
 {
-   int   i;
-
    if( ! (self = [super init]))
       return( nil);
    _world  = world;
@@ -126,8 +124,6 @@ static NSUInteger   feature_keys( const char *features, char (*keys)[ 32], NSUIn
    _feltAt = -1;
    _next  = 1;
    _news  = [NSMutableArray new];
-   for( i = 0; i < 32 * 32; i++)
-      _seenAt[ i] = -1;
    [self learnCommonLaws];
    return( self);
 }
@@ -258,6 +254,8 @@ static NSUInteger   feature_keys( const char *features, char (*keys)[ 32], NSUIn
    free( _laws);
    free( _recipes);
    free( _identities);
+   free( _seenChunks);
+   free( _recalls);
    if( _arena)
       tri_arena_free( _arena);
    [_parsed release];
@@ -308,21 +306,212 @@ static NSUInteger   feature_keys( const char *features, char (*keys)[ 32], NSUIn
 }
 
 
-- (int64_t) tileSeenAtX:(int32_t) x
-                      y:(int32_t) y
+/* --- terrain seen (TERRAIN.md decision 7) --------------------------------------- */
+
+static NSUInteger   seen_slot( int32_t cx, int32_t cy, int32_t z, NSUInteger cap)
 {
-   if( x < 0 || x >= 32 || y < 0 || y >= 32)
-      return( -1);
-   return( _seenAt[ y * 32 + x]);
+   return( (NSUInteger) BGMix( ((uint64_t) (uint32_t) cx << 32) ^ ((uint64_t) (uint32_t) cy << 8) ^ (uint64_t) (uint32_t) z) &
+           (cap - 1));
 }
 
 
-- (void) setTileSeen:(int64_t) t
-                   x:(int32_t) x
-                   y:(int32_t) y
+static int32_t   chunk_of( int32_t v)
 {
-   if( x >= 0 && x < 32 && y >= 0 && y < 32)
-      _seenAt[ y * 32 + x] = t;
+   return( v >= 0 ? v / BG_CHUNK : -((-v + BG_CHUNK - 1) / BG_CHUNK));
+}
+
+
+- (BGSeenChunk *) seenChunkX:(int32_t) x
+                           y:(int32_t) y
+                       level:(int32_t) z
+                        make:(BOOL) make
+{
+   BGSeenChunk   *old;
+   BGSeenChunk   *c;
+   NSUInteger    oldcap;
+   NSUInteger    i;
+   NSUInteger    k;
+   int32_t       cx;
+   int32_t       cy;
+
+   cx = chunk_of( x);
+   cy = chunk_of( y);
+   for( i = _seenCap ? seen_slot( cx, cy, z, _seenCap) : 0; _seenCap; i = (i + 1) & (_seenCap - 1))
+   {
+      c = &_seenChunks[ i];
+      if( ! c->used)
+         break;
+      if( c->cx == cx && c->cy == cy && c->z == z)
+         return( c);
+   }
+   if( ! make)
+      return( NULL);
+   if( (_nseenChunks + 1) * 2 > _seenCap)
+   {
+      old         = _seenChunks;
+      oldcap      = _seenCap;
+      _seenCap    = oldcap ? oldcap * 2 : 8;
+      _seenChunks = calloc( _seenCap, sizeof( BGSeenChunk));
+      for( k = 0; k < oldcap; k++)
+         if( old[ k].used)
+         {
+            for( i = seen_slot( old[ k].cx, old[ k].cy, old[ k].z, _seenCap); _seenChunks[ i].used; i = (i + 1) & (_seenCap - 1))
+               ;
+            _seenChunks[ i] = old[ k];
+         }
+      free( old);
+   }
+   for( i = seen_slot( cx, cy, z, _seenCap); _seenChunks[ i].used; i = (i + 1) & (_seenCap - 1))
+      ;
+   c       = &_seenChunks[ i];
+   c->cx   = cx;
+   c->cy   = cy;
+   c->z    = z;
+   c->used = YES;
+   c->seen = -1;
+   _nseenChunks++;
+   return( c);
+}
+
+
+static NSUInteger   bit_of( int32_t x, int32_t y)
+{
+   return( (NSUInteger) ((y - chunk_of( y) * BG_CHUNK) * BG_CHUNK + (x - chunk_of( x) * BG_CHUNK)));
+}
+
+
+- (BOOL) hasSeenX:(int32_t) x
+                y:(int32_t) y
+            level:(int32_t) level
+{
+   BGSeenChunk   *c;
+   NSUInteger    b;
+
+   c = [self seenChunkX:x y:y level:level make:NO];
+   b = bit_of( x, y);
+   return( c && (c->bits[ b / 32] >> (b % 32) & 1));
+}
+
+
+- (int64_t) chunkSeenAtX:(int32_t) x
+                       y:(int32_t) y
+                   level:(int32_t) level
+{
+   BGSeenChunk   *c;
+
+   c = [self seenChunkX:x y:y level:level make:NO];
+   return( c ? c->seen : -1);
+}
+
+
+- (BGTerrainKind) believedTerrainAtX:(int32_t) x
+                                   y:(int32_t) y
+                               level:(int32_t) level
+{
+   NSUInteger   i;
+
+   if( ! [_world terrain] || ! [self hasSeenX:x y:y level:level])
+      return( 0);
+   for( i = 0; i < _nrecalls; i++)
+      if( _recalls[ i].x == x && _recalls[ i].y == y && _recalls[ i].z == level)
+         return( _recalls[ i].kind);
+   return( BGTerrainAt( [_world terrain], x, y, level));
+}
+
+
+- (void) see:(int64_t) now
+           x:(int32_t) x
+           y:(int32_t) y
+       level:(int32_t) level
+{
+   BGSeenChunk   *c;
+   NSUInteger    b;
+   NSUInteger    i;
+
+   c        = [self seenChunkX:x y:y level:level make:YES];
+   b        = bit_of( x, y);
+   c->bits[ b / 32] |= (uint32_t) 1 << (b % 32);
+   if( now > c->seen)
+      c->seen = now;
+   for( i = 0; i < _nrecalls; i++)
+      if( _recalls[ i].x == x && _recalls[ i].y == y && _recalls[ i].z == level)
+      {
+         _recalls[ i] = _recalls[ --_nrecalls];
+         break;
+      }
+}
+
+
+- (void) missChangeFrom:(BGTerrainKind) was
+                      x:(int32_t) x
+                      y:(int32_t) y
+                  level:(int32_t) level
+{
+   NSUInteger   i;
+
+   if( ! was || ! [self hasSeenX:x y:y level:level])
+      return;
+   for( i = 0; i < _nrecalls; i++)
+      if( _recalls[ i].x == x && _recalls[ i].y == y && _recalls[ i].z == level)
+         return;          /* it recalls what it saw before the first change */
+   _recalls = realloc( _recalls, (_nrecalls + 1) * sizeof( BGTerrainRecall));
+   _recalls[ _nrecalls].x    = x;
+   _recalls[ _nrecalls].y    = y;
+   _recalls[ _nrecalls].z    = level;
+   _recalls[ _nrecalls].kind = was;
+   _nrecalls++;
+}
+
+
+static int   cmp_seen_chunk( const void *a, const void *b)
+{
+   const BGSeenChunk   *p;
+   const BGSeenChunk   *q;
+
+   p = a;
+   q = b;
+   if( p->z != q->z)
+      return( p->z < q->z ? -1 : 1);
+   if( p->cy != q->cy)
+      return( p->cy < q->cy ? -1 : 1);
+   return( p->cx < q->cx ? -1 : p->cx > q->cx);
+}
+
+
+- (NSUInteger) seenChunks:(BGSeenChunk **) out
+{
+   NSUInteger   i;
+   NSUInteger   n;
+
+   *out = malloc( (_nseenChunks ? _nseenChunks : 1) * sizeof( BGSeenChunk));
+   n    = 0;
+   for( i = 0; i < _seenCap; i++)
+      if( _seenChunks[ i].used)
+         (*out)[ n++] = _seenChunks[ i];
+   qsort( *out, n, sizeof( BGSeenChunk), cmp_seen_chunk);
+   return( n);
+}
+
+
+- (void) restoreSeenChunk:(const BGSeenChunk *) chunk
+{
+   BGSeenChunk   *c;
+
+   c = [self seenChunkX:chunk->cx * BG_CHUNK y:chunk->cy * BG_CHUNK level:chunk->z make:YES];
+   memcpy( c->bits, chunk->bits, sizeof( c->bits));
+   c->seen = chunk->seen;
+}
+
+
+- (NSUInteger) recallCount
+{
+   return( _nrecalls);
+}
+
+
+- (const BGTerrainRecall *) recallAt:(NSUInteger) i
+{
+   return( i < _nrecalls ? &_recalls[ i] : NULL);
 }
 
 
@@ -1610,14 +1799,75 @@ static NSString   *known_features( const BGReferent *r)
 }
 
 
-/* Whether the agent here can see the tile: in sight, and lit, or within
- * arm's reach. */
+/* Whether nothing opaque stands between two tiles of a level (TERRAIN.md):
+ * the cells a straight line passes through, the ends apart (a wall itself
+ * is seen), one way or the other, so sight is mutual. */
+static BOOL   line_clear( const BGTerrain *t, int32_t x0, int32_t y0, int32_t x1, int32_t y1, int32_t z)
+{
+   int32_t   dx;
+   int32_t   dy;
+   int32_t   sx;
+   int32_t   sy;
+   int32_t   err;
+   int32_t   e2;
+   int32_t   x;
+   int32_t   y;
+
+   dx  = abs( x1 - x0);
+   dy  = -abs( y1 - y0);
+   sx  = x0 < x1 ? 1 : -1;
+   sy  = y0 < y1 ? 1 : -1;
+   err = dx + dy;
+   x   = x0;
+   y   = y0;
+   for( ;;)
+   {
+      e2 = 2 * err;
+      if( e2 >= dy)
+      {
+         err += dy;
+         x   += sx;
+      }
+      if( e2 <= dx)
+      {
+         err += dx;
+         y   += sy;
+      }
+      if( x == x1 && y == y1)
+         return( YES);
+      if( BGTerrainOpaque( t, x, y, z))
+         return( NO);
+   }
+}
+
+
+/* Whether a tile is in the agent's line of sight: on its level, within
+ * BG_SIGHT, and nothing opaque between (light aside). */
+- (BOOL) inSight:(BGLocation) tile
+            from:(BGLocation) here
+{
+   const BGTerrain   *t;
+
+   if( _omniscient)
+      return( YES);
+   if( tile.level != here.level || abs( tile.x - here.x) > BG_SIGHT || abs( tile.y - here.y) > BG_SIGHT)
+      return( NO);
+   if( abs( tile.x - here.x) <= 1 && abs( tile.y - here.y) <= 1)
+      return( YES);
+   t = [_world terrain];
+   return( ! t || line_clear( t, here.x, here.y, tile.x, tile.y, here.level) ||
+           line_clear( t, tile.x, tile.y, here.x, here.y, here.level));
+}
+
+
+/* Whether the agent here can see the tile: in its line of sight, and lit,
+ * or within arm's reach. */
 - (BOOL) sees:(BGLocation) tile
          from:(BGLocation) here
 {
    if( _omniscient)
       return( YES);
-   if( tile.level != here.level || abs( tile.x - here.x) > BG_SIGHT || abs( tile.y - here.y) > BG_SIGHT)
+   if( ! [self inSight:tile from:here])
       return( NO);
    if( abs( tile.x - here.x) <= 1 && abs( tile.y - here.y) <= 1)
       return( YES);
@@ -3637,8 +3887,7 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
          continue;
       if( ! strcmp( ev->kind, "moved") && ev->subject == ev->actor)
          continue;      /* a step: where the walker is, it is seen */
-      if( ! _omniscient && (! ground_tile( _world, ev->actor, &tile) || tile.level != here.level ||
-                            abs( tile.x - here.x) > BG_SIGHT || abs( tile.y - here.y) > BG_SIGHT))
+      if( ! _omniscient && (! ground_tile( _world, ev->actor, &tile) || ! [self inSight:tile from:here]))
          continue;
       witnessed[ nwitnessed++] = i;
       if( ! strcmp( ev->kind, "moved") && nglimpsed < 64)
@@ -3669,14 +3918,22 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
       nseen++;
    }
    qsort( seen, nseen, sizeof( BGSeen), cmp_seen);
+   /* terrain changed where it can't see: it recalls what it saw there
+    * (TERRAIN.md decision 7); then the tiles it sees now */
+   for( i = first; i < last; i++)
+   {
+      ev = [_world eventAt:i];
+      if( ! strcmp( ev->kind, "terrain") && ev->location.form == BGLocationOnTile && ! [self sees:ev->location from:here])
+         [store missChangeFrom:(BGTerrainKind) ev->amount x:ev->location.x y:ev->location.y level:ev->location.level];
+   }
    for( y = here.y - BG_SIGHT; y <= here.y + BG_SIGHT; y++)
       for( x = here.x - BG_SIGHT; x <= here.x + BG_SIGHT; x++)
       {
          tile       = here;
          tile.x     = x;
          tile.y     = y;
-         if( [self sees:tile from:here])
-            [store setTileSeen:now x:x y:y];
+         if( [_world isTileX:x y:y level:here.level] && [self sees:tile from:here])
+            [store see:now x:x y:y level:here.level];
       }
 
    /* recognition: the same kind, at that very place first, then the nearest */
@@ -4765,8 +5022,6 @@ char   *BGDecodeWord( const char *s)
    NSUInteger         i;
    NSUInteger         j;
    NSUInteger         k;
-   int32_t            x;
-   int32_t            y;
 
    lines = [NSMutableArray array];
    for( i = 0; i < [_stores count]; i++)
@@ -4775,11 +5030,30 @@ char   *BGDecodeWord( const char *s)
       [lines addObject:[NSString stringWithFormat:@"store %llu %u %u %llu", (unsigned long long) [store agent],
                                                   [store nextID], [store selfReferent],
                                                   (unsigned long long) [store nextSerial]]];
-      for( y = 0; y < 32; y++)
-         for( x = 0; x < 32; x++)
-            if( [store tileSeenAtX:x y:y] >= 0)
-               [lines addObject:[NSString stringWithFormat:@"seen %llu %d %d %lld", (unsigned long long) [store agent],
-                                                           x, y, (long long) [store tileSeenAtX:x y:y]]];
+      /* the terrain seen: a chunk a line, its bits in hex; then what it recalls */
+      {
+         BGSeenChunk       *chunks;
+         NSMutableString   *bits;
+         NSUInteger        nchunks;
+         NSUInteger        c;
+         NSUInteger        w;
+
+         nchunks = [store seenChunks:&chunks];
+         for( c = 0; c < nchunks; c++)
+         {
+            bits = [NSMutableString string];
+            for( w = 0; w < BG_CHUNK * BG_CHUNK / 32; w++)
+               [bits appendFormat:@"%08x", chunks[ c].bits[ w]];
+            [lines addObject:[NSString stringWithFormat:@"seenchunk %llu %d %d %d %lld %@", (unsigned long long) [store agent],
+                                                        chunks[ c].cx, chunks[ c].cy, chunks[ c].z, (long long) chunks[ c].seen,
+                                                        bits]];
+         }
+         free( chunks);
+         for( c = 0; c < [store recallCount]; c++)
+            [lines addObject:[NSString stringWithFormat:@"recall %llu %d %d %d %s", (unsigned long long) [store agent],
+                                                        [store recallAt:c]->x, [store recallAt:c]->y, [store recallAt:c]->z,
+                                                        BGTerrainKindInfo( [_world terrain], [store recallAt:c]->kind)->name]];
+      }
       for( j = 0; j < [store count]; j++)
       {
          r = [store referentAt:j];
@@ -4918,8 +5192,39 @@ char   *BGDecodeWord( const char *s)
          [[self storeOf:(BGEntityID) agent] setNextID:next self:me];
          [[self storeOf:(BGEntityID) agent] setNextSerial:parent];
       }
-      else if( sscanf( text, "seen %llu %d %d %lld", &agent, &x, &y, &seen) == 4)
-         [[self storeOf:(BGEntityID) agent] setTileSeen:seen x:x y:y];
+      else if( ! strncmp( text, "seenchunk ", 10))
+      {
+         BGSeenChunk   chunk;
+         char          hex[ 300];
+         char          word[ 9];
+         NSUInteger    w;
+         int           cz;
+
+         memset( &chunk, 0, sizeof( chunk));
+         if( sscanf( text, "seenchunk %llu %d %d %d %lld %299s", &agent, &chunk.cx, &chunk.cy, &cz, &seen, hex) == 6 &&
+             strlen( hex) == BG_CHUNK * BG_CHUNK / 4)
+         {
+            chunk.z    = cz;
+            chunk.seen = seen;
+            for( w = 0; w < BG_CHUNK * BG_CHUNK / 32; w++)
+            {
+               memcpy( word, hex + 8 * w, 8);
+               word[ 8]        = 0;
+               chunk.bits[ w] = (uint32_t) strtoul( word, NULL, 16);
+            }
+            [[self storeOf:(BGEntityID) agent] restoreSeenChunk:&chunk];
+         }
+      }
+      else if( sscanf( text, "recall %llu %d %d %d %511s", &agent, &x, &y, &level, kind) == 5)
+      {
+         BGKnowledgeStore   *s;
+         BGTerrainKind      k;
+
+         s = [self storeOf:(BGEntityID) agent];
+         k = [_world terrain] ? BGTerrainKindNamed( [_world terrain], kind) : 0;
+         if( k)
+            [s missChangeFrom:k x:x y:y level:level];
+      }
       else if( sscanf( text, "obs %llu %lld %15s %u %u %u %d %d %llu %4095s", &agent, &seen, role, &id, &container,
                        &told, &present, &trust, &origin, features) == 10)
       {

@@ -36,7 +36,7 @@ static int   usage( void)
    fprintf( stderr, "usage: lab [-C contentdir] test [name]\n"
                     "       lab [-C contentdir] run|save marked-nail|marked-nail-a|marked-nail-b\n"
                     "       lab [-C contentdir] menu marked-nail|marked-nail-a|marked-nail-b <ms>\n"
-                    "       lab [-C contentdir] play workshop|cistern [--seed n] [--log file]\n");
+                    "       lab [-C contentdir] play workshop|cistern|shed [--seed n] [--log file]\n");
    return( 2);
 }
 

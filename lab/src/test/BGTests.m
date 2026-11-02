@@ -1028,7 +1028,6 @@ static void   test_stale_belief( void)
    uint32_t           rbin;
    uint32_t           rnails;
    uint64_t           position;
-   int64_t            taken;
    int                i;
 
    w          = BGTestWorld( 11);
@@ -1062,7 +1061,6 @@ static void   test_stale_belief( void)
       [s runUntil:BGTimeMake( [w time].ms + 1000)];
    }
    /* the smith takes the nails and walks off */
-   taken = [w time].ms;
    BG_CHECK( BGPerform( w, c, BGActionMake( "take", 5, 2, BGNoEntity), 0, &error) != nil);
    [s runUntil:BGTimeMake( [w time].ms + 1000)];
    for( i = 0; i < 5; i++)
@@ -1072,7 +1070,7 @@ static void   test_stale_belief( void)
    }
    nails = [store referent:rnails];
    BG_CHECK( nails->present && nails->form == BGLocationIn);           /* it saw none of that */
-   BG_CHECK( [store tileSeenAtX:3 y:4] < taken);                        /* nor the bin's tile, since */
+   BG_CHECK( abs( [w locationOf:4].x - 3) > BG_SIGHT);                  /* nor the bin's tile, since: out of sight */
 
    /* back by the bin: it sees the bin, not into it */
    for( i = 0; i < 6; i++)
@@ -4550,6 +4548,118 @@ static void   test_terrain( void)
 }
 
 
+/* TERRAIN.md step 2: sight stops at what is opaque, and what an agent has
+ * seen of the terrain is a bit per tile, with what it recalls of changes it
+ * missed. In the shed (shed_map), a worker inside by the east wall. */
+static NSString   *believed_kind( BGWorld *w, BGKnowledgeStore *store, int32_t x, int32_t y)
+{
+   const BGTerrainInfo   *info;
+
+   info = BGTerrainKindInfo( [w terrain], [store believedTerrainAtX:x y:y level:0]);
+   return( info ? [NSString stringWithUTF8String:(char *) info->name] : @"-");
+}
+
+
+static void   test_sight_and_memory( void)
+{
+   BGStage            st;
+   BGKnowledge        *knowledge;
+   BGKnowledgeStore   *store;
+   BGProposalGroup    *g;
+   BGEntityID         worker;
+   BGEntityID         past;
+   BGEntityID         behind;
+   BGSeenChunk        *chunks;
+   NSString           *error;
+   NSString           *text;
+   int                i;
+
+   st.w      = BGTestWorld( 7);
+   error     = nil;
+   BG_CHECK( [st.w setTerrainMap:"shed_map" error:&error]);
+   st.c      = BGTestCommitter( st.w);
+   knowledge = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+   st.s      = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [st.s setActivities:[BGActivities activitiesWithWorld:st.w committer:st.c]];
+   [st.s setPerception:knowledge];
+   g      = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: a worker by the wall, buckets outside"];
+   worker = [g create:"worker" key:"worker" at:BGOnTile( 9, 2, 0)];
+   past   = [g create:"bucket" key:"past the doorway" at:BGOnTile( 12, 3, 0)];
+   behind = [g create:"bucket" key:"behind the wall" at:BGOnTile( 12, 1, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1000)];
+   worker = [g idFor:worker];
+   past   = [g idFor:past];
+   behind = [g idFor:behind];
+   store  = [knowledge storeOf:worker];
+
+   /* through the doorway it sees the bucket past it; the one behind the
+    * wall, three tiles off, it doesn't */
+   BG_CHECK( referent_of( store, past) != 0);
+   BG_CHECK( referent_of( store, behind) == 0);
+   BG_CHECK( [knowledge inSight:BGOnTile( 12, 3, 0) from:BGOnTile( 9, 2, 0)] &&
+             ! [knowledge inSight:BGOnTile( 12, 1, 0) from:BGOnTile( 9, 2, 0)] &&
+             ! [knowledge inSight:BGOnTile( 9, 2, 0) from:BGOnTile( 12, 1, 0)]);
+   /* the wall it sees, and believes a wall; what is behind, it hasn't seen */
+   BG_CHECK( [store hasSeenX:11 y:2 level:0] && [believed_kind( st.w, store, 11, 2) isEqualToString:@"stone_wall"]);
+   BG_CHECK( ! [store hasSeenX:12 y:1 level:0] && [believed_kind( st.w, store, 12, 1) isEqualToString:@"-"]);
+   BG_CHECK( [store chunkSeenAtX:11 y:2 level:0] == [st.w time].ms);
+   /* the whole shed is one chunk: 128 bytes of bits, not a copy of the map */
+   BG_CHECK( [store seenChunks:&chunks] == 1);
+   free( chunks);
+
+   /* away from the doorway, the doorway is walled up: it believes what it
+    * saw, a doorway, and says so after a save */
+   for( i = 0; i < 7; i++)
+      walk_once( st, worker, "walk_west");
+   BG_CHECK( [st.w locationOf:worker].x == 2);
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the doorway walled up"];
+   [g setTerrain:"stone_wall" at:BGOnTile( 11, 3, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( [st.w time].ms + 1000)];
+   BG_CHECK( [believed_kind( st.w, store, 11, 3) isEqualToString:@"doorway"] && [store recallCount] == 1);
+   text = BGSave( st.w, st.c, [NSArray arrayWithObject:knowledge]);
+   {
+      NSString   *recall;
+
+      recall = [NSString stringWithFormat:@"recall %llu 11 3 0 doorway", (unsigned long long) worker];
+      BG_CHECK( [text rangeOfString:recall].location != NSNotFound);
+   }
+   {
+      BGKnowledge        *again;
+      BGCommitter        *c2;
+      BGWorld            *w2;
+      BGKnowledgeStore   *s2;
+
+      w2    = restore( text, [st.w contentBuild], &c2, &error);
+      again = [[[BGKnowledge alloc] initWithWorld:w2] autorelease];
+      [again restoreSavedState:BGSavedDomainState( text, @"knowledge")];
+      s2 = [again storeOf:worker];
+      BG_CHECK( [believed_kind( w2, s2, 11, 3) isEqualToString:@"doorway"] && [s2 hasSeenX:11 y:2 level:0] &&
+                ! [s2 hasSeenX:12 y:1 level:0] && [s2 chunkSeenAtX:5 y:5 level:0] == [store chunkSeenAtX:5 y:5 level:0]);
+   }
+
+   /* back where it can see it: a wall, and nothing recalled */
+   for( i = 0; i < 7; i++)
+      walk_once( st, worker, "walk_east");
+   BG_CHECK( [believed_kind( st.w, store, 11, 3) isEqualToString:@"stone_wall"] && [store recallCount] == 0);
+
+   /* played, the map shows the walls it sees, the bucket through the
+    * doorway, and nothing behind the wall */
+   {
+      uint64_t   h;
+
+      text = session( @"shed", [NSArray arrayWithObject:@"look"], &h);
+      BG_CHECK( [text rangeOfString:@"      #######     \n"
+                                    @"      ......#     \n"
+                                    @"      ....@.#     \n"
+                                    @"      .......w.   \n"
+                                    @"      ......#..   \n"
+                                    @"      ......# .   \n"].location != NSNotFound);
+   }
+}
+
+
 /* DOMAIN_SIMULATION.md Scenario 2's drain: the pump `key` under its header
  * tank (100 L), opened, and its piston taken out: through a leaky outlet
  * valve the tank drains onto the floor; an hour on, how much left the tank,
@@ -7417,7 +7527,7 @@ static void   test_explore_autopilot( void)
    unseen = 0;
    for( y = 0; y < 32; y++)
       for( x = 0; x < 32; x++)
-         if( [store tileSeenAtX:x y:y] < 0)
+         if( ! [store hasSeenX:x y:y level:0])
             unseen++;
    BG_CHECK( unseen == 0);
    notices = [agency takeNotices];
@@ -10616,6 +10726,7 @@ const BGTestCase   BGAllTests[] =
    { "servicing",                     test_servicing },
    { "diligence",                     test_diligence },
    { "terrain",                       test_terrain },
+   { "sight_and_memory",              test_sight_and_memory },
    { "pump_heat",                     test_pump_heat },
    { "pump_heat_running",             test_pump_heat_running },
    { "component_pump",                test_component_pump },

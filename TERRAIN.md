@@ -12,8 +12,8 @@ has none:
   how light, sound and air guess at walls;
 - the fluid domain is a grid with nothing to stop water.
 
-This document is a draft. Step 1 is built (lab/src/core/BGTerrain,
-lab/content/terrain.tri).
+This document is a draft. Steps 1 and 2 are built (lab/src/core/BGTerrain,
+lab/content/terrain.tri; sight and memory in lab/src/know/BGKnowledge).
 
 The world is meant to grow to large roguelike and simulation games, with
 maps generated as they are explored. Every decision here keeps that open,
@@ -91,8 +91,13 @@ floor.
    - The `setTerrain` proposal.
    - Saving and the state hash.
    - Walking blocked by solid terrain and by the world's edge.
-2. **Sight and memory.** Line of sight through cells that aren't opaque,
-   and agents' terrain memory (decision 7), replacing the grid of times.
+2. **Sight and memory** (built). Line of sight through cells that aren't
+   opaque, and agents' terrain memory (decision 7), replacing the grid of
+   times.
+   - **Sight:** a tile is in sight when nothing opaque stands on a straight
+     line to it, either way, so sight is mutual. A wall itself is seen.
+   - **Memory:** a terrain change emits an event, and an agent that doesn't
+     see the changed tile, but had seen it, recalls the kind it saw.
 3. **Rooms from terrain.**
    - Air regions found by flood fill, bounded by solid cells and closed
      doors, instead of rectangles written by hand; light, sound and air read

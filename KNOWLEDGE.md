@@ -218,7 +218,9 @@ hearing claims. History is never an agent input.
   stethoscope. Injury reduces senses through modifiers.
 - **Conditions** limit perception: light, distance, noise, occlusion. These
   come from a conditions provider. Light and sound may become domains later;
-  for now they are stubs with authored values.
+  for now they are stubs with authored values. Occlusion is terrain's
+  (TERRAIN.md): sight stops at an opaque cell, and what an agent has seen of
+  the terrain is kept as a bit per tile, not a copy.
 - **Attention** is limited. Each perceiver has an attention budget per
   boundary. Salience decides what gets attention first.
 

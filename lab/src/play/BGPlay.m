@@ -48,10 +48,10 @@
    BGProposalGroup   *setup;
    BGEntityID        h[ 8];
 
-   if( ! [name isEqualToString:@"workshop"] && ! [name isEqualToString:@"cistern"])
+   if( ! [name isEqualToString:@"workshop"] && ! [name isEqualToString:@"cistern"] && ! [name isEqualToString:@"shed"])
    {
       if( error)
-         *error = [NSString stringWithFormat:@"there is no world %@ (workshop, cistern)", name];
+         *error = [NSString stringWithFormat:@"there is no world %@ (workshop, cistern, shed)", name];
       return( nil);
    }
    world = BGTestWorld( seed);
@@ -65,12 +65,22 @@
    play->_name = [name copy];
    play->_out   = [NSMutableString new];
    play->_notes = [NSMutableArray new];
+   /* the shed (TERRAIN.md): a map, a worker inside, a bucket past the doorway */
+   if( [name isEqualToString:@"shed"] && ! [world setTerrainMap:"shed_map" error:error])
+      return( nil);
    [play buildOn:world];
-   setup = [name isEqualToString:@"workshop"] ? BGWorkshopSetup( NO, h) : BGCisternSetup( h);
+   if( [name isEqualToString:@"shed"])
+   {
+      setup = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the shed"];
+      h[ 3] = [setup create:"worker" key:"worker" at:BGOnTile( 9, 2, 0)];
+      [setup create:"bucket" key:"bucket" at:BGOnTile( 12, 3, 0)];
+   }
+   else
+      setup = [name isEqualToString:@"workshop"] ? BGWorkshopSetup( NO, h) : BGCisternSetup( h);
    [play->_committer submit:setup];
    play->_inputDue = YES;
    [play->_scheduler stepUntil:[world time]];
-   play->_actor      = [setup idFor:[name isEqualToString:@"workshop"] ? h[ 3] : h[ 6]];
+   play->_actor      = [setup idFor:[name isEqualToString:@"cistern"] ? h[ 6] : h[ 3]];
    [play controlOthers];
    play->_traceShown = [[play->_committer trace] count];
    [play->_out appendFormat:@"The %@, seed %llu. You are %llu. Type help for the commands.\n", name,
@@ -268,8 +278,20 @@ static char   glyph_of_kind( const char *kind)
       for( x = me->x - 7; x <= me->x + 7; x++)
       {
          g = ' ';
-         if( [store tileSeenAtX:x y:y] >= 0)
-            g = ([store tileSeenAtX:x y:y] == now && [_world waterAtX:x y:y level:me->level]) ? '~' : '.';
+         if( [store hasSeenX:x y:y level:me->level])
+         {
+            const BGTerrainInfo   *kind;
+            BGLocation            tile;
+
+            tile = BGOnTile( x, y, me->level);
+            kind = [_world terrain] ? BGTerrainKindInfo( [_world terrain], [store believedTerrainAtX:x y:y level:me->level])
+                                    : NULL;
+            if( kind && kind->solid)
+               g = '#';
+            else
+               g = ([_knowledge sees:tile from:BGOnTile( me->x, me->y, me->level)] &&
+                    [_world waterAtX:x y:y level:me->level]) ? '~' : '.';
+         }
          for( i = 0; i < [store count]; i++)
          {
             r = [store referentAt:i];

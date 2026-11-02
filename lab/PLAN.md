@@ -4048,3 +4048,40 @@ terrain (step 3); levels and falling (step 4); the fluid domain and the
 explorer past 32 x 32; pathfinding around walls.
 
 100 tests, 3323 checks, under both compilers, UBSan, and leak-free.
+
+### After the slice: terrain, step 2: sight and memory
+
+TERRAIN.md decision 7, built: sight stops at what is opaque, and what an
+agent has seen of the terrain costs a bit per tile, not a copy.
+
+- **Line of sight** (`-[BGKnowledge inSight:from:]`): within BG_SIGHT, on
+  its level, nothing opaque on a straight line between, either way. Seeing
+  a tile is that, and light; seeing what happens is that, without light
+  (as before, only nearer).
+- **Terrain seen** (`BGSeenChunk`): per chunk an agent has seen any of, a
+  bit per tile (128 bytes) and when it last saw the chunk. It replaces the
+  8 KB grid of times per agent, whose precision nothing read: exploring
+  asks "ever seen", the map "seen now" (perception's own question).
+- **Missed changes** (`BGTerrainRecall`): a terrain change is an event; an
+  agent that had seen the tile and doesn't see it change keeps the kind it
+  saw, until it sees the tile again. What it believes a tile is
+  (`believedTerrainAtX:y:level:`): never seen, nothing; recalled, that; else
+  what it is.
+- **Saved**: a line per chunk seen (its bits in hex), and one per recall.
+- **The map** (BGPlay `look`) draws the terrain the actor believes: `#`
+  for what is solid. A new play world, `shed`, is the shed map with a
+  bucket past its doorway.
+- The explorer passes over solid tiles, and scans the world's extent.
+
+Checked: in the shed, a worker sees the bucket through the doorway, not the
+one three tiles off behind the wall, nor does that tile see it; the wall it
+sees, it believes a wall; the whole shed is one chunk of bits. Walked away,
+the doorway walled up: it believes a doorway, after a save too; back, a
+wall, and nothing recalled. Played, the map shows the walls, the bucket
+through the doorway, the tile behind the wall blank.
+
+Not yet: pathfinding around walls (agents walk greedily); perception still
+looks over every body in the world for each agent, which a large world
+will need an index for.
+
+101 tests, 3337 checks, under both compilers, UBSan, and leak-free.

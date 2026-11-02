@@ -617,10 +617,11 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
       return( NO);
    best = INT_MAX;
    memset( &goal, 0, sizeof( goal));
-   for( y = 0; y < 32; y++)
-      for( x = 0; x < 32; x++)
+   for( y = 0; y < [_world tilesHigh]; y++)
+      for( x = 0; x < [_world tilesWide]; x++)
       {
-         if( ! [_world isTileX:x y:y level:me->level] || [store tileSeenAtX:x y:y] >= 0)
+         if( ! [_world isTileX:x y:y level:me->level] || [store hasSeenX:x y:y level:me->level] ||
+             ([_world terrain] && BGTerrainSolid( [_world terrain], x, y, me->level)))
             continue;
          d = abs( x - me->x) + abs( y - me->y);
          if( d < best)

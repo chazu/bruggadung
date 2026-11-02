@@ -289,6 +289,28 @@ typedef struct
 } BGAncestry;
 
 
+/* What an agent has seen of the terrain (TERRAIN.md decision 7): per chunk
+ * it has seen any of, a bit per tile, and when it last saw the chunk. */
+typedef struct
+{
+   int32_t          cx;
+   int32_t          cy;
+   int32_t          z;
+   BOOL             used;
+   int64_t          seen;          /* ms it last saw any of it */
+   uint32_t         bits[ BG_CHUNK * BG_CHUNK / 32];
+} BGSeenChunk;
+
+/* A tile it saw that has changed since, unseen: the kind it last saw. */
+typedef struct
+{
+   int32_t          x;
+   int32_t          y;
+   int32_t          z;
+   BGTerrainKind    kind;
+} BGTerrainRecall;
+
+
 @interface BGKnowledgeStore : NSObject
 {
    BGWorld          *_world;         /* not retained: for the time memory decays by */
@@ -298,7 +320,11 @@ typedef struct
    NSUInteger       _count;
    NSUInteger       _capacity;
    uint32_t         _next;
-   int64_t          _seenAt[ 32 * 32];
+   BGSeenChunk      *_seenChunks;    /* open addressing, by chunk */
+   NSUInteger       _nseenChunks;
+   NSUInteger       _seenCap;        /* a power of two, or 0 */
+   BGTerrainRecall  *_recalls;
+   NSUInteger       _nrecalls;
    NSMutableArray   *_news;          /* what perception changed, this boundary */
    BGObservation    *_observations;
    NSUInteger       _nobservations;
@@ -347,9 +373,38 @@ typedef struct
 - (NSUInteger) count;
 - (const BGReferent *) referentAt:(NSUInteger) i;
 - (const BGReferent *) referent:(uint32_t) referentID;
-/* when the agent last saw a tile, or -1 */
-- (int64_t) tileSeenAtX:(int32_t) x
-                      y:(int32_t) y;
+/* The terrain it has seen (TERRAIN.md decision 7): whether it ever saw a
+ * tile; when it last saw any of the tile's chunk (-1 never), coarse but
+ * enough to age a memory by; and what it believes the tile is: none if it
+ * never saw it, what it last saw if the tile changed since unseen, else what
+ * it is. */
+- (BOOL) hasSeenX:(int32_t) x
+                y:(int32_t) y
+            level:(int32_t) level;
+- (int64_t) chunkSeenAtX:(int32_t) x
+                       y:(int32_t) y
+                   level:(int32_t) level;
+- (BGTerrainKind) believedTerrainAtX:(int32_t) x
+                                   y:(int32_t) y
+                               level:(int32_t) level;
+/* Seeing a tile now: its bit, its chunk's time, and whatever it recalled
+ * of it gone. */
+- (void) see:(int64_t) now
+           x:(int32_t) x
+           y:(int32_t) y
+       level:(int32_t) level;
+/* A tile changed where it didn't see: if it had seen the tile, it recalls
+ * the kind it saw, until it sees the tile again. */
+- (void) missChangeFrom:(BGTerrainKind) was
+                      x:(int32_t) x
+                      y:(int32_t) y
+                  level:(int32_t) level;
+/* For saving: the chunks seen, in level, row, column order (a copy to
+ * free), and the recalls. */
+- (NSUInteger) seenChunks:(BGSeenChunk **) out;
+- (void) restoreSeenChunk:(const BGSeenChunk *) chunk;
+- (NSUInteger) recallCount;
+- (const BGTerrainRecall *) recallAt:(NSUInteger) i;
 /* lines saying what the last perception phase changed */
 - (NSArray *) news;
 /* What the agent can say (talk.tri), from what it knows, naming no
@@ -549,6 +604,13 @@ typedef struct
  * clock, rooms, lamps with fuel, fires; the ambient setting is unused. */
 - (void) setLight:(id) light;
 - (int) lightAt:(BGLocation) tile;
+/* Whether a tile is in an agent's line of sight from here: its level,
+ * within BG_SIGHT, nothing opaque between (TERRAIN.md); and whether it sees
+ * it: in sight and lit, or within arm's reach. */
+- (BOOL) inSight:(BGLocation) tile
+            from:(BGLocation) here;
+- (BOOL) sees:(BGLocation) tile
+         from:(BGLocation) here;
 /* dusk, or day */
 - (void) setDusk:(BOOL) flag;
 /* Compact every store's knowledge arena at every boundary, not only when it
