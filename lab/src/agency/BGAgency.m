@@ -3,6 +3,7 @@
 #import "BGActions.h"
 #import "BGPath.h"
 #import "BGWakes.h"
+#import "BGReality.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -3193,7 +3194,7 @@ static int   cmp_agent_id( const void *a, const void *b)
 /* When a mind is next due with nothing happening (REALITY.md decision 7):
  * a wake it set; the answer it waits for late; a commitment's window
  * opening or closing since it last decided. INT64_MAX: not of itself. */
-static int64_t   due_of( BGMotivation *m)
+static int64_t   due_of_( BGMotivation *m)
 {
    int64_t   at;
    int       k;
@@ -3216,6 +3217,15 @@ static int64_t   due_of( BGMotivation *m)
 }
 
 
+/* The same, below full detail on the cadence's beat (REALITY.md step 3). */
+static int64_t   due_on_beat( BGWorld *world, BGMotivation *m)
+{
+   return( BGRealityBeat( [world reality], (BGDetail) [world detailOf:m->agent], due_of_( m)));
+}
+
+#define due_of( m)   due_on_beat( _world, (m))
+
+
 static int64_t   mind_due_now( void *context, BGEntityID agent)
 {
    BGAgency       *self;
@@ -3223,7 +3233,7 @@ static int64_t   mind_due_now( void *context, BGEntityID agent)
 
    self = context;
    m    = [self existingMindOf:agent];
-   return( m ? due_of( m) : INT64_MAX);
+   return( m ? due_on_beat( self->_world, m) : INT64_MAX);
 }
 
 

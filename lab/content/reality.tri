@@ -24,3 +24,14 @@ distant: #AnchorKind & { full: { across: 0 }, reduced: { across: 2 }, abstract: 
 #Contact: { kinds: [...text], lease: time & >=0ms & <=1d }
 
 contact: #Contact & { kinds: ["said", "struck", "arrested", "moved"], lease: 60s } @family(contact)
+
+// What runs at a level below full (REALITY.md step 3): its agents' senses,
+// "all" (what happens around them) or "own" (only what they take part
+// in: their own doings, what is done to them); and the cadence, `every`,
+// that the times they would wake by themselves (to forget, to grow
+// hungry, to keep a commitment) are put off to, so that far off they don't
+// each make a boundary of their own. Below reduced, as reduced, until
+// abstract and frozen have ways of their own.
+#Level: { senses: *"all" | "own", every: *0ms | time & >=0ms & <=1d }
+
+reduced: #Level & { senses: "own", every: 10s } @family(levels)

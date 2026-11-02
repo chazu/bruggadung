@@ -4293,3 +4293,20 @@ centre staying within its margin and following past it; a word to someone
 at reduced detail leasing them full, saved and restored, and running out.
 
 110 tests, 3463 checks, under both compilers, UBSan, and leak-free.
+
+
+### After the slice: reduced detail (REALITY.md step 3)
+
+- `content/reality.tri`: `#Level` (`senses`: all | own; `every`), family
+  `levels`; `reduced`: own senses, every 10 s.
+- `BGRealityOwnSensesAt`, `BGRealityCadenceAt`, `BGRealityBeat`.
+- Perception: those concerned only by being near something are dropped if
+  their senses are their own; perception and forgetting wakes on the beat.
+- Decision: a mind's due time on the beat below full.
+- `lab bench crowd|spread N S anchor`: the first agent anchors; levels
+  counted.
+
+Measured: crowd 160 47.8 → 37.8 ms a world second; spread 1,600 unchanged
+(each agent's own loop, kept at reduced, is the cost: steps 4 and 5).
+
+111 tests, 3487 checks, under both compilers, UBSan, and leak-free.

@@ -47,6 +47,8 @@ struct BGReality
    BGLease        *leases;
    NSUInteger     nleases;
    NSUInteger     leasecap;
+   BOOL           reducedOwn;      /* reduced agents sense only what they take part in */
+   int64_t        reducedEvery;    /* reduced agents' own wakes, put off to this cadence */
 };
 
 
@@ -115,6 +117,17 @@ BGReality   *BGRealityNew( TriContent *tri)
       }
    }
    r->nkinds = (int) n;
+
+   family = tri_family_index( tri, "levels");
+   for( i = 0; family && i < tri_index_count( family); i++)
+   {
+      if( strcmp( tri_index_tag( family, i), "reduced"))
+         continue;
+      node = node_of( tri, tri_index_tag( family, i));
+      r->reducedEvery = int_at( tri, node, "every", 0);
+      n = node && tri_at( tri, node, "senses") ? tri_print( tri, tri_at( tri, node, "senses"), text, sizeof( text)) : 0;
+      r->reducedOwn = n > 0 && ! strcmp( text, "\"own\"");
+   }
 
    family = tri_family_index( tri, "contact");
    node   = family && tri_index_count( family) ? node_of( tri, tri_index_tag( family, 0)) : NULL;
@@ -461,6 +474,29 @@ BGEntityID   BGRealityLeaseAt( const BGReality *r, NSUInteger i, int64_t *until)
    if( until)
       *until = r->leases[ i].until;
    return( r->leases[ i].entity);
+}
+
+
+BOOL   BGRealityOwnSensesAt( const BGReality *r, BGDetail level)
+{
+   return( level < BGDetailFull && r->reducedOwn);
+}
+
+
+int64_t   BGRealityCadenceAt( const BGReality *r, BGDetail level)
+{
+   return( level < BGDetailFull ? r->reducedEvery : 0);
+}
+
+
+int64_t   BGRealityBeat( const BGReality *r, BGDetail level, int64_t at)
+{
+   int64_t   every;
+
+   every = BGRealityCadenceAt( r, level);
+   if( every <= 0 || at <= 0 || at == INT64_MAX)
+      return( at);
+   return( (at + every - 1) / every * every);
 }
 
 

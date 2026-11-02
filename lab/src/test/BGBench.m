@@ -10,6 +10,7 @@
 #import "BGAgency.h"
 
 #include <stdio.h>
+#include <string.h>
 #include <time.h>
 
 
@@ -21,11 +22,11 @@ static double   ms_of( uint64_t ns)
 
 int   BGBenchCrowd( int agents, int64_t seconds)
 {
-   return( BGBenchCrowdSpread( agents, seconds, NO));
+   return( BGBenchCrowdSpread( agents, seconds, NO, NO));
 }
 
 
-int   BGBenchCrowdSpread( int agents, int64_t seconds, BOOL spread)
+int   BGBenchCrowdSpread( int agents, int64_t seconds, BOOL spread, BOOL anchored)
 {
    int32_t            side;
    BGWorld            *w;
@@ -87,6 +88,12 @@ int   BGBenchCrowdSpread( int agents, int64_t seconds, BOOL spread)
       else
          [agency autopilotExplore:ids[ i] threshold:50];
    }
+   /* the first anchors the reality bubble: the rest further off, less exactly */
+   if( anchored)
+   {
+      [w setAnchor:ids[ 0] kind:"player"];
+      [w settleAnchors];
+   }
    st0 = [s stats];
    p0  = [knowledge perceptions];
    d0  = [agency decisions];
@@ -104,8 +111,18 @@ int   BGBenchCrowdSpread( int agents, int64_t seconds, BOOL spread)
    st.commitNs     -= st0.commitNs;
    st.perceptionNs -= st0.perceptionNs;
    st.decisionNs   -= st0.decisionNs;
-   printf( "crowd%s: %d agents (%d exploring), %lld s of world time\n", spread ? " spread" : "", agents, (agents + 1) / 2,
-           (long long) seconds);
+   printf( "crowd%s%s: %d agents (%d exploring), %lld s of world time\n", spread ? " spread" : "",
+           anchored ? ", anchored" : "", agents, (agents + 1) / 2, (long long) seconds);
+   if( anchored)
+   {
+      int   levels[ 4];
+
+      memset( levels, 0, sizeof( levels));
+      for( i = 0; i < agents; i++)
+         levels[ [w detailOf:ids[ i]]]++;
+      printf( "  levels        %d full, %d reduced, %d abstract, %d frozen\n", levels[ 3], levels[ 2], levels[ 1],
+              levels[ 0]);
+   }
    printf( "  wall          %10.1f ms  (%.1f ms a world second)\n", wall, wall / (double) seconds);
    printf( "  boundaries    %10llu     (%.1f a world second)\n", (unsigned long long) st.boundaries,
            (double) st.boundaries / (double) seconds);

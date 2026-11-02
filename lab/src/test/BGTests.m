@@ -8240,6 +8240,87 @@ static void   test_reality_bubble( void)
 }
 
 
+/* REALITY.md step 3: reduced detail. A player anchors the plain; a walker
+ * goes by two watchers, one at full detail beside the player, one three
+ * chunks off at reduced. The one at full sees it pass; the one at reduced,
+ * whose senses reach only what it takes part in, doesn't look up; walking
+ * itself, a reduced agent walks as fast; and what it would wake for by
+ * itself falls on the cadence's beat, ten seconds. A word from the player
+ * leases it full, and then it hears. */
+static void   test_reduced_detail( void)
+{
+   BGStage            st;
+   BGActivities       *activities;
+   BGKnowledge        *knowledge;
+   BGAgency           *agency;
+   BGProposalGroup    *g;
+   BGEntityID         player;
+   BGEntityID         nearWatcher;
+   BGEntityID         farWatcher;
+   BGEntityID         nearWalker;
+   BGEntityID         farWalker;
+   NSString           *error;
+   int64_t            nearSeen;
+   int64_t            farSeen;
+   int                i;
+
+   st.w = BGTestWorld( 223);
+   BG_CHECK( [st.w setTerrainMap:"plain_map" error:NULL]);
+   st.c       = BGTestCommitter( st.w);
+   activities = [BGActivities activitiesWithWorld:st.w committer:st.c];
+   knowledge  = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+   agency     = [[[BGAgency alloc] initWithWorld:st.w committer:st.c knowledge:knowledge] autorelease];
+   st.s       = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [agency setActivities:activities];
+   [st.s setActivities:activities];
+   [st.s setPerception:knowledge];
+   [st.s setDecision:agency];
+   g           = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: a player, watchers, walkers"];
+   player      = [g create:"worker" key:"player" at:BGOnTile( 100, 100, 0)];
+   nearWatcher = [g create:"watchman" key:"near watcher" at:BGOnTile( 104, 104, 0)];
+   nearWalker  = [g create:"worker" key:"near walker" at:BGOnTile( 100, 106, 0)];
+   farWatcher  = [g create:"watchman" key:"far watcher" at:BGOnTile( 100 + 3 * 32, 104, 0)];
+   farWalker   = [g create:"worker" key:"far walker" at:BGOnTile( 100 + 3 * 32 - 4, 106, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   player      = [g idFor:player];
+   nearWatcher = [g idFor:nearWatcher];
+   nearWalker  = [g idFor:nearWalker];
+   farWatcher  = [g idFor:farWatcher];
+   farWalker   = [g idFor:farWalker];
+   BG_CHECK( [st.w setAnchor:player kind:"player"]);
+   [st.s runUntil:BGTimeMake( 1000)];
+   BG_CHECK( [st.w detailOf:nearWatcher] == BGDetailFull && [st.w detailOf:farWatcher] == BGDetailReduced);
+   nearSeen = [knowledge storeOf:nearWatcher]->_perceivedAt;
+   farSeen  = [knowledge storeOf:farWatcher]->_perceivedAt;
+
+   /* each walker goes by its watcher, eight steps */
+   for( i = 0; i < 8; i++)
+   {
+      error = nil;
+      BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "walk_east", nearWalker, BGNoEntity, BGNoEntity), 0, &error) != nil);
+      BG_CHECK( BGPerform( st.w, st.c, BGActionMake( "walk_east", farWalker, BGNoEntity, BGNoEntity), 0, &error) != nil);
+      [st.s runUntil:BGTimeMake( [st.w time].ms + 1500)];
+   }
+   /* walking at reduced detail, as fast */
+   BG_CHECK( [st.w locationOf:nearWalker].x == 108 && [st.w locationOf:farWalker].x == 100 + 3 * 32 + 4);
+   /* the watcher at full saw the walker go by; the one at reduced didn't look */
+   BG_CHECK( [knowledge storeOf:nearWatcher]->_perceivedAt > nearSeen);
+   BG_CHECK( [knowledge storeOf:farWatcher]->_perceivedAt == farSeen);
+   /* and what it would wake for, by itself, falls on the beat */
+   BG_CHECK( [knowledge storeOf:farWatcher]->_perceiveBy == INT64_MAX ||
+             [knowledge storeOf:farWatcher]->_perceiveBy % 10000 == 0);
+
+   /* a word from the player: leased full, it hears */
+   g = [BGProposalGroup groupWithPhase:BGPhaseAction source:@"the player calls out"];
+   [g setActor:player];
+   [g emit:"said" subject:BGWhole( player) other:BGWhole( farWatcher)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( [st.w time].ms + 100)];
+   BG_CHECK( [st.w detailOf:farWatcher] == BGDetailFull && [knowledge storeOf:farWatcher]->_perceivedAt > farSeen);
+}
+
+
 /* A grid for BGPath, from rows of '#' (walls) and anything else. */
 typedef struct
 {
@@ -11529,6 +11610,7 @@ const BGTestCase   BGAllTests[] =
    { "water_at_scale",                test_water_at_scale },
    { "work_when_touched",             test_work_when_touched },
    { "reality_bubble",                test_reality_bubble },
+   { "reduced_detail",                test_reduced_detail },
    { "recipe_autopilot",              test_recipe_autopilot },
    { "resume_recheck",                test_resume_recheck },
    { "interrupted_repair",            test_interrupted_repair },

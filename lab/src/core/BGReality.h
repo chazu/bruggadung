@@ -63,6 +63,15 @@ void          BGRealityPrune( BGReality *r, int64_t now);
 NSUInteger    BGRealityLeaseCount( const BGReality *r);
 BGEntityID    BGRealityLeaseAt( const BGReality *r, NSUInteger i, int64_t *until);
 
+/* What runs at a level (content's `levels`, REALITY.md step 3): whether its
+ * agents sense only what they take part in, and the cadence their own
+ * wakes are put off to (0: none). Below reduced, as reduced; full, all
+ * senses and no cadence. */
+BOOL          BGRealityOwnSensesAt( const BGReality *r, BGDetail level);
+int64_t       BGRealityCadenceAt( const BGReality *r, BGDetail level);
+/* A wake at `at`, at a level: put off to the cadence's next beat, if any. */
+int64_t       BGRealityBeat( const BGReality *r, BGDetail level, int64_t at);
+
 /* Contact: whether an event's kind counts, and how long its lease runs. */
 BOOL          BGRealityIsContact( const BGReality *r, const char *kind);
 int64_t       BGRealityContactLease( const BGReality *r);

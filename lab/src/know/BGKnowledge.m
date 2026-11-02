@@ -1,5 +1,6 @@
 #import "BGKnowledge.h"
 #import "BGWakes.h"
+#import "BGReality.h"
 
 #import "BGView.h"
 #import "BGTraces.h"
@@ -4803,6 +4804,8 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
          if( when > now && when < store->_forgetBy)
             store->_forgetBy = when;
       }
+      /* below full detail, on the cadence's beat */
+      store->_forgetBy = BGRealityBeat( [_world reality], (BGDetail) [_world detailOf:store->_agent], store->_forgetBy);
    }
    return( store->_forgetBy);
 }
@@ -4943,6 +4946,10 @@ static int   cmp_entity_id( const void *a, const void *b)
                             to:(NSUInteger) last
                          count:(NSUInteger *) count
 {
+   BGEntityID         *nearby;
+   NSUInteger         nnear;
+   NSUInteger         nearcap;
+
    const BGEvent      *ev;
    const BGActivity   *activity;
    const BGTrace      *trace;
@@ -4961,9 +4968,12 @@ static int   cmp_entity_id( const void *a, const void *b)
 
    kagent = [_world kindNamed:"Agent"];
    kgas   = [_world kindNamed:"GasStore"];
-   marked = NULL;
-   n      = 0;
-   cap    = 0;
+   marked  = NULL;
+   n       = 0;
+   cap     = 0;
+   nearby  = NULL;
+   nnear   = 0;
+   nearcap = 0;
    gas    = malloc( (_ntouched + 1) * sizeof( BGEntityID));
    ngas   = 0;
    for( i = 0; i < _ntouched; i++)
@@ -4992,7 +5002,7 @@ static int   cmp_entity_id( const void *a, const void *b)
          radius = BG_SIGHT + 11;          /* a lamp lights its reach, ten at most */
       else if( [_world record:[_world kindNamed:"Door"] for:e])
          radius = BG_SIGHT + 16;          /* a door shades the room behind it */
-      mark_near( _world, tile, radius, kagent, &marked, &n, &cap);
+      mark_near( _world, tile, radius, kagent, &nearby, &nnear, &nearcap);
    }
    for( i = first; i < last; i++)
    {
@@ -5001,11 +5011,11 @@ static int   cmp_entity_id( const void *a, const void *b)
       mark( [_world record:kagent for:ev->other] ? ev->other : BGNoEntity, &marked, &n, &cap);
       mark( [_world record:kagent for:ev->actor] ? ev->actor : BGNoEntity, &marked, &n, &cap);
       if( ev->location.form == BGLocationOnTile)
-         mark_near( _world, ev->location, BG_SIGHT + 1, kagent, &marked, &n, &cap);
+         mark_near( _world, ev->location, BG_SIGHT + 1, kagent, &nearby, &nnear, &nearcap);
       if( ev->subject && ground_tile( _world, ev->subject, &tile))
-         mark_near( _world, tile, BG_SIGHT + 1, kagent, &marked, &n, &cap);
+         mark_near( _world, tile, BG_SIGHT + 1, kagent, &nearby, &nnear, &nearcap);
       if( ev->actor && ev->actor != ev->subject && ground_tile( _world, ev->actor, &tile))
-         mark_near( _world, tile, BG_SIGHT + 1, kagent, &marked, &n, &cap);
+         mark_near( _world, tile, BG_SIGHT + 1, kagent, &nearby, &nnear, &nearcap);
       /* terrain changed: whoever saw the tile, however far, recalls what was
        * there (TERRAIN.md decision 7) */
       if( ! strcmp( ev->kind, "terrain") && ev->location.form == BGLocationOnTile)
@@ -5020,7 +5030,7 @@ static int   cmp_entity_id( const void *a, const void *b)
 
       vacated = [_world takeVacated:&nvacated];
       for( i = 0; i < nvacated; i++)
-         mark_near( _world, vacated[ i], BG_SIGHT + 1, kagent, &marked, &n, &cap);
+         mark_near( _world, vacated[ i], BG_SIGHT + 1, kagent, &nearby, &nnear, &nearcap);
       free( vacated);
    }
    /* the air they breathe */
@@ -5033,6 +5043,12 @@ static int   cmp_entity_id( const void *a, const void *b)
             mark( [agents entityAtIndex:i], &marked, &n, &cap);
    }
    free( gas);
+   /* nearby, not party to it: those whose senses reach only what they take
+    * part in (below full detail, REALITY.md step 3) don't attend */
+   for( i = 0; i < nnear; i++)
+      if( ! BGRealityOwnSensesAt( [_world reality], (BGDetail) [_world detailOf:nearby[ i]]))
+         mark( nearby[ i], &marked, &n, &cap);
+   free( nearby);
    if( n)
       qsort( marked, n, sizeof( BGEntityID), cmp_entity_id);
    *count = n;
@@ -5209,7 +5225,8 @@ static int   cmp_entity_id( const void *a, const void *b)
       /* short of attention, or it learnt something: it looks again next
        * boundary, what it learnt checked against what it sees (told that
        * Kasimir has the purse, it sees whether he does) */
-      store->_perceiveBy   = _short || [[store news] count] ? now + 1 : [self perceiveByOf:store];
+      store->_perceiveBy   = BGRealityBeat( [_world reality], (BGDetail) [_world detailOf:agent],
+                                           _short || [[store news] count] ? now + 1 : [self perceiveByOf:store]);
       store->_forgetBy     = -2;
       BGWakesPush( _perceiveWakes, agent, store->_perceiveBy);
       BGWakesPush( _forgetWakes, agent, [self forgetByOf:store]);

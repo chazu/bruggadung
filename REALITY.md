@@ -13,7 +13,8 @@ done when something happens, and what falls due comes from queues of wakes
 (lab/src/know/BGKnowledge, lab/src/agency/BGAgency, lab/src/core/BGWakes),
 measured by `lab bench crowd` and `lab bench spread`. Step 2 is built: the
 levels are found and shown (lab/content/reality.tri, lab/src/core/
-BGReality), and nothing yet runs differently by them.
+BGReality). Step 3 is built: below full detail, agents sense only what
+they take part in, and their own wakes fall on a cadence.
 
 The aim is a world simulated exactly where it matters, and less exactly, by
 degrees, further away, with the degrees, their reach, and what each thing
@@ -223,6 +224,25 @@ full.
    reading the levels; a lease for what a full agent only perceives.
 3. **Reduced detail.** Agents' coarser cadence and narrower perception;
    the domains' longer steps.
+
+   **Built, for agents.** Content (`levels`): `reduced` senses `own` (what
+   it takes part in: its own changes, its activities, the events it is a
+   party to) and keeps a cadence, `every`, 10 s. An agent below full is not
+   concerned by what happens near it, only by what involves it; its own
+   wakes (forgetting, a promise due, hunger's band, a fading trace; a
+   mind's wake, an answer late, a commitment's window) are put off to the
+   cadence's next beat (`BGRealityBeat`). What it does itself runs at full
+   pace: its walk ends when it ends, and it decides then. Abstract and
+   frozen are as reduced until steps 4 and 5. The domains' longer steps
+   wait: a domain steps the whole world at once today.
+
+   Measured, wall time a world second, a player anchoring the first agent:
+   a crowd of 160 on the yard (104 full, 56 reduced), 47.8 → 37.8 ms;
+   1,600 spread over the plain (33 full, 184 reduced, 1,383 abstract),
+   unchanged at 181 ms: there what costs is each agent's own doing, a
+   walk a second and a decision after it, which reduced keeps. That is for
+   frozen (nothing runs) and abstract (progression in bulk) to take away.
+
 4. **Frozen, and catching up** (decision 6). A chunk's clock; catch-up on
    rising: the domains in closed form, activities finished or failed as
    they would have.
