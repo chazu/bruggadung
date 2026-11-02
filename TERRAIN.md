@@ -191,9 +191,6 @@ floor.
 - **Rooms larger than `BG_ROOM_MAX`** are open ground: a great hall wants
   the bound raised, or the outdoors told apart another way (with levels,
   open to the sky).
-- **What still holds a fixed number:** the atmosphere at most 8 regions
-  and 32 links, the thermal domain 16 bodies, as before; past them,
-  regions and bodies drop out unseen.
 - **Doorways one tile thick.** A link is found across one doorway cell; two
   doorway cells in a row join nothing.
 - **Paths past a search's reach.** A target further than the budget's

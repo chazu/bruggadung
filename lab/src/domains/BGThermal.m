@@ -17,6 +17,7 @@
 
 - (void) dealloc
 {
+   free( _bodies);
    [_world release];
    [super dealloc];
 }
@@ -55,16 +56,32 @@
 
 - (int) bodyOf:(BGEntityID) entity
 {
-   int   i;
+   int   lo;
+   int   hi;
+   int   mid;
 
-   for( i = 0; i < _nbodies; i++)
-      if( _bodies[ i].entity == entity)
-         return( i);
-   if( _nbodies == BG_THERMAL_BODIES)
-      return( -1);
-   memset( &_bodies[ _nbodies], 0, sizeof( BGThermalState));
-   _bodies[ _nbodies].entity = entity;
-   return( _nbodies++);
+   lo = 0;
+   hi = _nbodies;
+   while( lo < hi)
+   {
+      mid = (lo + hi) / 2;
+      if( _bodies[ mid].entity < entity)
+         lo = mid + 1;
+      else
+         hi = mid;
+   }
+   if( lo < _nbodies && _bodies[ lo].entity == entity)
+      return( lo);
+   if( _nbodies == _bodycap)
+   {
+      _bodycap = _bodycap ? _bodycap * 2 : 16;
+      _bodies  = realloc( _bodies, (size_t) _bodycap * sizeof( BGThermalState));
+   }
+   memmove( &_bodies[ lo + 1], &_bodies[ lo], (size_t) (_nbodies - lo) * sizeof( BGThermalState));
+   memset( &_bodies[ lo], 0, sizeof( BGThermalState));
+   _bodies[ lo].entity = entity;
+   _nbodies++;
+   return( lo);
 }
 
 

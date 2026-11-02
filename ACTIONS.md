@@ -251,6 +251,14 @@ An activity is an informational entity with an `Activity` component, holding:
 Others perceive an activity through its actor's position and the operation's
 observability declarations.
 
+**What is kept of activities ended.** The world indexes activities by their
+actor, by what they take part in, and by whether they watch, so asking what
+an agent is doing costs what it does, not all that was ever done. An ended
+activity goes, at the next boundary, unless something still asks of it: its
+actor's latest, and, per operation, the completed one that started last,
+which answers whether the actor did it since a time. The Activity store holds
+what is under way and what is still asked of.
+
 **Stages and progress**
 
 - `rate = f(capabilities, shortfall, actor modifiers)`

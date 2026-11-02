@@ -134,8 +134,12 @@ typedef struct
    struct BGIndex *_inPlace;         /* what is in, on, held by or part of a thing, by the thing */
    struct BGIndex *_tracesOnGround;  /* traces on the floor, by chunk */
    struct BGIndex *_tracesBorne;     /* traces on a thing, by the thing */
+   struct BGIndex *_activitiesOf;    /* activities, by actor */
+   struct BGIndex *_watching;        /* activities with a watch, under one key */
+   struct BGIndex *_touching;        /* activities, by actor, item and destination */
    NSUInteger     _kindTrace;
    NSUInteger     _kindGas;
+   NSUInteger     _kindActivity;
    BGEntityID     *_checkedOut;      /* sorted; not saved: saves check everything in */
    NSUInteger     _ncheckedOut;
 }
@@ -254,6 +258,23 @@ typedef struct
 - (NSUInteger) tracesNear:(BGLocation) tile
                    radius:(int32_t) radius
                      into:(BGEntityID **) out;
+/* An actor's activities, of every status, in entity order: returns how
+ * many, filling up to max. */
+- (NSUInteger) activitiesOf:(BGEntityID) actor
+                       into:(BGEntityID *) out
+                        max:(NSUInteger) max;
+/* The same, malloc'd: *n of them; the caller frees it. */
+- (BGEntityID *) copyActivitiesOf:(BGEntityID) actor
+                            count:(NSUInteger *) n;
+/* The activities an entity takes part in, as actor, item or destination,
+ * in entity order, malloc'd: *n of them. */
+- (BGEntityID *) copyActivitiesTouching:(BGEntityID) entity
+                                  count:(NSUInteger *) n;
+/* The activities with a watch (a holder's stock, a tile, the air), of
+ * every status, in entity order. */
+- (NSUInteger) watchingActivities:(BGEntityID *) out
+                              max:(NSUInteger) max;
+- (BGEntityID *) copyWatchingActivities:(NSUInteger *) n;
 /* What is in, on, held by or part of a thing, any way, in entity order. */
 - (NSUInteger) entitiesIn:(BGEntityID) place
                      into:(BGEntityID *) out

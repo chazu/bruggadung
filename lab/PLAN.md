@@ -4190,3 +4190,32 @@ moves, a refused group and a restore; 40 L of water spreading over 581
 tiles of a 96 by 64 yard and not past a wall, every millilitre kept.
 
 108 tests, 3425 checks, under both compilers, UBSan, and leak-free.
+
+
+### After the slice: no silent caps, and activities that don't pile up
+
+The audit's items 5 and 2.
+
+- **Caps gone**: the atmosphere's regions, links, stoves, surfaces,
+  breathers and reported watches, and the thermal domain's bodies, are
+  growing arrays kept in entity order and found by halving; a region's
+  watch crossed is read once, not once per watch. An agent binding a slot
+  ranks every referent that fits, not the first 64 it met.
+- **Activities indexed** in the world: by actor (`copyActivitiesOf:`), by
+  what they take part in (`copyActivitiesTouching:`), and those that
+  watch (`copyWatchingActivities`), kept like the spatial index. Every
+  per-agent scan reads them: an agent's busyness, attention, providers,
+  its "did it since", putting down and suspending, a breather at rest,
+  the domains' watches, the cistern, play. A round's events are matched
+  with the activities they concern, not every one.
+- **Activities let go** (`-[BGActivities letGo]`, one group a boundary,
+  read from the world alone): an ended activity goes unless it is its
+  actor's latest or, per operation, the completed one that started last.
+- Activity times bounded at 10,000 days, as the rest.
+- `-[BGAtmosphere watches:]` renamed `airWatches:`: mulle-objc wants one
+  signature per selector, and the fluid domain's differs.
+
+Checked besides: an explorer's dozens of walks leave five activities at
+most, and the index agrees with the store.
+
+108 tests, 3431 checks, under both compilers, UBSan, and leak-free.

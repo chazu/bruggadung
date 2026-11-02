@@ -255,6 +255,32 @@ static int   likely_in( BGCondition *c, uint32_t place)
 }
 
 
+static int   compare_candidates( BGCondition *c, const BGReferent *a, const BGReferent *b);
+
+/* A candidate for a slot, and where the store has it, to keep equals in
+ * the store's order. */
+typedef struct
+{
+   const BGReferent   *referent;
+   NSUInteger         order;
+} BGRanked;
+
+static BGCondition   *ranking;      /* the condition qsort ranks by; set only while it sorts */
+
+static int   cmp_ranked( const void *a, const void *b)
+{
+   const BGRanked   *x;
+   const BGRanked   *y;
+   int              d;
+
+   x = a;
+   y = b;
+   if( (d = compare_candidates( ranking, x->referent, y->referent)))
+      return( d);
+   return( x->order < y->order ? -1 : x->order > y->order);
+}
+
+
 static int   compare_candidates( BGCondition *c, const BGReferent *a, const BGReferent *b)
 {
    NSUInteger   k;
@@ -948,7 +974,7 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
      bindings:(BGSlotBinding *) b
         count:(int *) n
 {
-   const BGReferent   *candidates[ 64];
+   BGRanked           *candidates;
    const BGReferent   *r;
    const BGReferent   *t;
    NSUInteger         ncandidates;
@@ -957,6 +983,7 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    const char         *slot;
    int64_t            searched;
    int                before;
+   BOOL               held;
 
    if( k == c->nfind)
    {
@@ -994,7 +1021,9 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
          return( NO);
    }
 
-   for( i = 0; i < [c->store count] && ncandidates < 64; i++)
+   /* every referent that fits, however many, best first */
+   candidates = malloc( ([c->store count] + 1) * sizeof( BGRanked));
+   for( i = 0; i < [c->store count]; i++)
    {
       r = [c->store referentAt:i];
       if( ! r->present || r->id == c->me->id)
@@ -1008,28 +1037,33 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
          continue;      /* searched already: looked into, or asked the same */
       if( ! [self kind:r->kind fitsSlot:slot of:c])
          continue;
-      /* in the condition's order */
-      for( j = ncandidates; j > 0 && compare_candidates( c, r, candidates[ j - 1]) < 0; j--)
-         candidates[ j] = candidates[ j - 1];
-      candidates[ j] = r;
+      candidates[ ncandidates].referent = r;
+      candidates[ ncandidates].order    = i;
       ncandidates++;
    }
+   /* in the condition's order; equals as the store has them */
+   ranking = c;
+   qsort( candidates, ncandidates, sizeof( BGRanked), cmp_ranked);
+   ranking = NULL;
 
-   for( i = 0; i < ncandidates; i++)
+   held = NO;
+   for( i = 0; i < ncandidates && ! held; i++)
    {
       if( ++c->tries > BG_MAX_TRIES)
-         return( NO);
-      t               = candidates[ i];
+         break;
+      t               = candidates[ i].referent;
       before          = *n;
       b[ *n].slot     = [_world intern:slot];
       b[ *n].referent = t->id;
       (*n)++;
       if( [self match:c bindings:b count:*n] != TRI_INCOMPATIBLE &&
           [self bind:c slot:k + 1 bindings:b count:n])
-         return( YES);
-      *n = before;
+         held = YES;
+      else
+         *n = before;
    }
-   return( NO);
+   free( candidates);
+   return( held);
 }
 
 
@@ -1077,22 +1111,27 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
                   since:(int64_t) since
 {
    const BGActivity   *record;
-   BGStore            *store;
+   BGEntityID         *mine;
+   BGEntityID         found;
+   NSUInteger         n;
    NSUInteger         i;
    const char         *op;
    char               quoted[ 32];
+   uint32_t           wanted;
 
    snprintf( quoted, sizeof( quoted), "\"%s\"", status);
-   store = [_world storeForKind:[_world kindNamed:"Activity"]];
-   for( i = 0; i < [store count]; i++)
+   wanted = (uint32_t) tri_type_named( [_world tri], quoted);
+   mine   = [_world copyActivitiesOf:agent count:&n];
+   found  = BGNoEntity;
+   for( i = 0; i < n && ! found; i++)
    {
-      record = [store recordAtIndex:i];
-      op     = [_world textField:"Activity.operation" of:[store entityAtIndex:i]];
-      if( (BGEntityID) record->actorRef == agent && op && ! strcmp( op, operation) &&
-          record->status == (uint32_t) tri_type_named( [_world tri], quoted) && record->started >= since)
-         return( [store entityAtIndex:i]);
+      record = [_world record:[_world kindNamed:"Activity"] for:mine[ i]];
+      op     = [_world textField:"Activity.operation" of:mine[ i]];
+      if( record && op && ! strcmp( op, operation) && record->status == wanted && record->started >= since)
+         found = mine[ i];
    }
-   return( BGNoEntity);
+   free( mine);
+   return( found);
 }
 
 
@@ -1338,22 +1377,23 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
 - (BOOL) busy:(BGEntityID) agent
 {
    const BGActivity   *record;
-   BGStore            *store;
+   BGEntityID         *mine;
+   NSUInteger         n;
    NSUInteger         i;
    TriType            running;
+   BOOL               busy;
 
-   store   = [_world storeForKind:[_world kindNamed:"Activity"]];
    running = tri_type_named( [_world tri], "\"running\"");
-   for( i = 0; i < [store count]; i++)
+   mine    = [_world copyActivitiesOf:agent count:&n];
+   for( busy = NO, i = 0; i < n && ! busy; i++)
    {
-      record = [store recordAtIndex:i];
+      record = [_world record:[_world kindNamed:"Activity"] for:mine[ i]];
       /* talking occupies the voice, not the mind (ACTIONS.md §5: walking
        * while talking works) */
-      if( record->actorRef == agent && record->status == (uint32_t) running &&
-          ! voice_only( [_world tri], record->operation))
-         return( YES);
+      busy = record && record->status == (uint32_t) running && ! voice_only( [_world tri], record->operation);
    }
-   return( NO);
+   free( mine);
+   return( busy);
 }
 
 
@@ -1391,22 +1431,23 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
              why:(NSString *) why
 {
    const BGActivity   *record;
-   BGStore            *activities;
+   BGEntityID         *mine;
    NSString           *error;
+   NSUInteger         n;
    NSUInteger         i;
 
-   activities = [_world storeForKind:[_world kindNamed:"Activity"]];
-   for( i = 0; _activities && i < [activities count]; i++)
+   mine = [_world copyActivitiesOf:m->agent count:&n];
+   for( i = 0; _activities && i < n; i++)
    {
-      record = [activities recordAtIndex:i];
-      if( (BGEntityID) record->actorRef != m->agent ||
-          record->status != (uint32_t) tri_type_named( [_world tri], "\"running\""))
+      record = [_world record:[_world kindNamed:"Activity"] for:mine[ i]];
+      if( ! record || record->status != (uint32_t) tri_type_named( [_world tri], "\"running\""))
          continue;
       error = nil;
-      if( [_activities suspend:[activities entityAtIndex:i] because:why error:&error])
+      if( [_activities suspend:mine[ i] because:why error:&error])
          [self note:m line:[NSString stringWithFormat:@"%@: putting %s down", why,
-                                                      [_world textField:"Activity.operation" of:[activities entityAtIndex:i]]]];
+                                                      [_world textField:"Activity.operation" of:mine[ i]]]];
    }
+   free( mine);
 }
 
 
@@ -2651,7 +2692,8 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
    NSMutableArray     *parts;
    NSMutableArray     *bestParts;
    NSMutableArray     *currentParts;
-   BGStore            *activities;
+   BGEntityID         *mine;
+   NSUInteger         nmine;
    const char         *goal;
    const char         *best;
    NSString           *error;
@@ -2873,17 +2915,18 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
       return( NO);
 
    /* what it was doing, suspended */
-   activities = [_world storeForKind:[_world kindNamed:"Activity"]];
-   for( i = 0; busy && _activities && i < [activities count]; i++)
+   mine = [_world copyActivitiesOf:m->agent count:&nmine];
+   for( i = 0; busy && _activities && i < nmine; i++)
    {
-      record = [activities recordAtIndex:i];
-      if( (BGEntityID) record->actorRef != m->agent || record->status != (uint32_t) tri_type_named( tri, "\"running\""))
+      record = [_world record:[_world kindNamed:"Activity"] for:mine[ i]];
+      if( ! record || record->status != (uint32_t) tri_type_named( tri, "\"running\""))
          continue;
       error = nil;
-      if( [_activities suspend:[activities entityAtIndex:i] because:@"something else matters more" error:&error])
+      if( [_activities suspend:mine[ i] because:@"something else matters more" error:&error])
          [self note:m line:[NSString stringWithFormat:@"suspending %s",
-                                                      [_world textField:"Activity.operation" of:[activities entityAtIndex:i]]]];
+                                                      [_world textField:"Activity.operation" of:mine[ i]]]];
    }
+   free( mine);
    b.slot     = bestSlot;
    b.referent = bestAbout;
    if( bestCommitment >= 0)

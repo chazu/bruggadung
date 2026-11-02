@@ -59,11 +59,6 @@
 #import "BGScheduler.h"
 
 
-#define BG_ATMOS_REGIONS   8
-#define BG_ATMOS_STOVES    8
-#define BG_ATMOS_SURFACES  16
-#define BG_ATMOS_BREATHERS 8
-#define BG_ATMOS_LINKS     32
 
 
 typedef struct
@@ -149,21 +144,28 @@ typedef struct
    BGWorld        *_world;
    BOOL           _active;
    BOOL           _ledgered;
-   BGAirRegion    _regions[ BG_ATMOS_REGIONS];
+   /* each kept in entity order, as many as the world has */
+   BGAirRegion    *_regions;
    int            _nregions;
-   BGAirLink      _links[ BG_ATMOS_LINKS];
+   int            _regioncap;
+   BGAirLink      *_links;
    int            _nlinks;
-   BGStoveState   _stoves[ BG_ATMOS_STOVES];
+   int            _linkcap;
+   BGStoveState   *_stoves;
    int            _nstoves;
-   BGAirSurface   _surfaces[ BG_ATMOS_SURFACES];
+   int            _stovecap;
+   BGAirSurface   *_surfaces;
    int            _nsurfaces;
-   BGBreather     _breathers[ BG_ATMOS_BREATHERS];
+   int            _surfacecap;
+   BGBreather     *_breathers;
    int            _nbreathers;
+   int            _breathercap;
    BGAirLedger    _ledger;
    int64_t        _rise;          /* the last step's carbon dioxide rise, per second, in the first region */
    NSUInteger     _steps;
-   BGEntityID     _fired[ 16];
+   BGEntityID     *_fired;         /* watches reported, while they still watch */
    int            _nfired;
+   int            _firedcap;
 }
 
 - (id) initWithWorld:(BGWorld *) world;

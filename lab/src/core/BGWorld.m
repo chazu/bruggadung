@@ -297,8 +297,9 @@ static NSUInteger   stocks_wet( struct BGTileStocks *s, int32_t (*out)[ 3], NSUI
       _kindTypes[ k] = tri_type_named( [content content], BGComponents[ k].type);
    }
    _trueType   = tri_type_named( [content content], "true");
-   _kindTrace  = [self kindNamed:"Trace"];
-   _kindGas    = [self kindNamed:"GasStore"];
+   _kindTrace    = [self kindNamed:"Trace"];
+   _kindGas      = [self kindNamed:"GasStore"];
+   _kindActivity = [self kindNamed:"Activity"];
    _entities   = [[BGStore alloc] initWithRecordSize:sizeof( BGEntityInfo)];
    _locations  = [[BGStore alloc] initWithRecordSize:sizeof( BGLocation)];
    _tombstones = [[BGStore alloc] initWithRecordSize:sizeof( BGTombstone)];
@@ -306,6 +307,9 @@ static NSUInteger   stocks_wet( struct BGTileStocks *s, int32_t (*out)[ 3], NSUI
    _inPlace        = BGIndexNew();
    _tracesOnGround = BGIndexNew();
    _tracesBorne    = BGIndexNew();
+   _activitiesOf   = BGIndexNew();
+   _watching       = BGIndexNew();
+   _touching       = BGIndexNew();
    _arena      = tri_arena_new();
    _tilesWide  = 32;
    _tilesHigh  = 32;
@@ -345,6 +349,9 @@ static NSUInteger   stocks_wet( struct BGTileStocks *s, int32_t (*out)[ 3], NSUI
    BGIndexFree( _inPlace);
    BGIndexFree( _tracesOnGround);
    BGIndexFree( _tracesBorne);
+   BGIndexFree( _activitiesOf);
+   BGIndexFree( _watching);
+   BGIndexFree( _touching);
    free( _checkedOut);
    tri_arena_free( _arena);
    [_content release];
@@ -499,6 +506,7 @@ static void   journal_record( BGWorld *self, BGStore *store, NSUInteger kind, BG
 
 
 static void   edge_insert_raw( BGWorld *self, BGEdge e);
+static void   file_record( BGWorld *self, NSUInteger kind, BGEntityID entity, BOOL add);
 static void   edge_remove_raw( BGWorld *self, BGEdge e);
 
 
@@ -519,8 +527,8 @@ static void   edge_remove_raw( BGWorld *self, BGEdge e);
             _airAnchors++;
          if( j->store == _locations)
             file_location( self, j->entity, [_locations recordFor:j->entity], NO);
-         if( _kindTrace < _nkinds && j->store == _kinds[ _kindTrace])
-            file_trace( self, j->entity, [j->store recordFor:j->entity], NO);
+         if( j->kind < _nkinds && j->store == _kinds[ j->kind])
+            file_record( self, j->kind, j->entity, NO);
          if( j->had)
             [j->store setRecord:j->old
                             for:j->entity];
@@ -528,8 +536,8 @@ static void   edge_remove_raw( BGWorld *self, BGEdge e);
             [j->store removeRecordFor:j->entity];
          if( j->store == _locations)
             file_location( self, j->entity, [_locations recordFor:j->entity], YES);
-         if( _kindTrace < _nkinds && j->store == _kinds[ _kindTrace])
-            file_trace( self, j->entity, [j->store recordFor:j->entity], YES);
+         if( j->kind < _nkinds && j->store == _kinds[ j->kind])
+            file_record( self, j->kind, j->entity, YES);
          break;
 
       case BGJournalEdgeAdd:
@@ -699,17 +707,55 @@ static void   file_trace( BGWorld *self, BGEntityID entity, const BGTrace *trace
 }
 
 
+/* Files or unfiles an activity: under its actor, and, with a watch, among
+ * those watching. */
+static void   file_activity( BGWorld *self, BGEntityID entity, const BGActivity *activity, BOOL add)
+{
+   if( ! activity)
+      return;
+   if( add)
+   {
+      BGIndexAdd( self->_activitiesOf, activity->actorRef, entity);
+      if( activity->actorRef)
+         BGIndexAdd( self->_touching, activity->actorRef, entity);
+      if( activity->itemRef)
+         BGIndexAdd( self->_touching, activity->itemRef, entity);
+      if( activity->destinationRef)
+         BGIndexAdd( self->_touching, activity->destinationRef, entity);
+      if( activity->watchHolder || activity->watchFloor || activity->watchDioxide || activity->watchCool ||
+          activity->watchWarm)
+         BGIndexAdd( self->_watching, 0, entity);
+   }
+   else
+   {
+      BGIndexRemove( self->_activitiesOf, activity->actorRef, entity);
+      BGIndexRemove( self->_touching, activity->actorRef, entity);
+      BGIndexRemove( self->_touching, activity->itemRef, entity);
+      BGIndexRemove( self->_touching, activity->destinationRef, entity);
+      BGIndexRemove( self->_watching, 0, entity);
+   }
+}
+
+
+/* Files or unfiles a record in what the world indexes of its kind. */
+static void   file_record( BGWorld *self, NSUInteger kind, BGEntityID entity, BOOL add)
+{
+   if( kind == self->_kindTrace)
+      file_trace( self, entity, [self->_kinds[ kind] recordFor:entity], add);
+   else if( kind == self->_kindActivity)
+      file_activity( self, entity, [self->_kinds[ kind] recordFor:entity], add);
+}
+
+
 - (void) setRecord:(const void *) record
               kind:(NSUInteger) kind
                for:(BGEntityID) entity
 {
    journal_record( self, _kinds[ kind], kind, entity);
-   if( kind == _kindTrace)
-      file_trace( self, entity, [_kinds[ kind] recordFor:entity], NO);
+   file_record( self, kind, entity, NO);
    [_kinds[ kind] setRecord:record
                         for:entity];
-   if( kind == _kindTrace)
-      file_trace( self, entity, [_kinds[ kind] recordFor:entity], YES);
+   file_record( self, kind, entity, YES);
 }
 
 
@@ -719,8 +765,7 @@ static void   file_trace( BGWorld *self, BGEntityID entity, const BGTrace *trace
    if( ! [_kinds[ kind] recordFor:entity])
       return;
    journal_record( self, _kinds[ kind], kind, entity);
-   if( kind == _kindTrace)
-      file_trace( self, entity, [_kinds[ kind] recordFor:entity], NO);
+   file_record( self, kind, entity, NO);
    [_kinds[ kind] removeRecordFor:entity];
 }
 
@@ -1294,6 +1339,65 @@ static void   file_location( BGWorld *self, BGEntityID entity, const BGLocation 
    qsort( list, n, sizeof( BGEntityID), cmp_id);
    *out = list;
    return( n);
+}
+
+
+static NSUInteger   index_list( struct BGIndex *index, uint64_t key, BGEntityID *out, NSUInteger max)
+{
+   const BGEntityID   *ids;
+   NSUInteger         count;
+   NSUInteger         i;
+
+   ids = BGIndexGet( index, key, &count);
+   for( i = 0; i < count && i < max; i++)
+      out[ i] = ids[ i];
+   return( count);
+}
+
+
+- (NSUInteger) activitiesOf:(BGEntityID) actor
+                       into:(BGEntityID *) out
+                        max:(NSUInteger) max
+{
+   return( index_list( _activitiesOf, actor, out, max));
+}
+
+
+- (NSUInteger) watchingActivities:(BGEntityID *) out
+                              max:(NSUInteger) max
+{
+   return( index_list( _watching, 0, out, max));
+}
+
+
+static BGEntityID   *index_copy( struct BGIndex *index, uint64_t key, NSUInteger *n)
+{
+   BGEntityID   *list;
+
+   *n   = index_list( index, key, NULL, 0);
+   list = malloc( (*n ? *n : 1) * sizeof( BGEntityID));
+   index_list( index, key, list, *n);
+   return( list);
+}
+
+
+- (BGEntityID *) copyActivitiesOf:(BGEntityID) actor
+                            count:(NSUInteger *) n
+{
+   return( index_copy( _activitiesOf, actor, n));
+}
+
+
+- (BGEntityID *) copyActivitiesTouching:(BGEntityID) entity
+                                  count:(NSUInteger *) n
+{
+   return( index_copy( _touching, entity, n));
+}
+
+
+- (BGEntityID *) copyWatchingActivities:(NSUInteger *) n
+{
+   return( index_copy( _watching, 0, n));
 }
 
 

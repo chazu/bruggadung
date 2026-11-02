@@ -22,8 +22,8 @@
     // activity that ends by a watch or an event)
     stage:          int & >=0 & <=64           @field(content, saved, proposable, inspect)
     progress:       time & >=0ms & <=100d      @field(content, saved, proposable, inspect)
-    started:        time & >=0ms & <=100d      @field(content, saved, proposable, inspect)
-    due:            time & >=0ms & <=100d      @field(content, saved, proposable, inspect)
+    started:        time & >=0ms & <=10000d    @field(content, saved, proposable, inspect)
+    due:            time & >=0ms & <=10000d    @field(content, saved, proposable, inspect)
     status:         #ActivityStatus            @field(content, saved, proposable, inspect)
     // a watch (DOMAIN_SIMULATION.md §5): tell this activity when the holder's
     // water reaches watchAtLeast; no holder, no watch

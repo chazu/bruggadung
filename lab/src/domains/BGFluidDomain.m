@@ -584,19 +584,20 @@ typedef struct
 - (int) watches:(BGFluidWatch *) out
 {
    const BGActivity   *record;
-   BGStore            *store;
+   BGEntityID         *watching;
+   NSUInteger         count;
    TriType            running;
    NSUInteger         i;
    int                h;
    int                n;
 
-   store   = [_world storeForKind:[_world kindNamed:"Activity"]];
-   running = tri_type_named( [_world tri], "\"running\"");
-   n       = 0;
-   for( i = 0; i < [store count] && n < BG_FLUID_MAX; i++)
+   watching = [_world copyWatchingActivities:&count];      /* the world's index of watches */
+   running  = tri_type_named( [_world tri], "\"running\"");
+   n        = 0;
+   for( i = 0; i < count && n < BG_FLUID_MAX; i++)
    {
-      record = [store recordAtIndex:i];
-      if( (! record->watchHolder && ! record->watchFloor) || record->status != (uint32_t) running)
+      record = [_world record:[_world kindNamed:"Activity"] for:watching[ i]];
+      if( ! record || (! record->watchHolder && ! record->watchFloor) || record->status != (uint32_t) running)
          continue;
       /* a watch on a holder, or on a tile of the floor */
       for( h = 0; h < _nholders; h++)
@@ -604,13 +605,14 @@ typedef struct
                                   _holders[ h].y == record->watchY && _holders[ h].level == record->watchLevel
                                 : _holders[ h].entity == (BGEntityID) record->watchHolder)
          {
-            out[ n].activity = [store entityAtIndex:i];
+            out[ n].activity = watching[ i];
             out[ n].holder   = h;
             out[ n].atLeast  = record->watchFloor ? record->watchFloor : record->watchAtLeast;
             n++;
             break;
          }
    }
+   free( watching);
    return( n);
 }
 

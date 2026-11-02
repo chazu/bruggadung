@@ -2902,7 +2902,9 @@ NSString   *BGProvidersBusy( BGWorld *world, BGEntityID actor, const char *opera
 {
    const BGActivity   *record;
    const char         *other;
-   BGStore            *store;
+   BGEntityID         *mine;
+   NSString           *busy;
+   NSUInteger         nmine;
    TriContent         *tri;
    TriType            running;
    NSUInteger         nwanted;
@@ -2915,23 +2917,25 @@ NSString   *BGProvidersBusy( BGWorld *world, BGEntityID actor, const char *opera
 
    tri     = [world tri];
    nwanted = providers_of( tri, operation, wanted, 4);
-   store   = [world storeForKind:[world kindNamed:"Activity"]];
    running = tri_type_named( tri, "\"running\"");
-   for( i = 0; nwanted && i < [store count]; i++)
+   mine    = [world copyActivitiesOf:actor count:&nmine];
+   busy    = nil;
+   for( i = 0; nwanted && ! busy && i < nmine; i++)
    {
-      record = [store recordAtIndex:i];
-      if( record->actorRef != actor || record->status != (uint32_t) running || [store entityAtIndex:i] == except)
+      record = [world record:[world kindNamed:"Activity"] for:mine[ i]];
+      if( ! record || record->status != (uint32_t) running || mine[ i] == except)
          continue;
-      other = [world textField:"Activity.operation" of:[store entityAtIndex:i]];
+      other = [world textField:"Activity.operation" of:mine[ i]];
       nused = providers_of( tri, other, used, 4);
-      for( j = 0; j < nwanted; j++)
-         for( k = 0; k < nused; k++)
+      for( j = 0; j < nwanted && ! busy; j++)
+         for( k = 0; k < nused && ! busy; k++)
             if( ! strcmp( wanted[ j], used[ k]))
-               return( [NSString stringWithFormat:@"its %s %s busy with activity %llu (%s)", wanted[ j],
-                                                  strcmp( wanted[ j], "voice") ? "are" : "is",
-                                                  (unsigned long long) [store entityAtIndex:i], other]);
+               busy = [NSString stringWithFormat:@"its %s %s busy with activity %llu (%s)", wanted[ j],
+                                                 strcmp( wanted[ j], "voice") ? "are" : "is",
+                                                 (unsigned long long) mine[ i], other];
    }
-   return( nil);
+   free( mine);
+   return( busy);
 }
 
 

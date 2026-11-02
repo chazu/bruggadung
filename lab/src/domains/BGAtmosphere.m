@@ -34,6 +34,12 @@
 
 - (void) dealloc
 {
+   free( _regions);
+   free( _links);
+   free( _stoves);
+   free( _surfaces);
+   free( _breathers);
+   free( _fired);
    [_world release];
    [super dealloc];
 }
@@ -59,64 +65,90 @@
 
 /* --- reading the world ------------------------------------------------------------ */
 
+/* In a growing array of records, each beginning with its entity and kept
+ * in entity order: the index of an entity's record, found by halving, or,
+ * if `make`, made zeroed in its place (moving those after it up one), else
+ * -1. Indices held into the array are good until a record is made. */
+static int   entry_of( void **array, int *n, int *cap, size_t size, BGEntityID entity, BOOL make)
+{
+   uint8_t   *a;
+   int       lo;
+   int       hi;
+   int       mid;
+
+   a  = *array;
+   lo = 0;
+   hi = *n;
+   while( lo < hi)
+   {
+      mid = (lo + hi) / 2;
+      if( *(BGEntityID *) (a + (size_t) mid * size) < entity)
+         lo = mid + 1;
+      else
+         hi = mid;
+   }
+   if( lo < *n && *(BGEntityID *) (a + (size_t) lo * size) == entity)
+      return( lo);
+   if( ! make)
+      return( -1);
+   if( *n == *cap)
+   {
+      *cap   = *cap ? *cap * 2 : 8;
+      *array = a = realloc( a, (size_t) *cap * size);
+   }
+   memmove( a + (size_t) (lo + 1) * size, a + (size_t) lo * size, (size_t) (*n - lo) * size);
+   memset( a + (size_t) lo * size, 0, size);
+   *(BGEntityID *) (a + (size_t) lo * size) = entity;
+   (*n)++;
+   return( lo);
+}
+
+
 - (int) regionOf:(BGEntityID) entity
 {
-   int   i;
+   int   k;
 
-   for( i = 0; i < _nregions; i++)
-      if( _regions[ i].entity == entity)
-         return( i);
-   if( _nregions == BG_ATMOS_REGIONS || ! [_world record:[_world kindNamed:"GasStore"] for:entity])
+   if( (k = entry_of( (void **) &_regions, &_nregions, &_regioncap, sizeof( BGAirRegion), entity, NO)) >= 0)
+      return( k);
+   if( ! entity || ! [_world record:[_world kindNamed:"GasStore"] for:entity])
       return( -1);
-   memset( &_regions[ _nregions], 0, sizeof( BGAirRegion));
-   _regions[ _nregions].entity = entity;
-   return( _nregions++);
+   return( entry_of( (void **) &_regions, &_nregions, &_regioncap, sizeof( BGAirRegion), entity, YES));
 }
 
 
 - (int) stoveOf:(BGEntityID) entity
 {
-   int   i;
+   int   k;
 
-   for( i = 0; i < _nstoves; i++)
-      if( _stoves[ i].entity == entity)
-         return( i);
-   if( _nstoves == BG_ATMOS_STOVES)
-      return( -1);
-   memset( &_stoves[ _nstoves], 0, sizeof( BGStoveState));
-   _stoves[ _nstoves].entity = entity;
-   _stoves[ _nstoves].fuel   = -1;
-   return( _nstoves++);
+   if( (k = entry_of( (void **) &_stoves, &_nstoves, &_stovecap, sizeof( BGStoveState), entity, NO)) >= 0)
+      return( k);
+   k = entry_of( (void **) &_stoves, &_nstoves, &_stovecap, sizeof( BGStoveState), entity, YES);
+   _stoves[ k].fuel = -1;
+   return( k);
 }
 
 
 - (int) surfaceOf:(BGEntityID) entity
 {
-   int   i;
-
-   for( i = 0; i < _nsurfaces; i++)
-      if( _surfaces[ i].entity == entity)
-         return( i);
-   if( _nsurfaces == BG_ATMOS_SURFACES)
-      return( -1);
-   memset( &_surfaces[ _nsurfaces], 0, sizeof( BGAirSurface));
-   _surfaces[ _nsurfaces].entity = entity;
-   return( _nsurfaces++);
+   return( entry_of( (void **) &_surfaces, &_nsurfaces, &_surfacecap, sizeof( BGAirSurface), entity, YES));
 }
 
 
 - (int) breatherOf:(BGEntityID) entity
 {
-   int   i;
+   return( entry_of( (void **) &_breathers, &_nbreathers, &_breathercap, sizeof( BGBreather), entity, YES));
+}
 
-   for( i = 0; i < _nbreathers; i++)
-      if( _breathers[ i].entity == entity)
-         return( i);
-   if( _nbreathers == BG_ATMOS_BREATHERS)
-      return( -1);
-   memset( &_breathers[ _nbreathers], 0, sizeof( BGBreather));
-   _breathers[ _nbreathers].entity = entity;
-   return( _nbreathers++);
+
+/* A watch reported: kept until its activity stops watching. */
+- (void) fired:(BGEntityID) activity
+{
+   if( _nfired == _firedcap)
+   {
+      _firedcap = _firedcap ? _firedcap * 2 : 8;
+      _fired    = realloc( _fired, (size_t) _firedcap * sizeof( BGEntityID));
+   }
+   _fired[ _nfired++] = activity;
 }
 
 
@@ -155,8 +187,11 @@
    }
    if( i == _nlinks)
    {
-      if( _nlinks == BG_ATMOS_LINKS)
-         return;
+      if( _nlinks == _linkcap)
+      {
+         _linkcap = _linkcap ? _linkcap * 2 : 16;
+         _links   = realloc( _links, (size_t) _linkcap * sizeof( BGAirLink));
+      }
       l = &_links[ _nlinks++];
       memset( l, 0, sizeof( *l));
       l->from     = from;
@@ -244,8 +279,8 @@
    const BGFuelContainer   *fuel;
    const BGThermalBody     *body;
    BGStore                 *stores;
-   BGEntityID              gone[ BG_ATMOS_REGIONS];
-   int64_t                 goneHeat[ BG_ATMOS_REGIONS];
+   BGEntityID              *gone;
+   int64_t                 *goneHeat;
    NSUInteger              i;
    int                     ngone;
    int                     n;
@@ -253,6 +288,8 @@
 
    /* a region ended, joined into another: its heat in transit goes on to
     * the air it joined */
+   gone     = malloc( (size_t) (_nregions + 1) * sizeof( BGEntityID));
+   goneHeat = malloc( (size_t) (_nregions + 1) * sizeof( int64_t));
    for( ngone = 0, n = 0, k = 0; k < _nregions; k++)
       if( [_world record:[_world kindNamed:"GasStore"] for:_regions[ k].entity])
          _regions[ n++] = _regions[ k];
@@ -277,6 +314,8 @@
    for( k = 0; k < ngone; k++)
       if( gone[ k] && (n = [self regionOf:gone[ k]]) >= 0)
          _regions[ n].pending += goneHeat[ k];
+   free( gone);
+   free( goneHeat);
    [self loadLinks];
    stores = [_world storeForKind:[_world kindNamed:"Combustor"]];
    for( i = 0; i < [stores count]; i++)
@@ -312,23 +351,23 @@
 {
    const BGRespirator   *respirator;
    const BGActivity     *record;
-   BGStore              *store;
+   BGEntityID           *mine;
+   NSUInteger           n;
    NSUInteger           i;
+   BOOL                 resting;
 
    respirator = [_world record:[_world kindNamed:"Respirator"] for:_breathers[ b].entity];
    if( ! respirator || _breathers[ b].region < 0)
       return( 0);
-   store = [_world storeForKind:[_world kindNamed:"Activity"]];
-   for( i = 0; i < [store count]; i++)
+   mine = [_world copyActivitiesOf:_breathers[ b].entity count:&n];
+   for( resting = NO, i = 0; i < n && ! resting; i++)
    {
-      record = [store recordAtIndex:i];
-      if( (BGEntityID) record->actorRef == _breathers[ b].entity &&
-          record->status == (uint32_t) tri_type_named( [_world tri], "\"running\"") &&
-          [BGOperationEffect( _world, [_world textField:"Activity.operation" of:[store entityAtIndex:i]])
-             isEqualToString:@"rest"])
-         return( respirator->atRest);
+      record  = [_world record:[_world kindNamed:"Activity"] for:mine[ i]];
+      resting = record && record->status == (uint32_t) tri_type_named( [_world tri], "\"running\"") &&
+                [BGOperationEffect( _world, [_world textField:"Activity.operation" of:mine[ i]]) isEqualToString:@"rest"];
    }
-   return( respirator->atWork);
+   free( mine);
+   return( resting ? respirator->atRest : respirator->atWork);
 }
 
 
@@ -452,9 +491,7 @@ static void   across( const BGAirRegion *regions, const BGAirLink *l, int q, int
 - (BOOL) awake:(int) k
         values:(const BGAirRegion *) v
 {
-   BGEntityID   watched[ 16];
-   NSUInteger   n;
-   NSUInteger   i;
+   BGEntityID   crossed;
    int          j;
 
    if( v[ k].pending)
@@ -471,12 +508,8 @@ static void   across( const BGAirRegion *regions, const BGAirLink *l, int q, int
    for( j = 0; j < _nsurfaces; j++)
       if( _surfaces[ j].region == k && [self surfaceDelta:j capacity:NULL])
          return( YES);
-   n = [self watches:watched max:16];
-   for( i = 0; i < n; i++)
-      if( [self crossedWatch] == watched[ i] &&
-          [self regionWatchedBy:[_world record:[_world kindNamed:"Activity"] for:watched[ i]]] == k)
-         return( YES);
-   return( NO);
+   crossed = [self crossedWatch];
+   return( crossed && [self regionWatchedBy:[_world record:[_world kindNamed:"Activity"] for:crossed]] == k);
 }
 
 
@@ -546,23 +579,25 @@ static void   across( const BGAirRegion *regions, const BGAirLink *l, int q, int
 
 
 /* The activities watching a region's air, running. */
-- (NSUInteger) watches:(BGEntityID *) out
-                   max:(NSUInteger) max
+- (NSUInteger) airWatches:(BGEntityID **) out
 {
    const BGActivity   *record;
-   BGStore            *store;
+   BGEntityID         *list;
+   NSUInteger         count;
    NSUInteger         i;
    NSUInteger         n;
+   uint32_t           running;
 
-   store = [_world storeForKind:[_world kindNamed:"Activity"]];
-   n     = 0;
-   for( i = 0; i < [store count] && n < max; i++)
+   running = (uint32_t) tri_type_named( [_world tri], "\"running\"");
+   list    = [_world copyWatchingActivities:&count];       /* the world's index of watches */
+   for( n = 0, i = 0; i < count; i++)
    {
-      record = [store recordAtIndex:i];
-      if( (record->watchDioxide > 0 || record->watchCool > 0 || record->watchWarm > 0) && record->watchHolder &&
-          record->status == (uint32_t) tri_type_named( [_world tri], "\"running\""))
-         out[ n++] = [store entityAtIndex:i];
+      record = [_world record:[_world kindNamed:"Activity"] for:list[ i]];
+      if( record && (record->watchDioxide > 0 || record->watchCool > 0 || record->watchWarm > 0) && record->watchHolder &&
+          record->status == running)
+         list[ n++] = list[ i];
    }
+   *out = list;
    return( n);
 }
 
@@ -602,20 +637,23 @@ static void   across( const BGAirRegion *regions, const BGAirLink *l, int q, int
 /* A running watch already crossed and not yet reported: it wakes the domain. */
 - (BGEntityID) crossedWatch
 {
-   BGEntityID   watched[ 16];
+   BGEntityID   *watched;
+   BGEntityID   crossed;
    NSUInteger   n;
    NSUInteger   i;
    int          s;
 
-   n = [self watches:watched max:16];
-   for( i = 0; i < n; i++)
+   n       = [self airWatches:&watched];
+   crossed = BGNoEntity;
+   for( i = 0; i < n && ! crossed; i++)
    {
       for( s = 0; s < _nfired && _fired[ s] != watched[ i]; s++)
          ;
       if( s == _nfired && [self crossingOf:[_world record:[_world kindNamed:"Activity"] for:watched[ i]]])
-         return( watched[ i]);
+         crossed = watched[ i];
    }
-   return( BGNoEntity);
+   free( watched);
+   return( crossed);
 }
 
 
@@ -641,7 +679,7 @@ static void   across( const BGAirRegion *regions, const BGAirLink *l, int q, int
 - (BGHorizon) horizonAt:(BGTime) t
 {
    const BGActivity   *record;
-   BGEntityID         watched[ 16];
+   BGEntityID         *watched;
    BGHorizon          h;
    NSUInteger         n;
    NSUInteger         i;
@@ -676,7 +714,7 @@ static void   across( const BGAirRegion *regions, const BGAirLink *l, int q, int
     * already crossed, at once */
    if( [self crossedWatch] != BGNoEntity)
       h.nextEvent = BGTimeMake( t.ms + 1);
-   n = [self watches:watched max:16];
+   n = [self airWatches:&watched];
    for( i = 0; i < n; i++)
    {
       int64_t   rise;
@@ -717,6 +755,7 @@ static void   across( const BGAirRegion *regions, const BGAirLink *l, int q, int
       if( when < h.nextEvent.ms)
          h.nextEvent = BGTimeMake( when);
    }
+   free( watched);
    h.safeStep = BGTimeMake( burning ? 600000 : 3600000);
 
    /* an agent's body, warmed or cooled by what this domain sends it (the
@@ -870,8 +909,8 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
    const BGActivity   *record;
    BGProposalGroup    *g;
    BGAirRegion        *r;
-   BGAirRegion        before[ BG_ATMOS_REGIONS];
-   BGEntityID         watched[ 16];
+   BGAirRegion        *before;
+   BGEntityID         *watched;
    NSUInteger         n;
    NSUInteger         i;
    int64_t            dt;
@@ -890,11 +929,11 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
    int64_t            den;
    const BGDoor       *door;
    BGAirLink          *l;
-   BOOL               quiet[ BG_ATMOS_LINKS];
+   BOOL               *quiet;
    int                c;
    NSString           *why;
    int64_t            q;
-   int64_t            rates[ BG_ATMOS_STOVES];
+   int64_t            *rates;
    int                k;
    int                s;
    BOOL               open;
@@ -916,7 +955,10 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
          _ledger.fuel += _stoves[ s].fuel;
       _ledgered = YES;
    }
-   memcpy( before, _regions, sizeof( before));
+   before = malloc( (size_t) (_nregions + 1) * sizeof( BGAirRegion));
+   quiet  = malloc( (size_t) (_nlinks + 1) * sizeof( BOOL));
+   rates  = malloc( (size_t) (_nstoves + 1) * sizeof( int64_t));
+   memcpy( before, _regions, (size_t) _nregions * sizeof( BGAirRegion));
    for( s = 0; s < _nstoves; s++)
       rates[ s] = [self rateOf:s];          /* from step-start values */
    for( k = 0; k < _nlinks; k++)
@@ -1114,7 +1156,19 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
       }
 
    /* watches crossed */
-   n = [self watches:watched max:16];
+   free( before);
+   free( quiet);
+   free( rates);
+   n = [self airWatches:&watched];
+   /* a watch reported stays so while its activity watches */
+   for( c = 0, s = 0; s < _nfired; s++)
+   {
+      for( i = 0; i < n && watched[ i] != _fired[ s]; i++)
+         ;
+      if( i < n)
+         _fired[ c++] = _fired[ s];
+   }
+   _nfired = c;
    for( i = 0; i < n; i++)
    {
       record = [_world record:[_world kindNamed:"Activity"] for:watched[ i]];
@@ -1124,8 +1178,7 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
          ;
       if( s < _nfired)
          continue;
-      if( _nfired < 16)
-         _fired[ _nfired++] = watched[ i];
+      [self fired:watched[ i]];
       k = [self regionWatchedBy:record];
       g = [BGProposalGroup groupWithPhase:BGPhaseProcess
                                    source:[NSString stringWithFormat:@"atmosphere: the air at %llu %@",
@@ -1133,6 +1186,7 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
       [g emit:"watched" subject:BGWhole( watched[ i]) other:BGWhole( _regions[ k].entity)];
       [committer submit:g];
    }
+   free( watched);
 }
 
 
@@ -1281,8 +1335,11 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
       else if( sscanf( text, "link %llu %llu %d %d %d %d %lld %lld %lld %lld %lld %lld %lld %d", &e, &to, &flag, &x, &y,
                        &level, &v[ 0], &v[ 1], &v[ 2], &v[ 3], &v[ 4], &v[ 5], &v[ 6], &seen) == 14)
       {
-         if( _nlinks == BG_ATMOS_LINKS)
-            continue;
+         if( _nlinks == _linkcap)
+         {
+            _linkcap = _linkcap ? _linkcap * 2 : 16;
+            _links   = realloc( _links, (size_t) _linkcap * sizeof( BGAirLink));
+         }
          l = &_links[ _nlinks++];
          memset( l, 0, sizeof( *l));
          l->from        = (BGEntityID) e;
@@ -1320,8 +1377,8 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
          _breathers[ k].carry        = v[ 0];
          _breathers[ k].carryDioxide = v[ 1];
       }
-      else if( sscanf( text, "fired %llu", &e) == 1 && _nfired < 16)
-         _fired[ _nfired++] = (BGEntityID) e;
+      else if( sscanf( text, "fired %llu", &e) == 1)
+         [self fired:(BGEntityID) e];
    }
    [self load];
 }

@@ -142,6 +142,105 @@ static int64_t   next_checkpoint( BGWorld *world, BGEntityID a, const BGActivity
 }
 
 
+static BOOL   has_ended( const BGActivity *record)
+{
+   return( record->status != BG_ACTIVITYSTATUS_RUNNING && record->status != BG_ACTIVITYSTATUS_SUSPENDED);
+}
+
+
+static int   cmp_actor( const void *a, const void *b)
+{
+   BGEntityID   x;
+   BGEntityID   y;
+
+   x = *(const BGEntityID *) a;
+   y = *(const BGEntityID *) b;
+   return( x < y ? -1 : x > y);
+}
+
+
+/* Whether an ended activity is still asked of: its actor's latest, or, per
+ * operation, the completed one that started last (an agent asks whether it
+ * did a thing since a time, which only that one can answer). */
+- (BOOL) keeps:(BGEntityID) b
+     among:(const BGEntityID *) mine
+     count:(NSUInteger) n
+{
+   const BGActivity   *record;
+   const BGActivity   *other;
+   const char         *op;
+   const char         *otherOp;
+   NSUInteger         i;
+
+   if( b == mine[ n - 1])
+      return( YES);
+   record = [_world record:[_world kindNamed:"Activity"] for:b];
+   if( record->status != BG_ACTIVITYSTATUS_COMPLETED)
+      return( NO);
+   op = [_world textField:"Activity.operation" of:b];
+   for( i = 0; i < n; i++)
+   {
+      if( mine[ i] == b || ! (other = [_world record:[_world kindNamed:"Activity"] for:mine[ i]]) ||
+          other->status != BG_ACTIVITYSTATUS_COMPLETED)
+         continue;
+      otherOp = [_world textField:"Activity.operation" of:mine[ i]];
+      if( op && otherOp && ! strcmp( op, otherOp) &&
+          (other->started > record->started || (other->started == record->started && mine[ i] > b)))
+         return( NO);
+   }
+   return( YES);
+}
+
+
+/* Lets go of the activities that have ended and that nothing asks of any
+ * more, in one group: the Activity store holds what is under way, and what
+ * is still asked of, not all that ever was. Read from the world alone, so a
+ * game saved and resumed lets go of the same. */
+- (void) letGo
+{
+   const BGActivity   *record;
+   BGProposalGroup    *group;
+   BGStore            *store;
+   BGEntityID         *actors;
+   BGEntityID         *mine;
+   NSUInteger         nactors;
+   NSUInteger         n;
+   NSUInteger         i;
+   NSUInteger         j;
+
+   store   = [_world storeForKind:[_world kindNamed:"Activity"]];
+   actors  = malloc( ([store count] + 1) * sizeof( BGEntityID));
+   nactors = 0;
+   for( i = 0; i < [store count]; i++)
+   {
+      record = [store recordAtIndex:i];
+      if( has_ended( record))
+         actors[ nactors++] = (BGEntityID) record->actorRef;
+   }
+   qsort( actors, nactors, sizeof( BGEntityID), cmp_actor);
+   group = nil;
+   for( i = 0; i < nactors; i++)
+   {
+      if( i && actors[ i] == actors[ i - 1])
+         continue;
+      mine = [_world copyActivitiesOf:actors[ i] count:&n];
+      for( j = 0; j < n; j++)
+      {
+         record = [_world record:[_world kindNamed:"Activity"] for:mine[ j]];
+         if( ! has_ended( record) || [self keeps:mine[ j] among:mine count:n])
+            continue;
+         if( ! group)
+            group = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"activities: the ended let go"];
+         [group destroy:BGWhole( mine[ j]) reason:"ended"];
+      }
+      free( mine);
+   }
+   free( actors);
+   if( group)
+      [_committer submit:group];
+}
+
+
 - (void) completeDueAt:(BGTime) t
 {
    const BGActivity   *record;
@@ -156,6 +255,7 @@ static int64_t   next_checkpoint( BGWorld *world, BGEntityID a, const BGActivity
    int64_t            rate;
    BOOL               more;
 
+   [self letGo];
    store = [_world storeForKind:[_world kindNamed:"Activity"]];
    for( i = 0; i < [store count]; i++)
    {
@@ -507,6 +607,17 @@ static int64_t   next_checkpoint( BGWorld *world, BGEntityID a, const BGActivity
 }
 
 
+static BOOL   contains_id( const BGEntityID *list, NSUInteger n, BGEntityID e)
+{
+   NSUInteger   i;
+
+   for( i = 0; i < n; i++)
+      if( list[ i] == e)
+         return( YES);
+   return( NO);
+}
+
+
 /* An activity ended this round, kept to be told of once. */
 static BGEntityID   *remember_ended( BGEntityID *ended, NSUInteger *n, NSUInteger *cap, BGEntityID a)
 {
@@ -528,8 +639,9 @@ static BGEntityID   *remember_ended( BGEntityID *ended, NSUInteger *n, NSUIntege
    const BGActivity   *record;
    const BGEvent      *ev;
    BGProposalGroup    *group;
-   BGStore            *store;
    BGEntityID         *ended;
+   BGEntityID         *touching;
+   NSUInteger         ntouching;
    NSUInteger         endedcap;
    BGEntityID         a;
    NSString           *effect;
@@ -540,8 +652,10 @@ static BGEntityID   *remember_ended( BGEntityID *ended, NSUInteger *n, NSUIntege
    NSUInteger         k;
    BOOL               done;
 
-   ended    = NULL;
-   endedcap = 0;
+   ended     = NULL;
+   endedcap  = 0;
+   touching  = NULL;
+   ntouching = 0;
 
    /* a completion commitment rejected: the activity failed */
    for( i = 0; i + 1 < [_completions count];)
@@ -558,17 +672,23 @@ static BGEntityID   *remember_ended( BGEntityID *ended, NSUInteger *n, NSUIntege
       [_completions removeObjectsInRange:NSMakeRange( i, 2)];
    }
 
-   /* what this round's events mean for the activities bound to their subjects */
-   store  = [_world storeForKind:[_world kindNamed:"Activity"]];
+   /* what this round's events mean for the activities bound to their
+    * subjects: those it takes part in (the world's index), in entity
+    * order, then the subject itself, if it is an activity */
    nended = 0;
    for( i = first; i < last; i++)
    {
-      ev = [_world eventAt:i];
-      for( j = 0; j < [store count]; j++)
+      ev       = [_world eventAt:i];
+      touching = ev->subject ? [_world copyActivitiesTouching:ev->subject count:&ntouching] : NULL;
+      for( j = 0; j <= ntouching; j++)
       {
-         a      = [store entityAtIndex:j];
-         record = [store recordAtIndex:j];
-         if( ! running( _world, a, record))
+         /* then the subject itself, if it is an activity */
+         if( j == ntouching)
+            a = [_world record:[_world kindNamed:"Activity"] for:ev->subject] &&
+                ! contains_id( touching, ntouching, ev->subject) ? ev->subject : BGNoEntity;
+         else
+            a = touching[ j];
+         if( ! a || ! (record = [_world record:[_world kindNamed:"Activity"] for:a]) || ! running( _world, a, record))
             continue;
          for( done = NO, k = 0; k < nended && ! done; k++)
             done = ended[ k] == a;
@@ -614,6 +734,9 @@ static BGEntityID   *remember_ended( BGEntityID *ended, NSUInteger *n, NSUIntege
             ended = remember_ended( ended, &nended, &endedcap, a);
          }
       }
+      free( touching);
+      touching  = NULL;
+      ntouching = 0;
    }
    free( ended);
 }

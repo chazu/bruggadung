@@ -14,9 +14,6 @@
 #import "BGScheduler.h"
 
 
-#define BG_THERMAL_BODIES   16
-
-
 typedef struct
 {
    BGEntityID   entity;
@@ -31,8 +28,9 @@ typedef struct
 @interface BGThermal : NSObject <BGCoupledDomain>
 {
    BGWorld          *_world;
-   BGThermalState   _bodies[ BG_THERMAL_BODIES];
+   BGThermalState   *_bodies;       /* in entity order, as many as the world has */
    int              _nbodies;
+   int              _bodycap;
    BOOL             _ledgered;
    int64_t          _initial;      /* J, in the bodies */
    int64_t          _inflow;       /* from the outdoors */

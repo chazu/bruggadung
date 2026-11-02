@@ -2116,26 +2116,28 @@ static BOOL   line_clear( const BGTerrain *t, int32_t x0, int32_t y0, int32_t x1
 - (int) attentionOf:(BGEntityID) agent
 {
    const BGActivity   *record;
-   BGStore            *activities;
+   BGEntityID         *mine;
    TriContent         *tri;
    const TriNode      *v;
+   NSUInteger         n;
    NSUInteger         i;
    int64_t            lo;
    int64_t            hi;
    int                demand;
 
-   tri        = [_world tri];
-   activities = [_world storeForKind:[_world kindNamed:"Activity"]];
-   demand     = 0;
-   for( i = 0; i < [activities count]; i++)
+   tri    = [_world tri];
+   mine   = [_world copyActivitiesOf:agent count:&n];
+   demand = 0;
+   for( i = 0; i < n; i++)
    {
-      record = [activities recordAtIndex:i];
-      if( record->actorRef != agent || record->status != BG_ACTIVITYSTATUS_RUNNING || ! record->operation)
+      record = [_world record:[_world kindNamed:"Activity"] for:mine[ i]];
+      if( ! record || record->status != BG_ACTIVITYSTATUS_RUNNING || ! record->operation)
          continue;
       v = tri_at( tri, tri_pattern( tri, record->operation), "attention");
       if( v && tri_node_interval( v, &lo, &hi) && lo == hi && lo > demand)
          demand = (int) lo;
    }
+   free( mine);
    return( demand);
 }
 

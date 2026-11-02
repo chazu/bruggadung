@@ -285,15 +285,14 @@
 {
    const BGActivity   *record;
    const BGEvent      *ev;
-   BGStore            *store;
+   BGEntityID         *mine;
    BGEntityID         a;
+   NSUInteger         n;
    NSUInteger         i;
 
-   store = [_world storeForKind:[_world kindNamed:"Activity"]];
-   a     = BGNoEntity;
-   for( i = 0; i < [store count]; i++)
-      if( ((const BGActivity *) [store recordAtIndex:i])->actorRef == agent)
-         a = [store entityAtIndex:i];
+   mine = [_world copyActivitiesOf:agent count:&n];
+   a    = n ? mine[ n - 1] : BGNoEntity;          /* its latest */
+   free( mine);
    *boundary = 0;
    if( ! a)
       return( "none");

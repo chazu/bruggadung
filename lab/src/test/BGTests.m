@@ -7844,6 +7844,25 @@ static void   test_explore_rooms( void)
    BG_CHECK( ! logged_by( agency, worker, @"could not walk"));
    notices = [agency takeNotices];
    BG_CHECK( [notices count] == 1);
+   /* a walk is an activity of a second: of the dozens it walked, what stays
+    * is what is still asked of, a completed walk each way at most, and its
+    * latest (BGActivities letGo) */
+   BG_CHECK( [st.w activitiesOf:worker into:NULL max:0] <= 5 &&
+             [[st.w storeForKind:[st.w kindNamed:"Activity"]] count] <= 5);
+   {
+      BGEntityID   indexed[ 8];
+      BGStore      *store;
+      NSUInteger   n;
+      NSUInteger   i;
+
+      store = [st.w storeForKind:[st.w kindNamed:"Activity"]];
+      n     = [st.w activitiesOf:worker into:indexed max:8];
+      BG_CHECK( n == [store count]);
+      for( i = 0; i < n && i < [store count]; i++)
+         BG_CHECK( indexed[ i] == [store entityAtIndex:i] &&
+                   ((const BGActivity *) [store recordAtIndex:i])->actorRef == worker);
+   }
+   BG_CHECK( [[agency logOf:worker] count] > 20);
 }
 
 

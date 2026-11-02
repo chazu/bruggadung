@@ -773,43 +773,43 @@ static char   glyph_of_kind( const char *kind)
 - (BOOL) actorBusy
 {
    const BGActivity   *record;
-   BGStore            *store;
+   BGEntityID         *mine;
+   NSUInteger         n;
    NSUInteger         i;
    TriType            running;
+   BOOL               busy;
 
-   store   = [_world storeForKind:[_world kindNamed:"Activity"]];
    running = tri_type_named( [_world tri], "\"running\"");
-   for( i = 0; i < [store count]; i++)
-   {
-      record = [store recordAtIndex:i];
-      if( record->actorRef == _actor && record->status == (uint32_t) running)
-         return( YES);
-   }
-   return( NO);
+   mine    = [_world copyActivitiesOf:_actor count:&n];
+   for( busy = NO, i = 0; i < n && ! busy; i++)
+      busy = (record = [_world record:[_world kindNamed:"Activity"] for:mine[ i]]) && record->status == (uint32_t) running;
+   free( mine);
+   return( busy);
 }
 
 
 - (void) listActivities
 {
    const BGActivity   *record;
-   BGStore            *store;
+   BGEntityID         *mine;
+   NSUInteger         n;
    NSUInteger         i;
    BOOL               any;
 
-   store = [_world storeForKind:[_world kindNamed:"Activity"]];
-   any   = NO;
-   for( i = 0; i < [store count]; i++)
+   mine = [_world copyActivitiesOf:_actor count:&n];
+   any  = NO;
+   for( i = 0; i < n; i++)
    {
-      record = [store recordAtIndex:i];
-      if( record->actorRef != _actor)
+      if( ! (record = [_world record:[_world kindNamed:"Activity"] for:mine[ i]]))
          continue;
-      [_out appendFormat:@"%llu %s: %s, stage %lld, %lldms done%@\n", (unsigned long long) [store entityAtIndex:i],
-                         [_world textField:"Activity.operation" of:[store entityAtIndex:i]],
+      [_out appendFormat:@"%llu %s: %s, stage %lld, %lldms done%@\n", (unsigned long long) mine[ i],
+                         [_world textField:"Activity.operation" of:mine[ i]],
                          tri_type_name( [_world tri], record->status), (long long) record->stage,
                          (long long) record->progress,
                          record->due ? [NSString stringWithFormat:@", due at %lldms", (long long) record->due] : @""];
       any = YES;
    }
+   free( mine);
    if( ! any)
       [_out appendString:@"You have done nothing yet.\n"];
 }
