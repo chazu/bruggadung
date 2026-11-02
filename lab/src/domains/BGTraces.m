@@ -44,18 +44,7 @@ int64_t   BGTraceGone( BGWorld *world, const BGTrace *trace)
 /* The air region over a tile, or none. */
 static BGEntityID   region_at( BGWorld *world, BGLocation tile)
 {
-   const BGGasStore   *air;
-   BGStore            *stores;
-   NSUInteger         i;
-
-   stores = [world storeForKind:[world kindNamed:"GasStore"]];
-   for( i = 0; i < [stores count]; i++)
-   {
-      air = [stores recordAtIndex:i];
-      if( tile.x >= air->west && tile.x <= air->east && tile.y >= air->north && tile.y <= air->south)
-         return( [stores entityAtIndex:i]);
-   }
-   return( BGNoEntity);
+   return( [world airRegionAt:tile]);
 }
 
 

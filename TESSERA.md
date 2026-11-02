@@ -220,13 +220,10 @@ isometric later.
 
 ## Open questions
 
-- **Terrain.** The simulation has no tile terrain yet. A room is a
-  rectangle of air (`air.tri`'s regions), walls exist only as what muffles
-  sound and holds heat, and doors are entities. Tessera needs cells with
-  terrain. Until the world has a structure layer (walls and floors as
-  tiles, which pathing and line of sight will want as well), producers
-  derive terrain from regions. Is that structure layer the simulation's
-  next need, or Tessera's?
+- **Terrain** (settled: TERRAIN.md). The world has a terrain kind per
+  cell, with a `look` for Tessera; rooms are found from it. A knowledge
+  scene's cells come from what the character believes of the terrain
+  (`believedTerrainAtX:y:level:`).
 - **Perceived fields.** For a knowledge scene to show light and water
   without reading the world, the knowledge store has to keep what was
   perceived of a tile, not only when it was seen. How much (water seen,

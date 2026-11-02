@@ -4660,6 +4660,54 @@ static void   test_sight_and_memory( void)
 }
 
 
+/* TERRAIN.md step 3: rooms from terrain. In rooms_map, the room, the back
+ * room and the corridor are rooms; walls and doorways are in none; the
+ * ground outdoors is a room with no air of its own. */
+static void   test_rooms( void)
+{
+   BGStage            st;
+   BGProposalGroup    *g;
+   BGEntityID         room;
+   BGEntityID         back;
+   BGEntityID         corridor;
+   BGTerrain          *t;
+
+   st.w = BGTestWorld( 7);
+   BG_CHECK( [st.w setTerrainMap:"rooms_map" error:NULL]);
+   BG_CHECK( [st.w tilesWide] == 32 && [st.w tilesHigh] == 32);
+   t = (BGTerrain *) [st.w terrain];
+   BG_CHECK( BGTerrainRoomAt( t, 1, 1, 0) && BGTerrainRoomAt( t, 1, 1, 0) == BGTerrainRoomAt( t, 4, 5, 0));
+   BG_CHECK( BGTerrainRoomAt( t, 6, 1, 0) && BGTerrainRoomAt( t, 6, 1, 0) != BGTerrainRoomAt( t, 1, 1, 0));
+   BG_CHECK( BGTerrainRoomAt( t, 0, 7, 0) && BGTerrainRoomAt( t, 0, 7, 0) == BGTerrainRoomAt( t, 20, 8, 0) &&
+             BGTerrainRoomAt( t, 0, 7, 0) != BGTerrainRoomAt( t, 1, 1, 0));
+   BG_CHECK( BGTerrainRoomAt( t, 4, 6, 0) == 0 && BGTerrainRoomAt( t, 0, 0, 0) == 0 && BGTerrainRoomAt( t, 32, 0, 0) == 0);
+   BG_CHECK( BGTerrainRoomAt( t, 15, 15, 0) && BGTerrainRoomAt( t, 15, 15, 0) == BGTerrainRoomAt( t, 11, 0, 0));
+
+   /* the air over a tile is the region whose tile is in its room */
+   st.c = BGTestCommitter( st.w);
+   st.s = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   g        = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the air"];
+   room     = [g create:"room_air" key:"the room's air" at:BGLocationMakeNone()];
+   back     = [g create:"back_room" key:"the back room's air" at:BGLocationMakeNone()];
+   corridor = [g create:"corridor" key:"the corridor" at:BGLocationMakeNone()];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   room     = [g idFor:room];
+   back     = [g idFor:back];
+   corridor = [g idFor:corridor];
+   BG_CHECK( [st.w airRegionAt:BGOnTile( 3, 4, 0)] == room && [st.w airRegionAt:BGOnTile( 9, 5, 0)] == back &&
+             [st.w airRegionAt:BGOnTile( 12, 8, 0)] == corridor);
+   BG_CHECK( ! [st.w airRegionAt:BGOnTile( 4, 6, 0)] && ! [st.w airRegionAt:BGOnTile( 15, 15, 0)]);
+
+   /* a wall knocked through joins the rooms: found again, they are one */
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the wall between knocked through"];
+   [g setTerrain:"plank_floor" at:BGOnTile( 5, 3, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 2)];
+   BG_CHECK( [g applied] && BGTerrainRoomAt( t, 1, 1, 0) == BGTerrainRoomAt( t, 6, 1, 0) && BGTerrainRoomAt( t, 5, 3, 0));
+}
+
+
 /* DOMAIN_SIMULATION.md Scenario 2's drain: the pump `key` under its header
  * tank (100 L), opened, and its piston taken out: through a leaky outlet
  * valve the tank drains onto the floor; an hour on, how much left the tank,
@@ -8579,6 +8627,7 @@ static BGStoveRun   stove_run( BOOL damper, BOOL stepped, BOOL reversed, int64_t
 
    memset( &run, 0, sizeof( run));
    w          = BGTestWorld( 89);
+   BG_CHECK( [w setTerrainMap:"rooms_map" error:NULL]);      /* TERRAIN.md: the rooms, from the map */
    c          = BGTestCommitter( w);
    activities = [BGActivities activitiesWithWorld:w committer:c];
    air        = [[[BGAtmosphere alloc] initWithWorld:w] autorelease];
@@ -8765,6 +8814,7 @@ static void   test_local_wake( void)
    int64_t           u;
 
    w       = BGTestWorld( 97);
+   BG_CHECK( [w setTerrainMap:"rooms_map" error:NULL]);      /* TERRAIN.md: the rooms, from the map */
    c       = BGTestCommitter( w);
    air     = [[[BGAtmosphere alloc] initWithWorld:w] autorelease];
    thermal = [[[BGThermal alloc] initWithWorld:w] autorelease];
@@ -8853,6 +8903,7 @@ static BGStoveRun   cold_lodger( int64_t kelvin, int64_t numbness, BGAgency **mi
 
    memset( &run, 0, sizeof( run));
    st.w       = BGTestWorld( 101);
+   BG_CHECK( [st.w setTerrainMap:"rooms_map" error:NULL]);      /* TERRAIN.md: the rooms, from the map */
    st.c       = BGTestCommitter( st.w);
    activities = [BGActivities activitiesWithWorld:st.w committer:st.c];
    knowledge  = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
@@ -8904,6 +8955,7 @@ static int64_t   cooling_lodger( void)
    NSString           *error;
 
    st.w       = BGTestWorld( 113);
+   BG_CHECK( [st.w setTerrainMap:"rooms_map" error:NULL]);      /* TERRAIN.md: the rooms, from the map */
    st.c       = BGTestCommitter( st.w);
    activities = [BGActivities activitiesWithWorld:st.w committer:st.c];
    knowledge  = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
@@ -8984,6 +9036,7 @@ static BOOL   stuffy_lodger( int64_t dioxide, int32_t *felt, BGAgency **minds, B
    int64_t            v;
 
    st.w       = BGTestWorld( 103);
+   BG_CHECK( [st.w setTerrainMap:"rooms_map" error:NULL]);      /* TERRAIN.md: the rooms, from the map */
    st.c       = BGTestCommitter( st.w);
    activities = [BGActivities activitiesWithWorld:st.w committer:st.c];
    knowledge  = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
@@ -10061,6 +10114,7 @@ static void   test_light( void)
 
    hour      = 3600000LL;
    st.w      = BGTestWorld( 167);
+   BG_CHECK( [st.w setTerrainMap:"rooms_map" error:NULL]);      /* TERRAIN.md: the rooms, from the map */
    st.c      = BGTestCommitter( st.w);
    knowledge = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
    st.s      = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
@@ -10124,6 +10178,7 @@ static BOOL   hears_clatter( BOOL open, BOOL clang, BGLocation listener)
    BGEntityID         hearer;
 
    st.w      = BGTestWorld( 169);
+   BG_CHECK( [st.w setTerrainMap:"rooms_map" error:NULL]);      /* TERRAIN.md: the rooms, from the map */
    st.c      = BGTestCommitter( st.w);
    knowledge = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
    st.s      = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
@@ -10157,11 +10212,12 @@ static void   test_sound( void)
 {
    /* beside it, in the room */
    BG_CHECK( hears_clatter( NO, NO, BGOnTile( 3, 3, 0)));
-   /* in the corridor, three tiles off: through the wall, about 60 - 9 - 30,
-    * too faint (it fades over its two seconds) */
-   BG_CHECK( ! hears_clatter( NO, NO, BGOnTile( 5, 6, 0)));
-   /* through the open door, about 60 - 9 - 10: heard */
-   BG_CHECK( hears_clatter( YES, NO, BGOnTile( 5, 6, 0)));
+   /* in the corridor, four tiles off (rooms_map: past the wall below the
+    * room): through the wall, about 60 - 12 - 30, too faint (it fades over
+    * its two seconds) */
+   BG_CHECK( ! hears_clatter( NO, NO, BGOnTile( 5, 7, 0)));
+   /* through the open door, about 60 - 12 - 10: heard */
+   BG_CHECK( hears_clatter( YES, NO, BGOnTile( 5, 7, 0)));
    /* in the room, but a clang beside the listener drowns it */
    BG_CHECK( ! hears_clatter( NO, YES, BGOnTile( 3, 4, 0)));
 }
@@ -10727,6 +10783,7 @@ const BGTestCase   BGAllTests[] =
    { "diligence",                     test_diligence },
    { "terrain",                       test_terrain },
    { "sight_and_memory",              test_sight_and_memory },
+   { "rooms",                         test_rooms },
    { "pump_heat",                     test_pump_heat },
    { "pump_heat_running",             test_pump_heat_running },
    { "component_pump",                test_component_pump },

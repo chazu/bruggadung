@@ -33,6 +33,7 @@ struct BGTerrain
    BGChunk         *chunks;
    NSUInteger      nchunks;
    NSUInteger      cap;               /* a power of two, or 0 */
+   uint32_t        *rooms;            /* each cell's room, or NULL until asked, and after a change */
 };
 
 
@@ -104,6 +105,7 @@ static BOOL   load_kinds( BGTerrain *t, TriContent *tri, char *error, size_t err
       t->kinds[ i + 1].solid   = is_true( tri, kind, "solid");
       t->kinds[ i + 1].opaque  = is_true( tri, kind, "opaque");
       t->kinds[ i + 1].floored = is_true( tri, kind, "floored");
+      t->kinds[ i + 1].divides = is_true( tri, kind, "divides");
    }
    return( YES);
 }
@@ -282,6 +284,10 @@ BGTerrain   *BGTerrainFromMap( TriContent *tri, const char *map, char *error, si
       if( y > high)
          high = y;
    }
+   if( tri_node_interval( tri_at( tri, node, "width"), &lo, &hi) && lo == hi && lo > wide && lo <= 4096)
+      wide = (int32_t) lo;
+   if( tri_node_interval( tri_at( tri, node, "height"), &lo, &hi) && lo == hi && lo > high && lo <= 4096)
+      high = (int32_t) lo;
    ncells = (int64_t) wide * high * levels;
    if( ok && (! nlevels || ! wide || ! high))
    {
@@ -360,6 +366,7 @@ void   BGTerrainFree( BGTerrain *t)
       free( t->chunks[ i].cells);
    free( t->chunks);
    free( t->drawn);
+   free( t->rooms);
    free( t->map);
    free( t);
 }
@@ -528,6 +535,11 @@ BGTerrainKind   BGTerrainSet( BGTerrain *t, int32_t x, int32_t y, int32_t z, BGT
    }
    was = c->cells[ (y % BG_CHUNK) * BG_CHUNK + x % BG_CHUNK];
    c->cells[ (y % BG_CHUNK) * BG_CHUNK + x % BG_CHUNK] = k;
+   if( was != k && t->rooms)
+   {
+      free( t->rooms);            /* the rooms are found again when next asked */
+      t->rooms = NULL;
+   }
    return( was);
 }
 
@@ -612,4 +624,83 @@ uint64_t   BGTerrainHash( const BGTerrain *t)
    }
    free( corners);
    return( h);
+}
+
+
+/* --- rooms (TERRAIN.md step 3) ------------------------------------------------------ */
+
+static BOOL   roomy( const BGTerrain *t, int32_t x, int32_t y, int32_t z)
+{
+   BGTerrainKind   k;
+
+   k = BGTerrainAt( t, x, y, z);
+   return( k && ! t->kinds[ k].solid && ! t->kinds[ k].divides);
+}
+
+
+/* Every cell's room, by flood fill over each level, side by side. */
+static void   find_rooms( BGTerrain *t)
+{
+   static const int   dx[ 4] = { 1, -1, 0, 0 };
+   static const int   dy[ 4] = { 0, 0, 1, -1 };
+   size_t             n;
+   size_t             i;
+   size_t             j;
+   size_t             top;
+   size_t             *stack;
+   uint32_t           room;
+   int32_t            x;
+   int32_t            y;
+   int32_t            z;
+   int32_t            u;
+   int32_t            v;
+   int                d;
+
+   n        = (size_t) t->wide * (size_t) t->high * (size_t) t->levels;
+   t->rooms = calloc( n ? n : 1, sizeof( uint32_t));
+   stack    = malloc( (n ? n : 1) * sizeof( size_t));
+   room     = 0;
+   for( i = 0; i < n; i++)
+   {
+      if( t->rooms[ i])
+         continue;
+      x = (int32_t) (i % (size_t) t->wide);
+      y = (int32_t) (i / (size_t) t->wide % (size_t) t->high);
+      z = (int32_t) (i / ((size_t) t->wide * (size_t) t->high));
+      if( ! roomy( t, x, y, z))
+         continue;
+      t->rooms[ i] = ++room;
+      top = 0;
+      stack[ top++] = i;
+      while( top)
+      {
+         j = stack[ --top];
+         x = (int32_t) (j % (size_t) t->wide);
+         y = (int32_t) (j / (size_t) t->wide % (size_t) t->high);
+         for( d = 0; d < 4; d++)
+         {
+            u = x + dx[ d];
+            v = y + dy[ d];
+            if( ! inside( t, u, v, z) || ! roomy( t, u, v, z))
+               continue;
+            j = ((size_t) z * (size_t) t->high + (size_t) v) * (size_t) t->wide + (size_t) u;
+            if( ! t->rooms[ j])
+            {
+               t->rooms[ j]  = room;
+               stack[ top++] = j;
+            }
+         }
+      }
+   }
+   free( stack);
+}
+
+
+uint32_t   BGTerrainRoomAt( BGTerrain *t, int32_t x, int32_t y, int32_t z)
+{
+   if( ! inside( t, x, y, z))
+      return( 0);
+   if( ! t->rooms)
+      find_rooms( t);
+   return( t->rooms[ ((size_t) z * (size_t) t->high + (size_t) y) * (size_t) t->wide + (size_t) x]);
 }

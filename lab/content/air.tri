@@ -5,7 +5,9 @@
 // of the air (nitrogen) is the region's fixed total, less those two. Solids
 // hold heat too, in the thermal domain: a stove's iron, a room's walls.
 
-// A region of air over tiles from (west, north) to (east, south). It opens
+// A region of air: the room (TERRAIN.md, step 3) of the tile at (`atX`,
+// `atY`, `atLevel`), its tiles found from the terrain, bounded by what is
+// solid and by doorways. A tile in no room with air is outdoors. It opens
 // to another region (`opensTo`), or to the outdoors, at 275 K and of fixed
 // composition: through a gap that passes `gap` mmol of air a second each
 // way, or, while its door is ajar, the door's `wide`.
@@ -15,10 +17,9 @@
     dioxide: int & >=0 & <=100000000           @field(content, saved, proposable, inspect)
     gasHeat: int & >=0 & <=1000000000000       @field(content, saved, proposable, inspect)
     total:   int & >=1 & <=100000000           @field(content, saved, inspect)
-    west:    int & >=0 & <=1000                @field(content, saved, inspect)
-    north:   int & >=0 & <=1000                @field(content, saved, inspect)
-    east:    int & >=0 & <=1000                @field(content, saved, inspect)
-    south:   int & >=0 & <=1000                @field(content, saved, inspect)
+    atX:     int & >=0 & <=100000              @field(content, saved, inspect)
+    atY:     int & >=0 & <=100000              @field(content, saved, inspect)
+    atLevel: *0 | int & >=0 & <=63             @field(content, saved, inspect)
     opensTo: ref                               @field(saved, proposable, inspect)
     door:    ref                               @field(saved, proposable, inspect)
     gap:     *200 | int & >=0 & <=1000000      @field(content, saved, proposable, inspect)
@@ -80,17 +81,17 @@
     restsBelow: int & >=0 & <=400000           @field(content, saved, proposable, inspect)
 }
 
-// A 4 by 5 room, at 275 K, with 2 mol of air for each of its 20 m3 or so:
-// 2,000,000 mmol, 21% oxygen, 0.04% carbon dioxide; its heat, 29 mJ per mmol
-// per kelvin.
+// A 4 by 5 room (rooms_map, terrain.tri), at 275 K, with 2 mol of air for
+// each of its 20 m3 or so: 2,000,000 mmol, 21% oxygen, 0.04% carbon dioxide;
+// its heat, 29 mJ per mmol per kelvin.
 room_air:   #GasStore & { oxygen: 420000, dioxide: 800, gasHeat: 15950000, total: 2000000,
-                          west: 1, north: 1, east: 4, south: 5 }
-// another room like it, across the corridor
+                          atX: 1, atY: 1 }
+// another room like it, beside it
 back_room:  #GasStore & { oxygen: 420000, dioxide: 800, gasHeat: 15950000, total: 2000000,
-                          west: 6, north: 1, east: 9, south: 5 }
+                          atX: 6, atY: 1 }
 // a corridor ten times the room, open to the outdoors along its length
 corridor:   #GasStore & { oxygen: 4200000, dioxide: 8000, gasHeat: 159500000, total: 20000000,
-                          west: 0, north: 6, east: 20, south: 7, gap: 2000 }
+                          atX: 0, atY: 7, gap: 2000 }
 // a room's door, open: a cubic metre a minute or so
 room_door:  #Door & { material: "oak", mass: 30kg, wide: 5000 }
 stove:      #Stove & { material: "iron", mass: 120kg, burnRate: 250, fuel: 3kg,

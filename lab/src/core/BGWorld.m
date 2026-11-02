@@ -1166,6 +1166,27 @@ static void   edge_remove_raw( BGWorld *self, BGEdge e)
 }
 
 
+- (BGEntityID) airRegionAt:(BGLocation) tile
+{
+   const BGGasStore   *gas;
+   BGStore            *stores;
+   NSUInteger         i;
+   uint32_t           room;
+
+   if( (tile.form != BGLocationOnTile && tile.form != BGLocationNone) || ! _terrain ||
+       ! (room = BGTerrainRoomAt( _terrain, tile.x, tile.y, tile.level)))
+      return( BGNoEntity);
+   stores = [self storeForKind:[self kindNamed:"GasStore"]];
+   for( i = 0; i < [stores count]; i++)
+   {
+      gas = [stores recordAtIndex:i];
+      if( BGTerrainRoomAt( _terrain, (int32_t) gas->atX, (int32_t) gas->atY, (int32_t) gas->atLevel) == room)
+         return( [stores entityAtIndex:i]);
+   }
+   return( BGNoEntity);
+}
+
+
 - (BOOL) setTerrain:(const char *) kind
                 atX:(int32_t) x
                   y:(int32_t) y

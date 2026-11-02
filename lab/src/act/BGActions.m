@@ -2360,12 +2360,9 @@ static NSString   *effect_light( BGWorld *world, BGAction a, int64_t amount, BGP
 /* The region of air (a GasStore) over the entity's tile, or 0. */
 BGEntityID   BGAirOver( BGWorld *world, BGEntityID e)
 {
-   const BGGasStore   *air;
-   BGStore            *stores;
-   BGLocation         at;
-   BGEntityID         p;
-   NSUInteger         i;
-   int                k;
+   BGLocation   at;
+   BGEntityID   p;
+   int          k;
 
    for( p = e, k = 0; p && k < 64; k++)
    {
@@ -2376,14 +2373,7 @@ BGEntityID   BGAirOver( BGWorld *world, BGEntityID e)
    }
    if( at.form != BGLocationOnTile)
       return( BGNoEntity);
-   stores = [world storeForKind:[world kindNamed:"GasStore"]];
-   for( i = 0; i < [stores count]; i++)
-   {
-      air = [stores recordAtIndex:i];
-      if( at.x >= air->west && at.x <= air->east && at.y >= air->north && at.y <= air->south)
-         return( [stores entityAtIndex:i]);
-   }
-   return( BGNoEntity);
+   return( [world airRegionAt:at]);       /* the room's air (TERRAIN.md step 3) */
 }
 
 

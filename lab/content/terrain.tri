@@ -3,13 +3,15 @@
 // apart.
 //
 // A kind is `solid` when nothing walks into it, `opaque` when sight stops at
-// it, and `floored` when there is something to stand on (without, the level
-// below shows, and things fall). Its `look` is its appearance key for
+// it, `floored` when there is something to stand on (without, the level
+// below shows, and things fall), and `divides` where a room ends without
+// a wall (a doorway: it belongs to neither room it joins). Its `look` is its appearance key for
 // Tessera. `madeOf` is its material (`material` is a body's).
 #Terrain: {
     solid:   *false | true
     opaque:  *false | true
     floored: *true | false
+    divides: *false | true
     madeOf:  #Material
     look:    text
 }
@@ -19,18 +21,19 @@ open_floor:  #Terrain & { madeOf: "stone", look: "floor.stone" } @family(terrain
 plank_floor: #Terrain & { madeOf: "wood", look: "floor.plank" } @family(terrain)
 stone_wall:  #Terrain & { solid: true, opaque: true, madeOf: "stone", look: "wall.stone" } @family(terrain)
 // where a door stands, or would: floor, the door an entity on it
-doorway:     #Terrain & { madeOf: "stone", look: "doorway" } @family(terrain)
+doorway:     #Terrain & { divides: true, madeOf: "stone", look: "doorway" } @family(terrain)
 // nothing to stand on: the level below shows through
 open_air:    #Terrain & { floored: false, madeOf: "stone", look: "air" } @family(terrain)
 
 // A map: its levels drawn in characters, a level to a file brought in by
 // @embed; its legend, a terrain kind for each character; and the kind of
 // the cells a drawing leaves out (past a short row's end, a level not
-// drawn). The world is as wide as the longest row and as deep as the
-// highest level.
+// drawn). The world is as wide as the longest row, or `width` if more; as
+// long as the most rows, or `height`; and as deep as the highest level.
 #MapKey:   { glyph: text, terrain: text }
 #MapLevel: { z: int & >=0 & <=63, rows: text }
-#Map:      { legend: [...#MapKey], levels: [...#MapLevel], fill: text }
+#Map:      { legend: [...#MapKey], levels: [...#MapLevel], fill: text, width: *0 | int & >=0 & <=4096,
+             height: *0 | int & >=0 & <=4096 }
 
 // A shed of stone with a plank floor, a doorway in its east wall, and a
 // path of open ground beyond; past the drawing's short rows, open ground too.
@@ -41,4 +44,19 @@ shed_map: #Map & {
              { glyph: ",", terrain: "open_floor" }]
     levels: [{ z: 0, rows: _ @embed(file="maps/shed.0.map", type=text) }]
     fill:   "open_floor"
+}
+
+// The rooms of the air scenarios (DOMAIN_SIMULATION.md Scenario 1, air.tri):
+// a room and a back room, 4 by 5, side by side, their doorways onto a
+// corridor below, open to the outdoors along its length; the rest of a 32
+// by 32 world, open ground outdoors.
+rooms_map: #Map & {
+    legend: [{ glyph: "#", terrain: "stone_wall" },
+             { glyph: ".", terrain: "plank_floor" },
+             { glyph: "+", terrain: "doorway" },
+             { glyph: ",", terrain: "open_floor" }]
+    levels: [{ z: 0, rows: _ @embed(file="maps/rooms.0.map", type=text) }]
+    fill:   "open_floor"
+    width:  32
+    height: 32
 }

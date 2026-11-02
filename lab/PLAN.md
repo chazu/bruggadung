@@ -4085,3 +4085,33 @@ looks over every body in the world for each agent, which a large world
 will need an index for.
 
 101 tests, 3337 checks, under both compilers, UBSan, and leak-free.
+
+### After the slice: terrain, step 3: rooms from terrain
+
+TERRAIN.md step 3: a region of air is a room found from the terrain, not a
+rectangle written by hand; every air scenario is a map.
+
+- **Rooms** (`BGTerrainRoomAt`): cells of a level joined side by side,
+  neither solid nor `divides` (a new kind property: a doorway belongs to
+  neither room it joins), numbered by flood fill when asked, and again
+  after terrain changes.
+- **The air over a tile** (`-[BGWorld airRegionAt:]`): the GasStore whose
+  tile (`atX`, `atY`, `atLevel`, replacing `west`, `north`, `east`,
+  `south`) is in the tile's room. `BGAirOver`, light's rooms and sound's
+  regions read it.
+- **`rooms_map`**: 32 x 32, the room and the back room where they were, a
+  wall row below with their doorways (the room's door stands in its own),
+  the corridor a row lower; open ground outdoors. Maps may say a size
+  larger than their drawing (`width`, `height`).
+- Every air scenario (the stove, the airing, the lodgers, light, sound)
+  draws it, and gives the results it gave; the corridor's listener is a
+  tile further from the clatter, and still hears it through the open door.
+
+Checked besides: the room, the back room and the corridor are three rooms;
+walls and doorways in none; the ground outdoors a room with no air; the air
+over a tile is its room's; a wall knocked through joins the rooms.
+
+Not yet: air merging when rooms join, or a room split; regions' links
+found from doorways; rooms found per chunk for large worlds.
+
+102 tests, 3366 checks, under both compilers, UBSan, and leak-free.

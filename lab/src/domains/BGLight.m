@@ -80,17 +80,9 @@ static int   outdoors( BGWorld *world, int64_t t)
 static const BGGasStore   *room_at( BGWorld *world, BGLocation tile)
 {
    const BGGasStore   *air;
-   BGStore            *stores;
-   NSUInteger         i;
 
-   stores = [world storeForKind:[world kindNamed:"GasStore"]];
-   for( i = 0; i < [stores count]; i++)
-   {
-      air = [stores recordAtIndex:i];
-      if( air->door && tile.x >= air->west && tile.x <= air->east && tile.y >= air->north && tile.y <= air->south)
-         return( air);
-   }
-   return( NULL);
+   air = [world record:[world kindNamed:"GasStore"] for:[world airRegionAt:tile]];
+   return( air && air->door ? air : NULL);
 }
 
 

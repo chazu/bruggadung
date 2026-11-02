@@ -20,6 +20,7 @@ typedef struct
    BOOL         solid;                       /* nothing walks into it */
    BOOL         opaque;                      /* sight stops at it */
    BOOL         floored;                     /* something to stand on */
+   BOOL         divides;                     /* a room ends here without a wall: a doorway */
 } BGTerrainInfo;
 
 typedef struct BGTerrain   BGTerrain;
@@ -65,3 +66,9 @@ void             BGTerrainChunkCells( const BGTerrain *t, int32_t x0, int32_t y0
 BGTerrainKind    BGTerrainSource( const BGTerrain *t, int32_t x, int32_t y, int32_t z);
 /* A hash of the terrain: its source and what has changed. */
 uint64_t         BGTerrainHash( const BGTerrain *t);
+
+/* Rooms (TERRAIN.md step 3): a cell's room, the cells of its level joined
+ * side by side that are neither solid nor dividing; 0 for a cell in none (a
+ * wall, a doorway, outside the extent). Numbered when first asked, and again
+ * after terrain changes; a number means nothing across a change. */
+uint32_t         BGTerrainRoomAt( BGTerrain *t, int32_t x, int32_t y, int32_t z);

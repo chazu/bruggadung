@@ -12,8 +12,9 @@ has none:
   how light, sound and air guess at walls;
 - the fluid domain is a grid with nothing to stop water.
 
-This document is a draft. Steps 1 and 2 are built (lab/src/core/BGTerrain,
-lab/content/terrain.tri; sight and memory in lab/src/know/BGKnowledge).
+This document is a draft. Steps 1 to 3 are built (lab/src/core/BGTerrain,
+lab/content/terrain.tri; sight and memory in lab/src/know/BGKnowledge;
+rooms in BGTerrain and `-[BGWorld airRegionAt:]`).
 
 The world is meant to grow to large roguelike and simulation games, with
 maps generated as they are explored. Every decision here keeps that open,
@@ -98,15 +99,36 @@ floor.
      line to it, either way, so sight is mutual. A wall itself is seen.
    - **Memory:** a terrain change emits an event, and an agent that doesn't
      see the changed tile, but had seen it, recalls the kind it saw.
-3. **Rooms from terrain.**
-   - Air regions found by flood fill, bounded by solid cells and closed
-     doors, instead of rectangles written by hand; light, sound and air read
-     them.
-   - The existing scenarios drawn as maps, giving the results they give now.
+3. **Rooms from terrain** (built).
+   - **What a room is:** the cells of a level joined side by side that are
+     neither solid nor `divides` (a doorway: it belongs to neither room it
+     joins). Rooms are numbered by flood fill when first asked, and again
+     after terrain changes.
+   - **The air over a tile** is the region (a GasStore) whose tile (`atX`,
+     `atY`, `atLevel`) is in the tile's room; a tile in a room with no air
+     of its own is outdoors. Light, sound and the atmosphere read it, and
+     the rectangles written by hand are gone.
+   - **The scenarios:** every air scenario draws `rooms_map`, the room and
+     back room where they were, a wall row with their doorways below, and
+     the corridor a row lower. They give the results they gave, the
+     corridor's listener a tile further from the clatter.
+   - **Doors stay links, not geometry.** Which regions open to which, and
+     through what door, is still the region's `opensTo` and `door`.
 4. **Levels.** Floors, open air, stairs or ladders; water falling through
    what has no floor.
 
 ## Open questions
+
+- **Rooms joined, or split.** A wall knocked through joins two rooms with
+  air of their own; the tile answers with one region, where their air
+  should merge. A wall built across a room splits it, leaving one side
+  without air. Both want the atmosphere to follow terrain changes.
+- **Links from doorways.** Which regions open to which could be found from
+  the doorways between rooms, and the door standing in one, instead of
+  written as `opensTo`.
+- **Rooms in a large world.** Numbering the whole extent at every change
+  doesn't scale to a world generated as it is explored; rooms will want to
+  be found per chunk, or from the changed cells out.
 
 - **The world's extent past 32 x 32.** The fluid domain, the explorer and
   the tile memory loop over a 32 x 32 grid. Step 1 sizes the world from its
