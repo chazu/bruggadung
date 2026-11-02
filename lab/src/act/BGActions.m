@@ -1945,6 +1945,50 @@ static NSString   *effect_shape( BGWorld *world, BGAction a, int64_t amount, BGP
 }
 
 
+/* Servicing a part in place (LATENT_ASSEMBLY.md decision 8): it undoes its
+ * role's `mends` per cent of the wear since the part was last serviced
+ * (`tended`; since it was made, if never), and that is where it was last
+ * serviced now. Quality is untouched: a poor part, serviced, wears as fast
+ * again. Worn through, it is past servicing. */
+static NSString   *effect_service( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
+{
+   const BGPart         *p;
+   const BGEntityInfo   *info;
+   const TriNode        *schema;
+   TriContent           *tri;
+   BGEntityID           part;
+   BGLocation           place;
+   int64_t              worn;
+   int64_t              since;
+   int64_t              mends;
+
+   tri   = [world tri];
+   part  = a.roles[ BGRoleItem];
+   p     = [world record:[world kindNamed:"Part"] for:part];
+   place = [world locationOf:part];
+   info  = place.form == BGLocationPartOf ? [world info:place.place] : NULL;
+   schema = info && [world record:[world kindNamed:"Latent"] for:place.place]
+            ? tri_at( tri, tri_pattern( tri, info->blueprint), "latent") : NULL;
+   if( ! p || ! schema)
+      return( @"there is no part in place to service");
+   if( [world record:[world kindNamed:"Latent"] for:part])
+      return( @"it has parts of its own to service");
+   worn = part_attrition( p);
+   if( worn >= BG_PART_FAILED * 10000)
+      return( @"it is worn through, past servicing: it has to be replaced");
+   mends = int_feature( tri, latent_role( tri, schema, place.role), "mends", 0);
+   if( mends <= 0)
+      return( @"servicing won't help it");
+   since = worn > p->tended ? worn - p->tended : 0;
+   worn -= since * mends / 100;
+   [g set:"Part.attrition" of:BGWhole( part) to:worn];
+   [g set:"Part.wear" of:BGWhole( part) to:worn / 10000];
+   [g set:"Part.tended" of:BGWhole( part) to:worn];
+   [g emit:"serviced" subject:BGWhole( part) other:BGWhole( a.roles[ BGRoleActor])];
+   return( nil);
+}
+
+
 /* Putting a part back into its assembly, in its role. */
 static NSString   *effect_install( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
 {
@@ -2406,6 +2450,7 @@ static const struct
    { "copy",      effect_copy },
    { "reveal",    effect_reveal },
    { "replace",   effect_replace },
+   { "service",   effect_service },
    { "cut",       effect_cut },
    { "shape",     effect_shape },
    { "install",   effect_install },

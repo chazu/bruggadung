@@ -5,50 +5,50 @@
 // beliefs, too: something it saw before that is gone now.
 
 // What a rule concludes: something about a body.
-#Finding:   { about: #Body }
+#Finding:     { about: #Body }
 // Something was done to it.
-#Tampered:  #Finding & {}
+#Tampered:    #Finding & {}
 // Something was done to it, and hidden.
-#CoveredUp: #Finding & {}
+#CoveredUp:   #Finding & {}
 // Something stirred there.
 #Disturbance: #Finding & {}
 // Someone cleaned up beside it.
-#Cleaned: #Finding & {}
+#Cleaned:     #Finding & {}
 // It is reserved for someone (ACTIONS.md §7), the finding's choice: what
 // the agent was told.
-#Reserved: #Finding & {}
+#Reserved:    #Finding & {}
 // It is someone's own, the finding's choice: as the agent was told.
-#Owned: #Finding & {}
+#Owned:       #Finding & {}
 // Someone, the finding's choice, took it from its owner: seen, or told.
-#Taken: #Finding & {}
+#Taken:       #Finding & {}
 // It (the agent itself) is under arrest, by the finding's choice.
-#Arrested: #Finding & {}
+#Arrested:    #Finding & {}
 // It hires (AGENCY.md decision 15): as the agent read, or was told.
-#Hires: #Finding & {}
+#Hires:       #Finding & {}
 // It struck someone, the finding's choice (AGENCY.md §13): a threat, to
 // the agent itself when it was the one struck.
-#Struck: #Finding & {}
+#Struck:      #Finding & {}
 // Someone does something the same way, again and again (AGENCY.md §8): the
 // finding's choice is the way.
-#Habit: #Finding & {}
+#Habit:       #Finding & {}
 // It was swapped for another like it.
-#Replaced: #Finding & {}
+#Replaced:    #Finding & {}
 // It is a forgery.
-#Forged: #Finding & {}
+#Forged:      #Finding & {}
 
 // A rule's premises, over the body it is about.
-#Premise:  {}
+#Premise:    {}
 // a trace of this kind perceived on it now
-#Sign:     #Premise & { sign: text }
+#Sign:       #Premise & { sign: text }
 // a trace of this kind perceived on it before, gone now
-#Formerly: #Premise & { formerly: text }
+#Formerly:   #Premise & { formerly: text }
 // a trace of this kind perceived on the floor at it or beside it
-#Near:     #Premise & { near: text }
+#Near:       #Premise & { near: text }
 // it was seen to put things into the same container at least this often
-#Repeated: #Premise & { repeated: int }
+#Repeated:   #Premise & { repeated: int }
 // it was seen with more of this before, which wears on and never off, than
 // it is seen with now
-#Unworn:   #Premise & { unworn: text }
+#Unworn:     #Premise & { unworn: text }
 // a copy whose impression is not that of the seal the agent has seen of the
 // issuer it claims
 #Misprinted: #Premise & { misprinted: *true | false }

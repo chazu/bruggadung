@@ -3935,3 +3935,40 @@ Not yet: maintenance reducing wear; age wearing parts; a pump refusing
 work with a role empty; agents working pumps of their own accord.
 
 97 tests, 3184 checks, under both compilers, ASan, and leak-free.
+
+### After the slice: servicing
+
+LATENT_ASSEMBLY.md decision 8: servicing an opened part undoes part of its
+wear since it was last serviced. Its content is the first written in
+Triangle's newer syntax, and it found a gap: a bound couldn't name its
+value, so Triangle now takes `wear: <worn_through` (CONTENT_LANGUAGE.md §2).
+
+- **Servicing** (`service_part`, effect "service", new; ten minutes, with
+  hands): a part in place short of worn through (`let worn_through = 60`,
+  which `replace_part` now names too) has its role's `mends` per cent of
+  the wear since it was last serviced undone, and keeps that as where it
+  was last serviced (`Part.tended`, new). The cup 60, the valves and the
+  handle 50; the piston and cover none ("servicing won't help it"). Worn
+  through, it is past servicing; an assembly within has its own parts to
+  service.
+- **Content in the newer syntax:** `latent.tri`'s pumps share a body by
+  `let` (`crank_body`, `warm_iron`), the rickety pump copies its parts from
+  `#CrankPumpParts.parts`; `workshop.tri` and `permits.tri` make their
+  people from `let person`, and nail stacks from `let nail_stack`. The
+  content hash is unchanged by these (aa02c564fb79b95b before the slice's
+  own additions), so they change nothing loaded.
+
+Checked: of a pump 400 hours used, dressing the cup undoes 60 per cent of
+its wear, cleaning a valve half, and the piston nothing; serviced again at
+once, nothing more. Worked 100 hours on, it wears as its twin left alone
+does, and servicing undoes 60 per cent of that, no more; saved and
+restored, it remembers. A cup worked dry 1000 hours is past servicing. Of
+12 rickety pumps 900 hours used, worked 40 hours, none fails sooner with
+its parts serviced, and three later or not at all.
+
+Not yet: servicing using up grease or tallow; agents servicing of their
+own accord (a goal to keep a machine in order); age wearing parts; a pump
+refusing work with a role empty.
+
+98 tests, 3282 checks, under both compilers, UBSan (ASan can't start with
+this machine's clang), and leak-free.

@@ -41,13 +41,16 @@ src/test/BGTest.m
 src/test/BGTests.m
 src/triangle/BGContent.m
 src/triangle/src/arith.c
+src/triangle/src/builtins.c
 src/triangle/src/clause.c
 src/triangle/src/fs.c
 src/triangle/src/load.c
 src/triangle/src/parse.c
 src/triangle/src/qc.c
+src/triangle/src/regex.c
 src/triangle/src/runtime.c
 src/triangle/src/tdl.c
+src/triangle/src/text.c
 src/triangle/src/types.c
 src/triangle/src/units.c
 src/triangle/src/util.c

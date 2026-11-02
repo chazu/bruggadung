@@ -19,9 +19,17 @@
 // candidates by the unit's seed, weighted by their wear, and decided once.
 // Not among the level's parts, it isn't marked: none is invented. Once a
 // role is opened, its wear is the part's in it (decision 7): fitting another
-// brings that one's wear in, and the role wears on from there.
+// brings that one's wear in, and the role wears on from there. Servicing an
+// opened part (decision 8) undoes its role's `mends` per cent of the wear
+// since it was last serviced, so serviced often, it wears that much slower;
+// worn through, it is past servicing, and has to be replaced.
 
-#LatentRole:   { roleName: text, partKind: text, depth: int, wears: int & >=0 & <=100, strain: int & >=1 & <=10 }
+// A part this worn has failed: it can't be serviced, only replaced (the
+// lab's BG_PART_FAILED).
+let worn_through = 60
+
+#LatentRole:   { roleName: text, partKind: text, depth: int, wears: int & >=0 & <=100, strain: int & >=1 & <=10,
+                 mends: *0 | int & >=0 & <=100 }
 #Culprit:      { failing: text, candidates: [...text], chance: int & >=0 & <=1000 }
 // A kind of part a blueprint makes better (positive) or worse than usual.
 #Bias:         { biased: text, bias: int & >=-50 & <=50 }
@@ -53,12 +61,15 @@
 // does, by its own quality; out of place, it doesn't. `attrition` is its
 // wear finer, in ten-thousandths of a point (a part made worn in content is
 // as worn as its `wear`); `grade`, hidden, its quality, what it was made
-// with (revealed, its assembly's for the role; -1: by its own seed).
+// with (revealed, its assembly's for the role; -1: by its own seed);
+// `tended`, its attrition when it was last serviced, which servicing can't
+// undo.
 #Part: #Body & {
     @component(Part)
     wear:      *0 | int & >=0 & <=100          @field(content, saved, proposable, inspect, perceive(sight))
     attrition: *0 | int & >=0 & <=1000000      @field(content, saved, proposable, inspect)
     grade:     *-1 | int & >=-1 & <=100        @field(content, saved, proposable, inspect)
+    tended:    *0 | int & >=0 & <=1000000      @field(content, saved, proposable, inspect)
     cameFrom:  ref                             @field(saved, proposable, inspect)
     fits:      text                            @field(saved, proposable, inspect, perceive(sight))
     detached:  *false | true                   @field(content, saved, proposable, inspect)
@@ -74,15 +85,18 @@ outlet_valve: #Part & { material: "brass", mass: 500g }
 // The crank-driven piston pump's insides. The leather cup wears fastest, and
 // three times as fast run dry; the valves next; iron, slowly. It loses flow
 // about once in five hundred hours of use when new; seizing isn't from use.
+// Dressing the cup undoes most of its wear since it was last dressed,
+// cleaning a valve half, oiling the handle's pivot half; the piston's iron,
+// nothing.
 #CrankPumpParts: #LatentSchema & {
-    parts: [{ roleName: "handle", partKind: "pump_handle", depth: 1, wears: 1 },
-            { roleName: "cover", partKind: "pump_cover", depth: 1, wears: 0 },
-            { roleName: "piston", partKind: "piston", depth: 2, wears: 1 },
-            { roleName: "piston_seal", partKind: "leather_cup", depth: 2, wears: 5, strain: 3 },
-            { roleName: "inlet_valve", partKind: "inlet_valve", depth: 2, wears: 3 },
-            { roleName: "outlet_valve", partKind: "outlet_valve", depth: 2, wears: 3 }]
-    culprits: [{ failing: "flow_loss", candidates: ["piston_seal", "inlet_valve", "outlet_valve", "housing"], chance: 2 },
-               { failing: "seized", candidates: [], chance: 0 }]
+    parts:       [{ roleName: "handle", partKind: "pump_handle", depth: 1, wears: 1, mends: 50 },
+                  { roleName: "cover", partKind: "pump_cover", depth: 1, wears: 0 },
+                  { roleName: "piston", partKind: "piston", depth: 2, wears: 1 },
+                  { roleName: "piston_seal", partKind: "leather_cup", depth: 2, wears: 5, strain: 3, mends: 60 },
+                  { roleName: "inlet_valve", partKind: "inlet_valve", depth: 2, wears: 3, mends: 50 },
+                  { roleName: "outlet_valve", partKind: "outlet_valve", depth: 2, wears: 3, mends: 50 }]
+    culprits:    [{ failing: "flow_loss", candidates: ["piston_seal", "inlet_valve", "outlet_valve", "housing"], chance: 2 },
+                  { failing: "seized", candidates: [], chance: 0 }]
     pathWhenOut: "piston"
     pathThrough: "outlet_valve"
 }
@@ -90,42 +104,30 @@ outlet_valve: #Part & { material: "brass", mass: 500g }
 // The crank-driven piston pump: 40 kg in all, its parts inside until opened.
 // `warm_pump`: the same with its heat (iron, 18 kJ/K), which a part leaving
 // it takes its share of, by heat capacity (Scenario 2's check 3).
-crank_pump: #Pump & #Latent & {
-    material: "iron", mass: 40kg, slots: 8, lift: 20000
-    latent: #CrankPumpParts
-}
+let crank_body = { material: "iron", mass: 40kg, slots: 8 }
+let warm_iron  = { heat: 5490000, heatCapacity: 18000, toAir: 0 }
 
-warm_pump: #Pump & #Latent & #ThermalBody & {
-    material: "iron", mass: 40kg, slots: 8, heat: 5490000, heatCapacity: 18000, toAir: 0, toOutdoors: 0
-    latent: #CrankPumpParts
-}
+crank_pump: #Pump & #Latent & crank_body & { lift: 20000, latent: #CrankPumpParts }
+warm_pump:  #Pump & #Latent & #ThermalBody & crank_body & warm_iron & { toOutdoors: 0, latent: #CrankPumpParts }
 
 // A cheap make of the same pump, whose leather is poor; and a rickety one,
 // that fails five hundred times as often, for trying failure out.
-cheap_pump: #Pump & #Latent & {
-    material: "iron", mass: 40kg, slots: 8, lift: 20000
+cheap_pump:   #Pump & #Latent & crank_body & {
+    lift:   20000
     latent: #CrankPumpParts & { biases: [{ biased: "leather_cup", bias: -30 }] }
 }
-rickety_pump: #Pump & #Latent & {
-    material: "iron", mass: 40kg, slots: 8, lift: 20000
+rickety_pump: #Pump & #Latent & crank_body & {
+    lift: 20000
     latent: {
-        parts: [{ roleName: "handle", partKind: "pump_handle", depth: 1, wears: 1 },
-                { roleName: "cover", partKind: "pump_cover", depth: 1, wears: 0 },
-                { roleName: "piston", partKind: "piston", depth: 2, wears: 1 },
-                { roleName: "piston_seal", partKind: "leather_cup", depth: 2, wears: 5, strain: 3 },
-                { roleName: "inlet_valve", partKind: "inlet_valve", depth: 2, wears: 3 },
-                { roleName: "outlet_valve", partKind: "outlet_valve", depth: 2, wears: 3 }]
-        culprits: [{ failing: "flow_loss", candidates: ["piston_seal", "inlet_valve", "outlet_valve", "housing"], chance: 1000 }]
-        pathWhenOut: "piston"
-        pathThrough: "outlet_valve"
+        parts:       #CrankPumpParts.parts
+        culprits:    [{ failing: "flow_loss", candidates: ["piston_seal", "inlet_valve", "outlet_valve", "housing"], chance: 1000 }]
+        pathWhenOut: #CrankPumpParts.pathWhenOut
+        pathThrough: #CrankPumpParts.pathThrough
     }
 }
 
 // The same pump out in the yard: it gives its heat to the outdoors.
-yard_pump: #Pump & #Latent & #ThermalBody & {
-    material: "iron", mass: 40kg, slots: 8, heat: 5490000, heatCapacity: 18000, toAir: 0, toOutdoors: 50
-    latent: #CrankPumpParts
-}
+yard_pump: #Pump & #Latent & #ThermalBody & crank_body & warm_iron & { toOutdoors: 50, latent: #CrankPumpParts }
 
 // COMPONENTS.md Scenario 3's hand pump: its piston is itself an assembly,
 // with the seal inside. A culprit that is itself an assembly isn't worn: it
@@ -135,20 +137,20 @@ yard_pump: #Pump & #Latent & #ThermalBody & {
 nested_piston: #Part & #Assembly & #Latent & #ThermalBody & {
     material: "iron", mass: 4kg, slots: 2, heat: 0, heatCapacity: 1800, toAir: 0, toOutdoors: 0
     latent: {
-        parts:       [{ roleName: "seal", partKind: "leather_cup", depth: 1, wears: 5, strain: 3 }]
+        parts:       [{ roleName: "seal", partKind: "leather_cup", depth: 1, wears: 5, strain: 3, mends: 60 }]
         culprits:    [{ failing: "flow_loss", candidates: ["seal"], chance: 0 }]
         pathWhenOut: ""
         pathThrough: ""
     }
 }
-hand_pump: #Pump & #Latent & {
+hand_pump:     #Pump & #Latent & {
     material: "iron", mass: 40kg, slots: 8
     latent: {
-        parts: [{ roleName: "handle", partKind: "pump_handle", depth: 1, wears: 1 },
-                { roleName: "cover", partKind: "pump_cover", depth: 1, wears: 0 },
-                { roleName: "piston", partKind: "nested_piston", depth: 1, wears: 1 },
-                { roleName: "inlet_valve", partKind: "inlet_valve", depth: 1, wears: 3 },
-                { roleName: "outlet_valve", partKind: "outlet_valve", depth: 1, wears: 3 }]
+        parts:       [{ roleName: "handle", partKind: "pump_handle", depth: 1, wears: 1, mends: 50 },
+                      { roleName: "cover", partKind: "pump_cover", depth: 1, wears: 0 },
+                      { roleName: "piston", partKind: "nested_piston", depth: 1, wears: 1 },
+                      { roleName: "inlet_valve", partKind: "inlet_valve", depth: 1, wears: 3, mends: 50 },
+                      { roleName: "outlet_valve", partKind: "outlet_valve", depth: 1, wears: 3, mends: 50 }]
         culprits:    [{ failing: "flow_loss", candidates: ["piston"], chance: 2 }]
         pathWhenOut: ""
         pathThrough: ""
@@ -189,7 +191,7 @@ install_part: #Operation & {
 
 // Which claims cover parts: a claim of this kind on an assembly covers what
 // is part of it, and what came out of it (COMPONENTS.md Scenario 3).
-#Coverage: { claimKind: #ClaimKind, viaPartOf: *false | true }
+#Coverage:        { claimKind: #ClaimKind, viaPartOf: *false | true }
 ownership_covers: #Coverage & { claimKind: "ownership", viaPartOf: true } @family(coverage)
 
 // The raised header tank the riser fills, and a leak: a tap installed in a
@@ -209,7 +211,23 @@ replace_part: #Operation & {
     roles: {
         actor:       #Agent & { id: $a }
         item:        #Part & { place: #Held & { by: $a }, fits: $r }
-        destination: #Part & { place: #Installed, fits: $r, wear: >=60 }
+        destination: #Part & { place: #Installed, fits: $r, wear: >=worn_through }
+    }
+} @family(operations)
+
+// Service a part in place, short of worn through, for ten minutes: dress
+// the leather, clean the valve, oil the pivot (LATENT_ASSEMBLY.md decision
+// 8). It undoes its role's `mends` per cent of the wear since it was last
+// serviced (since it was made, if never), and no more: servicing it again at
+// once does nothing. A part that is itself an assembly has its own parts to
+// service.
+service_part: #Operation & {
+    effect:   "service"
+    duration: 10min
+    uses:     ["hands"]
+    roles: {
+        actor: #Agent
+        item:  #Part & { place: #Installed, wear: <worn_through }
     }
 } @family(operations)
 

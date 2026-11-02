@@ -4,8 +4,9 @@
 iron_nail: #Body & { material: "iron", mass: 3g }
 
 // Nails in a stack. Their unit is iron_nail, and so is their unit mass.
-nails_30: #Stack & { material: "iron", unit: "iron_nail", unitMass: 3g, count: 30 }
-nails_10: #Stack & { material: "iron", unit: "iron_nail", unitMass: 3g, count: 10 }
+let nail_stack = { material: "iron", unit: "iron_nail", unitMass: 3g }
+nails_30: #Stack & nail_stack & { count: 30 }
+nails_10: #Stack & nail_stack & { count: 10 }
 
 // The workshop bin.
 bin: #Container & { material: "oak", mass: 4kg, capacity: 50 }
@@ -13,38 +14,41 @@ bin: #Container & { material: "oak", mass: 4kg, capacity: 50 }
 // The lock that gets wedged shut.
 lock: #Assembly & { material: "brass", mass: 600g, slots: 4 }
 
-worker: #Agent & { material: "flesh", mass: 70kg, hands: 2, coat: "blue", trade: "fitter" }
-smith:  #Agent & { material: "flesh", mass: 85kg, hands: 2, coat: "brown" }
+// Someone with two hands to work with.
+let person = { material: "flesh", hands: 2 }
+
+worker: #Agent & person & { mass: 70kg, coat: "blue", trade: "fitter" }
+smith:  #Agent & person & { mass: 85kg, coat: "brown" }
 
 ownership: #Claim & { kind: "ownership" }
 
 // The cistern room of "Two draws on a dwindling stock": two agents, each
 // with a tap and a bucket.
-agent_a: #Agent & { material: "flesh", mass: 60kg, hands: 2, coat: "grey" }
-agent_b: #Agent & { material: "flesh", mass: 65kg, hands: 2, coat: "green" }
+agent_a: #Agent & person & { mass: 60kg, coat: "grey" }
+agent_b: #Agent & person & { mass: 65kg, coat: "green" }
 
 // For AGENCY.md's first scenario, as "the missing nails": a crate across the
 // workshop, and the spare nails that may be in it.
 crate:   #Container & { material: "oak", mass: 2kg, capacity: 20 }
-nails_4: #Stack & { material: "iron", unit: "iron_nail", unitMass: 3g, count: 4 }
+nails_4: #Stack & nail_stack & { count: 4 }
 // and a sack in the far corner, where nobody would think to look
 sack:    #Container & { material: "cloth", mass: 300g, capacity: 10 }
 
 // For the missing nails' "ask a coworker": the chest the smith puts the nails
 // in, and the apprentice who may see it.
 chest:      #Container & { material: "oak", mass: 6kg, capacity: 40 }
-apprentice: #Agent & { material: "flesh", mass: 55kg, hands: 2, coat: "navy" }
+apprentice: #Agent & person & { mass: 55kg, coat: "navy" }
 
 // For KNOWLEDGE.md's first scenario, as "the rumour of the nails": a carter
 // and a porter the apprentice tells, a neighbour who saw it too, and
 // the foreman who hears it from them all.
-carter:    #Agent & { material: "flesh", mass: 75kg, hands: 2, coat: "red" }
-porter:    #Agent & { material: "flesh", mass: 80kg, hands: 2, coat: "yellow" }
-neighbour: #Agent & { material: "flesh", mass: 60kg, hands: 2, coat: "grey" }
-foreman:   #Agent & { material: "flesh", mass: 90kg, hands: 2, coat: "black", painting: 50 }
+carter:    #Agent & person & { mass: 75kg, coat: "red" }
+porter:    #Agent & person & { mass: 80kg, coat: "yellow" }
+neighbour: #Agent & person & { mass: 60kg, coat: "grey" }
+foreman:   #Agent & person & { mass: 90kg, coat: "black", painting: 50 }
 
 // For salience and bounded stores: someone who keeps little in mind.
-gossip: #Agent & { material: "flesh", mass: 65kg, hands: 2, coat: "beige", memory: 4 }
+gossip: #Agent & person & { mass: 65kg, coat: "beige", memory: 4 }
 
 // For appearance and truth: a fitting that looks brass, and is brass-plated
 // steel.
@@ -55,7 +59,7 @@ notebook: #Record & { material: "paper", mass: 200g }
 
 // For AGENCY.md's false alarm: the watchman, with supper; the storeroom; and
 // a cat.
-watchman:  #Agent & { material: "flesh", mass: 80kg, hands: 2, coat: "grey" }
+watchman:  #Agent & person & { mass: 80kg, coat: "grey" }
 cat:       #Agent & { material: "flesh", mass: 4kg, hands: 0, coat: "black" }
 storeroom: #Container & { material: "oak", mass: 200kg, capacity: 1000 }
 supper:    #Body & { material: "food", mass: 300g }
@@ -63,9 +67,9 @@ supper:    #Body & { material: "food", mass: 300g }
 // For AGENCY.md's tempting purse: the merchant's purse, the merchant,
 // Kasimir, who owes, and Mira, a child, half hidden in a doorway.
 purse:    #Body & { material: "cloth", mass: 150g }
-merchant: #Agent & { material: "flesh", mass: 85kg, hands: 2, coat: "white" }
-kasimir:  #Agent & { material: "flesh", mass: 70kg, hands: 2, coat: "beige", honesty: 10, scruples: 5 }
-mira:     #Agent & { material: "flesh", mass: 25kg, hands: 2, coat: "red", curious: 100, hiding: true }
+merchant: #Agent & person & { mass: 85kg, coat: "white" }
+kasimir:  #Agent & person & { mass: 70kg, coat: "beige", honesty: 10, scruples: 5 }
+mira:     #Agent & person & { mass: 25kg, coat: "red", curious: 100, hiding: true }
 
 // For ACTIONS.md's two hands, one seal: the spare piston seal, and a
 // reservation of it.
@@ -75,7 +79,7 @@ reservation: #Claim & { kind: "reservation" }
 seal_tag:    #Label & { material: "paper", mass: 5g, legible: 1 }
 
 // For the coat at dusk: someone of the visitor's build, in a brown coat.
-stranger: #Agent & { material: "flesh", mass: 60kg, hands: 2, coat: "brown" }
+stranger: #Agent & person & { mass: 60kg, coat: "brown" }
 
 // For CONTENT_LANGUAGE.md's nut of unknown size: the pump's gland nut, and
 // spanners.
@@ -101,13 +105,13 @@ diagram:     #Record & { material: "paper", mass: 20g }
 
 // For ACTIONS.md §5's partial effects: a log, how far it is sawn through
 // (percent), and a saw.
-#Log: #Body & {
+#Log:     #Body & {
     @component(Log)
-    sawn: *0 | int & >=0 & <=100               @field(content, saved, proposable, inspect, perceive(sight))
+    sawn:     *0 | int & >=0 & <=100               @field(content, saved, proposable, inspect, perceive(sight))
     // how hard its wood is to cut, and how clean the cut came out (ACTIONS.md
     // decision 11)
-    hardness: *60 | int & >=1 & <=100          @field(content, saved, inspect)
-    finish:   *0 | int & >=0 & <=100           @field(content, saved, proposable, inspect, perceive(sight))
+    hardness: *60 | int & >=1 & <=100              @field(content, saved, inspect)
+    finish:   *0 | int & >=0 & <=100               @field(content, saved, proposable, inspect, perceive(sight))
 }
 #HandSaw: #Body & {
     @component(HandSaw)
@@ -134,4 +138,4 @@ hand_saw: #HandSaw & { material: "steel", mass: 700g }
 #Daylight: { dawn: time, nightfall: time, twilight: time }
 
 daylight: #Daylight & { dawn: 6h, nightfall: 18h, twilight: 1h } @family(light)
-lamp: #Lamp & { material: "brass", mass: 900g, reach: 2 }
+lamp:     #Lamp & { material: "brass", mass: 900g, reach: 2 }

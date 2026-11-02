@@ -4,7 +4,7 @@
 // bindings between roles. `effect` names the code that builds the proposal
 // group when the action is performed.
 
-#Effect: "take" | "take_some" | "put_in" | "drive" | "open_tap" | "fill" | "walk" | "loosen" | "look" | "say" | "tend" | "analyse" | "write" | "read" | "eat" | "give" | "investigate" | "tighten" | "rotate" | "strike" | "shut" | "dismantle" | "light" | "rest" | "open_door" | "saw" | "pass" | "copy" | "reveal" | "replace" | "cut" | "shape" | "install" | "issue" | "confiscate" | "arrest" | "flee" | "hit" | "hire" | "work"
+#Effect: "take" | "take_some" | "put_in" | "drive" | "open_tap" | "fill" | "walk" | "loosen" | "look" | "say" | "tend" | "analyse" | "write" | "read" | "eat" | "give" | "investigate" | "tighten" | "rotate" | "strike" | "shut" | "dismantle" | "light" | "rest" | "open_door" | "saw" | "pass" | "copy" | "reveal" | "replace" | "cut" | "shape" | "install" | "issue" | "confiscate" | "arrest" | "flee" | "hit" | "hire" | "work" | "service"
 
 // Which roles an operation has is its roles' type: a structure's type is the
 // most general one with all its features.
@@ -91,8 +91,8 @@
 // Pick something up into a free hand: from a container, the ground, or an
 // assembly it is installed in.
 take: #Operation & {
-    effect: "take"
-    contest:  "quickness"
+    effect:  "take"
+    contest: "quickness"
     roles: {
         actor: #Agent & { freeHands: >=1 }
         item:  #Body & { place: #Inside | #OnTile | #Installed }
@@ -102,8 +102,8 @@ take: #Operation & {
 // Take some units of a stack into a free hand: from a container, the ground,
 // or the actor's other hand. How many is the command's.
 take_some: #Operation & {
-    effect: "take_some"
-    contest:  "quickness"
+    effect:  "take_some"
+    contest: "quickness"
     roles: {
         actor: #Agent & { id: $a, freeHands: >=1 }
         item:  #Stack & { place: #Inside | #OnTile | #Held & { by: $a } }
@@ -175,7 +175,7 @@ walk_west:  #Walk @family(operations)
 // Pry a wedged nail out of an assembly: loosen it, then pull it free into a
 // free hand. Walking away suspends it; coming back, it can be resumed.
 pry_out: #Operation & {
-    effect: "take"
+    effect:    "take"
     stages:    [{ duration: 3s, effect: "loosen", leaves: [{ trace: "scratch", on: "item", strength: 30 }] },
                 { duration: 2s, effect: "take" }]
     uses:      ["hands"]
@@ -219,9 +219,9 @@ touch_up: #Operation & {
         actor: #Agent
         item:  #Assembly
     }
-    removes:   [{ trace: "tool_marks", on: "item" }]
-    leaves:    [{ trace: "fresh_paint", on: "item", strength: 80 },
-                { trace: "paint_smell", on: "item", strength: 70 }]
+    removes: [{ trace: "tool_marks", on: "item" }]
+    leaves:  [{ trace: "fresh_paint", on: "item", strength: 80 },
+              { trace: "paint_smell", on: "item", strength: 70 }]
 } @family(operations)
 
 // Scratch a body to see what it is made of beneath its surface (an analysis,
@@ -235,7 +235,7 @@ test_scratch: #Operation & {
         actor: #Agent
         item:  #Body & { place: #OnTile | #Installed }
     }
-    leaves:    [{ trace: "scratch", on: "item", strength: 40 }]
+    leaves: [{ trace: "scratch", on: "item", strength: 40 }]
 } @family(operations)
 
 // Eat what the actor holds: a while, with the hands, easily put down. It

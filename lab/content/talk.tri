@@ -29,9 +29,9 @@
 // How the speaker says it knows (the attribution, KNOWLEDGE.md §10): it saw
 // it, as sure as its memory of it is strong (in dB), or heard it, from
 // someone it describes, or from no one it names.
-#Source: {}
-#Saw:    #Source & { sure: int }
-#Heard:  #Source & { from: #Agent }
+#Source:  {}
+#Saw:     #Source & { sure: int }
+#Heard:   #Source & { from: #Agent }
 // A promise (AGENCY.md §7): the speaker will see to it, by `when`. Hearers
 // hold it as a claim about then, kept or broken as they come to find.
 #Pledged: #Source & {}

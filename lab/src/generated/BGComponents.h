@@ -1,4 +1,4 @@
-/* Generated from Triangle content aa02c564fb79b95b: do not edit. Type IDs are valid
+/* Generated from Triangle content 1c27b8927e22129e: do not edit. Type IDs are valid
  * only for this content; regenerate when it changes. */
 #ifndef BG_COMPONENTS_H
 #define BG_COMPONENTS_H
@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BG_CONTENT_HASH 0xaa02c564fb79b95bULL
+#define BG_CONTENT_HASH 0x1c27b8927e22129eULL
 
 typedef struct TriNode TriNode;
 
@@ -254,6 +254,7 @@ typedef struct {
     bool            detached;    /* bool; content, saved, proposable, inspect */
     const char *    fits;    /* text; saved, proposable, inspect, perceive(sight) */
     int64_t         grade;    /* int, in quanta of 1; content, saved, proposable, inspect */
+    int64_t         tended;    /* int, in quanta of 1; content, saved, proposable, inspect */
     int64_t         wear;    /* int, in quanta of 1; content, saved, proposable, inspect, perceive(sight) */
 } BGPart;
 
@@ -336,10 +337,10 @@ enum {
 
 /* #Tie */
 enum {
-    BG_TIE_EMPLOY = 488,
-    BG_TIE_FRIEND = 489,
-    BG_TIE_KIN = 490,
-    BG_TIE_SWORN = 491,
+    BG_TIE_EMPLOY = 489,
+    BG_TIE_FRIEND = 490,
+    BG_TIE_KIN = 491,
+    BG_TIE_SWORN = 492,
 };
 
 /* #ClaimKind */
@@ -351,41 +352,41 @@ enum {
 
 /* #Penalty */
 enum {
-    BG_PENALTY_FINE = 476,
-    BG_PENALTY_ARREST = 507,
-    BG_PENALTY_CONFISCATE = 508,
+    BG_PENALTY_FINE = 477,
+    BG_PENALTY_ARREST = 508,
+    BG_PENALTY_CONFISCATE = 509,
 };
 
 /* #Wrong */
 enum {
-    BG_WRONG_ANOTHERS = 499,
-    BG_WRONG_UNAUTHORIZED = 500,
+    BG_WRONG_ANOTHERS = 500,
+    BG_WRONG_UNAUTHORIZED = 501,
 };
 
 /* #Material */
 enum {
-    BG_MATERIAL_CLOTH = 463,
-    BG_MATERIAL_FOOD = 464,
-    BG_MATERIAL_LEATHER = 465,
-    BG_MATERIAL_RUBBER = 466,
-    BG_MATERIAL_STONE = 467,
-    BG_MATERIAL_FLESH = 510,
-    BG_MATERIAL_BRASS = 512,
-    BG_MATERIAL_IRON = 513,
-    BG_MATERIAL_PAPER = 514,
-    BG_MATERIAL_STEEL = 515,
-    BG_MATERIAL_OAK = 517,
+    BG_MATERIAL_CLOTH = 464,
+    BG_MATERIAL_FOOD = 465,
+    BG_MATERIAL_LEATHER = 466,
+    BG_MATERIAL_RUBBER = 467,
+    BG_MATERIAL_STONE = 468,
+    BG_MATERIAL_FLESH = 511,
+    BG_MATERIAL_BRASS = 513,
+    BG_MATERIAL_IRON = 514,
+    BG_MATERIAL_PAPER = 515,
+    BG_MATERIAL_STEEL = 516,
+    BG_MATERIAL_OAK = 518,
 };
 
 /* "flesh" | "metal" | "natural" | "paper" | "wood" */
 enum {
     BG_BODY_SURFACE_NATURAL = 314,
-    BG_BODY_SURFACE_FLESH = 510,
-    BG_BODY_SURFACE_BRASS = 512,
-    BG_BODY_SURFACE_IRON = 513,
-    BG_BODY_SURFACE_PAPER = 514,
-    BG_BODY_SURFACE_STEEL = 515,
-    BG_BODY_SURFACE_OAK = 517,
+    BG_BODY_SURFACE_FLESH = 511,
+    BG_BODY_SURFACE_BRASS = 513,
+    BG_BODY_SURFACE_IRON = 514,
+    BG_BODY_SURFACE_PAPER = 515,
+    BG_BODY_SURFACE_STEEL = 516,
+    BG_BODY_SURFACE_OAK = 518,
 };
 
 /* #Colour */
@@ -399,7 +400,7 @@ enum {
     BG_COLOUR_RED = 419,
     BG_COLOUR_YELLOW = 420,
     BG_COLOUR_BEIGE = 437,
-    BG_COLOUR_WHITE = 459,
+    BG_COLOUR_WHITE = 460,
 };
 
 /* The field registry: what code needs to read and write any component
@@ -645,6 +646,7 @@ static const BGFieldInfo BGPart_fields[] = {
     { "detached", offsetof(BGPart, detached), BG_VALUE_BOOL, "bool", "content, saved, proposable, inspect" },
     { "fits", offsetof(BGPart, fits), BG_VALUE_TEXT, "text", "saved, proposable, inspect, perceive(sight)" },
     { "grade", offsetof(BGPart, grade), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
+    { "tended", offsetof(BGPart, tended), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect" },
     { "wear", offsetof(BGPart, wear), BG_VALUE_QUANTITY, "int", "content, saved, proposable, inspect, perceive(sight)" },
 };
 
@@ -733,7 +735,7 @@ static const BGComponentInfo BGComponents[BG_COMPONENT_COUNT + 1] = {
     { "Lamp", "#Lamp", sizeof(BGLamp), 4, BGLamp_fields },
     { "Latent", "#Latent", sizeof(BGLatent), 9, BGLatent_fields },
     { "Log", "#Log", sizeof(BGLog), 3, BGLog_fields },
-    { "Part", "#Part", sizeof(BGPart), 6, BGPart_fields },
+    { "Part", "#Part", sizeof(BGPart), 7, BGPart_fields },
     { "Pump", "#Pump", sizeof(BGPump), 4, BGPump_fields },
     { "Record", "#Record", sizeof(BGRecord), 1, BGRecord_fields },
     { "Label", "#Label", sizeof(BGLabel), 1, BGLabel_fields },

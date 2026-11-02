@@ -99,7 +99,7 @@ stove:      #Stove & { material: "iron", mass: 120kg, burnRate: 250, fuel: 3kg,
 // someone to rest by the stove: at 310 K, 70 kg at 3.5 kJ/kg/K, abed and
 // clothed (4 W/K)
 lodger:     #Agent & #Respirator & #ThermalBody & {
-                material: "flesh", mass: 70kg, hands: 2, coat: "grey",
-                atRest: 190, atWork: 600, restsAbove: 0, restsBelow: 0,
-                heat: 75950000, heatCapacity: 245000, toAir: 4, toOutdoors: 0 }
+    material: "flesh", mass: 70kg, hands: 2, coat: "grey",
+    atRest: 190, atWork: 600, restsAbove: 0, restsBelow: 0,
+    heat: 75950000, heatCapacity: 245000, toAir: 4, toOutdoors: 0 }
 room_shell: #Shell & { heat: 1100000000, heatCapacity: 4000000, toAir: 100, toOutdoors: 50 }

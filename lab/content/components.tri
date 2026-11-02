@@ -27,7 +27,7 @@
 #Thing: { id: ref }
 
 // Where a physical thing is: the location relation, as a description.
-#Place: {}
+#Place:     {}
 #OnTile:    #Place & { x: int, y: int, level: int }
 #Inside:    #Place & { container: ref }
 #Held:      #Place & { by: ref, hand: int }
@@ -65,57 +65,57 @@
 // (KNOWLEDGE.md §12): past that, the least salient go first.
 #Agent: #Body & #Handed & {
     @component(Agent)
-    hands:  int & >=0 & <=4                  @field(content, saved, inspect, perceive(sight))
-    coat:   #Colour                          @field(content, saved, proposable, inspect, perceive(sight))
-    memory: *64 | int & >=1 & <=100000       @field(content, saved, inspect)
+    hands:         int & >=0 & <=4                  @field(content, saved, inspect, perceive(sight))
+    coat:          #Colour                          @field(content, saved, proposable, inspect, perceive(sight))
+    memory:        *64 | int & >=1 & <=100000       @field(content, saved, inspect)
     // a disposition (AGENCY.md §9), in dB: how much it likes to help whoever
     // asks; others can't see it, only how it behaves
-    helpful: *0 | int & >=-30 & <=30         @field(content, saved, proposable, inspect)
+    helpful:       *0 | int & >=-30 & <=30          @field(content, saved, proposable, inspect)
     // expertise (KNOWLEDGE.md §9): what interpretation rules it can draw
-    painting: *0 | int & >=0 & <=100         @field(content, saved, inspect)
+    painting:      *0 | int & >=0 & <=100           @field(content, saved, inspect)
     // dispositions and an internal norm (AGENCY.md §9), 0 to 100: how honest
     // it is, how curious (it notices more), and how much it minds stealing
-    honesty:  *50 | int & >=0 & <=100        @field(content, saved, proposable, inspect)
-    curious:  *0 | int & >=0 & <=100         @field(content, saved, proposable, inspect)
-    scruples: *20 | int & >=0 & <=100        @field(content, saved, proposable, inspect)
+    honesty:       *50 | int & >=0 & <=100          @field(content, saved, proposable, inspect)
+    curious:       *0 | int & >=0 & <=100           @field(content, saved, proposable, inspect)
+    scruples:      *20 | int & >=0 & <=100          @field(content, saved, proposable, inspect)
     // respect for reservations (AGENCY.md §9, ACTIONS.md §7), 0 to 100
-    respectful: *50 | int & >=0 & <=100      @field(content, saved, proposable, inspect)
+    respectful:    *50 | int & >=0 & <=100          @field(content, saved, proposable, inspect)
     // the disposition to abide by the rules (INSTITUTIONS.md decision 5), 0 to 100
-    abiding:    *50 | int & >=0 & <=100      @field(content, saved, proposable, inspect)
+    abiding:       *50 | int & >=0 & <=100          @field(content, saved, proposable, inspect)
     // how readily it trusts what it is told (KNOWLEDGE.md decision 15), dB
-    trusting:   *0 | int & >=-20 & <=20      @field(content, saved, proposable, inspect)
+    trusting:      *0 | int & >=-20 & <=20          @field(content, saved, proposable, inspect)
     // its trade (ACTIONS.md decision 12): it knows the trade's recipes
-    trade:      text                         @field(content, saved, proposable, inspect)
+    trade:         text                             @field(content, saved, proposable, inspect)
     // the job it offers, by name (AGENCY.md decision 15), if any
-    hires:      text                         @field(content, saved, proposable, inspect)
+    hires:         text                             @field(content, saved, proposable, inspect)
     // a deeply held norm against striking anyone (AGENCY.md decision 14), 0
     // to 100: any of it vetoes doing so
-    gentle:     *0 | int & >=0 & <=100       @field(content, saved, proposable, inspect)
+    gentle:        *0 | int & >=0 & <=100           @field(content, saved, proposable, inspect)
     // temper (AGENCY.md §13), 0 to 100: how readily it meets harm with force
-    temper:     *0 | int & >=0 & <=100       @field(content, saved, proposable, inspect)
+    temper:        *0 | int & >=0 & <=100           @field(content, saved, proposable, inspect)
     // reaction speed (ACTIONS.md §8): it weights the order of the agent's
     // actions among others' at the same boundary
-    quickness:  *10 | int & >=1 & <=100      @field(content, saved, proposable, inspect)
+    quickness:     *10 | int & >=1 & <=100          @field(content, saved, proposable, inspect)
     // risk tolerance (AGENCY.md §9), 0 to 100: a goal's believed risk counts
     // in full at 50, double at 0, and not at all at 100
-    riskTolerance: *50 | int & >=0 & <=100   @field(content, saved, proposable, inspect)
+    riskTolerance: *50 | int & >=0 & <=100          @field(content, saved, proposable, inspect)
     // what its hands can put into a turn (ACTIONS.md Scenario 1)
-    grip:       *200N | force & >=0N & <=5000N @field(content, saved, inspect)
+    grip:          *200N | force & >=0N & <=5000N   @field(content, saved, inspect)
     // half hidden: seen only from close by, though it sees as well as anyone
-    hiding:   *false | true                  @field(content, saved, proposable, inspect)
+    hiding:        *false | true                    @field(content, saved, proposable, inspect)
     // a body stock (AGENCY.md §6): how fed it is, 0 to 100, as of `fedAt`;
     // it falls a point every three minutes, computed when read
-    fed:      *80 | int & >=0 & <=100        @field(content, saved, proposable, inspect)
+    fed:           *80 | int & >=0 & <=100          @field(content, saved, proposable, inspect)
     // fatigue (AGENCY.md §6, a component field), 0 to 100: effort raises
     // it, a night's rest clears it
-    fatigue:  *0 | int & >=0 & <=100         @field(content, saved, proposable, inspect)
+    fatigue:       *0 | int & >=0 & <=100           @field(content, saved, proposable, inspect)
     // injury (AGENCY.md §6, a component field), 0 to 100, felt as pain; and
     // what changes how precisely the body is felt, not the body: adrenaline
     // dulls pain, numbness hides cold, by as many points
-    injury:     *0 | int & >=0 & <=100       @field(content, saved, proposable, inspect)
-    adrenaline: *0 | int & >=0 & <=100       @field(content, saved, proposable, inspect)
-    numbness:   *0 | int & >=0 & <=100       @field(content, saved, proposable, inspect)
-    fedAt:    *0ms | time & >=0ms & <=10000d @field(content, saved, proposable, inspect)
+    injury:        *0 | int & >=0 & <=100           @field(content, saved, proposable, inspect)
+    adrenaline:    *0 | int & >=0 & <=100           @field(content, saved, proposable, inspect)
+    numbness:      *0 | int & >=0 & <=100           @field(content, saved, proposable, inspect)
+    fedAt:         *0ms | time & >=0ms & <=10000d   @field(content, saved, proposable, inspect)
 }
 
 // Something entities can be put in.
@@ -191,13 +191,12 @@
 // The miller's pump: open once dismantled.
 #Pump: #Assembly & {
     @component(Pump)
-    opened: *false | true @field(content, saved, proposable, inspect, perceive(sight))
+    opened: *false | true                @field(content, saved, proposable, inspect, perceive(sight))
     // what it delivers of its rated flow, percent: an aggregate parameter
     // (COMPONENTS.md §7), changed by repairs as a delta
-    flow:   *100 | int & >=0 & <=100 @field(content, saved, proposable, inspect)
+    flow:   *100 | int & >=0 & <=100     @field(content, saved, proposable, inspect)
     // the store it draws from, and what it lifts out of it a minute, mL, at
     // full flow
     draws:  ref                          @field(saved, proposable, inspect)
     lift:   *0 | int & >=0 & <=100000    @field(content, saved, proposable, inspect)
 }
-

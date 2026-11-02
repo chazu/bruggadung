@@ -4126,6 +4126,196 @@ static void   test_part_condition( void)
 }
 
 
+/* LATENT_ASSEMBLY.md decision 8: servicing a part. The pump `blueprint`
+ * `key` on its well, `hours` used behind it, `dry` of them abused, opened two
+ * levels, a worker by it with a wrench. */
+static BGEntityID   serviced_pump( BGStage *st, const char *blueprint, const char *key, int64_t hours, int64_t dry,
+                                   BGEntityID *worker)
+{
+   BGProposalGroup   *g;
+   BGEntityID        pump;
+   BGEntityID        well;
+   BGEntityID        wrench;
+   NSString          *error;
+
+   st->w   = BGTestWorld( 157);
+   st->c   = BGTestCommitter( st->w);
+   st->s   = [[[BGScheduler alloc] initWithWorld:st->w committer:st->c] autorelease];
+   [st->s setActivities:[BGActivities activitiesWithWorld:st->w committer:st->c]];
+   g       = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the pump on its well, used"];
+   pump    = [g create:blueprint key:key at:BGOnTile( 5, 5, 0)];
+   well    = [g create:"well" key:"the well" at:BGOnTile( 5, 6, 0)];
+   *worker = [g create:"worker" key:"worker" at:BGOnTile( 4, 5, 0)];
+   wrench  = [g create:"wrench_250" key:"wrench" at:BGHeldBy( *worker, 0)];
+   [g set:"Pump.draws" of:BGWhole( pump) to:(int64_t) well];
+   [g set:"Latent.used" of:BGWhole( pump) to:hours * 3600000LL];
+   [g set:"Latent.abused" of:BGWhole( pump) to:dry * 3600000LL];
+   [st->c submit:g];
+   [st->s runUntil:BGTimeMake( 1)];
+   pump    = [g idFor:pump];
+   *worker = [g idFor:*worker];
+   wrench  = [g idFor:wrench];
+   error   = nil;
+   BG_CHECK( BGPerform( st->w, st->c, BGActionMake( "open_up", *worker, wrench, pump), 0, &error) != nil);
+   [st->s runUntil:BGTimeMake( 1000)];
+   BG_CHECK( BGPerform( st->w, st->c, BGActionMake( "open_up", *worker, wrench, pump), 0, &error) != nil);
+   [st->s runUntil:BGTimeMake( 2000)];
+   return( pump);
+}
+
+
+/* The pump worked `hours`, the worker rested and fed each hour; the hour of
+ * its first failure in them, or 0. */
+static int   serviced_work( BGStage st, BGEntityID worker, BGEntityID pump, int hours)
+{
+   BGProposalGroup   *g;
+   NSString          *error;
+   const char        *text;
+   int64_t           t;
+   int               h;
+   int               failedIn;
+
+   failedIn = 0;
+   error    = nil;
+   for( h = 1; h <= hours; h++)
+   {
+      t = [st.w time].ms;
+      g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: the worker rested and fed"];
+      [g set:"Agent.fatigue" of:BGWhole( worker) to:0];
+      [g set:"Agent.injury" of:BGWhole( worker) to:0];
+      [g set:"Agent.fed" of:BGWhole( worker) to:80];
+      [g set:"Agent.fedAt" of:BGWhole( worker) to:t];
+      [st.c submit:g];
+      BGPerform( st.w, st.c, BGActionMake( "work_pump", worker, pump, BGNoEntity), 0, &error);
+      [st.s runUntil:BGTimeMake( t + 3600000LL + 1000)];
+      text = [st.w textField:"Latent.failure" of:pump];
+      if( ! failedIn && text && *text)
+         failedIn = h;
+   }
+   return( failedIn);
+}
+
+
+/* The worker services the part in `role`, ten minutes; whether it could
+ * begin. */
+static BOOL   service_role( BGStage st, BGEntityID worker, BGEntityID pump, const char *role)
+{
+   NSString   *error;
+   BOOL       begun;
+   int64_t    t;
+
+   error = nil;
+   t     = [st.w time].ms;
+   begun = BGPerform( st.w, st.c, BGActionMake( "service_part", worker, part_in( st, pump, role), BGNoEntity), 0,
+                      &error) != nil;
+   [st.s runUntil:BGTimeMake( t + 600000LL + 1000)];
+   return( begun);
+}
+
+
+static int64_t   attrition_of( BGStage st, BGEntityID pump, const char *role)
+{
+   int64_t   v;
+
+   v = -1;
+   [st.w getField:"Part.attrition" of:part_in( st, pump, role) value:&v];
+   return( v);
+}
+
+
+static void   test_servicing( void)
+{
+   static const char   *roles[] = { "handle", "piston_seal", "inlet_valve", "outlet_valve" };
+   BGStage             st;
+   BGStage             twin;
+   BGEntityID          worker;
+   BGEntityID          twinWorker;
+   BGEntityID          pump;
+   BGEntityID          twinPump;
+   NSString            *error;
+   char                key[ 32];
+   int64_t             seal;
+   int64_t             valve;
+   int64_t             piston;
+   int64_t             after;
+   int64_t             grown;
+   int64_t             v;
+   int                 kept;
+   int                 serviced;
+   int                 later;
+   int                 k;
+   int                 r;
+
+   /* 400 hours used: dressing the cup undoes 60 per cent of its wear, a
+    * valve cleaned half; the piston's iron, nothing */
+   pump   = serviced_pump( &st, "crank_pump", "pump 2", 400, 0, &worker);
+   seal   = attrition_of( st, pump, "piston_seal");
+   valve  = attrition_of( st, pump, "inlet_valve");
+   piston = attrition_of( st, pump, "piston");
+   BG_CHECK( seal > 100000 && seal < 600000 && valve > 0 && piston > 0);
+   BG_CHECK( service_role( st, worker, pump, "piston_seal"));
+   BG_CHECK( attrition_of( st, pump, "piston_seal") == seal - seal * 60 / 100);
+   BG_CHECK( [st.w getField:"Part.wear" of:part_in( st, pump, "piston_seal") value:&v] &&
+             v == (seal - seal * 60 / 100) / 10000);
+   BG_CHECK( service_role( st, worker, pump, "inlet_valve"));
+   BG_CHECK( attrition_of( st, pump, "inlet_valve") == valve - valve * 50 / 100);
+   service_role( st, worker, pump, "piston");
+   BG_CHECK( attrition_of( st, pump, "piston") == piston);
+
+   /* serviced again at once, nothing more: what was undone was the wear since */
+   seal = attrition_of( st, pump, "piston_seal");
+   BG_CHECK( service_role( st, worker, pump, "piston_seal"));
+   BG_CHECK( attrition_of( st, pump, "piston_seal") == seal);
+
+   /* worked 100 hours, it wears as fast as its twin left alone (its quality
+    * is its own); serviced, 60 per cent of that is undone, no more */
+   twinPump = serviced_pump( &twin, "crank_pump", "pump 2", 400, 0, &twinWorker);
+   grown    = attrition_of( twin, twinPump, "piston_seal");
+   serviced_work( twin, twinWorker, twinPump, 100);
+   grown    = attrition_of( twin, twinPump, "piston_seal") - grown;
+   serviced_work( st, worker, pump, 100);
+   BG_CHECK( grown > 0 && attrition_of( st, pump, "piston_seal") == seal + grown);
+   BG_CHECK( service_role( st, worker, pump, "piston_seal"));
+   after = seal + grown - grown * 60 / 100;
+   BG_CHECK( attrition_of( st, pump, "piston_seal") == after);
+   BG_CHECK( after < attrition_of( twin, twinPump, "piston_seal"));
+
+   /* saved and restored, it remembers being serviced */
+   error = nil;
+   st.w  = restore( BGSave( st.w, st.c, [NSArray array]), [st.w contentBuild], &st.c, &error);
+   st.s  = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [st.s setActivities:[BGActivities activitiesWithWorld:st.w committer:st.c]];
+   BG_CHECK( st.w && [st.w getField:"Part.tended" of:part_in( st, pump, "piston_seal") value:&v] && v == after);
+   BG_CHECK( service_role( st, worker, pump, "piston_seal"));
+   BG_CHECK( attrition_of( st, pump, "piston_seal") == after);
+
+   /* worked dry 1000 hours, the cup is worn through: past servicing */
+   pump = serviced_pump( &st, "crank_pump", "pump 2", 1000, 1000, &worker);
+   BG_CHECK( attrition_of( st, pump, "piston_seal") == 1000000);
+   BG_CHECK( ! service_role( st, worker, pump, "piston_seal"));
+   BG_CHECK( attrition_of( st, pump, "piston_seal") == 1000000);
+
+   /* serviced, a pump is less likely to fail: of 12 rickety pumps 900 hours
+    * used, worked 40 hours, none fails sooner with its parts serviced, and
+    * some later or not at all */
+   kept = serviced = later = 0;
+   for( k = 0; k < 12; k++)
+   {
+      snprintf( key, sizeof( key), "pump %d", k);
+      pump = serviced_pump( &st, "rickety_pump", key, 900, 0, &worker);
+      kept = serviced_work( st, worker, pump, 40);
+      pump = serviced_pump( &st, "rickety_pump", key, 900, 0, &worker);
+      for( r = 0; r < 4; r++)
+         service_role( st, worker, pump, roles[ r]);
+      serviced = serviced_work( st, worker, pump, 40);
+      BG_CHECK( ! kept || ! serviced || serviced >= kept);
+      BG_CHECK( kept || ! serviced);
+      later += ! serviced ? kept != 0 : serviced > kept;
+   }
+   BG_CHECK( later > 0);
+}
+
+
 /* DOMAIN_SIMULATION.md Scenario 2's drain: the pump `key` under its header
  * tank (100 L), opened, and its piston taken out: through a leaky outlet
  * valve the tank drains onto the floor; an hour on, how much left the tank,
@@ -10189,6 +10379,7 @@ const BGTestCase   BGAllTests[] =
    { "latent_pump",                   test_latent_pump },
    { "pump_wear",                     test_pump_wear },
    { "part_condition",                test_part_condition },
+   { "servicing",                     test_servicing },
    { "pump_heat",                     test_pump_heat },
    { "pump_heat_running",             test_pump_heat_running },
    { "component_pump",                test_component_pump },

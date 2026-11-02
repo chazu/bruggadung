@@ -23,9 +23,9 @@
 #Repairing: #Frame & { shutoff: #Body, tool: #Body, pump: #Body }
 
 // Warming: a stove to light.
-#Warming: #Frame & { stove: #Body }
+#Warming:    #Frame & { stove: #Body }
 // Airing: a door to open, the way out.
-#Airing: #Frame & { exit: #Body }
+#Airing:     #Frame & { exit: #Body }
 // Tightening: the spanner, and the nut.
 #Tightening: #Frame & { spanner: #Body, nut: #Body }
 
@@ -39,10 +39,10 @@
 #Delivering: #Frame & { goods: #Body, dest: #Container }
 
 // Tidying: what to put away, and the bin to put it in.
-#Tidying:  #Frame & { stuff: #Body, bin: #Container }
+#Tidying: #Frame & { stuff: #Body, bin: #Container }
 
 // Getting money: the money, and a friend or someone to work for.
-#Getting:  #Frame & { money: #Body, friend: #Agent, boss: #Agent }
+#Getting: #Frame & { money: #Body, friend: #Agent, boss: #Agent }
 
 // Repaying a loan (AGENCY.md §7: a debt is a commitment): what was lent,
 // and who lent it.
@@ -52,9 +52,9 @@
 // and who took it.
 #Wronging: #Frame & { loot: #Body, officer: #Agent, culprit: #Agent }
 // Under arrest: the arrested, and the one holding it.
-#Custody: #Frame & { arrested: #Agent, warden: #Agent }
+#Custody:  #Frame & { arrested: #Agent, warden: #Agent }
 // Harmed: who struck.
-#Harming: #Frame & { attacker: #Agent }
+#Harming:  #Frame & { attacker: #Agent }
 
 // Eating: the food. Watching: the spot where something stirred.
 #Supper:   #Frame & { food: #Body }
@@ -79,20 +79,20 @@
 // norm.
 #Consideration: { curve: [...#Point], veto: *false | true }
 // a fixed worth: a duty, a meal
-#Flat:      #Consideration & { value: int }
+#Flat:          #Consideration & { value: int }
 // one that scales something of the agent's: `per` tenths of a point for
 // each point of it
-#Scaled:    #Consideration & { per: int }
+#Scaled:        #Consideration & { per: int }
 // a cost, the believed risk, as the agent's risk tolerance weighs it
-#Cost:      #Consideration & { cost: int }
+#Cost:          #Consideration & { cost: int }
 // how strongly the agent believes something like `suspect` is in the slot's
 // referent: the credence of what it was told, with its findings of
 // `evidence` about the place as a group of their own (KNOWLEDGE.md §11)
-#Suspicion: #Consideration & { suspect: #Body, inside: text, evidence: text }
+#Suspicion:     #Consideration & { suspect: #Body, inside: text, evidence: text }
 
 // What a need presses for (AGENCY.md §6): pressure over what the agent
 // feels, `per` tenths of a point for each point of it.
-#Need:      #Scaled & { pressure: text }
+#Need: #Scaled & { pressure: text }
 
 // When a need raises a goal (AGENCY.md §4's needs generator): while the
 // agent feels it above `above`.
@@ -118,8 +118,8 @@
 // Conditions of what the agent did, not of how things are: it has looked
 // into the slot's referent since adopting the goal; an activity of the
 // operation it started since has completed.
-#Looked: #Condition & { looked: text }
-#Did:    #Condition & { did: text }
+#Looked:  #Condition & { looked: text }
+#Did:     #Condition & { did: text }
 // ... it is within reach of the slot's referent.
 #Reached: #Condition & { reached: text }
 
@@ -190,18 +190,18 @@
 // unthinkable, and not tried at all.
 // what a disposition or a norm of the agent's adds: `per` tenths of a point
 // for each point of it
-#Trait:   #Scaled & { trait: text }
+#Trait:    #Scaled & { trait: text }
 // what respect for reservations costs: if the agent believes the slot's
 // referent reserved for someone else, `per` tenths of a point for each point
 // of its respect
-#Respect: #Scaled & { reserved: text }
+#Respect:  #Scaled & { reserved: text }
 // a penalty if the agent believes someone, not itself, could see the slot's
 // referent
-#Watched: #Consideration & { watched: text, penalty: int }
+#Watched:  #Consideration & { watched: text, penalty: int }
 // what loyalty adds (AGENCY.md decision 12): the agent's loyalty to the
 // slot's referent, or to whoever it believes owns it, `per` tenths of a
 // point for each point of it
-#Loyal: #Scaled & { loyal: text }
+#Loyal:    #Scaled & { loyal: text }
 // what the law weighs (INSTITUTIONS.md decision 5): if the agent knows a law
 // forbidding `act` on the slot's referent as it believes it to be (another's),
 // and believes itself seen, what the law weighs; unseen, nothing
@@ -246,7 +246,7 @@ drive_a_nail: #Method & {
         #Achieve & { subgoal: "have_nails" },
         #Do & { op: "drive", object: "nails", target: "lock" },
     ]
-}  @family(methods)
+} @family(methods)
 
 // Take two from nails believed lying about or in a container, nearest first:
 // two, so what is taken stays a stack, and drive splits one off.
@@ -748,7 +748,7 @@ take_the_seal: #Method & {
 tighten_nut: #Goal & {
     title:   "tighten the nut"
     urgency: [{ input: 0, output: 0 }, { input: 900, output: 2 }, { input: 1000, output: 30 }]
-    done:  { find: ["nut"], match: #Tightening & { nut: #Fastener & { tight: true } } }
+    done:    { find: ["nut"], match: #Tightening & { nut: #Fastener & { tight: true } } }
 } @family(goals)
 
 // With a spanner that fits: if whether it fits is unknown, look closer;

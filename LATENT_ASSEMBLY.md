@@ -63,6 +63,21 @@ designed.
    A spare's quality comes from its own seed, unless it was revealed from
    an assembly, when it keeps that one's.
 
+8. **Servicing undoes part of the wear since a part was last serviced.**
+   An opened part in place, short of worn through, can be serviced, ten
+   minutes' work: the leather dressed, a valve cleaned, a pivot oiled
+   (`service_part`). Its role says what share of the wear since the part
+   was last serviced (since it was made, if never) a servicing undoes
+   (`mends`: the leather cup 60 per cent, a valve or the handle 50, iron and
+   the cover none). The part keeps where it was last serviced to
+   (`tended`), so servicing again at once does nothing, and serviced
+   regularly a part wears only the rest of the share, never coming back new.
+   Worn through (60), a part is past servicing and has to be replaced. Its
+   quality is untouched: a poor part, serviced, wears as fast again. Roles
+   not yet opened can't be reached, so they can't be serviced; a part that
+   is itself an assembly has its own parts to service. Servicing lowers the
+   risk of failure and a part's weight as a culprit, as both read wear.
+
 ## Provisional
 
 - A part wears with use only: age alone (leather perishing on the shelf)
@@ -71,7 +86,8 @@ designed.
   flow, are the lab's numbers, not derived.
 - A candidate that is no part (the housing) wears at the default rate, two
   points per hundred hours, with a quality like any other.
-- Maintenance doesn't reduce wear yet; only replacing a part does.
+- The shares servicing undoes (`mends`) are the lab's numbers, not
+  derived; servicing uses up nothing (no grease or tallow) yet.
 - A part that is itself an assembly (the hand pump's piston) doesn't wear
   as a whole: its own parts do, and as a candidate it weighs as unworn.
 - A pump can be worked with an opened role empty; nothing stops it yet.

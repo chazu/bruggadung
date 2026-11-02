@@ -6,8 +6,8 @@
 // domain's value is authoritative and commitment refuses to change this one.
 #WaterStore: {
     @component(WaterStore)
-    water:    volume                    @field(content, saved, proposable, inspect, perceive(sight))
-    waterCapacity: volume & >=0mL & <=10m3 @field(content, saved, inspect, perceive(sight))
+    water:         volume                    @field(content, saved, proposable, inspect, perceive(sight))
+    waterCapacity: volume & >=0mL & <=10m3   @field(content, saved, inspect, perceive(sight))
 }
 
 // An outlet on a water store: open, it delivers up to `rate` millilitres a
