@@ -24,6 +24,8 @@ typedef struct
 static BGPathNode   *nodes;
 static NSUInteger   nodecap;
 static int32_t      *table;           /* node + 1, or 0 */
+static uint32_t     *stamps;          /* the search a slot was filled in; else it is empty */
+static uint32_t     search;           /* this search's stamp */
 static NSUInteger   tablecap;         /* a power of two */
 typedef struct
 {
@@ -65,7 +67,7 @@ static int32_t   node_at( int32_t x, int32_t y)
 {
    NSUInteger   i;
 
-   for( i = slot( x, y); table[ i]; i = (i + 1) & (tablecap - 1))
+   for( i = slot( x, y); stamps[ i] == search; i = (i + 1) & (tablecap - 1))
       if( nodes[ table[ i] - 1].x == x && nodes[ table[ i] - 1].y == y)
          return( table[ i] - 1);
    return( -1);
@@ -76,9 +78,10 @@ static void   table_put( int32_t n)
 {
    NSUInteger   i;
 
-   for( i = slot( nodes[ n].x, nodes[ n].y); table[ i]; i = (i + 1) & (tablecap - 1))
+   for( i = slot( nodes[ n].x, nodes[ n].y); stamps[ i] == search; i = (i + 1) & (tablecap - 1))
       ;
-   table[ i] = n + 1;
+   table[ i]  = n + 1;
+   stamps[ i] = search;
 }
 
 
@@ -191,9 +194,17 @@ BGPathResult   BGPathFind( const BGPathQuery *q)
    {
       for( tablecap = tablecap ? tablecap : 64; tablecap < need * 2; tablecap *= 2)
          ;
-      table = realloc( table, tablecap * sizeof( int32_t));
+      table  = realloc( table, tablecap * sizeof( int32_t));
+      stamps = realloc( stamps, tablecap * sizeof( uint32_t));
+      memset( stamps, 0, tablecap * sizeof( uint32_t));
+      search = 0;
    }
-   memset( table, 0, tablecap * sizeof( int32_t));
+   /* a new stamp, not a cleared table: each search reads only what it fills */
+   if( ++search == 0)
+   {
+      memset( stamps, 0, tablecap * sizeof( uint32_t));
+      search = 1;
+   }
 
    nnodes = 0;
    nheap  = 0;

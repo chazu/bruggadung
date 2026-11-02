@@ -21,6 +21,7 @@ src/core/BGIndex.m
 src/core/BGPath.m
 src/core/BGStore.m
 src/core/BGTerrain.m
+src/core/BGWakes.m
 src/core/BGWorld.m
 src/domains/BGAtmosphere.m
 src/domains/BGBodies.m

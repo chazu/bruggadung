@@ -42,6 +42,7 @@
 
 @interface BGCommitter : NSObject
 {
+   BOOL               _untraced;       /* no trace kept: a large world's */
    BGWorld          *_world;
    NSMutableArray   *_submitted;
    NSMutableArray   *_deferred;
@@ -82,6 +83,9 @@
 - (void) restoreDeferred:(NSArray *) groups;
 
 /* One line per group, rejection, event, and deferral, for the developer. */
+/* Whether the trace is kept (by default it is): a line a group and an
+ * event, which a large world running long can do without. */
+- (void) setTracing:(BOOL) flag;
 - (NSArray *) trace;
 - (void) note:(NSString *) line;
 

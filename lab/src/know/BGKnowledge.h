@@ -589,6 +589,14 @@ typedef struct
    uint64_t         _perceptions;      /* an agent's perceiving, counted, for measuring */
    BGEntityID       *_touched;         /* what changed by this boundary, sorted */
    BOOL             _short;            /* the agent perceiving ran out of attention */
+   NSMutableDictionary *_blurred;      /* blur's answers, by kind, distance and features: content is fixed */
+   NSMutableDictionary *_features;     /* what each entity looks like, until it changes */
+   struct BGWakes   *_perceiveWakes;   /* each agent's next perception with nothing happening */
+   struct BGWakes   *_forgetWakes;     /* each agent's next forgetting */
+   BOOL             _woken;            /* the wakes built, from the stores */
+   int              _daylight;         /* the daylight at the last boundary */
+   BGEntityID       *_perceived;       /* the agents that perceived at this boundary, in order */
+   NSUInteger       _nperceived;
    NSUInteger       _ntouched;
    BOOL             _omniscient;
    int              _ambient;          /* the light where no lamp shines: 2 day, 1 dusk, 0 night */
@@ -602,6 +610,8 @@ typedef struct
 /* Whether the agent perceived at this boundary; whether an entity changed
  * by it (REALITY.md decision 7). */
 - (BOOL) perceivedNow:(BGEntityID) agent;
+/* The agents that perceived at this boundary, in entity order. */
+- (const BGEntityID *) agentsPerceivedNow:(NSUInteger *) n;
 - (BOOL) touchedNow:(BGEntityID) entity;
 /* How many times an agent has perceived a boundary, all told: for measuring. */
 - (uint64_t) perceptions;

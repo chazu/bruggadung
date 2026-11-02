@@ -4248,3 +4248,24 @@ Measured, wall time a world second: 20 agents 17 → 3 ms, 40 76 → 8 ms, 80
 394 → 25 ms. Next: a queue of wakes, and perception's own cost.
 
 109 tests, 3447 checks, under both compilers, UBSan, and leak-free.
+
+
+### After the slice: work when something happens, made to scale (REALITY.md step 1)
+
+- `BGWakes` (lab/src/core): a heap of when each thing is next due,
+  stale entries checked and let go as they come up. Perception (each
+  agent's next look, next forgetting), decision (each mind's next due:
+  wake, answer late, a commitment's window), activities (next stage or
+  checkpoint; the world tells them of every Activity change,
+  `setActivityObserver:`). Minds looked up are nudged: checked at the
+  next boundary, which comes at once; a restore nudges none.
+- Kept rather than read again: blur by its arguments; an entity's
+  appearance until it changes (a container changes with its contents);
+  `-[BGWorld creationOf:]`; `kindNamed:` by the name's address, checked.
+- `-[BGCommitter setTracing:]`; BGPath's table cleared by stamps.
+- `lab bench spread [agents] [seconds]` on `plain_map` (1024 x 1024).
+
+Wall time a world second: spread 100 → 9 ms, 400 → 39 ms, 1600 → 181 ms
+(linear in the agents); crowd 80 → 14 ms (394 ms before step 1).
+
+109 tests, 3447 checks, under both compilers, UBSan, and leak-free.

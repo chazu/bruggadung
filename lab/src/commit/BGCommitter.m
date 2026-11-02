@@ -178,7 +178,14 @@ static void   declare( BGTally *t, const char *unit, int64_t units, int64_t mass
 
 - (void) note:(NSString *) line
 {
-   [_trace addObject:line];
+   if( ! _untraced)
+      [_trace addObject:line];
+}
+
+
+- (void) setTracing:(BOOL) flag
+{
+   _untraced = ! flag;
 }
 
 
@@ -1249,7 +1256,7 @@ static void   air_before( BGWorld *world, BGLocation at, BGAirBefore *before)
    [group setApplied:YES
            rejection:nil
             position:_position];
-   for( i = first; i < [_world eventCount]; i++)
+   for( i = first; ! _untraced && i < [_world eventCount]; i++)
       [self note:[self describeEvent:[_world eventAt:i]]];
 }
 

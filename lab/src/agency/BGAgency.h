@@ -221,6 +221,10 @@ typedef struct
    NSMutableArray   *_former;          /* pairs: an agent let go, its log */
    BGMotivation     *_deciding;        /* whose decision this is, for its habits */
    uint64_t         _decisions;        /* a mind's deciding, counted, for measuring */
+   struct BGWakes   *_wakes;           /* each mind's next time due with nothing happening */
+   BGEntityID       *_nudged;          /* minds looked up since the last boundary: checked at it */
+   NSUInteger       _nnudged;
+   NSUInteger       _nudgedcap;
    BGSlotBinding    _unknown[ BG_MAX_SLOTS];   /* the last condition's first unknown match: its bindings */
    int              _nunknown;
    char             _residual[ 128];   /* and the first path left unknown */

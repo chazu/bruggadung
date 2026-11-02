@@ -2,6 +2,7 @@
 
 #import "BGActions.h"
 #import "BGPath.h"
+#import "BGWakes.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -367,6 +368,8 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
    [_minds release];
    [_notices release];
    [_former release];
+   BGWakesFree( _wakes);
+   free( _nudged);
    [super dealloc];
 }
 
@@ -396,6 +399,10 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
       else
          hi = i;
    }
+   /* looked up: something may have changed it; checked at the next boundary */
+   if( _nnudged == _nudgedcap)
+      _nudged = realloc( _nudged, (_nudgedcap = _nudgedcap ? _nudgedcap * 2 : 64) * sizeof( BGEntityID));
+   _nudged[ _nnudged++] = agent;
    if( lo < [_minds count] && (m = [_minds objectAtIndex:lo])->agent == agent)
       return( m);
    m            = [[BGMotivation new] autorelease];
@@ -3172,45 +3179,147 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
 }
 
 
-/* Whether a mind decides at this boundary (REALITY.md decision 7): it never
- * has; its agent perceived something; a wake it set is due, or the answer
- * it waits for is late; a commitment's window opened or closed since it
- * last decided. Nothing of these, it decides as it did. */
-- (BOOL) isDue:(BGMotivation *) m
+static int   cmp_agent_id( const void *a, const void *b)
 {
-   int64_t   now;
-   int64_t   since;
+   BGEntityID   x;
+   BGEntityID   y;
+
+   x = *(const BGEntityID *) a;
+   y = *(const BGEntityID *) b;
+   return( x < y ? -1 : x > y);
+}
+
+
+/* When a mind is next due with nothing happening (REALITY.md decision 7):
+ * a wake it set; the answer it waits for late; a commitment's window
+ * opening or closing since it last decided. INT64_MAX: not of itself. */
+static int64_t   due_of( BGMotivation *m)
+{
+   int64_t   at;
    int       k;
 
-   now   = [_world time].ms;
-   since = m->decidedAt;
-   if( since < 0 || [_knowledge perceivedNow:m->agent] || (m->wake && m->wake <= now) ||
-       (m->awaiting && m->awaitUntil <= now))
-      return( YES);
+   at = INT64_MAX;
+   if( m->decidedAt < 0)
+      return( 0);
+   if( m->wake && m->wake < at)
+      at = m->wake;
+   if( m->awaiting && m->awaitUntil < at)
+      at = m->awaitUntil;
    for( k = 0; k < m->ncommitments; k++)
-      if( (m->commitments[ k].from > since && m->commitments[ k].from <= now) ||
-          (m->commitments[ k].until > since && m->commitments[ k].until <= now))
-         return( YES);
-   return( NO);
+   {
+      if( m->commitments[ k].from > m->decidedAt && m->commitments[ k].from < at)
+         at = m->commitments[ k].from;
+      if( m->commitments[ k].until > m->decidedAt && m->commitments[ k].until < at)
+         at = m->commitments[ k].until;
+   }
+   return( at);
+}
+
+
+static int64_t   mind_due_now( void *context, BGEntityID agent)
+{
+   BGAgency       *self;
+   BGMotivation   *m;
+
+   self = context;
+   m    = [self existingMindOf:agent];
+   return( m ? due_of( m) : INT64_MAX);
+}
+
+
+/* The mind of an agent, if it has one; none is made, nothing nudged. */
+- (BGMotivation *) existingMindOf:(BGEntityID) agent
+{
+   BGMotivation   *m;
+   NSUInteger     lo;
+   NSUInteger     hi;
+   NSUInteger     i;
+
+   lo = 0;
+   hi = [_minds count];
+   while( lo < hi)
+   {
+      i = (lo + hi) / 2;
+      if( ((BGMotivation *) [_minds objectAtIndex:i])->agent < agent)
+         lo = i + 1;
+      else
+         hi = i;
+   }
+   if( lo < [_minds count] && (m = [_minds objectAtIndex:lo])->agent == agent)
+      return( m);
+   return( nil);
+}
+
+
+/* Whether a mind decides at this boundary: its agent perceived something,
+ * or it is due of itself. */
+- (BOOL) isDue:(BGMotivation *) m
+{
+   return( [_knowledge perceivedNow:m->agent] || due_of( m) <= [_world time].ms);
+}
+
+
+- (void) wakeMinds
+{
+   NSUInteger   i;
+
+   if( _wakes)
+      return;
+   _wakes = BGWakesNew();
+   for( i = 0; i < [_minds count]; i++)
+      BGWakesPush( _wakes, ((BGMotivation *) [_minds objectAtIndex:i])->agent,
+                   due_of( [_minds objectAtIndex:i]));
 }
 
 
 - (void) decideBoundary:(uint64_t) boundary
 {
-   BGMotivation   *m;
-   NSUInteger     i;
-   int          k;
+   BGMotivation       *m;
+   const BGEntityID   *perceived;
+   BGEntityID         *woken;
+   BGEntityID         *due;
+   NSUInteger         nperceived;
+   NSUInteger         nwoken;
+   NSUInteger         ndue;
+   NSUInteger         i;
+   int                k;
+
+   /* which minds: those whose agents perceived; those due of themselves;
+    * those looked up since the last boundary. Else they rest, unread */
+   [self wakeMinds];
+   perceived = [_knowledge agentsPerceivedNow:&nperceived];
+   woken     = BGWakesTake( _wakes, [_world time].ms, mind_due_now, self, &nwoken);
+   due       = malloc( (nperceived + nwoken + _nnudged + 1) * sizeof( BGEntityID));
+   ndue      = 0;
+   if( nperceived)
+      memcpy( due, perceived, nperceived * sizeof( BGEntityID));
+   ndue += nperceived;
+   memcpy( due + ndue, woken, nwoken * sizeof( BGEntityID));
+   ndue += nwoken;
+   if( _nnudged)
+      memcpy( due + ndue, _nudged, _nnudged * sizeof( BGEntityID));
+   ndue    += _nnudged;
+   _nnudged = 0;
+   free( woken);
+   qsort( due, ndue, sizeof( BGEntityID), cmp_agent_id);
 
    /* in stable ID order; each reads only its own stores and committed state */
-   for( i = 0; i < [_minds count]; i++)
+   for( i = 0; i < ndue; i++)
    {
-      m = [_minds objectAtIndex:i];
-      if( ! [self isDue:m])
+      if( (i && due[ i] == due[ i - 1]) || ! (m = [self existingMindOf:due[ i]]))
          continue;
-      for( k = 0; k < 2 * BG_MAX_INTENTIONS && ! [self decide:m]; k++)
-         ;
-      m->decidedAt = [_world time].ms;
+      if( [self isDue:m])
+      {
+         for( k = 0; k < 2 * BG_MAX_INTENTIONS && ! [self decide:m]; k++)
+            ;
+         m->decidedAt = [_world time].ms;
+      }
+      BGWakesPush( _wakes, m->agent, due_of( m));
    }
+   free( due);
+   /* minds looked up while deciding (another's deal, a promise made to it)
+    * stay nudged: checked at the next boundary */
+
    /* the player's: with nothing left to do, or handed back */
    for( i = 0; i < [_minds count]; i++)
    {
@@ -3226,32 +3335,17 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
 
 - (BGTime) nextDecisionTime
 {
-   BGMotivation   *m;
-   BGTime         t;
-   NSUInteger     i;
-   int            k;
+   int64_t   next;
 
-   t = BGTimeNever;
-   for( i = 0; i < [_minds count]; i++)
-   {
-      m = [_minds objectAtIndex:i];
-      if( m->awaiting && m->awaitUntil < t.ms)
-         t = BGTimeMake( m->awaitUntil);
-      if( m->wake > [_world time].ms && m->wake < t.ms)
-         t = BGTimeMake( m->wake);
-      /* a commitment's window opening, or closing */
-      for( k = 0; k < m->ncommitments; k++)
-      {
-         if( m->commitments[ k].from > [_world time].ms && m->commitments[ k].from < t.ms &&
-             ! m->commitments[ k].settled)
-            t = BGTimeMake( m->commitments[ k].from);
-         /* closing; a recurring one's, settled too: its next window opens then */
-         if( m->commitments[ k].until > [_world time].ms && m->commitments[ k].until < t.ms &&
-             (! m->commitments[ k].settled || m->commitments[ k].every))
-            t = BGTimeMake( m->commitments[ k].until);
-      }
-   }
-   return( t);
+   [self wakeMinds];
+   next = BGWakesNext( _wakes, mind_due_now, self);
+   /* a mind looked up since: checked at the next boundary, which comes now */
+   if( _nnudged && [_world time].ms < next)
+      next = [_world time].ms;
+   /* due already, a mind is decided at the next boundary: none sooner */
+   if( next != INT64_MAX && next <= [_world time].ms)
+      next = [_world time].ms + 1;
+   return( next == INT64_MAX ? BGTimeNever : BGTimeMake( next));
 }
 
 
@@ -3492,6 +3586,11 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
          t->nparams = p;
       }
    }
+   /* restored, not looked up: nothing is nudged, and the wakes are built
+    * again from the minds when wanted */
+   _nnudged = 0;
+   BGWakesFree( _wakes);
+   _wakes = NULL;
 }
 
 @end

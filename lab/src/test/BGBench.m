@@ -21,6 +21,13 @@ static double   ms_of( uint64_t ns)
 
 int   BGBenchCrowd( int agents, int64_t seconds)
 {
+   return( BGBenchCrowdSpread( agents, seconds, NO));
+}
+
+
+int   BGBenchCrowdSpread( int agents, int64_t seconds, BOOL spread)
+{
+   int32_t            side;
    BGWorld            *w;
    BGCommitter        *c;
    BGScheduler        *s;
@@ -40,12 +47,17 @@ int   BGBenchCrowd( int agents, int64_t seconds)
    int                i;
 
    w = BGTestWorld( 211);
-   if( ! [w setTerrainMap:"yard_map" error:NULL])
+   if( ! [w setTerrainMap:spread ? "plain_map" : "yard_map" error:NULL])
    {
-      fprintf( stderr, "bench: no yard_map\n");
+      fprintf( stderr, "bench: no map\n");
       return( 1);
    }
+   /* spread: as many to a stretch of plain however many there are, ten
+    * tiles apart on a square; else all on the yard */
+   for( side = 1; side * side < agents; side++)
+      ;
    c          = BGTestCommitter( w);
+   [c setTracing:NO];                  /* a large world's: no trace kept */
    activities = [BGActivities activitiesWithWorld:w committer:c];
    knowledge  = [[[BGKnowledge alloc] initWithWorld:w] autorelease];
    agency     = [[[BGAgency alloc] initWithWorld:w committer:c knowledge:knowledge] autorelease];
@@ -59,7 +71,8 @@ int   BGBenchCrowd( int agents, int64_t seconds)
    for( i = 0; i < agents; i++)
       ids[ i] = [g create:"worker"
                       key:[[NSString stringWithFormat:@"worker %d", i] UTF8String]
-                       at:BGOnTile( (i * 37) % 96, (i * 23) % 64, 0)];
+                       at:spread ? BGOnTile( 20 + (i % side) * 10, 20 + (i / side) * 10, 0)
+                                 : BGOnTile( (i * 37) % 96, (i * 23) % 64, 0)];
    [c submit:g];
    [s runUntil:BGTimeMake( 1)];
    for( i = 0; i < agents; i++)
@@ -91,7 +104,8 @@ int   BGBenchCrowd( int agents, int64_t seconds)
    st.commitNs     -= st0.commitNs;
    st.perceptionNs -= st0.perceptionNs;
    st.decisionNs   -= st0.decisionNs;
-   printf( "crowd: %d agents (%d exploring), %lld s of world time\n", agents, (agents + 1) / 2, (long long) seconds);
+   printf( "crowd%s: %d agents (%d exploring), %lld s of world time\n", spread ? " spread" : "", agents, (agents + 1) / 2,
+           (long long) seconds);
    printf( "  wall          %10.1f ms  (%.1f ms a world second)\n", wall, wall / (double) seconds);
    printf( "  boundaries    %10llu     (%.1f a world second)\n", (unsigned long long) st.boundaries,
            (double) st.boundaries / (double) seconds);

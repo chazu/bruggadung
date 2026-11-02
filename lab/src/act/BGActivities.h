@@ -27,11 +27,27 @@
 #import "BGScheduler.h"
 
 
-@interface BGActivities : NSObject <BGActivityClock, BGRoundListener>
+/* An activity's next time due: a stage ending, or a checkpoint. */
+typedef struct
 {
-   BGWorld          *_world;
-   BGCommitter      *_committer;       /* not retained: the committer retains us */
-   NSMutableArray   *_completions;     /* pairs: the group, the activity */
+   int64_t      at;
+   BGEntityID   activity;
+} BGActivityTimer;
+
+
+@interface BGActivities : NSObject <BGActivityClock, BGRoundListener, BGRecordObserver>
+{
+   BGWorld           *_world;
+   BGCommitter       *_committer;       /* not retained: the committer retains us */
+   NSMutableArray    *_completions;     /* pairs: the group, the activity */
+   /* when each running activity is next due, a heap, earliest first; an
+    * entry may be stale, and is checked against the record when it comes
+    * up. Built from the store when first wanted, kept by the world's word
+    * of every change: not saved */
+   BGActivityTimer   *_timers;
+   NSUInteger        _ntimers;
+   NSUInteger        _timercap;
+   BOOL              _timed;
 }
 
 /* Creates the activity system and registers it with the committer. */

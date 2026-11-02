@@ -310,6 +310,7 @@ static NSUInteger   stocks_wet( struct BGTileStocks *s, int32_t (*out)[ 3], NSUI
    _activitiesOf   = BGIndexNew();
    _watching       = BGIndexNew();
    _touching       = BGIndexNew();
+   _creations      = BGIndexNew();
    _arena      = tri_arena_new();
    _tilesWide  = 32;
    _tilesHigh  = 32;
@@ -354,6 +355,7 @@ static NSUInteger   stocks_wet( struct BGTileStocks *s, int32_t (*out)[ 3], NSUI
    BGIndexFree( _activitiesOf);
    BGIndexFree( _watching);
    BGIndexFree( _touching);
+   BGIndexFree( _creations);
    free( _checkedOut);
    tri_arena_free( _arena);
    [_content release];
@@ -651,11 +653,22 @@ static int   cmp_id( const void *a, const void *b)
 
 - (NSUInteger) kindNamed:(const char *) name
 {
+   NSUInteger   slot;
    NSUInteger   k;
 
+   /* most names asked are literals, the same address each time: kept by
+    * it, and checked, as a buffer may hold another name at that address */
+   slot = ((uintptr_t) name >> 3) & 63;
+   if( _kindCache[ slot].name == name && _kindCache[ slot].kind < _nkinds &&
+       ! strcmp( BGComponents[ _kindCache[ slot].kind].name, name))
+      return( _kindCache[ slot].kind);
    for( k = 0; k < _nkinds; k++)
       if( ! strcmp( BGComponents[ k].name, name))
+      {
+         _kindCache[ slot].name = name;
+         _kindCache[ slot].kind = k;
          return( k);
+      }
    return( NSNotFound);
 }
 
@@ -779,6 +792,8 @@ static void   file_record( BGWorld *self, NSUInteger kind, BGEntityID entity, BO
 {
    if( add)
       touch( self, entity);
+   if( add && kind == self->_kindActivity && self->_activityObserver)
+      [self->_activityObserver world:self changedRecord:entity kind:kind];
    if( kind == self->_kindTrace)
       file_trace( self, entity, [self->_kinds[ kind] recordFor:entity], add);
    else if( kind == self->_kindActivity)
@@ -1263,6 +1278,11 @@ static void   file_location( BGWorld *self, BGEntityID entity, const BGLocation 
    journal_record( self, _locations, BGKindLocations, entity);
    file_location( self, entity, [_locations recordFor:entity], NO);
    vacate( self, [_locations recordFor:entity]);
+   /* what held it, and what holds it now, have changed too: their contents */
+   if( [_locations recordFor:entity] && ((BGLocation *) [_locations recordFor:entity])->form != BGLocationOnTile)
+      touch( self, ((BGLocation *) [_locations recordFor:entity])->place);
+   if( location.form != BGLocationOnTile && location.form != BGLocationNone)
+      touch( self, location.place);
    if( location.form == BGLocationNone)
       [_locations removeRecordFor:entity];
    else
@@ -1270,6 +1290,18 @@ static void   file_location( BGWorld *self, BGEntityID entity, const BGLocation 
                         for:entity];
    file_location( self, entity, [_locations recordFor:entity], YES);
    touch( self, entity);
+}
+
+
+- (void) setActivityObserver:(id <BGRecordObserver>) observer
+{
+   _activityObserver = observer;
+}
+
+
+- (id <BGRecordObserver>) activityObserver
+{
+   return( _activityObserver);
 }
 
 
@@ -2147,7 +2179,36 @@ static void   edge_remove_raw( BGWorld *self, BGEdge e)
    event.index        = _nevents + 1;
    _events[ _nevents] = event;
    _nevents++;
+   if( event.subject && event.kind && ! strcmp( event.kind, "created"))
+      BGIndexAdd( _creations, event.subject, (BGEntityID) event.index);
    return( event.index);
+}
+
+
+- (uint64_t) creationOf:(BGEntityID) entity
+{
+   const BGEntityID   *known;
+   const BGEvent      *ev;
+   NSUInteger         n;
+   NSUInteger         i;
+
+   /* the latest noted that is still so (a group rolled back takes its
+    * events with it, and later ones take their places) */
+   known = BGIndexGet( _creations, entity, &n);
+   for( i = n; i-- > 0;)
+   {
+      ev = [self eventAt:(NSUInteger) known[ i] - 1];
+      if( ev && ev->subject == entity && ! strcmp( ev->kind, "created"))
+         return( ev->index);
+   }
+   /* not noted (a save restored): read the history, once, and note it */
+   for( i = _nevents; i-- > 0;)
+      if( _events[ i].subject == entity && ! strcmp( _events[ i].kind, "created"))
+      {
+         BGIndexAdd( _creations, entity, (BGEntityID) _events[ i].index);
+         return( _events[ i].index);
+      }
+   return( 0);
 }
 
 

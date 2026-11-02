@@ -69,6 +69,14 @@ typedef struct
 extern const char   *BGEdgeKindNames[ BGEdgeKindCount];
 
 
+/* Told when a record of a kind it watches is set or removed. */
+@protocol BGRecordObserver
+- (void) world:(id) world
+ changedRecord:(BGEntityID) entity
+          kind:(NSUInteger) kind;
+@end
+
+
 /* A way a region of air opens: a doorway at its room's side, the region
  * beyond (none: the outdoors), the door standing in it, if any, and the air
  * it passes now, mmol a second each way: the door's width while it is ajar,
@@ -137,12 +145,15 @@ typedef struct
    struct BGIndex *_activitiesOf;    /* activities, by actor */
    struct BGIndex *_watching;        /* activities with a watch, under one key */
    struct BGIndex *_touching;        /* activities, by actor, item and destination */
+   struct BGIndex *_creations;       /* the "created" events' indices, by what they created */
+   id <BGRecordObserver> _activityObserver;   /* not retained */
    BGEntityID     *_touched;         /* entities changed since the mark, unsorted, maybe twice */
    BGLocation     *_vacated;         /* ground tiles left since the mark */
    NSUInteger     _nvacated;
    NSUInteger     _vacatedcap;
    NSUInteger     _ntouched;
    NSUInteger     _touchedcap;
+   struct { const char *name; NSUInteger kind; } _kindCache[ 64];   /* kindNamed's, by the name's address */
    NSUInteger     _kindTrace;
    NSUInteger     _kindGas;
    NSUInteger     _kindActivity;
@@ -281,6 +292,10 @@ typedef struct
 - (NSUInteger) watchingActivities:(BGEntityID *) out
                               max:(NSUInteger) max;
 - (BGEntityID *) copyWatchingActivities:(NSUInteger *) n;
+/* One observer of the Activity records, told of every change (activities'
+ * timers); not retained, so it unsets itself as it goes. */
+- (void) setActivityObserver:(id <BGRecordObserver>) observer;
+- (id <BGRecordObserver>) activityObserver;
 /* The entities whose records or location changed since the last call, in
  * entity order, each once (REALITY.md decision 7: work when something
  * happens): malloc'd, *n of them; the record starts again. */
@@ -415,6 +430,9 @@ typedef struct
 /* Appends the event, giving it the next index, which it returns. */
 - (uint64_t) emit:(BGEvent) event;
 - (NSUInteger) eventCount;
+/* The index of the event that created an entity, or 0: found without
+ * reading the history. */
+- (uint64_t) creationOf:(BGEntityID) entity;
 - (const BGEvent *) eventAt:(NSUInteger) i;
 
 /* --- groups --------------------------------------------------------------- */

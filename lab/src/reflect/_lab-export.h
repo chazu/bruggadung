@@ -24,6 +24,7 @@
 #import "BGStore.h"
 #import "BGTerrain.h"
 #import "BGTypes.h"
+#import "BGWakes.h"
 #import "BGWorld.h"
 #import "BGAtmosphere.h"
 #import "BGBodies.h"

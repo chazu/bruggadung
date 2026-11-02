@@ -17,12 +17,16 @@
    activities->_committer   = committer;
    activities->_completions = [NSMutableArray new];
    [committer addListener:activities];
+   [world setActivityObserver:activities];
    return( activities);
 }
 
 
 - (void) dealloc
 {
+   if( [_world activityObserver] == self)
+      [_world setActivityObserver:nil];
+   free( _timers);
    [_world release];
    [_completions release];
    [super dealloc];
@@ -118,29 +122,6 @@ static int64_t   next_checkpoint( BGWorld *world, BGEntityID a, const BGActivity
 
 
 /* --- the clock ----------------------------------------------------------------- */
-
-- (BGTime) nextCompletion
-{
-   const BGActivity   *record;
-   BGStore            *store;
-   BGTime             next;
-   NSUInteger         i;
-
-   store = [_world storeForKind:[_world kindNamed:"Activity"]];
-   next  = BGTimeNever;
-   for( i = 0; i < [store count]; i++)
-   {
-      record = [store recordAtIndex:i];
-      if( record->due > 0 && running( _world, [store entityAtIndex:i], record) && record->due < next.ms)
-         next = BGTimeMake( record->due);
-      /* a checkpoint is a step boundary too */
-      if( running( _world, [store entityAtIndex:i], record) &&
-          next_checkpoint( _world, [store entityAtIndex:i], record, [_world time].ms) < next.ms)
-         next = BGTimeMake( next_checkpoint( _world, [store entityAtIndex:i], record, [_world time].ms));
-   }
-   return( next);
-}
-
 
 static BOOL   has_ended( const BGActivity *record)
 {
@@ -253,26 +234,161 @@ static int   cmp_actor( const void *a, const void *b)
 }
 
 
+/* --- the timers ------------------------------------------------------------- */
+
+/* When a running activity is next due, as of `t`: its stage's end, or a
+ * checkpoint before; never, not running. */
+- (int64_t) dueOf:(BGEntityID) a
+            after:(int64_t) t
+{
+   const BGActivity   *record;
+   int64_t            at;
+   int64_t            check;
+
+   record = [_world record:[_world kindNamed:"Activity"] for:a];
+   if( ! running( _world, a, record))
+      return( BGTimeNever.ms);
+   at    = record->due > 0 ? record->due : BGTimeNever.ms;
+   check = next_checkpoint( _world, a, record, t);
+   return( check < at ? check : at);
+}
+
+
+static BOOL   timer_before( const BGActivityTimer *x, const BGActivityTimer *y)
+{
+   return( x->at < y->at || (x->at == y->at && x->activity < y->activity));
+}
+
+
+- (void) push:(BGEntityID) a
+           at:(int64_t) at
+{
+   BGActivityTimer   t;
+   NSUInteger        i;
+
+   if( at == BGTimeNever.ms)
+      return;
+   if( _ntimers == _timercap)
+   {
+      _timercap = _timercap ? _timercap * 2 : 64;
+      _timers   = realloc( _timers, _timercap * sizeof( BGActivityTimer));
+   }
+   _timers[ _ntimers].at       = at;
+   _timers[ _ntimers].activity = a;
+   for( i = _ntimers++; i && timer_before( &_timers[ i], &_timers[ (i - 1) / 2]); i = (i - 1) / 2)
+   {
+      t                    = _timers[ i];
+      _timers[ i]          = _timers[ (i - 1) / 2];
+      _timers[ (i - 1) / 2] = t;
+   }
+}
+
+
+- (BGActivityTimer) pop
+{
+   BGActivityTimer   top;
+   BGActivityTimer   t;
+   NSUInteger        i;
+   NSUInteger        c;
+
+   top         = _timers[ 0];
+   _timers[ 0] = _timers[ --_ntimers];
+   for( i = 0;; i = c)
+   {
+      c = 2 * i + 1;
+      if( c >= _ntimers)
+         break;
+      if( c + 1 < _ntimers && timer_before( &_timers[ c + 1], &_timers[ c]))
+         c++;
+      if( ! timer_before( &_timers[ c], &_timers[ i]))
+         break;
+      t           = _timers[ i];
+      _timers[ i] = _timers[ c];
+      _timers[ c] = t;
+   }
+   return( top);
+}
+
+
+/* The timers, from the store, the first time they are wanted. */
+- (void) time
+{
+   BGStore      *store;
+   NSUInteger   i;
+
+   if( _timed)
+      return;
+   _timed = YES;
+   store  = [_world storeForKind:[_world kindNamed:"Activity"]];
+   for( i = 0; i < [store count]; i++)
+      [self push:[store entityAtIndex:i]
+              at:[self dueOf:[store entityAtIndex:i] after:[_world time].ms]];
+}
+
+
+/* The world's word: an activity changed, so when it is due may have. */
+- (void) world:(id) world
+ changedRecord:(BGEntityID) entity
+          kind:(NSUInteger) kind
+{
+   if( _timed)
+      [self push:entity
+              at:[self dueOf:entity after:[_world time].ms]];
+}
+
+
+/* The earliest timer that is still so: a stale one (the activity ended, or
+ * due another time now) let go, its due time pushed again. */
+- (BGTime) nextCompletion
+{
+   BGActivityTimer   top;
+   int64_t           at;
+
+   [self time];
+   while( _ntimers)
+   {
+      top = _timers[ 0];
+      at  = [self dueOf:top.activity after:[_world time].ms];
+      if( at == top.at)
+         return( BGTimeMake( at));
+      [self pop];
+      [self push:top.activity at:at];      /* again, if it is due at all */
+   }
+   return( BGTimeNever);
+}
+
+
 - (void) completeDueAt:(BGTime) t
 {
    const BGActivity   *record;
    BGProposalGroup    *group;
-   BGStore            *store;
+   BGEntityID         *due;
    BGEntityID         a;
    NSString           *reason;
    NSString           *effect;
    const char         *operation;
+   NSUInteger         ndue;
    NSUInteger         i;
    int64_t            duration;
    int64_t            rate;
    BOOL               more;
 
-   store = [_world storeForKind:[_world kindNamed:"Activity"]];
-   for( i = 0; i < [store count]; i++)
+   /* what is due by now, from the timers, in entity order; each pushed
+    * again for its next */
+   [self time];
+   due  = malloc( (_ntimers + 1) * sizeof( BGEntityID));
+   ndue = 0;
+   while( _ntimers && _timers[ 0].at <= t.ms)
+      due[ ndue++] = [self pop].activity;
+   qsort( due, ndue, sizeof( BGEntityID), cmp_actor);
+   for( i = 0; i < ndue; i++)
    {
-      record = [store recordAtIndex:i];
-      a      = [store entityAtIndex:i];
-      if( ! record->due || ! running( _world, a, record))
+      if( i && due[ i] == due[ i - 1])
+         continue;
+      a      = due[ i];
+      record = [_world record:[_world kindNamed:"Activity"] for:a];
+      [self push:a at:[self dueOf:a after:t.ms]];
+      if( ! record || ! record->due || ! running( _world, a, record))
          continue;
       /* a checkpoint: the stage's progress shows */
       if( record->due > t.ms)
@@ -349,22 +465,14 @@ static int   cmp_actor( const void *a, const void *b)
       [_completions addObject:group];
       [_completions addObject:[NSNumber numberWithUnsignedLongLong:a]];
    }
+   free( due);
 }
 
 
 /* The event that created the activity: what its completion follows from. */
 - (uint64_t) startOf:(BGEntityID) a
 {
-   const BGEvent   *ev;
-   NSUInteger      i;
-
-   for( i = [_world eventCount]; i-- > 0;)
-   {
-      ev = [_world eventAt:i];
-      if( ev->subject == a && ! strcmp( ev->kind, "created"))
-         return( ev->index);
-   }
-   return( 0);
+   return( [_world creationOf:a]);
 }
 
 

@@ -73,3 +73,13 @@ yard_map: #Map & {
     width:  96
     height: 64
 }
+
+// A plain of open ground 1024 by 1024, drawn as one tile and filled: for
+// measuring a crowd spread wide (lab bench crowd).
+plain_map: #Map & {
+    legend: [{ glyph: ",", terrain: "open_floor" }]
+    levels: [{ z: 0, rows: _ @embed(file="maps/plain.0.map", type=text) }]
+    fill:   "open_floor"
+    width:  1024
+    height: 1024
+}

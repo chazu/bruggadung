@@ -8,9 +8,10 @@ makes a boundary at which every agent perceives and every mind decides: the
 cost of a simulated second grows with the square of the agents. That is fine
 for a workshop and fatal for a large roguelike or simulation.
 
-This document is a draft. Step 1 is begun: perception and decision are
-done when something happens (lab/src/know/BGKnowledge, lab/src/agency/
-BGAgency), measured by `lab bench crowd`.
+This document is a draft. Step 1 is built: perception and decision are
+done when something happens, and what falls due comes from queues of wakes
+(lab/src/know/BGKnowledge, lab/src/agency/BGAgency, lab/src/core/BGWakes),
+measured by `lab bench crowd` and `lab bench spread`.
 
 The aim is a world simulated exactly where it matters, and less exactly, by
 degrees, further away, with the degrees, their reach, and what each thing
@@ -134,7 +135,7 @@ full.
    Measured: boundaries and agents worked per simulated second, before and
    after, on a crowd.
 
-   **Begun.** The world notes what changes each boundary (records and
+   **Built.** The world notes what changes each boundary (records and
    locations: `takeTouched:`) and what was left (`takeVacated:`). An agent
    perceives when it, or what it takes part in, changed; when something
    changed, an event was, or something left, within its sight (a sound
@@ -159,20 +160,44 @@ full.
    | 80 | 394 ms | 25 ms |
    | 160 | | 103 ms |
 
-   Perceptions fell from one per agent per boundary to two or three per
-   boundary. Still to do, for a cost that grows with what happens and not
-   with the agents:
-   - **A queue of wakes.** Finding the next boundary, and what falls due
-     at it (an activity's stage, a mind's wake, a store's forgetting), still
-     reads every agent, activity and store each boundary; boundaries
-     themselves grow with the agents. One ordered queue of wakes, every
-     system's, read from the front.
-   - **Perception's own cost.** An agent's every perception reads all its
-     referents (absence, forgetting, interpretation), and an agent
-     remembers everyone it has seen; describing what it sees (appearance,
-     through Triangle) is most of the rest. Referents by believed place,
-     forgetting that lets go, and descriptions kept while nothing about
-     what is described changes.
+   **Then made to scale with what happens** (a second pass):
+   - **Queues of wakes** (`BGWakes`, lab/src/core): a heap of when each
+     thing is next due, checked against what is so when it comes up. Each
+     agent's next perception and next forgetting, each mind's next
+     decision, each activity's next stage or checkpoint: a boundary reads
+     what falls due at it, and finding the next boundary reads the front of
+     each queue. A mind looked up (another's deal with it, the player's
+     word) is checked at the next boundary, which comes at once.
+   - **What is read again and again, kept**: blurring an appearance by
+     distance (a pure function of content, kept by its arguments); what an
+     entity looks like (until it changes: a thing's contents changing
+     counts as it changing); the event that created an entity (noted, not
+     looked for in the history); a component kind by name.
+   - **The committer's trace** is optional (`setTracing:`), a line a group
+     and an event that a large world running long can do without.
+
+   Measured again, wall time a world second. `crowd` crowds the yard
+   (agents denser as there are more); `spread` keeps them ten tiles apart
+   on a 1024 by 1024 plain, so each has as many near it however many
+   there are:
+
+   | agents | crowd | spread |
+   | --- | --- | --- |
+   | 20 | 2.1 ms | |
+   | 40 | 4.8 ms | |
+   | 80 | 13.7 ms | |
+   | 100 | | 9.1 ms |
+   | 400 | | 39 ms |
+   | 1600 | | 181 ms |
+
+   Spread, the cost grows with the agents: 1,600 at full detail, half of
+   them exploring, run five times faster than real time on one thread.
+   What is left is the work itself: perceiving (Triangle, describing and
+   matching what is seen), deciding (weighing goals; an explorer searching
+   for the nearest tile unseen at every step, which a far frontier makes
+   dear), and committing what they do. Fewer agents at full detail (the
+   levels below) and threads (decision 8) are the next gains.
+
 2. **Anchors, levels and leases** (decisions 2, 3, 5, 10, 12). The
    content (`#Reality`: per kind of anchor and level, the reach across and
    up and down; the cadences; what counts as contact, and its lease),

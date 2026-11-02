@@ -1,4 +1,5 @@
 #import "BGKnowledge.h"
+#import "BGWakes.h"
 
 #import "BGView.h"
 #import "BGTraces.h"
@@ -1738,6 +1739,11 @@ static NSString   *known_features( const BGReferent *r)
    [_world release];
    [_stores release];
    free( _touched);
+   [_blurred release];
+   [_features release];
+   free( _perceived);
+   BGWakesFree( _perceiveWakes);
+   BGWakesFree( _forgetWakes);
    [_light release];
    free( _ancestry);
    [super dealloc];
@@ -2068,12 +2074,26 @@ static BOOL   line_clear( const BGTerrain *t, int32_t x0, int32_t y0, int32_t x1
    char              name[ 64];
    char              printed[ 256];
 
+   NSString          *key;
+   NSString          *known;
+   BOOL              didBlur;
+
    tri    = [_world tri];
    family = tri_family_index( tri, "acuity");
    if( distance <= 1 || ! family || ! tri_index_count( family))
       return( features);
-   arena = tri_arena_new();
-   node  = tri_value( tri, [[NSString stringWithFormat:@"%s & { %@ }", kind, features] UTF8String], arena, NULL, 0);
+   /* the same features of the same kind, from as far, blur the same: kept,
+    * so a crowd seen again and again is described once (a cache, bounded) */
+   key = [NSString stringWithFormat:@"%s|%d|%@", kind, distance, features];
+   if( (known = [_blurred objectForKey:key]))
+   {
+      if( [known hasPrefix:@"1"])
+         *blurred = YES;
+      return( [known substringFromIndex:1]);
+   }
+   didBlur = NO;
+   arena   = tri_arena_new();
+   node    = tri_value( tri, [[NSString stringWithFormat:@"%s & { %@ }", kind, features] UTF8String], arena, NULL, 0);
    pairs = BGSplitTopLevel( features);
    out   = [NSMutableString string];
    for( k = 0; k < [pairs count]; k++)
@@ -2094,11 +2114,18 @@ static BOOL   line_clear( const BGTerrain *t, int32_t x0, int32_t y0, int32_t x1
             tri_print( tri, tri_at( tri, wide, name + 1), printed, sizeof( printed));
             pair     = [NSString stringWithFormat:@"%s: %s", name + 1, printed];
             *blurred = YES;
+            didBlur  = YES;
          }
       }
       [out appendFormat:@"%@%@", [out length] ? @", " : @"", pair];
    }
    tri_arena_free( arena);
+   if( ! _blurred || [_blurred count] > 65536)
+   {
+      [_blurred release];
+      _blurred = [NSMutableDictionary new];
+   }
+   [_blurred setObject:[NSString stringWithFormat:@"%d%@", didBlur ? 1 : 0, out] forKey:key];
    return( out);
 }
 
@@ -4021,7 +4048,7 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
          if( assigned[ i])
             continue;
          kind     = [view kindOf:seen[ i].entity];
-         features = [view featuresOf:seen[ i].entity all:_omniscient];
+         features = [self featuresOf:seen[ i].entity view:view];
          at       = [_world locationOf:seen[ i].entity];
          ground_tile( _world, seen[ i].entity, &tile);
          /* by the light: at dusk, beyond arm's reach, a step less precisely;
@@ -4759,35 +4786,109 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
 }
 
 
-- (BGTime) nextForgetting
+/* A store's next forgetting, worked out again once it has passed. */
+- (int64_t) forgetByOf:(BGKnowledgeStore *) store
+{
+   NSUInteger   j;
+   int64_t      now;
+   int64_t      when;
+
+   now = [_world time].ms;
+   if( store->_forgetBy == -2 || (store->_forgetBy != INT64_MAX && store->_forgetBy <= now))
+   {
+      store->_forgetBy = INT64_MAX;
+      for( j = 0; j < [store count]; j++)
+      {
+         when = [store forgettingOf:[store referentAt:j]->id];
+         if( when > now && when < store->_forgetBy)
+            store->_forgetBy = when;
+      }
+   }
+   return( store->_forgetBy);
+}
+
+
+/* The store of an agent, if it has one; none is made. */
+- (BGKnowledgeStore *) existingStoreOf:(BGEntityID) agent
 {
    BGKnowledgeStore   *store;
+   NSUInteger         lo;
+   NSUInteger         hi;
    NSUInteger         i;
-   NSUInteger         j;
-   int64_t            now;
-   int64_t            when;
-   int64_t            next;
 
-   now  = [_world time].ms;
-   next = INT64_MAX;
-   for( i = 0; i < [_stores count]; i++)
+   lo = 0;
+   hi = [_stores count];
+   while( lo < hi)
    {
-      /* each store's, kept from when it last perceived: only perceiving
-       * changes what it would forget */
-      store = [_stores objectAtIndex:i];
-      if( store->_forgetBy == -2 || (store->_forgetBy != INT64_MAX && store->_forgetBy <= now))
-      {
-         store->_forgetBy = INT64_MAX;
-         for( j = 0; j < [store count]; j++)
-         {
-            when = [store forgettingOf:[store referentAt:j]->id];
-            if( when > now && when < store->_forgetBy)
-               store->_forgetBy = when;
-         }
-      }
-      if( store->_forgetBy < next)
-         next = store->_forgetBy;
+      i = (lo + hi) / 2;
+      if( ((BGKnowledgeStore *) [_stores objectAtIndex:i])->_agent < agent)
+         lo = i + 1;
+      else
+         hi = i;
    }
+   if( lo < [_stores count] && (store = [_stores objectAtIndex:lo])->_agent == agent)
+      return( store);
+   return( nil);
+}
+
+
+static int64_t   forget_by_now( void *context, BGEntityID agent)
+{
+   BGKnowledge        *self;
+   BGKnowledgeStore   *store;
+
+   self  = context;
+   store = [self existingStoreOf:agent];
+   return( store ? [self forgetByOf:store] : INT64_MAX);
+}
+
+
+static int64_t   perceive_by_now( void *context, BGEntityID agent)
+{
+   BGKnowledge        *self;
+   BGKnowledgeStore   *store;
+
+   self  = context;
+   store = [self existingStoreOf:agent];
+   return( store && [self->_world record:[self->_world kindNamed:"Agent"] for:agent] ? store->_perceiveBy : INT64_MAX);
+}
+
+
+/* The wakes, from the stores, when first wanted (a knowledge new, or
+ * restored): an agent that hasn't perceived, or perceived in another
+ * light, is due now. */
+- (void) wake
+{
+   BGKnowledgeStore   *store;
+   BGStore            *agents;
+   NSUInteger         i;
+   int                daylight;
+
+   if( _woken)
+      return;
+   _woken         = YES;
+   _perceiveWakes = BGWakesNew();
+   _forgetWakes   = BGWakesNew();
+   daylight       = BGDaylight( _world, [_world time].ms);
+   _daylight      = daylight;
+   agents         = [_world storeForKind:[_world kindNamed:"Agent"]];
+   for( i = 0; i < [agents count]; i++)
+   {
+      store = [self storeOf:[agents entityAtIndex:i]];
+      if( store->_perceivedAt < 0 || store->_daylightSeen != daylight)
+         store->_perceiveBy = [_world time].ms;
+      BGWakesPush( _perceiveWakes, store->_agent, store->_perceiveBy);
+      BGWakesPush( _forgetWakes, store->_agent, [self forgetByOf:store]);
+   }
+}
+
+
+- (BGTime) nextForgetting
+{
+   int64_t      next;
+
+   [self wake];
+   next = BGWakesNext( _forgetWakes, forget_by_now, self);
    return( next == INT64_MAX ? BGTimeNever : BGTimeMake( next));
 }
 
@@ -5033,10 +5134,13 @@ static int   cmp_entity_id( const void *a, const void *b)
    BGKnowledgeStore   *store;
    BGStore            *agents;
    BGEntityID         *concerned;
+   BGEntityID         *woken;
+   BGEntityID         *due;
    BGEntityID         agent;
    NSUInteger         nconcerned;
+   NSUInteger         nwoken;
+   NSUInteger         ndue;
    NSUInteger         i;
-   NSUInteger         k;
    NSUInteger         last;
    int64_t            now;
    int                daylight;
@@ -5051,26 +5155,51 @@ static int   cmp_entity_id( const void *a, const void *b)
    }
    free( _touched);
    _touched   = [_world takeTouched:&_ntouched];
+   /* what changed looks as it may not have */
+   for( i = 0; _features && i < _ntouched; i++)
+   {
+      [_features removeObjectForKey:[NSNumber numberWithUnsignedLongLong:_touched[ i] * 2]];
+      [_features removeObjectForKey:[NSNumber numberWithUnsignedLongLong:_touched[ i] * 2 + 1]];
+   }
    concerned  = [self concernedFrom:_eventsSeen to:last count:&nconcerned];
    now        = [_world time].ms;
    daylight   = BGDaylight( _world, now);
    agents     = [_world storeForKind:[_world kindNamed:"Agent"]];
-   /* in stable ID order; each depends only on the world and its own store.
-    * An agent perceives when something concerns it, when it hasn't yet,
-    * when a trace it knows fades, or the daylight turns; else it rests */
-   for( k = 0, i = 0; i < [agents count]; i++)
+
+   /* who perceives (REALITY.md decision 7): those concerned; those whose
+    * wake falls due; those new to it; and everyone, as the daylight turns,
+    * or to an omniscient eye. Else they rest, and no one reads them */
+   [self wake];
+   woken  = BGWakesTake( _perceiveWakes, now, perceive_by_now, self, &nwoken);
+   if( _omniscient || daylight != _daylight)
    {
-      agent = [agents entityAtIndex:i];
-      while( k < nconcerned && concerned[ k] < agent)
-         k++;
-      store = [self storeOf:agent];
-      if( ! _omniscient && ! (k < nconcerned && concerned[ k] == agent) && store->_perceivedAt >= 0 &&
-          store->_perceiveBy > now && store->_daylightSeen == daylight)
-      {
-         if( _compactAlways)
-            [store compact:YES];       /* a test's: compaction changes nothing, at every boundary */
+      ndue = [agents count];
+      due  = malloc( (ndue + 1) * sizeof( BGEntityID));
+      for( i = 0; i < ndue; i++)
+         due[ i] = [agents entityAtIndex:i];
+   }
+   else
+   {
+      due = malloc( (nconcerned + nwoken + 1) * sizeof( BGEntityID));
+      memcpy( due, concerned, nconcerned * sizeof( BGEntityID));
+      memcpy( due + nconcerned, woken, nwoken * sizeof( BGEntityID));
+      ndue = nconcerned + nwoken;
+      qsort( due, ndue, sizeof( BGEntityID), cmp_entity_id);
+   }
+   _daylight = daylight;
+   free( woken);
+   free( concerned);
+
+   /* in stable ID order; each depends only on the world and its own store */
+   free( _perceived);
+   _perceived  = malloc( (ndue + 1) * sizeof( BGEntityID));
+   _nperceived = 0;
+   for( i = 0; i < ndue; i++)
+   {
+      agent = due[ i];
+      if( (i && agent == due[ i - 1]) || ! [_world record:[_world kindNamed:"Agent"] for:agent])
          continue;
-      }
+      store  = [self storeOf:agent];
       _short = NO;
       [self perceive:store
                 from:_eventsSeen
@@ -5082,11 +5211,44 @@ static int   cmp_entity_id( const void *a, const void *b)
        * Kasimir has the purse, it sees whether he does) */
       store->_perceiveBy   = _short || [[store news] count] ? now + 1 : [self perceiveByOf:store];
       store->_forgetBy     = -2;
+      BGWakesPush( _perceiveWakes, agent, store->_perceiveBy);
+      BGWakesPush( _forgetWakes, agent, [self forgetByOf:store]);
+      _perceived[ _nperceived++] = agent;
       /* housekeeping: the knowledge arena, compacted when half garbage */
       [store compact:_compactAlways];
    }
-   free( concerned);
+   free( due);
+   /* a test's: compaction changes nothing, at every boundary */
+   for( i = 0; _compactAlways && i < [_stores count]; i++)
+      [[_stores objectAtIndex:i] compact:YES];
    _eventsSeen = last;
+}
+
+
+- (const BGEntityID *) agentsPerceivedNow:(NSUInteger *) n
+{
+   *n = _nperceived;
+   return( _perceived);
+}
+
+
+/* What an entity looks like, by its records: kept until it changes (what
+ * changed is let go of at each boundary), so a crowd looked at again and
+ * again is read once. */
+- (NSString *) featuresOf:(BGEntityID) entity
+                     view:(BGView *) view
+{
+   NSNumber   *key;
+   NSString   *features;
+
+   key = [NSNumber numberWithUnsignedLongLong:entity * 2 + (_omniscient ? 1 : 0)];
+   if( (features = [_features objectForKey:key]))
+      return( features);
+   features = [view featuresOf:entity all:_omniscient];
+   if( ! _features)
+      _features = [NSMutableDictionary new];
+   [_features setObject:features forKey:key];
+   return( features);
 }
 
 

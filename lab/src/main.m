@@ -38,7 +38,7 @@ static int   usage( void)
                     "       lab [-C contentdir] run|save marked-nail|marked-nail-a|marked-nail-b\n"
                     "       lab [-C contentdir] menu marked-nail|marked-nail-a|marked-nail-b <ms>\n"
                     "       lab [-C contentdir] play workshop|cistern|shed [--seed n] [--log file]\n"
-                    "       lab [-C contentdir] bench crowd [agents] [seconds]\n");
+                    "       lab [-C contentdir] bench crowd|spread [agents] [seconds]\n");
    return( 2);
 }
 
@@ -247,6 +247,8 @@ int   main( int argc, char *argv[])
       status = play( argc, argv, i);
    else if( ! strcmp( argv[ i], "bench") && i + 1 < argc && ! strcmp( argv[ i + 1], "crowd"))
       status = BGBenchCrowd( i + 2 < argc ? atoi( argv[ i + 2]) : 100, i + 3 < argc ? atoll( argv[ i + 3]) : 60);
+   else if( ! strcmp( argv[ i], "bench") && i + 1 < argc && ! strcmp( argv[ i + 1], "spread"))
+      status = BGBenchCrowdSpread( i + 2 < argc ? atoi( argv[ i + 2]) : 100, i + 3 < argc ? atoll( argv[ i + 3]) : 60, YES);
    else if( ! strcmp( argv[ i], "menu") && i + 2 < argc)
       status = run_scenario( argv[ i + 1], NO, strtoll( argv[ i + 2], NULL, 10));
    else
