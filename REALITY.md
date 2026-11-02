@@ -83,6 +83,26 @@ does at each, set in content and tunable, while running.
    their source, spreading and decaying to the background, nothing where
    nothing disturbs the air. Built when a scenario needs it.
 
+10. **Contact pulls up, by lease, and lets go.** Whatever a full-detail
+    agent perceives or acts on is raised to full for as long as the contact
+    lasts: content says what counts as contact (seeing, speaking, fighting,
+    trading) and how long its lease runs after the contact ends. A raised
+    thing holds a lease, not an anchor: when every lease has run out and no
+    anchor reaches it, it falls back past the hysteresis, through the same
+    transition as anything leaving the bubble (decision 6). Leases are
+    state: saved, and part of the hash.
+11. **Abstract progression is coarse.** Abstract agents don't take this
+    object or open that door; they work on coarse state: needs, stocks,
+    skills, standing, the condition of their things and places. What
+    changes in a place while no one watches (a house falling into
+    disrepair, a larder emptied, a field gone to weed) is the place's own
+    authored progression, made concrete when the place rises: its catch-up
+    may turn a condition into things (rubble, dust, a broken shutter).
+12. **Reach is chunks across and levels up and down.** Each kind of anchor
+    has, per level, a radius in chunks across and a reach in levels up and
+    down, separately: a mine's levels below matter less than a street
+    across.
+
 ## Steps
 
 Each keeps every existing scenario as it is: with no anchors, everything is
@@ -93,9 +113,10 @@ full.
    whose inputs changed; needs that rise with time predicted as wakes.
    Measured: boundaries and agents worked per simulated second, before and
    after, on a crowd.
-2. **Anchors and levels** (decisions 2, 3, 5). The content (`#Reality`:
-   the levels' radii per kind of anchor, the cadences), anchors, the
-   chunk level map with hysteresis, and the developer's view of it (a
+2. **Anchors, levels and leases** (decisions 2, 3, 5, 10, 12). The
+   content (`#Reality`: per kind of anchor and level, the reach across and
+   up and down; the cadences; what counts as contact, and its lease),
+   anchors, the chunk level map with hysteresis, leases, and the developer's view of it (a
    Tessera overlay once Tessera draws).
 3. **Reduced detail.** Agents' coarser cadence and narrower perception;
    the domains' longer steps.
@@ -111,24 +132,38 @@ full.
 
 ## Open questions
 
-- **Interaction across levels.** An agent at full detail speaking to one at
-  reduced: is contact itself an anchor, raising the other for as long as
-  it lasts? Probably: whatever a full agent perceives or touches is full.
-- **Contests across levels.** Two agents reaching for the same thing, one
-  at full detail and one abstract: abstract progression should not take
-  what someone at full detail could see taken. Abstract progression may
-  want to stay within what is its own (its home, its work) unless authored
-  otherwise.
-- **What a radius is measured in.** Chunks, for cost; tiles, rooms, or
-  levels up and down (TERRAIN.md step 4) for sense. Perhaps chunks across
-  and levels up and down, separately.
-- **Time skew.** A frozen chunk lags the world's clock until caught up.
-  Anything reading its state from outside (an agent far off asking about
-  it, a save) must see it as of when it last advanced, or catch it up
-  first.
-- **How authored progression is written.** The rule system
-  (content/interpret.tri), the operations' effects, or something new: a
-  progression is "per period, while this holds, this changes, this much".
-- **Knowledge across levels.** An agent abstract for a week has perceived
-  nothing; it remembers what it knew. Whether abstract progression gives
-  it knowledge (it heard the news in the village) is authored too.
+- **Catching up fast, and reading what lags** (a known unknown, deferred).
+  A frozen chunk lags the world's clock until caught up. Every system will
+  need a fast catch-up (closed form, or bulk by period), and anything
+  reading a lagging chunk from outside (an agent far off asking about it,
+  a save) must see it as of when it last advanced, or catch it up first.
+  Settled system by system as each is built.
+- **How progression is authored.** The candidates:
+  - *Rates on fields*: a field declares how it moves at each level
+    (`hunger` rises so much an hour while abstract; a house's `repair`
+    falls so much a season). Closed form, so catching up is one sum;
+    covers needs, decay, growth, most of the volume. It can't express a
+    process that converts one thing into another under a condition.
+  - *Progressions as periodic operations*: a pattern of what it applies to
+    (matched as methods' `pre` are), a period, and effects in the existing
+    effect vocabulary (a day at the forge: iron less, horseshoes more,
+    while there is iron). Caught up period by period, or in one step where
+    its effects are linear and its condition holds throughout.
+  - *The interpretation rules* (content/interpret.tri): built for beliefs,
+    a poor fit for the world's changes.
+  - *Code per kind*: flexible, and not content.
+  Leaning: rates on fields for the simple and the bulk, periodic operations
+  for processes; both in Triangle.
+- **News across the world.** Agents abstract perceive nothing, yet news
+  should travel: a death in one town known in the next a week later. One
+  direction: below full detail, knowledge is held by communities (a place,
+  a household, a guild), not by each agent; news moves between communities
+  along routes, with a delay and a fidelity set by the route (trade, a
+  road, a messenger); an agent rising is told what its community knows
+  (KNOWLEDGE.md's testimony and rumour, at a coarser grain). How rumour
+  distorts, and who hears first, wants a design of its own.
+- **Contests across levels.** Abstract progression should not take what
+  someone at full detail could see taken; keeping it to coarse state
+  (decision 11) and to what is its own (its home, its work) does most of
+  that. What is left (a town's market supplied from abstract farms while a
+  player shops there) is settled through stocks, not objects.
