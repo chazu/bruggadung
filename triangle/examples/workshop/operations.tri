@@ -16,5 +16,5 @@ loosen: #Roles & {
 
 tighten: #Roles & {
     instrument: #Wrench & { size: $s }
-    target:     #Nut    & { size: $s, state: "loose" }
+    target:     #Nut & { size: $s, state: "loose" }
 } @family(operations)

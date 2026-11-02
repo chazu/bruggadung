@@ -9,6 +9,7 @@
  * completion come from the declarations the loader records (which survive a
  * syntax error) and from a lexical scan of the sources. A spec shown on hover
  * comes from the last build that loaded without errors. */
+#include "fmt.h"
 #include "json.h"
 #include "triangle.h"
 
@@ -1575,11 +1576,43 @@ static void close_doc(const char *path)
         }
 }
 
+/* textDocument/formatting: the document as triangle fmt lays it out, one
+ * edit for the whole; none when it is laid out already. Source that can't be
+ * formatted (a string left open, say) is an error, with the reason. */
+static void formatting(const J *id, const J *params)
+{
+    char *path = uri_to_path(json_str(json_path(params, "textDocument.uri")));
+    Doc *d = path ? doc_find(path) : NULL;
+    char *disk = d || !path ? NULL : read_file(path);
+    const char *text = d ? d->text : disk;
+    char *err = NULL;
+    char *out = text ? fmt_source(text, &err) : NULL;
+    if (!out) reply_error(id, -32803, err ? err : "no such document");
+    else {
+        Str r = { 0 };
+        str_putc(&r, '[');
+        if (strcmp(out, text)) {
+            str_puts(&r, "{\"range\":");
+            put_range(&r, text, 0, strlen(text));
+            str_puts(&r, ",\"newText\":");
+            str_json(&r, out);
+            str_putc(&r, '}');
+        }
+        str_putc(&r, ']');
+        reply(id, r.s);
+        str_free(&r);
+    }
+    free(out);
+    free(err);
+    free(disk);
+    free(path);
+}
+
 static const char *capabilities =
     "{\"capabilities\":{"
     "\"textDocumentSync\":{\"openClose\":true,\"change\":1,\"save\":{\"includeText\":false}},"
     "\"hoverProvider\":true,\"definitionProvider\":true,\"referencesProvider\":true,"
-    "\"documentSymbolProvider\":true,\"workspaceSymbolProvider\":true,"
+    "\"documentSymbolProvider\":true,\"workspaceSymbolProvider\":true,\"documentFormattingProvider\":true,"
     "\"completionProvider\":{\"triggerCharacters\":[\"#\",\"@\",\".\"]}"
     "},\"serverInfo\":{\"name\":\"triangle\",\"version\":\"0.1.0\"}}";
 
@@ -1621,6 +1654,7 @@ int lsp_main(void)
         else if (!strcmp(method, "textDocument/documentSymbol")) document_symbols(id, params);
         else if (!strcmp(method, "workspace/symbol")) workspace_symbols(id, params);
         else if (!strcmp(method, "textDocument/completion")) completion(id, params);
+        else if (!strcmp(method, "textDocument/formatting")) formatting(id, params);
         else if (id) reply_error(id, -32601, "method not supported");
         json_free(msg);
     }

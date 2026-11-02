@@ -4,12 +4,14 @@
  *   triangle inspect NAME [PATH...]       a type, or an instance's spec with origins
  *   triangle components PREFIX [PATH...]  the C structs for the content's components
  *   triangle export [OPTIONS] [PATH...]   instances as JSON or YAML
+ *   triangle fmt [--check] [PATH...]      lay sources out canonically
  *   triangle lsp                          the language server, over stdio
  *
  * A PATH is a .tri file or a directory, which stands for the .tri files in it;
  * with none, the current directory. */
 #include "triangle.h"
 #include "export.h"
+#include "fmt.h"
 
 #include <dirent.h>
 #include <stdio.h>
@@ -183,6 +185,150 @@ static int cmd_components(char **args, int n)
     return 0;
 }
 
+static char *read_file(const char *path)
+{
+    FILE *f = !strcmp(path, "-") ? stdin : fopen(path, "rb");
+    if (!f) return NULL;
+    size_t n = 0, cap = 4096;
+    char *b = malloc(cap);
+    size_t got;
+    while ((got = fread(b + n, 1, cap - n - 1, f)) > 0) {
+        n += got;
+        if (n + 1 >= cap) b = realloc(b, cap *= 2);
+    }
+    b[n] = 0;
+    if (f != stdin) fclose(f);
+    return b;
+}
+
+static char *dir_of(const char *path)
+{
+    const char *slash = strrchr(path, '/');
+    size_t n = slash ? (size_t) (slash - path) : 1;
+    char *d = malloc(n + 1);
+    memcpy(d, slash ? path : ".", n);
+    d[n] = 0;
+    return d;
+}
+
+static void free_paths(Paths *p)
+{
+    for (size_t i = 0; i < p->n; i++) free(p->v[i]);
+    free(p->v);
+}
+
+/* Whether formatting the files of one directory keeps its content's meaning:
+ * loaded as it is and as formatted, the two hash the same. Content that
+ * doesn't load as it is can't be compared; the token check stands alone. */
+static int same_meaning(const char *dir, Paths *files, char **formatted)
+{
+    Paths all = { 0 };
+    if (!expand(&all, dir)) return 1;
+    const char **before = calloc(all.n ? all.n : 1, sizeof *before);
+    const char **after = calloc(all.n ? all.n : 1, sizeof *after);
+    char **owned = calloc(all.n ? all.n : 1, sizeof *owned);
+    int ok = 1;
+    for (size_t i = 0; i < all.n; i++) {
+        before[i] = owned[i] = read_file(all.v[i]);
+        after[i] = before[i] ? before[i] : "";
+        if (!before[i]) before[i] = "";
+        for (size_t j = 0; j < files->n; j++)
+            if (formatted[j] && !strcmp(files->v[j], all.v[i])) after[i] = formatted[j];
+    }
+    TriContent *a = tri_content_load_strings((const char *const *) all.v, before, all.n);
+    if (tri_content_ok(a)) {
+        TriContent *b = tri_content_load_strings((const char *const *) all.v, after, all.n);
+        ok = tri_content_ok(b) && tri_content_hash(a) == tri_content_hash(b);
+        tri_content_free(b);
+    }
+    tri_content_free(a);
+    for (size_t i = 0; i < all.n; i++) free(owned[i]);
+    free(owned);
+    free(before);
+    free(after);
+    free_paths(&all);
+    return ok;
+}
+
+static int cmd_fmt(char **args, int n)
+{
+    int check = 0;
+    Paths files = { 0 };
+    int ok = 1, any = 0;
+    for (int i = 0; i < n; i++) {
+        if (!strcmp(args[i], "--check") || !strcmp(args[i], "-l")) check = 1;
+        else if (!strcmp(args[i], "-")) {
+            /* stdin to stdout */
+            char *src = read_file("-"), *err = NULL;
+            char *out = src ? fmt_source(src, &err) : NULL;
+            if (!out) { fprintf(stderr, "triangle: <stdin>:%s\n", err ? err : " cannot read"); free(err); free(src); return 1; }
+            fputs(out, stdout);
+            free(out);
+            free(src);
+            return 0;
+        } else if (args[i][0] == '-') {
+            fprintf(stderr, "usage: triangle fmt [--check] [PATH...]   (or - for stdin to stdout)\n");
+            free_paths(&files);
+            return 2;
+        } else {
+            any = 1;
+            ok &= expand(&files, args[i]);
+        }
+    }
+    if (!any) ok &= expand(&files, ".");
+    if (!ok) { free_paths(&files); return 2; }
+
+    char **formatted = calloc(files.n ? files.n : 1, sizeof *formatted);
+    int failed = 0, changed = 0;
+    for (size_t i = 0; i < files.n; i++) {
+        char *src = read_file(files.v[i]), *err = NULL;
+        if (!src) { fprintf(stderr, "triangle: cannot read %s\n", files.v[i]); failed = 1; continue; }
+        char *out = fmt_source(src, &err);
+        if (!out) {
+            fprintf(stderr, "%s:%s\n", files.v[i], err);
+            free(err);
+            failed = 1;
+        } else if (strcmp(out, src)) formatted[i] = out;
+        else free(out);
+        free(src);
+    }
+    /* each directory's meaning kept, or nothing in it is written */
+    for (size_t i = 0; i < files.n; i++) {
+        if (!formatted[i]) continue;
+        char *d = dir_of(files.v[i]);
+        int seen = 0;
+        for (size_t j = 0; j < i && !seen; j++) {
+            char *e = formatted[j] ? dir_of(files.v[j]) : NULL;
+            seen = e && !strcmp(d, e);
+            free(e);
+        }
+        if (!seen && !same_meaning(d, &files, formatted)) {
+            fprintf(stderr, "triangle: formatting %s would change what its content means (a bug in triangle fmt); "
+                            "left as it is\n", d);
+            for (size_t j = 0; j < files.n; j++) {
+                char *e = dir_of(files.v[j]);
+                if (!strcmp(d, e)) { free(formatted[j]); formatted[j] = NULL; }
+                free(e);
+            }
+            failed = 1;
+        }
+        free(d);
+    }
+    for (size_t i = 0; i < files.n; i++) {
+        if (!formatted[i]) continue;
+        changed = 1;
+        if (check) { printf("%s\n", files.v[i]); continue; }
+        FILE *f = fopen(files.v[i], "wb");
+        if (!f || fputs(formatted[i], f) < 0) { fprintf(stderr, "triangle: cannot write %s\n", files.v[i]); failed = 1; }
+        if (f) fclose(f);
+    }
+    for (size_t i = 0; i < files.n; i++) free(formatted[i]);
+    free(formatted);
+    free_paths(&files);
+    if (failed) return 1;
+    return check && changed ? 1 : 0;
+}
+
 static void usage(FILE *f)
 {
     fputs("usage: triangle COMMAND [ARGS]\n\n"
@@ -193,6 +339,8 @@ static void usage(FILE *f)
           "                               (--seed N: one entity each), patterns as they are;\n"
           "                               -e NAME for some, --types for #type, --concrete to\n"
           "                               refuse values still open\n"
+          "  fmt [--check] [PATH...]      lay sources out canonically, in place (--check: list\n"
+          "                               the files it would change; -: stdin to stdout)\n"
           "  lsp                          run the language server over stdio\n"
           "  version                      print the version\n\n"
           "A PATH is a .tri file or a directory of them; the default is the current directory.\n",
@@ -209,6 +357,7 @@ int main(int argc, char **argv)
     if (!strcmp(cmd, "inspect")) return cmd_inspect(rest, n);
     if (!strcmp(cmd, "components")) return cmd_components(rest, n);
     if (!strcmp(cmd, "export")) return cmd_export(rest, n);
+    if (!strcmp(cmd, "fmt")) return cmd_fmt(rest, n);
     if (!strcmp(cmd, "lsp") || !strcmp(cmd, "--lsp")) return lsp_main();
     if (!strcmp(cmd, "version") || !strcmp(cmd, "--version")) { printf("triangle %s\n", TRIANGLE_VERSION); return 0; }
     if (!strcmp(cmd, "help") || !strcmp(cmd, "--help") || !strcmp(cmd, "-h")) { usage(stdout); return 0; }

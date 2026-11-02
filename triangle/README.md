@@ -72,8 +72,18 @@ triangle inspect '#Wrench' examples/workshop # a type's docstring, supertypes an
 triangle components BG examples/workshop     # what tri-components prints
 triangle export examples/workshop            # every instance as JSON (--yaml for YAML)
 triangle export --seed 7 -e nut examples/workshop   # one entity, constructed from a seed
+triangle fmt examples/workshop               # lay the sources out canonically, in place (--check to list)
 triangle lsp                                 # the language server, over stdio
 ```
+
+`fmt` lays sources out as `gofmt` and `cue fmt` do: one space after `,`
+and `:`, around binary operators and inside `{ }`; lines indented by what
+is open at their start; runs of consecutive fields, and of lets, aligned.
+It never joins or splits a line, and it writes nothing unless the result
+scans to exactly the same tokens and comments and each directory's content
+keeps its hash. `triangle fmt -` formats stdin to stdout, and the language
+server formats a document for the editor (`eglot-format-buffer`,
+`lsp-format-buffer`).
 
 `export` writes what `cue export` would: a blueprint as its spec (or, with
 `--seed N`, the entity construction makes from that seed), a pattern as it

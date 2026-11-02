@@ -21,7 +21,7 @@
 // 2. Enums
 
 #Material: "steel" | "brass" | "oak" | "ash"
-"steel": "mild" | "forged"
+"steel":   "mild" | "forged"
 
 // 3. A hierarchy
 

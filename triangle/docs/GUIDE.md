@@ -60,7 +60,7 @@ atom type below it:
 
 ```cue
 #Material: "steel" | "brass" | "oak" | "ash"
-"steel": "mild" | "forged"
+"steel":   "mild" | "forged"
 ```
 
 The second line makes an atom an enum in turn: `"mild"` and `"forged"` are
@@ -255,7 +255,7 @@ loosen: #Roles & {
 
 tighten: #Roles & {
     instrument: #Wrench & { size: $s }
-    target:     #Nut    & { size: $s, state: "loose" }
+    target:     #Nut & { size: $s, state: "loose" }
 } @family(operations)
 ```
 
@@ -444,11 +444,11 @@ ordinary instances of two built-in types, `#Fact` and `#Clause`:
 #Door: #Link & { width: length }
 #Way:  #Link & { length: length }
 
-d1: #Fact & { head: #Door & { from: "kitchen", to: "hall",   width: 90cm } }
-d2: #Fact & { head: #Door & { from: "hall",    to: "cellar", width: 70cm } }
-d3: #Fact & { head: #Door & { from: "cellar",  to: "yard",   width: 1m } }
+d1: #Fact & { head: #Door & { from: "kitchen", to: "hall", width: 90cm } }
+d2: #Fact & { head: #Door & { from: "hall", to: "cellar", width: 70cm } }
+d3: #Fact & { head: #Door & { from: "cellar", to: "yard", width: 1m } }
 
-way_one: #Clause & {
+way_one:  #Clause & {
     head: #Way & { from: $x, to: $y, length: 1m }
     body: [#Door & { from: $x, to: $y }]
 }
@@ -518,6 +518,7 @@ $ triangle check examples/workshop
 examples/workshop/blueprints.tri:21:1: warning: hammer: conflicting defaults for material from #Wooden, #Metal; both dropped
 ok: 72 types, 18 instances, 6 components, 1 warning; hash …
 $ triangle inspect rack examples/workshop        # the spec, and where each value came from
+$ triangle fmt examples/workshop                 # spacing, indentation and alignment, in place
 $ triangle export -e wrench_19 examples/workshop
 {
   "wrench_19": {
@@ -533,6 +534,12 @@ $ triangle export -e wrench_19 examples/workshop
 blueprint is written as its spec, or with `--seed N` as the entity
 construction makes from that seed. A value a spec leaves open is written as
 its constraint, such as `">=10mm & <=24mm"` for the nut's size.
+
+`fmt` gives sources one layout, as `gofmt` does Go's: the examples are
+written in it. Consecutive fields line up, and so do their attributes where
+one is set apart; a blank line starts a new run. It changes only
+whitespace, never a line break, and refuses to write anything that would
+change what the content means.
 
 ## Five things that surprise
 

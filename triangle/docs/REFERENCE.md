@@ -32,7 +32,10 @@ reference is a bug.
 
 ## Lexical structure
 
-Source files have the extension `.tri` and are read as bytes.
+Source files have the extension `.tri` and are read as bytes. Spaces, tabs
+and line breaks only separate tokens; `triangle fmt` gives source one
+layout (spacing, indentation, aligned runs of fields) without changing a
+token or a line break.
 
 | Token | Form | Notes |
 | --- | --- | --- |

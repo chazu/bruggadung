@@ -366,8 +366,27 @@ def main(exe):
     r = s.request("textDocument/hover", {"textDocument": {"uri": uri["instances.tri"]},
                                          "position": {"line": 0, "character": 3}})
     check(r["result"] is None, "hover in a comment is empty")
-    r = s.request("textDocument/formatting", {"textDocument": {"uri": uri["instances.tri"]}, "options": {}})
+    r = s.request("textDocument/codeLens", {"textDocument": {"uri": uri["instances.tri"]}})
     check(r.get("error", {}).get("code") == -32601, "an unsupported request is an error")
+
+    # formatting: one edit for the whole document, as triangle fmt lays it out
+    r = s.request("textDocument/formatting", {"textDocument": {"uri": furi}, "options": {}})["result"]
+    want = ('#Fn: { n: int, s: text }\n'
+            'fn:  #Fn & {\n'
+            '    _base: 3\n'
+            '    n:     len([1, 2]) + _base\n'
+            '    s:     strings.ToUpper("a")\n'
+            '}\n')
+    check(len(r) == 1 and r[0]["newText"] == want and r[0]["range"]["start"] == {"line": 0, "character": 0}
+          and r[0]["range"]["end"] == {"line": 6, "character": 0}, "formatting replaces the document")
+    s.notify("textDocument/didChange", {"textDocument": {"uri": furi, "version": 2}, "contentChanges": [{"text": want}]})
+    r = s.request("textDocument/formatting", {"textDocument": {"uri": furi}, "options": {}})["result"]
+    check(r == [], "formatted already: no edits")
+    s.notify("textDocument/didChange", {"textDocument": {"uri": furi, "version": 3},
+                                        "contentChanges": [{"text": 'x: "open\n'}]})
+    r = s.request("textDocument/formatting", {"textDocument": {"uri": furi}, "options": {}})
+    check(r.get("error", {}).get("code") == -32803 and "unterminated string" in r["error"]["message"],
+          "source that can't be formatted is an error, with the reason")
 
     s.request("shutdown", None)
     s.notify("exit", None)

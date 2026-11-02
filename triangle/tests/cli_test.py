@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
-"""The triangle command: export, and inspect on an instance without a spec.
+"""The triangle command: export, inspect on an instance without a spec, and fmt.
 
     python3 tests/cli_test.py build/triangle      (make cli-test)
 """
 import json
+import os
+import shutil
 import subprocess
 import sys
+import tempfile
 
 failures = 0
 
@@ -17,9 +20,95 @@ def check(cond, what):
         failures += 1
 
 
-def run(exe, *args):
-    p = subprocess.run([exe, *args], capture_output=True, text=True)
+def run(exe, *args, input=None):
+    p = subprocess.run([exe, *args], capture_output=True, text=True, input=input)
     return p.returncode, p.stdout, p.stderr
+
+
+MESSY = """
+
+let  socket=30mm
+let reach_of_arm = 2m
+#Wrench: #Tool&{
+  size:length @field(content)
+        material : "steel"|"brass"   @field(content, saved)
+\t// how heavy
+  mass:mass   @field(content)
+}
+
+
+
+w:#Wrench&{ size:>= 10mm & <=24mm,mass:1kg }
+shelf: #Shelf & {
+  list: [ 13mm,17mm ]
+       n: len( .list ) * 2
+  ok: !false && .n>2
+  steps: [
+     #Do & {op: "take"},
+  ]
+}
+spanner: #Wrench &
+({ size: 13mm } | { size: 17mm })   
+table: { rows: [[1, 2],
+  [3, 4]] }
+"""
+
+TIDY = """let socket       = 30mm
+let reach_of_arm = 2m
+#Wrench: #Tool & {
+    size:     length              @field(content)
+    material: "steel" | "brass"   @field(content, saved)
+    // how heavy
+    mass:     mass                @field(content)
+}
+
+
+w:       #Wrench & { size: >=10mm & <=24mm, mass: 1kg }
+shelf:   #Shelf & {
+    list: [13mm, 17mm]
+    n:    len(.list) * 2
+    ok:   !false && .n > 2
+    steps: [
+        #Do & { op: "take" },
+    ]
+}
+spanner: #Wrench &
+    ({ size: 13mm } | { size: 17mm })
+table:   { rows: [[1, 2],
+                  [3, 4]] }
+"""
+
+
+def test_fmt(exe):
+    rc, out, err = run(exe, "fmt", "-", input=MESSY)
+    check(rc == 0 and out == TIDY, "fmt lays source out: spacing, indentation, alignment (%s)" % err.strip())
+    rc, out, _ = run(exe, "fmt", "-", input=TIDY)
+    check(rc == 0 and out == TIDY, "fmt is idempotent")
+    rc, _, err = run(exe, "fmt", "-", input='x: "open\n')
+    check(rc == 1 and "1:4: unterminated string" in err, "fmt refuses source it can't scan")
+    for d in ("examples/workshop", "../lab/content"):
+        if os.path.isdir(d):
+            rc, out, _ = run(exe, "fmt", "--check", d)
+            check(rc == 0 and out == "", "%s is formatted" % d)
+    # in place: a directory's files rewritten, its meaning unchanged
+    tmp = tempfile.mkdtemp()
+    try:
+        shutil.copytree("examples/workshop", os.path.join(tmp, "ws"))
+        path = os.path.join(tmp, "ws", "things.tri")
+        with open(path) as f:
+            tidy = f.read()
+        with open(path, "w") as f:
+            f.write("\n".join(("  " + l.strip() + "   ") if l.strip() else l for l in tidy.split("\n")))
+        _, before, _ = run(exe, "check", os.path.join(tmp, "ws"))
+        rc, out, _ = run(exe, "fmt", "--check", os.path.join(tmp, "ws"))
+        check(rc == 1 and out.strip() == path, "--check lists what it would change, and fails")
+        rc, _, err = run(exe, "fmt", os.path.join(tmp, "ws"))
+        with open(path) as f:
+            check(rc == 0 and f.read() == tidy, "fmt rewrites in place (%s)" % err.strip())
+        _, after, _ = run(exe, "check", os.path.join(tmp, "ws"))
+        check(before == after and "hash" in after, "and the content hashes the same")
+    finally:
+        shutil.rmtree(tmp)
 
 
 def main(exe):
@@ -47,6 +136,7 @@ def main(exe):
     rc, _, err = run(exe, "inspect", "loosen", ws)
     check(rc == 1 and "loosen has no spec" in err and "not concrete and has no bounds" in err and "hammer" not in err,
           "inspect says why an instance has no spec")
+    test_fmt(exe)
     print("%d failed" % failures)
     return 1 if failures else 0
 
