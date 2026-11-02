@@ -32,6 +32,7 @@ void *arena_alloc_raw(TriArena *a, size_t n);   /* not zeroed */
 typedef struct { char *s; size_t len, cap; } Buf;
 void buf_putc(Buf *b, char c);
 void buf_puts(Buf *b, const char *s);
+void buf_putn(Buf *b, const char *s, size_t n);     /* bytes, kept terminated */
 void buf_printf(Buf *b, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
 void buf_free(Buf *b);
 

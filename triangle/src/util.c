@@ -101,6 +101,14 @@ void buf_puts(Buf *b, const char *s)
     b->len += n;
 }
 
+void buf_putn(Buf *b, const char *s, size_t n)
+{
+    buf_reserve(b, n);
+    memcpy(b->s + b->len, s, n);
+    b->len += n;
+    b->s[b->len] = 0;
+}
+
 void buf_printf(Buf *b, const char *fmt, ...)
 {
     va_list ap, ap2;

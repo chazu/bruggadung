@@ -340,6 +340,7 @@ attribute names are ignored, so tools can add their own.
 | `@family(name)` | After an instance declaration | A name | Put the instance in a pattern family, whose index is compiled at load (`tri_family_index`). |
 | `@quickcheck(p, …)` | After an instance declaration | Dotted feature paths | Quick-check paths for the instance's family. The family pools the paths of all its instances. |
 | `@widen(step)` | After a field | A quantity of the field's kind | In memory decay, the field's interval widens by `step` on each side per step, within what its type allows. Without it, a number is forgotten in one step. |
+| `@embed(file=path, type=text)` | After a field | `file`, and `type` unless the file ends in `.txt` | As CUE's: the field's value is unified with the file's contents, as text, read when the source is parsed. The path is relative to the source's directory and may not leave it (no absolute path, no `..`). Only `text` is supported; a file over 64 MB, or with a NUL byte, is an error. `rows: _ @embed(file="cellar.map", type=text)`. |
 | `@fn(name)` | After a field | A function name | The field's value is computed by C code registered with `tri_register_fn`. Construction and `tri_derive` call it. The field is never a variation point. |
 
 ## Defaults

@@ -808,6 +808,108 @@ static void parse_attrs(Parser *p, Attr **attrs, int *n)
     VEC_FREE(v);
 }
 
+/* An attribute's option, `key=value` or `key="value"`, copied into out;
+ * 0 if absent. */
+static int attr_option(const char *args, const char *key, char *out, size_t size)
+{
+    size_t klen = strlen(key);
+    for (const char *s = args; s && *s;) {
+        while (*s == ' ' || *s == ',') s++;
+        const char *eq = strchr(s, '=');
+        const char *comma = strchr(s, ',');
+        if (!eq || (comma && comma < eq)) { s = comma; continue; }
+        const char *k_end = eq;
+        while (k_end > s && k_end[-1] == ' ') k_end--;
+        const char *v = eq + 1;
+        while (*v == ' ') v++;
+        const char *v_end;
+        if (*v == '"') {
+            v++;
+            v_end = strchr(v, '"');
+            if (!v_end) return 0;
+        } else {
+            v_end = v;
+            while (*v_end && *v_end != ',') v_end++;
+            while (v_end > v && v_end[-1] == ' ') v_end--;
+        }
+        if ((size_t) (k_end - s) == klen && !strncmp(s, key, klen)) {
+            size_t n = (size_t) (v_end - v);
+            if (n >= size) n = size - 1;
+            memcpy(out, v, n);
+            out[n] = 0;
+            return 1;
+        }
+        s = strchr(v_end, ',');
+    }
+    return 0;
+}
+
+/* `@embed(file=path, type=text)`, as CUE's: the field's value unified with
+ * the file's contents, as text. The path is relative to the source's own
+ * directory, and stays within it (no absolute path, no ".."). */
+#define TRI_MAX_EMBED (64u * 1024u * 1024u)
+static X *embed(Parser *p, X *v, const Attr *a, Loc loc)
+{
+    char file[1024], type[32], msg[1200];
+    if (!attr_option(a->args, "file", file, sizeof file) || !*file) {
+        perr(p, loc, "@embed needs a file: @embed(file=name.txt)");
+        return NULL;
+    }
+    int escapes = file[0] == '/' || !strcmp(file, "..") || !strncmp(file, "../", 3) || strstr(file, "/../") ||
+                  (strlen(file) >= 3 && !strcmp(file + strlen(file) - 3, "/.."));
+    if (escapes) {
+        snprintf(msg, sizeof msg, "@embed: %s is outside this file's directory", file);
+        perr(p, loc, msg);
+        return NULL;
+    }
+    if (!attr_option(a->args, "type", type, sizeof type)) {
+        size_t n = strlen(file);
+        if (n > 4 && !strcmp(file + n - 4, ".txt")) strcpy(type, "text");
+        else {
+            snprintf(msg, sizeof msg, "@embed: say what %s is: @embed(file=%s, type=text)", file, file);
+            perr(p, loc, msg);
+            return NULL;
+        }
+    }
+    if (strcmp(type, "text")) {
+        snprintf(msg, sizeof msg, "@embed: type=%s is not supported; text is", type);
+        perr(p, loc, msg);
+        return NULL;
+    }
+    const char *src = p->file ? p->file : "";
+    if (src[0] == '<') { perr(p, loc, "@embed: a source without a directory can't embed"); return NULL; }
+    const char *slash = strrchr(src, '/');
+    char path[2048];
+    if (slash) snprintf(path, sizeof path, "%.*s/%s", (int) (slash - src), src, file);
+    else snprintf(path, sizeof path, "%s", file);
+    FILE *f = fopen(path, "rb");
+    if (!f) {
+        snprintf(msg, sizeof msg, "@embed: can't read %s", file);
+        perr(p, loc, msg);
+        return NULL;
+    }
+    Buf b = { 0 };
+    char chunk[8192];
+    size_t got;
+    while ((got = fread(chunk, 1, sizeof chunk, f)) > 0 && b.len <= TRI_MAX_EMBED) buf_putn(&b, chunk, got);
+    fclose(f);
+    if (b.len > TRI_MAX_EMBED || (b.len && memchr(b.s, 0, b.len))) {
+        snprintf(msg, sizeof msg, "@embed: %s is %s", file, b.len > TRI_MAX_EMBED ? "too large (64 MB at most)" :
+                                                         "not text (it has a NUL byte)");
+        perr(p, loc, msg);
+        buf_free(&b);
+        return NULL;
+    }
+    X *x = xnew(p, X_ATOM, loc);
+    x->u.name = string_canonical(p->c, b.s ? b.s : "", b.len);
+    buf_free(&b);
+    if (v->k == X_TOP) return x;
+    X *both = xnew(p, X_AND, loc);
+    both->u.bin.a = v;
+    both->u.bin.b = x;
+    return both;
+}
+
 /* A field value, allowing the path shorthand `a: b: c`. */
 static X *parse_field_value(Parser *p, Attr **attrs, int *nattrs)
 {
@@ -828,9 +930,12 @@ static X *parse_field_value(Parser *p, Attr **attrs, int *nattrs)
         *nattrs = 0;
         return x;
     }
+    Tok *start = peek(p, 0);
     X *v = parse_expr(p);
     if (!v) return NULL;
     parse_attrs(p, attrs, nattrs);
+    for (int i = 0; i < *nattrs; i++)
+        if (!strcmp((*attrs)[i].name, "embed") && !(v = embed(p, v, &(*attrs)[i], start->loc))) return NULL;
     return v;
 }
 

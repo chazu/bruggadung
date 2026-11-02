@@ -233,3 +233,43 @@ void test_named_bounds(void)
         tri_content_free(e);
     }
 }
+
+/* @embed, as CUE's: a field's value unified with a file's text, the file
+ * beside the source. */
+void test_embed(void)
+{
+    const char *names[] = { "tests/embed/e.tri" };
+    const char *ok[] = {
+        "#Level: { z: int, rows: text }\n"
+        "cellar: #Level & { z: 0, rows: _ @embed(file=\"room.map\", type=text) }\n"
+        "note: #Level & { z: 1, rows: text @embed(file=note.txt) }\n" };
+    TriContent *c = load(names, ok, 1);
+    CHECK(tri_content_ok(c));
+    if (!tri_content_ok(c)) dump_diags(c);
+    char buf[64];
+    CHECK(tri_text(c, tri_at(c, tri_spec(c, "cellar"), "rows"), buf, sizeof buf) == 18 &&
+          !strcmp(buf, "#####\n#..+#\n#####\n"));
+    CHECK(tri_text(c, tri_at(c, tri_spec(c, "note"), "rows"), buf, sizeof buf) != (size_t) -1 &&
+          !strcmp(buf, "hello \"there\"\n"));
+    tri_content_free(c);
+
+    static const struct { const char *src, *diag; } cases[] = {
+        { "x: #L & { r: _ @embed(file=\"../x.txt\") }\n", "@embed: ../x.txt is outside this file's directory" },
+        { "x: #L & { r: _ @embed(file=/etc/hosts) }\n", "outside this file's directory" },
+        { "x: #L & { r: _ @embed(file=room.map) }\n", "say what room.map is: @embed(file=room.map, type=text)" },
+        { "x: #L & { r: _ @embed(file=nope.txt) }\n", "@embed: can't read nope.txt" },
+        { "x: #L & { r: _ @embed(file=note.txt, type=json) }\n", "type=json is not supported" },
+        { "x: #L & { r: _ @embed() }\n", "@embed needs a file" },
+        { "x: #L & { r: int @embed(file=note.txt) }\n", "conflict" },
+    };
+    for (size_t i = 0; i < sizeof cases / sizeof *cases; i++) {
+        char src[512];
+        snprintf(src, sizeof src, "#L: { r: _ }\n%s", cases[i].src);
+        const char *srcs[] = { src };
+        TriContent *e = load(names, srcs, 1);
+        CHECK(!tri_content_ok(e));
+        if (!has_diag(e, cases[i].diag, 1)) { fprintf(stderr, "    case %zu:\n", i); dump_diags(e); }
+        CHECK(has_diag(e, cases[i].diag, 1));
+        tri_content_free(e);
+    }
+}

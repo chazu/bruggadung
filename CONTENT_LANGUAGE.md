@@ -266,6 +266,9 @@ by the same rule: the name is read when content loads, so it must give a
 number written in the content. Writing the bound with a literal everywhere
 the threshold appears was the first gap writing new content in the new
 syntax found (lab/content/latent.tri, servicing).
+`@embed(file=…, type=text)` brings a file's text into a field, as CUE's
+`@embed` does: for data better kept in its own form than spelled in
+Triangle, such as a map drawn in characters, its legend left in Triangle.
 `triangle export` writes instances as JSON or YAML, as `cue export` does;
 a value a spec leaves open is written as its constraint, since open values
 are the point of a blueprint.
