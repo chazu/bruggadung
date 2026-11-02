@@ -103,6 +103,24 @@ does at each, set in content and tunable, while running.
     down, separately: a mine's levels below matter less than a street
     across.
 
+13. **Each kind says which systems run at each level.** Content declares,
+    per kind of thing and per level, which systems are suspended and which
+    are engaged in their stead: these agents, at reduced, keep perception
+    and decision on a cadence; at abstract, suspend both and engage their
+    progression; this forge, at abstract, suspends the fire's domain and
+    engages a day's work. Progression is authored two ways, both in
+    Triangle:
+    - **Rates on fields:** a field declares how it moves at a level
+      (`hunger` rises so much an hour while abstract; a house's `repair`
+      falls so much a season). Closed form, so catching up is one sum;
+      most of the volume: needs, decay, growth.
+    - **Periodic operations:** for processes that turn one thing into
+      another under a condition: what they apply to (a pattern, matched as
+      methods' `pre` are), a period, and effects in the existing effect
+      vocabulary (a day at the forge: iron less, horseshoes more, while
+      there is iron). Caught up period by period, or in one step where
+      the effects are linear and the condition holds throughout.
+
 ## Steps
 
 Each keeps every existing scenario as it is: with no anchors, everything is
@@ -138,23 +156,8 @@ full.
   reading a lagging chunk from outside (an agent far off asking about it,
   a save) must see it as of when it last advanced, or catch it up first.
   Settled system by system as each is built.
-- **How progression is authored.** The candidates:
-  - *Rates on fields*: a field declares how it moves at each level
-    (`hunger` rises so much an hour while abstract; a house's `repair`
-    falls so much a season). Closed form, so catching up is one sum;
-    covers needs, decay, growth, most of the volume. It can't express a
-    process that converts one thing into another under a condition.
-  - *Progressions as periodic operations*: a pattern of what it applies to
-    (matched as methods' `pre` are), a period, and effects in the existing
-    effect vocabulary (a day at the forge: iron less, horseshoes more,
-    while there is iron). Caught up period by period, or in one step where
-    its effects are linear and its condition holds throughout.
-  - *The interpretation rules* (content/interpret.tri): built for beliefs,
-    a poor fit for the world's changes.
-  - *Code per kind*: flexible, and not content.
-  Leaning: rates on fields for the simple and the bulk, periodic operations
-  for processes; both in Triangle.
-- **News across the world.** Agents abstract perceive nothing, yet news
+- **News across the world** (deferred; an idea noted). Agents abstract
+  perceive nothing, yet news
   should travel: a death in one town known in the next a week later. One
   direction: below full detail, knowledge is held by communities (a place,
   a household, a guild), not by each agent; news moves between communities
