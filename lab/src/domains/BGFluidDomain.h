@@ -29,7 +29,6 @@
 
 
 #define BG_FLUID_MAX       64
-#define BG_FLUID_HOLDERS   512           /* stores and tiles */
 
 /* Water on the floor spreads between adjacent tiles: across each pair, in a
  * step of dt, (difference × dt) / (8 τ) whole millilitres, from step-start
@@ -64,8 +63,10 @@ typedef struct
    BOOL             _active;
    BOOL             _reversed;
    uint64_t         _signature;
-   BGFluidHolder    _holders[ BG_FLUID_HOLDERS];
+   BGFluidHolder    *_holders;      /* stores and tiles, as many as the structure takes */
    int              _nholders;
+   int              _holdercap;
+   int              _firstTile;     /* holders before it: the outlets' */
    BGFluidOutlet    _outlets[ BG_FLUID_MAX];
    int              _noutlets;
    NSMutableArray   *_log;

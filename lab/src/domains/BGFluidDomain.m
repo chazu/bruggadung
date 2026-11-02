@@ -59,6 +59,7 @@ static BOOL   ground_tile( BGWorld *world, BGEntityID e, BGLocation *tile)
 
 - (void) dealloc
 {
+   free( _holders);
    [_world release];
    [_log release];
    [super dealloc];
@@ -152,41 +153,85 @@ static BOOL   ground_tile( BGWorld *world, BGEntityID e, BGLocation *tile)
 }
 
 
-/* The floor the domain works on: wet tiles and their neighbours, and the
- * tiles below the taps, in (level, y, x) order. */
-- (int) region:(int32_t (*)[ 3]) tiles
+static int   cmp_floor( const void *a, const void *b)
+{
+   const int32_t   *p;
+   const int32_t   *q;
+   int             k;
+
+   p = a;
+   q = b;
+   for( k = 2; k >= 0; k--)
+      if( p[ k] != q[ k])
+         return( p[ k] < q[ k] ? -1 : 1);
+   return( 0);
+}
+
+
+/* Whether water can lie on a tile: one of the map, not solid. */
+- (BOOL) floorX:(int32_t) x
+              y:(int32_t) y
+          level:(int32_t) level
+{
+   return( [_world isTileX:x y:y level:level] &&
+           ! ([_world terrain] && BGTerrainSolid( [_world terrain], x, y, level)));
+}
+
+
+/* The floor the domain works on: wet tiles and their neighbours (not
+ * walls), and the tiles below the taps, in (level, y, x) order; read from
+ * what is wet, not the map. */
+- (int) region:(int32_t (**)[ 3]) result
          views:(BGTapView *) views
          count:(int) nviews
 {
+   int32_t            (*tiles)[ 3];
    static const int   dx[ 5] = { 0, 1, -1, 0, 0 };
    static const int   dy[ 5] = { 0, 0, 0, 1, -1 };
-   uint8_t            in[ 32][ 32];
-   int32_t            x;
-   int32_t            y;
+   int32_t            (*wet)[ 3];
+   int32_t            (*all)[ 3];
+   NSUInteger         nwet;
+   NSUInteger         nall;
+   NSUInteger         i;
    int                d;
-   int                i;
    int                n;
 
-   memset( in, 0, sizeof( in));
-   for( y = 0; y < 32; y++)
-      for( x = 0; x < 32; x++)
-         if( [_world waterAtX:x y:y level:0] > 0)
-            for( d = 0; d < 5; d++)
-               if( [_world isTileX:x + dx[ d] y:y + dy[ d] level:0])
-                  in[ y + dy[ d]][ x + dx[ d]] = 1;
-   for( i = 0; i < nviews; i++)
-      if( ! views[ i].destination && [_world isTileX:views[ i].x y:views[ i].y level:0])
-         in[ views[ i].y][ views[ i].x] = 1;
-   n = 0;
-   for( y = 0; y < 32; y++)
-      for( x = 0; x < 32; x++)
-         if( in[ y][ x] && n < BG_FLUID_HOLDERS - BG_FLUID_MAX)
+   nwet = [_world wetTiles:NULL max:0];
+   wet  = malloc( (nwet ? nwet : 1) * sizeof( *wet));
+   [_world wetTiles:wet max:nwet];
+   all  = malloc( (nwet * 5 + (NSUInteger) nviews + 1) * sizeof( *all));
+   nall = 0;
+   for( i = 0; i < nwet; i++)
+      for( d = 0; d < 5; d++)
+         if( [self floorX:wet[ i][ 0] + dx[ d] y:wet[ i][ 1] + dy[ d] level:wet[ i][ 2]])
          {
-            tiles[ n][ 0] = x;
-            tiles[ n][ 1] = y;
-            tiles[ n][ 2] = 0;
-            n++;
+            all[ nall][ 0] = wet[ i][ 0] + dx[ d];
+            all[ nall][ 1] = wet[ i][ 1] + dy[ d];
+            all[ nall][ 2] = wet[ i][ 2];
+            nall++;
          }
+   for( i = 0; i < (NSUInteger) nviews; i++)
+      if( ! views[ i].destination && [_world isTileX:views[ i].x y:views[ i].y level:views[ i].level])
+      {
+         all[ nall][ 0] = views[ i].x;
+         all[ nall][ 1] = views[ i].y;
+         all[ nall][ 2] = views[ i].level;
+         nall++;
+      }
+   qsort( all, nall, sizeof( *all), cmp_floor);
+   tiles = malloc( (nall ? nall : 1) * sizeof( *tiles));
+   n     = 0;
+   for( i = 0; i < nall; i++)
+      if( ! i || cmp_floor( all[ i], all[ i - 1]))
+      {
+         tiles[ n][ 0] = all[ i][ 0];
+         tiles[ n][ 1] = all[ i][ 1];
+         tiles[ n][ 2] = all[ i][ 2];
+         n++;
+      }
+   free( all);
+   free( wet);
+   *result = tiles;
    return( n);
 }
 
@@ -219,12 +264,17 @@ static uint64_t   signature( BGTapView *views, int n, int32_t (*tiles)[ 3], int 
    int       i;
    int64_t   water;
 
-   for( i = 0; i < _nholders; i++)
+   /* a tile of the region, after the outlets': only the outlets' to look
+    * through, for a tap's tile; the region has each tile once */
+   for( i = 0; i < (entity || _firstTile < 0 ? _nholders : _firstTile); i++)
       if( entity ? _holders[ i].entity == entity
                  : (! _holders[ i].entity && _holders[ i].x == x && _holders[ i].y == y && _holders[ i].level == level))
          return( i);
-   if( _nholders == BG_FLUID_HOLDERS)
-      return( -1);
+   if( _nholders == _holdercap)
+   {
+      _holdercap = _holdercap ? _holdercap * 2 : 64;
+      _holders   = realloc( _holders, (size_t) _holdercap * sizeof( BGFluidHolder));
+   }
    if( entity)
    {
       [_world getField:"WaterStore.water" of:entity value:&water];
@@ -256,8 +306,9 @@ static uint64_t   signature( BGTapView *views, int n, int32_t (*tiles)[ 3], int 
    int             k;
    int             m;
 
-   _nholders = 0;
-   _noutlets = 0;
+   _nholders  = 0;
+   _noutlets  = 0;
+   _firstTile = -1;
    for( k = 0; k < n; k++)
    {
       i = _reversed ? n - 1 - k : k;
@@ -275,52 +326,99 @@ static uint64_t   signature( BGTapView *views, int n, int32_t (*tiles)[ 3], int 
       o->exhausted = _holders[ o->source].water == 0;
       _noutlets++;
    }
+   _firstTile = _nholders;
    for( k = 0; k < ntiles; k++)
    {
       i = _reversed ? ntiles - 1 - k : k;
       [self holderFor:BGNoEntity x:tiles[ i][ 0] y:tiles[ i][ 1] level:tiles[ i][ 2]];
    }
-   _active = YES;
+   _firstTile = -1;
+   _active    = YES;
+}
+
+
+/* The tile holders, by (level, y, x), to find a tile's neighbours. */
+typedef struct
+{
+   int32_t   x;
+   int32_t   y;
+   int32_t   level;
+   int       holder;
+} BGFloorTile;
+
+static int   cmp_floor_tile( const void *a, const void *b)
+{
+   const BGFloorTile   *p;
+   const BGFloorTile   *q;
+
+   p = a;
+   q = b;
+   if( p->level != q->level)
+      return( p->level < q->level ? -1 : 1);
+   if( p->y != q->y)
+      return( p->y < q->y ? -1 : 1);
+   return( p->x < q->x ? -1 : p->x > q->x);
+}
+
+
+- (int) tileIndex:(BGFloorTile *) at
+{
+   int   i;
+   int   n;
+
+   for( n = 0, i = 0; i < _nholders; i++)
+      if( ! _holders[ i].entity)
+      {
+         at[ n].x      = _holders[ i].x;
+         at[ n].y      = _holders[ i].y;
+         at[ n].level  = _holders[ i].level;
+         at[ n].holder = i;
+         n++;
+      }
+   qsort( at, n, sizeof( *at), cmp_floor_tile);
+   return( n);
+}
+
+
+/* The holder of the tile east (d 0) or south (d 1) of one, or -1. */
+static int   neighbour( const BGFloorTile *at, int n, const BGFloorTile *t, int d)
+{
+   BGFloorTile   key;
+   BGFloorTile   *found;
+
+   key       = *t;
+   key.x    += d ? 0 : 1;
+   key.y    += d ? 1 : 0;
+   found     = bsearch( &key, at, n, sizeof( *at), cmp_floor_tile);
+   return( found ? found->holder : -1);
 }
 
 
 /* Whether some pair of adjacent tiles differs by enough to move water. */
-- (void) tileIndex:(int (*)[ 32]) at
-{
-   int   i;
-   int   x;
-   int   y;
-
-   for( y = 0; y < 32; y++)
-      for( x = 0; x < 32; x++)
-         at[ y][ x] = -1;
-   for( i = 0; i < _nholders; i++)
-      if( ! _holders[ i].entity && _holders[ i].level == 0 && [_world isTileX:_holders[ i].x y:_holders[ i].y level:0])
-         at[ _holders[ i].y][ _holders[ i].x] = i;
-}
-
-
 - (BOOL) spreading
 {
-   int64_t   diff;
-   int       at[ 32][ 32];
-   int       i;
-   int       j;
-   int       x;
-   int       y;
+   BGFloorTile   *at;
+   int64_t       diff;
+   BOOL          moves;
+   int           n;
+   int           k;
+   int           i;
+   int           j;
+   int           d;
 
-   [self tileIndex:at];
-   for( y = 0; y < 32; y++)
-      for( x = 0; x < 32; x++)
+   at    = malloc( (size_t) (_nholders ? _nholders : 1) * sizeof( BGFloorTile));
+   n     = [self tileIndex:at];
+   moves = NO;
+   for( k = 0; k < n && ! moves; k++)
+      for( d = 0; d < 2; d++)
       {
-         if( (i = at[ y][ x]) < 0)
-            continue;
-         if( x + 1 < 32 && (j = at[ y][ x + 1]) >= 0 && ((diff = _holders[ i].water - _holders[ j].water) >= 8 || diff <= -8))
-            return( YES);
-         if( y + 1 < 32 && (j = at[ y + 1][ x]) >= 0 && ((diff = _holders[ i].water - _holders[ j].water) >= 8 || diff <= -8))
-            return( YES);
+         i = at[ k].holder;
+         if( (j = neighbour( at, n, &at[ k], d)) >= 0 &&
+             ((diff = _holders[ i].water - _holders[ j].water) >= 8 || diff <= -8))
+            moves = YES;
       }
-   return( NO);
+   free( at);
+   return( moves);
 }
 
 
@@ -597,7 +695,7 @@ typedef struct
 {
    BGFluidWatch   watches[ BG_FLUID_MAX];
    BGTapView      views[ BG_FLUID_MAX];
-   int32_t        tiles[ BG_FLUID_HOLDERS][ 3];
+   int32_t        (*tiles)[ 3];
    int            ntiles;
    BGHorizon   h;
    BGTime      next;
@@ -608,7 +706,7 @@ typedef struct
    h.safeStep  = BGTimeNever;      /* constant rates: any step is exact */
    h.nextEvent = BGTimeNever;
    n      = [self scan:views];
-   ntiles = [self region:tiles views:views count:n];
+   ntiles = [self region:&tiles views:views count:n];
    sig    = signature( views, n, tiles, ntiles);
    /* a tap opened or closed, or a bucket moved: check in and form again */
    if( _active && sig != _signature)
@@ -620,12 +718,15 @@ typedef struct
                count:n
                tiles:tiles
               ntiles:ntiles];
+      free( tiles);
+      tiles = NULL;
       if( ! [self flowing])
       {
          [self checkInAll];
          return( h);
       }
    }
+   free( tiles);
    for( i = 0; i < _nholders; i++)
    {
       next = [self exhaustionOf:i
@@ -804,49 +905,49 @@ static void   sort_by_tap( int *order, int n, const BGFluidOutlet *outlets)
  * values, then all applied, so no order can matter. */
 - (void) spreadFor:(int64_t) dt
 {
-   int64_t   delta[ BG_FLUID_HOLDERS];
-   int64_t   diff;
-   int64_t   q;
-   int       at[ 32][ 32];
-   int       i;
-   int       j;
-   int       x;
-   int       y;
-   int       d;
+   BGFloorTile   *at;
+   int64_t       *delta;
+   int64_t       diff;
+   int64_t       q;
+   int           n;
+   int           k;
+   int           i;
+   int           j;
+   int           d;
 
    if( dt > BG_SPREAD_TAU)
       dt = BG_SPREAD_TAU;
-   [self tileIndex:at];
-   for( i = 0; i < _nholders; i++)
-      delta[ i] = 0;
-   for( y = 0; y < 32; y++)
-      for( x = 0; x < 32; x++)
-         for( d = 0; d < 2; d++)          /* each pair once: east, south */
+   at    = malloc( (size_t) (_nholders ? _nholders : 1) * sizeof( BGFloorTile));
+   delta = calloc( (size_t) (_nholders ? _nholders : 1), sizeof( int64_t));
+   n     = [self tileIndex:at];
+   for( k = 0; k < n; k++)
+      for( d = 0; d < 2; d++)          /* each pair once: east, south */
+      {
+         i = at[ k].holder;
+         if( (j = neighbour( at, n, &at[ k], d)) < 0)
+            continue;
+         diff = _holders[ i].water - _holders[ j].water;
+         q    = (diff < 0 ? -diff : diff) * dt / (8 * BG_SPREAD_TAU);
+         if( ! q)
+            continue;
+         if( diff > 0)
          {
-            i = at[ y][ x];
-            j = d ? (y + 1 < 32 ? at[ y + 1][ x] : -1) : (x + 1 < 32 ? at[ y][ x + 1] : -1);
-            if( i < 0 || j < 0)
-               continue;
-            diff = _holders[ i].water - _holders[ j].water;
-            q    = (diff < 0 ? -diff : diff) * dt / (8 * BG_SPREAD_TAU);
-            if( ! q)
-               continue;
-            if( diff > 0)
-            {
-               delta[ i] -= q;
-               delta[ j] += q;
-            }
-            else
-            {
-               delta[ i] += q;
-               delta[ j] -= q;
-            }
+            delta[ i] -= q;
+            delta[ j] += q;
          }
+         else
+         {
+            delta[ i] += q;
+            delta[ j] -= q;
+         }
+      }
    for( i = 0; i < _nholders; i++)
    {
       _holders[ i].water += delta[ i];
       assert( _holders[ i].water >= 0);
    }
+   free( delta);
+   free( at);
 }
 
 

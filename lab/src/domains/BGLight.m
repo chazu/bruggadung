@@ -80,20 +80,9 @@ static int   outdoors( BGWorld *world, int64_t t)
  * of whose ways out stands open, a doorway with no door or its door ajar. */
 static BOOL   shut_in( BGWorld *world, BGLocation tile)
 {
-   BGAirOpening   openings[ 16];
-   BGEntityID     air;
-   NSUInteger     n;
-   NSUInteger     i;
+   BGEntityID   air;
 
-   if( ! (air = [world airRegionAt:tile]))
-      return( NO);
-   n = [world airOpeningsOf:air
-                       into:openings
-                        max:16];
-   for( i = 0; i < n && i < 16; i++)
-      if( openings[ i].open)
-         return( NO);
-   return( YES);
+   return( (air = [world airRegionAt:tile]) && [world airIsShutIn:air]);
 }
 
 

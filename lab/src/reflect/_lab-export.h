@@ -19,6 +19,8 @@
 #import "BGAgency.h"
 #import "BGCommitter.h"
 #import "BGProposalGroup.h"
+#import "BGIndex.h"
+#import "BGPath.h"
 #import "BGStore.h"
 #import "BGTerrain.h"
 #import "BGTypes.h"

@@ -219,12 +219,18 @@ NSString   *BGSave( BGWorld *world, BGCommitter *committer, NSArray *domains)
       put_location( out, ev->location);
       [out appendFormat:@" %llu\n", (unsigned long long) ev->actor];
    }
-   for( k = 0; k < (NSUInteger) [world levels]; k++)
-      for( j = 0; j < (NSUInteger) [world tilesHigh]; j++)
-         for( i = 0; i < (NSUInteger) [world tilesWide]; i++)
-            if( [world waterAtX:(int32_t) i y:(int32_t) j level:(int32_t) k])
-               [out appendFormat:@"tile %lu %lu %lu water %lld\n", (unsigned long) i, (unsigned long) j,
-                                 (unsigned long) k, (long long) [world waterAtX:(int32_t) i y:(int32_t) j level:(int32_t) k]];
+   {
+      int32_t      (*wet)[ 3];
+      NSUInteger   n;
+
+      n   = [world wetTiles:NULL max:0];
+      wet = malloc( (n ? n : 1) * sizeof( *wet));
+      [world wetTiles:wet max:n];
+      for( i = 0; i < n; i++)
+         [out appendFormat:@"tile %ld %ld %ld water %lld\n", (long) wet[ i][ 0], (long) wet[ i][ 1], (long) wet[ i][ 2],
+                           (long long) [world waterAtX:wet[ i][ 0] y:wet[ i][ 1] level:wet[ i][ 2]]];
+      free( wet);
+   }
    deferred = [committer deferredGroups];
    for( i = 0; i < [deferred count]; i++)
    {

@@ -507,6 +507,19 @@ static int64_t   next_checkpoint( BGWorld *world, BGEntityID a, const BGActivity
 }
 
 
+/* An activity ended this round, kept to be told of once. */
+static BGEntityID   *remember_ended( BGEntityID *ended, NSUInteger *n, NSUInteger *cap, BGEntityID a)
+{
+   if( *n == *cap)
+   {
+      *cap  = *cap ? *cap * 2 : 64;
+      ended = realloc( ended, *cap * sizeof( BGEntityID));
+   }
+   ended[ (*n)++] = a;
+   return( ended);
+}
+
+
 - (void) committer:(BGCommitter *) committer
     didCommitRound:(uint32_t) round
         eventsFrom:(NSUInteger) first
@@ -516,7 +529,8 @@ static int64_t   next_checkpoint( BGWorld *world, BGEntityID a, const BGActivity
    const BGEvent      *ev;
    BGProposalGroup    *group;
    BGStore            *store;
-   BGEntityID         ended[ 64];
+   BGEntityID         *ended;
+   NSUInteger         endedcap;
    BGEntityID         a;
    NSString           *effect;
    NSString           *why;
@@ -525,6 +539,9 @@ static int64_t   next_checkpoint( BGWorld *world, BGEntityID a, const BGActivity
    NSUInteger         j;
    NSUInteger         k;
    BOOL               done;
+
+   ended    = NULL;
+   endedcap = 0;
 
    /* a completion commitment rejected: the activity failed */
    for( i = 0; i + 1 < [_completions count];)
@@ -564,18 +581,18 @@ static int64_t   next_checkpoint( BGWorld *world, BGEntityID a, const BGActivity
             group = [self suspend:a because:@"water is rising at its feet" error:NULL];
             [group set:"Activity.watchFloor" of:BGWhole( a) to:0];
             [group setCause:ev->index];
-            ended[ nended++ % 64] = a;
+            ended = remember_ended( ended, &nended, &endedcap, a);
          }
          else if( ! strcmp( ev->kind, "watched") && ev->subject == a)
          {
             [self end:a status:"completed" because:@"its watch fired" cause:ev->index];
-            ended[ nended++ % 64] = a;
+            ended = remember_ended( ended, &nended, &endedcap, a);
          }
          else if( ! strcmp( ev->kind, "exhausted") && ev->subject == (BGEntityID) record->itemRef &&
                   [effect isEqualToString:@"fill"])
          {
             [self end:a status:"exhausted" because:@"the source ran dry" cause:ev->index];
-            ended[ nended++ % 64] = a;
+            ended = remember_ended( ended, &nended, &endedcap, a);
          }
          else if( record->due && ev->subject == (BGEntityID) record->actorRef && ! strcmp( ev->kind, "changed") &&
                   ev->detail && (! strcmp( ev->detail, "Agent.fatigue") || ! strcmp( ev->detail, "Agent.injury")))
@@ -594,10 +611,11 @@ static int64_t   next_checkpoint( BGWorld *world, BGEntityID a, const BGActivity
                group = [self suspend:a because:why error:NULL];
                [group setCause:ev->index];
             }
-            ended[ nended++ % 64] = a;
+            ended = remember_ended( ended, &nended, &endedcap, a);
          }
       }
    }
+   free( ended);
 }
 
 @end

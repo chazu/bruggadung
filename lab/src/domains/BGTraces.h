@@ -27,6 +27,10 @@ int64_t   BGTraceGone( BGWorld *world, const BGTrace *trace);
 #define BG_SOUND_FALLOFF   3
 #define BG_SOUND_DOOR     10
 #define BG_SOUND_WALL     30
+/* How far any sound carries, at most: a trace's magnitude is at most 100
+ * (content/traces.tri), less BG_SOUND_FALLOFF a tile. Hearing looks no
+ * further (the spatial index). */
+#define BG_SOUND_REACH    (100 / BG_SOUND_FALLOFF + 1)
 #define BG_SOUND_MASK     20     /* a sound this much quieter than the loudest heard is masked */
 
 int64_t   BGLoudness( BGWorld *world, int64_t strength, BGLocation from, BGLocation to);

@@ -52,21 +52,7 @@ static BGEntityID   region_at( BGWorld *world, BGLocation tile)
  * doorway standing open: no door in it, or its door ajar. */
 static BOOL   open_between( BGWorld *world, BGEntityID a, BGEntityID b)
 {
-   BGAirOpening   openings[ 16];
-   BGEntityID     from;
-   BGEntityID     to;
-   NSUInteger     n;
-   NSUInteger     i;
-
-   from = a ? a : b;
-   to   = a ? b : a;
-   n    = [world airOpeningsOf:from
-                          into:openings
-                           max:16];
-   for( i = 0; i < n && i < 16; i++)
-      if( openings[ i].beyond == to && openings[ i].open)
-         return( YES);
-   return( NO);
+   return( [world airRegion:a opensOpenTo:b]);
 }
 
 

@@ -14,6 +14,7 @@
    BGEntityID   *_ids;
    uint8_t      *_records;
    uint64_t     _changes;
+   uint64_t     _members;
 }
 
 - (id) initWithRecordSize:(size_t) size;
@@ -32,5 +33,8 @@
 /* How many times a record was set or removed: a cache over the store is good
  * while this is as it was. */
 - (uint64_t) changes;
+/* How many times an entity was added or removed: a cache of which entities
+ * are here is good while this is as it was. */
+- (uint64_t) members;
 
 @end

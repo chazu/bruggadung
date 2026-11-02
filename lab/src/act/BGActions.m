@@ -636,26 +636,28 @@ static void   tread( BGWorld *world, BGLocation at, BGProposalGroup *g)
 {
    const BGTrace   *trace;
    const TriNode   *v;
-   BGStore         *traces;
+   BGEntityID      *here;
+   NSUInteger      n;
    NSUInteger      i;
    int64_t         now;
    int64_t         lo;
    int64_t         hi;
 
-   traces = [world storeForKind:[world kindNamed:"Trace"]];
-   now    = [world time].ms;
-   for( i = 0; i < [traces count]; i++)
+   now = [world time].ms;
+   n   = [world tracesNear:at radius:0 into:&here];      /* the spatial index: this tile's alone */
+   for( i = 0; i < n; i++)
    {
-      trace = [traces recordAtIndex:i];
-      if( trace->bearer || trace->tileX != at.x || trace->tileY != at.y || trace->tileLevel != at.level ||
+      trace = [world record:[world kindNamed:"Trace"] for:here[ i]];
+      if( ! trace || trace->bearer || trace->tileX != at.x || trace->tileY != at.y || trace->tileLevel != at.level ||
           ! trace->traceKind || trace->expires <= now)
          continue;
       v = tri_at( [world tri], tri_pattern( [world tri], trace->traceKind), "trodden");
       if( ! v || ! tri_node_interval( v, &lo, &hi) || lo != hi || lo <= 0)
          continue;
-      [g set:"Trace.expires" of:BGWhole( [traces entityAtIndex:i])
+      [g set:"Trace.expires" of:BGWhole( here[ i])
           to:now + (trace->expires - now) * (100 - lo) / 100];
    }
+   free( here);
 }
 
 

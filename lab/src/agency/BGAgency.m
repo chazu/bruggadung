@@ -1,6 +1,7 @@
 #import "BGAgency.h"
 
 #import "BGActions.h"
+#import "BGPath.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -128,6 +129,39 @@ static uint32_t   bound( const BGSlotBinding *b, int n, const char *slot)
 static BOOL   in_reach( const BGReferent *me, const BGReferent *r)
 {
    return( r && me->level == r->level && abs( me->x - r->x) <= 1 && abs( me->y - r->y) <= 1);
+}
+
+
+/* Walking over the ground as an agent believes it (TERRAIN.md decision 7):
+ * a tile of the world, not solid as it last saw it; a tile never seen, it
+ * guesses open. */
+typedef struct
+{
+   BGWorld            *world;
+   BGKnowledgeStore   *store;
+   int32_t            level;
+} BGWalkContext;
+
+
+static BOOL   walkable( void *context, int32_t x, int32_t y)
+{
+   const BGTerrainInfo   *kind;
+   BGWalkContext         *c;
+
+   c = context;
+   if( ! [c->world isTileX:x y:y level:c->level] || ! [c->world terrain])
+      return( [c->world isTileX:x y:y level:c->level]);
+   kind = BGTerrainKindInfo( [c->world terrain], [c->store believedTerrainAtX:x y:y level:c->level]);
+   return( ! kind || ! kind->solid);
+}
+
+
+static BOOL   unseen( void *context, int32_t x, int32_t y)
+{
+   BGWalkContext   *c;
+
+   c = context;
+   return( ! [c->store hasSeenX:x y:y level:c->level]);
 }
 
 
@@ -600,40 +634,36 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
 }
 
 
-/* Exploring: a step toward the nearest tile on its level it has never seen,
- * the lowest row, then column, among equals; NO if there is none. */
+/* Exploring: a step on the shortest way, over the ground as it believes
+ * it, to the nearest tile on its level it has never seen; NO if there is
+ * none within a search's reach (BG_PATH_BUDGET tiles). */
 - (BOOL) explore:(BGMotivation *) m
            store:(BGKnowledgeStore *) store
 {
    const BGReferent   *me;
-   BGReferent         goal;
-   int32_t            x;
-   int32_t            y;
-   int                d;
-   int                best;
+   BGWalkContext      c;
+   BGPathQuery        q;
+   BGPathResult       r;
 
    me = [store referent:[store selfReferent]];
    if( ! me)
       return( NO);
-   best = INT_MAX;
-   memset( &goal, 0, sizeof( goal));
-   for( y = 0; y < [_world tilesHigh]; y++)
-      for( x = 0; x < [_world tilesWide]; x++)
-      {
-         if( ! [_world isTileX:x y:y level:me->level] || [store hasSeenX:x y:y level:me->level] ||
-             ([_world terrain] && BGTerrainSolid( [_world terrain], x, y, me->level)))
-            continue;
-         d = abs( x - me->x) + abs( y - me->y);
-         if( d < best)
-         {
-            best   = d;
-            goal.x = x;
-            goal.y = y;
-         }
-      }
-   if( best == INT_MAX)
+   memset( &q, 0, sizeof( q));
+   c.world    = _world;
+   c.store    = store;
+   c.level    = me->level;
+   q.x        = me->x;
+   q.y        = me->y;
+   q.context  = &c;
+   q.passable = walkable;
+   q.goal     = unseen;
+   r = BGPathFind( &q);
+   if( ! r.found || r.step == BGStepNone)
       return( NO);
-   [self walk:m why:"exploring" me:me toward:&goal];
+   [self take:m
+         step:r.step
+          why:"exploring"
+         note:[NSString stringWithFormat:@"toward R0 at (%d, %d)", r.x, r.y]];
    return( YES);
 }
 
@@ -1198,28 +1228,89 @@ static const char   *goal_title( TriContent *tri, const char *goal, char *buf, s
 }
 
 
-/* One step toward a believed place: the longer way first. */
-- (void) walk:(BGMotivation *) m
-          why:(const char *) why
-           me:(const BGReferent *) me
-       toward:(const BGReferent *) target
-{
-   const char   *op;
-   NSString     *error;
-   int          dx;
-   int          dy;
+static const char   *step_ops[ 4] = { "walk_north", "walk_south", "walk_east", "walk_west" };
 
-   dx = target->x - me->x;
-   dy = target->y - me->y;
-   if( abs( dx) >= abs( dy))
-      op = dx > 0 ? "walk_east" : "walk_west";
-   else
-      op = dy > 0 ? "walk_south" : "walk_north";
+
+- (void) take:(BGMotivation *) m
+         step:(BGStep) step
+          why:(const char *) why
+         note:(NSString *) note
+{
+   NSString   *error;
+   const char *op;
+
+   op    = step_ops[ step];
    error = nil;
    if( ! BGPerform( _world, _committer, BGActionMake( [_world intern:op], m->agent, BGNoEntity, BGNoEntity), 0, &error))
       [self note:m line:[NSString stringWithFormat:@"%s: could not %s: %@", why, op, error]];
    else
-      [self note:m line:[NSString stringWithFormat:@"%s: %s, toward R%u at (%d, %d)", why, op, target->id, target->x, target->y]];
+      [self note:m line:[NSString stringWithFormat:@"%s: %s, %@", why, op, note]];
+}
+
+
+/* One step toward a believed place, on the shortest way over the ground as
+ * it believes it (BGPath: a tile never seen it guesses open). Where the
+ * way straight there is as short as any, the longer way first, as ever;
+ * with no way within a search's reach, toward the nearest it came. */
+- (void) walk:(BGMotivation *) m
+          why:(const char *) why
+           me:(const BGReferent *) me
+       toward:(const BGReferent *) target
+        store:(BGKnowledgeStore *) store
+{
+   BGWalkContext   c;
+   BGPathQuery     q;
+   BGPathResult    r;
+   BGPathResult    straight;
+   BGStep          greedy;
+   int64_t         ax;
+   int64_t         ay;
+   int64_t         direct;
+   int             dx;
+   int             dy;
+
+   dx = target->x - me->x;
+   dy = target->y - me->y;
+   if( abs( dx) >= abs( dy))
+      greedy = dx > 0 ? BGStepEast : BGStepWest;
+   else
+      greedy = dy > 0 ? BGStepSouth : BGStepNorth;
+   memset( &q, 0, sizeof( q));
+   c.world    = _world;
+   c.store    = store;
+   c.level    = me->level;
+   q.x        = me->x;
+   q.y        = me->y;
+   q.targeted = YES;
+   q.tx       = target->x;
+   q.ty       = target->y;
+   q.context  = &c;
+   q.passable = walkable;
+   r = BGPathFind( &q);
+   if( r.step == BGStepNone)
+   {
+      [self note:m line:[NSString stringWithFormat:@"%s: no way toward R%u at (%d, %d)", why, target->id, target->x, target->y]];
+      return;
+   }
+   ax     = abs( dx) - 1;
+   ay     = abs( dy) - 1;
+   direct = (ax > 0 ? ax : 0) + (ay > 0 ? ay : 0);
+   if( r.found && r.steps == direct && greedy != r.step)
+   {
+      /* the longer way first, if it too is as short as any */
+      q.x = me->x + (greedy == BGStepEast ? 1 : greedy == BGStepWest ? -1 : 0);
+      q.y = me->y + (greedy == BGStepSouth ? 1 : greedy == BGStepNorth ? -1 : 0);
+      if( walkable( &c, q.x, q.y))
+      {
+         straight = BGPathFind( &q);
+         if( straight.found && straight.steps == direct - 1)
+            r.step = greedy;
+      }
+   }
+   [self take:m
+         step:r.step
+          why:why
+         note:[NSString stringWithFormat:@"toward R%u at (%d, %d)", target->id, target->x, target->y]];
 }
 
 
@@ -1466,7 +1557,7 @@ static BOOL   voice_only( TriContent *tri, const char *operation)
       for( q = 0; q < 2; q++)
          if( roles[ q] && ! in_reach( me, r = [store referent:roles[ q]]) && r)
          {
-            [self walk:m why:title me:me toward:r];
+            [self walk:m why:title me:me toward:r store:store];
             return( YES);
          }
       /* what it says, if anything: after a question, it waits for the answer */

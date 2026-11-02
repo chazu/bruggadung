@@ -9,6 +9,7 @@
 #import "BGActivities.h"
 #import "BGPlay.h"
 #import "BGKnowledge.h"
+#import "BGPath.h"
 #import "BGWorlds.h"
 #import "BGAgency.h"
 #import "BGTraces.h"
@@ -7796,6 +7797,373 @@ static void   test_explore_autopilot( void)
 }
 
 
+/* TERRAIN.md, pathfinding: exploring the rooms from inside the room, the
+ * worker finds its way out by the doorway, along the corridor and into
+ * the back room by its doorway, until it has seen every floor of the
+ * building; walled in, it never sees the outdoors, and stops. Walking
+ * straight at the nearest unseen tile, it would stand at a wall. */
+static void   test_explore_rooms( void)
+{
+   BGStage            st;
+   BGActivities       *activities;
+   BGKnowledge        *knowledge;
+   BGAgency           *agency;
+   BGKnowledgeStore   *store;
+   BGProposalGroup    *g;
+   BGEntityID         worker;
+   NSArray            *notices;
+   int32_t            x;
+   int32_t            y;
+   int                unseen;
+
+   st.w       = BGTestWorld( 181);
+   BG_CHECK( [st.w setTerrainMap:"rooms_map" error:NULL]);
+   st.c       = BGTestCommitter( st.w);
+   activities = [BGActivities activitiesWithWorld:st.w committer:st.c];
+   knowledge  = [[[BGKnowledge alloc] initWithWorld:st.w] autorelease];
+   agency     = [[[BGAgency alloc] initWithWorld:st.w committer:st.c knowledge:knowledge] autorelease];
+   st.s       = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [agency setActivities:activities];
+   [st.s setActivities:activities];
+   [st.s setPerception:knowledge];
+   [st.s setDecision:agency];
+   g      = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: shut in the room"];
+   worker = [g create:"worker" key:"worker" at:BGOnTile( 2, 2, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   worker = [g idFor:worker];
+   BG_CHECK( [agency autopilotExplore:worker threshold:50]);
+   [st.s runUntil:BGTimeMake( 3600000)];
+   store  = [knowledge storeOf:worker];
+   BG_CHECK( [store hasSeenX:7 y:3 level:0] && [store hasSeenX:20 y:8 level:0] && ! [store hasSeenX:30 y:30 level:0]);
+   for( unseen = 0, y = 0; y < 10; y++)
+      for( x = 0; x < 22; x++)
+         if( BGTerrainRoomAt( [st.w terrain], x, y, 0) && ! [store hasSeenX:x y:y level:0])
+            unseen++;
+   BG_CHECK( unseen == 0);                                     /* every floor tile of the building */
+   BG_CHECK( ! logged_by( agency, worker, @"could not walk"));
+   notices = [agency takeNotices];
+   BG_CHECK( [notices count] == 1);
+}
+
+
+/* Whether the world's index of what is where agrees with its locations,
+ * read the slow way: on the ground near each of a few tiles, and in each
+ * thing. */
+static BOOL   index_agrees( BGWorld *w)
+{
+   BGEntityID   fast[ 256];
+   BGEntityID   slow[ 256];
+   BGLocation   *loc;
+   BGStore      *locations;
+   NSUInteger   nf;
+   NSUInteger   ns;
+   NSUInteger   i;
+   int32_t      x;
+   int32_t      y;
+
+   locations = [w locations];
+   for( y = 0; y < 64; y += 9)
+      for( x = 0; x < 64; x += 7)
+      {
+         nf = [w entitiesNear:BGOnTile( x, y, 0) radius:5 into:fast max:256];
+         for( ns = 0, i = 0; i < [locations count]; i++)
+         {
+            loc = [locations recordAtIndex:i];
+            if( loc->form == BGLocationOnTile && loc->level == 0 && abs( loc->x - x) <= 5 && abs( loc->y - y) <= 5)
+               slow[ ns++] = [locations entityAtIndex:i];
+         }
+         if( nf != ns || memcmp( fast, slow, ns * sizeof( BGEntityID)))
+            return( NO);
+      }
+   for( i = 0; i < [locations count]; i++)
+   {
+      loc = [locations recordAtIndex:i];
+      if( loc->form == BGLocationOnTile)
+         continue;
+      nf = [w entitiesAt:loc->place form:loc->form into:fast max:256];
+      for( ns = 0; ns < nf && fast[ ns] != [locations entityAtIndex:i]; ns++)
+         ;
+      if( ns == nf)
+         return( NO);
+   }
+   return( YES);
+}
+
+
+/* Whether the traces near a few tiles, by the index, are those a scan finds:
+ * on the floor within the square, or borne by what is in it. */
+static BOOL   traces_agree( BGWorld *w)
+{
+   const BGTrace   *trace;
+   BGEntityID      *fast;
+   BGEntityID      slow[ 256];
+   BGLocation      tile;
+   BGLocation      at;
+   BGStore         *traces;
+   NSUInteger      nf;
+   NSUInteger      ns;
+   NSUInteger      i;
+   BOOL            same;
+   int32_t         x;
+   int32_t         y;
+
+   traces = [w storeForKind:[w kindNamed:"Trace"]];
+   for( y = 0; y < 64; y += 9)
+      for( x = 0; x < 64; x += 7)
+      {
+         nf = [w tracesNear:BGOnTile( x, y, 0) radius:6 into:&fast];
+         for( ns = 0, i = 0; i < [traces count]; i++)
+         {
+            trace = [traces recordAtIndex:i];
+            if( trace->bearer)
+            {
+               for( at = [w locationOf:(BGEntityID) trace->bearer]; at.form != BGLocationOnTile && at.place;
+                    at = [w locationOf:at.place])
+                  ;
+               tile = at;
+            }
+            else
+               tile = BGOnTile( (int32_t) trace->tileX, (int32_t) trace->tileY, (int32_t) trace->tileLevel);
+            if( tile.form == BGLocationOnTile && tile.level == 0 && abs( tile.x - x) <= 6 && abs( tile.y - y) <= 6)
+               slow[ ns++] = [traces entityAtIndex:i];
+         }
+         same = nf == ns && ! memcmp( fast, slow, ns * sizeof( BGEntityID));
+         free( fast);
+         if( ! same)
+            return( NO);
+      }
+   return( YES);
+}
+
+
+/* TERRAIN.md, the spatial index: what stands where, by chunk, and what is
+ * held by whom, kept with every move, every move a refused group undid, and a
+ * save restored; a query near a tile across chunk corners. */
+static void   test_spatial_index( void)
+{
+   BGStage            st;
+   BGProposalGroup    *g;
+   BGEntityID         crates[ 40];
+   BGEntityID         box;
+   BGEntityID         worker;
+   BGEntityID         found[ 64];
+   BGWorld            *w2;
+   NSArray            *deferred;
+   NSString           *error;
+   NSString           *text;
+   uint64_t           position;
+   int                i;
+
+   st.w = BGTestWorld( 191);
+   st.c = BGTestCommitter( st.w);
+   st.s = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   g    = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: crates about"];
+   for( i = 0; i < 40; i++)
+      crates[ i] = [g create:"crate" key:[[NSString stringWithFormat:@"crate %d", i] UTF8String]
+                          at:BGOnTile( (i * 7) % 32, (i * 13) % 32, 0)];
+   box    = [g create:"crate" key:"a crate to hold" at:BGOnTile( 31, 31, 0)];
+   worker = [g create:"worker" key:"worker" at:BGOnTile( 25, 25, 0)];
+   for( i = 0; i < 12; i++)
+      BGMakeTrace( st.w, g, "scuffs", BGNoEntity, BGOnTile( (i * 11) % 60, (i * 17) % 60, 0), 50, "the test");
+   BGMakeTrace( st.w, g, "scuffs", box, BGOnTile( 31, 31, 0), 50, "the test");
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   for( i = 0; i < 40; i++)
+      crates[ i] = [g idFor:crates[ i]];
+   box    = [g idFor:box];
+   worker = [g idFor:worker];
+   BG_CHECK( index_agrees( st.w) && traces_agree( st.w));
+
+   /* across the corner of four chunks: a crate at (31, 31) and the one at (0, 0) */
+   BG_CHECK( [st.w entitiesNear:BGOnTile( 31, 31, 0) radius:1 into:found max:64] == 1 && found[ 0] == box);
+   BG_CHECK( [st.w entitiesOnTile:BGOnTile( 0, 0, 0) into:found max:64] == 2 && found[ 0] == crates[ 0] &&
+             found[ 1] == crates[ 32]);
+
+   /* moved about, and one taken up */
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"crates moved"];
+   for( i = 0; i < 40; i += 3)
+      [g move:BGWhole( crates[ i]) to:BGOnTile( (i * 5 + 3) % 32, (i * 11 + 1) % 32, 0)];
+   [g move:BGWhole( box) to:BGHeldBy( worker, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 2)];
+   BG_CHECK( [g applied] && index_agrees( st.w) && traces_agree( st.w));
+   BG_CHECK( [st.w entitiesAt:worker form:BGLocationHeldBy into:found max:64] == 1 && found[ 0] == box);
+   BG_CHECK( [st.w entitiesNear:BGOnTile( 31, 31, 0) radius:0 into:found max:64] == 0);
+
+   /* a group refused: its moves undone, and the index with them */
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"a move refused"];
+   [g move:BGWhole( crates[ 1]) to:BGOnTile( 20, 20, 0)];
+   [g move:BGWhole( crates[ 2]) to:BGOnTile( 21, 20, 0)];
+   [g set:"Door.ajar" of:BGWhole( crates[ 3]) to:1];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 3)];
+   BG_CHECK( ! [g applied] && index_agrees( st.w) && traces_agree( st.w));
+
+   /* saved and restored: built again from the locations */
+   text = BGSave( st.w, st.c, [NSArray array]);
+   w2   = BGRestore( text, [st.w contentBuild], &deferred, &position, &error);
+   BG_CHECK( w2 != nil && index_agrees( w2) && traces_agree( w2));
+}
+
+
+/* TERRAIN.md, water past 32 by 32: on a yard 96 by 64, a puddle poured at
+ * (68, 50) spreads west across hundreds of tiles, past where the domain's
+ * old cap of 448 would have frozen it, and east not at all, past a wall
+ * built down the yard at x 70; the water is all there, every boundary; and
+ * saved, only the wet tiles are written. */
+static void   test_water_at_scale( void)
+{
+   BGStage            st;
+   BGFluidDomain      *fluid;
+   BGProposalGroup    *g;
+   NSString           *text;
+   int32_t            x;
+   int32_t            y;
+   int                wet;
+   BOOL               conserved;
+
+   st.w  = BGTestWorld( 193);
+   BG_CHECK( [st.w setTerrainMap:"yard_map" error:NULL]);
+   BG_CHECK( [st.w tilesWide] == 96 && [st.w tilesHigh] == 64);
+   st.c  = BGTestCommitter( st.w);
+   fluid = [[[BGFluidDomain alloc] initWithWorld:st.w] autorelease];
+   st.s  = [[[BGScheduler alloc] initWithWorld:st.w committer:st.c] autorelease];
+   [st.s addDomain:fluid];
+   g = [BGProposalGroup groupWithPhase:BGPhaseSystem source:@"setup: a wall across the yard"];
+   for( y = 0; y < 64; y++)
+      [g setTerrain:"stone_wall" at:BGOnTile( 70, y, 0)];
+   [st.c submit:g];
+   [st.s runUntil:BGTimeMake( 1)];
+   BG_CHECK( [g applied]);
+   [st.w setWater:40000 atX:68 y:50 level:0];
+   conserved = YES;
+   while( [st.s stepUntil:BGTimeMake( 3600000)])
+      conserved = conserved && [st.w totalTileWater] + [fluid checkedOutWater] == 40000;
+   BG_CHECK( conserved && [st.w totalTileWater] + [fluid checkedOutWater] == 40000);
+   for( wet = 0, y = 0; y < 64; y++)
+      for( x = 71; x < 96; x++)
+         wet += [st.w waterAtX:x y:y level:0] != 0;
+   BG_CHECK( wet == 0 && [st.w wetTiles:NULL max:0] > 448 && [st.w waterAtX:50 y:50 level:0] > 0);
+   text = BGSave( st.w, st.c, [NSArray array]);
+   BG_CHECK( [[text componentsSeparatedByString:@"\ntile "] count] - 1 == [st.w wetTiles:NULL max:0]);
+}
+
+
+/* A grid for BGPath, from rows of '#' (walls) and anything else. */
+typedef struct
+{
+   const char   **rows;
+   int32_t      high;
+} BGTestGrid;
+
+static BOOL   grid_open( void *context, int32_t x, int32_t y)
+{
+   BGTestGrid   *g;
+
+   g = context;
+   return( y >= 0 && y < g->high && x >= 0 && x < (int32_t) strlen( g->rows[ y]) && g->rows[ y][ x] != '#');
+}
+
+
+static BOOL   everywhere( void *context, int32_t x, int32_t y)
+{
+   return( YES);
+}
+
+
+static BOOL   at_star( void *context, int32_t x, int32_t y)
+{
+   BGTestGrid   *g;
+
+   g = context;
+   return( grid_open( context, x, y) && g->rows[ y][ x] == '*');
+}
+
+
+/* BGPath: the shortest way through a maze, step by step, never into a
+ * wall; breadth-first to the nearest of what it looks for; no way out of a
+ * box, the nearest it came; and bounded, the same few thousand tiles in an
+ * endless plain. */
+static void   test_paths( void)
+{
+   static const char   *maze[] = { "#########",
+                                   "#...#...#",
+                                   "#.#.#.#.#",
+                                   "#.#...#.#",
+                                   "#########" };
+   static const char   *box[]  = { "#####.....",
+                                   "#...#.....",
+                                   "#####....." };
+   static const char   *seek[] = { "..........",
+                                   "....#.....",
+                                   "..*.#...*." };
+   BGTestGrid           grid;
+   BGPathQuery          q;
+   BGPathResult         r;
+   BGPathResult         first;
+   int64_t              walked;
+   BOOL                 clear;
+
+   /* the maze: from (1, 1) to beside (7, 1), round the walls, not into
+    * the dead end below */
+   grid.rows = maze;
+   grid.high = 5;
+   memset( &q, 0, sizeof( q));
+   q.x        = 1;
+   q.y        = 1;
+   q.targeted = YES;
+   q.tx       = 7;
+   q.ty       = 1;
+   q.context  = &grid;
+   q.passable = grid_open;
+   first      = BGPathFind( &q);
+   BG_CHECK( first.found && first.step == BGStepEast && first.steps == 9);
+   for( walked = 0, clear = YES; walked < 20; walked++)
+   {
+      r = BGPathFind( &q);
+      if( r.step == BGStepNone)
+         break;
+      q.x += r.step == BGStepEast ? 1 : r.step == BGStepWest ? -1 : 0;
+      q.y += r.step == BGStepSouth ? 1 : r.step == BGStepNorth ? -1 : 0;
+      clear = clear && grid_open( &grid, q.x, q.y);
+   }
+   BG_CHECK( clear && walked == first.steps && abs( q.x - 7) <= 1 && abs( q.y - 1) <= 1);
+
+   /* shut in a box: no way, but the nearest it came */
+   grid.rows = box;
+   grid.high = 3;
+   q.x  = 1;
+   q.y  = 1;
+   q.tx = 9;
+   q.ty = 1;
+   r    = BGPathFind( &q);
+   BG_CHECK( ! r.found && r.x == 3 && r.y == 1 && r.step == BGStepEast);
+
+   /* looking, not going: the nearest '*' by steps, round the wall */
+   grid.rows  = seek;
+   q.targeted = NO;
+   q.goal     = at_star;
+   q.x        = 6;
+   q.y        = 2;
+   r          = BGPathFind( &q);
+   BG_CHECK( r.found && r.x == 8 && r.y == 2 && r.steps == 2 && r.step == BGStepEast);
+   q.x = 5;
+   r   = BGPathFind( &q);
+   BG_CHECK( r.found && r.x == 8 && r.steps == 3);          /* (2, 2) is 7 round the wall */
+
+   /* an endless plain, the target a million tiles off: bounded, and toward it */
+   memset( &q, 0, sizeof( q));
+   q.targeted = YES;
+   q.tx       = 1000000;
+   q.ty       = 7;
+   q.passable = everywhere;
+   r          = BGPathFind( &q);
+   BG_CHECK( ! r.found && r.expanded <= BG_PATH_BUDGET && (r.step == BGStepEast || r.step == BGStepSouth) &&
+             r.x > 4000);
+}
+
+
 /* Talking takes time (ACTIONS.md §5, AGENCY.md §11: conversations are
  * communicate activities): a remark is a second on the voice, the words
  * said when it ends. Walking while talking works; a second remark at once
@@ -10965,6 +11333,10 @@ const BGTestCase   BGAllTests[] =
    { "talking_takes_time",            test_talking_takes_time },
    { "reading_takes_time",            test_reading_takes_time },
    { "explore_autopilot",             test_explore_autopilot },
+   { "explore_rooms",                 test_explore_rooms },
+   { "paths",                         test_paths },
+   { "spatial_index",                 test_spatial_index },
+   { "water_at_scale",                test_water_at_scale },
    { "recipe_autopilot",              test_recipe_autopilot },
    { "resume_recheck",                test_resume_recheck },
    { "interrupted_repair",            test_interrupted_repair },

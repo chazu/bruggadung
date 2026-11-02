@@ -1862,6 +1862,32 @@ static BOOL   line_clear( const BGTerrain *t, int32_t x0, int32_t y0, int32_t x1
 
 /* Whether the agent here can see the tile: in its line of sight, and lit,
  * or within arm's reach. */
+/* What might be in sight from a tile: what stands on the ground within
+ * BG_SIGHT of it (the world's spatial index, TERRAIN.md), and what is in,
+ * on, held by or part of that, all the way down; everything, for an
+ * omniscient eye. Malloc'd into *out; returns how many. */
+- (NSUInteger) candidatesFrom:(BGLocation) here
+                         into:(BGEntityID **) out
+{
+   BGStore      *bodies;
+   BGEntityID   *list;
+   NSUInteger   n;
+   NSUInteger   i;
+
+   if( _omniscient)
+   {
+      bodies = [_world storeForKind:[_world kindNamed:"Body"]];
+      n      = [bodies count];
+      list   = malloc( (n ? n : 1) * sizeof( BGEntityID));
+      for( i = 0; i < n; i++)
+         list[ i] = [bodies entityAtIndex:i];
+      *out = list;
+      return( n);
+   }
+   return( [_world thingsNear:here radius:BG_SIGHT into:out]);
+}
+
+
 - (BOOL) sees:(BGLocation) tile
          from:(BGLocation) here
 {
@@ -3197,12 +3223,26 @@ static int   cmp_fresh( const void *a, const void *b)
    int64_t         loudest;
    BGTraceSeen     fresh[ 64];
    NSUInteger      nfresh;
+   BGEntityID      *near;
+   NSUInteger      nnear;
    int             sensed;
    char            sense[ 16];
    const char      *kind;
 
    tri      = [_world tri];
    traces   = [_world storeForKind:[_world kindNamed:"Trace"]];
+   /* the traces it could sense: those a sound could carry from (the
+    * spatial index, TERRAIN.md), the farthest reach of any sense; all of
+    * them, to an omniscient eye */
+   if( _omniscient)
+   {
+      nnear = [traces count];
+      near  = malloc( (nnear ? nnear : 1) * sizeof( BGEntityID));
+      for( i = 0; i < nnear; i++)
+         near[ i] = [traces entityAtIndex:i];
+   }
+   else
+      nnear = [_world tracesNear:here radius:BG_SOUND_REACH into:&near];
    range[ 0] = BG_SIGHT;
    range[ 1] = BG_SMELL + (closely ? 1 : 0);
    range[ 2] = BG_HEARING;
@@ -3210,16 +3250,17 @@ static int   cmp_fresh( const void *a, const void *b)
    /* sound (KNOWLEDGE.md decision 14): the loudest heard here, which masks
     * what is much quieter */
    loudest = 0;
-   for( i = 0; ! _omniscient && i < [traces count]; i++)
-      if( sound_from( _world, tri, [traces recordAtIndex:i], [traces entityAtIndex:i], &tile))
+   for( i = 0; ! _omniscient && i < nnear; i++)
+      if( (record = [traces recordFor:near[ i]]) && sound_from( _world, tri, record, near[ i], &tile))
       {
-         strength = BGLoudness( _world, BGTraceStrength( [traces recordAtIndex:i], now), tile, here);
+         strength = BGLoudness( _world, BGTraceStrength( record, now), tile, here);
          loudest  = strength > loudest ? strength : loudest;
       }
-   for( i = 0; i < [traces count]; i++)
+   for( i = 0; i < nnear; i++)
    {
-      record   = [traces recordAtIndex:i];
-      kind     = [_world textField:"Trace.traceKind" of:[traces entityAtIndex:i]];
+      if( ! (record = [traces recordFor:near[ i]]))
+         continue;
+      kind     = [_world textField:"Trace.traceKind" of:near[ i]];
       strength = BGTraceStrength( record, now);
       v = kind ? tri_at( tri, tri_pattern( tri, kind), "sense") : NULL;
       sense[ 0] = 0;
@@ -3232,7 +3273,7 @@ static int   cmp_fresh( const void *a, const void *b)
        * from where it came */
       if( sensed == 2 && ! _omniscient)
       {
-         if( ! sound_from( _world, tri, record, [traces entityAtIndex:i], &tile))
+         if( ! sound_from( _world, tri, record, near[ i], &tile))
             continue;
          strength = BGLoudness( _world, strength, tile, here);
          if( strength < (closely ? BG_TRACE_FLOOR_CLOSE : BG_TRACE_FLOOR) || strength < loudest - BG_SOUND_MASK)
@@ -3247,7 +3288,7 @@ static int   cmp_fresh( const void *a, const void *b)
          t.strength = (int32_t) strength;
          t.seen     = now;
          t.present  = YES;
-         t.truth    = [traces entityAtIndex:i];        /* developer-only */
+         t.truth    = near[ i];        /* developer-only */
          if( ! [store knowsTrace:t])
          {
             if( nfresh < 64)
@@ -3283,7 +3324,7 @@ static int   cmp_fresh( const void *a, const void *b)
       t.strength = (int32_t) strength;
       t.seen     = now;
       t.present  = YES;
-      t.truth    = [traces entityAtIndex:i];        /* developer-only */
+      t.truth    = near[ i];        /* developer-only */
       /* known already, it is seen as it is now; new, it waits for attention */
       if( ! [store knowsTrace:t])
       {
@@ -3293,6 +3334,8 @@ static int   cmp_fresh( const void *a, const void *b)
       }
       [store noteTrace:t];
    }
+
+   free( near);
 
    /* new to it: the strongest first get what attention is left (KNOWLEDGE.md
     * §5); a close look, investigating, attends to all of them */
@@ -3795,7 +3838,9 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
    const BGThermalBody *body;
    const BGGasStore   *gas;
    BGReferent         *r;
-   BGStore            *bodies;
+   BGEntityID         *near;
+   NSUInteger         nnear;
+   NSUInteger         kbody;
    BGView             *view;
    BGSeen             *seen;
    BGEntityID         lookedIn[ 64];
@@ -3895,15 +3940,16 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
    }
 
    /* what is in sight, holders before what they hold */
-   bodies = [_world storeForKind:[_world kindNamed:"Body"]];
-   seen   = malloc( sizeof( BGSeen) * ([bodies count] + 1));
-   nseen  = 0;
-   for( i = 0; i < [bodies count]; i++)
+   kbody = [_world kindNamed:"Body"];
+   nnear = [self candidatesFrom:here into:&near];
+   seen  = malloc( sizeof( BGSeen) * (nnear + 1));
+   nseen = 0;
+   for( i = 0; i < nnear; i++)
    {
       BGEntityID   e;
 
-      e = [bodies entityAtIndex:i];
-      if( ! ground_tile( _world, e, &tile) || ! [self sees:tile from:here])
+      e = near[ i];
+      if( ! [_world record:kbody for:e] || ! ground_tile( _world, e, &tile) || ! [self sees:tile from:here])
          continue;
       at = [_world locationOf:e];
       if( at.form == BGLocationIn && ! _omniscient && ! contains( lookedIn, nlooked, at.place) &&
@@ -3918,6 +3964,7 @@ static uint32_t   usual_place( BGKnowledgeStore *store, uint32_t actor, int64_t 
       nseen++;
    }
    qsort( seen, nseen, sizeof( BGSeen), cmp_seen);
+   free( near);
    /* terrain changed where it can't see: it recalls what it saw there
     * (TERRAIN.md decision 7); then the tiles it sees now */
    for( i = first; i < last; i++)

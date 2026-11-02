@@ -121,15 +121,21 @@ typedef struct
    int32_t        _tilesWide;
    int32_t        _tilesHigh;
    int32_t        _levels;
-   int64_t        *_tileWater;       /* a stock per tile, in mL */
+   struct BGTileStocks *_stocks;     /* tile stocks (water, mL), by chunk, only where ever wet */
    BGTerrain      *_terrain;         /* what each tile is (TERRAIN.md); NULL: content has no kinds, all open */
-   uint8_t        *_tileOut;         /* checked out by a domain; not saved */
    BGEntityID     *_roomAir;         /* each room's air, by room number; a cache */
    uint32_t       _nroomAir;
-   uint64_t       _roomAirChanges;   /* the GasStore store's changes, when it was made */
+   uint64_t       _roomAirChanges;   /* the GasStore store's members and anchors moved, when it was made */
+   uint64_t       _airAnchors;       /* GasStore tiles set, or undone */
    uint64_t       _roomAirDropped;   /* the terrain's rooms dropped, then */
    BOOL           _roomAirKnown;
 
+   struct BGIndex *_onGround;        /* what stands on a tile, by its chunk; derived from the locations */
+   struct BGIndex *_inPlace;         /* what is in, on, held by or part of a thing, by the thing */
+   struct BGIndex *_tracesOnGround;  /* traces on the floor, by chunk */
+   struct BGIndex *_tracesBorne;     /* traces on a thing, by the thing */
+   NSUInteger     _kindTrace;
+   NSUInteger     _kindGas;
    BGEntityID     *_checkedOut;      /* sorted; not saved: saves check everything in */
    NSUInteger     _ncheckedOut;
 }
@@ -225,6 +231,33 @@ typedef struct
 - (void) setLocation:(BGLocation) location
                   of:(BGEntityID) entity;
 /* Entities located at `place` in the given form, in ID order. */
+/* What stands on the ground at a tile, in entity order: returns how many,
+ * filling up to max. */
+- (NSUInteger) entitiesOnTile:(BGLocation) tile
+                         into:(BGEntityID *) out
+                          max:(NSUInteger) max;
+/* What stands on the ground within `radius` tiles of a tile (corners too),
+ * on its level, in entity order. A spatial query: it reads the chunks the
+ * square touches, nothing else. */
+- (NSUInteger) entitiesNear:(BGLocation) tile
+                     radius:(int32_t) radius
+                       into:(BGEntityID *) out
+                        max:(NSUInteger) max;
+/* What is within `radius` of a tile, all of it: on the ground there, and
+ * what is in, on, held by or part of that, all the way down. Malloc'd into
+ * *out, in no set order; returns how many. */
+- (NSUInteger) thingsNear:(BGLocation) tile
+                   radius:(int32_t) radius
+                     into:(BGEntityID **) out;
+/* The traces within `radius` of a tile: on the floor there, or borne by
+ * what is there (thingsNear). Malloc'd into *out, in entity order. */
+- (NSUInteger) tracesNear:(BGLocation) tile
+                   radius:(int32_t) radius
+                     into:(BGEntityID **) out;
+/* What is in, on, held by or part of a thing, any way, in entity order. */
+- (NSUInteger) entitiesIn:(BGEntityID) place
+                     into:(BGEntityID *) out
+                      max:(NSUInteger) max;
 - (NSUInteger) entitiesAt:(BGEntityID) place
                      form:(BGLocationForm) form
                      into:(BGEntityID *) out
@@ -255,8 +288,8 @@ typedef struct
 /* --- tiles ---------------------------------------------------------------- */
 
 /* The map: 32 × 32 tiles on one level, unless a terrain map says otherwise.
- * Tiles hold stocks; water is the first. A tile outside the map holds
- * nothing and takes nothing. */
+ * Tiles hold stocks; water is the first, kept per chunk only where a tile
+ * was ever wet. A tile outside the map holds nothing and takes nothing. */
 - (BOOL) isTileX:(int32_t) x
                y:(int32_t) y
            level:(int32_t) level;
@@ -271,6 +304,10 @@ typedef struct
             level:(int32_t) level;
 /* the water in tiles whose stock is at rest */
 - (int64_t) totalTileWater;
+/* The tiles holding water, by level, then row, then column: returns how
+ * many, filling up to max. Costs what is wet, not the map. */
+- (NSUInteger) wetTiles:(int32_t (*)[ 3]) out
+                    max:(NSUInteger) max;
 - (BOOL) isTileCheckedOutX:(int32_t) x
                          y:(int32_t) y
                      level:(int32_t) level;
@@ -313,6 +350,13 @@ typedef struct
 - (NSUInteger) airOpeningsOf:(BGEntityID) region
                         into:(BGAirOpening *) out
                          max:(NSUInteger) max;
+/* Whether a region of air is shut in: none of its doorways open (no door,
+ * or the door ajar). */
+- (BOOL) airIsShutIn:(BGEntityID) region;
+/* Whether one region (none: the outdoors) opens to the other through a
+ * doorway standing open. */
+- (BOOL) airRegion:(BGEntityID) a
+      opensOpenTo:(BGEntityID) b;
 
 /* --- checkout --------------------------------------------------------------- */
 

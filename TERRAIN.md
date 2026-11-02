@@ -158,23 +158,48 @@ floor.
 4. **Levels.** Floors, open air, stairs or ladders; water falling through
    what has no floor.
 
+### Built besides: what lets terrain scale
+
+- **Pathfinding** (lab/src/core/BGPath): a bounded search over tiles,
+  expanding at most `BG_PATH_BUDGET` (4096) of them, so it costs the same
+  in any world. Toward a target it is A* to the target's reach; looking
+  for something it is breadth-first. Agents walk over the ground as they
+  believe it (decision 7): a tile they saw solid stops them, a tile never
+  seen they guess open. Where the straight way is as short as any, they
+  take the longer axis first, as before, so open-ground walks are
+  unchanged. Exploring is the same search, for the nearest tile never
+  seen, in place of a scan of the whole map; out of a search's reach of
+  anything unseen, the explorer stops.
+- **The spatial index** (lab/src/core/BGIndex, BGWorld): what stands on the
+  ground, filed by chunk; what is in, on, held by or part of a thing,
+  filed by the thing; traces on the floor by chunk, and traces borne by
+  their bearer. Each list is in entity order, so a query reads the same
+  however the index was built; kept with every change of location or
+  trace, with every change a refused group undoes, and built again by a
+  save restored. Sight reads only what is within `BG_SIGHT` and all it
+  holds; hearing only the traces within `BG_SOUND_REACH` (no sound carries
+  further); a step only its tile's traces; a doorway's door only its
+  tile.
+- **Tile stocks are sparse.** Water lies in chunks kept once a tile in
+  them is wet; saves write the wet tiles, the state hash reads them.
+  The fluid domain works from the wet tiles and their neighbours on any
+  map, as many as there are (its holders grow as needed), and water
+  stops at walls.
+
 ## Open questions
 
 - **Rooms larger than `BG_ROOM_MAX`** are open ground: a great hall wants
   the bound raised, or the outdoors told apart another way (with levels,
   open to the sky).
-- **What step 3 still scans:** finding the door in a doorway goes through
-  every door; the atmosphere holds at most 8 regions and 32 links, as
-  before. Both want the spatial index perception wants.
+- **What still holds a fixed number:** the atmosphere at most 8 regions
+  and 32 links, the thermal domain 16 bodies, as before; past them,
+  regions and bodies drop out unseen.
 - **Doorways one tile thick.** A link is found across one doorway cell; two
   doorway cells in a row join nothing.
-- **The world's extent past 32 x 32.** The fluid domain, the explorer and
-  the tile memory loop over a 32 x 32 grid. Step 1 sizes the world from its
-  map; maps larger than that work for terrain and walking, but water there
-  waits for the fluid domain to be generalised.
+- **Paths past a search's reach.** A target further than the budget's
+  reach is walked toward by the nearest point found, which a long wall can
+  mislead; long journeys want a coarser graph (rooms and doorways, or
+  chunks) to plan over first.
 - **Generators.** What a generator is in content (rules, rooms and
   corridors, noise), and how determinism by seed and chunk meets content
   that changes.
-- **Pathfinding.** Agents walk greedily toward a goal, so a wall stops
-  them. Paths over terrain, and over the terrain an agent remembers rather
-  than the true one, come with step 2 or soon after.

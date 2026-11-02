@@ -4156,3 +4156,37 @@ its links. At scale: a 1024 x 1024 plain in no room; a hut a room when its
 last wall closes; a hall past `BG_ROOM_MAX` open, parted into two rooms.
 
 104 tests, 3399 checks, under both compilers, UBSan, and leak-free.
+
+
+### After the slice: terrain that scales
+
+Pathfinding, a spatial index, and nothing sized by the map.
+
+- **Pathfinding** (`BGPath`): bounded A* (4096 tiles expanded) to a
+  target's reach, or breadth-first to what it looks for, deterministic in
+  every tie. Agents walk over the ground they believe; on open ground the
+  step is the one they took before. The explorer searches for the nearest
+  unseen tile instead of scanning the map.
+- **The spatial index** (`BGIndex`; `-[BGWorld entitiesNear:radius:...]`,
+  `entitiesOnTile:`, `entitiesIn:`, `thingsNear:`, `tracesNear:`): by chunk
+  on the ground, by thing for what it holds, and traces by chunk or
+  bearer; kept with every change, every rollback, and a restore. Sight,
+  hearing (within `BG_SOUND_REACH`), a step's traces, a doorway's door and
+  `entitiesAt:` read it.
+- **Sparse tile stocks**: water per chunk, only where ever wet;
+  `-[BGWorld wetTiles:max:]`; saves and the state hash read the wet tiles.
+  The fluid domain works on any map from the wet tiles, its holders
+  growing as needed, and water stops at walls.
+- **Caps gone**: a room's doorways, a region's openings (light's "shut
+  in" and sound's "open between" are world queries now); the room-to-air
+  cache kept while only stocks change. Trace tiles up to 1,000,000.
+- **A bug**: activities ended in one round, past 64, read off the end of a
+  buffer; it grows now.
+
+Checked besides: a maze, a box, a nearest-of search and an endless plain
+for BGPath; an explorer finding its way out of the room and round the
+building; the index against a scan of every location and trace, through
+moves, a refused group and a restore; 40 L of water spreading over 581
+tiles of a 96 by 64 yard and not past a wall, every millilitre kept.
+
+108 tests, 3425 checks, under both compilers, UBSan, and leak-free.

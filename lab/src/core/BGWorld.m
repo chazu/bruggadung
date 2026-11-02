@@ -1,5 +1,6 @@
 #define BG_COMPONENT_REGISTRY
 #import "BGWorld.h"
+#import "BGIndex.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -74,6 +75,185 @@ void   BGLocationFormat( BGLocation loc, char *buf, size_t len)
 }
 
 
+/* --- tile stocks --------------------------------------------------------- */
+
+/* Water per tile, a chunk of BG_CHUNK x BG_CHUNK cells of a level at a
+ * time, kept once a tile in it is wet or checked out: a world costs what has
+ * ever been wet, not its extent. */
+typedef struct
+{
+   int32_t   cx;
+   int32_t   cy;
+   int32_t   z;
+   int64_t   *water;          /* NULL: an empty slot */
+   uint8_t   *out;
+} BGStockChunk;
+
+struct BGTileStocks
+{
+   BGStockChunk   *chunks;
+   NSUInteger     n;
+   NSUInteger     cap;        /* a power of two, or 0 */
+};
+
+
+static struct BGTileStocks   *stocks_new( void)
+{
+   return( calloc( 1, sizeof( struct BGTileStocks)));
+}
+
+
+static void   stocks_free( struct BGTileStocks *s)
+{
+   NSUInteger   i;
+
+   for( i = 0; i < s->cap; i++)
+   {
+      free( s->chunks[ i].water);
+      free( s->chunks[ i].out);
+   }
+   free( s->chunks);
+   free( s);
+}
+
+
+static NSUInteger   stock_slot( int32_t cx, int32_t cy, int32_t z, NSUInteger cap)
+{
+   return( (NSUInteger) BGMix( ((uint64_t) (uint32_t) cx << 32) ^ ((uint64_t) (uint32_t) cy << 8) ^ (uint64_t) (uint32_t) z) &
+           (cap - 1));
+}
+
+
+static BGStockChunk   *stocks_chunk( struct BGTileStocks *s, int32_t x, int32_t y, int32_t z, BOOL make)
+{
+   BGStockChunk   *old;
+   NSUInteger     oldcap;
+   NSUInteger     i;
+   NSUInteger     j;
+   int32_t        cx;
+   int32_t        cy;
+
+   cx = x / BG_CHUNK;
+   cy = y / BG_CHUNK;
+   for( i = s->cap ? stock_slot( cx, cy, z, s->cap) : 0; s->cap && s->chunks[ i].water; i = (i + 1) & (s->cap - 1))
+      if( s->chunks[ i].cx == cx && s->chunks[ i].cy == cy && s->chunks[ i].z == z)
+         return( &s->chunks[ i]);
+   if( ! make)
+      return( NULL);
+   if( (s->n + 1) * 2 > s->cap)
+   {
+      old       = s->chunks;
+      oldcap    = s->cap;
+      s->cap    = oldcap ? oldcap * 2 : 8;
+      s->chunks = calloc( s->cap, sizeof( BGStockChunk));
+      for( i = 0; i < oldcap; i++)
+         if( old[ i].water)
+         {
+            for( j = stock_slot( old[ i].cx, old[ i].cy, old[ i].z, s->cap); s->chunks[ j].water; j = (j + 1) & (s->cap - 1))
+               ;
+            s->chunks[ j] = old[ i];
+         }
+      free( old);
+   }
+   for( i = stock_slot( cx, cy, z, s->cap); s->chunks[ i].water; i = (i + 1) & (s->cap - 1))
+      ;
+   s->chunks[ i].cx    = cx;
+   s->chunks[ i].cy    = cy;
+   s->chunks[ i].z     = z;
+   s->chunks[ i].water = calloc( BG_CHUNK * BG_CHUNK, sizeof( int64_t));
+   s->chunks[ i].out   = calloc( BG_CHUNK * BG_CHUNK, 1);
+   s->n++;
+   return( &s->chunks[ i]);
+}
+
+
+static int64_t   *stocks_cell( struct BGTileStocks *s, int32_t x, int32_t y, int32_t z, BOOL make)
+{
+   BGStockChunk   *c;
+
+   c = stocks_chunk( s, x, y, z, make);
+   return( c ? &c->water[ (y % BG_CHUNK) * BG_CHUNK + x % BG_CHUNK] : NULL);
+}
+
+
+static uint8_t   *stocks_out( struct BGTileStocks *s, int32_t x, int32_t y, int32_t z, BOOL make)
+{
+   BGStockChunk   *c;
+
+   c = stocks_chunk( s, x, y, z, make);
+   return( c ? &c->out[ (y % BG_CHUNK) * BG_CHUNK + x % BG_CHUNK] : NULL);
+}
+
+
+static BOOL   stocks_any( struct BGTileStocks *s)
+{
+   NSUInteger   i;
+   NSUInteger   k;
+
+   for( i = 0; i < s->cap; i++)
+      for( k = 0; s->chunks[ i].water && k < BG_CHUNK * BG_CHUNK; k++)
+         if( s->chunks[ i].water[ k] || s->chunks[ i].out[ k])
+            return( YES);
+   return( NO);
+}
+
+
+static int64_t   stocks_total( struct BGTileStocks *s)
+{
+   NSUInteger   i;
+   NSUInteger   k;
+   int64_t      sum;
+
+   sum = 0;
+   for( i = 0; i < s->cap; i++)
+      for( k = 0; s->chunks[ i].water && k < BG_CHUNK * BG_CHUNK; k++)
+         if( ! s->chunks[ i].out[ k])
+            sum += s->chunks[ i].water[ k];
+   return( sum);
+}
+
+
+static int   cmp_tile( const void *a, const void *b)
+{
+   const int32_t   *p;
+   const int32_t   *q;
+   int             k;
+
+   p = a;
+   q = b;
+   for( k = 2; k >= 0; k--)
+      if( p[ k] != q[ k])
+         return( p[ k] < q[ k] ? -1 : 1);
+   return( 0);
+}
+
+
+/* The wet tiles, by level, row, column; how many, filling up to max. */
+static NSUInteger   stocks_wet( struct BGTileStocks *s, int32_t (*out)[ 3], NSUInteger max)
+{
+   NSUInteger   i;
+   NSUInteger   k;
+   NSUInteger   n;
+
+   n = 0;
+   for( i = 0; i < s->cap; i++)
+      for( k = 0; s->chunks[ i].water && k < BG_CHUNK * BG_CHUNK; k++)
+         if( s->chunks[ i].water[ k])
+         {
+            if( n < max)
+            {
+               out[ n][ 0] = s->chunks[ i].cx * BG_CHUNK + (int32_t) (k % BG_CHUNK);
+               out[ n][ 1] = s->chunks[ i].cy * BG_CHUNK + (int32_t) (k / BG_CHUNK);
+               out[ n][ 2] = s->chunks[ i].z;
+            }
+            n++;
+         }
+   if( out && max)
+      qsort( out, n < max ? n : max, sizeof( *out), cmp_tile);
+   return( n);
+}
+
+
 @implementation BGWorld
 
 + (instancetype) worldWithContent:(BGContent *) content
@@ -117,15 +297,20 @@ void   BGLocationFormat( BGLocation loc, char *buf, size_t len)
       _kindTypes[ k] = tri_type_named( [content content], BGComponents[ k].type);
    }
    _trueType   = tri_type_named( [content content], "true");
+   _kindTrace  = [self kindNamed:"Trace"];
+   _kindGas    = [self kindNamed:"GasStore"];
    _entities   = [[BGStore alloc] initWithRecordSize:sizeof( BGEntityInfo)];
    _locations  = [[BGStore alloc] initWithRecordSize:sizeof( BGLocation)];
    _tombstones = [[BGStore alloc] initWithRecordSize:sizeof( BGTombstone)];
+   _onGround       = BGIndexNew();
+   _inPlace        = BGIndexNew();
+   _tracesOnGround = BGIndexNew();
+   _tracesBorne    = BGIndexNew();
    _arena      = tri_arena_new();
    _tilesWide  = 32;
    _tilesHigh  = 32;
    _levels     = 1;
-   _tileWater  = calloc( (size_t) (_tilesWide * _tilesHigh * _levels), sizeof( int64_t));
-   _tileOut    = calloc( (size_t) (_tilesWide * _tilesHigh * _levels), 1);
+   _stocks     = stocks_new();
    {
       char   why[ 256];
 
@@ -153,10 +338,13 @@ void   BGLocationFormat( BGLocation loc, char *buf, size_t len)
       free( _strings[ i]);
    free( _strings);
    free( _journal);
-   free( _tileWater);
-   free( _tileOut);
+   stocks_free( _stocks);
    BGTerrainFree( _terrain);
    free( _roomAir);
+   BGIndexFree( _onGround);
+   BGIndexFree( _inPlace);
+   BGIndexFree( _tracesOnGround);
+   BGIndexFree( _tracesBorne);
    free( _checkedOut);
    tri_arena_free( _arena);
    [_content release];
@@ -327,11 +515,21 @@ static void   edge_remove_raw( BGWorld *self, BGEdge e);
       switch( j->op)
       {
       case BGJournalRecord:
+         if( _kindGas < _nkinds && j->store == _kinds[ _kindGas])
+            _airAnchors++;
+         if( j->store == _locations)
+            file_location( self, j->entity, [_locations recordFor:j->entity], NO);
+         if( _kindTrace < _nkinds && j->store == _kinds[ _kindTrace])
+            file_trace( self, j->entity, [j->store recordFor:j->entity], NO);
          if( j->had)
             [j->store setRecord:j->old
                             for:j->entity];
          else
             [j->store removeRecordFor:j->entity];
+         if( j->store == _locations)
+            file_location( self, j->entity, [_locations recordFor:j->entity], YES);
+         if( _kindTrace < _nkinds && j->store == _kinds[ _kindTrace])
+            file_trace( self, j->entity, [j->store recordFor:j->entity], YES);
          break;
 
       case BGJournalEdgeAdd:
@@ -473,13 +671,45 @@ static int   cmp_id( const void *a, const void *b)
 }
 
 
+static uint64_t   ground_key( int32_t x, int32_t y, int32_t level);
+
+
+/* Files or unfiles a trace where it is: on what bears it, or its tile. */
+static void   file_trace( BGWorld *self, BGEntityID entity, const BGTrace *trace, BOOL add)
+{
+   struct BGIndex   *index;
+   uint64_t         key;
+
+   if( ! trace)
+      return;
+   if( trace->bearer)
+   {
+      index = self->_tracesBorne;
+      key   = trace->bearer;
+   }
+   else
+   {
+      index = self->_tracesOnGround;
+      key   = ground_key( (int32_t) trace->tileX, (int32_t) trace->tileY, (int32_t) trace->tileLevel);
+   }
+   if( add)
+      BGIndexAdd( index, key, entity);
+   else
+      BGIndexRemove( index, key, entity);
+}
+
+
 - (void) setRecord:(const void *) record
               kind:(NSUInteger) kind
                for:(BGEntityID) entity
 {
    journal_record( self, _kinds[ kind], kind, entity);
+   if( kind == _kindTrace)
+      file_trace( self, entity, [_kinds[ kind] recordFor:entity], NO);
    [_kinds[ kind] setRecord:record
                         for:entity];
+   if( kind == _kindTrace)
+      file_trace( self, entity, [_kinds[ kind] recordFor:entity], YES);
 }
 
 
@@ -489,6 +719,8 @@ static int   cmp_id( const void *a, const void *b)
    if( ! [_kinds[ kind] recordFor:entity])
       return;
    journal_record( self, _kinds[ kind], kind, entity);
+   if( kind == _kindTrace)
+      file_trace( self, entity, [_kinds[ kind] recordFor:entity], NO);
    [_kinds[ kind] removeRecordFor:entity];
 }
 
@@ -606,6 +838,8 @@ static BOOL   field_set( const BGFieldInfo *f, void *record, int64_t value)
    memcpy( copy, record, BGComponents[ k].size);
    if( ! field_set( f, copy, value))
       return( NO);
+   if( k == _kindGas && f->name[ 0] == 'a' && f->name[ 1] == 't')
+      _airAnchors++;                /* atX, atY, atLevel: the air's room may move */
    [self setRecord:copy
               kind:k
                for:entity];
@@ -904,17 +1138,51 @@ static BOOL   field_set( const BGFieldInfo *f, void *record, int64_t value)
 }
 
 
+/* The chunk a tile is filed under. */
+static uint64_t   ground_key( int32_t x, int32_t y, int32_t level)
+{
+   return( ((uint64_t) (uint32_t) (x >> 5) << 32) ^ ((uint64_t) (uint32_t) (y >> 5) << 8) ^ (uint64_t) (uint32_t) level);
+}
+
+
+/* Files or unfiles an entity where it is (BGIndex). */
+static void   file_location( BGWorld *self, BGEntityID entity, const BGLocation *loc, BOOL add)
+{
+   struct BGIndex   *index;
+   uint64_t         key;
+
+   if( ! loc || loc->form == BGLocationNone)
+      return;
+   if( loc->form == BGLocationOnTile)
+   {
+      index = self->_onGround;
+      key   = ground_key( loc->x, loc->y, loc->level);
+   }
+   else
+   {
+      index = self->_inPlace;
+      key   = loc->place;
+   }
+   if( add)
+      BGIndexAdd( index, key, entity);
+   else
+      BGIndexRemove( index, key, entity);
+}
+
+
 - (void) setLocation:(BGLocation) location
                   of:(BGEntityID) entity
 {
    if( location.form == BGLocationNone && ! [_locations recordFor:entity])
       return;
    journal_record( self, _locations, BGKindLocations, entity);
+   file_location( self, entity, [_locations recordFor:entity], NO);
    if( location.form == BGLocationNone)
       [_locations removeRecordFor:entity];
    else
       [_locations setRecord:&location
                         for:entity];
+   file_location( self, entity, [_locations recordFor:entity], YES);
 }
 
 
@@ -923,20 +1191,177 @@ static BOOL   field_set( const BGFieldInfo *f, void *record, int64_t value)
                      into:(BGEntityID *) out
                       max:(NSUInteger) max
 {
-   BGLocation   *loc;
-   NSUInteger   i;
-   NSUInteger   n;
+   const BGEntityID   *ids;
+   BGLocation         *loc;
+   NSUInteger         count;
+   NSUInteger         i;
+   NSUInteger         n;
 
-   n = 0;
-   for( i = 0; i < [_locations count]; i++)
+   ids = BGIndexGet( _inPlace, place, &count);
+   n   = 0;
+   for( i = 0; i < count; i++)
    {
-      loc = [_locations recordAtIndex:i];
-      if( loc->form != form || loc->place != place)
+      loc = [_locations recordFor:ids[ i]];
+      if( ! loc || loc->form != form || loc->place != place)
          continue;
       if( n < max)
-         out[ n] = [_locations entityAtIndex:i];
+         out[ n] = ids[ i];
       n++;
    }
+   return( n);
+}
+
+
+- (NSUInteger) thingsNear:(BGLocation) tile
+                   radius:(int32_t) radius
+                     into:(BGEntityID **) out
+{
+   BGEntityID   *list;
+   NSUInteger   n;
+   NSUInteger   cap;
+   NSUInteger   i;
+   NSUInteger   m;
+
+   n    = [self entitiesNear:tile radius:radius into:NULL max:0];
+   cap  = n + 16;
+   list = malloc( cap * sizeof( BGEntityID));
+   n    = [self entitiesNear:tile radius:radius into:list max:cap];
+   for( i = 0; i < n; i++)
+   {
+      m = [self entitiesIn:list[ i] into:NULL max:0];
+      if( n + m > cap)
+      {
+         cap  = (n + m) * 2;
+         list = realloc( list, cap * sizeof( BGEntityID));
+      }
+      n += [self entitiesIn:list[ i] into:&list[ n] max:m];
+   }
+   *out = list;
+   return( n);
+}
+
+
+- (NSUInteger) tracesNear:(BGLocation) tile
+                   radius:(int32_t) radius
+                     into:(BGEntityID **) out
+{
+   const BGEntityID   *ids;
+   const BGTrace      *trace;
+   BGEntityID         *things;
+   BGEntityID         *list;
+   NSUInteger         nthings;
+   NSUInteger         count;
+   NSUInteger         cap;
+   NSUInteger         n;
+   NSUInteger         i;
+   NSUInteger         k;
+   int32_t            cx;
+   int32_t            cy;
+
+   cap  = 64;
+   list = malloc( cap * sizeof( BGEntityID));
+   n    = 0;
+   if( tile.form == BGLocationOnTile && radius >= 0 && _kindTrace < _nkinds)
+   {
+      for( cy = (tile.y - radius) >> 5; cy <= (tile.y + radius) >> 5; cy++)
+         for( cx = (tile.x - radius) >> 5; cx <= (tile.x + radius) >> 5; cx++)
+         {
+            ids = BGIndexGet( _tracesOnGround, ground_key( cx * BG_CHUNK, cy * BG_CHUNK, tile.level), &count);
+            for( i = 0; i < count; i++)
+            {
+               trace = [_kinds[ _kindTrace] recordFor:ids[ i]];
+               if( ! trace || trace->bearer || trace->tileLevel != tile.level ||
+                   llabs( trace->tileX - tile.x) > radius || llabs( trace->tileY - tile.y) > radius)
+                  continue;
+               if( n == cap)
+                  list = realloc( list, (cap *= 2) * sizeof( BGEntityID));
+               list[ n++] = ids[ i];
+            }
+         }
+      nthings = [self thingsNear:tile radius:radius into:&things];
+      for( k = 0; k < nthings; k++)
+      {
+         ids = BGIndexGet( _tracesBorne, things[ k], &count);
+         for( i = 0; i < count; i++)
+         {
+            if( n == cap)
+               list = realloc( list, (cap *= 2) * sizeof( BGEntityID));
+            list[ n++] = ids[ i];
+         }
+      }
+      free( things);
+   }
+   qsort( list, n, sizeof( BGEntityID), cmp_id);
+   *out = list;
+   return( n);
+}
+
+
+- (NSUInteger) entitiesIn:(BGEntityID) place
+                     into:(BGEntityID *) out
+                      max:(NSUInteger) max
+{
+   const BGEntityID   *ids;
+   NSUInteger         count;
+   NSUInteger         i;
+
+   ids = BGIndexGet( _inPlace, place, &count);
+   for( i = 0; i < count && i < max; i++)
+      out[ i] = ids[ i];
+   return( count);
+}
+
+
+- (NSUInteger) entitiesOnTile:(BGLocation) tile
+                         into:(BGEntityID *) out
+                          max:(NSUInteger) max
+{
+   return( [self entitiesNear:tile
+                       radius:0
+                         into:out
+                          max:max]);
+}
+
+
+- (NSUInteger) entitiesNear:(BGLocation) tile
+                     radius:(int32_t) radius
+                       into:(BGEntityID *) out
+                        max:(NSUInteger) max
+{
+   const BGEntityID   *ids;
+   BGLocation         *loc;
+   NSUInteger         count;
+   NSUInteger         i;
+   NSUInteger         n;
+   int32_t            cx;
+   int32_t            cy;
+   BOOL               sorted;
+
+   if( tile.form != BGLocationOnTile || radius < 0)
+      return( 0);
+   n      = 0;
+   sorted = YES;
+   for( cy = (tile.y - radius) >> 5; cy <= (tile.y + radius) >> 5; cy++)
+      for( cx = (tile.x - radius) >> 5; cx <= (tile.x + radius) >> 5; cx++)
+      {
+         ids = BGIndexGet( _onGround, ground_key( cx * BG_CHUNK, cy * BG_CHUNK, tile.level), &count);
+         for( i = 0; i < count; i++)
+         {
+            loc = [_locations recordFor:ids[ i]];
+            if( ! loc || loc->form != BGLocationOnTile || loc->level != tile.level ||
+                abs( loc->x - tile.x) > radius || abs( loc->y - tile.y) > radius)
+               continue;
+            if( n < max)
+            {
+               if( n && out[ n - 1] > ids[ i])
+                  sorted = NO;
+               out[ n] = ids[ i];
+            }
+            n++;
+         }
+      }
+   if( ! sorted)
+      qsort( out, n < max ? n : max, sizeof( BGEntityID), cmp_id);
    return( n);
 }
 
@@ -1136,18 +1561,14 @@ static void   edge_remove_raw( BGWorld *self, BGEdge e)
                  error:(NSString **) error
 {
    BGTerrain    *t;
-   NSUInteger   i;
-   NSUInteger   n;
    char         why[ 256];
 
-   n = (NSUInteger) (_tilesWide * _tilesHigh * _levels);
-   for( i = 0; i < n; i++)
-      if( _tileWater[ i] || _tileOut[ i])
-      {
-         if( error)
-            *error = @"a map is drawn before any tile holds a stock";
-         return( NO);
-      }
+   if( stocks_any( _stocks))
+   {
+      if( error)
+         *error = @"a map is drawn before any tile holds a stock";
+      return( NO);
+   }
    if( ! (t = BGTerrainFromMap( [_content content], map, why, sizeof( why))))
    {
       if( error)
@@ -1160,10 +1581,6 @@ static void   edge_remove_raw( BGWorld *self, BGEdge e)
    _tilesWide    = BGTerrainWide( t);
    _tilesHigh = BGTerrainHigh( t);
    _levels    = BGTerrainLevels( t);
-   free( _tileWater);
-   free( _tileOut);
-   _tileWater = calloc( (size_t) _tilesWide * (size_t) _tilesHigh * (size_t) _levels, sizeof( int64_t));
-   _tileOut   = calloc( (size_t) _tilesWide * (size_t) _tilesHigh * (size_t) _levels, 1);
    return( YES);
 }
 
@@ -1176,8 +1593,9 @@ static void   edge_remove_raw( BGWorld *self, BGEdge e)
 }
 
 
-/* Each room's air, kept while neither the regions of air nor the rooms have
- * changed: a region's room is found again, and any other room has none. */
+/* Each room's air, kept while no region of air has come or gone or had its
+ * tile set, and no room was let go: its stocks change every step, and
+ * leave it be. A region's room is found again, and any other has none. */
 - (BGEntityID) airOfRoom:(uint32_t) room
 {
    const BGGasStore   *gas;
@@ -1188,7 +1606,8 @@ static void   edge_remove_raw( BGWorld *self, BGEdge e)
    if( ! room || ! _terrain)
       return( BGNoEntity);
    stores = [self storeForKind:[self kindNamed:"GasStore"]];
-   if( ! _roomAirKnown || _roomAirChanges != [stores changes] || _roomAirDropped != BGTerrainRoomsDropped( _terrain))
+   if( ! _roomAirKnown || _roomAirChanges != [stores members] + _airAnchors ||
+       _roomAirDropped != BGTerrainRoomsDropped( _terrain))
    {
       memset( _roomAir, 0, _nroomAir * sizeof( BGEntityID));
       for( i = 0; i < [stores count]; i++)
@@ -1205,7 +1624,7 @@ static void   edge_remove_raw( BGWorld *self, BGEdge e)
          if( ! _roomAir[ r - 1])
             _roomAir[ r - 1] = [stores entityAtIndex:i];
       }
-      _roomAirChanges = [stores changes];
+      _roomAirChanges = [stores members] + _airAnchors;
       _roomAirDropped = BGTerrainRoomsDropped( _terrain);
       _roomAirKnown   = YES;
    }
@@ -1227,17 +1646,16 @@ static void   edge_remove_raw( BGWorld *self, BGEdge e)
 /* The door standing on a tile, or none. */
 - (BGEntityID) doorOnTile:(BGLocation) tile
 {
-   BGStore      *doors;
-   BGLocation   at;
+   BGEntityID   here[ 32];
+   NSUInteger   n;
    NSUInteger   i;
 
-   doors = [self storeForKind:[self kindNamed:"Door"]];
-   for( i = 0; i < [doors count]; i++)
-   {
-      at = [self locationOf:[doors entityAtIndex:i]];
-      if( at.form == BGLocationOnTile && at.x == tile.x && at.y == tile.y && at.level == tile.level)
-         return( [doors entityAtIndex:i]);
-   }
+   n = [self entitiesOnTile:tile
+                       into:here
+                        max:32];
+   for( i = 0; i < n && i < 32; i++)
+      if( [self record:[self kindNamed:"Door"] for:here[ i]])
+         return( here[ i]);
    return( BGNoEntity);
 }
 
@@ -1251,7 +1669,7 @@ static void   edge_remove_raw( BGWorld *self, BGEdge e)
    const BGTerrainInfo   *kind;
    const BGDoor          *door;
    BGAirOpening          o;
-   int32_t               cells[ 64][ 3];
+   int32_t               (*cells)[ 3];
    NSUInteger            ndoors;
    NSUInteger            i;
    NSUInteger            j;
@@ -1265,9 +1683,9 @@ static void   edge_remove_raw( BGWorld *self, BGEdge e)
 
    if( ! (room = [self roomOfAir:region]))
       return( 0);
-   ndoors = BGTerrainRoomDoorways( _terrain, room, cells, 64);
-   if( ndoors > 64)
-      ndoors = 64;
+   ndoors = BGTerrainRoomDoorways( _terrain, room, NULL, 0);
+   cells  = malloc( (ndoors ? ndoors : 1) * sizeof( *cells));
+   BGTerrainRoomDoorways( _terrain, room, cells, ndoors);
    n = 0;
    for( i = 0; i < ndoors; i++)
    {
@@ -1290,14 +1708,54 @@ static void   edge_remove_raw( BGWorld *self, BGEdge e)
          o.beyond = [self airOfRoom:side];
          for( j = first; j < n && j < max && out[ j].beyond != o.beyond; j++)
             ;
-         if( j < n)
+         if( j < n && j < max)
             continue;
          if( n < max)
             out[ n] = o;
          n++;
       }
    }
+   free( cells);
    return( n);
+}
+
+
+- (BOOL) airIsShutIn:(BGEntityID) region
+{
+   BGAirOpening   *openings;
+   NSUInteger     n;
+   NSUInteger     i;
+   BOOL           shut;
+
+   n        = [self airOpeningsOf:region into:NULL max:0];
+   openings = malloc( (n ? n : 1) * sizeof( BGAirOpening));
+   [self airOpeningsOf:region into:openings max:n];
+   for( shut = YES, i = 0; i < n && shut; i++)
+      shut = ! openings[ i].open;
+   free( openings);
+   return( shut);
+}
+
+
+- (BOOL) airRegion:(BGEntityID) a
+      opensOpenTo:(BGEntityID) b
+{
+   BGAirOpening   *openings;
+   BGEntityID     from;
+   BGEntityID     to;
+   NSUInteger     n;
+   NSUInteger     i;
+   BOOL           open;
+
+   from     = a ? a : b;
+   to       = a ? b : a;
+   n        = [self airOpeningsOf:from into:NULL max:0];
+   openings = malloc( (n ? n : 1) * sizeof( BGAirOpening));
+   [self airOpeningsOf:from into:openings max:n];
+   for( open = NO, i = 0; i < n && ! open; i++)
+      open = openings[ i].beyond == to && openings[ i].open;
+   free( openings);
+   return( open);
 }
 
 
@@ -1338,7 +1796,7 @@ static void   edge_remove_raw( BGWorld *self, BGEdge e)
 {
    if( ! [self isTileX:x y:y level:level])
       return( 0);
-   return( _tileWater[ (level * _tilesHigh + y) * _tilesWide + x]);
+   return( stocks_cell( _stocks, x, y, level, NO) ? *stocks_cell( _stocks, x, y, level, NO) : 0);
 }
 
 
@@ -1347,21 +1805,16 @@ static void   edge_remove_raw( BGWorld *self, BGEdge e)
                 y:(int32_t) y
             level:(int32_t) level
 {
-   if( [self isTileX:x y:y level:level])
-      _tileWater[ (level * _tilesHigh + y) * _tilesWide + x] = water;
+   int64_t   *cell;
+
+   if( [self isTileX:x y:y level:level] && (cell = stocks_cell( _stocks, x, y, level, water != 0)))
+      *cell = water;
 }
 
 
 - (int64_t) totalTileWater
 {
-   int64_t   sum;
-   int32_t   i;
-
-   sum = 0;
-   for( i = 0; i < _tilesWide * _tilesHigh * _levels; i++)
-      if( ! _tileOut[ i])
-         sum += _tileWater[ i];
-   return( sum);
+   return( stocks_total( _stocks));
 }
 
 
@@ -1371,7 +1824,10 @@ static void   edge_remove_raw( BGWorld *self, BGEdge e)
 {
    if( ! [self isTileX:x y:y level:level])
       return( NO);
-   return( _tileOut[ (level * _tilesHigh + y) * _tilesWide + x] != 0);
+   uint8_t   *out;
+
+   out = stocks_out( _stocks, x, y, level, NO);
+   return( out && *out);
 }
 
 
@@ -1380,8 +1836,17 @@ static void   edge_remove_raw( BGWorld *self, BGEdge e)
                          y:(int32_t) y
                      level:(int32_t) level
 {
-   if( [self isTileX:x y:y level:level])
-      _tileOut[ (level * _tilesHigh + y) * _tilesWide + x] = flag ? 1 : 0;
+   uint8_t   *out;
+
+   if( [self isTileX:x y:y level:level] && (out = stocks_out( _stocks, x, y, level, flag)))
+      *out = flag ? 1 : 0;
+}
+
+
+- (NSUInteger) wetTiles:(int32_t (*)[ 3]) out
+                    max:(NSUInteger) max
+{
+   return( stocks_wet( _stocks, out, max));
 }
 
 
@@ -1621,9 +2086,23 @@ static uint64_t   hash_record( uint64_t h, const BGComponentInfo *info, const vo
    }
    for( i = 0; i < _nedges; i++)
       h = BGMix( h ^ (uint64_t) _edges[ i].kind ^ (_edges[ i].from << 8) ^ (_edges[ i].to << 36));
-   for( i = 0; i < (NSUInteger) (_tilesWide * _tilesHigh * _levels); i++)
-      if( _tileWater[ i])
-         h = BGMix( h ^ (uint64_t) i ^ ((uint64_t) _tileWater[ i] << 20));
+   {
+      int32_t      (*wet)[ 3];
+      NSUInteger   nwet;
+      NSUInteger   w;
+      uint64_t     cell;
+
+      nwet = stocks_wet( _stocks, NULL, 0);
+      wet  = malloc( (nwet ? nwet : 1) * sizeof( *wet));
+      stocks_wet( _stocks, wet, nwet);
+      for( w = 0; w < nwet; w++)
+      {
+         cell = ((uint64_t) wet[ w][ 2] * (uint64_t) _tilesHigh + (uint64_t) wet[ w][ 1]) * (uint64_t) _tilesWide +
+                (uint64_t) wet[ w][ 0];
+         h = BGMix( h ^ cell ^ ((uint64_t) [self waterAtX:wet[ w][ 0] y:wet[ w][ 1] level:wet[ w][ 2]] << 20));
+      }
+      free( wet);
+   }
    if( _terrain)
       h = BGMix( h ^ BGTerrainHash( _terrain));
    for( i = 0; i < _nevents; i++)

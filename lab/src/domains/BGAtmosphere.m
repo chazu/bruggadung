@@ -179,7 +179,7 @@
 {
    const BGGasStore   *air;
    const BGDoor       *door;
-   BGAirOpening       openings[ 16];
+   BGAirOpening       *openings;
    NSUInteger         n;
    NSUInteger         i;
    int                k;
@@ -208,10 +208,10 @@
                  at:BGLocationMakeNone()
                door:BGNoEntity
                flow:air->gap];
-      n = [_world airOpeningsOf:_regions[ k].entity
-                           into:openings
-                            max:16];
-      for( i = 0; i < n && i < 16; i++)
+      n        = [_world airOpeningsOf:_regions[ k].entity into:NULL max:0];
+      openings = malloc( (n ? n : 1) * sizeof( BGAirOpening));
+      [_world airOpeningsOf:_regions[ k].entity into:openings max:n];
+      for( i = 0; i < n; i++)
       {
          j = openings[ i].beyond ? [self regionOf:openings[ i].beyond] : -1;
          if( openings[ i].beyond && j < 0)
@@ -222,6 +222,7 @@
                door:openings[ i].door
                flow:openings[ i].flow];
       }
+      free( openings);
    }
    for( n = 0, j = 0; j < _nlinks; j++)
       if( _links[ j].found)

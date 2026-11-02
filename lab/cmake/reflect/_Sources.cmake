@@ -17,6 +17,8 @@ src/act/BGView.m
 src/agency/BGAgency.m
 src/commit/BGCommitter.m
 src/commit/BGProposalGroup.m
+src/core/BGIndex.m
+src/core/BGPath.m
 src/core/BGStore.m
 src/core/BGTerrain.m
 src/core/BGWorld.m

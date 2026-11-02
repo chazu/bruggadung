@@ -76,6 +76,8 @@ src/act/BGView.h
 src/agency/BGAgency.h
 src/commit/BGCommitter.h
 src/commit/BGProposalGroup.h
+src/core/BGIndex.h
+src/core/BGPath.h
 src/core/BGStore.h
 src/core/BGTerrain.h
 src/core/BGTypes.h

@@ -63,3 +63,13 @@ rooms_map: #Map & {
     width:  32
     height: 32
 }
+
+// A yard of open ground 96 by 64, drawn as one tile and filled: for what
+// must work past 32 by 32 (TERRAIN.md), walls built on it as it goes.
+yard_map: #Map & {
+    legend: [{ glyph: ",", terrain: "open_floor" }]
+    levels: [{ z: 0, rows: _ @embed(file="maps/yard.0.map", type=text) }]
+    fill:   "open_floor"
+    width:  96
+    height: 64
+}
