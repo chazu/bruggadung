@@ -51,6 +51,10 @@ void u64map_free(U64Map *m);
 uint64_t hash64(uint64_t x);
 uint64_t fnv1a(uint64_t h, const void *data, size_t n);
 
+/* Milliseconds for the load's timings: wall time, and the process's CPU time. */
+double clock_wall_ms(void);
+double clock_cpu_ms(void);
+
 #define VEC(T) struct { T *v; size_t n, cap; }
 #define VEC_PUSH(vec, x) do { \
     if ((vec).n == (vec).cap) { \

@@ -1,6 +1,7 @@
 #include "internal.h"
 
 #include <stdarg.h>
+#include <time.h>
 
 /* --- arena ------------------------------------------------------------------- */
 
@@ -128,6 +129,39 @@ void buf_free(Buf *b)
     b->s = NULL;
     b->len = b->cap = 0;
 }
+
+/* --- clocks ------------------------------------------------------------------- */
+
+/* POSIX has clock_gettime, and so has MinGW (from winpthreads); the MSVC C
+ * runtime, which Odin links with on Windows, has only C11's timespec_get and
+ * clock. The timings are stats, so these suffice there. */
+#if defined(_WIN32) && !defined(__MINGW32__)
+double clock_wall_ms(void)
+{
+    struct timespec ts;
+    timespec_get(&ts, TIME_UTC);
+    return ts.tv_sec * 1e3 + ts.tv_nsec / 1e6;
+}
+
+double clock_cpu_ms(void)
+{
+    return clock() * (1e3 / CLOCKS_PER_SEC);
+}
+#else
+double clock_wall_ms(void)
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ts.tv_sec * 1e3 + ts.tv_nsec / 1e6;
+}
+
+double clock_cpu_ms(void)
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts);      /* CPU time: robust to machine load */
+    return ts.tv_sec * 1e3 + ts.tv_nsec / 1e6;
+}
+#endif
 
 /* --- hashing ------------------------------------------------------------------- */
 

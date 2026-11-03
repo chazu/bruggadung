@@ -8,9 +8,7 @@ static void trace(const char *what, size_t a, size_t b)
     static int on = -1;
     if (on < 0) on = getenv("TRI_TRACE") != NULL;
     if (!on) return;
-    struct timespec ts;
-    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts);      /* CPU time: robust to machine load */
-    double t = ts.tv_sec * 1e3 + ts.tv_nsec / 1e6;
+    double t = clock_cpu_ms();                         /* CPU time: robust to machine load */
     if (!trace_t0) trace_t0 = t;
     fprintf(stderr, "[%8.0f ms] %s %zu %zu\n", t - trace_t0, what, a, b);
 }

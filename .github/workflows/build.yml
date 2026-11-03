@@ -43,3 +43,26 @@ jobs:
         run: make -C triangle CC=clang test cli-test lsp-test
       - name: Lab
         run: make -C lab check
+
+  # The Odin spike (lab/odin): Triangle linked into Odin, the content hash,
+  # formatting against printf. Not on Windows yet (triangle/Makefile's
+  # odin-lib has the untried MSVC build).
+  odin-spike:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Odin (macOS)
+        if: runner.os == 'macOS'
+        run: sh lab/ci/odin/install-odin.sh "$RUNNER_TEMP/odin" >> "$GITHUB_PATH"
+      - name: Spike (macOS)
+        if: runner.os == 'macOS'
+        run: make -C triangle odin && make -C lab odin-spike
+      - name: Spike (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          docker build -t bruggadung-odin lab/ci/odin
+          docker run --rm -v "$PWD":/repo -w /repo bruggadung-odin sh -c 'make -C triangle odin && make -C lab odin-spike'

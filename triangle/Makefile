@@ -102,7 +102,41 @@ objc: build/libtriangle.a
 	    $(OBJC_LIBS) -o build/test_objc
 	./build/test_objc
 
+# The game's library for Odin (odin/triangle), in a directory per platform:
+# an ar archive on the Mac and Linux; on Windows, a COFF library for the MSVC
+# ABI, the only one Odin links with there, compiled by clang for that target
+# against the Visual Studio and Windows SDK it finds (not yet tried).
+ifeq ($(OS),Windows_NT)
+ODIN_PLATFORM = windows
+ODIN_LIB      = build/windows/triangle.lib
+# (the CRT hides POSIX names such as strdup from strict C unless asked)
+ODIN_CC       = clang --target=x86_64-pc-windows-msvc -D_CRT_SECURE_NO_WARNINGS \
+                -D_CRT_DECLARE_NONSTDC_NAMES=1 -D_CRT_NONSTDC_NO_WARNINGS
+else
+ODIN_PLATFORM = $(shell uname -s | tr A-Z a-z)
+ODIN_LIB      = build/$(ODIN_PLATFORM)/libtriangle.a
+ODIN_CC       = $(CC)
+endif
+ODINOBJ = $(filter-out build/$(ODIN_PLATFORM)/obj/tdl.o,$(SRC:src/%.c=build/$(ODIN_PLATFORM)/obj/%.o))
+
+build/$(ODIN_PLATFORM)/obj/%.o: src/%.c src/internal.h include/triangle.h
+	@mkdir -p $(dir $@)
+	$(ODIN_CC) $(CPPFLAGS) $(CFLAGS) -DTRI_NO_TDL -c $< -o $@
+
+$(ODIN_LIB): $(ODINOBJ)
+ifeq ($(OS),Windows_NT)
+	llvm-lib /out:$@ $^
+else
+	ar rcs $@ $^
+endif
+
+odin-lib: $(ODIN_LIB)
+
+# The Odin wrapper's tests.
+odin: $(ODIN_LIB)
+	odin test odin/test -vet -strict-style
+
 clean:
 	rm -rf build
 
-.PHONY: cli-test all test asan objc leakcheck game clean lsp-test emacs-test install examples
+.PHONY: cli-test all test asan objc odin odin-lib leakcheck game clean lsp-test emacs-test install examples
