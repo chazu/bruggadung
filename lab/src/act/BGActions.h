@@ -178,10 +178,11 @@ int64_t            BGOperationExertion( BGWorld *world, const char *operation, i
  * use different providers). nil when it can. */
 NSString           *BGProvidersBusy( BGWorld *world, BGEntityID actor, const char *operation, BGEntityID except);
 
-/* The traces the operation declares (KNOWLEDGE.md §3, content/traces.tri),
- * as proposals added to `group`: those it removes destroyed, those it leaves
- * created, made now and running out after their kind's `lasts`. Called with
- * its effect, when an instant action is performed or an activity completes. */
+/* The traces the operation declares (KNOWLEDGE.md §3,
+ * content/traces/traces.tri), as proposals added to `group`: those it removes
+ * destroyed, those it leaves created, made now and running out after their
+ * kind's `lasts`. Called with its effect, when an instant action is performed
+ * or an activity completes. */
 void               BGLeaveTraces( BGWorld *world, BGAction action, BGProposalGroup *group);
 /* The traces stage `index` of a staged operation declares, in its group. */
 void               BGLeaveStageTraces( BGWorld *world, BGAction action, int64_t index, BGProposalGroup *group);
@@ -208,8 +209,8 @@ NSArray            *BGAuthorize( BGWorld *world, BGAction action);
 NSArray            *BGLawsBroken( BGWorld *world, BGAction action);
 /* Whether someone other than `who` claims it (ownership or custody). */
 BOOL               BGClaimedByAnother( BGWorld *world, BGEntityID entity, BGEntityID who);
-/* A trace of `kind` (traces.tri) on the bearer, or on the tile if none, at
- * `strength`, made in the group; `by` says what left it. */
+/* A trace of `kind` (content/traces/traces.tri) on the bearer, or on the
+ * tile if none, at `strength`, made in the group; `by` says what left it. */
 void               BGMakeTrace( BGWorld *world, BGProposalGroup *group, const char *kind, BGEntityID bearer,
                                 BGLocation tile, int64_t strength, const char *by);
 

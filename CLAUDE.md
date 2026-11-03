@@ -15,4 +15,16 @@ comments, commit messages, and conversation with the user.
 - If a request or a doc uses a term inconsistently with the glossary, say
   so rather than silently following either.
 
+## Content layout
+
+lab/content/README.md is the rule for arranging Triangle content. In short:
+
+- Each topic (hunger, air, law) is a directory holding everything about
+  it, at every level of detail. The root's own `.tri` files hold only the
+  vocabulary every topic is written in.
+- Every content file starts with a header listing its cut points: what
+  changes at each level of detail, what crosses to other topics, and what
+  the code does that the content doesn't say. A change that moves a cut
+  point updates the header in the same change.
+
 See also lab/AGENTS.md for the lab's build rules.

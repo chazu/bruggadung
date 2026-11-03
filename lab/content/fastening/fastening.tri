@@ -1,0 +1,142 @@
+// Fastening: nuts and the spanners that fit them, and tightening a nut whose
+// size is uncertain (CONTENT_LANGUAGE.md Scenario 2, "the nut of unknown
+// size").
+//
+// Cut points:
+// - full:      committed to tightening a nut, an agent tightens it with a
+//              spanner that fits, gets one that does, or goes to look closer
+//              when it isn't sure enough of the size.
+// - reduced:   the same, decided on the cadence's beat.
+// - abstract:  as reduced.
+// - frozen:    it doesn't decide.
+// - knowledge: a size seen from afar is known only roughly (#Sized's
+//              @widen, knowledge.tri's `size_blurs`).
+// - code:      effect_tighten, effect_look.
+
+// Something with a size that matters: a nut, a spanner's jaw. Seen from
+// afar, the size is known only roughly: it widens a millimetre a step.
+#Sized: {
+    @component(Sized)
+    size: length & >=1mm & <=200mm @widen(1mm) @field(content, saved, inspect, perceive(sight))
+}
+
+// A nut, loose or tight. (Sized first: its size widens as #Sized says.)
+#Fastener: #Sized & #Body & {
+    @component(Fastener)
+    tight: *false | true @field(content, saved, proposable, inspect, perceive(sight))
+}
+
+// What turns a nut: a spanner, or a wrench.
+#Turner: {}
+
+// A spanner: its size is the nut it fits.
+#Spanner: #Sized & #Body & #Turner & {}
+
+// Tightening: the spanner, and the nut.
+#Tightening: #Frame & { spanner: #Body, nut: #Body }
+
+// Committed to, it is barely urgent until the last tenth of its window.
+tighten_nut: #Goal & {
+    title:   "tighten the nut"
+    urgency: [{ input: 0, output: 0 }, { input: 900, output: 2 }, { input: 1000, output: 30 }]
+    done:    { find: ["nut"], match: #Tightening & { nut: #Fastener & { tight: true } } }
+} @family(goals)
+
+// With a spanner that fits: if whether it fits is unknown, look closer;
+// sure to nine in ten is sure enough.
+tighten_it: #Method & {
+    title: "tighten it"
+    goal:  "tighten_nut"
+    rank:  1
+    pre: {
+        find:  ["spanner", "nut"]
+        match: #Tightening & {
+            me:      #Agent & { id: $me }
+            spanner: #Spanner & { size: $s, place: #Held & { by: $me } }
+            nut:     #Fastener & { size: $s, tight: false }
+        }
+    }
+    onUnknown: "look_closer"
+    threshold: 900
+    steps:     [#Do & { op: "tighten", object: "spanner", target: "nut" }]
+} @family(methods)
+
+// Else get a spanner that fits it (AGENCY.md §5's *seek 22 mm wrench*: the
+// size is the nut's, as the agent now believes it, through the frame's
+// slots), and tighten it with that.
+get_one_that_fits: #Method & {
+    title: "get one that fits"
+    goal:  "tighten_nut"
+    rank:  2
+    pre:   { find: ["nut"], match: #Tightening & { nut: #Fastener & { tight: false } } }
+    steps: [#Achieve & { subgoal: "fitting_spanner" },
+            #Do & { op: "tighten", object: "spanner", target: "nut" }]
+} @family(methods)
+
+fitting_spanner: #Goal & {
+    title: "find a spanner that fits"
+    done: {
+        find:  ["spanner", "nut"]
+        match: #Tightening & {
+            me:      #Agent & { id: $me }
+            spanner: #Spanner & { size: $s, place: #Held & { by: $me } }
+            nut:     #Fastener & { size: $s }
+        }
+    }
+} @family(goals)
+
+// Pick up a spanner of the nut's size, lying about or in something.
+pick_up_spanner: #Method & {
+    title: "pick up one that fits"
+    goal:  "fitting_spanner"
+    rank:  1
+    pre: {
+        find:  ["spanner", "nut"]
+        match: #Tightening & {
+            spanner: #Spanner & { size: $s, place: #OnTile | #Inside }
+            nut:     #Fastener & { size: $s }
+        }
+    }
+    order: ["near"]
+    steps: [#Do & { op: "take_up", object: "spanner" }]
+} @family(methods)
+
+look_closer: #Goal & {
+    title: "look closer"
+    done:  #Reached & { reached: "nut" }
+} @family(goals)
+
+go_and_peer: #Method & {
+    title: "go and peer at it"
+    goal:  "look_closer"
+    rank:  1
+    pre:   { find: ["nut"], match: #Tightening & { nut: #Fastener } }
+    steps: [#Do & { op: "peer_at", object: "nut" }]
+} @family(methods)
+
+// Tighten a nut with a spanner the actor holds that fits it: the same size.
+tighten: #Operation & {
+    effect: "tighten"
+    uses:   ["hands"]
+    roles: {
+        actor:       #Agent & { id: $a }
+        item:        #Spanner & { size: $s, place: #Held & { by: $a } }
+        destination: #Fastener & { size: $s, tight: false }
+    }
+} @family(operations)
+
+// Peer at a nut in reach: up close, its size is plain.
+peer_at: #Operation & {
+    effect: "look"
+    roles: {
+        actor: #Agent
+        item:  #Fastener
+    }
+} @family(operations)
+
+// For CONTENT_LANGUAGE.md's nut of unknown size: the pump's gland nut, and
+// spanners.
+gland_nut:    #Fastener & { material: "brass", mass: 50g, size: 19mm }
+gland_nut_22: #Fastener & { material: "brass", mass: 70g, size: 22mm }
+spanner_19:   #Spanner & { material: "steel", mass: 850g, size: 19mm }
+spanner_22:   #Spanner & { material: "steel", mass: 950g, size: 22mm }

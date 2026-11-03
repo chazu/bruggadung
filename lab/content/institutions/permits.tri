@@ -1,3 +1,16 @@
+// Institutions, permits: informational content and its physical copies, the
+// organizations that issue it and their office holders, seals, and a forged
+// permit (COMPONENTS.md §8, Scenario 2, "the forged permit").
+//
+// Cut points:
+// - full, reduced, abstract, frozen: an agent's, as reality.tri says;
+//              nothing of their own here.
+// - knowledge: a copy pressed with another seal than its issuer's is found
+//              forged by one who has seen the real one (`forged_seal`).
+// - law:       an officer of the watch is an office holder
+//              (institutions/law.tri).
+// - code:      effect_issue, effect_copy.
+
 // COMPONENTS.md §8, informational content and physical copies, and its
 // second scenario, "the forged permit".
 
@@ -54,14 +67,6 @@
     handwriting: text                          @field(saved, proposable, inspect)
 }
 
-// Someone with two hands to work with.
-let person = { material: "flesh", hands: 2 }
-
-clerk:  #Agent & #Scribe & person & { mass: 65kg, coat: "black" }
-forger: #Agent & #Scribe & person & { mass: 70kg, coat: "grey" }
-guard:  #Agent & person & { mass: 85kg, coat: "navy" }
-alun:   #Agent & person & { mass: 75kg, coat: "green" }
-
 // An office holder (ACTIONS.md §2): the organization it holds an office
 // in, which gives it that office's capabilities, issuing permits among
 // them. Holding the capability to issue is not permission to act.
@@ -71,10 +76,16 @@ alun:   #Agent & person & { mass: 75kg, coat: "green" }
     // what shows it: a badge, a uniform, anyone can see
     badge:  text                               @field(content, saved, proposable, inspect, perceive(sight))
 }
-office_clerk:  #Agent & #Scribe & #OfficeHolder & person & { mass: 65kg, coat: "black", badge: "office" }
-// The town's watch (INSTITUTIONS.md decision 4): it acts for the town only
-// as its members do.
-watch_officer: #Agent & #OfficeHolder & person & { mass: 80kg, coat: "navy", badge: "watch" }
+
+// Someone with two hands to work with.
+let person = { material: "flesh", hands: 2 }
+
+clerk:  #Agent & #Scribe & person & { mass: 65kg, coat: "black" }
+forger: #Agent & #Scribe & person & { mass: 70kg, coat: "grey" }
+guard:  #Agent & person & { mass: 85kg, coat: "navy" }
+alun:   #Agent & person & { mass: 75kg, coat: "green" }
+
+office_clerk: #Agent & #Scribe & #OfficeHolder & person & { mass: 65kg, coat: "black", badge: "office" }
 
 harbour_office: #Organization & {}
 content:        #Content & {}
@@ -109,3 +120,13 @@ copy_out: #Operation & {
         item:  #Copy & { place: #Held & { by: $a } }
     }
 } @family(operations)
+
+// A copy claiming an issuer whose seal the agent has seen, pressed with
+// another: it is forged (COMPONENTS.md Scenario 2: the guard "may know what
+// the office's seal should look like").
+forged_seal: #Rule & {
+    premises:  [#Misprinted & { misprinted: true }]
+    mastery:   0
+    concludes: "#Forged"
+    weight:    20
+} @family(rules)

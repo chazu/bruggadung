@@ -23,11 +23,11 @@
  * Event perception: an agent perceives what happens where it can see, by an
  * actor in sight. A thing it sees put somewhere is perceived there, inside a
  * container too, though nothing else inside is. What it perceives happen is
- * kept as observations, in its referents: who moved what where, who said
- * what to whom. A claim it hears (talk.tri's #IsIn) is kept as testimony:
- * the things described are bound to its referents by recognition, or become
- * new ones, and the speaker, and the one the claim says saw it, are its
- * source and its perceived root.
+ * kept as observations, in its referents: who moved what where, who said what
+ * to whom. A claim it hears (content/talk/talk.tri's #IsIn) is kept as
+ * testimony: the things described are bound to its referents by recognition,
+ * or become new ones, and the speaker, and the one the claim says saw it, are
+ * its source and its perceived root.
  *
  * Credence (KNOWLEDGE.md §11) is fixed-point log-odds, in whole decibans
  * (dB): a claim of where something is starts at BG_PRIOR, and each group of
@@ -67,10 +67,10 @@
  * smells a tile further, and draws the rules that take thought.
  *
  * Interpretation (KNOWLEDGE.md §9), immediate: after each perception phase,
- * the rules of content/interpret.tri run over the agent's referents, those
- * whose expertise it has; a rule whose premises hold (traces perceived on
- * the thing now, or perceived before and gone) adds its finding, with the
- * rule as its provenance.
+ * the interpretation rules (content/knowledge.tri, and each topic's) run over
+ * the agent's referents, those whose expertise it has; a rule whose premises
+ * hold (traces perceived on the thing now, or perceived before and gone) adds
+ * its finding, with the rule as its provenance.
  *
  * A promise heard is testimony about a time to come: not believed of now,
  * and settled only when it is due: kept, if the agent sees the thing in
@@ -94,7 +94,7 @@
  *
  * Recognition by unification (CONTENT_LANGUAGE.md Scenario 3): a percept
  * that fails to unify with a referent only on short-lived features
- * (content/persistence.tri: a coat) may still be that one, changed: the
+ * (content/knowledge.tri: a coat) may still be that one, changed: the
  * agent makes a new referent and an identity hypothesis, "it may be that
  * one", with a credence from the paths that agree and those that conflict,
  * all of them reported. A percept that later fits both is evidence they are
@@ -415,7 +415,7 @@ typedef struct
 - (const BGTerrainRecall *) recallAt:(NSUInteger) i;
 /* lines saying what the last perception phase changed */
 - (NSArray *) news;
-/* What the agent can say (talk.tri), from what it knows, naming no
+/* What the agent can say (content/talk/talk.tri), from what it knows, naming no
  * referents. A claim that the thing is in the container, as the agent
  * believes: where, as of when, and how it knows; nil if it believes the thing
  * nowhere inside something on the ground. */
@@ -624,10 +624,11 @@ typedef struct
 - (void) setOmniscient:(BOOL) flag;
 
 /* Conditions (KNOWLEDGE.md §5), stubbed with authored values: the ambient
- * light, 2 day, 1 dusk, 0 night; a shining lamp (`#Lamp`, workshop.tri)
- * makes day within its reach. At dusk what is beyond arm's
- * reach is seen a step less precisely; at night it isn't seen, and what is
- * within it is felt a step less precisely, unless the agent just handled it. */
+ * light, 2 day, 1 dusk, 0 night; a shining lamp (`#Lamp`,
+ * content/light/light.tri) makes day within its reach. At dusk what is beyond
+ * arm's reach is seen a step less precisely; at night it isn't seen, and what
+ * is within it is felt a step less precisely, unless the agent just handled
+ * it. */
 - (void) setAmbient:(int) light;
 /* With a light domain (BGLight), light is the world's: the daylight by the
  * clock, rooms, lamps with fuel, fires; the ambient setting is unused. */

@@ -5,20 +5,20 @@
  * own knowledge store (the knowledge view). Everything it does is an action,
  * through the menu's machinery.
  *
- * Goals and methods are content (content/agency.tri, AGENCY.md §5). A goal
- * is done when its `done` condition holds; a condition binds slots to
- * referents the agent believes present and matches the frame they describe,
- * so nothing reads world state or truth. A method is followed when its `pre`
- * holds, its steps re-read at each decision: a subgoal not yet done is
- * adopted above the goal, which stays the intention beneath it; an operation
- * is performed once the agent has walked within reach of what it names. A
- * goal no method can serve is impossible for now: it is dropped, with the
- * reason, and the method that needed it has failed, so the goal beneath
- * tries its next.
+ * Goals and methods are content (content/agency.tri, and each topic's
+ * directory; AGENCY.md §5). A goal is done when its `done` condition holds; a
+ * condition binds slots to referents the agent believes present and matches
+ * the frame they describe, so nothing reads world state or truth. A method is
+ * followed when its `pre` holds, its steps re-read at each decision: a
+ * subgoal not yet done is adopted above the goal, which stays the intention
+ * beneath it; an operation is performed once the agent has walked within
+ * reach of what it names. A goal no method can serve is impossible for now:
+ * it is dropped, with the reason, and the method that needed it has failed,
+ * so the goal beneath tries its next.
  *
- * A step can say something (talk.tri): after a question, the agent waits
- * for the one it asked to answer, a while at most, and a search slot passes
- * over whoever it has asked since adopting the goal.
+ * A step can say something (content/talk/talk.tri): after a question, the
+ * agent waits for the one it asked to answer, a while at most, and a search
+ * slot passes over whoever it has asked since adopting the goal.
  *
  * Being asked is a candidate goal (AGENCY.md §4's social generator, §11),
  * considered at every decision point: answering is worth the agent's trust

@@ -1,3 +1,29 @@
+// Work: employment as a deal: asking for work, hiring, a job, and paying the
+// wage (AGENCY.md decision 15).
+//
+// Cut points:
+// - full:     an employer weighs a request for work like any request;
+//             granting it, it hires the worker and says the job, and so
+//             promises the pay. As the shift ends it pays, if it believes the
+//             job done and its honesty has it.
+// - reduced:  the same, decided on the cadence's beat; a shift's end wakes
+//             the employer on the beat.
+// - abstract: as reduced. Wages paid each shift as a periodic transfer are
+//             planned (DETAIL_REGIMES.md).
+// - frozen:   it doesn't decide.
+// - bonds:    hiring makes a bond of the worker's to the employer
+//             (bonds/bonds.tri's `work_bond`).
+// - money:    needing money, an agent may ask for work (money/money.tri).
+// - promises: a job's task is a goal, such as delivering
+//             (promises/promises.tri).
+// - code:     effect_hire.
+
+// What work adds to an agent: the job it offers, by name (AGENCY.md decision
+// 15), if any.
+#Agent: {
+    hires: text @field(content, saved, proposable, inspect)
+}
+
 // Work (AGENCY.md decision 15): employment is a deal. An employer weighs a
 // request for work like any request; granting it, it hires the worker (a
 // bond, with the worker's loyalty to it, AGENCY.md decision 12), says the

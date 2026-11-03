@@ -63,7 +63,8 @@ TRI_PROPS_SCALE=10 ./build/test properties     # ten times the randomised cases
 ## The command-line tool and the editor
 
 `build/triangle` loads content from files, or from directories that stand for
-the `.tri` files in them (the current directory by default):
+the `.tri` files in them and in their subdirectories (the current directory by
+default; names starting with a dot are passed over):
 
 ```sh
 triangle check examples/workshop             # diagnostics, or a summary and the content hash
@@ -80,8 +81,8 @@ triangle lsp                                 # the language server, over stdio
 and `:`, around binary operators and inside `{ }`; lines indented by what
 is open at their start; runs of consecutive fields, and of lets, aligned.
 It never joins or splits a line, and it writes nothing unless the result
-scans to exactly the same tokens and comments and each directory's content
-keeps its hash. `triangle fmt -` formats stdin to stdout, and the language
+scans to exactly the same tokens and comments and each content root's
+content keeps its hash. `triangle fmt -` formats stdin to stdout, and the language
 server formats a document for the editor (`eglot-format-buffer`,
 `lsp-format-buffer`).
 
@@ -103,12 +104,15 @@ The guide is its source: `make examples` regenerates the files, and
 `check` exits 1 when there are errors. Its diagnostics have the
 `file:line:col:` form that compilation buffers and editors parse.
 
-**The language server** treats the directory of the file being edited as one
-content build. Every change reloads that directory, with the text of open
-files in place of the files on disk; loading bruggadung's content takes a few
-milliseconds. It provides:
+**The language server** treats the content root of the file being edited as
+one content build: the file's directory, or, while the directory above holds
+`.tri` files of its own, that one, so a file in a topic directory (bruggadung's
+`lab/content/hunger/`) loads with the content around it. Every change reloads
+the content root and its subdirectories, with the text of open files in place
+of the files on disk; loading bruggadung's content takes a few milliseconds.
+It provides:
 
-- **Diagnostics** for every file in the directory, as the loader reports them.
+- **Diagnostics** for every file in the build, as the loader reports them.
 - **Hover**: the declarations of the name under the cursor, with its
   docstring; a type's supertypes and components; an instance's spec, each
   value annotated with its origin.

@@ -1,0 +1,115 @@
+// Money: getting it, by borrowing or by taking, and paying a loan back
+// (AGENCY.md Scenario 3, "the tempting purse"; decisions 16 and 18).
+//
+// Cut points:
+// - full:     a debt due raises getting money: borrowing from a friend,
+//             asking for work (work/work.tri), or taking an unwatched purse,
+//             as the agent's honesty and scruples weigh it. A loan granted is
+//             a debt to repay within its term.
+// - reduced:  the same, decided on the cadence's beat; a debt's window wakes
+//             it on the beat.
+// - abstract: as reduced. Money as a coarse stock is planned
+//             (DETAIL_REGIMES.md).
+// - frozen:   it doesn't decide.
+// - talk:     asking for it, and the answer (#Request, #HaveNone, #Granted).
+// - law:      taking another's purse is a theft (institutions/law.tri).
+// - code:     money is cloth (`material: "cloth"`) for now.
+
+// Getting money: the money, and a friend or someone to work for.
+#Getting: #Frame & { money: #Body, friend: #Agent, boss: #Agent }
+
+// Repaying a loan (AGENCY.md §7: a debt is a commitment): what was lent,
+// and who lent it.
+#Repaying: #Frame & { loan: #Body, lender: #Agent }
+
+// A debt due: get money. A commitment, not a body's need.
+get_money: #Goal & {
+    title: "get money"
+    done: {
+        find:  ["money"]
+        match: #Getting & {
+            me:    #Agent & { id: $me }
+            money: #Body & { material: "cloth", place: #Held & { by: $me } }
+        }
+    }
+} @family(goals)
+
+// Ask a friend to lend it: awkward, but no harm. The closest friend first;
+// anyone it is not loyal to is barely worth asking.
+borrow_money: #Method & {
+    title:  "borrow from a friend"
+    goal:   "get_money"
+    rank:   1
+    pre:    { find: ["friend"], match: #Getting & { friend: #Agent } }
+    order:  ["loyal", "near"]
+    search: "friend"
+    steps:  [#Do & { op: "say", object: "friend", says: #Request & { what: #Body & { material: "cloth" } } }]
+    score:  [#Loyal & { loyal: "friend", curve: [{ input: 0, output: 1 }, { input: 20, output: 10 }] }]
+} @family(methods)
+
+// Take the purse: worth more than borrowing, to the dishonest, unwatched.
+take_the_purse: #Method & {
+    title: "take the purse"
+    goal:  "get_money"
+    rank:  1
+    pre: {
+        find:  ["money"]
+        match: #Getting & { money: #Body & { material: "cloth", place: #OnTile | #Inside } }
+    }
+    order: ["near"]
+    steps: [#Do & { op: "take", object: "money" }]
+    score: [
+        #Flat & { value: 30 },
+        #Trait & { trait: "honesty", per: -5 },
+        #Trait & { trait: "scruples", per: -10 },
+        #Unlawful & { unlawful: "money", act: "take" },
+    ]
+} @family(methods)
+
+// A loan granted is a debt the borrower owes back: what was lent, back in
+// the lender's hand, by the end of the loan's term.
+repay: #Goal & {
+    title: "repay the loan"
+    done: {
+        find:  ["loan", "lender"]
+        match: #Repaying & {
+            loan:   #Body & { place: #Held & { by: $l } }
+            lender: #Agent & { id: $l }
+        }
+    }
+} @family(goals)
+
+hand_it_back: #Method & {
+    title: "hand it back"
+    goal:  "repay"
+    rank:  1
+    pre: {
+        find:  ["loan", "lender"]
+        match: #Repaying & { loan: #Body & { place: #Held & { by: $me } } }
+    }
+    steps: [#Do & { op: "give", object: "loan", target: "lender" }]
+} @family(methods)
+
+// Give me something like `what`? A request is a question: the asker waits
+// for the answer.
+#Request: #Question & {}
+
+// Asked for something like `what`: the speaker has nothing like it; or has
+// lent it, on the terms it says (AGENCY.md decision 18): owed back within
+// `owedIn`. With none said, the borrower takes the terms its relationship
+// with the lender has by default: between friends, a week.
+#HaveNone: #Utterance & {}
+#Granted:  #Utterance & { owedIn: time & >=1ms & <=1000d }
+
+money_value: #Valuing & { valued: #Body & { material: "cloth" }, value: 30 } @family(values)
+
+// For AGENCY.md's tempting purse: the merchant's purse, the merchant,
+// Kasimir, who owes, and Mira, a child, half hidden in a doorway.
+purse: #Body & { material: "cloth", mass: 150g }
+
+// Someone with two hands to work with.
+let person = { material: "flesh", hands: 2 }
+
+merchant: #Agent & person & { mass: 85kg, coat: "white" }
+kasimir:  #Agent & person & { mass: 70kg, coat: "beige", honesty: 10, scruples: 5 }
+mira:     #Agent & person & { mass: 25kg, coat: "red", curious: 100, hiding: true }

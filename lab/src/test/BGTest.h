@@ -14,8 +14,8 @@ void   BGTestCheck( int ok, const char *what, const char *file, int line);
 
 #define BG_CHECK( cond)   BGTestCheck( (cond) ? 1 : 0, #cond, __FILE__, __LINE__)
 
-/* The content in BGContentDir (every *.tri, in name order), or nil with the
- * diagnostics printed. */
+/* The content in BGContentDir (every *.tri, its topic directories' too, in
+ * path order), or nil with the diagnostics printed. */
 BGContent    *BGLoadContent( void);
 /* A fresh world on that content, with a committer that has the kinds'
  * reactors. */

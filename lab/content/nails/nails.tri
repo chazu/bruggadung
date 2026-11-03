@@ -1,0 +1,191 @@
+// Nails: nails in stacks, wedging a lock with one, finding nails, and putting
+// them away (COMPONENTS.md Scenario 1, "the marked nail"; AGENCY.md Scenario
+// 1, "the missing nails", and §8, habits).
+//
+// Cut points:
+// - full:     wanting the lock wedged, an agent fetches nails, searches the
+//             containers it knows of, or asks someone where they are.
+// - reduced:  the same, decided on the cadence's beat; it doesn't see what
+//             others do with the nails.
+// - abstract: as reduced.
+// - frozen:   it doesn't decide; a drive or a pry under way waits.
+// - talk:     asking where nails are, and what is answered, are
+//             talk/talk.tri's.
+// - code:     effect_drive (a nail split off the stack, driven in as a
+//             wedge); stacks split and merge in the components system.
+
+#WithNails: #Frame & { nails: #Stack }
+
+// Wedging a lock: the lock, and the nail driven into it as a wedge.
+#Wedging: #WithNails & { lock: #Assembly, wedge: #Body }
+
+// Having nails: the nails, the containers to look in for them, and someone
+// to ask.
+#HavingNails: #WithNails & { box: #Container, someone: #Agent }
+
+// Tidying: what to put away, and the bin to put it in.
+#Tidying: #Frame & { stuff: #Body, bin: #Container }
+
+wedge_lock: #Goal & {
+    title:    "wedge the lock"
+    concerns: [#Assembly, #Stack & { unit: "iron_nail" }]
+    done: {
+        find:  ["lock", "wedge"]
+        match: #Wedging & {
+            lock:  #Assembly & { id: $l }
+            wedge: #Body & { place: #Installed & { assembly: $l, role: "wedge" } }
+        }
+    }
+} @family(goals)
+
+have_nails: #Goal & {
+    title:    "have nails"
+    concerns: [#Stack & { unit: "iron_nail" }]
+    done: {
+        find:  ["nails"]
+        match: #HavingNails & {
+            me:    #Agent & { id: $me }
+            nails: #Stack & { unit: "iron_nail", place: #Held & { by: $me } }
+        }
+    }
+} @family(goals)
+
+// Nails in hand, then drive one into the lock.
+drive_a_nail: #Method & {
+    title: "drive a nail in"
+    goal:  "wedge_lock"
+    rank:  1
+    pre:   { find: ["lock"], match: #Wedging & { lock: #Assembly } }
+    order: ["near"]
+    steps: [
+        #Achieve & { subgoal: "have_nails" },
+        #Do & { op: "drive", object: "nails", target: "lock" },
+    ]
+} @family(methods)
+
+// Take two from nails believed lying about or in a container, nearest first:
+// two, so what is taken stays a stack, and drive splits one off.
+fetch_nails: #Method & {
+    title: "fetch nails"
+    goal:  "have_nails"
+    rank:  1
+    pre: {
+        find:  ["nails"]
+        match: #HavingNails & { nails: #Stack & { unit: "iron_nail", place: #Inside | #OnTile } }
+    }
+    order: ["near"]
+    steps: [#Do & { op: "take_some", object: "nails", units: 2 }]
+} @family(methods)
+
+// Look into the containers the agent knows of, where it most believes nails
+// are first, then the most recently seen, then the nearest: two of them,
+// and more if it is curious.
+search_for_nails: #Method & {
+    title:  "search for nails"
+    goal:   "have_nails"
+    rank:   2
+    pre:    { find: ["box"], match: #HavingNails & { box: #Container } }
+    order:  ["likely", "recent", "near"]
+    seeks:  #Stack & { unit: "iron_nail" }
+    search: "box"
+    places: 2
+    steps:  [#Do & { op: "look_in", object: "box" }]
+} @family(methods)
+
+// Ask someone the agent knows of where nails are, the nearest first. What
+// they answer, the agent believes (KNOWLEDGE.md §10): told where nails are,
+// fetching them holds again.
+ask_for_nails: #Method & {
+    title:  "ask where nails are"
+    goal:   "have_nails"
+    rank:   3
+    pre:    { find: ["someone"], match: #HavingNails & { someone: #Agent } }
+    order:  ["near"]
+    search: "someone"
+    steps:  [#Do & { op: "say", object: "someone", says: #WhereIs & { what: #Stack & { unit: "iron_nail" } } }]
+} @family(methods)
+
+// Put away the nails in hand: done when both hands are free.
+put_away: #Goal & {
+    title: "put the nails away"
+    done:  { find: [], match: #Tidying & { me: #Agent & { freeHands: 2 } } }
+} @family(goals)
+
+// Into a container: the habitual one, else the nearest.
+put_them_in_a_box: #Method & {
+    title: "put them in a box"
+    goal:  "put_away"
+    rank:  1
+    pre: {
+        find:  ["stuff", "bin"]
+        match: #Tidying & {
+            me:    #Agent & { id: $me }
+            stuff: #Stack & { unit: "iron_nail", place: #Held & { by: $me } }
+            bin:   #Container
+        }
+    }
+    order: ["habit", "near"]
+    steps: [#Do & { op: "put_in", object: "stuff", target: "bin" }]
+} @family(methods)
+
+// Drive a held nail into an assembly, as a wedge: it bends and takes tool
+// marks. From a stack, one nail is driven.
+drive: #Operation & {
+    effect:    "drive"
+    duration:  4s
+    uses:      ["hands"]
+    attention: 10
+    leaves:    [{ trace: "tool_marks", on: "destination", strength: 60 },
+                { trace: "scuffs", on: "tile", strength: 40 }]
+    roles: {
+        actor:       #Agent & { id: $a }
+        item:        #Body & { material: "iron", place: #Held & { by: $a } }
+        destination: #Assembly
+    }
+} @family(operations)
+
+// Pry a wedged nail out of an assembly: loosen it, then pull it free into a
+// free hand. Walking away suspends it; coming back, it can be resumed.
+pry_out: #Operation & {
+    effect:    "take"
+    stages:    [{ duration: 3s, effect: "loosen", leaves: [{ trace: "scratch", on: "item", strength: 30 }] },
+                { duration: 2s, effect: "take" }]
+    uses:      ["hands"]
+    attention: 10
+    roles: {
+        actor: #Agent & { freeHands: >=1 }
+        item:  #Body & { place: #Installed }
+    }
+} @family(operations)
+
+// One iron nail: the unit of the nail stacks.
+iron_nail: #Body & { material: "iron", mass: 3g }
+
+// Nails in a stack. Their unit is iron_nail, and so is their unit mass.
+let nail_stack = { material: "iron", unit: "iron_nail", unitMass: 3g }
+nails_30: #Stack & nail_stack & { count: 30 }
+nails_10: #Stack & nail_stack & { count: 10 }
+
+// The workshop bin.
+bin: #Container & { material: "oak", mass: 4kg, capacity: 50 }
+
+// The lock that gets wedged shut.
+lock: #Assembly & { material: "brass", mass: 600g, slots: 4 }
+
+// Someone with two hands to work with.
+let person = { material: "flesh", hands: 2 }
+
+worker: #Agent & person & { mass: 70kg, coat: "blue", trade: "fitter" }
+smith:  #Agent & person & { mass: 85kg, coat: "brown" }
+
+// For AGENCY.md's first scenario, as "the missing nails": a crate across the
+// workshop, and the spare nails that may be in it.
+crate:   #Container & { material: "oak", mass: 2kg, capacity: 20 }
+nails_4: #Stack & nail_stack & { count: 4 }
+// and a sack in the far corner, where nobody would think to look
+sack:    #Container & { material: "cloth", mass: 300g, capacity: 10 }
+
+// For the missing nails' "ask a coworker": the chest the smith puts the nails
+// in, and the apprentice who may see it.
+chest:      #Container & { material: "oak", mass: 6kg, capacity: 40 }
+apprentice: #Agent & person & { mass: 55kg, coat: "navy" }

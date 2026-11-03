@@ -363,6 +363,23 @@ def main(exe):
                                                   "position": pos(FN, "len(")})["result"]["items"]
     check("strings.ToUpper" in {i["label"] for i in items}, "completion offers the built-in functions")
 
+    # a topic directory loads with the content root above it
+    TOPIC = "// In a topic directory.\nkept: #Tool & { size: 22mm }\n"
+    os.makedirs(os.path.join(d, "topic"))
+    turi = "file://" + os.path.join(d, "topic", "kept.tri")
+    with open(os.path.join(d, "topic", "kept.tri"), "w") as f:
+        f.write(TOPIC)
+    s.notify("textDocument/didOpen", {"textDocument": {"uri": turi, "languageId": "triangle",
+                                                       "version": 1, "text": TOPIC}})
+    check(s.diagnostics(turi) == [], "a file in a topic directory sees the root's types")
+    r = s.request("textDocument/definition", {"textDocument": {"uri": turi},
+                                              "position": pos(TOPIC, "#Tool", 1)})["result"]
+    check(len(r) == 1 and r[0]["uri"] == uri["types.tri"], "and goes to their definitions there")
+    r = s.request("textDocument/references", {"textDocument": {"uri": uri["types.tri"]},
+                                              "position": pos(TYPES, "#Tool", 1),
+                                              "context": {"includeDeclaration": False}})["result"]
+    check(any(x["uri"] == turi for x in r), "the root's types are referenced from the topic directory")
+
     r = s.request("textDocument/hover", {"textDocument": {"uri": uri["instances.tri"]},
                                          "position": {"line": 0, "character": 3}})
     check(r["result"] is None, "hover in a comment is empty")

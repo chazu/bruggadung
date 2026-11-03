@@ -1,3 +1,19 @@
+// Air: regions of air, doors between them, what breathes, and stuffiness
+// (DOMAIN_SIMULATION.md Scenario 1; AGENCY.md §6).
+//
+// Cut points:
+// - full, reduced, abstract, frozen: alike. The atmosphere domain runs over
+//             the whole world at every level of detail; it doesn't yet step
+//             by region (REALITY.md step 4).
+// - stuffy:   felt by what breathes, from the carbon dioxide of the air over
+//             it, ten points for every 0.1% above 0.1%, by bands. Above 30 it
+//             raises airing the room, decided as the agent's level of detail
+//             has it.
+// - terrain:  a region's tiles are found from the terrain, bounded by what is
+//             solid and by doorways (terrain/terrain.tri).
+// - heat:     fire, and the heat of solids, are heat/heat.tri's.
+// - code:     src/domains/BGAtmosphere.m; effect_open_door, effect_pass.
+
 // Air, for DOMAIN_SIMULATION.md's first scenario, "The unattended stove".
 // Gas is a stock: whole millimoles of oxygen and carbon dioxide, and whole
 // joules of the heat the gas carries, held by a region of air (the room)
@@ -35,43 +51,6 @@
     wide: int & >=0 & <=1000000                @field(content, saved, inspect)
 }
 
-// A stove's firebox: lit or not, its damper open to the flue or not, and how
-// fast it burns at most (mg of wood a second).
-#Combustor: {
-    @component(Combustor)
-    lit:      *false | true                    @field(content, saved, proposable, inspect, perceive(sight))
-    damper:   *true | false                    @field(content, saved, proposable, inspect, perceive(sight))
-    burnRate: int & >=0 & <=100000             @field(content, saved, inspect)
-}
-
-// Fuel in a stove, a stock the atmosphere domain checks out while it burns.
-#FuelContainer: {
-    @component(FuelContainer)
-    fuel: mass & >=0g & <=1000kg               @field(content, saved, proposable, inspect)
-}
-
-// A solid's heat: whole joules, owned by the thermal domain while it
-// changes, and its capacity (J/K). How fast it exchanges heat with the air
-// around it (W/K), which the atmosphere computes and sends it, and with the
-// outdoors (W/K), which the thermal domain does. A body with no place names
-// the air it bounds: a room's shell.
-#ThermalBody: {
-    @component(ThermalBody)
-    heat:         int & >=0 & <=1000000000000  @field(content, saved, proposable, inspect)
-    heatCapacity: int & >=1 & <=1000000000     @field(content, saved, proposable, inspect)
-    toAir:        int & >=0 & <=100000         @field(content, saved, inspect)
-    toOutdoors:   int & >=0 & <=100000         @field(content, saved, inspect)
-    bounds:       ref                          @field(saved, proposable, inspect)
-}
-
-// A stove's iron takes three tenths of its fire's heat; the rest goes up the
-// flue, or, damper closed, into the room.
-#Stove: #Body & #Combustor & #FuelContainer & #ThermalBody & {}
-
-// The stone of a room's walls, floor and ceiling, its inner layer: what
-// warms with the air.
-#Shell: #ThermalBody & {}
-
 // What breathes: the oxygen it takes from the air over it (mmol a thousand
 // seconds), at rest and at work, giving back four fifths as much carbon
 // dioxide and 448 J for each mmol to its body. And the air it rests easy in
@@ -84,7 +63,7 @@
     restsBelow: int & >=0 & <=400000           @field(content, saved, proposable, inspect)
 }
 
-// A 4 by 5 room (rooms_map, terrain.tri), at 275 K, with 2 mol of air for
+// A 4 by 5 room (rooms_map, terrain/terrain.tri), at 275 K, with 2 mol of air for
 // each of its 20 m3 or so: 2,000,000 mmol, 21% oxygen, 0.04% carbon dioxide;
 // its heat, 29 mJ per mmol per kelvin.
 room_air:   #GasStore & { oxygen: 420000, dioxide: 800, gasHeat: 15950000, total: 2000000,
@@ -99,13 +78,49 @@ corridor:   #GasStore & { oxygen: 4200000, dioxide: 8000, gasHeat: 159500000, to
 parted_air: #GasStore & { oxygen: 0, dioxide: 0, gasHeat: 0, total: 1, atX: 0, atY: 0 }
 // a room's door, open: a cubic metre a minute or so
 room_door:  #Door & { material: "oak", mass: 30kg, wide: 5000 }
-stove:      #Stove & { material: "iron", mass: 120kg, burnRate: 250, fuel: 3kg,
-                       heat: 12375000, heatCapacity: 45000, toAir: 20, toOutdoors: 0 }
-// at 275 K
+
 // someone to rest by the stove: at 310 K, 70 kg at 3.5 kJ/kg/K, abed and
 // clothed (4 W/K)
-lodger:     #Agent & #Respirator & #ThermalBody & {
+lodger: #Agent & #Respirator & #ThermalBody & {
     material: "flesh", mass: 70kg, hands: 2, coat: "grey",
     atRest: 190, atWork: 600, restsAbove: 0, restsBelow: 0,
     heat: 75950000, heatCapacity: 245000, toAir: 4, toOutdoors: 0 }
-room_shell: #Shell & { heat: 1100000000, heatCapacity: 4000000, toAir: 100, toOutdoors: 50 }
+
+// Airing: a door to open, the way out.
+#Airing: #Frame & { exit: #Body }
+
+// Stuffy air raises airing the room: done once a door it knows of is ajar.
+air_the_room: #Goal & {
+    title:   "air the room"
+    done:    { find: ["exit"], match: #Airing & { exit: #Door & { ajar: true } } }
+    pressed: { need: "stuffy", above: 30 }
+    worth:   [#Need & { pressure: "stuffy", per: 5 }]
+} @family(goals)
+
+open_a_door: #Method & {
+    title: "open a door"
+    goal:  "air_the_room"
+    rank:  1
+    pre:   { find: ["exit"], match: #Airing & { exit: #Door & { ajar: false } } }
+    order: ["near"]
+    steps: [#Do & { op: "open_door", object: "exit" }]
+} @family(methods)
+
+// Open a door in reach: the air on its two sides mixes faster.
+open_door: #Operation & {
+    effect: "open_door"
+    roles: {
+        actor: #Agent
+        item:  #Door & { ajar: false }
+    }
+} @family(operations)
+
+// Go through an open door in reach (KNOWLEDGE.md Scenario 3): onto its
+// tile, and so past it. Believed open and shut, it is a bump into it.
+go_through: #Operation & {
+    effect: "pass"
+    roles: {
+        actor: #Agent
+        item:  #Door & { ajar: true }
+    }
+} @family(operations)

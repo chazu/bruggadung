@@ -7,13 +7,13 @@
  *   triangle fmt [--check] [PATH...]      lay sources out canonically
  *   triangle lsp                          the language server, over stdio
  *
- * A PATH is a .tri file or a directory, which stands for the .tri files in it;
- * with none, the current directory. */
+ * A PATH is a .tri file or a directory, which stands for the .tri files in it
+ * and beneath it (its topic directories); with none, the current directory. */
 #include "triangle.h"
 #include "export.h"
 #include "fmt.h"
+#include "paths.h"
 
-#include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,36 +23,13 @@
 
 int lsp_main(void);
 
-typedef struct { char **v; size_t n, cap; } Paths;
-
-static void add(Paths *p, const char *s)
-{
-    if (p->n == p->cap) p->v = realloc(p->v, (p->cap = p->cap ? p->cap * 2 : 16) * sizeof *p->v);
-    size_t len = strlen(s) + 1;
-    p->v[p->n] = malloc(len);
-    memcpy(p->v[p->n++], s, len);
-}
-
-static int cmp_str(const void *a, const void *b) { return strcmp(*(char *const *) a, *(char *const *) b); }
-
+/* A PATH: a file as itself, a directory as the .tri files beneath it. */
 static int expand(Paths *out, const char *path)
 {
     struct stat st;
     if (stat(path, &st) != 0) { fprintf(stderr, "triangle: cannot read %s\n", path); return 0; }
-    if (!S_ISDIR(st.st_mode)) { add(out, path); return 1; }
-    DIR *d = opendir(path);
-    if (!d) { fprintf(stderr, "triangle: cannot read %s\n", path); return 0; }
-    size_t first = out->n;
-    struct dirent *e;
-    while ((e = readdir(d))) {
-        size_t n = strlen(e->d_name);
-        if (e->d_name[0] == '.' || n < 5 || strcmp(e->d_name + n - 4, ".tri")) continue;
-        char buf[4096];
-        snprintf(buf, sizeof buf, "%s%s%s", path, path[strlen(path) - 1] == '/' ? "" : "/", e->d_name);
-        add(out, buf);
-    }
-    closedir(d);
-    qsort(out->v + first, out->n - first, sizeof *out->v, cmp_str);
+    if (!S_ISDIR(st.st_mode)) { paths_add(out, path); return 1; }
+    if (!paths_add_tree(out, path)) { fprintf(stderr, "triangle: cannot read %s\n", path); return 0; }
     return 1;
 }
 
@@ -211,13 +188,33 @@ static char *dir_of(const char *path)
     return d;
 }
 
-static void free_paths(Paths *p)
+/* The content root a source loads in (paths.h): its directory's. */
+static char *root_of(const char *path)
 {
-    for (size_t i = 0; i < p->n; i++) free(p->v[i]);
-    free(p->v);
+    char *d = dir_of(path);
+    char *r = paths_content_root(d);
+    free(d);
+    return r;
 }
 
-/* Whether formatting the files of one directory keeps its content's meaning:
+/* Whether two paths name one file: by device and inode, or on Windows,
+ * which has no inodes, by full path. */
+static int same_file(const char *a, const char *b)
+{
+    if (!strcmp(a, b)) return 1;
+#ifdef _WIN32
+    char *fa = _fullpath(NULL, a, 0), *fb = _fullpath(NULL, b, 0);
+    int same = fa && fb && !_stricmp(fa, fb);
+    free(fa);
+    free(fb);
+    return same;
+#else
+    struct stat sa, sb;
+    return stat(a, &sa) == 0 && stat(b, &sb) == 0 && sa.st_dev == sb.st_dev && sa.st_ino == sb.st_ino;
+#endif
+}
+
+/* Whether formatting the files of one content root keeps its content's meaning:
  * loaded as it is and as formatted, the two hash the same. Content that
  * doesn't load as it is can't be compared; the token check stands alone. */
 static int same_meaning(const char *dir, Paths *files, char **formatted)
@@ -233,7 +230,7 @@ static int same_meaning(const char *dir, Paths *files, char **formatted)
         after[i] = before[i] ? before[i] : "";
         if (!before[i]) before[i] = "";
         for (size_t j = 0; j < files->n; j++)
-            if (formatted[j] && !strcmp(files->v[j], all.v[i])) after[i] = formatted[j];
+            if (formatted[j] && same_file(files->v[j], all.v[i])) after[i] = formatted[j];
     }
     TriContent *a = tri_content_load_strings((const char *const *) all.v, before, all.n);
     if (tri_content_ok(a)) {
@@ -246,7 +243,7 @@ static int same_meaning(const char *dir, Paths *files, char **formatted)
     free(owned);
     free(before);
     free(after);
-    free_paths(&all);
+    paths_free(&all);
     return ok;
 }
 
@@ -268,7 +265,7 @@ static int cmd_fmt(char **args, int n)
             return 0;
         } else if (args[i][0] == '-') {
             fprintf(stderr, "usage: triangle fmt [--check] [PATH...]   (or - for stdin to stdout)\n");
-            free_paths(&files);
+            paths_free(&files);
             return 2;
         } else {
             any = 1;
@@ -276,7 +273,7 @@ static int cmd_fmt(char **args, int n)
         }
     }
     if (!any) ok &= expand(&files, ".");
-    if (!ok) { free_paths(&files); return 2; }
+    if (!ok) { paths_free(&files); return 2; }
 
     char **formatted = calloc(files.n ? files.n : 1, sizeof *formatted);
     int failed = 0, changed = 0;
@@ -292,13 +289,13 @@ static int cmd_fmt(char **args, int n)
         else free(out);
         free(src);
     }
-    /* each directory's meaning kept, or nothing in it is written */
+    /* each content root's meaning kept, or nothing in it is written */
     for (size_t i = 0; i < files.n; i++) {
         if (!formatted[i]) continue;
-        char *d = dir_of(files.v[i]);
+        char *d = root_of(files.v[i]);
         int seen = 0;
         for (size_t j = 0; j < i && !seen; j++) {
-            char *e = formatted[j] ? dir_of(files.v[j]) : NULL;
+            char *e = formatted[j] ? root_of(files.v[j]) : NULL;
             seen = e && !strcmp(d, e);
             free(e);
         }
@@ -306,7 +303,7 @@ static int cmd_fmt(char **args, int n)
             fprintf(stderr, "triangle: formatting %s would change what its content means (a bug in triangle fmt); "
                             "left as it is\n", d);
             for (size_t j = 0; j < files.n; j++) {
-                char *e = dir_of(files.v[j]);
+                char *e = root_of(files.v[j]);
                 if (!strcmp(d, e)) { free(formatted[j]); formatted[j] = NULL; }
                 free(e);
             }
@@ -324,7 +321,7 @@ static int cmd_fmt(char **args, int n)
     }
     for (size_t i = 0; i < files.n; i++) free(formatted[i]);
     free(formatted);
-    free_paths(&files);
+    paths_free(&files);
     if (failed) return 1;
     return check && changed ? 1 : 0;
 }
@@ -343,7 +340,8 @@ static void usage(FILE *f)
           "                               the files it would change; -: stdin to stdout)\n"
           "  lsp                          run the language server over stdio\n"
           "  version                      print the version\n\n"
-          "A PATH is a .tri file or a directory of them; the default is the current directory.\n",
+          "A PATH is a .tri file or a directory of them, its subdirectories included; the default\n"
+          "is the current directory.\n",
           f);
 }
 

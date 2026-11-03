@@ -1,0 +1,67 @@
+// Water: stores and taps, and drawing from them (DOMAIN_SIMULATION.md
+// Scenario 3, "two draws on a dwindling stock").
+//
+// Cut points:
+// - full, reduced, abstract, frozen: alike. The fluid domain runs over the
+//             whole world at every level of detail; it doesn't yet step by
+//             region (REALITY.md step 4).
+// - activities: filling a bucket ends by a watch on it (activities.tri), or
+//             when the store runs dry.
+// - machines: a pump lifts water from a store into its riser
+//             (machines/pump.tri).
+// - code:     src/domains/BGFluidDomain.m; effect_open_tap, effect_fill.
+
+// Water, for DOMAIN_SIMULATION.md's third scenario, "Two draws on a
+// dwindling stock". Water is a stock: whole millilitres, held by entities
+// (WaterStore) and by tiles, and moved by the fluid domain while it flows.
+
+// Something that holds water. While the fluid domain has it checked out, the
+// domain's value is authoritative and commitment refuses to change this one.
+#WaterStore: {
+    @component(WaterStore)
+    water:         volume                    @field(content, saved, proposable, inspect, perceive(sight))
+    waterCapacity: volume & >=0mL & <=10m3   @field(content, saved, inspect, perceive(sight))
+}
+
+// An outlet on a water store: open, it delivers up to `rate` millilitres a
+// minute into what sits in it (a bucket), or onto its tile if nothing does.
+// It is installed in the store it draws from.
+#Tap: #Container & {
+    @component(Tap)
+    open: *false | true         @field(content, saved, proposable, inspect, perceive(sight))
+    rate: int & >=0 & <=100000  @field(content, saved, proposable, inspect)
+}
+
+cistern: #Assembly & #WaterStore & { material: "oak", mass: 40kg, slots: 4, water: 15L, waterCapacity: 200L }
+tap:     #Tap & { material: "brass", mass: 300g, capacity: 1, rate: 5000 }
+crack:   #Tap & { material: "oak", mass: 0g, capacity: 1, rate: 500, open: true }
+bucket:  #WaterStore & #Body & { material: "oak", mass: 1500g, water: 0mL, waterCapacity: 10L }
+
+// Open a tap the actor can reach.
+open_tap: #Operation & {
+    effect: "open_tap"
+    roles: {
+        actor: #Agent
+        item:  #Tap & { open: false }
+    }
+} @family(operations)
+
+// Fill a bucket from a tap: open it, and keep filling until the bucket holds
+// the command's amount (a watch on the bucket) or the source runs dry (the
+// tap's "exhausted"). The bucket must sit in the tap.
+fill_bucket: #Operation & {
+    effect: "fill"
+    roles: {
+        actor:       #Agent
+        item:        #Tap & { id: $t, open: false }
+        destination: #WaterStore & #Body & { place: #Inside & { container: $t } }
+    }
+} @family(operations)
+
+// Someone with two hands to work with.
+let person = { material: "flesh", hands: 2 }
+
+// The cistern room of "Two draws on a dwindling stock": two agents, each
+// with a tap and a bucket.
+agent_a: #Agent & person & { mass: 60kg, coat: "grey" }
+agent_b: #Agent & person & { mass: 65kg, coat: "green" }

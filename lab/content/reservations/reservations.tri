@@ -1,0 +1,48 @@
+// Reservations: a soft claim on a thing, which never blocks anyone taking
+// it; a tag saying whose it is; and respecting it (ACTIONS.md §7, Scenario 2,
+// "two hands, one seal").
+//
+// Cut points:
+// - full:     an agent wanting the seal weighs taking it against its respect
+//             for a reservation it believes in.
+// - reduced:  the same, decided on the cadence's beat.
+// - abstract: as reduced.
+// - frozen:   it doesn't decide.
+// - code:     a reservation is a claim (things.tri); #Respect (agency.tri)
+//             weighs it; the #Reserved finding comes from what the agent is
+//             told or reads.
+
+// Fetching: a part.
+#Fetching: #Frame & { part: #Body }
+
+get_the_seal: #Goal & {
+    title: "get the seal"
+    done: {
+        find:  ["part"]
+        match: #Fetching & {
+            me:   #Agent & { id: $me }
+            part: #Body & { material: "rubber", place: #Held & { by: $me } }
+        }
+    }
+} @family(goals)
+
+// Take it up from the bench, unless the agent minds that it is reserved.
+take_the_seal: #Method & {
+    title: "take the seal"
+    goal:  "get_the_seal"
+    rank:  1
+    pre:   { find: ["part"], match: #Fetching & { part: #Body & { material: "rubber", place: #OnTile } } }
+    steps: [#Do & { op: "take_up", object: "part" }]
+    score: [#Flat & { value: 10 }, #Respect & { reserved: "part", per: -8 }]
+} @family(methods)
+
+// A claim: something like `what` is reserved for someone like `holder`
+// (ACTIONS.md §7): a soft claim, which never blocks anyone taking it.
+#ReservedFor: #Naming & {}
+
+// For ACTIONS.md's two hands, one seal: the spare piston seal, and a
+// reservation of it.
+seal:        #Body & { material: "rubber", mass: 50g }
+reservation: #Claim & { kind: "reservation" }
+// A tag tied beside it, saying whose it is, legible from a step away.
+seal_tag:    #Label & { material: "paper", mass: 5g, legible: 1 }

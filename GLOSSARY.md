@@ -388,7 +388,7 @@ REALITY.md, TER = TERRAIN.md, TES = TESSERA.md. "d3" is a doc's decision
   on perceiving) or **deliberate** (investigating, an activity). Retracted
   only when a premise is contradicted. (KNO §9)
 - **Telling**: the content of a claim made in speech or writing, with its
-  **attribution** ("I saw", "Teodor told me"). (KNO §10, talk.tri)
+  **attribution** ("I saw", "Teodor told me"). (KNO §10, lab/content/knowledge.tri)
 - **Utterance**: the committed event of saying something; heard by event
   perception. (KNO §10)
 - **Testimony**: what an agent has been told: tellings heard and believed
@@ -476,7 +476,7 @@ REALITY.md, TER = TERRAIN.md, TES = TESSERA.md. "d3" is a doc's decision
   shift, pay. A **debt** is a commitment to pay. (AGE d15, d18)
 - **Bond**: a reified relation from one agent toward another, with a
   **tie** (kin, friend, employ, sworn) and a **loyalty** weight. (AGE d12,
-  bonds.tri)
+  lab/content/bonds/bonds.tri)
 - **Loyalty**: the weight of a bond. *Avoid:* treating it as a
   disposition. (AGE d12)
 - **Routine**: the goals in force at a time, from commitments and habits.
@@ -737,7 +737,20 @@ REALITY.md, TER = TERRAIN.md, TES = TESSERA.md. "d3" is a doc's decision
 - **Attribute**: `@name(...)`: `@component`, `@field`, `@family`,
   `@vary`, `@widen`, `@fn`, `@embed`, `@quickcheck`, `@variants`. (CL §1)
 - **Derived field**: a value computed by code named by `@fn`. (CL §5)
-- **Package**: a file or directory scoping names, not features. (CL d12)
+- **Package**: a file or directory scoping names, not features. Not a
+  topic directory. (CL d12)
+- **Topic**: one subject of the content that crosses systems (hunger: a
+  body field, a felt need, a goal and its methods, eating), kept in one
+  directory of content with what it does at every level of detail. Not a
+  system: a regime sets a mode per system, and a topic says what its parts
+  do under each. *Avoid:* subject (a claim's), concern (see **concerned**).
+  (lab/content/README.md)
+- **Content root**: the directory content loads from. Its own `.tri` files
+  hold the vocabulary every topic is written in; each topic is a directory
+  beneath it. (lab/content/README.md)
+- **Cut point**: where a content file's content stops and something else
+  takes over: another level of detail, another topic, or code. Every
+  content file lists its cut points in its header. (lab/content/README.md)
 - **Content build / content hash**: one load of all content / its hash,
   stored in saves. (CL §8)
 - **Arena**: a region allocator for nodes; compacted by copying. (CL §12)
@@ -798,3 +811,4 @@ Each row says which term to use for which sense.
 | fidelity | how faithfully a route carries news | **detail** (AGENCY.md's "fidelity levels" are levels of detail) |
 | loyalty | a bond's weight | (not a disposition) |
 | office | a position in an organization | **organization** (the body) |
+| subject | a claim's subject | **topic** (what a content directory is about) |

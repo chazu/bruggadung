@@ -31,7 +31,7 @@ CFLAGS`.
 
 | Path | Contents |
 | --- | --- |
-| `content/` | `components.tri`: the component kinds and their field registry, plus what descriptions say besides fields (ids, places, free hands); `water.tri`: water stores and taps; `activities.tri`: the Activity component; `operations.tri`: the operations; `agency.tri`: goals and methods; `talk.tri`: what agents say, and the say operation; `air.tri`: gas stores, stoves and their fuel, and the heat of solids; `workshop.tri`: the scenarios' blueprints |
+| `content/` | The Triangle content, laid out by `content/README.md`. At the root, the vocabulary every topic is written in: `things.tri` (the shared component kinds and their field registry, and what descriptions say besides fields), `actions.tri` (what an operation is, and the operations every topic uses), `activities.tri`, `agency.tri` (goals, methods, considerations), `knowledge.tri` (findings, rules, persistence, the shapes of claims), `reality.tri` (anchors and levels of detail). Beneath it, a directory per topic (`hunger/`, `air/`, `institutions/`, ...), each holding everything about its topic, its scenarios' blueprints too, with its cut points in each file's header |
 | `src/generated/BGComponents.h` | Generated from `content/` by `make gen`: one struct per component, enums, and the field registry. Committed; the lab refuses to run on content with another hash. |
 | `src/core/` | `BGTypes.h` (IDs, time, seeds, locations), `BGStore` (records of one kind, sorted by ID), `BGWorld` (all authoritative state, journaled for rollback) |
 | `src/commit/` | `BGProposalGroup` (proposals, handles, unit references), `BGCommitter` (ordering, individuation, apply, validation, events, reactions) |
@@ -49,13 +49,13 @@ CFLAGS`.
 
 ## How an action happens
 
-Operations are content (`content/operations.tri`): patterns over the
-descriptions of the entities filling their roles, with tags carrying
-bindings between roles. An actor's view (`BGView`) can bind only what is in
-reach, and describes each entity by its type, id, place, and the component
-fields whose `@field` flags say they can be perceived. A hidden field stays
-open, so a match on it is unknown, and unknown never excludes. The menu
-lists every operation and binding whose match isn't incompatible.
+Operations are content (`content/actions.tri`, and each topic's): patterns
+over the descriptions of the entities filling their roles, with tags
+carrying bindings between roles. An actor's view (`BGView`) can bind only
+what is in reach, and describes each entity by its type, id, place, and the
+component fields whose `@field` flags say they can be perceived. A hidden
+field stays open, so a match on it is unknown, and unknown never excludes.
+The menu lists every operation and binding whose match isn't incompatible.
 Performing a command checks it is on the menu, then runs the operation's
 effect function, which builds a proposal group for commitment.
 
@@ -76,7 +76,7 @@ can see, and not seen there, is marked absent.
 Agents also perceive what happens, by an actor in sight: a thing seen put
 somewhere is perceived there, inside a container too, though nothing else in
 it is. What they see happen, and hear said, they keep as observations, in
-their referents. What is said is a Triangle structure (`content/talk.tri`)
+their referents. What is said is a Triangle structure (`content/talk/talk.tri`)
 carried by the "said" event; it describes things by kind, features, and
 place, never by referents; people are described by how they look (their
 coat). A claim heard (`#IsIn`: something like this is in that, as of then,
@@ -127,19 +127,20 @@ In the decision phase after perception, each agent agency controls decides
 one step from its intention, reading only its own knowledge store, and acts
 through the same believed actions a player uses.
 
-Goals and methods are content (`content/agency.tri`). A goal is done when
-its `done` condition holds: a condition names slots to bind to referents the
-agent believes present, each tried in the condition's order (nearest, most
-recently seen), and holds when the frame they describe is entailed by its
-pattern; a partial binding the pattern already rules out isn't followed. A
-goal's methods are tried by rank; the first whose `pre` holds is followed,
-its steps re-read at each decision: a subgoal already done is passed over and
-its bindings join the method's, one not done is adopted above the goal, and
-an operation is performed once the agent has walked within reach of what it
-names. A method's `search` slot is somewhere to look, passed over once the
-agent has seen inside it since adopting the goal. When no method's `pre`
-holds, the goal is impossible for now: dropped with the reason, and the
-method that needed it has failed, so the goal beneath tries its next.
+Goals and methods are content (`content/agency.tri`, and each topic's). A
+goal is done when its `done` condition holds: a condition names slots to
+bind to referents the agent believes present, each tried in the condition's
+order (nearest, most recently seen), and holds when the frame they describe
+is entailed by its pattern; a partial binding the pattern already rules out
+isn't followed. A goal's methods are tried by rank; the first whose `pre`
+holds is followed, its steps re-read at each decision: a subgoal already
+done is passed over and its bindings join the method's, one not done is
+adopted above the goal, and an operation is performed once the agent has
+walked within reach of what it names. A method's `search` slot is somewhere
+to look, passed over once the agent has seen inside it since adopting the
+goal. When no method's `pre` holds, the goal is impossible for now: dropped
+with the reason, and the method that needed it has failed, so the goal
+beneath tries its next.
 
 A step can say something: *ask where nails are* puts a `#WhereIs` to the
 nearest agent the worker knows of, then waits up to five seconds for the

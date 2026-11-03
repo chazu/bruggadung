@@ -1,0 +1,77 @@
+// Valves: levers, wrenches and pipes, and turning a seized valve with the
+// best chain of them (ACTIONS.md Scenario 1).
+//
+// Cut points:
+// - full, reduced, abstract: a turn runs at full pace while its actor is at
+//            any of them.
+// - frozen:  a turn under way waits.
+// - code:    effect_rotate builds the chain and applies its torque;
+//            src/kinds/BGValveKind.m reacts (breaking free, a lever
+//            bending); effect_strike.
+
+// What valves add to an agent: what its hands can put into a turn
+// (ACTIONS.md Scenario 1).
+#Agent: {
+    grip: *200N | force & >=0N & <=5000N @field(content, saved, inspect)
+}
+
+// A lever (ACTIONS.md Scenario 1, instrument chains): how far it reaches
+// for a turn, and the torque it bears before it bends. A sleeve fits over
+// another lever's handle and lengthens it.
+#Lever: {
+    @component(Lever)
+    leverage: length & >=1mm & <=5000mm      @field(content, saved, inspect, perceive(sight))
+    limit:    torque & >=1Nm & <=100000Nm    @field(content, saved, proposable, inspect)
+    sleeve:   *false | true                  @field(content, saved, inspect, perceive(sight))
+}
+#Wrench: #Body & #Lever & #Turner & {}
+#Pipe:   #Body & #Lever & {}
+
+// A valve: the turn its rating says, what (hidden) it takes to break it
+// free, and whether it has turned.
+#Valve: #Body & {
+    @component(Valve)
+    rating:    torque & >=1Nm & <=100000Nm   @field(content, saved, inspect, perceive(sight))
+    breakaway: torque & >=1Nm & <=100000Nm   @field(content, saved, proposable, inspect)
+    turned:    *false | true                 @field(content, saved, proposable, inspect, perceive(sight))
+}
+
+// Turn a valve (ACTIONS.md Scenario 1): with the best chain of what the
+// actor can reach (taking up what it doesn't hold, a take_up's time each,
+// twice from a container), hand, wrench, pipe over the wrench; the command's amount, if
+// any, holds the torque steady there (Nm). The stage commits the torque
+// applied; the valve's reaction decides what happens.
+rotate_valve: #Operation & {
+    effect:   "rotate"
+    duration: 2s
+    uses:     ["hands"]
+    roles: {
+        actor: #Agent
+        item:  #Valve & { turned: false }
+    }
+} @family(operations)
+
+// Strike something with a stone the actor holds: a blow, which loosens
+// what has seized.
+strike: #Operation & {
+    effect: "strike"
+    uses:   ["hands"]
+    roles: {
+        actor:       #Agent & { id: $a }
+        item:        #Body & { material: "stone", place: #Held & { by: $a } }
+        destination: #Valve
+    }
+} @family(operations)
+
+// ACTIONS.md Scenario 1's sounds: a seized valve breaking free, a lever
+// giving
+creak: #TraceKind & { sense: "hearing", lasts: 2s } @family(traces)
+clang: #TraceKind & { sense: "hearing", lasts: 2s } @family(traces)
+
+// For ACTIONS.md's seized valve: a valve rated 12 Nm, free or seized; a
+// wrench, a length of pipe that fits over its handle, and a stone.
+water_valve:  #Valve & { material: "brass", mass: 2kg, rating: 12Nm, breakaway: 12Nm }
+seized_valve: #Valve & { material: "brass", mass: 2kg, rating: 12Nm, breakaway: 70Nm }
+wrench_250:   #Wrench & { material: "steel", mass: 400g, leverage: 250mm, limit: 80Nm }
+pipe_600:     #Pipe & { material: "iron", mass: 1500g, leverage: 600mm, limit: 2000Nm, sleeve: true }
+stone:        #Body & { material: "stone", mass: 800g }

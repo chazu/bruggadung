@@ -13,7 +13,7 @@ has none:
 - the fluid domain is a grid with nothing to stop water.
 
 This document is a draft. Steps 1 to 3 are built (lab/src/core/BGTerrain,
-lab/content/terrain.tri; sight and memory in lab/src/know/BGKnowledge;
+lab/content/terrain/terrain.tri; sight and memory in lab/src/know/BGKnowledge;
 rooms in BGTerrain and `-[BGWorld airRegionAt:]`; links from doorways in
 `-[BGWorld airOpeningsOf:]`; air following terrain in BGCommitter).
 

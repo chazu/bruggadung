@@ -1,0 +1,215 @@
+// Machines, latent assembly: an assembly whose parts are not entities until
+// it is opened, and how they wear, fail, and are serviced and replaced
+// (COMPONENTS.md §7, DOMAIN_SIMULATION.md Scenario 2, LATENT_ASSEMBLY.md).
+//
+// Cut points:
+// - full, reduced, abstract: wear accrues per use, as an operation works the
+//             assembly; nothing wears while nobody works it. A wear rate for
+//             machines in daily use, abstract, is planned (DETAIL_REGIMES.md).
+// - frozen:   nobody works it, so nothing wears.
+// - knowledge: a part seen wearing is found wanting servicing
+//             (`wearing_part`), which the diligent do.
+// - code:     src/kinds/BGLatentKind.m: opening, wear, failures, servicing;
+//             effect_reveal, effect_replace, effect_service, effect_install,
+//             effect_cut, effect_shape.
+
+// Latent physical assembly (COMPONENTS.md §7, DOMAIN_SIMULATION.md Scenario
+// 2, LATENT_ASSEMBLY.md).
+//
+// An assembly's descriptor (`latent`, in content with its blueprint) lists its
+// roles: each a part blueprint, at a depth (the level opening reveals it at);
+// and, per failure, the roles that could be its culprit. The assembly keeps
+// what is revealed, the failures committed against it, and how long it has
+// been used and abused (its history). Opening a level makes its parts
+// entities, `partOf` the assembly, their mass carved out of the aggregate's.
+//
+// Wear is the assembly's use, shared out (LATENT_ASSEMBLY.md decisions 4-6,
+// after dewdrop's latent anatomy): a role `wears` that many points in a
+// hundred hours of use, `strain` times as fast while the assembly is abused,
+// and faster the poorer it is. Its quality is hidden, decided when the unit
+// was made: 50, give or take 20 by the unit's seed, and the blueprint's
+// `bias` for its kind of part. Every hour of use risks each failure: its
+// `chance` in a thousand, per hundred hours, when new, four times that when
+// its most worn candidate is worn through. The culprit is drawn among the
+// candidates by the unit's seed, weighted by their wear, and decided once.
+// Not among the level's parts, it isn't marked: none is invented. Once a
+// role is opened, its wear is the part's in it (decision 7): fitting another
+// brings that one's wear in, and the role wears on from there. Servicing an
+// opened part (decision 8) undoes its role's `mends` per cent of the wear
+// since it was last serviced, so serviced often, it wears that much slower;
+// worn through, it is past servicing, and has to be replaced.
+
+// A part this worn has failed: it can't be serviced, only replaced (the
+// lab's BG_PART_FAILED).
+let worn_through = 60
+
+#LatentRole:   { roleName: text, partKind: text, depth: int, wears: int & >=0 & <=100, strain: int & >=1 & <=10,
+                 mends: *0 | int & >=0 & <=100 }
+#Culprit:      { failing: text, candidates: [...text], chance: int & >=0 & <=1000 }
+// A kind of part a blueprint makes better (positive) or worse than usual.
+#Bias:         { biased: text, bias: int & >=-50 & <=50 }
+// `pathWhenOut`: the role whose extraction opens a path from the store the
+// assembly holds back (its `riser`) to its floor, through `pathThrough`,
+// which passes in proportion to its wear past half (DOMAIN_SIMULATION.md
+// Scenario 2: the open cylinder, through the outlet check valve).
+#LatentSchema: { parts: [...#LatentRole], culprits: [...#Culprit], biases: [...#Bias], pathWhenOut: text, pathThrough: text }
+
+#Latent: #Body & {
+    @component(Latent)
+    revealed: *0 | int & >=0 & <=8             @field(content, saved, proposable, inspect)
+    failure:  text                             @field(saved, proposable, inspect)
+    failedAt: *0ms | time & >=0ms & <=10000d   @field(content, saved, proposable, inspect)
+    riser:    ref                              @field(saved, proposable, inspect)
+    leaking:  *false | true                    @field(content, saved, proposable, inspect)
+    // how long it has been worked, and how long of that abused
+    used:     *0ms | time & >=0ms & <=100000d  @field(content, saved, proposable, inspect)
+    abused:   *0ms | time & >=0ms & <=100000d  @field(content, saved, proposable, inspect)
+    // the role its failure is due to, decided at the failure (or, for a
+    // failure a scenario set, when first opened); hidden
+    blamed:   text                             @field(saved, proposable, inspect)
+    latent:   #LatentSchema
+}
+
+// A revealed part: how worn it is (0 to 100), which can be seen; the
+// assembly it came from; whether it has left it. Its wear is its own: it
+// brings it into the role it is fitted in, and wears on there as the role
+// does, by its own quality; out of place, it doesn't. `attrition` is its
+// wear finer, in ten-thousandths of a point (a part made worn in content is
+// as worn as its `wear`); `grade`, hidden, its quality, what it was made
+// with (revealed, its assembly's for the role; -1: by its own seed);
+// `tended`, its attrition when it was last serviced, which servicing can't
+// undo.
+#Part: #Body & {
+    @component(Part)
+    wear:      *0 | int & >=0 & <=100          @field(content, saved, proposable, inspect, perceive(sight))
+    attrition: *0 | int & >=0 & <=1000000      @field(content, saved, proposable, inspect)
+    grade:     *-1 | int & >=-1 & <=100        @field(content, saved, proposable, inspect)
+    tended:    *0 | int & >=0 & <=1000000      @field(content, saved, proposable, inspect)
+    cameFrom:  ref                             @field(saved, proposable, inspect)
+    fits:      text                            @field(saved, proposable, inspect, perceive(sight))
+    detached:  *false | true                   @field(content, saved, proposable, inspect)
+}
+
+// Open an assembly in reach a level further, with a wrench in hand.
+open_up: #Operation & {
+    effect: "reveal"
+    uses:   ["hands"]
+    roles: {
+        actor:       #Agent & { id: $a }
+        item:        #Wrench & { place: #Held & { by: $a } }
+        destination: #Latent
+    }
+} @family(operations)
+
+// Replace a worn part in an assembly with a spare that fits its role, held:
+// the worn one out onto the floor, the spare in its place. A part worn by a
+// failure, replaced, repairs it (provisional: LATENT_ASSEMBLY.md).
+replace_part: #Operation & {
+    effect:   "replace"
+    duration: 5s
+    uses:     ["hands"]
+    roles: {
+        actor:       #Agent & { id: $a }
+        item:        #Part & { place: #Held & { by: $a }, fits: $r }
+        destination: #Part & { place: #Installed, fits: $r, wear: >=worn_through }
+    }
+} @family(operations)
+
+// Service a part in place, short of worn through, for ten minutes: dress
+// the leather, clean the valve, oil the pivot (LATENT_ASSEMBLY.md decision
+// 8). It undoes its role's `mends` per cent of the wear since it was last
+// serviced (since it was made, if never), and no more: servicing it again at
+// once does nothing. A part that is itself an assembly has its own parts to
+// service.
+service_part: #Operation & {
+    effect:   "service"
+    duration: 10min
+    uses:     ["hands"]
+    roles: {
+        actor: #Agent
+        item:  #Part & { place: #Installed, wear: <worn_through }
+    }
+} @family(operations)
+
+// Clean out an open assembly's cylinder, with a wrench in hand, for ten
+// minutes: watching the floor, as water may come (ACTIONS.md Scenario 3).
+clean_out: #Operation & {
+    effect:     "tend"
+    duration:   10min
+    uses:       ["hands"]
+    floodWatch: 500
+    roles: {
+        actor:       #Agent & { id: $a }
+        item:        #Wrench & { place: #Held & { by: $a } }
+        destination: #Latent
+    }
+} @family(operations)
+
+// Put a part held back into the assembly it came from, in its role.
+install_part: #Operation & {
+    effect: "install"
+    roles: {
+        actor:       #Agent & { id: $a }
+        item:        #Part & { place: #Held & { by: $a } }
+        destination: #Latent
+    }
+} @family(operations)
+
+// A leather hide, and a strip cut from it: an individual divided.
+hide:          #Body & { material: "leather", mass: 1kg }
+leather_strip: #Part & { material: "leather", mass: 100g }
+
+// Cut a strip from a hide held: the hide persists, smaller.
+cut_strip: #Operation & {
+    effect: "cut"
+    roles: {
+        actor: #Agent & { id: $a }
+        item:  #Body & { material: "leather", place: #Held & { by: $a } }
+    }
+} @family(operations)
+
+// Shape a strip held into a seal: it fits the role a seal fills.
+shape_seal: #Operation & {
+    effect: "shape"
+    roles: {
+        actor: #Agent & { id: $a }
+        item:  #Part & { material: "leather", place: #Held & { by: $a } }
+    }
+} @family(operations)
+
+// Which claims cover parts: a claim of this kind on an assembly covers what
+// is part of it, and what came out of it (COMPONENTS.md Scenario 3).
+#Coverage:        { claimKind: #ClaimKind, viaPartOf: *false | true }
+ownership_covers: #Coverage & { claimKind: "ownership", viaPartOf: true } @family(coverage)
+
+// A part seen worn a fifth of the way through: it wants servicing. Seen
+// serviced, it stops; seen wearing again, it is drawn again.
+wearing_part: #Rule & {
+    premises:  [#Wearing & { wearing: 20 }]
+    mastery:   0
+    concludes: "#Worn"
+    weight:    10
+} @family(rules)
+
+// --- keeping a machine in order (LATENT_ASSEMBLY.md decision 8) ---------------------
+
+// Seeing a part wearing, service it, if the agent is so inclined: nothing
+// but diligence recommends it. At the default 50 it is worth doing when
+// there is nothing better; a lazy agent (25 or less) lets it be; a diligent
+// one breaks off lesser things for it. The part it can service is the one
+// service_part takes: in place, short of worn through.
+
+service_worn: #Goal & {
+    title:  "service the worn part"
+    done:   #Did & { did: "service_part" }
+    arises: { finding: "#Worn", slot: "worn", lapse: 1h, of: #Part }
+    worth:  [#Flat & { value: -10 }, #Trait & { trait: "diligent", per: 4 }]
+} @family(goals)
+
+service_it: #Method & {
+    title: "service it"
+    goal:  "service_worn"
+    rank:  1
+    pre:   { find: ["worn"], match: #Mending & { worn: service_part.roles.item } }
+    steps: [#Do & { op: "service_part", object: "worn" }]
+} @family(methods)

@@ -511,7 +511,8 @@ the truth. Two operations matter:
 
 ## 15. Checking and exporting
 
-The `triangle` command loads content from files or directories:
+The `triangle` command loads content from files or directories, a directory
+standing for the `.tri` files in it and in its subdirectories:
 
 ```text
 $ triangle check examples/workshop

@@ -32,6 +32,25 @@
   (should (eq (assoc-default "content/workshop.tri" auto-mode-alist #'string-match-p)
               'triangle-mode)))
 
+(ert-deftest triangle-test-content-dir ()
+  ;; A topic directory's content root is the directory above it, which holds
+  ;; .tri files of its own; above that, none do.
+  (let* ((top (make-temp-file "triangle-test" t))
+         (root (file-name-as-directory (expand-file-name "content" top)))
+         (topic (file-name-as-directory (expand-file-name "hunger" root))))
+    (unwind-protect
+        (progn
+          (make-directory topic t)
+          (write-region "" nil (expand-file-name "things.tri" root))
+          (write-region "" nil (expand-file-name "eating.tri" topic))
+          (with-temp-buffer
+            (setq buffer-file-name (expand-file-name "eating.tri" topic))
+            (should (equal (triangle--content-dir) root)))
+          (with-temp-buffer
+            (setq buffer-file-name (expand-file-name "things.tri" root))
+            (should (equal (triangle--content-dir) root))))
+      (delete-directory top t))))
+
 (ert-deftest triangle-test-font-lock ()
   (triangle-test-with
       "package shop\n// A tool.\n#Tool: #Thing & {\n    size: length @field(saved)\n    wear: *0 | >=0\n}\n\"steel\": \"mild\" | \"forged\"\nw: #Tool & { size: 19mm, tag: $s, ok: true, r: ref(3) }\n"

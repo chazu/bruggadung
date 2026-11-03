@@ -418,8 +418,9 @@ typedef struct
 - (int32_t) tilesWide;
 - (int32_t) tilesHigh;
 - (int32_t) levels;
-/* The region of air over a tile (air.tri, TERRAIN.md step 3): the GasStore
- * whose tile is in the tile's room; none outdoors, or on a wall or doorway. */
+/* The region of air over a tile (content/air/air.tri, TERRAIN.md step 3):
+ * the GasStore whose tile is in the tile's room; none outdoors, or on a wall
+ * or doorway. */
 - (BGEntityID) airRegionAt:(BGLocation) tile;
 /* A room's air, by its number (BGTerrainRoomAt); none if it has none. */
 - (BGEntityID) airOfRoom:(uint32_t) room;

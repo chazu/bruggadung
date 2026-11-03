@@ -1,0 +1,63 @@
+// Harm: striking someone, and being struck: hitting back, or getting clear
+// (AGENCY.md §13).
+//
+// Cut points:
+// - full:     a blow is an injury of 15, felt as pain, and a #Struck finding
+//             of who struck; the struck hits back as its temper has it,
+//             unless it holds never to strike anyone, or gets clear.
+// - reduced:  a blow is done to it, so it is perceived; a blow from someone
+//             at full detail raises it to full while the contact lease runs
+//             (reality.tri).
+// - abstract: as reduced.
+// - frozen:   it neither perceives nor decides; contact raises it.
+// - body:     injury is things.tri's (#Agent), felt as pain less adrenaline.
+// - code:     effect_hit; effect_flee, to get clear.
+
+// Harmed: who struck.
+#Harming: #Frame & { attacker: #Agent }
+
+// Hit someone in reach (AGENCY.md §13): a blow, an injury of 15 to its
+// body, which it feels, and knows who dealt.
+hit: #Operation & {
+    effect:   "hit"
+    duration: 1s
+    uses:     ["hands"]
+    roles: {
+        actor: #Agent
+        item:  #Agent
+    }
+} @family(operations)
+
+// Struck (a #Struck finding, about who struck): a threat, weighed against
+// whatever the agent is doing. Hit back, as its temper has it, unless it
+// holds never to strike anyone (a veto); or get clear, the more the more it
+// hurts and the less its temper.
+hit_back: #Goal & {
+    title:  "hit back"
+    done:   #Did & { did: "hit" }
+    arises: { finding: "#Struck", slot: "attacker", lapse: 10s, of: #Agent }
+    worth:  [#Flat & { value: -10 }, #Trait & { trait: "temper", per: 4 }, #Trait & { trait: "gentle", per: -1, veto: true }]
+} @family(goals)
+
+strike_back: #Method & {
+    title: "strike back"
+    goal:  "hit_back"
+    rank:  1
+    pre:   { find: ["attacker"], match: #Harming & { attacker: #Agent } }
+    steps: [#Do & { op: "hit", object: "attacker" }]
+} @family(methods)
+
+get_clear: #Goal & {
+    title:  "get clear"
+    done:   #Did & { did: "flee" }
+    arises: { finding: "#Struck", slot: "attacker", lapse: 10s, of: #Agent }
+    worth:  [#Trait & { trait: "injury", per: 5 }, #Trait & { trait: "temper", per: -4 }]
+} @family(goals)
+
+back_away: #Method & {
+    title: "back away"
+    goal:  "get_clear"
+    rank:  1
+    pre:   { find: ["attacker"], match: #Harming & { attacker: #Agent } }
+    steps: [#Do & { op: "flee", object: "attacker" }]
+} @family(methods)

@@ -1,3 +1,13 @@
+// Terrain: what each tile at each level is, and the maps the lab's worlds are
+// drawn from (TERRAIN.md).
+//
+// Cut points:
+// - full, reduced, abstract, frozen: alike; terrain changes only as it is
+//            built on or knocked through.
+// - air:     rooms, and so regions of air, are found from it (air/air.tri).
+// - code:    src/core/BGTerrain.m; a map's levels are files in maps/,
+//            brought in by @embed (a path from this directory).
+
 // Terrain (TERRAIN.md): what each tile at each level is. A wall fills its
 // tile; a cell is a kind's index, not an entity, until something tells it
 // apart.
@@ -49,7 +59,7 @@ shed_map: #Map & {
     fill:   "open_floor"
 }
 
-// The rooms of the air scenarios (DOMAIN_SIMULATION.md Scenario 1, air.tri):
+// The rooms of the air scenarios (DOMAIN_SIMULATION.md Scenario 1, air/air.tri):
 // a room and a back room, 4 by 5, side by side, their doorways onto a
 // corridor below, walled at its ends; the rest of a 32 by 32 world, open
 // ground outdoors.

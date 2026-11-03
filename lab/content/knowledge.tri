@@ -1,0 +1,151 @@
+// Knowledge (KNOWLEDGE.md): what interpretation concludes and from what, how
+// features last and blur, and the shapes of what is said: what every topic's
+// findings, rules and utterances are written in. A topic's own rules and
+// claims are in its directory.
+//
+// Cut points:
+// - full:     an agent perceives what happens around it.
+// - reduced:  only what it takes part in: its own doings, what is done to it,
+//             what is said to it (reality.tri's `reduced`).
+// - abstract: as reduced.
+// - frozen:   it perceives nothing; its memory's fading is reckoned from
+//             times, so it is caught up as it is read.
+// - code:     src/know/BGKnowledge.m: perception, recognition, memory, each
+//             premise's kind, and the findings no rule concludes (#Taken,
+//             #Struck, #Arrested, #Hires, #Owned, #Reserved).
+
+// Interpretation (KNOWLEDGE.md §9): rules that derive findings from what an
+// agent perceives and believes, run on what it perceives, as it perceives
+// it. Each rule may need expertise: an agent less skilled than its `mastery`
+// doesn't draw it, and sees only the signs. Its premises can need prior
+// beliefs, too: something it saw before that is gone now.
+
+// What a rule concludes: something about a body.
+#Finding:     { about: #Body }
+// Something was done to it.
+#Tampered:    #Finding & {}
+// Something was done to it, and hidden.
+#CoveredUp:   #Finding & {}
+// Something stirred there.
+#Disturbance: #Finding & {}
+// Someone cleaned up beside it.
+#Cleaned:     #Finding & {}
+// It is reserved for someone (ACTIONS.md §7), the finding's choice: what
+// the agent was told.
+#Reserved:    #Finding & {}
+// It is someone's own, the finding's choice: as the agent was told.
+#Owned:       #Finding & {}
+// Someone, the finding's choice, took it from its owner: seen, or told.
+#Taken:       #Finding & {}
+// It (the agent itself) is under arrest, by the finding's choice.
+#Arrested:    #Finding & {}
+// It hires (AGENCY.md decision 15): as the agent read, or was told.
+#Hires:       #Finding & {}
+// It struck someone, the finding's choice (AGENCY.md §13): a threat, to
+// the agent itself when it was the one struck.
+#Struck:      #Finding & {}
+// Someone does something the same way, again and again (AGENCY.md §8): the
+// finding's choice is the way.
+#Habit:       #Finding & {}
+// It was swapped for another like it.
+#Replaced:    #Finding & {}
+// It is a forgery.
+#Forged:      #Finding & {}
+// It is wearing: a part that wants servicing.
+#Worn:        #Finding & {}
+
+// A rule's premises, over the body it is about.
+#Premise:    {}
+// a trace of this kind perceived on it now
+#Sign:       #Premise & { sign: text }
+// a trace of this kind perceived on it before, gone now
+#Formerly:   #Premise & { formerly: text }
+// a trace of this kind perceived on the floor at it or beside it
+#Near:       #Premise & { near: text }
+// it was seen to put things into the same container at least this often
+#Repeated:   #Premise & { repeated: int }
+// it was seen with more of this before, which wears on and never off, than
+// it is seen with now
+#Unworn:     #Premise & { unworn: text }
+// a copy whose impression is not that of the seal the agent has seen of the
+// issuer it claims
+#Misprinted: #Premise & { misprinted: *true | false }
+// it is seen worn at least this much (a part's `wear`); weighed again as
+// it is seen, so a part serviced stops being so
+#Wearing:    #Premise & { wearing: int }
+
+#Skill: "painting"
+
+// `concludes` is a #Finding type; `weight` the credence it lends, in dB. A
+// `deliberate` rule takes thought: it is drawn only when the agent
+// investigates (KNOWLEDGE.md §9).
+#Rule: {
+    premises:   [...#Premise]
+    skill:      #Skill
+    mastery:    int & >=0 & <=100
+    concludes:  text
+    weight:     int & >=0 & <=30
+    deliberate: *false | true
+}
+
+// Seen putting things in the same place three times: they usually do.
+usually_puts: #Rule & {
+    premises:  [#Repeated & { repeated: 3 }]
+    mastery:   0
+    concludes: "#Habit"
+    weight:    10
+} @family(rules)
+
+// How long features usually last (KNOWLEDGE.md §8, CONTENT_LANGUAGE.md §17's
+// recognition): a coat changes daily, the rest of how someone looks hardly
+// at all. Recognition weighs a conflict on a short-lived feature lightly: it
+// may be the same one, changed.
+// Something said of a feature of how things look.
+#OfFeature: { feature: text }
+
+#Persistence: #OfFeature & { persists: time }
+
+coat_persists: #Persistence & { feature: "coat", persists: 1d } @family(persistence)
+
+// How a feature blurs with distance (KNOWLEDGE.md §5, perception's
+// precision): `blur` steps for each tile beyond arm's reach.
+#Acuity: #OfFeature & { blur: int }
+
+size_blurs: #Acuity & { feature: "size", blur: 1 } @family(acuity)
+
+// Believed the same past `mergeAt` dB (KNOWLEDGE.md decision 13), two
+// referents merge into one; a wrong merge stands until they are seen apart.
+#Merging: { mergeAt: int }
+
+identities_merge: #Merging & { mergeAt: 20 } @family(recognition)
+
+// What agents say (KNOWLEDGE.md §10). An utterance's content is a structure,
+// carried by the "said" event, and whoever is in earshot perceives it.
+// Content names no referents: it describes things by kind, features, and
+// where they are, and each hearer binds them to referents of its own by
+// recognition.
+
+// Every utterance is about something like `what`.
+#Utterance: { what: #Body }
+
+// An utterance about something like `what` inside `within`.
+#Placing: #Utterance & { within: #Body }
+
+// A question expects an answer from the one it is put to.
+#Question: #Utterance & {}
+
+// How the speaker says it knows (the attribution, KNOWLEDGE.md §10): it saw
+// it, as sure as its memory of it is strong (in dB), or heard it, from
+// someone it describes, or from no one it names.
+#Source:  {}
+#Saw:     #Source & { sure: int }
+#Heard:   #Source & { from: #Agent }
+// A promise (AGENCY.md §7): the speaker will see to it, by `when`. Hearers
+// hold it as a claim about then, kept or broken as they come to find.
+#Pledged: #Source & {}
+
+// A claim, as of `when`, with how the speaker says it knows.
+#Telling: #Utterance & { when: time, attribution: #Source }
+
+// A claim naming someone like `holder`.
+#Naming: #Telling & { holder: #Agent }

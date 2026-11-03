@@ -1,8 +1,9 @@
 /* The Triangle language server: `triangle lsp`, over stdio.
  *
- * A content build is a directory: every .tri file in the directory of an open
- * document loads together, as the game loads its content directory. Each change
- * reloads the directory, with the text of open documents in place of the
+ * A content build is a content root: every .tri file beneath the content root
+ * of an open document (paths.h: its directory, or the one above it that holds
+ * .tri files of its own) loads together, as the game loads its content
+ * directory. Each change reloads the content root, with the text of open documents in place of the
  * files on disk; loading is fast enough (milliseconds) to do on every edit.
  *
  * Diagnostics come from the loader. Hover, definition, references, symbols and
@@ -11,10 +12,10 @@
  * comes from the last build that loaded without errors. */
 #include "fmt.h"
 #include "json.h"
+#include "paths.h"
 #include "triangle.h"
 
 #include <ctype.h>
-#include <dirent.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -88,42 +89,28 @@ static char *dir_of(const char *path)
 
 static int cmp_str(const void *a, const void *b) { return strcmp(*(char *const *) a, *(char *const *) b); }
 
-static int has_ext(const char *name, const char *ext)
+/* Whether `path` is beneath directory `dir`. */
+static int beneath(const char *path, const char *dir)
 {
-    size_t n = strlen(name), e = strlen(ext);
-    return n > e && !strcmp(name + n - e, ext);
+    size_t n = strlen(dir);
+    return !strncmp(path, dir, n) && path[n] == '/';
 }
 
-/* The .tri files of a directory, sorted, plus open documents there that are
- * not on disk yet. */
+/* The .tri files beneath a content root, its topic directories included,
+ * sorted, plus open documents there that are not on disk yet. */
 static size_t dir_files(const char *dir, char ***out)
 {
-    char **v = NULL;
-    size_t n = 0, cap = 0;
-    DIR *d = opendir(dir);
-    struct dirent *e;
-    while (d && (e = readdir(d))) {
-        if (e->d_name[0] == '.' || !has_ext(e->d_name, ".tri")) continue;
-        if (n == cap) v = realloc(v, (cap = cap ? cap * 2 : 16) * sizeof *v);
-        size_t len = strlen(dir) + strlen(e->d_name) + 2;
-        v[n] = malloc(len);
-        snprintf(v[n++], len, "%s/%s", dir, e->d_name);
-    }
-    if (d) closedir(d);
+    Paths p = { 0 };
+    paths_add_tree(&p, dir);
     for (size_t i = 0; i < ndocs; i++) {
-        char *dd = dir_of(docs[i].path);
-        int here = !strcmp(dd, dir);
-        free(dd);
-        if (!here) continue;
+        if (!beneath(docs[i].path, dir)) continue;
         int listed = 0;
-        for (size_t k = 0; k < n && !listed; k++) listed = !strcmp(v[k], docs[i].path);
-        if (listed) continue;
-        if (n == cap) v = realloc(v, (cap = cap ? cap * 2 : 16) * sizeof *v);
-        v[n++] = xstrdup(docs[i].path);
+        for (size_t k = 0; k < p.n && !listed; k++) listed = !strcmp(p.v[k], docs[i].path);
+        if (!listed) paths_add(&p, docs[i].path);
     }
-    qsort(v, n, sizeof *v, cmp_str);
-    *out = v;
-    return n;
+    qsort(p.v, p.n, sizeof *p.v, cmp_str);
+    *out = p.v;
+    return p.n;
 }
 
 static void free_strings(char **v, size_t n)
@@ -169,7 +156,9 @@ static void build_reload(Build *b)
 
 static Build *build_for(const char *path)
 {
-    char *dir = dir_of(path);
+    char *in = dir_of(path);
+    char *dir = paths_content_root(in);
+    free(in);
     for (size_t i = 0; i < nbuilds; i++)
         if (!strcmp(builds[i].dir, dir)) { free(dir); return &builds[i]; }
     builds = realloc(builds, (nbuilds + 1) * sizeof *builds);

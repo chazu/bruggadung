@@ -4329,3 +4329,20 @@ Measured: 1,600 spread, `distant` anchor (871 frozen): 180 → 83 ms a
 world second.
 
 112 tests, 3498 checks, under both compilers, UBSan, and leak-free.
+
+
+### After the slice: content by topic (content/README.md)
+
+- `content/`: at the root, the vocabulary every topic is written in
+  (`things.tri`, `actions.tri`, `activities.tri`, `agency.tri`,
+  `knowledge.tri`, `reality.tri`); beneath it, a directory per topic
+  (`hunger/`, `air/`, `institutions/`, ...) holding everything about it, at
+  every level of detail, each file headed by its cut points. Moved, not
+  changed: the content hash (82409220f2de70ec), the generated components,
+  and every spec are as they were.
+- `BGLoadContent` and `make gen` read the topic directories. The `triangle`
+  tool loads a directory with its subdirectories; its language server,
+  `fmt` and the Emacs mode load a file with its content root.
+
+112 tests, 3498 checks, under Apple clang; the mulle build not yet run on
+it.

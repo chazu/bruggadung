@@ -1,6 +1,14 @@
 // Activities (ACTIONS.md §5): an action under way is an informational
 // entity, with no body and no location. Being a component, it is saved like
 // any other, and so are its watches.
+//
+// Cut points:
+// - full, reduced, abstract: it runs at its pace.
+// - frozen:  it waits: its timer drops out, as nothing is due for a frozen
+//            actor. Risen, it is told: its timer comes back, and a stage long
+//            due ends at once, not when it would have; a checkpoint passed
+//            while frozen is skipped (REALITY.md step 4).
+// - code:    src/act/BGActivities.m.
 
 #ActivityStatus: "running" | "suspended" | "completed" | "exhausted" | "failed" | "aborted"
 

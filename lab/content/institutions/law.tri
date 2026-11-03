@@ -1,0 +1,205 @@
+// Institutions, law: laws, wrongs, the watch, and what agents do about a
+// theft: report it, enforce the law, flee or resist arrest (INSTITUTIONS.md).
+//
+// Cut points:
+// - full:     a theft seen is a #Taken finding: a witness reports it, an
+//             officer who believes it arrests the taker and takes the thing
+//             back, and the arrested flees, resists or complies.
+// - reduced:  an agent perceives only what it takes part in, so it sees no
+//             theft it isn't party to; what is said to it, it hears.
+// - abstract: as reduced. Sentences counting down are planned
+//             (DETAIL_REGIMES.md).
+// - frozen:   it doesn't decide.
+// - talk:     a grievance is told to an office holder; a law is learned by
+//             reading or being told (#LawSays).
+// - code:     BGLawsBroken (whether an act breaks a law); effect_confiscate,
+//             effect_arrest, effect_flee; the #Taken and #Arrested findings.
+
+// Institutions (INSTITUTIONS.md): real organizations, made of people, that
+// act only through their members. An organization's rules are content it
+// issues: a law says what it forbids, what makes doing it wrong, and what
+// breaking it brings. Whether an act breaks one is true or not (the
+// inspector shows it, `BGLawsBroken`); nothing blocks the act.
+
+// What makes an act a wrong: taking what someone else claims, with no
+// authorization over it; or acting without an authorization at all.
+#Wrong:   "anothers" | "unauthorized"
+// What breaking it brings, done by the organization's members (decision 7).
+#Penalty: "arrest" | "fine" | "confiscate"
+
+// A law: content an organization issues (`lawOf`), forbidding an
+// operation's effect (`forbids`, as actions.tri names effects) when it
+// is a wrong of its kind. A common law is one everyone in its society
+// knows from the start (decision 8). What breaking it brings `weighs` that
+// much (dB) with someone who knows it and believes itself seen (decision 5).
+#Law: #Content & {
+    @component(Law)
+    forbids: text                              @field(content, saved, proposable, inspect)
+    wrong:   #Wrong                            @field(content, saved, inspect)
+    brings:  #Penalty                          @field(content, saved, inspect)
+    weighs:  int & >=0 & <=100                 @field(content, saved, inspect)
+    lawOf:   ref                               @field(saved, proposable, inspect)
+    common:  bool                              @field(content, saved, inspect)
+}
+
+// A claim stating a law (decision 8): read on a posted notice, or told,
+// it teaches the law it states.
+#LawSays: #Telling & { law: #Law }
+
+// The town and its watch; the law against theft, which everyone knows; and
+// an ordinance, known only to whoever reads or is told it: no taking
+// firewood from the commons without leave, a fine.
+town:      #Organization & {}
+theft_law: #Law & { forbids: "take", wrong: "anothers", brings: "arrest", weighs: 40, common: true }
+wood_law:  #Law & { forbids: "take", wrong: "unauthorized", brings: "fine", weighs: 15, common: false }
+
+// Custody (decision 7): a claim the watch takes on what it confiscates, and
+// on whom it arrests.
+custody: #Claim & { kind: "custody" }
+
+// Sanctions are operations an office gives its holders (decision 7), chosen
+// like any other. Confiscate: take a thing out of someone's hand into one's
+// own, in the watch's custody.
+confiscate: #Operation & {
+    effect:   "confiscate"
+    duration: 2s
+    uses:     ["hands"]
+    roles: {
+        actor: #Agent & #OfficeHolder & { freeHands: >=1 }
+        item:  #Body & { place: #Held }
+    }
+} @family(operations)
+
+// Arrest: take someone into the watch's custody. What the arrested does is
+// its own decision.
+arrest: #Operation & {
+    effect:   "arrest"
+    duration: 3s
+    uses:     ["hands"]
+    roles: {
+        actor: #Agent & #OfficeHolder
+        item:  #Agent
+    }
+} @family(operations)
+
+// Flee: run from someone, straight away from them, four tiles in four
+// seconds (INSTITUTIONS.md decision 7: the arrested complies, resists, or
+// flees, as its own agency decides). If they are gone meanwhile, out of
+// reach, there is nothing left to flee: it fails, not to be resumed.
+flee: #Operation & {
+    effect:   "flee"
+    duration: 4s
+    hard:     "fail"
+    uses:     ["legs"]
+    roles: {
+        actor: #Agent & { place: #OnTile }
+        item:  #Agent
+    }
+} @family(operations)
+
+// A claim: something like `what` is someone like `holder`'s own
+// (INSTITUTIONS.md: what makes taking it a wrong).
+#OwnedBy: #Naming & {}
+
+// A grievance (INSTITUTIONS.md decision 6): something like `what`, someone
+// like `holder`'s own, was taken by someone like `taker`. Told to an office
+// holder, it is ordinary knowledge, weighed by who says it.
+#Grievance: #Naming & { taker: #Agent }
+
+// A wrong (INSTITUTIONS.md): what was taken, someone of the watch to tell,
+// and who took it.
+#Wronging: #Frame & { loot: #Body, officer: #Agent, culprit: #Agent }
+// Under arrest: the arrested, and the one holding it.
+#Custody:  #Frame & { arrested: #Agent, warden: #Agent }
+
+// Seen something taken from its owner (a #Taken finding): tell the watch,
+// unless one is of the watch oneself; the more, the more loyal to the owner. A grievance is a claim told to an
+// office holder; whether it acts is its own decision.
+report_wrong: #Goal & {
+    title:  "report the theft"
+    done:   #Did & { did: "say" }
+    arises: { finding: "#Taken", slot: "loot", lapse: 1h, of: #Body, exempt: "watch" }
+    worth:  [#Flat & { value: 15 }, #Loyal & { loyal: "loot", per: 3 }]
+} @family(goals)
+
+// Go to someone wearing the watch's badge, the nearest first, and say what
+// was taken, whose it was, and who took it (`regarding` the loot).
+tell_the_watch: #Method & {
+    title: "tell the watch"
+    goal:  "report_wrong"
+    rank:  1
+    pre: {
+        find:  ["loot", "officer"]
+        match: #Wronging & { officer: #Agent & #OfficeHolder & { badge: "watch" } }
+    }
+    order: ["near"]
+    steps: [#Do & { op: "say", object: "officer", says: #Grievance, regarding: "loot" }]
+} @family(methods)
+
+// An officer of the watch who believes something was taken (INSTITUTIONS.md
+// decisions 4 and 7): its office's duty, weighed like any goal: arrest the
+// taker, as the law against theft brings, and take the thing back.
+enforce: #Goal & {
+    title:  "recover it and arrest the taker"
+    done:   #Did & { did: "confiscate" }
+    arises: { finding: "#Taken", slot: "loot", lapse: 1h, of: #Body, duty: "watch" }
+    worth:  [#Flat & { value: 30 }]
+} @family(goals)
+
+take_it_back: #Method & {
+    title:    "take it back"
+    goal:     "enforce"
+    rank:     1
+    sequence: true
+    pre: {
+        find:  ["loot", "culprit"]
+        match: #Wronging & { loot: #Body & { place: #Held & { by: $t } }, culprit: #Agent & { id: $t } }
+    }
+    steps: [#Do & { op: "arrest", object: "culprit" }, #Do & { op: "confiscate", object: "loot" }]
+} @family(methods)
+
+// Arrested (INSTITUTIONS.md decision 7): flee, or comply by not. Escaping
+// what the arrest brings is worth 40; the disposition to abide weighs
+// against it, so that by default one complies.
+flee_arrest: #Goal & {
+    title:  "get away"
+    done:   #Did & { did: "flee" }
+    arises: { finding: "#Arrested", slot: "arrested", lapse: 60s, of: #Agent }
+    worth:  [#Flat & { value: 40 }, #Trait & { trait: "abiding", per: -8 }]
+} @family(goals)
+
+run_off: #Method & {
+    title: "run off"
+    goal:  "flee_arrest"
+    rank:  1
+    pre:   { find: ["warden"], match: #Custody & { warden: #Agent & #OfficeHolder & { badge: "watch" } } }
+    order: ["near"]
+    steps: [#Do & { op: "flee", object: "warden" }]
+} @family(methods)
+
+// Or resist (decision 7, AGENCY.md §13): strike the one making the
+// arrest. Worth less than getting away, but more to one with a temper;
+// never, to one who holds never to strike anyone.
+resist_arrest: #Goal & {
+    title:  "resist"
+    done:   #Did & { did: "hit" }
+    arises: { finding: "#Arrested", slot: "arrested", lapse: 60s, of: #Agent }
+    worth:  [#Flat & { value: 20 }, #Trait & { trait: "abiding", per: -8 }, #Trait & { trait: "temper", per: 4 },
+             #Trait & { trait: "gentle", per: -1, veto: true }]
+} @family(goals)
+
+fight_off: #Method & {
+    title: "fight them off"
+    goal:  "resist_arrest"
+    rank:  1
+    pre:   { find: ["warden"], match: #Custody & { warden: #Agent & #OfficeHolder & { badge: "watch" } } }
+    order: ["near"]
+    steps: [#Do & { op: "hit", object: "warden" }]
+} @family(methods)
+
+// Someone with two hands to work with.
+let person = { material: "flesh", hands: 2 }
+
+// The town's watch (INSTITUTIONS.md decision 4): it acts for the town only
+// as its members do.
+watch_officer: #Agent & #OfficeHolder & person & { mass: 80kg, coat: "navy", badge: "watch" }

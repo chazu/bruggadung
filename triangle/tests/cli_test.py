@@ -101,12 +101,40 @@ def test_fmt(exe):
             f.write("\n".join(("  " + l.strip() + "   ") if l.strip() else l for l in tidy.split("\n")))
         _, before, _ = run(exe, "check", os.path.join(tmp, "ws"))
         rc, out, _ = run(exe, "fmt", "--check", os.path.join(tmp, "ws"))
-        check(rc == 1 and out.strip() == path, "--check lists what it would change, and fails")
+        check(rc == 1 and os.path.normpath(out.strip()) == os.path.normpath(path), "--check lists what it would change, and fails")
         rc, _, err = run(exe, "fmt", os.path.join(tmp, "ws"))
         with open(path) as f:
             check(rc == 0 and f.read() == tidy, "fmt rewrites in place (%s)" % err.strip())
         _, after, _ = run(exe, "check", os.path.join(tmp, "ws"))
         check(before == after and "hash" in after, "and the content hashes the same")
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_topics(exe):
+    # a directory stands for its .tri files and its subdirectories'; a file
+    # formatted in a topic directory is checked against its content root
+    tmp = tempfile.mkdtemp()
+    try:
+        root = os.path.join(tmp, "content")
+        os.makedirs(os.path.join(root, "topic"))
+        with open(os.path.join(root, "things.tri"), "w") as f:
+            f.write("#Tool: { size: length }\n")
+        kept = os.path.join(root, "topic", "kept.tri")
+        with open(kept, "w") as f:
+            f.write("kept:   #Tool & { size: 22mm }\n")
+        with open(os.path.join(root, ".hidden.tri"), "w") as f:
+            f.write("this does not parse\n")
+        rc, out, err = run(exe, "check", root)
+        check(rc == 0 and "1 instances" in out, "check loads a topic directory with its root (%s)" % err.strip())
+        rc, _, err = run(exe, "check", os.path.join(root, "topic"))
+        check(rc != 0 and "#Tool" in err, "a topic directory alone is not the content")
+        rc, out, _ = run(exe, "fmt", "--check", kept)
+        check(rc == 1 and os.path.normpath(out.strip()) == os.path.normpath(kept), "fmt --check names a file in a topic directory")
+        rc, _, err = run(exe, "fmt", kept)
+        with open(kept) as f:
+            check(rc == 0 and f.read() == "kept: #Tool & { size: 22mm }\n",
+                  "and formats it, its meaning checked over the root (%s)" % err.strip())
     finally:
         shutil.rmtree(tmp)
 
@@ -137,6 +165,7 @@ def main(exe):
     check(rc == 1 and "loosen has no spec" in err and "not concrete and has no bounds" in err and "hammer" not in err,
           "inspect says why an instance has no spec")
     test_fmt(exe)
+    test_topics(exe)
     print("%d failed" % failures)
     return 1 if failures else 0
 

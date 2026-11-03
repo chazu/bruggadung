@@ -20,9 +20,9 @@ build/tri-components: tools/tri-components.c build/libtriangle.a
 	$(CC) $(CPPFLAGS) $(CFLAGS) $< build/libtriangle.a -o $@
 
 # The command-line tool, with the language server.
-TOOLSRC = tools/triangle.c tools/lsp.c tools/json.c tools/export.c tools/fmt.c
+TOOLSRC = tools/triangle.c tools/lsp.c tools/json.c tools/export.c tools/fmt.c tools/paths.c
 
-build/triangle: $(TOOLSRC) tools/json.h tools/export.h tools/fmt.h build/libtriangle.a
+build/triangle: $(TOOLSRC) tools/json.h tools/export.h tools/fmt.h tools/paths.h build/libtriangle.a
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TOOLSRC) build/libtriangle.a -o $@
 
 # The language server driven over stdio, the command line, and the Emacs mode's tests.

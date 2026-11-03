@@ -5,6 +5,7 @@
 #import "BGLatentKind.h"
 
 #include <dirent.h>
+#include <sys/stat.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -35,40 +36,71 @@ static int   cmp_name( const void *a, const void *b)
 }
 
 
+/* Every *.tri under `dir`, its topic directories' too (content/README.md),
+ * added to `names` as paths from the content directory. A name starting
+ * with a dot is passed over, as the triangle tool does. */
+static int   collect_tri( const char *dir, char ***names, size_t *n)
+{
+   DIR             *d;
+   struct dirent   *ent;
+   struct stat     st;
+   char            path[ 4096];
+   size_t          len;
+   int             ok;
+
+   d = opendir( dir);
+   if( ! d)
+   {
+      fprintf( stderr, "lab: cannot open the content directory %s\n", dir);
+      return( 0);
+   }
+   ok = 1;
+   while( (ent = readdir( d)))
+   {
+      if( ent->d_name[ 0] == '.')
+         continue;
+      snprintf( path, sizeof( path), "%s/%s", dir, ent->d_name);
+      if( stat( path, &st))
+         continue;
+      if( S_ISDIR( st.st_mode))
+      {
+         ok &= collect_tri( path, names, n);
+         continue;
+      }
+      len = strlen( ent->d_name);
+      if( len < 5 || strcmp( ent->d_name + len - 4, ".tri"))
+         continue;
+      *names            = realloc( *names, sizeof( char *) * (*n + 1));
+      (*names)[ (*n)++] = strdup( path);
+   }
+   closedir( d);
+   return( ok);
+}
+
+
 BGContent   *BGLoadContent( void)
 {
    BGContent        *content;
    NSMutableArray   *paths;
    NSError          *error;
-   DIR              *dir;
-   struct dirent    *ent;
    char             **names;
-   size_t           len;
    size_t           i;
    size_t           n;
 
-   dir = opendir( BGContentDir);
-   if( ! dir)
-   {
-      fprintf( stderr, "lab: cannot open the content directory %s\n", BGContentDir);
-      return( nil);
-   }
    names = NULL;
    n     = 0;
-   while( (ent = readdir( dir)))
+   if( ! collect_tri( BGContentDir, &names, &n))
    {
-      len = strlen( ent->d_name);
-      if( len < 5 || strcmp( ent->d_name + len - 4, ".tri"))
-         continue;
-      names      = realloc( names, sizeof( char *) * (n + 1));
-      names[ n++] = strdup( ent->d_name);
+      for( i = 0; i < n; i++)
+         free( names[ i]);
+      free( names);
+      return( nil);
    }
-   closedir( dir);
    qsort( names, n, sizeof( char *), cmp_name);
    paths = [NSMutableArray array];
    for( i = 0; i < n; i++)
    {
-      [paths addObject:[NSString stringWithFormat:@"%s/%s", BGContentDir, names[ i]]];
+      [paths addObject:[NSString stringWithFormat:@"%s", names[ i]]];
       free( names[ i]);
    }
    free( names);

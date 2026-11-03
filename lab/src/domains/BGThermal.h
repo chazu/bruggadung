@@ -1,6 +1,6 @@
 /*
  * BGThermal — the heat of solids (DOMAIN_SIMULATION.md Scenario 1): a
- * stove's iron, a room's shell (content/air.tri, ThermalBody), in whole
+ * stove's iron, a room's shell (content/heat/heat.tri, ThermalBody), in whole
  * joules. Its records mirror its values after each step.
  *
  * Coupled (BGCoupledDomain): it publishes its bodies' temperatures at step

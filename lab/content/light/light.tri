@@ -1,0 +1,36 @@
+// Light: daylight and lamps, and seeing by them (KNOWLEDGE.md §5, decisions
+// 12 and 14).
+//
+// Cut points:
+// - full, reduced, abstract, frozen: alike. Daylight is the clock's; a lamp
+//             burns its oil down as of `oilAt`, and goes out spent, at every
+//             level of detail.
+// - perception: at dusk, beyond arm's reach, and at night, what an agent sees
+//             it sees less precisely (knowledge.tri).
+// - code:     src/domains/BGLight.m; the knowledge system's light at a tile.
+
+// Light (KNOWLEDGE.md §5's conditions, authored): a lamp, shining, makes it
+// day within `reach` tiles of where it is, held or set down. With the light
+// domain (KNOWLEDGE.md decision 14), it burns its `oil` down while it
+// shines, as of `oilAt`, and goes out spent.
+#Lamp: #Body & {
+    @component(Lamp)
+    shining: *true | false                     @field(content, saved, proposable, inspect, perceive(sight))
+    reach:   int & >=0 & <=10                  @field(content, saved, inspect)
+    oil:     *30d | time & >=0ms & <=10000d    @field(content, saved, proposable, inspect)
+    oilAt:   *0ms | time & >=0ms & <=10000d    @field(content, saved, proposable, inspect)
+}
+
+// Daylight (KNOWLEDGE.md decision 14): day from `dawn` to `nightfall`,
+// twilight for `twilight` either side, night between, each day of the
+// clock. Indoors it is a step darker, in a room with no doorway open.
+#Daylight: { dawn: time, nightfall: time, twilight: time }
+
+daylight: #Daylight & { dawn: 6h, nightfall: 18h, twilight: 1h } @family(light)
+lamp:     #Lamp & { material: "brass", mass: 900g, reach: 2 }
+
+// Someone with two hands to work with.
+let person = { material: "flesh", hands: 2 }
+
+// For the coat at dusk: someone of the visitor's build, in a brown coat.
+stranger: #Agent & person & { mass: 60kg, coat: "brown" }

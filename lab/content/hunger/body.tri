@@ -1,0 +1,26 @@
+// Hunger, the body: how fed an agent is, and how that falls (AGENCY.md §6,
+// d17).
+//
+// Cut points:
+// - full, reduced, abstract, frozen: alike. `fed` is kept as of `fedAt`, and
+//            falls a point every three minutes, computed when read
+//            (BGSatiety), so nothing steps it. Going without (fed 10 or less)
+//            harms the body a point every ten minutes, fatigue up to 50 and
+//            then injury, at every level of detail, frozen included: a frozen
+//            agent doesn't decide, so doesn't eat, and starves (open:
+//            DETAIL_REGIMES.md).
+// - eating:  eating.tri sets `fed` and `fedAt`.
+// - feeling: interoception feels hunger as 100 less how fed, less twice the
+//            attention the agent's activities take, by bands of 10 (20 when
+//            exhausted); its wake is the next band, put off to the cadence's
+//            beat below full.
+// - code:    src/domains/BGBodies.m: the period, the band, starving and its
+//            harm, none of them in content yet; src/know/BGKnowledge.m:
+//            interoception.
+
+// What hunger adds to an agent: how fed it is (AGENCY.md §6), 0 to 100, as of
+// `fedAt`. It falls a point every three minutes, computed when read.
+#Agent: {
+    fed:   *80 | int & >=0 & <=100          @field(content, saved, proposable, inspect)
+    fedAt: *0ms | time & >=0ms & <=10000d   @field(content, saved, proposable, inspect)
+}

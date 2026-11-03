@@ -88,6 +88,12 @@ smith_regime: #Regime & {
 The progressions a `progress` mode engages are declared beside it, in the
 four forms below.
 
+Where they go (lab/content/README.md): a progression, and a regime for one
+topic's things, go in that topic's directory, beside what the topic does at
+full detail, and its files' cut points say what each level of detail
+changes. A regime for every agent, or every thing of a kind, goes at the
+content root, in `reality.tri`.
+
 ## The systems, level by level
 
 The first nine exist; the last two are new.

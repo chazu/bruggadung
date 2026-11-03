@@ -1,0 +1,199 @@
+// Traces: what committed effects leave on bodies and on the floor, and what
+// is read from them: tampering, a cover-up, a disturbance investigated
+// (KNOWLEDGE.md §3, §4, §9; AGENCY.md Scenario 2, "the false alarm").
+//
+// Cut points:
+// - full, reduced, abstract, frozen: a trace fades by its times alike at
+//             every level of detail; foot traffic wears a floor trace only
+//             where someone walks.
+// - reduced:  an agent perceives only what it takes part in: a clatter nearby
+//             goes unheard, so nothing stirred, and nothing is investigated.
+// - frozen:   nothing is perceived; traces fade on, read from their times.
+// - actions:  an operation's `leaves` and `removes` (actions.tri) make and
+//             remove traces, with its effect.
+// - code:     src/domains/BGTraces.m; perceiving traces, and the premises
+//             (#Sign, #Near, ...), in src/know/BGKnowledge.m; effect_tend,
+//             effect_analyse, effect_investigate.
+
+// Traces (KNOWLEDGE.md §3): what committed effects leave on bodies and on
+// the floor. A trace is an informational entity, with no body and no
+// location: what it is, what bears it (or which tile), how strong it was
+// made, and when it was made and runs out. Its cause is its creation's, in
+// history, for the developer.
+
+// A kind of trace: the sense that perceives it, and how long it lasts. It
+// fades evenly from its magnitude to nothing over `lasts`, and is removed
+// when it runs out. Foot traffic speeds that (KNOWLEDGE.md §3): each step
+// onto its tile takes `trodden` percent of the life a floor trace has left.
+// Below its `floor` (strength), a trace of the kind is gone, removed then
+// (KNOWLEDGE.md §3), though `lasts` would have it fade on.
+#TraceKind: { sense: #Sense, lasts: time, trodden: int & >=0 & <=100 | *0, floor: int & >=0 & <=100 | *0 }
+
+#Trace: #Thing & {
+    @component(Trace)
+    traceKind: text                       @field(content, saved, proposable, inspect)
+    bearer:    ref                        @field(saved, proposable, inspect)
+    tileX:     int & >=0 & <=1000000      @field(content, saved, proposable, inspect)
+    tileY:     int & >=0 & <=1000000      @field(content, saved, proposable, inspect)
+    tileLevel: int & >=0 & <=63           @field(content, saved, proposable, inspect)
+    magnitude: int & >=0 & <=100          @field(content, saved, proposable, inspect)
+    created:   time & >=0ms & <=10000d    @field(content, saved, proposable, inspect)
+    expires:   time & >=0ms & <=10000d    @field(content, saved, proposable, inspect)
+}
+
+trace: #Trace & { tileX: 0, tileY: 0, tileLevel: 0, magnitude: 0, created: 0ms, expires: 0ms }
+
+// The workshop's traces.
+tool_marks:  #TraceKind & { sense: "sight", lasts: 365d } @family(traces)
+scuffs:      #TraceKind & { sense: "sight", lasts: 30d }  @family(traces)
+damp_floor:  #TraceKind & { sense: "sight", lasts: 6h, trodden: 25 } @family(traces)
+soap_smell:  #TraceKind & { sense: "smell", lasts: 1d, floor: 20 } @family(traces)
+fresh_paint: #TraceKind & { sense: "sight", lasts: 3d }   @family(traces)
+paint_smell: #TraceKind & { sense: "smell", lasts: 4d }   @family(traces)
+scratch:     #TraceKind & { sense: "sight", lasts: 365d } @family(traces)
+clatter:     #TraceKind & { sense: "hearing", lasts: 2s } @family(traces)
+
+// Wash the floor where the actor stands: the scuffs go, and the floor is left
+// damp, smelling of soap.
+wash_floor: #Operation & {
+    effect:    "tend"
+    duration:  10s
+    uses:      ["hands"]
+    attention: 5
+    roles:     { actor: #Agent & { place: #OnTile } }
+    removes:   [{ trace: "scuffs", on: "tile" }]
+    leaves:    [{ trace: "damp_floor", on: "tile", strength: 60 },
+                { trace: "soap_smell", on: "tile", strength: 50 }]
+} @family(operations)
+
+// Touch up the paint on an assembly: its tool marks go under fresh paint,
+// which smells.
+touch_up: #Operation & {
+    effect:    "tend"
+    duration:  20s
+    uses:      ["hands"]
+    attention: 10
+    roles: {
+        actor: #Agent
+        item:  #Assembly
+    }
+    removes: [{ trace: "tool_marks", on: "item" }]
+    leaves:  [{ trace: "fresh_paint", on: "item", strength: 80 },
+              { trace: "paint_smell", on: "item", strength: 70 }]
+} @family(operations)
+
+// Scratch a body to see what it is made of beneath its surface (an analysis,
+// KNOWLEDGE.md §4): the actor learns its true material; the scratch stays.
+test_scratch: #Operation & {
+    effect:    "analyse"
+    duration:  3s
+    uses:      ["hands"]
+    attention: 10
+    roles: {
+        actor: #Agent
+        item:  #Body & { place: #OnTile | #Installed }
+    }
+    leaves: [{ trace: "scratch", on: "item", strength: 40 }]
+} @family(operations)
+
+// Knock things over, as a cat does at night: a clatter where it is.
+knock_over: #Operation & {
+    effect: "tend"
+    roles:  { actor: #Agent & { hands: 0 } }
+    leaves: [{ trace: "clatter", on: "tile", strength: 60 }]
+} @family(operations)
+
+// Investigate where the actor is (KNOWLEDGE.md §9, deliberate): half a
+// minute watching closely, which ends with the actor noticing fainter traces
+// and drawing the rules that take thought.
+watch_closely: #Operation & {
+    effect:    "investigate"
+    duration:  30s
+    attention: 20
+    roles:     { actor: #Agent & { place: #OnTile } }
+} @family(operations)
+
+// Fresh paint, to a painter's eye, means something was touched up: something
+// happened to it.
+touched_up: #Rule & {
+    premises:  [#Sign & { sign: "fresh_paint" }]
+    skill:     "painting"
+    mastery:   30
+    concludes: "#Tampered"
+    weight:    10
+} @family(rules)
+
+// Fresh paint where there were tool marks: they were painted over. Anyone
+// sees it, who saw the marks.
+covered_up: #Rule & {
+    premises:  [#Sign & { sign: "fresh_paint" }, #Formerly & { formerly: "tool_marks" }]
+    mastery:   0
+    concludes: "#CoveredUp"
+    weight:    20
+} @family(rules)
+
+// A clatter heard by something: something stirred there.
+stirring: #Rule & {
+    premises:  [#Near & { near: "clatter" }]
+    mastery:   0
+    concludes: "#Disturbance"
+    weight:    10
+} @family(rules)
+
+// A thing seen worn, and seen again where it was as good as new: it was
+// swapped for another. Only one who saw it worn can tell (KNOWLEDGE.md
+// Scenario 2: "the wrench was replaced").
+replaced: #Rule & {
+    premises:  [#Unworn & { unworn: "toolMarks" }]
+    mastery:   0
+    concludes: "#Replaced"
+    weight:    15
+} @family(rules)
+
+// A faint smell of soap on the floor beside something: someone cleaned up
+// there. It takes thought.
+cleaned_nearby: #Rule & {
+    premises:   [#Near & { near: "soap_smell" }]
+    mastery:    0
+    concludes:  "#Cleaned"
+    weight:     10
+    deliberate: true
+} @family(rules)
+
+// Watching: the spot where something stirred.
+#Watching: #Frame & { spot: #Container }
+
+// Arises from a disturbance: worth how strongly the agent believes someone is
+// there, its duty, and less the risk.
+investigate: #Goal & {
+    title:    "investigate the disturbance"
+    done:     #Looked & { looked: "spot" }
+    arises:   { finding: "#Disturbance", slot: "spot", lapse: 30s, of: #Container }
+    concerns: [#Agent]
+    worth: [
+        #Suspicion & { suspect: #Agent, inside: "spot", evidence: "#Disturbance" },
+        #Flat & { value: 20 },
+        #Cost & { cost: 5 },
+    ]
+} @family(goals)
+
+look_into_it: #Method & {
+    title: "look into it"
+    goal:  "investigate"
+    rank:  1
+    pre:   { find: ["spot"], match: #Watching & { spot: #Container } }
+    steps: [#Do & { op: "look_in", object: "spot" }]
+} @family(methods)
+
+// For appearance and truth: a fitting that looks brass, and is brass-plated
+// steel.
+fitting: #Body & { material: "steel", surface: "brass", mass: 400g }
+
+// Someone with two hands to work with.
+let person = { material: "flesh", hands: 2 }
+
+// For AGENCY.md's false alarm: the watchman, with supper; the storeroom; and
+// a cat.
+watchman:  #Agent & person & { mass: 80kg, coat: "grey" }
+cat:       #Agent & { material: "flesh", mass: 4kg, hands: 0, coat: "black" }
+storeroom: #Container & { material: "oak", mass: 200kg, capacity: 1000 }

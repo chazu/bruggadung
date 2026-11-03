@@ -1,0 +1,192 @@
+// Actions (ACTIONS.md): what an operation is, its stages, roles and traces,
+// and the operations every topic uses: taking, putting in, giving, walking,
+// looking in. A topic's own operations are in its directory.
+//
+// Operations (ACTIONS.md §1) are patterns over the descriptions of the
+// entities that fill their roles. An actor's menu lists each operation and
+// binding whose match is not incompatible; unknown never excludes. Tags carry
+// bindings between roles. `effect` names the code that builds the proposal
+// group when the action is performed.
+//
+// Cut points:
+// - full, reduced, abstract: an activity runs at its own pace while its actor
+//            is at any of them (REALITY.md step 3).
+// - frozen:  its activities wait; risen, a stage long due ends at once
+//            (REALITY.md step 4; activities.tri).
+// - code:    an `effect` names a function in src/act/BGActions.m
+//            (effect_take, effect_eat, ...). #Effect lists them all: a
+//            topic's new effect is added there and in the code together.
+
+#Effect: "take" | "take_some" | "put_in" | "drive" | "open_tap" | "fill" | "walk" | "loosen" | "look" | "say" | "tend" | "analyse" | "write" | "read" | "eat" | "give" | "investigate" | "tighten" | "rotate" | "strike" | "shut" | "dismantle" | "light" | "rest" | "open_door" | "saw" | "pass" | "copy" | "reveal" | "replace" | "cut" | "shape" | "install" | "issue" | "confiscate" | "arrest" | "flee" | "hit" | "hire" | "work" | "service"
+
+// Which roles an operation has is its roles' type: a structure's type is the
+// most general one with all its features.
+#Roles:        { actor: #Agent }
+#ItemRoles:    #Roles & { item: #Body }
+#PlacingRoles: #ItemRoles & { destination: #Body }
+
+// Something that takes time and has an effect: an operation's single stage,
+// or one of its stages. A stage whose progress shows in the world declares
+// it `partial` (ACTIONS.md §5): a field of a role's entity (`showsOn`), the `whole` it
+// reaches as the stage completes. It is set in proportion to the stage's
+// progress at each of its `checkpoints` (evenly spaced; each a step
+// boundary), and when the activity is interrupted: suspended, aborted, or
+// failed. Its effect proper commits on completion, with its `exertion`: the
+// fatigue it adds to the actor (AGENCY.md §6). With a `floodWatch`, water
+// rising to that many millilitres on the actor's tile interrupts it. A hard interruption
+// (what it binds gone or out of reach, or what it needs no longer holding)
+// suspends it, or fails it, as it declares (`hard`).
+#Partial: { field: text, showsOn: *"destination" | "item", whole: int }
+#Step: {
+    duration:    time & >=0ms & <=1d
+    effect:      #Effect
+    partial:     #Partial
+    checkpoints: *0 | int & >=0 & <=100
+    hard:        *"suspend" | "fail"
+    exertion:    *0 | int & >=0 & <=100
+    floodWatch:  *0 | int & >=0 & <=1000000
+    leaves:      [...#Leaves]
+    removes:     [...#Removes]
+}
+
+// A stage of an activity: it takes `duration`, and its effect commits when
+// it is done (ACTIONS.md §5).
+#Stage: #Step & { duration: >=1ms }
+
+// What of the actor's an activity occupies while it runs (ACTIONS.md §5,
+// provider allocation): an actor runs two activities at once only if they
+// use different providers. Walking while driving a nail is two activities;
+// two walks are not.
+#Provider: "hands" | "legs" | "voice"
+
+// An operation with stages, or with a duration (one stage), is a timed
+// activity, which can be suspended and resumed, keeping its progress. One
+// without is instant, unless its effect's code makes it an activity that ends
+// by a watch or an event (fill).
+// `attention` is what it demands of the actor while it runs (AGENCY.md
+// §10): it raises what the actor must find salient to notice it. `leaves`
+// and `removes` are its traces (KNOWLEDGE.md §3; the vocabulary here, the kinds in traces/traces.tri), made and
+// removed with its effect, when it completes: an operation that removes
+// traces leaves some of its own, so a cover-up can be found out. A stage
+// may leave its own, with its own effect (ACTIONS.md §2: costs are
+// committed per stage).
+#Operation: #Step & {
+    roles:     #Roles
+    stages:    [...#Stage]
+    uses:      [...#Provider]
+    attention: *0 | int & >=0 & <=100
+    contest:   text
+    graded:    #Graded
+}
+
+// A graded requirement (ACTIONS.md decision 11): what a role brings (the
+// `offers` field of the `offerer`'s entity) as a percent of what another
+// demands (`demands`, of the `demander`'s). Curves over that percent, as
+// agency's considerations have: how long it takes, in percent (`slowing`);
+// the chance of a mishap, in thousandths (`mishap`), leaving its `slip`;
+// and the result's quality, in percent, set on the demander's `grades`.
+#Graded: {
+    offerer:  #TraceSite
+    offers:   text
+    demander: #TraceSite
+    demands:  text
+    slowing:  [...#Point]
+    mishap:   [...#Point]
+    slip:     #Leaves
+    quality:  [...#Point]
+    grades:   text
+}
+
+#Sense: "sight" | "smell" | "hearing"
+
+// Where an operation leaves a trace, or removes one: on one of its roles, or
+// on the tile the actor stands on.
+#TraceSite: "actor" | "item" | "destination" | "tile"
+#TraceAt:   { trace: text, on: #TraceSite }
+#Leaves:    #TraceAt & { strength: int & >=1 & <=100 }
+#Removes:   #TraceAt & {}
+
+// `contest` (ACTIONS.md decision 13): the actor's field that weights its
+// groups when they conflict with others in the action phase; taking is a
+// matter of quickness. Without one, who goes first is an even draw.
+
+// Pick something up into a free hand: from a container, the ground, or an
+// assembly it is installed in.
+take: #Operation & {
+    effect:  "take"
+    contest: "quickness"
+    roles: {
+        actor: #Agent & { freeHands: >=1 }
+        item:  #Body & { place: #Inside | #OnTile | #Installed }
+    }
+} @family(operations) @quickcheck(actor.freeHands)
+
+// Take some units of a stack into a free hand: from a container, the ground,
+// or the actor's other hand. How many is the command's.
+take_some: #Operation & {
+    effect:  "take_some"
+    contest: "quickness"
+    roles: {
+        actor: #Agent & { id: $a, freeHands: >=1 }
+        item:  #Stack & { place: #Inside | #OnTile | #Held & { by: $a } }
+    }
+} @family(operations) @quickcheck(actor.freeHands)
+
+// Put something the actor holds into a container.
+put_in: #Operation & {
+    effect: "put_in"
+    roles: {
+        actor:       #Agent & { id: $a }
+        item:        #Body & { place: #Held & { by: $a } }
+        destination: #Container
+    }
+} @family(operations)
+
+// Take something up, carefully: a second, then into a free hand. Two who
+// start together finish together, and only one gets it. Taken from where it
+// was meanwhile, the take fails: there is nothing to come back to.
+take_up: #Operation & {
+    effect:   "take"
+    contest:  "quickness"
+    duration: 1s
+    uses:     ["hands"]
+    hard:     "fail"
+    roles: {
+        actor: #Agent & { freeHands: >=1 }
+        item:  #Body & { place: #OnTile | #Inside }
+    }
+} @family(operations)
+
+// Give something the actor holds to someone in reach, into a free hand.
+give: #Operation & {
+    effect: "give"
+    roles: {
+        actor:       #Agent & { id: $a }
+        item:        #Body & { place: #Held & { by: $a } }
+        destination: #Agent & { freeHands: >=1 }
+    }
+} @family(operations)
+
+// Look into a container: what is inside is perceived only by looking.
+look_in: #Operation & {
+    effect: "look"
+    roles: {
+        actor: #Agent
+        item:  #Container
+    }
+} @family(operations)
+
+// Walk one tile, an activity of a second; the direction is in the
+// operation's name. The walker arrives when it is done. What the actor holds
+// goes along: it is held by the actor, wherever the actor is.
+#Walk: #Operation & {
+    effect:   "walk"
+    duration: 1s
+    uses:     ["legs"]
+    roles:    { actor: #Agent & { place: #OnTile } }
+}
+
+walk_north: #Walk @family(operations)
+walk_south: #Walk @family(operations)
+walk_east:  #Walk @family(operations)
+walk_west:  #Walk @family(operations)

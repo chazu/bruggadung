@@ -22,13 +22,16 @@
 ;;
 ;;   (add-hook 'triangle-mode-hook #'lsp-deferred)    ; or #'eglot-ensure
 ;;
-;; The server loads every .tri file in the directory of the file you are
-;; editing, as one content build.
+;; The server loads every .tri file beneath the content root of the file
+;; you are editing, as one content build: its directory, or, while the
+;; directory above holds .tri files of its own, that one (a topic directory
+;; loads with the content around it).
 
 ;;; Code:
 
 (require 'compile)
 (require 'subr-x)
+(require 'seq)
 
 (defgroup triangle nil
   "Editing Triangle content."
@@ -239,9 +242,23 @@ line, or nil when the opener ends its line.  Return nil at top level."
 
 ;;; Commands
 
+(defun triangle--holds-tri-p (dir)
+  "Return non-nil if DIR holds a .tri file itself, not only beneath it."
+  (seq-some (lambda (f) (not (file-directory-p f)))
+            (directory-files dir t "\\`[^.].*\\.tri\\'" t)))
+
 (defun triangle--content-dir ()
-  "Return the content directory of the current buffer."
-  (if buffer-file-name (file-name-directory buffer-file-name) default-directory))
+  "Return the content root of the current buffer.
+That is its directory, or, while the directory above holds .tri files
+of its own, that one: a topic directory loads with the content around it."
+  (let ((dir (file-name-as-directory
+              (if buffer-file-name (file-name-directory buffer-file-name) default-directory))))
+    (catch 'root
+      (while t
+        (let ((up (file-name-directory (directory-file-name dir))))
+          (if (and up (not (equal up dir)) (triangle--holds-tri-p up))
+              (setq dir up)
+            (throw 'root dir)))))))
 
 (defun triangle-check ()
   "Load the current content directory with `triangle check'.

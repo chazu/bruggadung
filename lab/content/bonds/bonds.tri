@@ -1,3 +1,16 @@
+// Bonds: loyalty, formed by kinship, friendship and employment (AGENCY.md
+// decision 12).
+//
+// Cut points:
+// - full, reduced, abstract, frozen: a bond stands alike at every level of
+//             detail; nothing moves its loyalty by itself yet. Loyalty
+//             drifting toward a baseline, abstract, is planned
+//             (DETAIL_REGIMES.md).
+// - agency:   #Loyal weighs it, and `order: "loyal"` sorts by it
+//             (agency.tri).
+// - code:     bonds are made from these blueprints (hiring makes a
+//             `work_bond`: effect_hire).
+
 // Loyalty (AGENCY.md decision 12): a weighted relation from an agent to
 // another. It is the agent's own, as its dispositions are, formed by
 // kinship, friendship, employment, or authored. Like a claim, it is reified: a bond,

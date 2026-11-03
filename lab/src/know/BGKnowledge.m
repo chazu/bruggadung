@@ -1913,7 +1913,7 @@ static BOOL   line_clear( const BGTerrain *t, int32_t x0, int32_t y0, int32_t x1
 }
 
 
-/* How long a feature usually lasts (content/persistence.tri): long, unless
+/* How long a feature usually lasts (content/knowledge.tri): long, unless
  * said. */
 - (int64_t) persistenceOf:(const char *) feature
 {
@@ -2052,7 +2052,7 @@ static BOOL   line_clear( const BGTerrain *t, int32_t x0, int32_t y0, int32_t x1
 
 
 /* The percept's features as seen from `distance` tiles: each feature with
- * an acuity (content/persistence.tri) blurred `blur` steps for each tile
+ * an acuity (content/knowledge.tri) blurred `blur` steps for each tile
  * beyond arm's reach. *blurred is set if any was. */
 - (NSString *) blur:(NSString *) features
                kind:(const char *) kind

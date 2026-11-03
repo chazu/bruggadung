@@ -265,7 +265,7 @@ A bound may name its value (`wear: <worn_through`, `>=.lead`), as in CUE,
 by the same rule: the name is read when content loads, so it must give a
 number written in the content. Writing the bound with a literal everywhere
 the threshold appears was the first gap writing new content in the new
-syntax found (lab/content/latent.tri, servicing).
+syntax found (lab/content/machines/latent.tri, servicing).
 `@embed(file=…, type=text)` brings a file's text into a field, as CUE's
 `@embed` does: for data better kept in its own form than spelled in
 Triangle, such as a map drawn in characters, its legend left in Triangle.

@@ -1,0 +1,54 @@
+// Sawing: a log sawn through, its cut showing as it goes, and how the saw's
+// sharpness meets the wood's hardness (ACTIONS.md §5, decision 11).
+//
+// Cut points:
+// - full, reduced, abstract: sawing runs at its pace; the cut shows at each
+//            checkpoint.
+// - frozen:  it waits; risen, a checkpoint passed meanwhile is skipped
+//            (REALITY.md step 4).
+// - code:    effect_saw; the partial effect and the grading in
+//            src/act/BGActivities.m.
+
+// For ACTIONS.md §5's partial effects: a log, how far it is sawn through
+// (percent), and a saw.
+#Log:     #Body & {
+    @component(Log)
+    sawn:     *0 | int & >=0 & <=100               @field(content, saved, proposable, inspect, perceive(sight))
+    // how hard its wood is to cut, and how clean the cut came out (ACTIONS.md
+    // decision 11)
+    hardness: *60 | int & >=1 & <=100              @field(content, saved, inspect)
+    finish:   *0 | int & >=0 & <=100               @field(content, saved, proposable, inspect, perceive(sight))
+}
+#HandSaw: #Body & {
+    @component(HandSaw)
+    sharpness: *60 | int & >=0 & <=100         @field(content, saved, proposable, inspect, perceive(sight))
+}
+log:      #Log & { material: "oak", mass: 20kg }
+hand_saw: #HandSaw & { material: "steel", mass: 700g }
+
+// Saw a log through, with a saw in hand: its cut shows as it goes, so a
+// half-sawn log is left when the sawing stops.
+saw_through: #Operation & {
+    effect:      "saw"
+    duration:    8s
+    uses:        ["hands"]
+    partial:     { field: "Log.sawn", whole: 100 }
+    checkpoints: 3
+    exertion:    30
+    // the saw's sharpness against the log's hardness: half as sharp as the
+    // wood is hard, three times as long, a slip one time in two, and a
+    // rough cut
+    graded: {
+        offerer: "item", offers: "HandSaw.sharpness", demander: "destination", demands: "Log.hardness"
+        slowing: [{ input: 50, output: 300 }, { input: 100, output: 100 }]
+        mishap:  [{ input: 50, output: 500 }, { input: 100, output: 0 }]
+        slip:    { trace: "scratch", on: "destination", strength: 40 }
+        quality: [{ input: 50, output: 40 }, { input: 100, output: 90 }, { input: 150, output: 100 }]
+        grades:  "Log.finish"
+    }
+    roles: {
+        actor:       #Agent & { id: $a }
+        item:        #HandSaw & { place: #Held & { by: $a } }
+        destination: #Log & { sawn: <=99 }
+    }
+} @family(operations)

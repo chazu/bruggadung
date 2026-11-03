@@ -6,7 +6,7 @@ The document COMPONENTS.md §7 points to: how a latent assembly's parts
 come to exist (materialization), how they agree with what happened to the
 unit (consistency with history), and which part a failure is due to
 (culprit attribution). It adopts the rules the lab has run provisionally
-(lab/content/latent.tri, `BGLatentKind`), and marks what is still to be
+(lab/content/machines/latent.tri, `BGLatentKind`), and marks what is still to be
 designed.
 
 ## Fixed by COMPONENTS.md §7

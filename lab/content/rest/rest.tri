@@ -1,0 +1,42 @@
+// Rest: tiredness, and resting it off (AGENCY.md §6).
+//
+// Cut points:
+// - full:     felt tiredness above 50 raises getting some rest: eight hours
+//             lying down, which clears fatigue.
+// - reduced:  the same, decided on the cadence's beat; a rest runs at full
+//             pace.
+// - abstract: as reduced.
+// - frozen:   it doesn't decide; a rest under way waits.
+// - body:     fatigue is things.tri's (#Agent): effort raises it (an
+//             operation's `exertion`), and so does going without
+//             (hunger/body.tri); it is felt by bands of 10.
+// - air:      a rest watches the air over it: it wakes when the carbon
+//             dioxide reaches the command's amount, or the temperature
+//             leaves what the breather rests easy in (air/air.tri).
+// - code:     effect_rest (src/act/BGActions.m).
+
+// Tiredness raises resting: worth what the agent feels of it; done once a
+// rest has run its course.
+rest_when_tired: #Goal & {
+    title:   "get some rest"
+    done:    #Did & { did: "while_away" }
+    pressed: { need: "tired", above: 50 }
+    worth:   [#Need & { pressure: "tired", per: 5 }]
+} @family(goals)
+
+lie_down: #Method & {
+    title: "lie down"
+    goal:  "rest_when_tired"
+    rank:  1
+    pre:   { find: [], match: #Frame & { me: #Agent & { id: $me, place: #OnTile } } }
+    steps: [#Do & { op: "while_away" }]
+} @family(methods)
+
+// Rest a while, 8 hours (rested through, fatigue is gone), with a watch on the air: woken when its carbon
+// dioxide reaches the command's amount (mmol; 4,000 if none).
+while_away: #Operation & {
+    effect:   "rest"
+    duration: 8h
+    uses:     ["hands", "legs"]
+    roles:    { actor: #Agent & { place: #OnTile } }
+} @family(operations)

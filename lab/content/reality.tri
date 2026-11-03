@@ -1,3 +1,26 @@
+// Reality: the reality bubble and its levels of detail, and what they mean
+// for every agent (REALITY.md).
+//
+// Cut points, for every agent, as built (REALITY.md steps 3 and 4):
+// - full:     it perceives what happens around it, and decides when it wakes.
+// - reduced:  it perceives only what it takes part in (`senses: "own"`), and
+//             its own wakes (forgetting, a promise due, hunger's band, a
+//             fading trace) wait for the cadence's beat (`every`); what it
+//             does runs at full pace.
+// - abstract: as reduced, until abstract progression is built
+//             (DETAIL_REGIMES.md).
+// - frozen:   it neither perceives nor decides, and its activities wait.
+//             Risen, its activities are told, and it looks and decides at
+//             once.
+// - contact:  an event between something at full detail and something not
+//             (`contact`'s kinds) raises the other to full while the lease
+//             runs.
+// - domains:  air, heat, water, light, traces and the body's going without
+//             run over the whole world at every level of detail, frozen
+//             included: they don't yet step by region.
+// - code:     src/core/BGReality.m (anchors, levels, leases), BGWakes.m (the
+//             cadence).
+
 // The reality bubble (REALITY.md): how exactly each part of the world is
 // simulated, by how far it is from what anchors it. Four levels of detail:
 // full, reduced, abstract, and, beyond them all, frozen. With no anchors at

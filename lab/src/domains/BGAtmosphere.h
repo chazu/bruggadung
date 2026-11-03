@@ -1,7 +1,7 @@
 /*
  * BGAtmosphere — the air (DOMAIN_SIMULATION.md Scenario 1, "The unattended
  * stove"). It owns, while anything moves, the gas of each region of air
- * (content/air.tri: oxygen and carbon dioxide in whole millimoles, the heat
+ * (content/air/air.tri: oxygen and carbon dioxide in whole millimoles, the heat
  * the gas carries in whole joules) and the fuel of a lit stove; their
  * records mirror its values after each step, and it checks them in when it
  * sleeps.
@@ -23,7 +23,7 @@
  *     draws from the room and vents into it, smouldering as the oxygen
  *     falls below 21% and going out by 10%.
  *
- * A respirator (content/air.tri) breathes the air over it: oxygen at its
+ * A respirator (content/air/air.tri) breathes the air over it: oxygen at its
  * rate, at rest or at work, for four fifths as much carbon dioxide, and the
  * heat to its body, as a contribution.
  *

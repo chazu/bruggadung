@@ -1,0 +1,79 @@
+// Hunger, eating: wanting to eat, the ways to, the eat operation, and food
+// (AGENCY.md §6, Scenario 2, decision 16).
+//
+// Cut points:
+// - full:     felt hunger above 40 raises eating something, worth more the
+//             hungrier; the agent eats what it holds.
+// - reduced:  the same, decided on the cadence's beat; eating runs at full
+//             pace.
+// - abstract: as reduced. How hunger and food work below reduced is open
+//             (DETAIL_REGIMES.md).
+// - frozen:   it doesn't decide, so it doesn't eat; an eat under way waits.
+// - body:     eating sets body.tri's `fed` (50 more, at most 100) and `fedAt`;
+//             how much is the code's yet, not the food's.
+// - finding food: none yet: only food already in hand is eaten.
+// - code:     effect_eat (src/act/BGActions.m) feeds the actor and destroys
+//             the food.
+
+// Hunger raises eating, worth what the agent feels of it.
+eat_when_hungry: #Goal & {
+    title:   "eat something"
+    done:    #Did & { did: "eat" }
+    pressed: { need: "hunger", above: 40 }
+    worth:   [#Need & { pressure: "hunger", per: 5 }]
+} @family(goals)
+
+eat_what_i_have: #Method & {
+    title: "eat what I have"
+    goal:  "eat_when_hungry"
+    rank:  1
+    pre: {
+        find:  ["food"]
+        match: #Supper & {
+            me:   #Agent & { id: $me }
+            food: #Body & { material: "food", place: #Held & { by: $me } }
+        }
+    }
+    steps: [#Do & { op: "eat", object: "food" }]
+} @family(methods)
+
+// AGENCY.md Scenario 2, "the false alarm": the watchman's supper.
+// Eating: the food.
+#Supper: #Frame & { food: #Body }
+
+eat_supper: #Goal & {
+    title: "eat supper"
+    done:  #Did & { did: "eat" }
+    worth: [#Flat & { value: 20 }]
+} @family(goals)
+
+eat_it: #Method & {
+    title: "eat"
+    goal:  "eat_supper"
+    rank:  1
+    pre: {
+        find:  ["food"]
+        match: #Supper & {
+            me:   #Agent & { id: $me }
+            food: #Body & { material: "food", place: #Held & { by: $me } }
+        }
+    }
+    steps: [#Do & { op: "eat", object: "food" }]
+} @family(methods)
+
+supper: #Body & { material: "food", mass: 300g }
+
+// Eat what the actor holds: a while, with the hands, easily put down. It
+// is gone, and the actor is fed.
+eat: #Operation & {
+    effect:    "eat"
+    duration:  60s
+    uses:      ["hands"]
+    attention: 5
+    roles: {
+        actor: #Agent & { id: $a }
+        item:  #Body & { material: "food", place: #Held & { by: $a } }
+    }
+} @family(operations)
+
+food_value: #Valuing & { valued: #Body & { material: "food" }, value: 10, pressure: "hunger", per: 5 } @family(values)

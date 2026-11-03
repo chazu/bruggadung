@@ -1,7 +1,7 @@
 /*
  * BGTraces — the trace system (KNOWLEDGE.md §3). Traces are component state
- * on informational entities (content/traces.tri), made and removed only by
- * the operations that declare them, in their effects' groups. Aging is
+ * on informational entities (content/traces/traces.tri), made and removed
+ * only by the operations that declare them, in their effects' groups. Aging is
  * analytic: a trace's strength is computed from its age when it is read,
  * fading evenly from its magnitude to nothing at its `expires`. This domain
  * costs nothing between: its horizon's next event is the earliest moment a
@@ -15,7 +15,7 @@
  * expiry. */
 int64_t   BGTraceStrength( const BGTrace *trace, int64_t t);
 /* When it is gone (KNOWLEDGE.md §3): the first moment its strength is below
- * its kind's floor (traces.tri), or its expiry. */
+ * its kind's floor (traces/traces.tri), or its expiry. */
 int64_t   BGTraceGone( BGWorld *world, const BGTrace *trace);
 
 
@@ -28,7 +28,7 @@ int64_t   BGTraceGone( BGWorld *world, const BGTrace *trace);
 #define BG_SOUND_DOOR     10
 #define BG_SOUND_WALL     30
 /* How far any sound carries, at most: a trace's magnitude is at most 100
- * (content/traces.tri), less BG_SOUND_FALLOFF a tile. Hearing looks no
+ * (content/traces/traces.tri), less BG_SOUND_FALLOFF a tile. Hearing looks no
  * further (the spatial index). */
 #define BG_SOUND_REACH    (100 / BG_SOUND_FALLOFF + 1)
 #define BG_SOUND_MASK     20     /* a sound this much quieter than the loudest heard is masked */

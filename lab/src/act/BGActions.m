@@ -1310,9 +1310,10 @@ static BOOL   text_feature( TriContent *tri, const TriNode *node, const char *pa
 }
 
 
-/* Latent wear (LATENT_ASSEMBLY.md decisions 4-6, content/latent.tri): the
- * assembly's use shared out among its roles by how fast each wears, how
- * hard abuse strains it, and its hidden quality. */
+/* Latent wear (LATENT_ASSEMBLY.md decisions 4-6,
+ * content/machines/latent.tri): the assembly's use shared out among its roles
+ * by how fast each wears, how hard abuse strains it, and its hidden
+ * quality. */
 #define BG_WEARS        2               /* a role's points in 100 h of use, unless it says */
 #define BG_PART_FAILED  60              /* the wear a failure leaves its culprit at, at least */
 #define BG_WEAR_SPAN    (100 * 3600000LL)      /* the 100 h `wears` and `chance` are per */
@@ -1561,12 +1562,12 @@ static void   latent_use( BGWorld *world, BGProposalGroup *g, BGEntityID assembl
 }
 
 
-/* Working a pump an hour (content/latent.tri): it lifts water from the store
- * it draws from into its riser, at its flow; what it can't draw, the store
- * dry, it is worked dry, abused. The use risks each failure the schema
- * names: its chance, by the wear of its most worn candidate, drawn by the
- * seed and the use so far. Failed, its culprit is decided then, and a flow
- * loss costs it the flow its culprit's loss does. The parts opened in it
+/* Working a pump an hour (content/machines/pump.tri): it lifts water from
+ * the store it draws from into its riser, at its flow; what it can't draw,
+ * the store dry, it is worked dry, abused. The use risks each failure the
+ * schema names: its chance, by the wear of its most worn candidate, drawn by
+ * the seed and the use so far. Failed, its culprit is decided then, and a
+ * flow loss costs it the flow its culprit's loss does. The parts opened in it
  * wear on. Seized, it can't be worked. */
 static NSString   *effect_work( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
 {
@@ -1673,7 +1674,7 @@ static NSString   *effect_work( BGWorld *world, BGAction a, int64_t amount, BGPr
 }
 
 
-/* Opening a latent assembly a level further (content/latent.tri): the
+/* Opening a latent assembly a level further (content/machines/latent.tri): the
  * level's parts become entities, part of it, their mass carved out of its
  * own; each one worn by the assembly's use. The culprit of a failure
  * committed against it, decided at the failure or else now, is worn at least
@@ -1774,9 +1775,9 @@ static NSString   *effect_reveal( BGWorld *world, BGAction a, int64_t amount, BG
 }
 
 
-/* Replacing a part (provisional, content/latent.tri): the worn one out onto
- * the actor's tile, the spare into its place; a part worn by the assembly's
- * failure, replaced, repairs it. */
+/* Replacing a part (provisional, content/machines/latent.tri): the worn one
+ * out onto the actor's tile, the spare into its place; a part worn by the
+ * assembly's failure, replaced, repairs it. */
 static NSString   *effect_replace( BGWorld *world, BGAction a, int64_t amount, BGProposalGroup *g)
 {
    const BGPart   *worn;

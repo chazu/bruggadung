@@ -1,0 +1,275 @@
+// Machines, the pump: the crank pump and its makes, the stores it draws from,
+// the cocks on its lines and a diagram of them, and repairing it (ACTIONS.md
+// Scenario 3, "the interrupted repair"; DOMAIN_SIMULATION.md Scenario 2).
+//
+// Cut points:
+// - full:     an agent repairs the pump by a recipe, its trade's or one it
+//             read or was told, rightly or not; or mends it, opening it
+//             further until a worn part shows, and replacing that.
+// - reduced:  the same, decided on the cadence's beat; the work runs at full
+//             pace.
+// - abstract: as reduced.
+// - frozen:   it doesn't decide; a dismantling under way waits.
+// - water:    working the pump lifts water from its store; opened with its
+//             line open, the store comes out onto the floor
+//             (water/water.tri).
+// - talk:     a recipe or a diagram's claim is learned by reading or being
+//             told (#RecipeSays, #Serves).
+// - code:     effect_dismantle, effect_shut, effect_work;
+//             src/kinds/BGLatentKind.m.
+
+// The miller's pump: open once dismantled.
+#Pump: #Assembly & {
+    @component(Pump)
+    opened: *false | true                @field(content, saved, proposable, inspect, perceive(sight))
+    // what it delivers of its rated flow, percent: an aggregate parameter
+    // (COMPONENTS.md §7), changed by repairs as a delta
+    flow:   *100 | int & >=0 & <=100     @field(content, saved, proposable, inspect)
+    // the store it draws from, and what it lifts out of it a minute, mL, at
+    // full flow
+    draws:  ref                          @field(saved, proposable, inspect)
+    lift:   *0 | int & >=0 & <=100000    @field(content, saved, proposable, inspect)
+}
+
+// A shutoff cock on a line (ACTIONS.md Scenario 3): which line it serves
+// can't be seen; a diagram may say, rightly or not.
+#Cock: #Body & {
+    @component(Cock)
+    serves: text          @field(content, saved, inspect)
+    shut:   *false | true @field(content, saved, proposable, inspect, perceive(sight))
+}
+
+pump_handle:  #Part & { material: "iron", mass: 2kg }
+pump_cover:   #Part & { material: "iron", mass: 3kg }
+piston:       #Part & #ThermalBody & { material: "iron", mass: 4kg, heat: 0, heatCapacity: 1800, toAir: 0, toOutdoors: 0 }
+leather_cup:  #Part & { material: "rubber", mass: 200g }
+inlet_valve:  #Part & { material: "brass", mass: 500g }
+outlet_valve: #Part & { material: "brass", mass: 500g }
+
+// The crank-driven piston pump's insides. The leather cup wears fastest, and
+// three times as fast run dry; the valves next; iron, slowly. It loses flow
+// about once in five hundred hours of use when new; seizing isn't from use.
+// Dressing the cup undoes most of its wear since it was last dressed,
+// cleaning a valve half, oiling the handle's pivot half; the piston's iron,
+// nothing.
+#CrankPumpParts: #LatentSchema & {
+    parts:       [{ roleName: "handle", partKind: "pump_handle", depth: 1, wears: 1, mends: 50 },
+                  { roleName: "cover", partKind: "pump_cover", depth: 1, wears: 0 },
+                  { roleName: "piston", partKind: "piston", depth: 2, wears: 1 },
+                  { roleName: "piston_seal", partKind: "leather_cup", depth: 2, wears: 5, strain: 3, mends: 60 },
+                  { roleName: "inlet_valve", partKind: "inlet_valve", depth: 2, wears: 3, mends: 50 },
+                  { roleName: "outlet_valve", partKind: "outlet_valve", depth: 2, wears: 3, mends: 50 }]
+    culprits:    [{ failing: "flow_loss", candidates: ["piston_seal", "inlet_valve", "outlet_valve", "housing"], chance: 2 },
+                  { failing: "seized", candidates: [], chance: 0 }]
+    pathWhenOut: "piston"
+    pathThrough: "outlet_valve"
+}
+
+// The crank-driven piston pump: 40 kg in all, its parts inside until opened.
+// `warm_pump`: the same with its heat (iron, 18 kJ/K), which a part leaving
+// it takes its share of, by heat capacity (Scenario 2's check 3).
+let crank_body = { material: "iron", mass: 40kg, slots: 8 }
+let warm_iron  = { heat: 5490000, heatCapacity: 18000, toAir: 0 }
+
+crank_pump: #Pump & #Latent & crank_body & { lift: 20000, latent: #CrankPumpParts }
+warm_pump:  #Pump & #Latent & #ThermalBody & crank_body & warm_iron & { toOutdoors: 0, latent: #CrankPumpParts }
+
+// A cheap make of the same pump, whose leather is poor; and a rickety one,
+// that fails five hundred times as often, for trying failure out.
+cheap_pump:   #Pump & #Latent & crank_body & {
+    lift:   20000
+    latent: #CrankPumpParts & { biases: [{ biased: "leather_cup", bias: -30 }] }
+}
+rickety_pump: #Pump & #Latent & crank_body & {
+    lift: 20000
+    latent: {
+        parts:       #CrankPumpParts.parts
+        culprits:    [{ failing: "flow_loss", candidates: ["piston_seal", "inlet_valve", "outlet_valve", "housing"], chance: 1000 }]
+        pathWhenOut: #CrankPumpParts.pathWhenOut
+        pathThrough: #CrankPumpParts.pathThrough
+    }
+}
+
+// The same pump out in the yard: it gives its heat to the outdoors.
+yard_pump: #Pump & #Latent & #ThermalBody & crank_body & warm_iron & { toOutdoors: 50, latent: #CrankPumpParts }
+
+// COMPONENTS.md Scenario 3's hand pump: its piston is itself an assembly,
+// with the seal inside. A culprit that is itself an assembly isn't worn: it
+// takes the failure on, and its own descriptor finds its culprit. A part's
+// `loss` is the flow it costs its pump while in it (provisional: 80 points
+// at wear 60 or more); replacing it changes the pump's flow by the delta.
+nested_piston: #Part & #Assembly & #Latent & #ThermalBody & {
+    material: "iron", mass: 4kg, slots: 2, heat: 0, heatCapacity: 1800, toAir: 0, toOutdoors: 0
+    latent: {
+        parts:       [{ roleName: "seal", partKind: "leather_cup", depth: 1, wears: 5, strain: 3, mends: 60 }]
+        culprits:    [{ failing: "flow_loss", candidates: ["seal"], chance: 0 }]
+        pathWhenOut: ""
+        pathThrough: ""
+    }
+}
+hand_pump:     #Pump & #Latent & {
+    material: "iron", mass: 40kg, slots: 8
+    latent: {
+        parts:       [{ roleName: "handle", partKind: "pump_handle", depth: 1, wears: 1, mends: 50 },
+                      { roleName: "cover", partKind: "pump_cover", depth: 1, wears: 0 },
+                      { roleName: "piston", partKind: "nested_piston", depth: 1, wears: 1 },
+                      { roleName: "inlet_valve", partKind: "inlet_valve", depth: 1, wears: 3, mends: 50 },
+                      { roleName: "outlet_valve", partKind: "outlet_valve", depth: 1, wears: 3, mends: 50 }]
+        culprits:    [{ failing: "flow_loss", candidates: ["piston"], chance: 2 }]
+        pathWhenOut: ""
+        pathThrough: ""
+    }
+}
+
+// The raised header tank the riser fills, and a leak: a tap installed in a
+// store, open, at the rate the path allows.
+header_tank: #Assembly & #WaterStore & { material: "oak", mass: 30kg, slots: 2, water: 100L, waterCapacity: 100L }
+// A well a pump draws from.
+well:        #Assembly & #WaterStore & { material: "stone", mass: 500kg, slots: 1, water: 10m3, waterCapacity: 10m3 }
+leak:        #Tap & { material: "brass", mass: 0g, capacity: 1, rate: 0, open: true }
+
+// Work a pump in reach for an hour: it lifts water from the store it draws
+// from into its riser, at its flow, and is used an hour. What it can't draw,
+// the store run dry, it is abused for: worked dry.
+work_pump: #Operation & {
+    effect:   "work"
+    duration: 1h
+    uses:     ["hands"]
+    roles: {
+        actor: #Agent
+        item:  #Pump & #Latent
+    }
+} @family(operations)
+
+// For ACTIONS.md's interrupted repair: the miller's pump, the cocks on the
+// riser and the trough line, and the diagram.
+pump:        #Pump & { material: "iron", mass: 40kg, slots: 4 }
+cock_trough: #Cock & { material: "brass", mass: 300g, serves: "trough" }
+cock_pump:   #Cock & { material: "brass", mass: 300g, serves: "pump" }
+diagram:     #Record & { material: "paper", mass: 20g }
+
+// A claim stating a recipe (ACTIONS.md decision 12), by name: read in a
+// manual, or told, it teaches it.
+#RecipeSays: #Telling & { recipe: text }
+
+// A claim: something like `what` serves `line` (a diagram's: which cock shuts
+// off which line).
+#Serves: #Telling & { line: text }
+
+// Repairing: the shutoff to close, the wrench, and the pump.
+#Repairing: #Frame & { shutoff: #Body, tool: #Body, pump: #Body }
+
+repair_pump: #Goal & {
+    title: "repair the pump"
+    done:  { find: ["pump"], match: #Repairing & { pump: #Pump & { opened: true } } }
+} @family(goals)
+
+// The recipe: shut off the pump's line, then dismantle it. Which cock is
+// the shutoff comes from what the agent knows: a diagram, say.
+the_recipe: #Method & {
+    title:    "follow the recipe"
+    goal:     "repair_pump"
+    rank:     1
+    sequence: true
+    ofTrade:  "fitter"
+    pre: {
+        find:  ["shutoff", "tool", "pump"]
+        match: #Repairing & {
+            me:      #Agent & { id: $me }
+            shutoff: #Cock & { serves: "pump" }
+            tool:    #Wrench & { place: #Held & { by: $me } }
+            pump:    #Pump & { opened: false }
+        }
+    }
+    steps: [
+        #Do & { op: "shut_off", object: "shutoff" },
+        #Do & { op: "dismantle", object: "tool", target: "pump" },
+    ]
+} @family(methods)
+
+// A wrong recipe, as a bad manual has it (ACTIONS.md decision 12): take the
+// pump apart straight away, its line still open. Nobody's trade; learned,
+// it is followed, wrongly.
+rash_recipe: #Method & {
+    title:    "take it apart"
+    goal:     "repair_pump"
+    rank:     2
+    sequence: true
+    ofTrade:  "none"
+    pre: {
+        find:  ["tool", "pump"]
+        match: #Repairing & {
+            me:   #Agent & { id: $me }
+            tool: #Wrench & { place: #Held & { by: $me } }
+            pump: #Pump & { opened: false }
+        }
+    }
+    steps: [#Do & { op: "dismantle", object: "tool", target: "pump" }]
+} @family(methods)
+
+// Shut a cock in reach.
+shut_off: #Operation & {
+    effect: "shut"
+    roles: {
+        actor: #Agent
+        item:  #Cock & { shut: false }
+    }
+} @family(operations)
+
+// Dismantle a pump with a wrench in hand: the gland nut, the cover, then the
+// piston out; open at the end.
+dismantle: #Operation & {
+    effect: "dismantle"
+    stages: [{ duration: 3s, effect: "tend" }, { duration: 3s, effect: "tend" }, { duration: 5s, effect: "dismantle" }]
+    uses:   ["hands"]
+    roles: {
+        actor:       #Agent & { id: $a }
+        item:        #Turner & #Body & { place: #Held & { by: $a } }
+        destination: #Pump & { opened: false }
+    }
+} @family(operations)
+
+// Mending a latent assembly (ACTIONS.md Scenario 3's steps 3 and 4): the
+// machine, the wrench, the worn part once one is seen, and its spare.
+#Mending: #Frame & { machine: #Body, wrench: #Body, worn: #Body, spare: #Body }
+
+// Mend the pump: done once the faulty part is replaced.
+mend_pump: #Goal & {
+    title: "mend the pump"
+    done:  #Did & { did: "replace_part" }
+} @family(goals)
+
+// Replace a part seen worn with a spare that fits its role: once one is
+// seen, better than opening further. Nothing is bound to `worn` until
+// opening the pump shows one.
+replace_the_worn: #Method & {
+    title: "replace the worn part"
+    goal:  "mend_pump"
+    rank:  1
+    pre: {
+        find:  ["worn", "spare"]
+        match: #Mending & {
+            me:    #Agent & { id: $me }
+            worn:  #Part & { place: #Installed, fits: $r, wear: >=60 }
+            spare: #Part & { place: #Held & { by: $me }, fits: $r }
+        }
+    }
+    score: [#Flat & { value: 10 }]
+    steps: [#Do & { op: "replace_part", object: "spare", target: "worn" }]
+} @family(methods)
+
+// Else open it a level further, to see inside.
+open_it_further: #Method & {
+    title: "open it further"
+    goal:  "mend_pump"
+    rank:  2
+    pre: {
+        find:  ["wrench", "machine"]
+        match: #Mending & {
+            me:      #Agent & { id: $me }
+            wrench:  #Wrench & { place: #Held & { by: $me } }
+            machine: #Pump
+        }
+    }
+    steps: [#Do & { op: "open_up", object: "wrench", target: "machine" }]
+} @family(methods)

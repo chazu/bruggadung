@@ -1,17 +1,20 @@
-// What agents say (KNOWLEDGE.md §10). An utterance's content is a structure,
-// carried by the "said" event, and whoever is in earshot perceives it.
-// Content names no referents: it describes things by kind, features, and
-// where they are, and each hearer binds them to referents of its own by
-// recognition.
-
-// Every utterance is about something like `what`.
-#Utterance: { what: #Body }
-
-// An utterance about something like `what` inside `within`.
-#Placing: #Utterance & { within: #Body }
-
-// A question expects an answer from the one it is put to.
-#Question: #Utterance & {}
+// Talk: what agents say to each other, questions, claims and answers,
+// accounts, a lie; and records, written and read (KNOWLEDGE.md §10, §15;
+// AGENCY.md decision 11; KNOWLEDGE.md Scenario 1, "the rumour of the
+// nails").
+//
+// Cut points:
+// - full:      whoever is in earshot hears what is said.
+// - reduced:   an agent hears only what is said to it.
+// - abstract:  as reduced. News held by communities, moving along routes, is
+//              planned (DETAIL_REGIMES.md).
+// - frozen:    it hears nothing.
+// - contact:   being spoken to by someone at full detail raises an agent to
+//              full while the contact lease runs (reality.tri).
+// - knowledge: the shapes of claims (#Utterance, #Telling, ...) are
+//              knowledge.tri's; a topic's own claims are in its directory.
+// - code:      effect_say, effect_write, effect_read; what a hearer makes of
+//              what it hears is src/know/BGKnowledge.m's.
 
 // Where is something like `what`?
 #WhereIs: #Question & {}
@@ -26,19 +29,6 @@
 // source, KNOWLEDGE.md §10). The answer is the claim again, with its source.
 #WhoToldYou: #Question & #Placing & {}
 
-// How the speaker says it knows (the attribution, KNOWLEDGE.md §10): it saw
-// it, as sure as its memory of it is strong (in dB), or heard it, from
-// someone it describes, or from no one it names.
-#Source:  {}
-#Saw:     #Source & { sure: int }
-#Heard:   #Source & { from: #Agent }
-// A promise (AGENCY.md §7): the speaker will see to it, by `when`. Hearers
-// hold it as a claim about then, kept or broken as they come to find.
-#Pledged: #Source & {}
-
-// A claim, as of `when`, with how the speaker says it knows.
-#Telling: #Utterance & { when: time, attribution: #Source }
-
 // A claim: something like `what` is inside `within`.
 #IsIn: #Placing & #Telling & {}
 
@@ -48,42 +38,15 @@
 // credible as the hearer finds the speaker.
 #IsLike: #Telling & { as: #Body }
 
-// A claim naming someone like `holder`.
-#Naming: #Telling & { holder: #Agent }
-
 // A claim: something like `what` is held by someone like `holder`.
 #IsHeld: #Naming & {}
-
-// Give me something like `what`? A request is a question: the asker waits
-// for the answer.
-#Request: #Question & {}
 
 // The speaker knows of nothing like `what` that it could say where it is.
 #DontKnow: #Utterance & {}
 
-// A claim: something like `what` is reserved for someone like `holder`
-// (ACTIONS.md §7): a soft claim, which never blocks anyone taking it.
-#ReservedFor: #Naming & {}
-
-// A claim: something like `what` is someone like `holder`'s own
-// (INSTITUTIONS.md: what makes taking it a wrong).
-#OwnedBy: #Naming & {}
-
-// A grievance (INSTITUTIONS.md decision 6): something like `what`, someone
-// like `holder`'s own, was taken by someone like `taker`. Told to an office
-// holder, it is ordinary knowledge, weighed by who says it.
-#Grievance: #Naming & { taker: #Agent }
-
 // The speaker won't say where something like `what` is, or give it
 // (AGENCY.md §11).
 #WontSay: #Utterance & {}
-
-// Asked for something like `what`: the speaker has nothing like it; or has
-// lent it, on the terms it says (AGENCY.md decision 18): owed back within
-// `owedIn`. With none said, the borrower takes the terms its relationship
-// with the lender has by default: between friends, a week.
-#HaveNone: #Utterance & {}
-#Granted:  #Utterance & { owedIn: time & >=1ms & <=1000d }
 
 // Say something to an agent in reach. What is said is the command's.
 say: #Operation & {
@@ -124,14 +87,6 @@ say: #Operation & {
 // the first; a hearer takes in each.
 #Account: #Utterance & #Entries & {}
 
-// A claim stating a recipe (ACTIONS.md decision 12), by name: read in a
-// manual, or told, it teaches it.
-#RecipeSays: #Telling & { recipe: text }
-
-// A claim: something like `what` serves `line` (a diagram's: which cock shuts
-// off which line).
-#Serves: #Telling & { line: text }
-
 // Write a claim into a record the actor holds. What is written is the
 // command's: a #Writing with one entry.
 write_down: #Operation & {
@@ -153,3 +108,28 @@ read: #Operation & {
         item:  #Record
     }
 } @family(operations)
+
+// Escaping a consequence: the theft the truth would expose, against its
+// honesty, and the risk of being found out (the thing in sight of someone).
+deny_it: #Lie & {
+    title: "deny it"
+    score: [#Exposing & { exposing: "what", act: "take" }, #Trait & { trait: "honesty", per: -5 },
+            #Watched & { watched: "what", penalty: 20 }]
+} @family(lies)
+
+// For the notebook: a record a character writes in, which can be stolen.
+notebook: #Record & { material: "paper", mass: 200g }
+
+// Someone with two hands to work with.
+let person = { material: "flesh", hands: 2 }
+
+// For KNOWLEDGE.md's first scenario, as "the rumour of the nails": a carter
+// and a porter the apprentice tells, a neighbour who saw it too, and
+// the foreman who hears it from them all.
+carter:    #Agent & person & { mass: 75kg, coat: "red" }
+porter:    #Agent & person & { mass: 80kg, coat: "yellow" }
+neighbour: #Agent & person & { mass: 60kg, coat: "grey" }
+foreman:   #Agent & person & { mass: 90kg, coat: "black", painting: 50 }
+
+// For salience and bounded stores: someone who keeps little in mind.
+gossip: #Agent & person & { mass: 65kg, coat: "beige", memory: 4 }

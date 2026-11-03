@@ -1,0 +1,89 @@
+// Heat: stoves and their fuel, the heat of solids, and cold
+// (DOMAIN_SIMULATION.md Scenario 1, "the unattended stove"; AGENCY.md §6).
+//
+// Cut points:
+// - full, reduced, abstract, frozen: alike. The thermal and atmosphere
+//             domains run over the whole world at every level of detail; they
+//             don't yet step by region (REALITY.md step 4).
+// - cold:     felt from the body's heat (a #ThermalBody's), ten points a
+//             kelvin below 310 K, less numbness, by bands of 10. Above 30 it
+//             raises getting warm, decided as the agent's level of detail has
+//             it (agency.tri).
+// - air:      a fire burns the oxygen of its room's air and heats its gas; a
+//             solid exchanges heat with the air around it (air/air.tri).
+// - code:     src/domains/BGThermal.m (solids), BGAtmosphere.m (fire, the
+//             gas's heat); effect_light.
+
+// A stove's firebox: lit or not, its damper open to the flue or not, and how
+// fast it burns at most (mg of wood a second).
+#Combustor: {
+    @component(Combustor)
+    lit:      *false | true                    @field(content, saved, proposable, inspect, perceive(sight))
+    damper:   *true | false                    @field(content, saved, proposable, inspect, perceive(sight))
+    burnRate: int & >=0 & <=100000             @field(content, saved, inspect)
+}
+
+// Fuel in a stove, a stock the atmosphere domain checks out while it burns.
+#FuelContainer: {
+    @component(FuelContainer)
+    fuel: mass & >=0g & <=1000kg               @field(content, saved, proposable, inspect)
+}
+
+// A solid's heat: whole joules, owned by the thermal domain while it
+// changes, and its capacity (J/K). How fast it exchanges heat with the air
+// around it (W/K), which the atmosphere computes and sends it, and with the
+// outdoors (W/K), which the thermal domain does. A body with no place names
+// the air it bounds: a room's shell.
+#ThermalBody: {
+    @component(ThermalBody)
+    heat:         int & >=0 & <=1000000000000  @field(content, saved, proposable, inspect)
+    heatCapacity: int & >=1 & <=1000000000     @field(content, saved, proposable, inspect)
+    toAir:        int & >=0 & <=100000         @field(content, saved, inspect)
+    toOutdoors:   int & >=0 & <=100000         @field(content, saved, inspect)
+    bounds:       ref                          @field(saved, proposable, inspect)
+}
+
+// A stove's iron takes three tenths of its fire's heat; the rest goes up the
+// flue, or, damper closed, into the room.
+#Stove: #Body & #Combustor & #FuelContainer & #ThermalBody & {}
+
+// The stone of a room's walls, floor and ceiling, its inner layer: what
+// warms with the air.
+#Shell: #ThermalBody & {}
+
+// A stove, at 275 K.
+stove: #Stove & { material: "iron", mass: 120kg, burnRate: 250, fuel: 3kg,
+                  heat: 12375000, heatCapacity: 45000, toAir: 20, toOutdoors: 0 }
+
+room_shell: #Shell & { heat: 1100000000, heatCapacity: 4000000, toAir: 100, toOutdoors: 50 }
+
+// Warming: a stove to light.
+#Warming: #Frame & { stove: #Body }
+
+// Cold raises getting warm, worth what the agent feels of it, and more the
+// colder it gets (a curve): done once a stove it knows of is lit.
+get_warm: #Goal & {
+    title:   "get warm"
+    done:    { find: ["stove"], match: #Warming & { stove: #Combustor & { lit: true } } }
+    pressed: { need: "cold", above: 30 }
+    worth:   [#Need & { pressure: "cold", curve: [{ input: 30, output: 10 }, { input: 60, output: 40 },
+                                                  { input: 100, output: 60 }] }]
+} @family(goals)
+
+light_the_stove: #Method & {
+    title: "light the stove"
+    goal:  "get_warm"
+    rank:  1
+    pre:   { find: ["stove"], match: #Warming & { stove: #Combustor & #Body & { lit: false } } }
+    order: ["near"]
+    steps: [#Do & { op: "light", object: "stove" }]
+} @family(methods)
+
+// Light a stove in reach, with fuel in it.
+light: #Operation & {
+    effect: "light"
+    roles: {
+        actor: #Agent
+        item:  #Combustor & #Body & { lit: false }
+    }
+} @family(operations)

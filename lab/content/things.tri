@@ -1,7 +1,16 @@
-// The component kinds of the laboratory. Each @component type is one
-// component kind; the features it introduces are its fields, with their
-// field registry flags. The structs and the registry the lab uses are
-// generated from this file (make gen).
+// Things: the component kinds every topic shares, and what descriptions say
+// besides component fields (ids, places, free hands). Each @component type
+// is one component kind; the features it introduces are its fields, with
+// their field registry flags. A topic adds fields of its own to these kinds,
+// in its directory: hunger's `fed`, on #Agent, is in hunger/body.tri.
+//
+// Cut points:
+// - detail:  none here. What a field does at each level of detail is its
+//            topic's to say.
+// - code:    the structs and the registry the lab uses are generated from all
+//            the content, every topic's fields with these (make gen:
+//            src/generated/BGComponents.h); the lab refuses to run on content
+//            with another hash.
 
 // What things are made of, and the colours they come in: hierarchies, so a
 // memory loses detail along them (KNOWLEDGE.md §12): an oak chest is
@@ -62,7 +71,8 @@
 
 // Something that acts, with hands to hold things in, a coat to know it by
 // at a glance, and room in its memory for so many observations
-// (KNOWLEDGE.md §12): past that, the least salient go first.
+// (KNOWLEDGE.md §12): past that, the least salient go first. Topics add
+// fields of their own (hunger's `fed`, work's `hires`, valves' `grip`).
 #Agent: #Body & #Handed & {
     @component(Agent)
     hands:         int & >=0 & <=4                  @field(content, saved, inspect, perceive(sight))
@@ -89,8 +99,6 @@
     trusting:      *0 | int & >=-20 & <=20          @field(content, saved, proposable, inspect)
     // its trade (ACTIONS.md decision 12): it knows the trade's recipes
     trade:         text                             @field(content, saved, proposable, inspect)
-    // the job it offers, by name (AGENCY.md decision 15), if any
-    hires:         text                             @field(content, saved, proposable, inspect)
     // a deeply held norm against striking anyone (AGENCY.md decision 14), 0
     // to 100: any of it vetoes doing so
     gentle:        *0 | int & >=0 & <=100           @field(content, saved, proposable, inspect)
@@ -102,13 +110,8 @@
     // risk tolerance (AGENCY.md §9), 0 to 100: a goal's believed risk counts
     // in full at 50, double at 0, and not at all at 100
     riskTolerance: *50 | int & >=0 & <=100          @field(content, saved, proposable, inspect)
-    // what its hands can put into a turn (ACTIONS.md Scenario 1)
-    grip:          *200N | force & >=0N & <=5000N   @field(content, saved, inspect)
     // half hidden: seen only from close by, though it sees as well as anyone
     hiding:        *false | true                    @field(content, saved, proposable, inspect)
-    // a body stock (AGENCY.md §6): how fed it is, 0 to 100, as of `fedAt`;
-    // it falls a point every three minutes, computed when read
-    fed:           *80 | int & >=0 & <=100          @field(content, saved, proposable, inspect)
     // fatigue (AGENCY.md §6, a component field), 0 to 100: effort raises
     // it, a night's rest clears it
     fatigue:       *0 | int & >=0 & <=100           @field(content, saved, proposable, inspect)
@@ -118,7 +121,6 @@
     injury:        *0 | int & >=0 & <=100           @field(content, saved, proposable, inspect)
     adrenaline:    *0 | int & >=0 & <=100           @field(content, saved, proposable, inspect)
     numbness:      *0 | int & >=0 & <=100           @field(content, saved, proposable, inspect)
-    fedAt:         *0ms | time & >=0ms & <=10000d   @field(content, saved, proposable, inspect)
 }
 
 // Something entities can be put in.
@@ -143,63 +145,5 @@
     quantity: int & >=0 & <=100000 @field(content, saved, proposable, inspect)
 }
 
-// Something with a size that matters: a nut, a spanner's jaw. Seen from
-// afar, the size is known only roughly: it widens a millimetre a step.
-#Sized: {
-    @component(Sized)
-    size: length & >=1mm & <=200mm @widen(1mm) @field(content, saved, inspect, perceive(sight))
-}
-
-// A nut, loose or tight. (Sized first: its size widens as #Sized says.)
-#Fastener: #Sized & #Body & {
-    @component(Fastener)
-    tight: *false | true @field(content, saved, proposable, inspect, perceive(sight))
-}
-
-// A spanner: its size is the nut it fits.
-// What turns a nut: a spanner, or a wrench.
-#Turner: {}
-
-#Spanner: #Sized & #Body & #Turner & {}
-
-// A lever (ACTIONS.md Scenario 1, instrument chains): how far it reaches
-// for a turn, and the torque it bears before it bends. A sleeve fits over
-// another lever's handle and lengthens it.
-#Lever: {
-    @component(Lever)
-    leverage: length & >=1mm & <=5000mm      @field(content, saved, inspect, perceive(sight))
-    limit:    torque & >=1Nm & <=100000Nm    @field(content, saved, proposable, inspect)
-    sleeve:   *false | true                  @field(content, saved, inspect, perceive(sight))
-}
-#Wrench: #Body & #Lever & #Turner & {}
-#Pipe:   #Body & #Lever & {}
-
-// A valve: the turn its rating says, what (hidden) it takes to break it
-// free, and whether it has turned.
-#Valve: #Body & {
-    @component(Valve)
-    rating:    torque & >=1Nm & <=100000Nm   @field(content, saved, inspect, perceive(sight))
-    breakaway: torque & >=1Nm & <=100000Nm   @field(content, saved, proposable, inspect)
-    turned:    *false | true                 @field(content, saved, proposable, inspect, perceive(sight))
-}
-
-// A shutoff cock on a line (ACTIONS.md Scenario 3): which line it serves
-// can't be seen; a diagram may say, rightly or not.
-#Cock: #Body & {
-    @component(Cock)
-    serves: text          @field(content, saved, inspect)
-    shut:   *false | true @field(content, saved, proposable, inspect, perceive(sight))
-}
-
-// The miller's pump: open once dismantled.
-#Pump: #Assembly & {
-    @component(Pump)
-    opened: *false | true                @field(content, saved, proposable, inspect, perceive(sight))
-    // what it delivers of its rated flow, percent: an aggregate parameter
-    // (COMPONENTS.md §7), changed by repairs as a delta
-    flow:   *100 | int & >=0 & <=100     @field(content, saved, proposable, inspect)
-    // the store it draws from, and what it lifts out of it a minute, mL, at
-    // full flow
-    draws:  ref                          @field(saved, proposable, inspect)
-    lift:   *0 | int & >=0 & <=100000    @field(content, saved, proposable, inspect)
-}
+// An ownership claim, as the lab makes them.
+ownership: #Claim & { kind: "ownership" }

@@ -1,0 +1,58 @@
+// Promises: delivering something somewhere, what a promise to put it there
+// commits to (AGENCY.md §7).
+//
+// Cut points:
+// - full:     a promise is a commitment with a window; its urgency rises to
+//             its deadline, and it is kept or broken as the agent decides.
+// - reduced:  the same; its window's wakes wait for the cadence's beat.
+// - abstract: as reduced. How a commitment falling due while abstract
+//             settles is open (DETAIL_REGIMES.md).
+// - frozen:   it doesn't decide.
+// - talk:     a promise is made by saying it (#Pledged, knowledge.tri).
+// - work:     a job's task is `deliver` (work/work.tri).
+// - code:     commitments, urgency and windows, in src/agency/BGAgency.m.
+
+// Delivering: the goods, and where they are to go.
+#Delivering: #Frame & { goods: #Body, dest: #Container }
+
+// The goods in the destination: what a promise to put them there commits to.
+deliver: #Goal & {
+    title: "deliver it"
+    done: {
+        find:  ["goods", "dest"]
+        match: #Delivering & {
+            goods: #Body & { place: #Inside & { container: $c } }
+            dest:  #Container & { id: $c }
+        }
+    }
+} @family(goals)
+
+hold_it: #Goal & {
+    title: "hold it"
+    done: {
+        find:  ["goods"]
+        match: #Delivering & {
+            me:    #Agent & { id: $me }
+            goods: #Body & { place: #Held & { by: $me } }
+        }
+    }
+} @family(goals)
+
+bring_it: #Method & {
+    title: "bring it"
+    goal:  "deliver"
+    rank:  1
+    pre:   { find: ["goods", "dest"], match: #Delivering & { dest: #Container } }
+    steps: [
+        #Achieve & { subgoal: "hold_it" },
+        #Do & { op: "put_in", object: "goods", target: "dest" },
+    ]
+} @family(methods)
+
+pick_it_up: #Method & {
+    title: "pick it up"
+    goal:  "hold_it"
+    rank:  1
+    pre:   { find: ["goods"], match: #Delivering & { goods: #Body & { place: #Inside | #OnTile } } }
+    steps: [#Do & { op: "take", object: "goods" }]
+} @family(methods)

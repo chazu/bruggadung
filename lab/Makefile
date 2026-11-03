@@ -14,7 +14,7 @@ SANITIZE ?=
 
 gen:
 	$(MAKE) -C $(TRIANGLE) build/tri-components
-	$(TRIANGLE)/build/tri-components BG content/*.tri > src/generated/BGComponents.h
+	$(TRIANGLE)/build/tri-components BG $$(find content -name '*.tri' -not -path '*/.*' | sort) > src/generated/BGComponents.h
 
 build/apple/lab: $(SOURCES) $(CSOURCES) $(shell find src -name '*.h')
 	mkdir -p build/apple
