@@ -208,7 +208,8 @@ knowledge_perceive :: proc(self: ^Knowledge, store: ^Knowledge_Store, first: uin
 	taken    = make([^]u8, knowledge_store_count(store) + nseen + 1)
 	/* the perceiver's state, and its attention (KNOWLEDGE.md decision 12) */
 	memory     = (^Agent)(world_record(self.world, world_kind_named(self.world, "Agent"), agent))
-	impaired   = memory != nil && (memory.fatigue + memory.injury >= BG_IMPAIRED || memory.adrenaline >= BG_IMPAIRED / 2)
+	impaired   = memory != nil && (memory.fatigue + memory.injury >= BG_IMPAIRED || memory.adrenaline >= BG_IMPAIRED / 2 ||
+	                               weakness(self.world, agent, .Perception, now) >= 50)
 	distracted = knowledge_attention_of(self, agent) >= BG_ATTENTION / 2
 	for pass = 0; pass < 2; pass += 1 {
 		for i = 0; i < nseen; i += 1 {
@@ -584,7 +585,7 @@ knowledge_perceive :: proc(self: ^Knowledge, store: ^Knowledge_Store, first: uin
 
 		/* exhaustion blurs it (AGENCY.md §6): felt half as precisely */
 		band   = 2 * BG_HUNGER_BAND if memory.fatigue >= 80 else BG_HUNGER_BAND
-		hunger = 100 - satiety(memory, now) - 2 * i64(knowledge_attention_of(self, agent))
+		hunger = 100 - satiety(hungry_of(self.world, agent), now) - 2 * i64(knowledge_attention_of(self, agent))
 		hunger = 0 if hunger < 0 else (hunger / band) * band
 		if knowledge_store_feel_hunger(store, i32(hunger), now) {
 			append(news, fmt.aprintf("you feel hunger (%d)", i32(hunger)))
@@ -728,7 +729,8 @@ knowledge_perceive :: proc(self: ^Knowledge, store: ^Knowledge_Store, first: uin
 	/* the attention budget (KNOWLEDGE.md §5, AGENCY.md §10): what is left of
 	 * BG_ATTENTION after the running activity's demand, BG_PERCEPT_COST a
 	 * percept; the most salient first, in event order among equals */
-	budget = int((BG_ATTENTION - knowledge_attention_of(self, agent)) / BG_PERCEPT_COST)
+	budget = int((BG_ATTENTION * (100 - weakness(self.world, agent, .Attention, now)) / 100 -
+	              i64(knowledge_attention_of(self, agent))) / BG_PERCEPT_COST)
 	slice.sort_by(candidates[:ncandidates], know_cmp_candidates)
 	for i = 0; i < ncandidates; i += 1 {
 		if int(i) >= budget {
@@ -1186,7 +1188,7 @@ knowledge_hunger_of :: proc(self: ^Knowledge, agent: Entity_ID, memory: ^Agent, 
 	hunger: i64
 
 	band   = 2 * BG_HUNGER_BAND if memory.fatigue >= 80 else BG_HUNGER_BAND
-	hunger = 100 - satiety(memory, t) - 2 * i64(knowledge_attention_of(self, agent))
+	hunger = 100 - satiety(hungry_of(self.world, agent), t) - 2 * i64(knowledge_attention_of(self, agent))
 	return 0 if hunger < 0 else (hunger / band) * band
 }
 

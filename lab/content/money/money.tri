@@ -108,7 +108,7 @@ money_value: #Valuing & { valued: #Body & { material: "cloth" }, value: 30 } @fa
 purse: #Body & { material: "cloth", mass: 150g }
 
 // Someone with two hands to work with.
-let person = { material: "flesh", hands: 2 }
+let person = #Hungry & { material: "flesh", hands: 2 }
 
 merchant: #Agent & person & { mass: 85kg, coat: "white" }
 kasimir:  #Agent & person & { mass: 70kg, coat: "beige", honesty: 10, scruples: 5 }

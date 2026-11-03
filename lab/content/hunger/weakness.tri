@@ -1,0 +1,31 @@
+// Hunger, weakness: what a body going without loses as its reserves run
+// down (VILLAGE.md decision 2; AGENCY.md d17).
+//
+// Cut points:
+// - full, reduced, abstract, frozen: alike. Weakness is read from reserves
+//            (body.tri) when it is used, at every level of detail.
+// - body:    each `lost` curve's input is reserves, 0 to 100; its output,
+//            how much of what it weakens is lost, in percent. Attention goes
+//            first, then the pace of work, then perception and grip; injury
+//            only once reserves are gone (body.tri's `harmsEvery`).
+// - knowledge: attention lost shrinks the budget a boundary's percepts are
+//            taken in with; perception lost by half or more sees as if worn
+//            out (knowledge.tri).
+// - work:    the pace of work that takes exertion, with fatigue and injury
+//            (actions.tri).
+// - valves:  grip, the force the hands put on a valve (valves/valves.tri).
+// - code:    src/domains_bodies.odin (weakness), read in act_actions.odin's
+//            work rate and grip, and know_knowledge_2.odin's perception.
+
+// What going without weakens, and how much at each level of reserves:
+// points by rising input, straight between them, level beyond the ends.
+#Weakness: { weakens: "attention" | "pace" | "perception" | "grip", lost: [...#Point] }
+
+weak_attention:  #Weakness & { weakens: "attention",
+                               lost:  [{ input: 0, output: 50 }, { input: 40, output: 25 }, { input: 80, output: 0 }] } @family(weakness)
+weak_pace:       #Weakness & { weakens: "pace",
+                               lost:  [{ input: 0, output: 60 }, { input: 20, output: 40 }, { input: 60, output: 0 }] } @family(weakness)
+weak_perception: #Weakness & { weakens: "perception",
+                               lost:  [{ input: 10, output: 100 }, { input: 40, output: 0 }] } @family(weakness)
+weak_grip:       #Weakness & { weakens: "grip",
+                               lost:  [{ input: 0, output: 50 }, { input: 40, output: 0 }] } @family(weakness)

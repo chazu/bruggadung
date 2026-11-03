@@ -7,15 +7,15 @@ households, living for weeks in a village. They farm, gather firewood, hunt
 and meet at a market. The watcher shows it (TESSERA.md), and `lab run
 village` checks it, as the other scenarios are checked.
 
-This document is a proposal. Nothing in it is built. Each slice below is a
-ticket: slice n is GitHub issue #n (label `village`). A slice moves into
-`lab/PLAN.md` when it is built.
+This document is a proposal, built a slice at a time: slice 1 (hunger over
+weeks) is built. Each slice below is a ticket: slice n is GitHub issue #n
+(label `village`). A slice moves into `lab/PLAN.md` when it is built.
 
 It is the first scenario that runs for weeks, not minutes. That forces two
 things the lab put off:
 
-- **Hunger on the scale of weeks.** Today, going without starts harming the
-  body 4.5 h after a meal (`lab/content/hunger/body.tri`). The user asked
+- **Hunger on the scale of weeks.** Going without used to start harming
+  the body 4.5 h after a meal (`lab/content/hunger/body.tri`). The user asked
   for hunger kept apart from finding, preparing and eating food, and for
   starvation over weeks that weakens strength and cognition (slice 1).
 - **Things that change on their own over days**: crops ripening, meat
@@ -215,7 +215,8 @@ already proves that watching changes nothing.
 Each slice is one ticket, the issue of its number, and each can be watched
 when it is built:
 
-1. **Hunger over weeks**: satiety, reserves, nourishment, weakness.
+1. **Hunger over weeks**: satiety, reserves, nourishment, weakness
+   (built).
 2. **Looks in content** (TESSERA.md slice 3).
 3. **The village and its homes**: the map, the households, beds, the day's
    commitments, sleeping at home.
@@ -241,9 +242,9 @@ New, and entered in the glossary with this document:
 
 | Term | Meaning |
 | --- | --- |
-| Satiety | How full the stomach is: hours of it, felt as hunger. |
-| Reserves | What the body has to draw on: falls while satiety is empty, over weeks; weakness comes from it. |
-| Nourishment | What a food gives satiety when eaten (`nourish by N`). |
+| Satiety | How full the stomach is: hours of it, felt as hunger. (Built.) |
+| Reserves | What the body has to draw on: falls while satiety is empty, over weeks; weakness comes from it. (Built.) |
+| Nourishment | What a food gives satiety when eaten (`nourish by N`). (Built.) |
 | Plot | Tilled ground a household farms. *Avoid:* field, which is a component's field. |
 | Crop | A plant growing on a plot tile: sown at a time, ripe after its growth. |
 | Perishable | Good for so long after it was made, then spoiled. |

@@ -52,8 +52,8 @@ first), which wants a document of its own.
    continuously at a level (hunger rising, a room cooling, a part wearing)
    is kept as a value, the time it was so, and the regime that moves it;
    reading it computes it for now. Far away it costs nothing until read.
-   Hunger already works this way (`BGSatiety`: `fed`, `fedAt` and a
-   period).
+   Hunger already works this way (`satiety` and `reserves` as of
+   `fedAt`, and the periods they move at: lab/content/hunger/body.tri).
 5. **Discrete change goes on the wake queues.** A threshold crossed (a
    household starving, a pump breaking) and a periodic operation that
    changes other things (a day's work, a wage paid) is a wake on the queues

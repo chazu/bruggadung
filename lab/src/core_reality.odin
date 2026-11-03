@@ -97,7 +97,7 @@ dup_string :: proc(s: cstring) -> cstring {
 	return cstring(d)
 }
 
-@(private = "file")
+// A content instance by its tag, its defaults applied.
 node_of :: proc(content: ^tri.Content, tag: cstring) -> ^tri.Node {
 	node: ^tri.Node
 

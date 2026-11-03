@@ -87,10 +87,14 @@ Out of scope here, except where they touch agency:
     raised for what serves its goals or needs now (food when hungry, its
     tools while it works). Giving a thing away costs its worth; lending
     it costs less, by the agent's trust that it comes back.
-17. **Going without harms the body.** A body stock below its threshold
-    adds fatigue and then injury over time (hunger slowly, cold faster, air
-    fastest): world state, which slows work and is felt as pain (§6).
-    Death at the extreme is left for a scenario of its own.
+17. **Going without harms the body.** Cold or bad air past its threshold
+    adds fatigue and then injury over time (cold slowly, air fast). Hunger
+    is slower and works otherwise (VILLAGE.md decision 2): an empty stomach
+    is only felt, and draws on the body's **reserves**, which last weeks.
+    As they run down the body weakens (attention, the pace of work,
+    perception, grip), and only once they are gone is it injured. All of it
+    is world state, which slows work and is felt as pain (§6). Death at the
+    extreme is left for a scenario of its own.
 18. **A loan's terms are part of the deal**, said or written when lending
     (when it is due, any interest), as employment's are; with none said, a
     default by relationship (between friends: a week, no interest).

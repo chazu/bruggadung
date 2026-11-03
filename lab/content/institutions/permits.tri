@@ -78,7 +78,7 @@
 }
 
 // Someone with two hands to work with.
-let person = { material: "flesh", hands: 2 }
+let person = #Hungry & { material: "flesh", hands: 2 }
 
 clerk:  #Agent & #Scribe & person & { mass: 65kg, coat: "black" }
 forger: #Agent & #Scribe & person & { mass: 70kg, coat: "grey" }

@@ -173,7 +173,7 @@ bin: #Container & { material: "oak", mass: 4kg, capacity: 50 }
 lock: #Assembly & { material: "brass", mass: 600g, slots: 4 }
 
 // Someone with two hands to work with.
-let person = { material: "flesh", hands: 2 }
+let person = #Hungry & { material: "flesh", hands: 2 }
 
 worker: #Agent & person & { mass: 70kg, coat: "blue", trade: "fitter" }
 smith:  #Agent & person & { mass: 85kg, coat: "brown" }

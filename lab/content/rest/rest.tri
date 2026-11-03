@@ -8,8 +8,9 @@
 // - abstract: as reduced.
 // - frozen:   it doesn't decide; a rest under way waits.
 // - body:     fatigue is things.tri's (#Agent): effort raises it (an
-//             operation's `exertion`), and so does going without
-//             (hunger/body.tri); it is felt by bands of 10.
+//             operation's `exertion`), and so do freezing and smothering
+//             (src/domains_bodies.odin); it is felt by bands of 10. Starving
+//             doesn't tire (hunger/body.tri), so resting doesn't mend it.
 // - air:      a rest watches the air over it: it wakes when the carbon
 //             dioxide reaches the command's amount, or the temperature
 //             leaves what the breather rests easy in (air/air.tri).

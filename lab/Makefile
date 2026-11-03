@@ -35,7 +35,7 @@ FLAGS     = -vet -strict-style $(ODINFLAGS)
 all: $(LAB)
 
 triangle:
-	$(MAKE) -C $(TRIANGLE) odin-lib
+	@$(MAKE) -s --no-print-directory -C $(TRIANGLE) odin-lib
 
 $(LAB): $(wildcard src/*.odin) $(wildcard ../tessera/*.odin) | triangle
 	@mkdir -p $(BUILD)

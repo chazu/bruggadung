@@ -464,8 +464,20 @@ REALITY.md, TER = TERRAIN.md, TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc'
   **interruption threshold**, a soft interruption. (AGE d7, §10)
 - **Need**: pressure from a perceived body condition (hunger, cold,
   stuffy, tired): a consideration over the interoceptive belief, not the
-  body. Felt by **band**. **Going without** harms the body over time.
-  (AGE d3, d17)
+  body. Felt by **band**. **Going without** harms the body over time:
+  cold and bad air by fatigue then injury, hunger by **weakness** as
+  **reserves** run down, then injury. (AGE d3, d17)
+- **Satiety**: how full the stomach is (`#Hungry`), emptying over hours;
+  what is felt as hunger. An empty stomach doesn't harm. (VIL d2,
+  lab/content/hunger/body.tri)
+- **Reserves**: what the body draws on while satiety is empty, lasting
+  weeks, and refilling while it isn't. (VIL d2)
+- **Weakness**: what going without takes as reserves run down, by curves
+  in content: attention, the pace of work, perception, grip. Not felt.
+  (VIL d2, lab/content/hunger/weakness.tri)
+- **Nourishment**: what a food (`#Food`) gives satiety when eaten; eating
+  asks the body to be **nourished** by it, and the body's code applies it.
+  (VIL d2)
 - **Commitment**: a goal an agent is bound to (a shift, a promise, a
   debt), with a window or deadline and an **urgency curve**. Not change
   commitment. (AGE d5, §7)
@@ -782,13 +794,6 @@ REALITY.md, TER = TERRAIN.md, TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc'
 
 ## The village (proposed)
 
-- **Satiety**: how full the stomach is, emptying over hours; what is felt
-  as hunger. An empty stomach doesn't harm. (VIL d2)
-- **Reserves**: what the body draws on while satiety is empty, lasting
-  weeks; weakness (attention, the pace of work, perception, grip) comes
-  from them, by curves in content. (VIL d2)
-- **Nourishment**: what a food gives satiety when eaten; eating proposes
-  **nourish by N**, and the body applies it. (VIL d2)
 - **Plot**: tilled ground a household farms. *Avoid:* field (a
   component's field). (VIL d5)
 - **Crop**: a plant on a plot tile, sown at a time, ripe after its growth,

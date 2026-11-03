@@ -59,7 +59,7 @@ fill_bucket: #Operation & {
 } @family(operations)
 
 // Someone with two hands to work with.
-let person = { material: "flesh", hands: 2 }
+let person = #Hungry & { material: "flesh", hands: 2 }
 
 // The cistern room of "Two draws on a dwindling stock": two agents, each
 // with a tap and a bucket.

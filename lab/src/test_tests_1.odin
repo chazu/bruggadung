@@ -65,7 +65,7 @@ test_registry_and_construction :: proc() {
 
 	w = test_world(1)
 	c = test_committer(w)
-	bg_check(world_kind_count(w) == 38)
+	bg_check(world_kind_count(w) == 40)
 	bg_check(world_kind_named(w, "Body") != NOT_FOUND && world_kind_named(w, "Nonesuch") == NOT_FOUND)
 	bin   = test_commit_create(c, "bin", on_tile(0, 0, 0))
 	nails = test_commit_create(c, "nails_30", in_(bin))
@@ -1143,8 +1143,8 @@ test_missing_nails_ :: proc(spares: bool, omniscient: bool, apprentice: Apprenti
 	}
 	if shiftUntil > BG_EIGHT {
 		/* breakfast at 7:30, before the shift */
-		proposal_group_set_of_to(g, "Agent.fed", whole(4), 100)
-		proposal_group_set_of_to(g, "Agent.fedAt", whole(4), BG_EIGHT - 1800000)
+		proposal_group_set_of_to(g, "Hungry.satiety", whole(4), 100)
+		proposal_group_set_of_to(g, "Hungry.fedAt", whole(4), BG_EIGHT - 1800000)
 	}
 	chest  = NO_ENTITY
 	helper = NO_ENTITY
@@ -1620,7 +1620,7 @@ test_hunger_run :: proc(fed: i64, drive: bool, until: i64) -> Hunger_Run {
 	scheduler_run_until(s, time_make(1))
 	g      = proposal_group_group_with_phase(.System, "setup: supper, and how fed the worker is")
 	supper = proposal_group_create(g, "supper", "supper", held_by(4, 1))
-	proposal_group_set_of_to(g, "Agent.fed", whole(4), fed)
+	proposal_group_set_of_to(g, "Hungry.satiety", whole(4), fed)
 	committer_submit(c, g)
 	scheduler_run_until(s, time_make(2))
 	run.supper = proposal_group_id_for(g, supper)
@@ -1655,9 +1655,29 @@ test_going_without :: proc() {
 	h:       [8]Entity_ID
 	fatigue: i64
 	injury:  i64
-	fed:     i32
 
-	for fed = 5; fed <= 50; fed += 45 {
+	/* hunger in closed form (content/hunger/body.tri's defaults): the
+	 * stomach empties a point every 4.8 min (8 h), reserves refill a point
+	 * every 1.68 h (7 d) until it is empty, then fall a point every 5.04 h
+	 * (21 d) */
+	{
+		hu := Hungry{satiety = 50, reserves = 60, fedAt = 1000, emptiesIn = 8 * 3600000,
+		             lastsFor = 21 * BG_DAY, refillsIn = 7 * BG_DAY, harmsEvery = 2 * 3600000}
+		empty := i64(1000 + 50 * 288000)
+		bg_check(satiety(&hu, 1000 + 10 * 288000) == 40 && satiety(&hu, empty - 1) == 1 && satiety(&hu, empty) == 0)
+		bg_check(hunger_empties_at(&hu) == empty)
+		bg_check(reserves(&hu, 1000 + 6048000) == 61 && reserves(&hu, empty) == 62)
+		bg_check(reserves(&hu, empty + 12 * 18144000) == 50)
+		bg_check(hunger_exhausted_at(&hu) == empty + 62 * 18144000)    /* 13 days on */
+		bg_check(reserves(&hu, hunger_exhausted_at(&hu) - 1) == 1 && reserves(&hu, hunger_exhausted_at(&hu)) == 0)
+		bg_check(reserves(&hu, 100 * BG_DAY) == 0)
+		/* what doesn't get hungry is always full */
+		bg_check(satiety(nil, 5000) == 100 && reserves(nil, 5000) == 100)
+	}
+
+	/* the body domain: an empty stomach doesn't harm; reserves gone, a point
+	 * of injury every 2 h, and none of fatigue (a rest doesn't cure it) */
+	for gone := 0; gone < 2; gone += 1 {
 		w = test_world(49)
 		c = test_committer(w)
 		s = autorelease(scheduler_init_with_world(w, c))
@@ -1665,22 +1685,83 @@ test_going_without :: proc() {
 		committer_submit(c, workshop_setup(true, &h))
 		scheduler_run_until(s, time_make(1))
 		g = proposal_group_group_with_phase(.System, "setup: how fed and tired the worker is")
-		proposal_group_set_of_to(g, "Agent.fed", whole(4), i64(fed))
+		proposal_group_set_of_to(g, "Hungry.satiety", whole(4), 0)
+		proposal_group_set_of_to(g, "Hungry.reserves", whole(4), 1 if gone == 1 else 50)
+		proposal_group_set_of_to(g, "Hungry.fedAt", whole(4), 1)
 		proposal_group_set_of_to(g, "Agent.fatigue", whole(4), 49)
 		committer_submit(c, g)
-		scheduler_run_until(s, time_make(31 * 60000))
+		/* reserves of 1 run out at 18,144,001 ms; harm at 21.6, 28.8 and 36 Ms */
+		scheduler_run_until(s, time_make(18000000))
+		world_get_field(w, "Agent.injury", 4, &injury)
+		bg_check(injury == 0)
+		scheduler_run_until(s, time_make(36000001))
 		fatigue = 0
 		injury  = 0
 		world_get_field(w, "Agent.fatigue", 4, &fatigue)
 		world_get_field(w, "Agent.injury", 4, &injury)
-		/* starving (95): at 10, 20 and 30 minutes, fatigue to 50, then two
-		 * of injury; fed 50, nothing */
-		if fed == 5 {
-			bg_check(fatigue == 50 && injury == 2)
+		if gone == 1 {
+			bg_check(fatigue == 49 && injury == 3)
 		} else {
 			bg_check(fatigue == 49 && injury == 0)
 		}
 	}
+
+	/* weakness, by content/hunger/weakness.tri's curves, at reserves of 20:
+	 * attention 38% lost, the pace of work 40%, perception 67%, grip 25% */
+	w = test_world(49)
+	c = test_committer(w)
+	s = autorelease(scheduler_init_with_world(w, c))
+	committer_submit(c, workshop_setup(true, &h))
+	scheduler_run_until(s, time_make(1))
+	bg_check(work_rate(w, 4, "saw_through", 0) == 100)
+	g = proposal_group_group_with_phase(.System, "setup: weeks without")
+	proposal_group_set_of_to(g, "Hungry.satiety", whole(4), 0)
+	proposal_group_set_of_to(g, "Hungry.reserves", whole(4), 20)
+	proposal_group_set_of_to(g, "Hungry.fedAt", whole(4), 1)
+	committer_submit(c, g)
+	scheduler_run_until(s, time_make(2))
+	bg_check(weakness(w, 4, .Attention, 2) == 38 && weakness(w, 4, .Pace, 2) == 40)
+	bg_check(weakness(w, 4, .Perception, 2) == 67 && weakness(w, 4, .Grip, 2) == 25)
+	bg_check(work_rate(w, 4, "saw_through", 0) == 60)
+	/* fed well, nothing lost; and what isn't hungry (the bin) never weakens */
+	bg_check(weakness(w, 4, .Pace, -1) == 40 && weakness(w, 1, .Pace, 2) == 0)
+}
+
+
+/* VILLAGE.md decision 2: a worker weeks without food sees as if worn out
+ * (perception lost by half or more): the smith's brown coat only as dark. */
+test_starving_sight :: proc() {
+	st:        Stage
+	knowledge: ^Knowledge
+	store:     ^Knowledge_Store
+	g:         ^Proposal_Group
+	worker:    Entity_ID
+	smith:     Entity_ID
+	r:         u32
+
+	st.w      = test_world(157)
+	st.c      = test_committer(st.w)
+	knowledge = autorelease(knowledge_init_with_world(st.w))
+	st.s      = autorelease(scheduler_init_with_world(st.w, st.c))
+	scheduler_set_perception(st.s, knowledge_as_perception_phase(knowledge))
+	g      = proposal_group_group_with_phase(.System, "setup: a starving worker")
+	worker = proposal_group_create(g, "worker", "worker", on_tile(5, 5, 0))
+	smith  = proposal_group_create(g, "smith", "smith", on_tile(7, 5, 0))
+	proposal_group_set_of_to(g, "Hungry.satiety", whole(worker), 0)
+	proposal_group_set_of_to(g, "Hungry.reserves", whole(worker), 15)
+	committer_submit(st.c, g)
+	scheduler_run_until(st.s, time_make(1000))
+	worker = proposal_group_id_for(g, worker)
+	smith  = proposal_group_id_for(g, smith)
+	store  = knowledge_store_of(knowledge, worker)
+	r      = test_referent_of(store, smith)
+	bg_check(r != 0 && ns_contains(knowledge_store_describe_referent(store, r), "coat: \"dark\""))
+	g = proposal_group_group_with_phase(.System, "setup: fed back to health")
+	proposal_group_set_of_to(g, "Hungry.reserves", whole(worker), 100)
+	proposal_group_set_of_to(g, "Hungry.fedAt", whole(worker), 1000)
+	committer_submit(st.c, g)
+	scheduler_run_until(st.s, time_make(2000))
+	bg_check(knowledge_store_hypotheses_of(store, r) == 0 && ns_contains(knowledge_store_describe_referent(store, r), "coat: \"brown\""))
 }
 
 
@@ -1689,7 +1770,6 @@ test_needs :: proc() {
 	busy:     Hunger_Run
 	later:    Hunger_Run
 	again:    Hunger_Run
-	agent:    ^Agent
 	w2:       ^World
 	restored: ^Knowledge
 	deferred: []^Proposal_Group
@@ -1718,8 +1798,8 @@ test_needs :: proc() {
 		store = knowledge_store_of(early.knowledge, 4)
 		bg_check(knowledge_store_feels(store, "hunger") == 0 && agency_worth_of(early.agency, test_referent_of(store, early.supper), 4) == 10)
 	}
-	agent = (^Agent)(world_record(hungry.world, world_kind_named(hungry.world, "Agent"), 4))
-	bg_check(agent != nil && agent.fed == 80)
+	fed := hungry_of(hungry.world, 4)
+	bg_check(fed != nil && fed.satiety == 80)
 	bg_check(knowledge_store_feels(knowledge_store_of(hungry.knowledge, 4), "hunger") == 20)
 
 	/* driving a nail, its hunger (50) dulled by the attention the drive
@@ -1730,16 +1810,17 @@ test_needs :: proc() {
 	bg_check(test_log_count(busy.agency, 4, "weighing") == 1)
 	bg_check(!world_is_live(busy.world, busy.supper))
 
-	/* fed (80), it grows hungry as time passes, a point every three minutes,
-	 * computed when read: the body domain wakes it at each band, and at 90
-	 * minutes it feels 50 and eats; nothing is computed between */
-	later = test_hunger_run(80, false, 2 * 3600000)
-	bg_check(test_logged_by(later.agency, 4, "t=5400000ms [-] weighing eat something: +25 (hunger +25)"))
+	/* fed (80), it grows hungry as time passes, a point every 4.8 minutes
+	 * (its stomach empties in 8 h), computed when read: the body domain
+	 * wakes it at each band, and at 144 minutes it feels 50 and eats;
+	 * nothing is computed between */
+	later = test_hunger_run(80, false, 3 * 3600000)
+	bg_check(test_logged_by(later.agency, 4, "t=8640000ms [-] weighing eat something: +25 (hunger +25)"))
 	bg_check(later.boundaries < 12)
 	bg_check(!world_is_live(later.world, later.supper))
 
 	/* the same on replay; what it feels is saved */
-	again = test_hunger_run(80, false, 2 * 3600000)
+	again = test_hunger_run(80, false, 3 * 3600000)
 	bg_check(again.text == later.text)
 	w2 = restore(later.text, world_content_build(later.world), &deferred, &position, &error)
 	bg_check(w2 != nil)
@@ -1766,11 +1847,24 @@ Habit_Run :: struct {
 
 BG_DAY :: i64(86400000)
 
+/* Everyone who gets hungry fed full at t: for tests that run for days
+ * about something else, in which nobody should weaken from going without. */
+test_breakfast :: proc(w: ^World, g: ^Proposal_Group, t: i64) {
+	hungry := world_store_for_kind(w, world_kind_named(w, "Hungry"))
+	for i: uint = 0; i < store_count(hungry); i += 1 {
+		e := store_entity_at_index(hungry, i)
+		proposal_group_set_of_to(g, "Hungry.satiety", whole(e), 100)
+		proposal_group_set_of_to(g, "Hungry.reserves", whole(e), 100)
+		proposal_group_set_of_to(g, "Hungry.fedAt", whole(e), t)
+	}
+}
+
 test_hand_nails :: proc(w: ^World, c: ^Committer, s: ^Scheduler, agency: ^Agency, day: i64) {
 	g: ^Proposal_Group
 
 	scheduler_run_until(s, time_make(day * BG_DAY))
 	g = proposal_group_group_with_phase(.System, "setup: in at the door, with nails for the day")
+	test_breakfast(w, g, day * BG_DAY)
 	proposal_group_move_to(g, whole(4), on_tile(5, 5, 0))
 	proposal_group_create(g, "nails_10", ns_utf8(fmt.tprintf("nails of day %d", day)), held_by(4, 0))
 	committer_submit(c, g)
@@ -3666,8 +3760,8 @@ test_pump_work :: proc(blueprint: cstring, key: cstring, failure: cstring, water
 		g = proposal_group_group_with_phase(.System, "setup: the worker rested and fed")
 		proposal_group_set_of_to(g, "Agent.fatigue", whole(worker), 0)
 		proposal_group_set_of_to(g, "Agent.injury", whole(worker), 0)
-		proposal_group_set_of_to(g, "Agent.fed", whole(worker), 80)
-		proposal_group_set_of_to(g, "Agent.fedAt", whole(worker), t)
+		proposal_group_set_of_to(g, "Hungry.satiety", whole(worker), 80)
+		proposal_group_set_of_to(g, "Hungry.fedAt", whole(worker), t)
 		committer_submit(st.c, g)
 		error = ""
 		perform(st.w, st.c, action_make("work_pump", worker, pump, NO_ENTITY), 0, &error)

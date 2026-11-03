@@ -876,19 +876,16 @@ effect_read :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -
 }
 
 
-/* Eating: the food is gone, and the eater is fed, half its stock more. */
+/* Eating: the food is gone, and the eater nourished by what the food gives
+ * (its #Food's nourishment; none, nothing). How the body keeps it is the
+ * body's (bodies_nourish). */
 @(private = "file")
 effect_eat :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
-	agent: ^Agent
-	fed: i64
-
-	agent = (^Agent)(world_record(world, world_kind_named(world, "Agent"), a.roles[.Actor]))
-	if agent == nil {
+	if world_record(world, world_kind_named(world, "Agent"), a.roles[.Actor]) == nil {
 		return "only an agent eats"
 	}
-	fed = satiety(agent, world_time(world).ms) + 50
-	proposal_group_set_of_to(g, "Agent.fed", whole(a.roles[.Actor]), 100 if fed > 100 else fed)
-	proposal_group_set_of_to(g, "Agent.fedAt", whole(a.roles[.Actor]), world_time(world).ms)
+	food := (^Food)(world_record(world, world_kind_named(world, "Food"), a.roles[.Item]))
+	bodies_nourish(world, g, a.roles[.Actor], food.nourishment if food != nil else 0, world_time(world).ms)
 	proposal_group_destroy(g, whole(a.roles[.Item]), "eaten")
 	return ""
 }
@@ -1062,8 +1059,9 @@ turning_chain :: proc(world: ^World, actor: Entity_ID, chain: ^[2]Entity_ID, cos
  * shortfall, actor modifiers)). Provisional, until the document's open
  * question 4 settles f: modifiers only, and only for a stage that takes
  * effort (its `exertion`); fatigue and injury slow it, 200 / (200 +
- * fatigue + injury): half again as long at 100 of them together. Resting,
- * waiting, talking go at their pace. */
+ * fatigue + injury): half again as long at 100 of them together; and going
+ * without, by the pace it has lost (hunger/weakness.tri). Resting, waiting,
+ * talking go at their pace. */
 work_rate :: proc(world: ^World, actor: Entity_ID, operation: cstring, index: i64) -> i64 {
 	agent: ^Agent
 	worn: i64
@@ -1073,7 +1071,8 @@ work_rate :: proc(world: ^World, actor: Entity_ID, operation: cstring, index: i6
 		return 100
 	}
 	worn = agent.fatigue + agent.injury
-	return 100 * 200 / (200 + (worn if worn > 0 else 0))
+	/* and going without takes its share of what is left (hunger/weakness.tri) */
+	return 100 * 200 / (200 + (worn if worn > 0 else 0)) * (100 - weakness(world, actor, .Pace, world_time(world).ms)) / 100
 }
 
 
@@ -1331,6 +1330,7 @@ effect_rotate :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group)
 	inner = (^Lever)(world_record(world, world_kind_named(world, "Lever"), lever)) if lever != 0 else nil
 
 	applied = agent.grip * best / 10000
+	applied = applied * (100 - weakness(world, actor, .Grip, world_time(world).ms)) / 100   /* going without */
 	if amount > 0 && amount * 1000 < applied {
 		applied = amount * 1000
 	}

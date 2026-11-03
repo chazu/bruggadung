@@ -137,6 +137,7 @@ World :: struct {
 	touching:         ^Index,           /* activities, by actor, item and destination */
 	creations:        ^Index,           /* the "created" events' indices, by what they created */
 	reality:          ^Reality,         /* anchors, levels of detail, leases (REALITY.md) */
+	weakness:         Weakness_Table,   /* hunger's curves, from content (domains_bodies.odin) */
 	settled:          ^Anchors_Kept,    /* the anchors as last settled, to tell what rose */
 	risen:            [^]Entity_ID,     /* what rose from frozen since it was last taken */
 	nrisen:           uint,
@@ -409,6 +410,7 @@ world_init_with_content :: proc(content: ^tri.Content, seed: u64) -> ^World {
 	self.touching = index_new()
 	self.creations = index_new()
 	self.reality = reality_new(content)
+	self.weakness = weakness_load(content)
 	self.arena = tri.arena_new()
 	self.tilesWide = 32
 	self.tilesHigh = 32

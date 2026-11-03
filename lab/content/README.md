@@ -39,8 +39,10 @@ with. It applies to all content, and to every agent and person adding to it.
    the same change.
 4. **A declaration goes with the topic whose meaning it carries.**
    - A field goes with the topic that sets it, added to the root's
-     component kind from the topic's directory: hunger's `fed` is
-     `#Agent: { fed: ... }` in `hunger/body.tri`. A field that several
+     component kind from the topic's directory: work's `hires` is
+     `#Agent: { hires: ... }` in `work/work.tri`. A topic whose fields only
+     some things carry declares a component of its own (hunger's `#Hungry`,
+     in `hunger/body.tri`). A field that several
      topics set (`fatigue`: effort, rest, going without) stays at the root.
    - A frame goes with its goals.
    - A claim (`#Grievance`) goes with the topic it is about. The shapes all
@@ -70,9 +72,10 @@ with. It applies to all content, and to every agent and person adding to it.
 // - abstract: as reduced. How hunger and food work below reduced is open
 //             (DETAIL_REGIMES.md).
 // - frozen:   it doesn't decide, so it doesn't eat; ...
-// - body:     eating sets body.tri's `fed` (50 more, at most 100) and `fedAt`; ...
-// - code:     effect_eat (src/act_actions.odin) feeds the actor and destroys
-//             the food.
+// - body:     eating nourishes the eater by the food's `nourishment`: the
+//             body's code raises its satiety (body.tri). ...
+// - code:     effect_eat (src/act_actions.odin) destroys the food and asks
+//             the body to be nourished (bodies_nourish, domains_bodies.odin).
 ```
 
 The title line names the topic, the part of it the file holds, and the
@@ -88,7 +91,7 @@ cut: the levels of detail first, then other topics, then code.
 | `fastening/` | nuts and spanners; tightening a nut of uncertain size |
 | `harm/` | striking and being struck: hitting back, getting clear |
 | `heat/` | stoves and fuel, the heat of solids, cold |
-| `hunger/` | how fed an agent is (`body.tri`); eating (`eating.tri`) |
+| `hunger/` | satiety and reserves (`body.tri`); what going without weakens (`weakness.tri`); eating and food's nourishment (`eating.tri`) |
 | `institutions/` | laws and the watch (`law.tri`); content, copies, seals and permits (`permits.tri`) |
 | `light/` | daylight and lamps |
 | `machines/` | latent assembly, wear and servicing (`latent.tri`); the pump and its repair (`pump.tri`) |

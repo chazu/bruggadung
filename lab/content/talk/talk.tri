@@ -121,7 +121,7 @@ deny_it: #Lie & {
 notebook: #Record & { material: "paper", mass: 200g }
 
 // Someone with two hands to work with.
-let person = { material: "flesh", hands: 2 }
+let person = #Hungry & { material: "flesh", hands: 2 }
 
 // For KNOWLEDGE.md's first scenario, as "the rumour of the nails": a carter
 // and a porter the apprentice tells, a neighbour who saw it too, and

@@ -4415,3 +4415,31 @@ Objective-C lab's (the hashes in `ci/scenario-hashes.txt` are unchanged).
   never links raylib.
 
 114 tests, 3565 checks, on macOS and Linux; the scenario hashes unchanged.
+
+
+### After the slice: hunger over weeks (VILLAGE.md slice 1, issue #1)
+
+- Hunger is a component of its own, `#Hungry` (content/hunger/body.tri),
+  that people carry: `satiety`, the stomach, emptying over 8 h, felt as
+  hunger as `fed` was; and `reserves`, falling only while the stomach is
+  empty, over 21 days, and refilling over 7 while it isn't. Both are kept
+  as of `fedAt` and computed when read; the bodies domain wakes at the
+  bands, as before, and where reserves run out.
+- Eating no longer does the body's arithmetic: the food says what it gives
+  (`#Food`'s `nourishment`, the supper's 50) and `bodies_nourish` applies
+  it.
+- Weakness (content/hunger/weakness.tri), curves from reserves: attention
+  (the percept budget), the pace of work (`work_rate`), perception (seen as
+  if worn out at half or more lost), grip. Starving injures a point every
+  2 h once reserves are gone, and no longer tires, so a rest doesn't mend
+  it; cold and bad air harm as before.
+- A perceived kind names only the components the senses can tell, and of
+  them the most specific (`view_kind_of`): a person is `#Agent`, not
+  `#Thing & #Hungry & #Body & #Agent`, as nobody can see a stomach.
+- Tests that run for days about something else feed everyone each morning
+  (`test_breakfast`); `going_without` and `starving_sight` test the closed
+  form, the harm and the weakness.
+
+115 tests, 3582 checks. The scenario hashes changed: agents' records have
+`Hungry` in place of `Agent.fed`, and the content's new types move a type
+number in the trace; every scenario's printed trace is otherwise the same.

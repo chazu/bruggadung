@@ -2,7 +2,7 @@
 // besides component fields (ids, places, free hands). Each @component type
 // is one component kind; the features it introduces are its fields, with
 // their field registry flags. A topic adds fields of its own to these kinds,
-// in its directory: hunger's `fed`, on #Agent, is in hunger/body.tri.
+// in its directory: work's `hires`, on #Agent, is in work/work.tri.
 //
 // Cut points:
 // - detail:  none here. What a field does at each level of detail is its
@@ -72,7 +72,7 @@
 // Something that acts, with hands to hold things in, a coat to know it by
 // at a glance, and room in its memory for so many observations
 // (KNOWLEDGE.md §12): past that, the least salient go first. Topics add
-// fields of their own (hunger's `fed`, work's `hires`, valves' `grip`).
+// fields of their own (work's `hires`, valves' `grip`).
 #Agent: #Body & #Handed & {
     @component(Agent)
     hands:         int & >=0 & <=4                  @field(content, saved, inspect, perceive(sight))

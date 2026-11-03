@@ -30,7 +30,7 @@ daylight: #Daylight & { dawn: 6h, nightfall: 18h, twilight: 1h } @family(light)
 lamp:     #Lamp & { material: "brass", mass: 900g, reach: 2 }
 
 // Someone with two hands to work with.
-let person = { material: "flesh", hands: 2 }
+let person = #Hungry & { material: "flesh", hands: 2 }
 
 // For the coat at dusk: someone of the visitor's build, in a brown coat.
 stranger: #Agent & person & { mass: 60kg, coat: "brown" }

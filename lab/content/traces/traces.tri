@@ -190,10 +190,10 @@ look_into_it: #Method & {
 fitting: #Body & { material: "steel", surface: "brass", mass: 400g }
 
 // Someone with two hands to work with.
-let person = { material: "flesh", hands: 2 }
+let person = #Hungry & { material: "flesh", hands: 2 }
 
 // For AGENCY.md's false alarm: the watchman, with supper; the storeroom; and
 // a cat.
 watchman:  #Agent & person & { mass: 80kg, coat: "grey" }
-cat:       #Agent & { material: "flesh", mass: 4kg, hands: 0, coat: "black" }
+cat:       #Agent & #Hungry & { material: "flesh", mass: 4kg, hands: 0, coat: "black" }
 storeroom: #Container & { material: "oak", mass: 200kg, capacity: 1000 }

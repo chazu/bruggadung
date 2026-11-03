@@ -1,16 +1,21 @@
-// Generated from Triangle content 82409220f2de70ec: do not edit. Type IDs are valid
+// Generated from Triangle content b4c48f758dd53ef1: do not edit. Type IDs are valid
 // only for this content; regenerate when it changes.
 package lab
 
 import tri "../../triangle/odin/triangle"
 
-CONTENT_HASH :: 0x82409220f2de70ec
+CONTENT_HASH :: 0xb4c48f758dd53ef1
 
 // Combustor, from #Combustor
 Combustor :: struct {
 	burnRate: i64,    // int, in quanta of 1; content, saved, inspect
 	damper: bool,    // bool; content, saved, proposable, inspect, perceive(sight)
 	lit: bool,    // bool; content, saved, proposable, inspect, perceive(sight)
+}
+
+// Food, from #Food
+Food :: struct {
+	nourishment: i64,    // int, in quanta of 1; content, saved, inspect
 }
 
 // FuelContainer, from #FuelContainer
@@ -28,6 +33,17 @@ Gas_Store :: struct {
 	gasHeat: i64,    // int, in quanta of 1; content, saved, proposable, inspect
 	oxygen: i64,    // int, in quanta of 1; content, saved, proposable, inspect
 	total: i64,    // int, in quanta of 1; content, saved, inspect
+}
+
+// Hungry, from #Hungry
+Hungry :: struct {
+	emptiesIn: i64,    // time, in quanta of 1ms; content, saved, inspect
+	fedAt: i64,    // time, in quanta of 1ms; content, saved, proposable, inspect
+	harmsEvery: i64,    // time, in quanta of 1ms; content, saved, inspect
+	lastsFor: i64,    // time, in quanta of 1ms; content, saved, inspect
+	refillsIn: i64,    // time, in quanta of 1ms; content, saved, inspect
+	reserves: i64,    // int, in quanta of 1; content, saved, proposable, inspect
+	satiety: i64,    // int, in quanta of 1; content, saved, proposable, inspect
 }
 
 // Lever, from #Lever
@@ -154,8 +170,6 @@ Agent :: struct {
 	curious: i64,    // int, in quanta of 1; content, saved, proposable, inspect
 	diligent: i64,    // int, in quanta of 1; content, saved, proposable, inspect
 	fatigue: i64,    // int, in quanta of 1; content, saved, proposable, inspect
-	fed: i64,    // int, in quanta of 1; content, saved, proposable, inspect
-	fedAt: i64,    // time, in quanta of 1ms; content, saved, proposable, inspect
 	gentle: i64,    // int, in quanta of 1; content, saved, proposable, inspect
 	grip: i64,    // force, in quanta of 0.001N; content, saved, inspect
 	hands: i64,    // int, in quanta of 1; content, saved, inspect, perceive(sight)
@@ -320,66 +334,66 @@ Fastener :: struct {
 }
 
 // #ActivityStatus
-ACTIVITYSTATUS_ABORTED :: 441
-ACTIVITYSTATUS_COMPLETED :: 442
-ACTIVITYSTATUS_EXHAUSTED :: 443
-ACTIVITYSTATUS_FAILED :: 444
-ACTIVITYSTATUS_RUNNING :: 445
-ACTIVITYSTATUS_SUSPENDED :: 446
+ACTIVITYSTATUS_ABORTED :: 450
+ACTIVITYSTATUS_COMPLETED :: 451
+ACTIVITYSTATUS_EXHAUSTED :: 452
+ACTIVITYSTATUS_FAILED :: 453
+ACTIVITYSTATUS_RUNNING :: 454
+ACTIVITYSTATUS_SUSPENDED :: 455
 
 // #Tie
-TIE_EMPLOY :: 530
-TIE_FRIEND :: 531
-TIE_KIN :: 532
-TIE_SWORN :: 533
+TIE_EMPLOY :: 539
+TIE_FRIEND :: 540
+TIE_KIN :: 541
+TIE_SWORN :: 542
 
 // #ClaimKind
-CLAIMKIND_CUSTODY :: 448
-CLAIMKIND_OWNERSHIP :: 449
-CLAIMKIND_RESERVATION :: 450
+CLAIMKIND_CUSTODY :: 457
+CLAIMKIND_OWNERSHIP :: 458
+CLAIMKIND_RESERVATION :: 459
 
 // #Penalty
-PENALTY_FINE :: 518
-PENALTY_ARREST :: 549
-PENALTY_CONFISCATE :: 550
+PENALTY_FINE :: 527
+PENALTY_ARREST :: 558
+PENALTY_CONFISCATE :: 559
 
 // #Wrong
-WRONG_ANOTHERS :: 541
-WRONG_UNAUTHORIZED :: 542
+WRONG_ANOTHERS :: 550
+WRONG_UNAUTHORIZED :: 551
 
 // #Material
-MATERIAL_CLOTH :: 505
-MATERIAL_FOOD :: 506
-MATERIAL_LEATHER :: 507
-MATERIAL_RUBBER :: 508
-MATERIAL_STONE :: 509
-MATERIAL_FLESH :: 552
-MATERIAL_BRASS :: 554
-MATERIAL_IRON :: 555
-MATERIAL_PAPER :: 556
-MATERIAL_STEEL :: 557
-MATERIAL_OAK :: 559
+MATERIAL_CLOTH :: 514
+MATERIAL_FOOD :: 515
+MATERIAL_LEATHER :: 516
+MATERIAL_RUBBER :: 517
+MATERIAL_STONE :: 518
+MATERIAL_FLESH :: 561
+MATERIAL_BRASS :: 563
+MATERIAL_IRON :: 564
+MATERIAL_PAPER :: 565
+MATERIAL_STEEL :: 566
+MATERIAL_OAK :: 568
 
 // "flesh" | "metal" | "natural" | "paper" | "wood"
-BODY_SURFACE_NATURAL :: 344
-BODY_SURFACE_FLESH :: 552
-BODY_SURFACE_BRASS :: 554
-BODY_SURFACE_IRON :: 555
-BODY_SURFACE_PAPER :: 556
-BODY_SURFACE_STEEL :: 557
-BODY_SURFACE_OAK :: 559
+BODY_SURFACE_NATURAL :: 351
+BODY_SURFACE_FLESH :: 561
+BODY_SURFACE_BRASS :: 563
+BODY_SURFACE_IRON :: 564
+BODY_SURFACE_PAPER :: 565
+BODY_SURFACE_STEEL :: 566
+BODY_SURFACE_OAK :: 568
 
 // #Colour
-COLOUR_BLUE :: 453
-COLOUR_BLACK :: 455
-COLOUR_BROWN :: 456
-COLOUR_GREEN :: 457
-COLOUR_GREY :: 458
-COLOUR_NAVY :: 459
-COLOUR_RED :: 460
-COLOUR_YELLOW :: 461
-COLOUR_BEIGE :: 478
-COLOUR_WHITE :: 501
+COLOUR_BLUE :: 462
+COLOUR_BLACK :: 464
+COLOUR_BROWN :: 465
+COLOUR_GREEN :: 466
+COLOUR_GREY :: 467
+COLOUR_NAVY :: 468
+COLOUR_RED :: 469
+COLOUR_YELLOW :: 470
+COLOUR_BEIGE :: 487
+COLOUR_WHITE :: 510
 
 // The field registry: what code needs to read and write any component
 // generically.
@@ -407,12 +421,15 @@ Component_Info :: struct {
 	fields:  [^]Field_Info,
 }
 
-COMPONENT_COUNT :: 38
+COMPONENT_COUNT :: 40
 
 @(rodata) Combustor_fields := [?]Field_Info{
 	{"burnRate", offset_of(Combustor, burnRate), VALUE_QUANTITY, "int", "content, saved, inspect"},
 	{"damper", offset_of(Combustor, damper), VALUE_BOOL, "bool", "content, saved, proposable, inspect, perceive(sight)"},
 	{"lit", offset_of(Combustor, lit), VALUE_BOOL, "bool", "content, saved, proposable, inspect, perceive(sight)"},
+}
+@(rodata) Food_fields := [?]Field_Info{
+	{"nourishment", offset_of(Food, nourishment), VALUE_QUANTITY, "int", "content, saved, inspect"},
 }
 @(rodata) Fuel_Container_fields := [?]Field_Info{
 	{"fuel", offset_of(Fuel_Container, fuel), VALUE_QUANTITY, "mass", "content, saved, proposable, inspect"},
@@ -426,6 +443,15 @@ COMPONENT_COUNT :: 38
 	{"gasHeat", offset_of(Gas_Store, gasHeat), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
 	{"oxygen", offset_of(Gas_Store, oxygen), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
 	{"total", offset_of(Gas_Store, total), VALUE_QUANTITY, "int", "content, saved, inspect"},
+}
+@(rodata) Hungry_fields := [?]Field_Info{
+	{"emptiesIn", offset_of(Hungry, emptiesIn), VALUE_QUANTITY, "time", "content, saved, inspect"},
+	{"fedAt", offset_of(Hungry, fedAt), VALUE_QUANTITY, "time", "content, saved, proposable, inspect"},
+	{"harmsEvery", offset_of(Hungry, harmsEvery), VALUE_QUANTITY, "time", "content, saved, inspect"},
+	{"lastsFor", offset_of(Hungry, lastsFor), VALUE_QUANTITY, "time", "content, saved, inspect"},
+	{"refillsIn", offset_of(Hungry, refillsIn), VALUE_QUANTITY, "time", "content, saved, inspect"},
+	{"reserves", offset_of(Hungry, reserves), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
+	{"satiety", offset_of(Hungry, satiety), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
 }
 @(rodata) Lever_fields := [?]Field_Info{
 	{"leverage", offset_of(Lever, leverage), VALUE_QUANTITY, "length", "content, saved, inspect, perceive(sight)"},
@@ -522,8 +548,6 @@ COMPONENT_COUNT :: 38
 	{"curious", offset_of(Agent, curious), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
 	{"diligent", offset_of(Agent, diligent), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
 	{"fatigue", offset_of(Agent, fatigue), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
-	{"fed", offset_of(Agent, fed), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
-	{"fedAt", offset_of(Agent, fedAt), VALUE_QUANTITY, "time", "content, saved, proposable, inspect"},
 	{"gentle", offset_of(Agent, gentle), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
 	{"grip", offset_of(Agent, grip), VALUE_QUANTITY, "force", "content, saved, inspect"},
 	{"hands", offset_of(Agent, hands), VALUE_QUANTITY, "int", "content, saved, inspect, perceive(sight)"},
@@ -649,8 +673,10 @@ COMPONENT_COUNT :: 38
 
 COMPONENTS := [COMPONENT_COUNT + 1]Component_Info{
 	{"Combustor", "#Combustor", size_of(Combustor), 3, &Combustor_fields[0]},
+	{"Food", "#Food", size_of(Food), 1, &Food_fields[0]},
 	{"FuelContainer", "#FuelContainer", size_of(Fuel_Container), 1, &Fuel_Container_fields[0]},
 	{"GasStore", "#GasStore", size_of(Gas_Store), 8, &Gas_Store_fields[0]},
+	{"Hungry", "#Hungry", size_of(Hungry), 7, &Hungry_fields[0]},
 	{"Lever", "#Lever", size_of(Lever), 3, &Lever_fields[0]},
 	{"OfficeHolder", "#OfficeHolder", size_of(Office_Holder), 2, &Office_Holder_fields[0]},
 	{"Respirator", "#Respirator", size_of(Respirator), 4, &Respirator_fields[0]},
@@ -665,7 +691,7 @@ COMPONENTS := [COMPONENT_COUNT + 1]Component_Info{
 	{"Law", "#Law", size_of(Law), 6, &Law_fields[0]},
 	{"Organization", "#Organization", size_of(Organization), 1, &Organization_fields[0]},
 	{"Body", "#Body", size_of(Body), 5, &Body_fields[0]},
-	{"Agent", "#Agent", size_of(Agent), 26, &Agent_fields[0]},
+	{"Agent", "#Agent", size_of(Agent), 24, &Agent_fields[0]},
 	{"Assembly", "#Assembly", size_of(Assembly), 1, &Assembly_fields[0]},
 	{"Cock", "#Cock", size_of(Cock), 2, &Cock_fields[0]},
 	{"Container", "#Container", size_of(Container), 1, &Container_fields[0]},

@@ -198,7 +198,7 @@ fight_off: #Method & {
 } @family(methods)
 
 // Someone with two hands to work with.
-let person = { material: "flesh", hands: 2 }
+let person = #Hungry & { material: "flesh", hands: 2 }
 
 // The town's watch (INSTITUTIONS.md decision 4): it acts for the town only
 // as its members do.

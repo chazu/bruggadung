@@ -2323,8 +2323,8 @@ test_tired_worker :: proc() {
 	/* exhausted, it would feel hunger only to the twenty: at 90, its 30 is felt 20 */
 	g = proposal_group_group_with_phase(.System, "setup: worn out, and hungrier")
 	proposal_group_set_of_to(g, "Agent.fatigue", whole(worker), 90)
-	proposal_group_set_of_to(g, "Agent.fed", whole(worker), 70)
-	proposal_group_set_of_to(g, "Agent.fedAt", whole(worker), world_time(st.w).ms)
+	proposal_group_set_of_to(g, "Hungry.satiety", whole(worker), 70)
+	proposal_group_set_of_to(g, "Hungry.fedAt", whole(worker), world_time(st.w).ms)
 	committer_submit(st.c, g)
 	scheduler_run_until(st.s, time_make(world_time(st.w).ms + 2))
 	bg_check(knowledge_store_feels(knowledge_store_of(knowledge, worker), "hunger") == 20 &&
@@ -3726,6 +3726,7 @@ ALL_TESTS := [?]Test_Case{
 	{"memory_decay",                  test_memory_decay},
 	{"salience",                      test_salience},
 	{"going_without",                 test_going_without},
+	{"starving_sight",                test_starving_sight},
 	{"doubts",                        test_doubts},
 	{"account",                       test_account},
 	{"shortfall",                     test_shortfall},

@@ -81,7 +81,7 @@ room_door:  #Door & { material: "oak", mass: 30kg, wide: 5000 }
 
 // someone to rest by the stove: at 310 K, 70 kg at 3.5 kJ/kg/K, abed and
 // clothed (4 W/K)
-lodger: #Agent & #Respirator & #ThermalBody & {
+lodger: #Agent & #Hungry & #Respirator & #ThermalBody & {
     material: "flesh", mass: 70kg, hands: 2, coat: "grey",
     atRest: 190, atWork: 600, restsAbove: 0, restsBelow: 0,
     heat: 75950000, heatCapacity: 245000, toAir: 4, toOutdoors: 0 }
