@@ -15,6 +15,7 @@ implements a method settles its signature, and callers follow it.
   - `BGRoleDestination` → `.Destination`
   - `BGRoleCount` → `.Count`
 - type `BGAction` → `Action` (struct)
+- global `BGRoleNames[ BGRoleCount]` → `ROLE_NAMES` (a table)
 - function `BGActionMake` → `action_make`
 - function `BGMatchAction` → `match_action`
 - function `BGPerform` → `perform`
@@ -111,7 +112,7 @@ implements a method settles its signature, and callers follow it.
 - class `BGMotivation` → `Motivation` (`^Motivation`)
 - class `BGAgency` <BGDecisionPhase, BGSavedSystem, BGConcerns> → `Agency` (`^Agency`)
   - `-decisions` → `agency_decisions` :: proc(self: ^Agency) -> u64
-  - `-initWithWorld:committer:knowledge:` → `agency_init_with_world` :: proc(self: ^Agency, world: ^World, committer: ^Committer, knowledge: ^Knowledge) -> rawptr
+  - `-initWithWorld:committer:knowledge:` → `agency_init_with_world` :: proc(world: ^World, committer: ^Committer, knowledge: ^Knowledge) -> ^Agency
   - `-control:` → `agency_control` :: proc(self: ^Agency, agent: Entity_ID)
   - `-commit:toGoal:` → `agency_commit` :: proc(self: ^Agency, agent: Entity_ID, goal: cstring) -> bool
   - `-undertake:goal:from:until:source:` → `agency_undertake_goal_from_until_source` :: proc(self: ^Agency, agent: Entity_ID, goal: cstring, from: i64, until: i64, source: cstring) -> bool
@@ -136,7 +137,7 @@ implements a method settles its signature, and callers follow it.
 - protocol `BGRoundListener` → `Round_Listener` (a struct of procs, `data: rawptr` first: PORTING.md)
   - `-committer:didCommitRound:eventsFrom:to:` → `did_commit_round` :: proc(data: rawptr, committer: ^Committer, round: u32, first: uint, last: uint)
 - class `BGCommitter` → `Committer` (`^Committer`)
-  - `-initWithWorld:` → `committer_init_with_world` :: proc(self: ^Committer, world: ^World) -> rawptr
+  - `-initWithWorld:` → `committer_init_with_world` :: proc(world: ^World) -> ^Committer
   - `-world` → `committer_world` :: proc(self: ^Committer) -> ^World
   - `-setRounds:` → `committer_set_rounds` :: proc(self: ^Committer, rounds: uint)
   - `-addReactor:forKind:` → `committer_add_reactor` :: proc(self: ^Committer, reactor: Reactor, kind: cstring)
@@ -173,6 +174,7 @@ implements a method settles its signature, and callers follow it.
   - `BGProposeEvent` → `.Event`
   - `BGProposeSetTerrain` → `.Set_Terrain`
 - type `BGProposal` → `Proposal` (struct)
+- global `BGPhaseNames[ BGPhaseCount]` → `PHASE_NAMES` (a table)
 - function `BGWhole` → `whole`
 - function `BGUnit` → `unit`
 - class `BGProposalGroup` → `Proposal_Group` (`^Proposal_Group`)
@@ -214,6 +216,7 @@ implements a method settles its signature, and callers follow it.
 
 ## core/BGIndex.h
 
+- type `BGIndex` → `Index` (opaque: the module that has it defines it)
 - function `BGIndexNew` → `index_new`
 - function `BGIndexFree` → `index_free`
 - function `BGIndexClear` → `index_clear`
@@ -243,6 +246,8 @@ implements a method settles its signature, and callers follow it.
   - `BGDetailReduced` → `.Reduced`
   - `BGDetailFull` → `.Full`
 - type `BGReach` → `Reach` (struct)
+- type `BGReality` → `Reality` (opaque: the module that has it defines it)
+- type `BGAnchorsKept` → `Anchors_Kept` (opaque: the module that has it defines it)
 - function `BGRealityNew` → `reality_new`
 - function `BGRealityFree` → `reality_free`
 - function `BGDetailName` → `detail_name`
@@ -276,7 +281,7 @@ implements a method settles its signature, and callers follow it.
 ## core/BGStore.h
 
 - class `BGStore` → `Store` (`^Store`)
-  - `-initWithRecordSize:` → `store_init_with_record_size` :: proc(self: ^Store, size: uint) -> rawptr
+  - `-initWithRecordSize:` → `store_init_with_record_size` :: proc(size: uint) -> ^Store
   - `-recordSize` → `store_record_size` :: proc(self: ^Store) -> uint
   - `-count` → `store_count` :: proc(self: ^Store) -> uint
   - `-entityAtIndex:` → `store_entity_at_index` :: proc(self: ^Store, i: uint) -> Entity_ID
@@ -294,6 +299,7 @@ implements a method settles its signature, and callers follow it.
 - constant `BG_CHUNK` → `BG_CHUNK`
 - constant `BG_MAX_TERRAIN` → `BG_MAX_TERRAIN`
 - constant `BG_ROOM_MAX` → `BG_ROOM_MAX`
+- type `BGTerrain` → `Terrain` (opaque: the module that has it defines it)
 - function `BGTerrainNew` → `terrain_new`
 - function `BGTerrainFromMap` → `terrain_from_map`
 - function `BGTerrainFree` → `terrain_free`
@@ -309,6 +315,7 @@ implements a method settles its signature, and callers follow it.
 - function `BGTerrainOpaque` → `terrain_opaque`
 - function `BGTerrainFloored` → `terrain_floored`
 - function `BGTerrainSet` → `terrain_set`
+- function `BGTerrainChanged` → `terrain_changed`
 - function `BGTerrainChunkCells` → `terrain_chunk_cells`
 - function `BGTerrainSource` → `terrain_source`
 - function `BGTerrainHash` → `terrain_hash`
@@ -316,6 +323,7 @@ implements a method settles its signature, and callers follow it.
 - function `BGTerrainRoomAt` → `terrain_room_at`
 - function `BGTerrainRoomSize` → `terrain_room_size`
 - function `BGTerrainRoomCorner` → `terrain_room_corner`
+- function `BGTerrainRoomDoorways` → `terrain_room_doorways`
 - function `BGTerrainRoomsDropped` → `terrain_rooms_dropped`
 
 ## core/BGTypes.h
@@ -328,7 +336,7 @@ implements a method settles its signature, and callers follow it.
   - `BGLocationHeldBy` → `.Held_By`
   - `BGLocationPartOf` → `.Part_Of`
 - type `BGLocation` → `Location` (struct)
-- type `BGEntityID` → `Entity_Id` (= u64)
+- type `BGEntityID` → `Entity_ID` (= u64)
 - constant `BGNoEntity` → `NO_ENTITY`
 - constant `BGHandleBit` → `HANDLE_BIT`
 - macro `BGHandle( n)` → `handle` (a proc)
@@ -348,6 +356,8 @@ implements a method settles its signature, and callers follow it.
 
 ## core/BGWakes.h
 
+- type `BGWakes` → `Wakes` (opaque: the module that has it defines it)
+- type `BGWakeTime` → `Wake_Time` (a procedure type)
 - function `BGWakesNew` → `wakes_new`
 - function `BGWakesFree` → `wakes_free`
 - function `BGWakesClear` → `wakes_clear`
@@ -371,6 +381,7 @@ implements a method settles its signature, and callers follow it.
 - type `BGEdge` → `Edge` (struct)
 - type `BGEvent` → `Event` (struct)
 - type `BGAirOpening` → `Air_Opening` (struct)
+- global `BGEdgeKindNames[ BGEdgeKindCount]` → `EDGE_KIND_NAMES` (a table)
 - protocol `BGRecordObserver` → `Record_Observer` (a struct of procs, `data: rawptr` first: PORTING.md)
   - `-world:changedRecord:kind:` → `changed_record` :: proc(data: rawptr, world: rawptr, entity: Entity_ID, kind: uint)
 - class `BGWorld` → `World` (`^World`)
@@ -492,7 +503,7 @@ implements a method settles its signature, and callers follow it.
 - type `BGBreather` → `Breather` (struct)
 - type `BGAirLedger` → `Air_Ledger` (struct)
 - class `BGAtmosphere` <BGCoupledDomain> → `Atmosphere` (`^Atmosphere`)
-  - `-initWithWorld:` → `atmosphere_init_with_world` :: proc(self: ^Atmosphere, world: ^World) -> rawptr
+  - `-initWithWorld:` → `atmosphere_init_with_world` :: proc(world: ^World) -> ^Atmosphere
   - `-balanced` → `atmosphere_balanced` :: proc(self: ^Atmosphere) -> bool
   - `-sent` → `atmosphere_sent` :: proc(self: ^Atmosphere) -> i64
   - `-steps` → `atmosphere_steps` :: proc(self: ^Atmosphere) -> uint
@@ -514,7 +525,7 @@ implements a method settles its signature, and callers follow it.
 - function `BGColdness` → `coldness`
 - function `BGBreathlessness` → `breathlessness`
 - class `BGBodies` <BGDomain> → `Bodies` (`^Bodies`)
-  - `-initWithWorld:` → `bodies_init_with_world` :: proc(self: ^Bodies, world: ^World) -> rawptr
+  - `-initWithWorld:` → `bodies_init_with_world` :: proc(world: ^World) -> ^Bodies
 
 ## domains/BGFluidDomain.h
 
@@ -523,7 +534,7 @@ implements a method settles its signature, and callers follow it.
 - constant `BG_FLUID_MAX` → `BG_FLUID_MAX`
 - constant `BG_SPREAD_TAU` → `BG_SPREAD_TAU`
 - class `BGFluidDomain` <BGDomain> → `Fluid_Domain` (`^Fluid_Domain`)
-  - `-initWithWorld:` → `fluid_domain_init_with_world` :: proc(self: ^Fluid_Domain, world: ^World) -> rawptr
+  - `-initWithWorld:` → `fluid_domain_init_with_world` :: proc(world: ^World) -> ^Fluid_Domain
   - `-setReversedOrder:` → `fluid_domain_set_reversed_order` :: proc(self: ^Fluid_Domain, flag: bool)
   - `-checkedOutWater` → `fluid_domain_checked_out_water` :: proc(self: ^Fluid_Domain) -> i64
   - `-predictedExhaustion` → `fluid_domain_predicted_exhaustion` :: proc(self: ^Fluid_Domain) -> Time
@@ -535,13 +546,13 @@ implements a method settles its signature, and callers follow it.
 - function `BGDaylight` → `daylight`
 - function `BGLampOil` → `lamp_oil`
 - class `BGLight` <BGDomain> → `Light` (`^Light`)
-  - `-initWithWorld:` → `light_init_with_world` :: proc(self: ^Light, world: ^World) -> rawptr
+  - `-initWithWorld:` → `light_init_with_world` :: proc(world: ^World) -> ^Light
 
 ## domains/BGThermal.h
 
 - type `BGThermalState` → `Thermal_State` (struct)
 - class `BGThermal` <BGCoupledDomain> → `Thermal` (`^Thermal`)
-  - `-initWithWorld:` → `thermal_init_with_world` :: proc(self: ^Thermal, world: ^World) -> rawptr
+  - `-initWithWorld:` → `thermal_init_with_world` :: proc(world: ^World) -> ^Thermal
   - `-balanced` → `thermal_balanced` :: proc(self: ^Thermal) -> bool
   - `-received` → `thermal_received` :: proc(self: ^Thermal) -> i64
   - `-pending` → `thermal_pending` :: proc(self: ^Thermal) -> i64
@@ -560,7 +571,7 @@ implements a method settles its signature, and callers follow it.
 - function `BGTraceGone` → `trace_gone`
 - function `BGLoudness` → `loudness`
 - class `BGTraces` <BGDomain> → `Traces` (`^Traces`)
-  - `-initWithWorld:` → `traces_init_with_world` :: proc(self: ^Traces, world: ^World) -> rawptr
+  - `-initWithWorld:` → `traces_init_with_world` :: proc(world: ^World) -> ^Traces
 
 ## kinds/BGBodyKind.h
 
@@ -708,7 +719,7 @@ implements a method settles its signature, and callers follow it.
   - `-agentsPerceivedNow:` → `knowledge_agents_perceived_now` :: proc(self: ^Knowledge, n: ^uint) -> ^Entity_ID
   - `-touchedNow:` → `knowledge_touched_now` :: proc(self: ^Knowledge, entity: Entity_ID) -> bool
   - `-perceptions` → `knowledge_perceptions` :: proc(self: ^Knowledge) -> u64
-  - `-initWithWorld:` → `knowledge_init_with_world` :: proc(self: ^Knowledge, world: ^World) -> rawptr
+  - `-initWithWorld:` → `knowledge_init_with_world` :: proc(world: ^World) -> ^Knowledge
   - `-setOmniscient:` → `knowledge_set_omniscient` :: proc(self: ^Knowledge, flag: bool)
   - `-setAmbient:` → `knowledge_set_ambient` :: proc(self: ^Knowledge, light: i32)
   - `-setLight:` → `knowledge_set_light` :: proc(self: ^Knowledge, light: rawptr)
@@ -750,7 +761,7 @@ implements a method settles its signature, and callers follow it.
   - `BGCisternStopsEarly` → `.Stops_Early`
 - class `BGCistern` <BGInputSource, BGSchedulerObserver> → `Cistern` (`^Cistern`)
   - `+nameOf:` → `cistern_name_of` :: proc(variant: Cistern_Variant) -> string
-  - `-initWithWorld:committer:variant:` → `cistern_init_with_world` :: proc(self: ^Cistern, world: ^World, committer: ^Committer, variant: Cistern_Variant) -> rawptr
+  - `-initWithWorld:committer:variant:` → `cistern_init_with_world` :: proc(world: ^World, committer: ^Committer, variant: Cistern_Variant) -> ^Cistern
   - `-run` → `cistern_run` :: proc(self: ^Cistern)
   - `-runUntil:` → `cistern_run_until` :: proc(self: ^Cistern, t: Time)
   - `-resumeWithWorld:committer:fluidState:` → `cistern_resume_with_world` :: proc(self: ^Cistern, world: ^World, committer: ^Committer, state: []T)
@@ -770,7 +781,7 @@ implements a method settles its signature, and callers follow it.
   - `BGMarkedNailMixedGoods` → `.Mixed_Goods`
 - class `BGMarkedNail` <BGInputSource, BGSchedulerObserver> → `Marked_Nail` (`^Marked_Nail`)
   - `+nameOf:` → `marked_nail_name_of` :: proc(variant: Marked_Nail_Variant) -> string
-  - `-initWithWorld:committer:variant:` → `marked_nail_init_with_world` :: proc(self: ^Marked_Nail, world: ^World, committer: ^Committer, variant: Marked_Nail_Variant) -> rawptr
+  - `-initWithWorld:committer:variant:` → `marked_nail_init_with_world` :: proc(world: ^World, committer: ^Committer, variant: Marked_Nail_Variant) -> ^Marked_Nail
   - `-run` → `marked_nail_run` :: proc(self: ^Marked_Nail)
   - `-runUntil:` → `marked_nail_run_until` :: proc(self: ^Marked_Nail, t: Time)
   - `-resumeWithWorld:committer:` → `marked_nail_resume_with_world` :: proc(self: ^Marked_Nail, world: ^World, committer: ^Committer)
@@ -832,7 +843,7 @@ implements a method settles its signature, and callers follow it.
 - protocol `BGSchedulerObserver` → `Scheduler_Observer` (a struct of procs, `data: rawptr` first: PORTING.md)
   - `-scheduler:didCommitBoundary:groups:` → `did_commit_boundary` :: proc(data: rawptr, scheduler: ^Scheduler, boundary: u64, groups: []T)
 - class `BGScheduler` → `Scheduler` (`^Scheduler`)
-  - `-initWithWorld:committer:` → `scheduler_init_with_world` :: proc(self: ^Scheduler, world: ^World, committer: ^Committer) -> rawptr
+  - `-initWithWorld:committer:` → `scheduler_init_with_world` :: proc(world: ^World, committer: ^Committer) -> ^Scheduler
   - `-addDomain:` → `scheduler_add_domain` :: proc(self: ^Scheduler, domain: Domain)
   - `-setInputs:` → `scheduler_set_inputs` :: proc(self: ^Scheduler, inputs: Input_Source)
   - `-setActivities:` → `scheduler_set_activities` :: proc(self: ^Scheduler, activities: Activity_Clock)
@@ -853,6 +864,8 @@ implements a method settles its signature, and callers follow it.
 
 - type `BGTestCase` → `Test_Case` (struct)
 - macro `BG_CHECK( cond)` → `bg_check` (a proc)
+- global `BGContentDir` → `content_dir` (a variable)
+- type `BGTestFunction` → `Test_Function` (a procedure type)
 - function `BGTestCheck` → `test_check`
 - function `BGLoadContent` → `load_content`
 - function `BGTestWorld` → `test_world`

@@ -20,6 +20,8 @@ jobs:
         run: sh lab/ci/odin/install-odin.sh "$RUNNER_TEMP/odin" >> "$GITHUB_PATH"
       - name: Tessera and the Odin spike
         run: make -C tessera test && make -C triangle odin && make -C lab odin-spike
+      - name: Lab in Odin
+        run: make -C lab odin-check
 
   linux:
     runs-on: ubuntu-24.04
@@ -35,6 +37,8 @@ jobs:
         run: |
           docker build -t bruggadung-odin lab/ci/odin
           docker run --rm -v "$PWD":/repo -w /repo bruggadung-odin sh -c 'make -C tessera test && make -C triangle odin && make -C lab odin-spike'
+      - name: Lab in Odin
+        run: docker run --rm -v "$PWD":/repo -w /repo/lab bruggadung-odin make odin-check
 
   windows:
     runs-on: windows-latest

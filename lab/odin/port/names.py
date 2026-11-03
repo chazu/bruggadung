@@ -42,7 +42,9 @@ def snake(name):
 
 
 def ada(name):
-    return '_'.join(p[:1].upper() + p[1:] for p in snake(name).split('_'))
+    out = '_'.join(p[:1].upper() + p[1:] for p in snake(name).split('_'))
+    # an initialism stays one: EntityID -> Entity_ID, not Entity_Id
+    return re.sub(r'_Id$', '_ID', re.sub(r'_Id_', '_ID_', out))
 
 
 def safe(name):
@@ -207,10 +209,32 @@ def main():
                 print(f'- macro `{name}{args}` → `{safe(snake(strip_bg(name)))}` (a proc)')
             else:
                 print(f'- constant `{name}` → `{snake(strip_bg(name)).upper()}`')
-        # functions (prototypes and static inlines)
-        for m in re.finditer(r'^(?:static inline\s+)?([A-Za-z_][\w \*]*?)\s*\b(BG\w+)\s*\(([^)]*)\)\s*[;{]', text, re.M):
-            ret, name, args = m.groups()
-            if ret.strip() in ('return', 'typedef', '#define') or name.endswith('_H'):
+        # extern globals: a table of constants is SCREAMING, a variable snake
+        for m in re.finditer(r'^extern\s+([^;]*?)\b(BG\w+)\s*(\[[^\]]*\])?\s*;', text, re.M):
+            ctype, name, arr = m.groups()
+            if arr:
+                print(f'- global `{name}{arr}` → `{snake(strip_bg(name)).upper()}` (a table)')
+            else:
+                print(f'- global `{name}` → `{snake(strip_bg(name))}` (a variable)')
+        # opaque and function-pointer typedefs
+        for m in re.finditer(r'typedef\s+struct\s+(\w+)\s+(\w+)\s*;', text):
+            name = m.group(2)
+            print(f'- type `{name}` → `{ada(strip_bg(name))}` (opaque: the module that has it defines it)')
+        for m in re.finditer(r'typedef\s+[^;()]*\(\s*\*\s*(\w+)\s*\)\s*\(', text):
+            name = m.group(1)
+            print(f'- type `{name}` → `{ada(strip_bg(name))}` (a procedure type)')
+        # functions (prototypes and static inlines), parameters balanced so
+        # a pointer to an array, (*corners)[3], is one
+        for m in re.finditer(r'^(?:static inline\s+)?([A-Za-z_][\w \*]*?)\s*\b(BG\w+)\s*\(', text, re.M):
+            ret, name = m.groups()
+            if ret.strip() in ('return', 'typedef', '#define') or name.endswith('_H') or ret.strip().startswith('typedef'):
+                continue
+            depth, j = 1, m.end()
+            while j < len(text) and depth:
+                depth += {'(': 1, ')': -1}.get(text[j], 0)
+                j += 1
+            after = text[j:j + 40].lstrip()
+            if not after or after[0] not in ';{':
                 continue
             print(f'- function `{name}` → `{safe(snake(strip_bg(name)))}`')
         # protocols and classes
@@ -225,11 +249,12 @@ def main():
             names = method_names(strip_bg(name), methods, label == 'protocol')
             for (kind, sel, params, ret), n in zip(methods, names):
                 objc = kind + ''.join(f'{k}:' for k in sel) if params else kind + sel[0]
-                ps = ([] if kind == '+' or label == 'protocol' else [f'self: ^{od}'])
+                is_init = kind == '-' and sel[0].startswith('init')
+                ps = ([] if kind == '+' or label == 'protocol' or is_init else [f'self: ^{od}'])
                 if label == 'protocol':
                     ps = ['data: rawptr']
                 ps += [f'{safe(p)}: {odin_type(t)}' for p, t in params]
-                r = f'^{od}' if ret == 'instancetype' else odin_type(ret)
+                r = f'^{od}' if ret == 'instancetype' or is_init else odin_type(ret)
                 sig = f'proc({", ".join(ps)})' + (f' -> {r}' if r else '')
                 field = n[len(snake(strip_bg(name))) + 1:] if label == 'protocol' else n
                 print(f'  - `{objc}` → `{field}` :: {sig}')

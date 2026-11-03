@@ -10,8 +10,11 @@
 #   make scenarios    each scenario's hashes, for ci/scenario-hashes.txt
 #   make gen          src/generated/BGComponents.h and odin/components.odin,
 #                     from content/
-#   make odin-spike   the Odin spike (odin/main.odin): Triangle linked into
+#   make odin-spike   the Odin spike (odin/spike): Triangle linked into
 #                     Odin, the content hash, formatting against printf
+#   make odin-lab     the lab's Odin port (odin/): build/<platform>/lab-odin
+#   make odin-check   the port's tests, and every scenario's hashes against
+#                     ci/scenario-hashes.txt, as `make check` does
 #   make clean
 #
 # XFLAGS adds flags to every compile and link (an -isysroot, say).
@@ -64,7 +67,7 @@ OBJ      = $(LAB_SRC:%.m=$(BUILD)/obj/%.o) $(BUILD)/obj/triangle/BGContent.o \
            $(TRI_SRC:$(TRIANGLE)/src/%.c=$(BUILD)/obj/triangle/%.o)
 LAB      = $(BUILD)/lab$(EXE)
 
-.PHONY: all test check asan scenarios gen odin-spike clean
+.PHONY: all test check asan scenarios gen odin-spike odin-lab odin-check clean
 
 all: $(LAB)
 
@@ -109,6 +112,17 @@ odin-spike:
 	@mkdir -p $(BUILD)
 	odin build odin/spike -vet -strict-style -out:$(BUILD)/odin-spike$(EXE)
 	./$(BUILD)/odin-spike$(EXE)
+
+ODIN_LAB = $(BUILD)/lab-odin$(EXE)
+
+odin-lab:
+	$(MAKE) -C $(TRIANGLE) odin-lib
+	@mkdir -p $(BUILD)
+	odin build odin -vet -strict-style -out:$(ODIN_LAB)
+
+odin-check: odin-lab
+	./$(ODIN_LAB) test $(TEST)
+	sh ci/scenario-hashes.sh ./$(ODIN_LAB) | diff ci/scenario-hashes.txt - && echo "scenarios: as expected"
 
 clean:
 	rm -rf $(BUILD)

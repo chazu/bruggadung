@@ -49,6 +49,11 @@ Look names up there; don't derive them. It is generated (`port/names.py`).
   from NAMES.md's. Callers follow the header's meaning.
 - What a `.m` declares for itself only (static functions, private methods,
   file-level variables) is `@(private = "file")`, named by the same rules.
+  A file-private name doesn't clash with the same name in another file, so
+  static helpers keep their C names (`keep`, `declare`).
+- A header's extern globals are in NAMES.md: a table (`BGPhaseNames[...]`)
+  is SCREAMING (`PHASE_NAMES`), indexed by its enum; a variable
+  (`BGContentDir`) is snake (`content_dir`).
 - Struct fields keep their C names (`loc.place`, `rec.burnRate`,
   `info.blueprint`). An instance variable drops its underscore:
   `_world` → `world`.
@@ -157,6 +162,19 @@ A conformer's procedures cast `data` back: `(^Atmosphere)(data)`.
 - Never store a temp-allocated string or slice in an object: clone it.
 - C memory (`malloc`'d buffers, `free`) stays as it was.
 
+## nil
+
+- An NSString that could be nil is `""`. Where callers told nil from an
+  empty string, the procedure returns `(string, bool) #optional_ok`, and
+  those callers test the bool.
+- An object pointer that could be nil is nil, as before.
+- C's `?:` is Odin's `a if c else b`: like C, only the branch taken is
+  evaluated.
+- **A range loop's end is evaluated on every iteration**: `for _ in 0 ..<
+  r_count(r)` calls `r_count` each time round (C's `for` does too, but a
+  port from a `n = f(); for (i = 0; i < n; ...)` must keep the `n`). Bind
+  anything with a side effect or a cost to a variable first.
+
 ## Strings
 
 - `[NSString stringWithFormat:@"...", ...]` → `fmt.tprintf("...", ...)`.
@@ -179,6 +197,10 @@ A conformer's procedures cast `data` back: `(^Atmosphere)(data)`.
     `%15s` stay).
   - printf's own space flag (`% d`) has no Odin form; the lab doesn't use
     it.
+  - **Braces are fmt's**: `{` in an Odin format starts a placeholder. A
+    literal brace is `{{` (and `}}` for `}`): printf's `"#A & { x: %d }"` is
+    Odin's `"#A & {{ x: %d }}"`. `port/braces.py` doubles them in every fmt
+    call's literal format.
   - `%.*s` (a length and a pointer) → `%s` of the string sliced to it;
     `%*s` stays (`%*s` with the width, then the string).
   - The spike checks the rule against libc (`make -C lab odin-spike`).
@@ -251,6 +273,62 @@ ported as it is: a test is a procedure in the `TESTS` table, and
 BGTestCheck did, with the expression's text (`#caller_expression`) and the
 caller's file and line.
 
+## Settled so far
+
+Signatures modules already ported have settled, which callers follow
+(they differ from NAMES.md's first guess):
+
+- `committer_init_with_world(world) -> ^Committer`,
+  `scheduler_init_with_world(world, committer) -> ^Scheduler`,
+  `snapshot_new() -> ^Snapshot`, `contributions_new() -> ^Contributions`:
+  each new object with a count of 1 (an `-init…` method never takes self).
+- `committer_commit_boundary(c) -> []^Proposal_Group` and
+  `committer_deferred_groups(c) -> []^Proposal_Group`: temporary slices.
+  `committer_restore_deferred(c, groups: []^Proposal_Group)`.
+- `committer_trace(c) -> []string`: the trace as it is now.
+- `committer_source_of_position(c, pos) -> (string, bool) #optional_ok`.
+- `proposal_group_proposals(g) -> [^]Proposal`, `proposal_group_count(g)`
+  of them. A group's rejection or a failure reason is `""` for none.
+- `PHASE_NAMES` (commit_proposal_group.odin) and `EDGE_KIND_NAMES`
+  (core_world.odin): `[Enum]cstring`-indexable tables.
+- `store_init_with_record_size(size: uint) -> ^Store`.
+- `index_get(index, key, n: ^uint) -> [^]Entity_ID`.
+- `wakes_take(q, t: i64, now: Wake_Time, context_: rawptr, n: ^uint) ->
+  [^]Entity_ID`, freed by the caller with `free()`; `Wake_Time ::
+  proc(context_: rawptr, thing: Entity_ID) -> i64`. A C parameter or field
+  named `context` (Odin's keyword) is `context_`, as in `Path_Query`.
+- `terrain_new(content, wide, high, levels: i32, fill: cstring, error:
+  ^string) -> ^Terrain`, `terrain_from_map(content, map_: cstring, error:
+  ^string)`: a C `char *err, size_t errlen` pair becomes `^string`, set (in
+  the temporary allocator) when not nil.
+- `terrain_changed(t, corners: [^][3]i32, max_) -> uint`,
+  `terrain_room_doorways(t, room, cells: [^][3]i32, max_) -> uint`,
+  `terrain_kind_info -> ^Terrain_Info` (nil for none),
+  `terrain_kind_named(t, name: cstring)`, `terrain_map -> cstring`.
+- Reality: C `int` kinds are `i32`; levels of detail are `Detail`, an enum
+  over i32; `detail_name -> cstring`, `reality_kind_name -> cstring` (nil
+  for none); `reality_anchor_at(r, i, kind, cx, cy, z: ^i32, centred: ^bool)
+  -> Entity_ID` (each out parameter may be nil); `reality_keep_anchors ->
+  ^Anchors_Kept`, freed with `free()`.
+- Struct fields named like an Odin keyword or builtin take an underscore:
+  `map_`, `cap_`, `free_`.
+- World (core_world.odin), checked against the Objective-C world byte for
+  byte:
+  - `world_with_content(content: ^tri.Content, seed, error: ^string) ->
+    ^World`; `world_content_build`, `world_tri` -> `^tri.Content`.
+  - Out arrays filled up to `max` are `[^]T` (`entities_on_tile`,
+    `entities_near`, `entities_in`, `entities_at`, `activities_of`,
+    `watching_activities`, `touched`, `edges_from`, `edges_to`,
+    `air_openings_of`); `world_things_near`/`world_traces_near` take
+    `out: ^[^]Entity_ID`; the `copy_*`/`take_*` procedures return a `[^]T`
+    the caller frees with `free()`.
+  - `-wetTiles:max:` is `world_wet_tiles(w, out: [^][3]i32, max_) -> uint`
+    (NAMES.md's `world_max` is wrong).
+  - `world_detail_at`/`world_detail_of` return `i32`: compare with
+    `i32(Detail.Full)`.
+  - `world_set_activity_observer(w, Record_Observer)`: none is `data == nil`.
+  - `EDGE_KIND_NAMES :: #partial [Edge_Kind]cstring`.
+
 ## Checking your module
 
 The package compiles only when every module is there, so while you port:
@@ -258,6 +336,10 @@ The package compiles only when every module is there, so while you port:
 ```sh
 cd lab/odin && odin check . -no-entry-point -vet -strict-style 2>&1 | grep '<your_file>.odin'
 ```
+
+If you check your files alone in a scratch package, give the directory a
+name of your own (other agents share the scratchpad), and import Triangle
+there as `"tr:triangle"` with `-collection:tr=<repo>/triangle/odin`.
 
 Errors in your files that name another module's procedures or types (not
 yet ported) are expected; fix every other error in your files: syntax,
