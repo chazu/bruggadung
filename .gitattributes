@@ -1,0 +1,4 @@
+# Every text file checks out with LF, on Windows too: the tools read content,
+# maps, docs and scripts byte for byte (the content hash is of them, a test
+# reads the guide's blocks, and sh and make run what is checked out).
+* text=auto eol=lf

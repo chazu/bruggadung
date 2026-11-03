@@ -1,3 +1,0 @@
-var/
-environment-host-*.sh
-!environment-host-ci-*.sh

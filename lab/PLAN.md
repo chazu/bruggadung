@@ -4346,3 +4346,27 @@ world second.
 
 112 tests, 3498 checks, under Apple clang; the mulle build not yet run on
 it.
+
+
+### After the slice: clang and GNUstep, on macOS, Linux and Windows (ci/README.md)
+
+- Off mulle-objc and mulle-sde, for standard tools and for Linux and Windows
+  builds: clang with Apple's Foundation on the Mac, GNUstep's (libobjc2 2.3,
+  gnustep-base 1.31.1) on Linux and on Windows under MSYS2's clang64. The
+  mulle-sde project (`.mulle/`, `cmake/`, `CMakeLists.txt`, `src/reflect`,
+  `src/generic`, the `src/triangle` links) is gone.
+- `Makefile`: per-object, incremental, one build directory per platform;
+  `make check` builds with warnings as errors, tests, and compares every
+  scenario's hashes with `ci/scenario-hashes.txt`, the same on every
+  platform; `make asan`.
+- Portability: a `qsort` tie in Triangle's default resolution that C
+  libraries broke differently (a diagnostic named its sources in another
+  order on Windows); `int64_t` printed as `long long`; null pointers with
+  a count of 0 kept from `memcpy`, `memset` and `qsort`; Windows'
+  `near`, `far` and `_daylight` macros; blocks off; binary stdio for the
+  language server on Windows.
+- `ci/linux/Dockerfile`, `ci/windows/setup-msys2.sh`, and
+  `.github/workflows/build.yml`, running both suites on all three.
+
+112 tests, 3498 checks, on macOS, Linux and Windows; every scenario ends in
+the same state on each.

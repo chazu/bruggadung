@@ -69,7 +69,11 @@ static void write_file(const char *dir, const char *name, const char *text)
 
 void test_tdl_front_end(void)
 {
+#ifdef _WIN32
+    const char *tmp = getenv("TEMP");      /* MSYS2's TMPDIR is a POSIX path */
+#else
     const char *tmp = getenv("TMPDIR");
+#endif
     char dir[1024];
     snprintf(dir, sizeof dir, "%s/triangle-tdl-XXXXXX", tmp ? tmp : "/tmp");
     if (!mkdtemp(dir)) { CHECK(0); return; }

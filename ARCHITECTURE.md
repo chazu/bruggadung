@@ -19,7 +19,7 @@ proven on COMPONENTS.md's first scenario.
 | --- | --- | --- |
 | [DESIGN.md](DESIGN.md) | The six systems, ambitions, and development sequence | Proposal |
 | [GLOSSARY.md](GLOSSARY.md) | The ubiquitous language: every term, in one sense | Kept current; used everywhere |
-| [STACK.md](STACK.md) | Language: mulle Objective-C | Decided |
+| [STACK.md](STACK.md) | Language: Objective-C (clang; Apple Foundation, GNUstep) | Decided |
 | [DOMAIN_SIMULATION.md](DOMAIN_SIMULATION.md) | §3: domains, stocks, horizons, the scheduler | Contract proposed, 3 scenarios; all run in [lab/](lab/README.md), 2 on provisional latent assembly |
 | [COMPONENTS.md](COMPONENTS.md) | §2: entities, components, relations, identity on demand | Contract proposed, 3 scenarios; all run in [lab/](lab/README.md), 3 on provisional latent assembly |
 | [ACTIONS.md](ACTIONS.md) | §1: capabilities, actions, activities; change commitment | Contract proposed, 3 scenarios; all run in [lab/](lab/README.md), Scenario 3's latent-assembly steps aside |
@@ -283,7 +283,7 @@ A rebuilt world produces the same next step as one that never saved.
    the same meet types, the same result on every one of 597,000
    unifications, and about 1.5 times the speed. See
    [CONTENT_LANGUAGE.md](CONTENT_LANGUAGE.md) §18.
-4. **The simulation laboratory:** in [lab/](lab/README.md), in mulle
+4. **The simulation laboratory:** in [lab/](lab/README.md), in
    Objective-C, with content from Triangle. The first slice is built:
    entities, component stores generated from content, relations, tombstones,
    change commitment with automatic individuation and reactions, the clock

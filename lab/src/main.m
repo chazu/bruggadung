@@ -237,9 +237,6 @@ int   main( int argc, char *argv[])
    int                 i;
    int                 status;
 
-#if defined( DEBUG) && defined( __MULLE_OBJC__)
-   mulle_objc_global_check_universe( __MULLE_OBJC_UNIVERSENAME__);
-#endif
    i = 1;
    if( i + 1 < argc && ! strcmp( argv[ i], "-C"))
    {

@@ -1,172 +1,57 @@
 # Agent and AI information
 
-## MANDATORY FIRST STEPS - DO THIS IMMEDIATELY
-
-🚨 **CRITICAL: YOU MUST DO THIS AT THE START OF EVERY CHAT SESSION** 🚨
-
-DO NOT skip these steps. DO NOT treat them as optional. DO NOT proceed with any
-task until you have completed ALL of these commands in order:
-
-### Step 1: REQUIRED - Enable vibecoding and study the returned information
-
-```bash
-mulle-sde vibecoding on          # detach training wheels for freewheeling AIs
-mulle-sde commands               # what's available
-mulle-bashfunctions flags        # how to trace mulle-sde operations
-mulle-sde api help
-mulle-sde code help
-mulle-sde howto help
-mulle-sde api list               # available API information
-mulle-sde howto list             # available tooling information
-mulle-sde howto cat dependency
-mulle-sde howto cat testing
-```
-
-The provided information is CRITICAL to your success. Study the available
-howtos list and use them, when the case arises.
-
-> **Note:** The first `mulle-sde api` or `mulle-sde howto` call in a fresh
-> project will auto-craft dependencies. This can take a while. Do NOT cancel
-> or timeout these commands — wait for them to finish.
-
-
-
 ## TRANSGRESSIONS PUNISHABLE BY DEATH
 
 DO NOT `git revert` AND DO NOT clobber files with git `checkout`  or run
 any other destructive git command. You will be shot and another better AI
 will take your place.
 
-## OTHER PUNISHABLE TRANSGRESSIONS
+## Building
 
-DO NOT attempt to fix build system problems with *anything* else then standard
-mulle-sde commands. If you feel stuck, ask the user for help.
+The lab is Objective-C with manual retain/release (`-fno-objc-arc`), built
+with clang and this directory's `Makefile`: Apple's Foundation on the Mac,
+GNUstep's (libobjc2, gnustep-base) on Linux and on Windows under MSYS2's
+clang64. ci/README.md says what each platform needs installed.
 
-DO NOT circumvent vibecoding. If you think you need to do this, you are
-already in a death spiral of confusion. Escalate to the user for help.
-
-DO NOT try to hack environment variables like this:
-
-``` bash
-VARIABLE=foo mulle-sde command ...
-```
-it just doesn't work. Its another death spiral of confusion indicator.
-Instead use `-DCFLAGS` to pass compile-time defines:
-
-``` bash
-mulle-sde -DCFLAGS="-DFLAG=value" craft --clean
-mulle-sde run
+```sh
+make              # build/<platform>/lab
+make test         # the tests (TEST=name for those whose names contain it)
+make check        # warnings as errors, the tests, every scenario's hashes
+make asan         # the tests under AddressSanitizer and UBSan
+make gen          # src/generated/BGComponents.h, after a content change to components
 ```
 
-If that doesn't solve your problem, escalate to the user for help.
+Run `make check` before committing a change to code. It must pass on every
+platform: write only what clang, Apple's Foundation and GNUstep's all
+accept.
 
+## Writing portable code
 
-## MANDATORY BEFORE DOING YOU FIRST CODING EDITS
+- Foundation only: no Apple-only frameworks or API. Check that what you use
+  exists in GNUstep's gnustep-base.
+- No blocks: they are off outside the Mac (`-fno-blocks`, see ci/README.md).
+- Print `int64_t` and `uint64_t` with a cast to `long long` or `unsigned
+  long long` for `%lld` and `%llu`: `int64_t` is `long` on Linux.
+- Never pass a null pointer to `memcpy`, `memset`, `qsort` and friends, even
+  with a count of 0: glibc declares them nonnull, and UBSan says so.
+- A `qsort` comparator orders ties fully (by ID, say): C libraries order
+  ties differently, and the simulation must come out the same everywhere.
+- Windows headers define macros with plain names (`near`, `far`, `min`,
+  `max`, `_daylight`, `interface`, ...). `BGTypes.h` undefines the ones
+  that collide; don't name things after the rest.
+- A selector has one signature in every class: keep it so, though only
+  mulle's runtime used to insist.
+- In tests, prefer `rangeOfString:` to `hasSuffix:` and the like on long
+  strings, and test under both Foundations when in doubt.
 
-🚨 **YOU MUST HAVE RUN THIS COMMAND BEFORE WRITING OR MODIFYING ANY CODE** 🚨
+## The simulation is deterministic, everywhere
 
-```bash
-value="$(mulle-sde env get PROJECT_DIALECT)"
-value="${value:-$(mulle-sde env get PROJECT_LANGUAGE)}"
-mulle-sde howto show --keyword styleguide --keyword "${value}"
-```
+Every scenario must end in the same state on every platform.
+`ci/scenario-hashes.txt` holds each scenario's hashes and `make check`
+compares. A change meant to change a scenario regenerates it (`make
+scenarios > ci/scenario-hashes.txt`) and says so in the commit.
 
-This gets the style information for the project. It is NOT optional.
+## Content
 
-## MANDATORY BEFORE DOING YOUR FIRST CODE BUILD
-
-🚨 **YOU MUST HAVE RUN THIS COMMAND BEFORE EXECUTING MULLE-SDE CRAFT OR TEST COMMANDS** 🚨
-
-``` bash
-mulle-sde log help
-```
-
-Use the builtin log facility. Do not rerun `mulle-sde craft` just to grep a
-different diagnostic. Use `grep -B n -A m` on `mulle-sde log` output to grep
-for patterns with surrounding context.
-
-### Fast verification with `mulle-sde check`
-
-Use `mulle-sde check` (~0.7s) for syntax and type checking after edits.
-Only use `mulle-sde craft` when you need a linked executable (before `run`
-or `test`). This saves enormous time during iterative development.
-
-
-🚨 **YOU MUST HAVE RUN THIS COMMAND WHEN WORKING WITH MULTIPLE PROJECTS** 🚨
-
-```bash
-mulle-sde howto show multi-project"
-```
-
-It is NOT optional.
-
-And get familiar with the available API. You MUST always use custom API
-in favor of standard API, when available:
-
-``` bash
-mulle-sde api list
-```
-
-When you are writing code, you have great search tools at your disposal:
-
-``` bash
-mulle-sde code help
-```
-
-## MANDATORY BEFORE YOUR FIRST CHANGE OF ANY MULLE-SDE SHELL CODE
-
-🚨 **YOU MUST HAVE RUN THIS COMMAND BEFORE WRITING OR MODIFYING ANY MULLE-SDE SHELL CODE** 🚨
-
-```bash
-mulle-bashfunctions toc
-```
-
-This gets you the coding information for the shell/bash project. It is NOT optional.
-## Executable
-
-This project produces an executable product.
-To run it, use the following command:
-
-```bash
-mulle-sde run
-```
-
-If you have multiple executables built, use
-
-``` bash
-mulle-sde run <productname>
-```
-
-You can get a list of products after crafting with
-
-``` bash
-mulle-sde product list
-```
-
-
-## Testing Executable Projects (No Code Required)
-
-For executable projects, mulle-test automatically creates output-based
-tests:
-
-1. Setup: mulle-sde test init creates test infrastructure
-2. Test files: Create .args and .stdout file pairs in test directories
-   - hello.args - command line arguments for the executable
-   - hello.stdout - expected output (exact match required)
-3. Run: mulle-sde test run automatically finds these pairs, runs the executable with the args, and compares output
-## C
-
-This is a C project.
-
-## CMake Guidelines
-
-Changes to the build system must be done with `mulle-sde`. Only edit CMake
-files as a  _very_ last resort and under user guidance.
-
-
-| Path             | Editable? | Notes                                                        |
-| ---------------- | --------- | ------------------------------------------------------------ |
-| `CMakeLists.txt` | Yes       | High-level project settings.                                 |
-| `cmake/`         | Yes       | Override modules by copying from `cmake/share/`.             |
-| `cmake/share/`   | No        | Managed by `mulle-sde upgrade`. Changes will be lost.        |
-| `cmake/reflect/` | No        | Auto-generated by `mulle-sde reflect`. Changes will be lost. |
+Triangle content is laid out by topic: see content/README.md, and
+../CLAUDE.md for the terminology rule.

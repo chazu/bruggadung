@@ -1,0 +1,45 @@
+# The lab and Triangle on macOS, Linux and Windows (lab/ci/README.md).
+name: build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Triangle
+        run: make -C triangle test cli-test lsp-test
+      - name: Lab
+        run: make -C lab check
+
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain image
+        run: docker build -t bruggadung-lab lab/ci/linux
+      - name: Triangle
+        run: docker run --rm -v "$PWD":/repo -w /repo bruggadung-lab make -C triangle CC=clang test cli-test lsp-test
+      - name: Lab
+        run: docker run --rm -v "$PWD":/repo -w /repo bruggadung-lab make -C lab check
+
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: CLANG64
+          update: true
+      - name: Toolchain
+        run: sh lab/ci/windows/setup-msys2.sh
+      - name: Triangle
+        run: make -C triangle CC=clang test cli-test lsp-test
+      - name: Lab
+        run: make -C lab check

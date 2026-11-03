@@ -1,1 +1,0 @@
-../../../triangle/objc/BGContent.m

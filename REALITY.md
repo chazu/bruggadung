@@ -297,7 +297,7 @@ full.
    - **What decisions submit**: the committer's queue, whose order the
      contest shuffle starts from; nudges. An outbox per agent, merged in
      entity order.
-   - **mulle-objc**: a pool per worker; thread-affinity checks on shared
+   - **Objective-C**: an autorelease pool per worker; thread-affinity checks on shared
      objects in debug builds.
    No direct world writes from either phase were found.
 7. **Outdoor plumes** (decision 9), with their first scenario.

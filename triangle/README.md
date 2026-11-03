@@ -3,8 +3,8 @@
 Triangle is bruggadung's content language: TDL's typed feature structure
 semantics with CUE-style syntax, specified in
 [CONTENT_LANGUAGE.md](../CONTENT_LANGUAGE.md). This directory is a prototype
-of its engine. It is plain C11 with no dependencies, so it builds without the mulle
-toolchain.
+of its engine. It is plain C11 with no dependencies: it builds and passes its
+tests with clang on macOS, Linux, and Windows (MSYS2's clang64).
 
 Documentation:
 
@@ -53,7 +53,7 @@ TRI_PROPS_SCALE=10 ./build/test properties     # ten times the randomised cases
 | `tools/guide-examples.py` | Writes `examples/workshop` from the guide (`make examples`) |
 | `src/xtree.c` | Syntax tree printing and construction |
 | `src/util.c` | Arenas, symbols, maps, diagnostics |
-| `objc/` | `BGContent`, the Objective-C wrapper, with its test; runs under Apple's runtime and mulle-objc |
+| `objc/` | `BGContent`, the Objective-C wrapper, with its test; runs on Apple's Foundation and on GNUstep's |
 | `docs/` | The guide, the language reference, and the embedding API |
 | `tests/` | Core tests; the three scenarios and the example file from CONTENT_LANGUAGE.md; every feature; randomised property tests and source fuzzing; a small TDL grammar; a leak check against a counting allocator |
 | `bench/erg.c` | Benchmark against a TDL grammar such as the English Resource Grammar |
@@ -359,23 +359,11 @@ blueprint errors appeared only when a spec was asked for; `bool`, `text`, and
 `ref` were missing; and content could set a field the registry does not mark
 `content`.
 
-**The wrapper and mulle-objc.** `BGContent` uses manual retain/release and
-needs only MulleObjC and MulleFoundationBase. Built with mulle-clang 22.1.8
-in a mulle-sde project (`-m mulle-objc/objc-developer`, plus
-`mulle-sde dependency add --objc --github MulleFoundation MulleFoundationBase`,
-crafted with `mulle-sde -DCFLAGS="-fobjc-tao" craft`), it and the library run
-its test under the mulle-objc runtime with no failures. With Apple clang and
-Foundation it builds and passes the same test (`make objc`).
-
-The full MulleFoundation does not build on this Mac (macOS 14, arm64): in
-`NSTask+System.m`, mulle-clang emits an empty inline-assembly barrier for
-`@try` with every local variable as a memory operand, 30 in that method, and
-arm64 runs out of registers. The wrapper doesn't need that part. mulle-clang
-has fixed this on its `mulle/23.1.3` branch (commit 2759313016, batching the
-operands), not yet in a release; the tap's `--HEAD` build is an older line
-(17.0.6) and no help. Built from that branch, mulle-clang 23.1.3 compiles the
-whole MulleFoundation, where 22.1.8 fails on exactly that file, and the
-wrapper's test passes against the full MulleFoundation.
+**The wrapper.** `BGContent` uses manual retain/release, and needs only
+Foundation: `make objc` builds it and runs its test with Apple's Foundation on
+the Mac, and with GNUstep's (libobjc2, gnustep-base) on Linux and Windows. (It
+also ran under mulle-objc, which the lab used until it moved to clang and
+GNUstep; the record of that is in the history of this file.)
 
 An independent audit (a separate agent reading only the spec and the code)
 then found eleven gaps, now closed or recorded. Residuals and bindings for a

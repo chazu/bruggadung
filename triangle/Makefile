@@ -4,6 +4,21 @@ CPPFLAGS = -Iinclude -D_DEFAULT_SOURCE
 SRC      = $(wildcard src/*.c)
 OBJ      = $(SRC:src/%.c=build/%.o)
 TESTS    = $(wildcard tests/*.c)
+LDLIBS   =
+ifeq ($(OS),Windows_NT)
+# MinGW: clock_gettime is winpthreads'
+LDLIBS  += -lpthread
+endif
+
+# Foundation for the Objective-C wrapper: Apple's on the Mac, GNUstep's
+# elsewhere (blocks off: see lab/Makefile)
+ifeq ($(shell uname -s),Darwin)
+OBJC_FLAGS =
+OBJC_LIBS  = -framework Foundation
+else
+OBJC_FLAGS = $(shell gnustep-config --objc-flags) -fno-blocks
+OBJC_LIBS  = $(shell gnustep-config --base-libs) -fno-blocks $(LDLIBS)
+endif
 
 all: build/libtriangle.a build/test build/tri-components build/triangle
 
@@ -14,16 +29,16 @@ build/libtriangle.a: $(OBJ)
 	ar rcs $@ $^
 
 build/test: $(TESTS) build/libtriangle.a tests/test.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(TESTS) build/libtriangle.a -o $@
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(TESTS) build/libtriangle.a $(LDLIBS) -o $@
 
 build/tri-components: tools/tri-components.c build/libtriangle.a
-	$(CC) $(CPPFLAGS) $(CFLAGS) $< build/libtriangle.a -o $@
+	$(CC) $(CPPFLAGS) $(CFLAGS) $< build/libtriangle.a $(LDLIBS) -o $@
 
 # The command-line tool, with the language server.
 TOOLSRC = tools/triangle.c tools/lsp.c tools/json.c tools/export.c tools/fmt.c tools/paths.c
 
 build/triangle: $(TOOLSRC) tools/json.h tools/export.h tools/fmt.h tools/paths.h build/libtriangle.a
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(TOOLSRC) build/libtriangle.a -o $@
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(TOOLSRC) build/libtriangle.a $(LDLIBS) -o $@
 
 # The language server driven over stdio, the command line, and the Emacs mode's tests.
 lsp-test: build/triangle
@@ -71,7 +86,7 @@ build/leak/%.o: src/%.c src/internal.h include/triangle.h tests/leakcheck/counti
 	$(CC) $(CPPFLAGS) $(CFLAGS) -include tests/leakcheck/counting.h -c $< -o $@
 
 build/leakcheck: $(LEAKOBJ) tests/leakcheck/main.c tests/leakcheck/counting.c
-	$(CC) $(CPPFLAGS) $(CFLAGS) tests/leakcheck/main.c tests/leakcheck/counting.c $(LEAKOBJ) -o $@
+	$(CC) $(CPPFLAGS) $(CFLAGS) tests/leakcheck/main.c tests/leakcheck/counting.c $(LEAKOBJ) $(LDLIBS) -o $@
 
 leakcheck: build/leakcheck
 	./build/leakcheck
@@ -81,10 +96,10 @@ asan:
 	$(MAKE) CFLAGS="-std=c11 -O1 -g -Wall -Wextra -Wno-unused-parameter -fsanitize=address,undefined" test
 
 # The Objective-C wrapper, built with the platform's compiler and Foundation
-# (manual retain/release, so it also suits mulle-objc).
+# (manual retain/release).
 objc: build/libtriangle.a
-	$(CC) $(CPPFLAGS) -Iobjc -fno-objc-arc -Wall objc/BGContent.m objc/test_objc.m build/libtriangle.a \
-	    -framework Foundation -o build/test_objc
+	$(CC) $(CPPFLAGS) $(OBJC_FLAGS) -Iobjc -fno-objc-arc -Wall objc/BGContent.m objc/test_objc.m build/libtriangle.a \
+	    $(OBJC_LIBS) -o build/test_objc
 	./build/test_objc
 
 clean:

@@ -1,6 +1,6 @@
 # The simulation laboratory
 
-The first code of the bruggadung framework, in mulle Objective-C: entities,
+The first code of the bruggadung framework, in Objective-C: entities,
 component stores, relations, change commitment, the clock and scheduler,
 saves, the action menu, and the first domain, with content loaded from
 Triangle. It runs COMPONENTS.md's first scenario, *The marked nail*, and
@@ -8,24 +8,26 @@ DOMAIN_SIMULATION.md's third, *Two draws on a dwindling stock*, headless,
 and checks their acceptance criteria. The plan
 and its status are in [PLAN.md](PLAN.md).
 
+It builds with clang and the `Makefile`, on macOS (Apple's Foundation),
+Linux and Windows (GNUstep's); [ci/README.md](ci/README.md) says what each
+needs installed. `build/<platform>` is `build/darwin`, `build/linux` or
+`build/windows` (where the binary is `lab.exe`).
+
 ```sh
-mulle-sde craft                         # the real build: mulle-clang, MulleObjC, MulleFoundationBase
-./kitchen/Debug/lab test                # unit tests and scenarios; non-zero exit on any failure
-./kitchen/Debug/lab run marked-nail     # one scenario: trace, entities, checks (also -a, -b)
-./kitchen/Debug/lab save marked-nail    # the save of its end state
-./kitchen/Debug/lab menu marked-nail 1000   # what the worker sees, and its menu, at 1000 ms
-./kitchen/Debug/lab run cistern         # the fluid domain: two taps and a leak on a dwindling cistern (also -b, -d, -e)
-./kitchen/Debug/lab play workshop       # play: the map, the menu, commands, the inspector (also cistern)
-make gen                                # regenerate src/generated/BGComponents.h from content/
-make test-apple                         # the same sources with Apple clang and Foundation
-make asan                               # the Apple build under AddressSanitizer and UBSan
-make leaks                              # object leaks, through mulle-testallocator
-make check                              # craft, test, and fail on runtime warnings or leaks
+make                                     # build/<platform>/lab
+make test                                # unit tests and scenarios; non-zero exit on any failure
+make check                               # warnings as errors, the tests, and every scenario's hashes
+make asan                                # the tests under AddressSanitizer and UBSan
+make gen                                 # regenerate src/generated/BGComponents.h from content/
+./build/<platform>/lab run marked-nail   # one scenario: trace, entities, checks (also -a, -b)
+./build/<platform>/lab save marked-nail  # the save of its end state
+./build/<platform>/lab menu marked-nail 1000   # what the worker sees, and its menu, at 1000 ms
+./build/<platform>/lab run cistern       # the fluid domain: two taps and a leak on a dwindling cistern (also -b, -d, -e)
+./build/<platform>/lab play workshop     # play: the map, the menu, commands, the inspector (also cistern)
 ```
 
-The first craft fetches and builds the mulle-objc dependencies. The build
-passes `-fobjc-tao -DTRI_NO_TDL`, set once with `mulle-sde definition set
-CFLAGS`.
+Every scenario ends in the same state on every platform: `make check`
+compares each one's hashes with `ci/scenario-hashes.txt`.
 
 ## Layout
 
@@ -45,7 +47,6 @@ CFLAGS`.
 | `src/scenario/` | `BGWorlds` (the worlds' setups), `BGMarkedNail` and `BGCistern`: the scenarios, their input logs, and their checks |
 | `src/play/` | `BGPlay`: the interactive session behind `lab play` |
 | `src/test/` | The test runner and the tests |
-| `src/triangle/` | Symlinks to the Triangle engine and its Objective-C wrapper, compiled into the lab |
 
 ## How an action happens
 
@@ -268,18 +269,12 @@ and submits it. At the next boundary the committer:
 
 Every step is in the trace: `lab run marked-nail` prints it.
 
-## Notes for mulle-objc
+## Notes on portability
 
-- A selector has one signature across every class in mulle-objc. The world
-  can't have `-content` returning `BGContent *` while `BGContent` has
-  `-content` returning `TriContent *`; the runtime warns, and the world's is
-  `-contentBuild`. Describing an entity is `-describeEntity:` for the same
-  reason. `make check` fails on any such warning.
-- **Variadic methods don't receive their arguments through `va_start`**: the
-  meta-ABI passes them differently, and reading them that way returns
-  garbage. The lab's own methods are not variadic; callers format with
-  `stringWithFormat:`, which MulleFoundation handles.
-- The code uses manual retain/release, no properties, and no blocks, so the
-  same sources build with Apple clang (`make test-apple`).
-- The full MulleFoundation needs mulle-clang 23.1.3, which isn't released;
-  the lab needs only MulleObjC and MulleFoundationBase.
+The code uses manual retain/release, no properties, and no blocks, and only
+what Apple's Foundation and GNUstep's both have: AGENTS.md lists the rules
+that keep it building, and coming out the same, on every platform. Some
+names are as they are from when the lab ran on mulle-objc, where a selector
+has one signature across every class: the world's content is
+`-contentBuild`, not `-content` (which `BGContent` has, returning
+`TriContent *`), and describing an entity is `-describeEntity:`.

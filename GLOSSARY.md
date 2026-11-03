@@ -34,7 +34,7 @@ REALITY.md, TER = TERRAIN.md, TES = TESSERA.md. "d3" is a doc's decision
 - **Framework**: the common engine for actions and consequences, with the
   systems beneath it. *Avoid:* engine (reserved for Triangle's and
   Tessera's engines). (DES)
-- **The lab**: the mulle Objective-C simulation laboratory in `lab/` that
+- **The lab**: the Objective-C simulation laboratory in `lab/` that
   implements the system contracts and proves them by scenarios; it has
   stepping, inspection, causal traces and `lab play`. *Avoid:* simulation
   lab, harness (for the whole). (DES, lab/README.md)

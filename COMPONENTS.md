@@ -136,7 +136,7 @@ Rules:
   including changes to the component's own state. A handler returns proposals;
   it never mutates anything. This keeps the causal trace complete. Components
   are cold data, so the extra step is cheap.
-- Whether the field registry can be derived from mulle-objc's runtime property
+- Whether the field registry can be derived from the Objective-C runtime's property
   metadata, or has to be generated from declarations, is an open question.
 
 ### 3. Stores and queries

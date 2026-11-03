@@ -6,11 +6,7 @@
 #ifndef BG_TYPES_H
 #define BG_TYPES_H
 
-#ifdef __MULLE_OBJC__
-# import "import-private.h"
-#else
-# import <Foundation/Foundation.h>
-#endif
+#import <Foundation/Foundation.h>
 
 #ifdef _WIN32
 /* GNUstep's Foundation brings in <windows.h>, which makes these macros. */

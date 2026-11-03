@@ -18,9 +18,11 @@ Two things in the repository shape it:
   the truth. The player view is built only from perception and the
   character's knowledge store. A visualizer that reads world state directly
   would break this the first time it drew a player's map.
-- **mulle-objc is not Apple's runtime.** The lab can't link Metal, AppKit
-  or MetalKit. A hardware-accelerated frontend has to be plain C over a
-  cross-platform layer, or another process.
+- **The lab runs on three platforms.** It builds with Apple's Foundation on
+  the Mac and GNUstep's on Linux and Windows (STACK.md), so a frontend
+  linking Metal or AppKit would be the Mac's alone. A hardware-accelerated
+  frontend has to be plain C over a cross-platform layer, or another
+  process.
 
 ## Decisions so far
 
