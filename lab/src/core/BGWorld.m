@@ -1565,7 +1565,8 @@ static void   rise_from( BGWorld *self, struct BGAnchorsKept *before)
    NSUInteger   k;
 
    list = _touched;
-   qsort( list, _ntouched, sizeof( BGEntityID), cmp_id);
+   if( _ntouched)
+      qsort( list, _ntouched, sizeof( BGEntityID), cmp_id);
    for( k = 0, i = 0; i < _ntouched; i++)
       if( ! k || list[ k - 1] != list[ i])
          list[ k++] = list[ i];
@@ -2059,7 +2060,8 @@ static void   edge_remove_raw( BGWorld *self, BGEdge e)
    if( ! _roomAirKnown || _roomAirChanges != [stores members] + _airAnchors ||
        _roomAirDropped != BGTerrainRoomsDropped( _terrain))
    {
-      memset( _roomAir, 0, _nroomAir * sizeof( BGEntityID));
+      if( _nroomAir)
+         memset( _roomAir, 0, _nroomAir * sizeof( BGEntityID));
       for( i = 0; i < [stores count]; i++)
       {
          gas = [stores recordAtIndex:i];

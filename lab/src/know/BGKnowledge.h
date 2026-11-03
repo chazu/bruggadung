@@ -594,7 +594,7 @@ typedef struct
    struct BGWakes   *_perceiveWakes;   /* each agent's next perception with nothing happening */
    struct BGWakes   *_forgetWakes;     /* each agent's next forgetting */
    BOOL             _woken;            /* the wakes built, from the stores */
-   int              _daylight;         /* the daylight at the last boundary */
+   int              _boundaryDaylight; /* the daylight at the last boundary */
    BGEntityID       *_perceived;       /* the agents that perceived at this boundary, in order */
    NSUInteger       _nperceived;
    NSUInteger       _ntouched;

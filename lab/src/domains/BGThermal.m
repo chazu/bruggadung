@@ -290,10 +290,11 @@ static int64_t   temperature( const BGThermalState *b)
 
    lines = [NSMutableArray array];
    [lines addObject:[NSString stringWithFormat:@"thermal %d %llu %lld %lld %lld", _ledgered ? 1 : 0,
-                                               (unsigned long long) _steps, _initial, _inflow, _received]];
+                                               (unsigned long long) _steps, (long long) _initial, (long long) _inflow,
+                                               (long long) _received]];
    for( i = 0; i < _nbodies; i++)
       [lines addObject:[NSString stringWithFormat:@"body %llu %lld %lld", (unsigned long long) _bodies[ i].entity,
-                                                  _bodies[ i].carry, _bodies[ i].pending]];
+                                                  (long long) _bodies[ i].carry, (long long) _bodies[ i].pending]];
    return( lines);
 }
 

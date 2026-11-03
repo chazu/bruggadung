@@ -1234,19 +1234,25 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
                                                (long long) _rise]];
    [lines addObject:[NSString stringWithFormat:@"ledger %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld "
                                                @"%lld %lld %lld",
-                                               _ledger.initial[ 0], _ledger.initial[ 1], _ledger.initial[ 2],
-                                               _ledger.inflow[ 0], _ledger.inflow[ 1], _ledger.inflow[ 2],
-                                               _ledger.produced[ 0], _ledger.produced[ 1], _ledger.produced[ 2],
-                                               _ledger.consumed[ 0], _ledger.consumed[ 1], _ledger.consumed[ 2],
-                                               _ledger.fuel, _ledger.burned,
-                                               _ledger.exchanged, _ledger.toSolids, _ledger.received]];
+                                               (long long) _ledger.initial[ 0], (long long) _ledger.initial[ 1],
+                                               (long long) _ledger.initial[ 2],
+                                               (long long) _ledger.inflow[ 0], (long long) _ledger.inflow[ 1],
+                                               (long long) _ledger.inflow[ 2],
+                                               (long long) _ledger.produced[ 0], (long long) _ledger.produced[ 1],
+                                               (long long) _ledger.produced[ 2],
+                                               (long long) _ledger.consumed[ 0], (long long) _ledger.consumed[ 1],
+                                               (long long) _ledger.consumed[ 2],
+                                               (long long) _ledger.fuel, (long long) _ledger.burned,
+                                               (long long) _ledger.exchanged, (long long) _ledger.toSolids,
+                                               (long long) _ledger.received]];
    for( k = 0; k < _nregions; k++)
    {
       r = &_regions[ k];
       [lines addObject:[NSString stringWithFormat:@"region %llu %lld %lld %lld %lld %lld",
                                                   (unsigned long long) r->entity,
-                                                  r->carryBurn[ 0], r->carryBurn[ 1], r->carryBurn[ 2],
-                                                  r->pending, (long long) r->steps]];
+                                                  (long long) r->carryBurn[ 0], (long long) r->carryBurn[ 1],
+                                                  (long long) r->carryBurn[ 2],
+                                                  (long long) r->pending, (long long) r->steps]];
    }
    for( k = 0; k < _nlinks; k++)
    {
@@ -1254,18 +1260,22 @@ static int64_t   exchange( int64_t air, int64_t mine, int64_t total, int64_t out
       [lines addObject:[NSString stringWithFormat:@"link %llu %llu %d %d %d %d %lld %lld %lld %lld %lld %lld %lld %d",
                                                   (unsigned long long) l->from, (unsigned long long) l->to,
                                                   l->at.form == BGLocationOnTile, l->at.x, l->at.y, l->at.level,
-                                                  l->carryAir, l->carryIn[ 0], l->carryIn[ 1], l->carryIn[ 2],
-                                                  l->carryOut[ 0], l->carryOut[ 1], l->carryOut[ 2], l->doorSeen]];
+                                                  (long long) l->carryAir, (long long) l->carryIn[ 0],
+                                                  (long long) l->carryIn[ 1], (long long) l->carryIn[ 2],
+                                                  (long long) l->carryOut[ 0], (long long) l->carryOut[ 1],
+                                                  (long long) l->carryOut[ 2], l->doorSeen]];
    }
    for( k = 0; k < _nstoves; k++)
       [lines addObject:[NSString stringWithFormat:@"stove %llu %lld %lld %lld", (unsigned long long) _stoves[ k].entity,
-                                                  _stoves[ k].fuel, _stoves[ k].carry, _stoves[ k].carryShare]];
+                                                  (long long) _stoves[ k].fuel, (long long) _stoves[ k].carry,
+                                                  (long long) _stoves[ k].carryShare]];
    for( k = 0; k < _nsurfaces; k++)
       [lines addObject:[NSString stringWithFormat:@"surface %llu %lld", (unsigned long long) _surfaces[ k].entity,
-                                                  _surfaces[ k].carry]];
+                                                  (long long) _surfaces[ k].carry]];
    for( k = 0; k < _nbreathers; k++)
       [lines addObject:[NSString stringWithFormat:@"breather %llu %lld %lld", (unsigned long long) _breathers[ k].entity,
-                                                  _breathers[ k].carry, _breathers[ k].carryDioxide]];
+                                                  (long long) _breathers[ k].carry,
+                                                  (long long) _breathers[ k].carryDioxide]];
    for( k = 0; k < _nfired; k++)
       [lines addObject:[NSString stringWithFormat:@"fired %llu", (unsigned long long) _fired[ k]]];
    return( lines);

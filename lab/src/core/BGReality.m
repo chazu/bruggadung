@@ -416,7 +416,8 @@ BGAnchorsKept   *BGRealityKeepAnchors( const BGReality *r)
 
    kept    = malloc( sizeof( BGAnchorsKept) + (r->nanchors + 1) * sizeof( BGAnchor));
    kept->n = r->nanchors;
-   memcpy( kept->anchors, r->anchors, r->nanchors * sizeof( BGAnchor));
+   if( r->nanchors)
+      memcpy( kept->anchors, r->anchors, r->nanchors * sizeof( BGAnchor));
    return( kept);
 }
 

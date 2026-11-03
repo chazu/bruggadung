@@ -20,6 +20,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef _WIN32
+#include <fcntl.h>
+#include <io.h>
+#endif
 
 /* --- documents and builds -------------------------------------------------------------- */
 
@@ -1608,6 +1612,11 @@ static const char *capabilities =
 int lsp_main(void)
 {
     int shutdown = 0;
+#ifdef _WIN32
+    /* Content-Length counts bytes: no newline translation on the wire */
+    _setmode(_fileno(stdin), _O_BINARY);
+    _setmode(_fileno(stdout), _O_BINARY);
+#endif
     for (;;) {
         char *body = read_message();
         if (!body) return shutdown ? 0 : 1;

@@ -4878,7 +4878,7 @@ static int64_t   perceive_by_now( void *context, BGEntityID agent)
    _perceiveWakes = BGWakesNew();
    _forgetWakes   = BGWakesNew();
    daylight       = BGDaylight( _world, [_world time].ms);
-   _daylight      = daylight;
+   _boundaryDaylight      = daylight;
    agents         = [_world storeForKind:[_world kindNamed:"Agent"]];
    for( i = 0; i < [agents count]; i++)
    {
@@ -5200,7 +5200,7 @@ static int   cmp_entity_id( const void *a, const void *b)
    memcpy( woken + nwoken, risen, nrisen * sizeof( BGEntityID));
    nwoken += nrisen;
    free( risen);
-   if( _omniscient || daylight != _daylight)
+   if( _omniscient || daylight != _boundaryDaylight)
    {
       ndue = [agents count];
       due  = malloc( (ndue + 1) * sizeof( BGEntityID));
@@ -5210,12 +5210,14 @@ static int   cmp_entity_id( const void *a, const void *b)
    else
    {
       due = malloc( (nconcerned + nwoken + 1) * sizeof( BGEntityID));
-      memcpy( due, concerned, nconcerned * sizeof( BGEntityID));
-      memcpy( due + nconcerned, woken, nwoken * sizeof( BGEntityID));
+      if( nconcerned)
+         memcpy( due, concerned, nconcerned * sizeof( BGEntityID));
+      if( nwoken)
+         memcpy( due + nconcerned, woken, nwoken * sizeof( BGEntityID));
       ndue = nconcerned + nwoken;
       qsort( due, ndue, sizeof( BGEntityID), cmp_entity_id);
    }
-   _daylight = daylight;
+   _boundaryDaylight = daylight;
    free( woken);
    free( concerned);
 

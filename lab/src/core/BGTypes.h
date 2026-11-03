@@ -12,6 +12,12 @@
 # import <Foundation/Foundation.h>
 #endif
 
+#ifdef _WIN32
+/* GNUstep's Foundation brings in <windows.h>, which makes these macros. */
+# undef near
+# undef far
+#endif
+
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>

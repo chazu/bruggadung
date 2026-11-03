@@ -1,6 +1,6 @@
 CC      ?= cc
 CFLAGS  ?= -std=c11 -O2 -g -Wall -Wextra -Wno-unused-parameter
-CPPFLAGS = -Iinclude
+CPPFLAGS = -Iinclude -D_DEFAULT_SOURCE
 SRC      = $(wildcard src/*.c)
 OBJ      = $(SRC:src/%.c=build/%.o)
 TESTS    = $(wildcard tests/*.c)

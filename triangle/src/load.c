@@ -126,7 +126,7 @@ static bool type_field_loc(Content *c, uint32_t t, const uint32_t *path, size_t 
 static bool unify_at_other(Build *b, TriNode *x, TriNode *y, Loc loc, const char *what, uint32_t other)
 {
     Content *c = b->c;
-    memcpy(c->pathstack, b->path.v, b->path.n * sizeof(uint32_t));
+    if (b->path.n) memcpy(c->pathstack, b->path.v, b->path.n * sizeof(uint32_t));
     c->depth = (int) b->path.n;
     c->failed = false;
     if (unify1(c, x, y)) return true;
@@ -1705,7 +1705,10 @@ static void note(Notes *ns, Buf *b)
 static int cmp_defptr(const void *a, const void *b)
 {
     const DefaultRec *x = *(DefaultRec *const *) a, *y = *(DefaultRec *const *) b;
-    return cmp_path(&x->path, &y->path);
+    int d = cmp_path(&x->path, &y->path);
+    /* qsort isn't stable, and C libraries order ties differently: keep the
+     * records' own order within a path, so every platform reads the same */
+    return d ? d : (x > y) - (x < y);
 }
 
 /* YADU-style default resolution: per path, the most specific defaults first;
@@ -1721,7 +1724,7 @@ static TriNode *resolve_defaults(Content *c, TriNode *root, const DefVec *instde
 
     DefaultRec **order = malloc(sizeof(DefaultRec *) * (all.n ? all.n : 1));
     for (size_t k = 0; k < all.n; k++) order[k] = &all.v[k];
-    qsort(order, all.n, sizeof(DefaultRec *), cmp_defptr);   /* stable enough: groups by path */
+    qsort(order, all.n, sizeof(DefaultRec *), cmp_defptr);   /* by path, then as collected */
 
     Buf nb = { 0 };
     size_t g0 = 0;

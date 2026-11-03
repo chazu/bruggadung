@@ -106,7 +106,7 @@ void families_build(Content *c)
                 }
             }
         }
-        qsort(paths.v, paths.n, sizeof(char *), cmp_str);
+        if (paths.n) qsort(paths.v, paths.n, sizeof(char *), cmp_str);
         f->qc = tri_qc_new(c, (const char *const *) paths.v, paths.n);
         f->index = tri_index_new(f->qc);
         for (size_t q = 0; q < f->insts.n; q++) {
