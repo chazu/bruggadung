@@ -18,6 +18,7 @@ proven on COMPONENTS.md's first scenario.
 | Document | Covers | State |
 | --- | --- | --- |
 | [DESIGN.md](DESIGN.md) | The six systems, ambitions, and development sequence | Proposal |
+| [GLOSSARY.md](GLOSSARY.md) | The ubiquitous language: every term, in one sense | Kept current; used everywhere |
 | [STACK.md](STACK.md) | Language: mulle Objective-C | Decided |
 | [DOMAIN_SIMULATION.md](DOMAIN_SIMULATION.md) | §3: domains, stocks, horizons, the scheduler | Contract proposed, 3 scenarios; all run in [lab/](lab/README.md), 2 on provisional latent assembly |
 | [COMPONENTS.md](COMPONENTS.md) | §2: entities, components, relations, identity on demand | Contract proposed, 3 scenarios; all run in [lab/](lab/README.md), 3 on provisional latent assembly |
@@ -29,6 +30,7 @@ proven on COMPONENTS.md's first scenario.
 | [TERRAIN.md](TERRAIN.md) | Terrain: a kind per cell from content, maps embedded, chunked storage, agents' memory of it | Draft; step 1 (kinds, maps, changes, walls stop movement) runs in [lab/](lab/README.md) |
 | [TESSERA.md](TESSERA.md) | Tessera, the visual engine: scenes from the two views, appearance in content, terminal and GPU backends | Draft; the scene core built in [tessera/](tessera/README.md), nothing draws yet |
 | [REALITY.md](REALITY.md) | The reality bubble: four levels of detail set by anchors, tunable in content; authored progression away from the players; work done when something happens; threads | Draft; nothing built |
+| [DETAIL_REGIMES.md](DETAIL_REGIMES.md) | What each system does at each level of detail; regimes and progression; what Triangle can model | Draft; nothing built |
 | [CONTENT_LANGUAGE.md](CONTENT_LANGUAGE.md) | Triangle, the content language: typed feature structures, TDL semantics, CUE-style syntax, the engine | Contract proposed, 3 scenarios; Scenario 1 runs in triangle/, 2 and 3 in [lab/](lab/README.md) |
 | [CHAT.md](CHAT.md) | Original brainstorm. The setting is discarded. | Reference |
 
