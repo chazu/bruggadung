@@ -36,13 +36,13 @@ first), which wants a document of its own.
    nothing evaluates regimes per entity per tick.
 3. **Five modes.**
 
-   | Mode | Meaning |
-   | --- | --- |
-   | `exact` | Runs as at full detail. |
-   | `coarse` | Runs, on a cadence or with its own senses only (REALITY.md step 3). |
-   | `progress` | Replaced by the authored bulk progression. |
-   | `deferred` | Doesn't run; caught up, on rising, for the time that passed (REALITY.md step 4). |
-   | `paused` | Doesn't run, and that time is lost: on rising it resumes as though none had passed. |
+   | Mode       | Meaning                                                                             |
+   |------------|-------------------------------------------------------------------------------------|
+   | `exact`    | Runs as at full detail.                                                             |
+   | `coarse`   | Runs, on a cadence or with its own senses only (REALITY.md step 3).                 |
+   | `progress` | Replaced by the authored bulk progression.                                          |
+   | `deferred` | Doesn't run; caught up, on rising, for the time that passed (REALITY.md step 4).    |
+   | `paused`   | Doesn't run, and that time is lost: on rising it resumes as though none had passed. |
 
    `deferred` and `paused` are both "suspended" and behave very
    differently: a deferred fuse has burnt down when the player arrives; a
