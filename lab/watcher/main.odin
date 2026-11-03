@@ -169,6 +169,7 @@ main :: proc() {
 		lab.pool_drain()
 	}
 
+	view.viewer_free(&v)
 	rl.CloseWindow()
 	view.theme_free(&theme)
 	delete(w.ids)

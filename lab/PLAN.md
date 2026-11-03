@@ -4402,9 +4402,9 @@ Objective-C lab's (the hashes in `ci/scenario-hashes.txt` are unchanged).
   water, light, and a mark for each entity on the ground or held, keyed by
   its blueprint's name until looks are content (slice 3).
 - The first window backend, `tess_raylib` (`../tessera/raylib/`): glyph
-  tiles in raylib's font, camera, focus level, selection, a panel.
-  TESSERA.md's decision 8 now names raylib, which comes with Odin, not
-  sokol.
+  tiles in DejaVu Sans Mono (built in), camera, focus level, selection, a
+  panel. TESSERA.md's decision 8 now names raylib, which comes with Odin,
+  not sokol.
 - The watcher (`watcher/`, `make watcher`): a crowd on the yard, the
   cistern or the marked nail, run on the viewer's clock, paused, stepped a
   boundary at a time, or up to an hour a second; the inspector shows what

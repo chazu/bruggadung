@@ -55,6 +55,12 @@ caller gives. A `Theme` maps appearance keys to glyphs and colours, by
 name, then by the name's family before its first dot (`wall.stone`,
 `wall`). It knows nothing of where a scene came from.
 
+Text and glyphs are DejaVu Sans Mono 2.37 (`raylib/fonts/`, its license
+beside it), built into the program with `#load` and rasterised at each
+pixel size as it is first drawn (`font.odin`), so they stay sharp at every
+zoom. Its atlas holds ASCII, Latin-1, Greek, arrows, box drawing, blocks
+and shades, and the suits and faces; any other code point draws as `?`.
+
 ## Building
 
 ```sh

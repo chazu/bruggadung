@@ -196,10 +196,11 @@ isometric later.
 - **tess-raylib** (`tessera/raylib/`, built in part): a window with a
   camera that pans and zooms, the focus level up and down, and a panel.
   Selecting a mark in a truth scene names its entity, which the watcher's
-  inspector shows. Glyphs are raylib's own font for now, drawn at whole
-  multiples of its size, with a theme from appearance keys to glyphs and
-  colours; a key with no glyph is drawn as its first letter in a colour
-  of its own. To come: overlay toggles, a glyph atlas, and developer
+  inspector shows. Glyphs and text are DejaVu Sans Mono, built into the
+  program and rasterised at each size drawn, so they stay sharp at every
+  zoom, with the symbols a glyph theme wants (♣, ≈, ⌂, ☺, box drawing,
+  shades). A theme maps appearance keys to glyphs and colours; a key with
+  no glyph is drawn as its first letter in a colour of its own. To come: overlay toggles, a glyph atlas, and developer
   panels (raygui comes with it).
 - **Later:** a browser viewer (sokol or wgpu on wasm, reading scenes over a
   socket), and a recording player.
@@ -235,7 +236,7 @@ isometric later.
    resolved by type, and a theme for tess-term. BGPlay's glyph table goes.
 4. **The first window.** tess-raylib watching a lab scenario: glyph atlas,
    camera, focus level. Built: the watcher, with the camera, the focus
-   level, selection and an inspector, in raylib's font.
+   level, selection and an inspector.
 5. **Overlays and the developer panel.** Fields from domains (heat, air,
    light, sound), knowledge age, causal traces.
 6. **Control.** A character played from the window, through the action

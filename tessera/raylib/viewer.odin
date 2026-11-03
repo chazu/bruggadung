@@ -19,6 +19,9 @@ import rl "vendor:raylib"
 
 import "../../tessera"
 
+HEADER_PX :: 18
+PANEL_PX  :: 15
+
 // What the viewer looks at, and how. Change it freely between frames.
 Viewer :: struct {
 	centre:   [2]f32,          // the tile at the middle of the map
@@ -28,10 +31,15 @@ Viewer :: struct {
 	selected: u64,             // a mark's id, or 0
 	shade:    bool,            // darken by light
 	panel:    i32,             // px wide at most, the panel on the right (two fifths of a narrow window)
+	fonts:    Fonts,           // viewer_free lets them go
 }
 
 viewer_make :: proc(centre: [2]f32, focus: i32, levels: [2]i32) -> Viewer {
 	return Viewer{centre = centre, tile = 22, focus = focus, levels = levels, shade = true, panel = 380}
+}
+
+viewer_free :: proc(v: ^Viewer) {
+	fonts_free(&v.fonts)
 }
 
 // The map's part of the window, left of the panel.
@@ -142,18 +150,18 @@ viewer_draw :: proc(v: ^Viewer, s: ^tessera.Scene, theme: ^Theme, header, panel:
 	}
 	y: f32 = 6
 	for line in header {
-		rl.DrawRectangle(4, i32(y) - 2, rl.MeasureText(cstr(line), 20) + 8, 22, {0, 0, 0, 170})
-		rl.DrawText(cstr(line), 8, i32(y), 20, {230, 230, 220, 255})
-		y += 22
+		rl.DrawRectangleV({4, y - 2}, {text_width(&v.fonts, line, HEADER_PX) + 8, HEADER_PX + 4}, {0, 0, 0, 180})
+		draw_text(&v.fonts, line, {8, y}, HEADER_PX, {230, 230, 220, 255})
+		y += HEADER_PX + 4
 	}
 	rl.DrawRectangle(i32(pane.width), 0, panel_width(v), rl.GetScreenHeight(), {18, 18, 24, 255})
 	rl.DrawLine(i32(pane.width), 0, i32(pane.width), rl.GetScreenHeight(), {70, 70, 80, 255})
 	y = 10
 	for line in panel {
-		for part in wrap(line, panel_width(v) - 20, 16) {
-			if y > f32(rl.GetScreenHeight()) - 16 do return
-			rl.DrawText(cstr(part), i32(pane.width) + 10, i32(y), 16, {210, 210, 200, 255})
-			y += 18
+		for part in wrap(&v.fonts, line, f32(panel_width(v) - 20), PANEL_PX) {
+			if y > f32(rl.GetScreenHeight()) - PANEL_PX do return
+			draw_text(&v.fonts, part, {pane.width + 10, y}, PANEL_PX, {210, 210, 200, 255})
+			y += PANEL_PX + 3
 		}
 		y += 4
 	}
@@ -162,7 +170,7 @@ viewer_draw :: proc(v: ^Viewer, s: ^tessera.Scene, theme: ^Theme, header, panel:
 @(private)
 draw_map :: proc(v: ^Viewer, s: ^tessera.Scene, theme: ^Theme) {
 	e := s.extent
-	font := rl.GetFontDefault()
+	font := font_at(&v.fonts, i32(v.tile * 0.85 + 0.5))
 	for y in e.y0 ..< e.y0 + e.h {
 		for x in e.x0 ..< e.x0 + e.w {
 			o := tile_origin(v, x, y)
@@ -195,15 +203,16 @@ draw_map :: proc(v: ^Viewer, s: ^tessera.Scene, theme: ^Theme) {
 	}
 }
 
+// A glyph centred on its tile, at the size its font was made for.
 @(private)
 draw_glyph :: proc(font: rl.Font, ch: rune, o: [2]f32, tile: f32, fg: rl.Color) {
 	buf: [8]u8
 	n := copy(buf[:], fmt.bprintf(buf[:7], "%c", ch))
 	buf[n] = 0
-	// the default font is 10 px: drawn at a whole multiple, it stays crisp
-	size := max(10, f32(int(tile * 0.9 / 10 + 0.5)) * 10)
+	size := f32(font.baseSize)
 	w := rl.MeasureTextEx(font, cstring(&buf[0]), size, 0)
-	rl.DrawTextCodepoint(font, ch, o + ([2]f32{tile, tile} - w) / 2, size, fg)
+	at := o + ([2]f32{tile, tile} - w) / 2
+	rl.DrawTextCodepoint(font, ch, {f32(int(at.x + 0.5)), f32(int(at.y + 0.5))}, size, fg)
 }
 
 @(private)
@@ -230,11 +239,11 @@ cstr :: proc(s: string) -> cstring {
 // A line broken at spaces into parts at most `width` px wide (a word wider
 // than that stands alone).
 @(private)
-wrap :: proc(line: string, width: i32, size: i32) -> []string {
+wrap :: proc(f: ^Fonts, line: string, width: f32, px: i32) -> []string {
 	parts := make([dynamic]string, context.temp_allocator)
 	rest := line
 	for len(rest) > 0 {
-		if rl.MeasureText(cstr(rest), size) <= width {
+		if text_width(f, rest, px) <= width {
 			append(&parts, rest)
 			break
 		}
@@ -242,7 +251,7 @@ wrap :: proc(line: string, width: i32, size: i32) -> []string {
 		for i < len(rest) {
 			j := strings.index_byte(rest[i:], ' ')
 			end := len(rest) if j < 0 else i + j
-			if rl.MeasureText(cstr(rest[:end]), size) > width do break
+			if text_width(f, rest[:end], px) > width do break
 			cut = end
 			if j < 0 do break
 			i = end + 1
