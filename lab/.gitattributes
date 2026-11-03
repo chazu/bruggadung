@@ -1,3 +1,0 @@
-# Test expectations are compared exactly
-*.stderr    binary
-*.stdout    binary

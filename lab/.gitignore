@@ -1,9 +1,2 @@
 # build output
 build/
-
-# left behind by mulle-sde, which the lab no longer uses: safe to delete
-.mulle/
-kitchen/
-dependency/
-addiction/
-stash/
