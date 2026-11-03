@@ -23,7 +23,7 @@ Watcher :: struct {
 	ids:       []Entity_ID,      // the watcher deletes it
 }
 
-WATCHABLE :: "crowd [agents], spread [agents], cistern, cistern-b, cistern-d, cistern-e, " +
+WATCHABLE :: "village, crowd [agents], spread [agents], cistern, cistern-b, cistern-d, cistern-e, " +
              "marked-nail, marked-nail-a, marked-nail-b"
 
 
@@ -42,6 +42,21 @@ watcher_open :: proc(name: string, agents: i32) -> (w: Watcher, why: string) {
 			agency    = crowd.agency,
 			follow    = crowd.ids[0] if len(crowd.ids) > 0 else 0,
 			ids       = crowd.ids,
+		}, ""
+	case name == "village":
+		world := test_world(101)
+		if world == nil do return {}, "no world"
+		village := autorelease(village_init_with_world(world, test_committer(world)))
+		if village.error != "" do return {}, village.error
+		ids := make([]Entity_ID, len(village.people))
+		for v, i in village.people do ids[i] = v.id
+		return Watcher {
+			title     = strings.clone(name),
+			world     = world,
+			scheduler = village.scheduler,
+			agency    = village.agency,
+			follow    = ids[0],
+			ids       = ids,
 		}, ""
 	case strings.has_prefix(name, "cistern"):
 		variant: Cistern_Variant

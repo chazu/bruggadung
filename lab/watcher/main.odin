@@ -3,7 +3,7 @@
  * viewer in one process. The world runs on the viewer's clock, boundary by
  * boundary, and each frame draws a truth scene of what is in view.
  *
- *   watcher [-C contentdir] <what> [agents] [--shot file.png]
+ *   watcher [-C contentdir] <what> [agents] [--from hours] [--shot file.png]
  *
  * <what> is one of lab.WATCHABLE. In the window:
  *
@@ -14,7 +14,9 @@
  *   arrows/WASD, right-drag: pan; wheel: zoom; PgUp/PgDn or < >: level;
  *   L: light; Esc: select nothing
  *
- * --shot draws three seconds of frames, saves the last as a PNG, and quits:
+ * --from runs the world that many hours before the window opens (as it
+ * would run watched: no boundary put in). --shot draws three seconds of
+ * frames, saves the last as a PNG, and quits:
  * a look at the window without anyone at it.
  *
  * The lab itself never links raylib: this is its own executable, built by
@@ -47,8 +49,13 @@ HELP :: [?]string {
 main :: proc() {
 	args := os.args[1:]
 	shot: string
-	if len(args) >= 2 && args[len(args) - 2] == "--shot" {
-		shot = args[len(args) - 1]
+	from: f64                          // hours of world time run before the window opens
+	for len(args) >= 2 && (args[len(args) - 2] == "--shot" || args[len(args) - 2] == "--from") {
+		if args[len(args) - 2] == "--shot" {
+			shot = args[len(args) - 1]
+		} else if h, ok := strconv.parse_f64(args[len(args) - 1]); ok && h >= 0 {
+			from = h
+		}
 		args = args[:len(args) - 2]
 	}
 	if len(args) >= 2 && args[0] == "-C" {
@@ -82,10 +89,22 @@ main :: proc() {
 	rl.SetExitKey(.KEY_NULL)           // Escape lets go of the selection; q quits
 	rl.SetTargetFPS(60)
 
+	/* until looks are content (TESSERA.md slice 3, issue #2): the lab's
+	 * blueprints by name */
 	theme := view.theme_make()
 	for agent in ([?]string{"worker", "smith", "agent_a", "agent_b"}) {
 		view.theme_set(&theme, agent, {'@', {240, 220, 120, 255}, theme.background})
 	}
+	view.theme_set(&theme, "farmer",         {'@', {170, 230, 110, 255}, theme.background})
+	view.theme_set(&theme, "woodcutter",     {'@', {230, 170, 100, 255}, theme.background})
+	view.theme_set(&theme, "hunter",         {'@', {200, 200, 210, 255}, theme.background})
+	view.theme_set(&theme, "bed",            {'Θ', {190, 140, 90, 255}, theme.background})
+	view.theme_set(&theme, "stove",          {'¤', {230, 120, 60, 255}, theme.background})
+	view.theme_set(&theme, "larder",         {'■', {170, 130, 80, 255}, theme.background})
+	view.theme_set(&theme, "woodpile",       {'≡', {160, 110, 60, 255}, theme.background})
+	view.theme_set(&theme, "scarecrow",      {'¥', {220, 200, 120, 255}, theme.background})
+	view.theme_set(&theme, "chopping_block", {'Ω', {180, 130, 80, 255}, theme.background})
+	view.theme_set(&theme, "hunting_blind",  {'⌂', {150, 170, 120, 255}, theme.background})
 	world := w.world
 	levels := lab.world_levels(world)
 	v := view.viewer_make({f32(lab.world_tiles_wide(world)) / 2, f32(lab.world_tiles_high(world)) / 2}, 0,
@@ -96,7 +115,8 @@ main :: proc() {
 	speeds := SPEEDS
 	speed := 2                         // 1 world second a second
 	paused := false
-	clock := f64(lab.world_time(world).ms)   // the viewer's clock: world ms
+	lab.watcher_step_until(&w, i64(from * 3_600_000), max(u64))
+	clock := max(f64(lab.world_time(world).ms), from * 3_600_000)   // the viewer's clock: world ms
 	behind := false
 	seq: u64
 

@@ -91,6 +91,7 @@ cut: the levels of detail first, then other topics, then code.
 | `fastening/` | nuts and spanners; tightening a nut of uncertain size |
 | `harm/` | striking and being struck: hitting back, getting clear |
 | `heat/` | stoves and fuel, the heat of solids, cold |
+| `home/` | beds, worksites, and the day's commitments: to work, home, to bed |
 | `hunger/` | satiety and reserves (`body.tri`); what going without weakens (`weakness.tri`); eating and food's nourishment (`eating.tri`) |
 | `institutions/` | laws and the watch (`law.tri`); content, copies, seals and permits (`permits.tri`) |
 | `light/` | daylight and lamps |
@@ -104,6 +105,7 @@ cut: the levels of detail first, then other topics, then code.
 | `talk/` | utterances, accounts, a lie; records written and read |
 | `terrain/` | terrain kinds, and the maps (`maps/`, brought in by `@embed`) |
 | `traces/` | trace kinds, what is read from them, a disturbance investigated |
+| `village/` | the village: its map, its villagers, their beds, larders, woodpiles and worksites |
 | `valves/` | levers, wrenches and pipes; turning a seized valve |
 | `water/` | stores and taps, and drawing from them |
 | `work/` | employment: asking for work, hiring, a job, the wage |

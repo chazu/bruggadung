@@ -7,8 +7,8 @@ households, living for weeks in a village. They farm, gather firewood, hunt
 and meet at a market. The watcher shows it (TESSERA.md), and `lab run
 village` checks it, as the other scenarios are checked.
 
-This document is a proposal, built a slice at a time: slice 1 (hunger over
-weeks) is built. Each slice below is a ticket: slice n is GitHub issue #n
+This document is a proposal, built a slice at a time: slices 1 (hunger
+over weeks) and 3 (the village and its homes) are built. Each slice below is a ticket: slice n is GitHub issue #n
 (label `village`). A slice moves into `lab/PLAN.md` when it is built.
 
 It is the first scenario that runs for weeks, not minutes. That forces two
@@ -54,6 +54,10 @@ things the lab put off:
    household (ownership claims, things.tri). A household is its members'
    kin bonds (bonds.tri). No new entity is needed until abstract detail
    needs a **place** (DETAIL_REGIMES.md) to carry a larder's level.
+   - Built: a bed is known by its blanket, a colour of its own in the
+     village. Beds just alike were taken for one another: an agent passing
+     a neighbour's door saw a bed like its own and believed its own had
+     moved there.
 4. **A day's shape is a routine of commitments.** Each agent has
    commitments that recur every day (AGENCY.md §8): sleep at home through
    the night, and its work in the day's hours. Its needs (hunger, cold,
@@ -62,6 +66,13 @@ things the lab put off:
    The lab already undertakes a goal over a window, every period
    (`agency_undertake_goal_from_until_source_every`), so the routine is
    content: what the commitments are and when.
+   - Built (content/home/home.tri): to work 07:00–15:00, home by one's bed
+     15:00–22:00, a night's sleep in one's own bed from 22:00. Each is
+     undertaken with its slots bound (`agency_undertake_every_with`): the
+     agent's bed, its household's **worksite** (a scarecrow in the plot, a
+     chopping block, a hunting blind). Sight reaches four tiles, so each
+     villager is shown its worksite and its home before the first morning;
+     the rest of the way it finds as it walks.
 5. **Crops ripen in closed form** (slice 6). A crop is an entity on a plot
    tile, sown at a time. Its growth is a function of time since sowing,
    read when needed, with one wake when it ripens. Nothing steps it.
@@ -104,16 +115,17 @@ things the lab put off:
 
 ## The village
 
-A map of about 160 × 100 tiles on one level (`content/village/maps/`), from
-north to south:
+A map of 160 × 100 tiles on one level (`content/village/maps/`, built),
+from north to south:
 
-- **The woods**, in the north and east: woodland ground and about 200 trees
-  (oak and birch), with deer and hares.
-- **Four houses round a green**, each one room (two for the largest), with
-  a door, a stove, beds, a larder and a woodpile.
-- **The green**, where the market is held, with a well (water.tri's
-  cistern and tap, for later).
-- **The plots**, in the south: tilled ground, a few dozen tiles to each
+- **The woods**, in the north and east: woodland ground, and (with slices
+  5 and 7) about 200 trees, oak and birch, with deer and hares.
+- **Four houses round the green**, two on either side of the path east,
+  each one room with a door onto the path, a stove, beds, a larder, and a
+  woodpile by the door.
+- **The green**, where the paths cross, where the market is to be held
+  (slice 9), with a well later (water.tri's cistern and tap).
+- **The plots**, in the south: tilled ground, a few hundred tiles to each
   farming household.
 - **Paths** joining the plots, the green and the woods.
 
@@ -219,7 +231,7 @@ when it is built:
    (built).
 2. **Looks in content** (TESSERA.md slice 3).
 3. **The village and its homes**: the map, the households, beds, the day's
-   commitments, sleeping at home.
+   commitments, sleeping at home (built).
 4. **Cooking and the larder**: meals, eating at home.
 5. **Firewood**: trees, felling, splitting, the woodpile, stoking.
 6. **Farming**: plots, sowing, ripening, harvesting.
@@ -254,6 +266,7 @@ New, and entered in the glossary with this document:
 | Sale | A deal of goods for coins, made on the spot. *Avoid:* trade, which is a craft. |
 | Market day | Every fourth day, when stalls are set out on the green. |
 | Household | The people of a home: kin bonds. Not a **place** (DETAIL_REGIMES.md's entity), until abstract detail needs one. |
+| Worksite | What a household's day's work is done at: a scarecrow in a plot, a chopping block, a hunting blind. *Avoid:* workplace. (Built.) |
 
 ## Open questions
 

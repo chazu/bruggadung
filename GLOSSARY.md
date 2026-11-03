@@ -493,6 +493,10 @@ REALITY.md, TER = TERRAIN.md, TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc'
   disposition. (AGE d12)
 - **Routine**: the goals in force at a time, from commitments and habits.
   (AGE §8)
+- **Worksite**: what a household's day's work is done at (`#Worksite`: a
+  scarecrow in a plot, a chopping block): its people's work commitment is
+  bound to it. *Avoid:* workplace, place of work (a **place** is
+  DETAIL_REGIMES.md's). (VIL d4, lab/content/home/home.tri)
 - **Habit**: a learned preference in a context, with a strength that
   rises with repetition and decays. (AGE §8)
 - **Disposition**: a per-agent weight: honesty, curiosity, diligence, risk

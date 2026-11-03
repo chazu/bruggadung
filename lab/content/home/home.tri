@@ -1,0 +1,100 @@
+// Home: beds, sleeping in one's own, and the day's commitments: to work by
+// day, home after, and to bed at night (VILLAGE.md decisions 3 and 4).
+//
+// Cut points:
+// - full:     each commitment is a window that recurs every day; it is
+//             weighed as duty, against needs and whatever else the agent
+//             wants, as any commitment is (AGENCY.md §7, §8). Its slots are
+//             bound when it is undertaken: the agent's own bed, its
+//             household's worksite.
+// - reduced:  the same, decided on the cadence's beat; sleeping runs its
+//             hours.
+// - abstract: as reduced. Where an abstract agent counts as being, by the
+//             hour, is a schedule (DETAIL_REGIMES.md), not built.
+// - frozen:   it doesn't decide; a sleep under way waits.
+// - rest:     sleeping is resting (rest/rest.tri's effect): it clears
+//             fatigue, and wakes when the air over the sleeper turns bad.
+// - village:  the houses, beds and worksites are the village's
+//             (village/village.tri); what the work is, is for the topics
+//             that do it (farming, firewood, hunting).
+// - code:     the scenario undertakes the commitments, binding their slots
+//             (src/scenario_village.odin); a bed's owner is an ownership
+//             claim (things.tri), not yet something a method can ask after.
+
+// Something to sleep in, its blanket the colour it is known by: a bed is
+// told from another just like it by that, as an agent's own is.
+#Bed: #Body & {
+    @component(Bed)
+    blanket: #Colour @field(content, saved, proposable, inspect, perceive(sight))
+}
+
+// Where someone works: what a day's work is done at, or near. What the
+// work is, its topic says.
+#Worksite: #Body & {}
+
+#Sleeping: #Frame & { bed: #Bed }
+#Working:  #Frame & { worksite: #Worksite }
+
+// The night's commitment: a night's sleep in one's own bed (bound when it
+// is undertaken).
+sleep_in_bed: #Goal & {
+    title: "sleep in my bed"
+    done:  #Did & { did: "sleep" }
+} @family(goals)
+
+go_to_bed: #Method & {
+    title: "go to bed"
+    goal:  "sleep_in_bed"
+    rank:  1
+    pre:   { find: ["bed"], match: #Sleeping & { bed: #Bed } }
+    steps: [#Do & { op: "sleep", object: "bed" }]
+} @family(methods)
+
+// The afternoon's: home again, by one's bed.
+be_home: #Goal & {
+    title: "go home"
+    done:  #Reached & { reached: "bed" }
+} @family(goals)
+
+walk_home: #Method & {
+    title: "walk home"
+    goal:  "be_home"
+    rank:  1
+    pre:   { find: ["bed"], match: #Sleeping & { bed: #Bed } }
+    steps: [#Do & { op: "look_over", object: "bed" }]
+} @family(methods)
+
+// The day's: at one's worksite.
+be_at_work: #Goal & {
+    title: "go to work"
+    done:  #Reached & { reached: "worksite" }
+} @family(goals)
+
+walk_to_work: #Method & {
+    title: "walk to work"
+    goal:  "be_at_work"
+    rank:  1
+    pre:   { find: ["worksite"], match: #Working & { worksite: #Worksite } }
+    steps: [#Do & { op: "look_over", object: "worksite" }]
+} @family(methods)
+
+// Sleep the night through in a bed within reach: rest, eight hours of it.
+sleep: #Operation & {
+    effect:   "rest"
+    duration: 8h
+    uses:     ["hands", "legs"]
+    roles: {
+        actor: #Agent & { place: #OnTile }
+        item:  #Bed
+    }
+} @family(operations)
+
+// Look over one's bed or one's worksite, within reach: what walking
+// there to be by it does when it gets there.
+look_over: #Operation & {
+    effect: "look"
+    roles: {
+        actor: #Agent
+        item:  #Bed | #Worksite
+    }
+} @family(operations)

@@ -1,10 +1,10 @@
-// Generated from Triangle content b4c48f758dd53ef1: do not edit. Type IDs are valid
+// Generated from Triangle content 7d535891d647340b: do not edit. Type IDs are valid
 // only for this content; regenerate when it changes.
 package lab
 
 import tri "../../triangle/odin/triangle"
 
-CONTENT_HASH :: 0xb4c48f758dd53ef1
+CONTENT_HASH :: 0x7d535891d647340b
 
 // Combustor, from #Combustor
 Combustor :: struct {
@@ -195,6 +195,11 @@ Assembly :: struct {
 	slots: i64,    // int, in quanta of 1; content, saved, inspect, perceive(sight)
 }
 
+// Bed, from #Bed
+Bed :: struct {
+	blanket: u32,    // #Colour: a type ID; content, saved, proposable, inspect, perceive(sight)
+}
+
 // Cock, from #Cock
 Cock :: struct {
 	serves: cstring,    // text; content, saved, inspect
@@ -334,66 +339,69 @@ Fastener :: struct {
 }
 
 // #ActivityStatus
-ACTIVITYSTATUS_ABORTED :: 450
-ACTIVITYSTATUS_COMPLETED :: 451
-ACTIVITYSTATUS_EXHAUSTED :: 452
-ACTIVITYSTATUS_FAILED :: 453
-ACTIVITYSTATUS_RUNNING :: 454
-ACTIVITYSTATUS_SUSPENDED :: 455
+ACTIVITYSTATUS_ABORTED :: 482
+ACTIVITYSTATUS_COMPLETED :: 483
+ACTIVITYSTATUS_EXHAUSTED :: 484
+ACTIVITYSTATUS_FAILED :: 485
+ACTIVITYSTATUS_RUNNING :: 486
+ACTIVITYSTATUS_SUSPENDED :: 487
 
 // #Tie
-TIE_EMPLOY :: 539
-TIE_FRIEND :: 540
-TIE_KIN :: 541
-TIE_SWORN :: 542
+TIE_EMPLOY :: 574
+TIE_FRIEND :: 575
+TIE_KIN :: 576
+TIE_SWORN :: 577
 
 // #ClaimKind
-CLAIMKIND_CUSTODY :: 457
-CLAIMKIND_OWNERSHIP :: 458
-CLAIMKIND_RESERVATION :: 459
+CLAIMKIND_CUSTODY :: 489
+CLAIMKIND_OWNERSHIP :: 490
+CLAIMKIND_RESERVATION :: 491
 
 // #Penalty
-PENALTY_FINE :: 527
-PENALTY_ARREST :: 558
-PENALTY_CONFISCATE :: 559
+PENALTY_FINE :: 562
+PENALTY_ARREST :: 593
+PENALTY_CONFISCATE :: 594
 
 // #Wrong
-WRONG_ANOTHERS :: 550
-WRONG_UNAUTHORIZED :: 551
+WRONG_ANOTHERS :: 585
+WRONG_UNAUTHORIZED :: 586
 
 // #Material
-MATERIAL_CLOTH :: 514
-MATERIAL_FOOD :: 515
-MATERIAL_LEATHER :: 516
-MATERIAL_RUBBER :: 517
-MATERIAL_STONE :: 518
-MATERIAL_FLESH :: 561
-MATERIAL_BRASS :: 563
-MATERIAL_IRON :: 564
-MATERIAL_PAPER :: 565
-MATERIAL_STEEL :: 566
-MATERIAL_OAK :: 568
+MATERIAL_CLOTH :: 548
+MATERIAL_EARTH :: 549
+MATERIAL_FOOD :: 550
+MATERIAL_LEATHER :: 551
+MATERIAL_RUBBER :: 552
+MATERIAL_STONE :: 553
+MATERIAL_FLESH :: 596
+MATERIAL_BRASS :: 598
+MATERIAL_IRON :: 599
+MATERIAL_PAPER :: 600
+MATERIAL_STEEL :: 601
+MATERIAL_OAK :: 603
 
 // "flesh" | "metal" | "natural" | "paper" | "wood"
-BODY_SURFACE_NATURAL :: 351
-BODY_SURFACE_FLESH :: 561
-BODY_SURFACE_BRASS :: 563
-BODY_SURFACE_IRON :: 564
-BODY_SURFACE_PAPER :: 565
-BODY_SURFACE_STEEL :: 566
-BODY_SURFACE_OAK :: 568
+BODY_SURFACE_NATURAL :: 374
+BODY_SURFACE_FLESH :: 596
+BODY_SURFACE_BRASS :: 598
+BODY_SURFACE_IRON :: 599
+BODY_SURFACE_PAPER :: 600
+BODY_SURFACE_STEEL :: 601
+BODY_SURFACE_OAK :: 603
 
 // #Colour
-COLOUR_BLUE :: 462
-COLOUR_BLACK :: 464
-COLOUR_BROWN :: 465
-COLOUR_GREEN :: 466
-COLOUR_GREY :: 467
-COLOUR_NAVY :: 468
-COLOUR_RED :: 469
-COLOUR_YELLOW :: 470
-COLOUR_BEIGE :: 487
-COLOUR_WHITE :: 510
+COLOUR_BLUE :: 494
+COLOUR_BLACK :: 496
+COLOUR_BROWN :: 497
+COLOUR_GREEN :: 498
+COLOUR_GREY :: 499
+COLOUR_NAVY :: 500
+COLOUR_ORANGE :: 501
+COLOUR_PURPLE :: 502
+COLOUR_RED :: 503
+COLOUR_YELLOW :: 504
+COLOUR_BEIGE :: 521
+COLOUR_WHITE :: 544
 
 // The field registry: what code needs to read and write any component
 // generically.
@@ -421,7 +429,7 @@ Component_Info :: struct {
 	fields:  [^]Field_Info,
 }
 
-COMPONENT_COUNT :: 40
+COMPONENT_COUNT :: 41
 
 @(rodata) Combustor_fields := [?]Field_Info{
 	{"burnRate", offset_of(Combustor, burnRate), VALUE_QUANTITY, "int", "content, saved, inspect"},
@@ -570,6 +578,9 @@ COMPONENT_COUNT :: 40
 @(rodata) Assembly_fields := [?]Field_Info{
 	{"slots", offset_of(Assembly, slots), VALUE_QUANTITY, "int", "content, saved, inspect, perceive(sight)"},
 }
+@(rodata) Bed_fields := [?]Field_Info{
+	{"blanket", offset_of(Bed, blanket), VALUE_TYPE, "#Colour", "content, saved, proposable, inspect, perceive(sight)"},
+}
 @(rodata) Cock_fields := [?]Field_Info{
 	{"serves", offset_of(Cock, serves), VALUE_TEXT, "text", "content, saved, inspect"},
 	{"shut", offset_of(Cock, shut), VALUE_BOOL, "bool", "content, saved, proposable, inspect, perceive(sight)"},
@@ -693,6 +704,7 @@ COMPONENTS := [COMPONENT_COUNT + 1]Component_Info{
 	{"Body", "#Body", size_of(Body), 5, &Body_fields[0]},
 	{"Agent", "#Agent", size_of(Agent), 24, &Agent_fields[0]},
 	{"Assembly", "#Assembly", size_of(Assembly), 1, &Assembly_fields[0]},
+	{"Bed", "#Bed", size_of(Bed), 1, &Bed_fields[0]},
 	{"Cock", "#Cock", size_of(Cock), 2, &Cock_fields[0]},
 	{"Container", "#Container", size_of(Container), 1, &Container_fields[0]},
 	{"Inscription", "#Copy", size_of(Inscription), 6, &Inscription_fields[0]},

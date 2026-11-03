@@ -3752,4 +3752,5 @@ ALL_TESTS := [?]Test_Case{
 	{"restore_errors",                test_restore_errors},
 	{"formatting",                    test_formatting},
 	{"watcher",                       test_watcher},
+	{"village",                       test_village},
 }

@@ -4,7 +4,7 @@
  *   lab test [name]          run the tests (those whose names contain `name`)
  *   lab run <scenario>       run a scenario and print its trace and checks:
  *                            marked-nail, marked-nail-a, marked-nail-b,
- *                            cistern, cistern-b, cistern-d, cistern-e
+ *                            cistern, cistern-b, cistern-d, cistern-e, village
  *   lab save <scenario>      run a scenario and print the save of its end state
  *   lab menu <scenario> <ms> run a scenario to a time and print the worker's menu
  *   lab play <world> [--seed n] [--log file]
@@ -25,7 +25,7 @@ import "core:strings"
 @(private = "file")
 usage :: proc() -> i32 {
 	fmt.eprintf("usage: lab [-C contentdir] test [name]\n" +
-	            "       lab [-C contentdir] run|save marked-nail|marked-nail-a|marked-nail-b\n" +
+	            "       lab [-C contentdir] run|save marked-nail|marked-nail-a|marked-nail-b|cistern...|village\n" +
 	            "       lab [-C contentdir] menu marked-nail|marked-nail-a|marked-nail-b <ms>\n" +
 	            "       lab [-C contentdir] play workshop|cistern|shed [--seed n] [--log file]\n" +
 	            "       lab [-C contentdir] bench crowd|spread [agents] [seconds] [anchor[=kind]]\n")
@@ -120,6 +120,28 @@ run_cistern :: proc(name: string) -> i32 {
 }
 
 
+/* The village: three days and nights, its people, its checks. */
+@(private = "file")
+run_village :: proc(save_: bool) -> i32 {
+	world := test_world(101)
+	if world == nil do return 1
+	release_shared_content_after_use()
+	c := test_committer(world)
+	village := autorelease(village_init_with_world(world, c))
+	village_run(village)
+	if save_ {
+		fmt.printf("%s", save(world, c, nil))
+		return 1 if village_failure_count(village) != 0 else 0
+	}
+	fmt.printf("== the village at t=%dms, boundary %d\n", world_time(world).ms, world_boundary(world))
+	for i: u64 = 1; i < world_next_id(world); i += 1 do fmt.printf("%s\n", world_describe_entity(world, Entity_ID(i)))
+	fmt.printf("\n== checks\n")
+	for line in village_results(village) do fmt.printf("%s\n", line)
+	fmt.printf("state hash %016x\n", world_state_hash(world))
+	return 1 if village_failure_count(village) != 0 else 0
+}
+
+
 @(private = "file")
 run_scenario :: proc(name: string, save_: bool, menuAt: i64) -> i32 {
 	variant:  Marked_Nail_Variant
@@ -129,6 +151,7 @@ run_scenario :: proc(name: string, save_: bool, menuAt: i64) -> i32 {
 	entities: ^Store
 
 	if strings.has_prefix(name, "cistern") do return run_cistern(name)
+	if name == "village" do return run_village(save_)
 	if name == "marked-nail" {
 		variant = .Base
 	} else if name == "marked-nail-a" {

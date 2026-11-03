@@ -4443,3 +4443,33 @@ Objective-C lab's (the hashes in `ci/scenario-hashes.txt` are unchanged).
 115 tests, 3582 checks. The scenario hashes changed: agents' records have
 `Hungry` in place of `Agent.fed`, and the content's new types move a type
 number in the trace; every scenario's printed trace is otherwise the same.
+
+
+### After the slice: the village and its homes (VILLAGE.md slice 3, issue #3)
+
+- `content/village/`: the village's map, 160 by 100 (woods north and east,
+  four houses either side of the path east, plots south), drawn on four new
+  terrain kinds (grass, tilled soil, woodland, dirt path; `earth`, a
+  material); its villagers (farmers, woodcutters, hunters), beds, larders,
+  woodpiles and worksites.
+- `content/home/`: beds and worksites, and the day's commitments: to work
+  07:00–15:00, home by one's bed until 22:00, a night's sleep in one's own
+  bed. `agency_undertake_every_with` undertakes a recurring commitment with
+  its slots bound.
+- `lab run village` (src/scenario_village.odin): twelve people in four
+  households, kin to each other, each bed owned by its sleeper and the
+  household's things by its eldest; three days and nights, checked at
+  11:00, 21:00 and 02:00. The run goes boundary by boundary to each check,
+  putting none in, so a watched village is the same run. About 4 s on this
+  Mac.
+- Found on the way: beds just alike were taken for each other. An agent
+  passing a neighbour's door saw a bed like its own and believed its own
+  had moved there; a bed is now known by its blanket's colour (two colours
+  added, purple and orange, for twelve). Sight is four tiles, so each
+  villager is shown its worksite and its home before the first morning.
+- The watcher watches the village (`watcher village --from 15`), with
+  glyphs for its ground and things until looks are content (issue #2).
+
+116 tests, 3597 checks. The scenario hashes changed: the content's new
+types (a material, two colours, the terrain kinds) move type numbers in
+the traces and state; each scenario's printed trace is otherwise the same.

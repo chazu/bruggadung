@@ -28,6 +28,10 @@ theme_make :: proc(allocator := context.allocator) -> Theme {
 	theme_set(&t, "wall",        {'#', {190, 186, 176, 255}, {74, 72, 68, 255}})
 	theme_set(&t, "doorway",     {'\'', {170, 130, 70, 255}, {30, 26, 20, 255}})
 	theme_set(&t, "air",         {' ', {0, 0, 0, 255}, {4, 4, 6, 255}})
+	theme_set(&t, "ground.grass",    {',', {84, 132, 58, 255}, {20, 34, 16, 255}})
+	theme_set(&t, "ground.tilled",   {'≈', {150, 108, 62, 255}, {44, 30, 18, 255}})
+	theme_set(&t, "ground.woodland", {'"', {58, 112, 52, 255}, {12, 26, 12, 255}})
+	theme_set(&t, "ground.path",     {'.', {156, 136, 102, 255}, {42, 36, 26, 255}})
 	return t
 }
 

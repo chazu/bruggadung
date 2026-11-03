@@ -729,6 +729,22 @@ agency_undertake_goal_from_until_source_every :: proc(self: ^Agency, agent: Enti
 }
 
 
+/* A commitment recurring every period, its slots bound already (a bed of
+ * the agent's own, its household's worksite): referents of the
+ * agent's. */
+agency_undertake_every_with :: proc(self: ^Agency, agent: Entity_ID, goal: cstring, from: i64, until: i64,
+                                    source: cstring, every: i64, slots: []Slot_Binding) -> bool {
+	if len(slots) > BG_MAX_SLOTS || !agency_undertake_goal_from_until_source_every(self, agent, goal, from, until, source, every) {
+		return false
+	}
+	m := agency_mind_of(self, agent)
+	c := &m.commitments[m.ncommitments - 1]
+	for b, i in slots do c.params[i] = {world_intern(self.world, b.slot), b.referent}
+	c.nparams = i32(len(slots))
+	return true
+}
+
+
 /* A recurring commitment whose window has closed opens its next one. */
 @(private = "file")
 agency_renew_commitments :: proc(self: ^Agency, m: ^Motivation) {

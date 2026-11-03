@@ -1,0 +1,53 @@
+// The village: its map, its four households, their homes and places of
+// work (VILLAGE.md, slice 3).
+//
+// Cut points:
+// - full:     everyone in the village is at full detail: the scenario sets
+//             no anchor, so nobody falls below (VILLAGE.md decision 1).
+// - reduced, abstract, frozen: nobody is, yet.
+// - home:     beds and worksites are home/home.tri's kinds, and the
+//             day's commitments its goals.
+// - hunger:   the villagers get hungry (hunger/body.tri); there is no food
+//             in the village yet (cooking, farming and hunting are slices
+//             to come), so over its first days their reserves fall a
+//             little.
+// - heat:     each house has a stove (heat/heat.tri), cold, with no domain
+//             running it in the scenario yet.
+// - terrain:  the map's kinds are terrain/terrain.tri's.
+// - code:     src/scenario_village.odin: where everyone and everything
+//             stands, the households' bonds and claims, the commitments,
+//             and the checks.
+
+// The village (VILLAGE.md, "The village"): 160 by 100, the woods north and
+// east, four houses on either side of the path east, a path north to the
+// woods and south to the two farming households' plots.
+village_map: #Map & {
+    legend: [{ glyph: "#", terrain: "stone_wall" },
+             { glyph: ".", terrain: "plank_floor" },
+             { glyph: "+", terrain: "doorway" },
+             { glyph: ",", terrain: "grass" },
+             { glyph: "%", terrain: "tilled_soil" },
+             { glyph: ";", terrain: "woodland" },
+             { glyph: "=", terrain: "dirt_path" }]
+    levels: [{ z: 0, rows: _ @embed(file="maps/village.0.map", type=text) }]
+    fill:   "grass"
+}
+
+let person = #Hungry & { material: "flesh", hands: 2 }
+
+// The villagers, by their work.
+farmer:     #Agent & person & { mass: 75kg, coat: "green", trade: "farmer" }
+woodcutter: #Agent & person & { mass: 85kg, coat: "brown", trade: "woodcutter" }
+hunter:     #Agent & person & { mass: 70kg, coat: "grey", trade: "hunter" }
+
+// In each house: a bed for each of its people, a larder; by its door, a
+// woodpile. (Its stove is heat/heat.tri's.)
+bed:      #Bed & { material: "wood", mass: 40kg, blanket: "grey" }
+larder:   #Container & { material: "wood", mass: 30kg, capacity: 50 }
+woodpile: #Container & { material: "wood", mass: 5kg, capacity: 100 }
+
+// Where each household works: a scarecrow in a plot, a chopping block at
+// the woods' edge, a hunting blind in the east woods.
+scarecrow:      #Worksite & { material: "wood", mass: 8kg }
+chopping_block: #Worksite & { material: "oak", mass: 60kg }
+hunting_blind:  #Worksite & { material: "wood", mass: 30kg }

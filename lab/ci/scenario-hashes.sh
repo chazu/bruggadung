@@ -19,7 +19,7 @@ hash() {
     tr -d '\r' | $SHA | cut -c1-16
 }
 
-for s in marked-nail marked-nail-a marked-nail-b cistern cistern-b cistern-d cistern-e; do
+for s in marked-nail marked-nail-a marked-nail-b cistern cistern-b cistern-d cistern-e village; do
     run=$("$LAB" run "$s" 2>&1 | tr -d '\r')
     printf '%-14s run %s save %s %s\n' "$s" \
         "$(printf '%s\n' "$run" | hash)" \

@@ -37,6 +37,12 @@ stone_wall:  #Terrain & { solid: true, opaque: true, madeOf: "stone", look: "wal
 doorway:     #Terrain & { divides: true, draught: 200, madeOf: "stone", look: "doorway" } @family(terrain)
 // nothing to stand on: the level below shows through
 open_air:    #Terrain & { floored: false, madeOf: "stone", look: "air" } @family(terrain)
+// out of doors (VILLAGE.md): grass; ground tilled for a crop; the floor of
+// the woods, among the trees; a path worn bare
+grass:       #Terrain & { madeOf: "earth", look: "ground.grass" } @family(terrain)
+tilled_soil: #Terrain & { madeOf: "earth", look: "ground.tilled" } @family(terrain)
+woodland:    #Terrain & { madeOf: "earth", look: "ground.woodland" } @family(terrain)
+dirt_path:   #Terrain & { madeOf: "earth", look: "ground.path" } @family(terrain)
 
 // A map: its levels drawn in characters, a level to a file brought in by
 // @embed; its legend, a terrain kind for each character; and the kind of

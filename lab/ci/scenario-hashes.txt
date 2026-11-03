@@ -1,7 +1,8 @@
-marked-nail    run e7c1bb908df4def9 save d3f8a98030e54781 state hash 1b7e2e29aa1e22e4
-marked-nail-a  run c8317b0e64f98e71 save 1b4142ba5137b6e3 state hash b43070ccfa60998c
-marked-nail-b  run 96c008edf7562c17 save fd4d69d529940e33 state hash 842072bbf83a8c86
-cistern        run 2b9c5d2ac77ff646 save 2b9c5d2ac77ff646 
-cistern-b      run 51c0b145256afab4 save 51c0b145256afab4 
-cistern-d      run 2b9c5d2ac77ff646 save 2b9c5d2ac77ff646 
-cistern-e      run 11b4fef7b42e6928 save 11b4fef7b42e6928 
+marked-nail    run ff412869bfd2b741 save 60bb5256c08073c1 state hash 666217dd6d550b63
+marked-nail-a  run f74af10f05c244c0 save 8c5765eccc0675a2 state hash 0db1505ac5682535
+marked-nail-b  run 07eaf8db7ef06a9a save 68d3dbd437cdacde state hash bcb850616dc965ab
+cistern        run b07c499d2eb1fa0d save b07c499d2eb1fa0d 
+cistern-b      run 1bb91e837b95bba4 save 1bb91e837b95bba4 
+cistern-d      run b07c499d2eb1fa0d save b07c499d2eb1fa0d 
+cistern-e      run d61c2ad53bf1a272 save d61c2ad53bf1a272 
+village        run fbfc7ce3359dd515 save 0b551cdfc50b98f8 state hash 9087126614866d6a
