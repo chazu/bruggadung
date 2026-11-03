@@ -23,7 +23,7 @@ Doc abbreviations: ACT = ACTIONS.md, AGE = AGENCY.md, ARC =
 ARCHITECTURE.md, CL = CONTENT_LANGUAGE.md, COM = COMPONENTS.md, DES =
 DESIGN.md, DOM = DOMAIN_SIMULATION.md, DR = DETAIL_REGIMES.md, INS =
 INSTITUTIONS.md, KNO = KNOWLEDGE.md, LAT = LATENT_ASSEMBLY.md, REA =
-REALITY.md, TER = TERRAIN.md, TES = TESSERA.md. "d3" is a doc's decision
+REALITY.md, TER = TERRAIN.md, TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
 3; "§3" its numbered section.
 
 ## The project
@@ -780,6 +780,31 @@ REALITY.md, TER = TERRAIN.md, TES = TESSERA.md. "d3" is a doc's decision
   `lab/watcher/`, in one process with its window. Not an activity's
   **watch**. (TES)
 
+## The village (proposed)
+
+- **Satiety**: how full the stomach is, emptying over hours; what is felt
+  as hunger. An empty stomach doesn't harm. (VIL d2)
+- **Reserves**: what the body draws on while satiety is empty, lasting
+  weeks; weakness (attention, the pace of work, perception, grip) comes
+  from them, by curves in content. (VIL d2)
+- **Nourishment**: what a food gives satiety when eaten; eating proposes
+  **nourish by N**, and the body applies it. (VIL d2)
+- **Plot**: tilled ground a household farms. *Avoid:* field (a
+  component's field). (VIL d5)
+- **Crop**: a plant on a plot tile, sown at a time, ripe after its growth,
+  read lazily. (VIL d5)
+- **Perishable**: good for so long after it was made, then spoiled. (VIL
+  d8)
+- **Carcass**: what an animal's body is once it has died, to butcher.
+  (VIL d7)
+- **Stall**: where a seller sets out goods on **market day** (every fourth
+  day, on the green), with its **posted prices**: written records of what
+  it asks. (VIL d9)
+- **Sale**: a deal of goods for coins, made on the spot. *Avoid:* trade
+  (a craft, `Agent.trade`). (VIL d9)
+- **Household**: the people of a home, joined by kin bonds. Not a
+  **place**, until abstract detail needs one. (VIL d3)
+
 ## Words with more than one sense
 
 Each row says which term to use for which sense.
@@ -816,3 +841,5 @@ Each row says which term to use for which sense.
 | office | a position in an organization | **organization** (the body) |
 | subject | a claim's subject | **topic** (what a content directory is about) |
 | package | Triangle's: content scoping names | **Odin package** (a directory of Odin code) |
+| field | a component's field | **plot** (farmed ground) |
+| trade | a craft (`Agent.trade`) | **sale** (goods for coins) |
