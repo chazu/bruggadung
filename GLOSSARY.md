@@ -96,6 +96,16 @@ REALITY.md, TER = TERRAIN.md, TES = TESSERA.md. "d3" is a doc's decision
 - **Component**: one instance of a component kind on one entity. (COM)
 - **Component kind**: a kind of state and behaviour (`Body`,
   `ThermalBody`, `Stack`), declared in content by `@component`. (COM, CL §3)
+- **Blueprint**: content describing what an entity is made of: its
+  component kinds and their fields' values, or the ranges and alternatives
+  they are drawn from. A blueprint is a Triangle instance whose type
+  includes at least one component kind (`cistern: #Assembly & #WaterStore
+  & { ... }`); it combines the constraints of its parents, mixins and its
+  own fields by unification, conflicts being load errors. At load it
+  resolves into a **spec**, and entities are constructed from the spec,
+  never from the blueprint; nothing at runtime is written back into it. A
+  blueprint may name latent schemas, unit specs for stacks, and domain
+  parameters. *Avoid:* template, prototype, archetype. (COM §10, CL §8)
 - **Component store**: all components of one kind, keyed by entity and
   iterated in entity order. *Avoid:* bare "store". (COM §3)
 - **Field**: a declared piece of component state, with a unit and flags.
@@ -687,10 +697,12 @@ REALITY.md, TER = TERRAIN.md, TES = TESSERA.md. "d3" is a doc's decision
 - **Let**: a named expression, copied at each use. **Comprehension**: a
   `for`/`if` expanded at load. (CL §1)
 - **Instance**: a top-level name without `#`; not in the hierarchy. (CL)
-- **Blueprint**: an instance whose type includes a component kind; what an
-  entity is made from. (CL §8, COM §10)
-- **Spec**: a blueprint resolved at load: immutable, without defaults,
-  with its variation points recorded. (CL §7)
+- **Blueprint**: see *Entities and components*. In Triangle's terms, an
+  instance whose type includes a component kind; other instances
+  (operations, methods, regimes) become patterns instead. (CL §8)
+- **Spec**: a blueprint resolved at load: flat, immutable, its defaults
+  decided, its variation points recorded; what construction reads. (CL §7,
+  COM §10)
 - **Construction**: making an entity from a spec and its **seed**. (CL §7)
 - **Variation**: what a spec leaves open, drawn from the seed at
   construction, per **variation point** (seed hashed with the point's
