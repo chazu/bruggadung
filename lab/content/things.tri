@@ -7,6 +7,8 @@
 // Cut points:
 // - detail:  none here. What a field does at each level of detail is its
 //            topic's to say.
+// - looks:   a kind's #Look is declared beside the kind, here or in its
+//            topic; what each theme draws for a look is looks/'s.
 // - code:    the structs and the registry the lab uses are generated from all
 //            the content, every topic's fields with these (make gen:
 //            src/components.odin); the lab refuses to run on content
@@ -34,6 +36,28 @@
 
 // Anything with identity. In the truth projection, id is the entity's handle.
 #Thing: { id: ref }
+
+// How something is drawn (TESSERA.md decision 6): its look, an appearance
+// key, which a backend's theme gives a glyph, a sprite (looks/). Terrain
+// kinds carry theirs (terrain/terrain.tri); a thing's is a #Look, declared
+// beside its kind.
+#Looks: { look: text }
+
+// What things of a kind look like: `kindOf`, the kind, a type ("#Bed") or a
+// blueprint ("scarecrow"). A thing looks as the most specific kind it is
+// with a look: its blueprint, then its blueprint's type, then that type's
+// parents, in turn (a look can't be a field refined down the types: two
+// defaults conflict). A thing several kinds at once (a cistern, an assembly
+// and a water store) looks as the one whose look `prevails` most; on a tie,
+// the first.
+#Look: #Looks & { kindOf: text, prevails: *0 | int }
+
+thing_look:     #Look & { kindOf: "#Thing", look: "thing", prevails: -2 } @family(looks)
+body_look:      #Look & { kindOf: "#Body", look: "body", prevails: -1 } @family(looks)
+agent_look:     #Look & { kindOf: "#Agent", look: "agent", prevails: 3 } @family(looks)
+stack_look:     #Look & { kindOf: "#Stack", look: "stack" } @family(looks)
+container_look: #Look & { kindOf: "#Container", look: "container" } @family(looks)
+assembly_look:  #Look & { kindOf: "#Assembly", look: "assembly", prevails: 2 } @family(looks)
 
 // Where a physical thing is: the location relation, as a description.
 #Place:     {}

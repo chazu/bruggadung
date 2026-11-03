@@ -52,6 +52,8 @@
 #Shell: #ThermalBody & {}
 
 // A stove, at 275 K.
+stove_look: #Look & { kindOf: "#Stove", look: "stove" } @family(looks)
+
 stove: #Stove & { material: "iron", mass: 120kg, burnRate: 250, fuel: 3kg,
                   heat: 12375000, heatCapacity: 45000, toAir: 20, toOutdoors: 0 }
 

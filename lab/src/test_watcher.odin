@@ -54,7 +54,7 @@ test_watcher :: proc() {
 		x, y, z, ok := watcher_tile_of(&w, id)
 		m := tessera.mark_find(s, u64(id)) if s != nil else nil
 		bg_check(ok && m != nil && m.x == x && m.y == y && m.z == z && m.stack > 0)
-		if m != nil do bg_check(tessera.look_name(s, m.look) == "worker")
+		if m != nil do bg_check(tessera.look_name(s, m.look) == "agent")   /* a worker looks as an agent */
 	}
 	delete(w.ids)
 	delete(w.title)

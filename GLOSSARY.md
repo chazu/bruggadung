@@ -788,8 +788,11 @@ REALITY.md, TER = TERRAIN.md, TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc'
   with a range and palette. (TES)
 - **Annotation**: a line, arrow, path or callout. *Avoid:* note. (TES)
 - **Developer-only**: tagged so a player-view backend refuses it. (TES d2)
-- **Look**: a kind's appearance in content; in a scene, its **appearance
-  key**, mapped by a **theme** to glyphs, atlas cells and tints. (TES d6)
+- **Look**: a kind's appearance in content (a `#Look`, beside the kind:
+  the most specific kind's wins, and of a kind several at once the one
+  that **prevails**); in a scene, its **appearance key**, mapped by a
+  **theme** to glyphs, atlas cells and tints. Themes are content too
+  (lab/content/looks/: text, tiles). (TES d6)
 - **Viewer**: the program that displays scenes; the scene's `viewer` field
   is the entity whose knowledge it shows. (TES d5)
 - **Watcher**: what runs a lab world and publishes its scenes to a viewer:

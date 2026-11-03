@@ -53,7 +53,9 @@ select), `viewer_extent` says what to ask a producer for, and
 `viewer_draw` draws the scene with a header and a panel of lines the
 caller gives. A `Theme` maps appearance keys to glyphs and colours, by
 name, then by the name's family before its first dot (`wall.stone`,
-`wall`). It knows nothing of where a scene came from.
+`wall`); `theme_make` starts one empty, and the caller fills it (the
+watcher, from the lab's content: lab/content/looks/tiles.tri). It knows
+nothing of where a scene came from.
 
 Text and glyphs are DejaVu Sans Mono 2.37 (`raylib/fonts/`, its license
 beside it), built into the program with `#load` and rasterised at each

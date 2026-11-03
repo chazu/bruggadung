@@ -89,22 +89,12 @@ main :: proc() {
 	rl.SetExitKey(.KEY_NULL)           // Escape lets go of the selection; q quits
 	rl.SetTargetFPS(60)
 
-	/* until looks are content (TESSERA.md slice 3, issue #2): the lab's
-	 * blueprints by name */
+	/* the tiles theme, from content (content/looks/tiles.tri) */
 	theme := view.theme_make()
-	for agent in ([?]string{"worker", "smith", "agent_a", "agent_b"}) {
-		view.theme_set(&theme, agent, {'@', {240, 220, 120, 255}, theme.background})
+	for g in lab.watcher_glyphs(&w) {
+		ground := view.rgb(g.ground) if g.has_ground else theme.background
+		view.theme_set(&theme, g.look, {g.char, view.rgb(g.ink), ground})
 	}
-	view.theme_set(&theme, "farmer",         {'@', {170, 230, 110, 255}, theme.background})
-	view.theme_set(&theme, "woodcutter",     {'@', {230, 170, 100, 255}, theme.background})
-	view.theme_set(&theme, "hunter",         {'@', {200, 200, 210, 255}, theme.background})
-	view.theme_set(&theme, "bed",            {'Θ', {190, 140, 90, 255}, theme.background})
-	view.theme_set(&theme, "stove",          {'¤', {230, 120, 60, 255}, theme.background})
-	view.theme_set(&theme, "larder",         {'■', {170, 130, 80, 255}, theme.background})
-	view.theme_set(&theme, "woodpile",       {'≡', {160, 110, 60, 255}, theme.background})
-	view.theme_set(&theme, "scarecrow",      {'¥', {220, 200, 120, 255}, theme.background})
-	view.theme_set(&theme, "chopping_block", {'Ω', {180, 130, 80, 255}, theme.background})
-	view.theme_set(&theme, "hunting_blind",  {'⌂', {150, 170, 120, 255}, theme.background})
 	world := w.world
 	levels := lab.world_levels(world)
 	v := view.viewer_make({f32(lab.world_tiles_wide(world)) / 2, f32(lab.world_tiles_high(world)) / 2}, 0,
@@ -143,8 +133,9 @@ main :: proc() {
 		if !paused {
 			clock += dt * 1000 * speeds[speed]
 			behind = !lab.watcher_step_until(&w, i64(clock), BUDGET_NS)
-			// a world slower than the clock falls behind by a quarter second at most
-			clock = min(clock, f64(lab.world_time(world).ms) + 250 * speeds[speed])
+			// a world slower than the clock falls behind by a quarter second at
+			// most; one with nothing to do (no boundary due) isn't behind
+			if behind do clock = min(clock, f64(lab.world_time(world).ms) + 250 * speeds[speed])
 		}
 
 		if follow && v.selected != 0 {

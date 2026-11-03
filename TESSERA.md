@@ -68,8 +68,18 @@ Two things in the repository shape it:
    stacking order. It resolves through the type hierarchy, so the most
    specific kind with a look wins. Producers put an **appearance key** on
    each mark, and a backend's **theme** maps keys to what it can draw (a
-   glyph set, a sprite atlas). Nothing hard-codes a kind's look, as
-   BGPlay's glyph table does today.
+   glyph set, a sprite atlas). Nothing hard-codes a kind's look.
+   - Built (slice 3): a look is a `#Look` in the `looks` family, declared
+     beside its kind (lab/content/things.tri), naming the kind (a type, or
+     one blueprint) and its key. It can't be a field refined down the
+     types: in Triangle two defaults conflict. A thing looks as its
+     blueprint's look, else its type's, else that type's parents' in turn;
+     a kind several at once (the cistern, an assembly and a water store)
+     as the look that `prevails` most. The lab resolves them (lab/src/looks.odin).
+   - Themes are content too (lab/content/looks/): a text theme, BGPlay's
+     map a character to a tile, and a tiles theme, the watcher's glyphs
+     and colours. A theme matches a key by name, then by its family (the
+     part before its first dot: `agent.farmer`, then `agent`).
 7. **Glyphs come first.** The first GPU backend draws glyph tiles from a
    font atlas. It is the same pipeline that sprites will use (instanced
    textured quads), without the art.
@@ -232,8 +242,10 @@ isometric later.
    tests), and tests, including truncated and corrupted input.
 2. **Producers in the lab.** Scenes for both views, and BGPlay's `look`
    drawn through tess-term, with the same output. Built: truth scenes.
-3. **Appearance in content.** A look declared beside blueprints, keys
-   resolved by type, and a theme for tess-term. BGPlay's glyph table goes.
+3. **Appearance in content** (built). A look declared beside blueprints,
+   keys resolved by type, and themes in content: BGPlay's glyph table and
+   the watcher's are gone. BGPlay's map isn't yet a knowledge scene drawn
+   by tess-term (slice 2); it draws in the text theme directly.
 4. **The first window.** tess-raylib watching a lab scenario: glyph atlas,
    camera, focus level. Built: the watcher, with the camera, the focus
    level, selection and an inspector.
@@ -257,5 +269,6 @@ isometric later.
 - **Motion between boundaries.** An activity has progress, so a walking
   agent could be drawn partway across a tile. Should scenes carry activity
   progress, or should backends only interpolate between positions?
-- **Where themes live.** In content, beside the looks, or as assets (atlas
-  images, glyph sets) a backend loads.
+- **Where themes live** (settled, for glyphs: decision 6). In content
+  (lab/content/looks/). Atlas images, when sprites come, would be assets a
+  theme in content names.

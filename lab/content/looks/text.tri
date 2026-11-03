@@ -1,0 +1,17 @@
+// Looks, the text theme: `lab play`'s map, a character to a tile (see
+// looks.tri for the cut points).
+
+text_wall:        #Glyph & { theme: "text", look: "wall", char: "#" } @family(glyphs)
+text_floor:       #Glyph & { theme: "text", look: "floor", char: "." } @family(glyphs)
+text_doorway:     #Glyph & { theme: "text", look: "doorway", char: "." } @family(glyphs)
+text_air:         #Glyph & { theme: "text", look: "air", char: "." } @family(glyphs)
+text_ground:      #Glyph & { theme: "text", look: "ground", char: "." } @family(glyphs)
+text_water:       #Glyph & { theme: "text", look: "water", char: "~" } @family(glyphs)
+text_thing:       #Glyph & { theme: "text", look: "thing", char: "o" } @family(glyphs)
+text_body:        #Glyph & { theme: "text", look: "body", char: "o" } @family(glyphs)
+text_agent:       #Glyph & { theme: "text", look: "agent", char: "A" } @family(glyphs)
+text_assembly:    #Glyph & { theme: "text", look: "assembly", char: "m" } @family(glyphs)
+text_container:   #Glyph & { theme: "text", look: "container", char: "u" } @family(glyphs)
+text_tap:         #Glyph & { theme: "text", look: "tap", char: "u" } @family(glyphs)
+text_stack:       #Glyph & { theme: "text", look: "stack", char: "*" } @family(glyphs)
+text_water_store: #Glyph & { theme: "text", look: "water.store", char: "w" } @family(glyphs)

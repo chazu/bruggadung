@@ -95,6 +95,7 @@ cut: the levels of detail first, then other topics, then code.
 | `hunger/` | satiety and reserves (`body.tri`); what going without weakens (`weakness.tri`); eating and food's nourishment (`eating.tri`) |
 | `institutions/` | laws and the watch (`law.tri`); content, copies, seals and permits (`permits.tri`) |
 | `light/` | daylight and lamps |
+| `looks/` | themes: what `lab play`'s map (`text.tri`) and the watcher (`tiles.tri`) draw for each look |
 | `machines/` | latent assembly, wear and servicing (`latent.tri`); the pump and its repair (`pump.tri`) |
 | `money/` | getting money: borrowing, taking; a loan repaid |
 | `nails/` | nail stacks, wedging a lock, finding nails, putting them away |

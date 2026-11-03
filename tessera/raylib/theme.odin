@@ -20,19 +20,15 @@ Theme :: struct {
 	background: rl.Color,
 }
 
-// A theme for the terrain content has now (content/terrain/terrain.tri).
+// An empty theme on a dark background: the caller gives it its glyphs
+// (the lab's from content: content/looks/tiles.tri).
 theme_make :: proc(allocator := context.allocator) -> Theme {
-	t := Theme{glyphs = make(map[string]Glyph, allocator), background = {8, 8, 10, 255}}
-	theme_set(&t, "floor",       {'.', {110, 110, 100, 255}, {28, 28, 26, 255}})
-	theme_set(&t, "floor.plank", {'.', {140, 104, 60, 255}, {42, 30, 18, 255}})
-	theme_set(&t, "wall",        {'#', {190, 186, 176, 255}, {74, 72, 68, 255}})
-	theme_set(&t, "doorway",     {'\'', {170, 130, 70, 255}, {30, 26, 20, 255}})
-	theme_set(&t, "air",         {' ', {0, 0, 0, 255}, {4, 4, 6, 255}})
-	theme_set(&t, "ground.grass",    {',', {84, 132, 58, 255}, {20, 34, 16, 255}})
-	theme_set(&t, "ground.tilled",   {'≈', {150, 108, 62, 255}, {44, 30, 18, 255}})
-	theme_set(&t, "ground.woodland", {'"', {58, 112, 52, 255}, {12, 26, 12, 255}})
-	theme_set(&t, "ground.path",     {'.', {156, 136, 102, 255}, {42, 36, 26, 255}})
-	return t
+	return Theme{glyphs = make(map[string]Glyph, allocator), background = {8, 8, 10, 255}}
+}
+
+// A colour from red, green and blue, opaque.
+rgb :: proc(c: [3]u8) -> rl.Color {
+	return {c[0], c[1], c[2], 255}
 }
 
 theme_free :: proc(t: ^Theme) {

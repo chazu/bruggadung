@@ -49,7 +49,7 @@ compares each one's hashes with `ci/scenario-hashes.txt`.
 | `src/save_save.odin` | Saves as text, and restoring them |
 | `src/scenario_*.odin` | The worlds' setups, and *The marked nail*, the cistern and the village: the scenarios, their input logs, and their checks |
 | `src/play_play.odin` | The interactive session behind `lab play` |
-| `src/scene_truth.odin`, `src/watcher.odin` | Tessera's truth scenes of a world; what the watcher can watch, and its running of it |
+| `src/scene_truth.odin`, `src/looks.odin`, `src/watcher.odin` | Tessera's truth scenes of a world; what things look like, and themes, from content; what the watcher can watch, and its running of it |
 | `watcher/` | The watcher: a lab world in a window, its own executable (raylib), built by `make watcher` |
 | `src/test_*.odin`, `main.odin` | The test runner and the tests; the command line |
 

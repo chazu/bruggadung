@@ -32,6 +32,9 @@
 // work is, its topic says.
 #Worksite: #Body & {}
 
+bed_look:      #Look & { kindOf: "#Bed", look: "bed" } @family(looks)
+worksite_look: #Look & { kindOf: "#Worksite", look: "worksite" } @family(looks)
+
 #Sleeping: #Frame & { bed: #Bed }
 #Working:  #Frame & { worksite: #Worksite }
 

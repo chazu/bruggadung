@@ -32,6 +32,9 @@
     rate: int & >=0 & <=100000  @field(content, saved, proposable, inspect)
 }
 
+water_store_look: #Look & { kindOf: "#WaterStore", look: "water.store", prevails: 1 } @family(looks)
+tap_look:         #Look & { kindOf: "#Tap", look: "tap" } @family(looks)
+
 cistern: #Assembly & #WaterStore & { material: "oak", mass: 40kg, slots: 4, water: 15L, waterCapacity: 200L }
 tap:     #Tap & { material: "brass", mass: 300g, capacity: 1, rate: 5000 }
 crack:   #Tap & { material: "oak", mass: 0g, capacity: 1, rate: 500, open: true }

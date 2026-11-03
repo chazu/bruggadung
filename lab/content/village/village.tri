@@ -40,6 +40,10 @@ farmer:     #Agent & person & { mass: 75kg, coat: "green", trade: "farmer" }
 woodcutter: #Agent & person & { mass: 85kg, coat: "brown", trade: "woodcutter" }
 hunter:     #Agent & person & { mass: 70kg, coat: "grey", trade: "hunter" }
 
+farmer_look:     #Look & { kindOf: "farmer", look: "agent.farmer" } @family(looks)
+woodcutter_look: #Look & { kindOf: "woodcutter", look: "agent.woodcutter" } @family(looks)
+hunter_look:     #Look & { kindOf: "hunter", look: "agent.hunter" } @family(looks)
+
 // In each house: a bed for each of its people, a larder; by its door, a
 // woodpile. (Its stove is heat/heat.tri's.)
 bed:      #Bed & { material: "wood", mass: 40kg, blanket: "grey" }
@@ -51,3 +55,9 @@ woodpile: #Container & { material: "wood", mass: 5kg, capacity: 100 }
 scarecrow:      #Worksite & { material: "wood", mass: 8kg }
 chopping_block: #Worksite & { material: "oak", mass: 60kg }
 hunting_blind:  #Worksite & { material: "wood", mass: 30kg }
+
+larder_look:         #Look & { kindOf: "larder", look: "container.larder" } @family(looks)
+woodpile_look:       #Look & { kindOf: "woodpile", look: "container.woodpile" } @family(looks)
+scarecrow_look:      #Look & { kindOf: "scarecrow", look: "worksite.scarecrow" } @family(looks)
+chopping_block_look: #Look & { kindOf: "chopping_block", look: "worksite.block" } @family(looks)
+hunting_blind_look:  #Look & { kindOf: "hunting_blind", look: "worksite.blind" } @family(looks)

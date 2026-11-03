@@ -19,14 +19,13 @@
 // A doorway's `draught` is the air it passes with no door shut in it, mmol
 // a second each way. Its `look` is its appearance key for Tessera. `madeOf`
 // is its material (`material` is a body's).
-#Terrain: {
+#Terrain: #Looks & {
     solid:   *false | true
     opaque:  *false | true
     floored: *true | false
     divides: *false | true
     draught: *0 | int & >=0 & <=1000000
     madeOf:  #Material
-    look:    text
 }
 
 // A world with no map is open floor.

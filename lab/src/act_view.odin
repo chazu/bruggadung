@@ -170,40 +170,44 @@ append_place :: proc(s: ^strings.Builder, loc: Location) {
  * ("mass: 90g, material: \"iron\", ..."), without id or place. "" where the
  * Objective-C returned nil (no such entity). */
 view_kind_of :: proc(self: ^View, entity: Entity_ID) -> string {
-	info:    ^Entity_Info
+	return kind_of_entity(self.world, entity)
+}
+
+
+/* An entity's kind, as the senses can tell it: the type of the blueprint it
+   was built from. A generated type (a meet, glb[...]) has no name to write,
+   so the types of its components stand for it: those the senses can tell
+   (one with fields, none of them perceived, is nothing it looks like: a
+   stomach), and of those only the most specific (#Agent says #Body). One
+   left is the kind; more, their conjunction. "" for no entity. */
+kind_of_entity :: proc(world: ^World, entity: Entity_ID) -> string {
 	pattern: ^tri.Node
 	name:    cstring
 	s:       strings.Builder
 	k:       uint
 
-	info = world_info(self.world, entity)
+	info := world_info(world, entity)
 	if info == nil do return ""
-	/* the type of the blueprint it was built from. A generated type (a meet,
-	   glb[...]) has no name to write, so the types of its components stand
-	   for it: those the senses can tell (one with fields, none of them
-	   perceived, is nothing it looks like: a stomach), and of those only the
-	   most specific (#Agent says #Body). One left is the kind; more, their
-	   conjunction. */
-	tc     := world_tri(self.world)
+	tc     := world_tri(world)
 	pattern = tri.pattern(tc, info.blueprint)
 	name    = tri.type_name(tc, tri.node_type(pattern)) if pattern != nil else "#Thing"
 	if !strings.contains_any(string(name), "[ &") do return string(name)
 	shown := make([dynamic]uint, context.temp_allocator)
-	for k = 0; k < world_kind_count(self.world); k += 1 {
-		if world_record(self.world, k, entity) == nil do continue
-		kind := world_kind_info(self.world, k)
+	for k = 0; k < world_kind_count(world); k += 1 {
+		if world_record(world, k, entity) == nil do continue
+		kind := world_kind_info(world, k)
 		seen := kind.nfields == 0
 		for i: uint = 0; i < kind.nfields && !seen; i += 1 do seen = strings.contains(string(kind.fields[i].flags), "perceive(")
 		if seen do append(&shown, k)
 	}
 	kept := make([dynamic]cstring, context.temp_allocator)
 	for a in shown {
-		ta := tri.type_named(tc, world_kind_info(self.world, a).type)
+		ta := tri.type_named(tc, world_kind_info(world, a).type)
 		implied := false
 		for b in shown {
-			if b != a && tri.subtype(tc, tri.type_named(tc, world_kind_info(self.world, b).type), ta) != 0 do implied = true
+			if b != a && tri.subtype(tc, tri.type_named(tc, world_kind_info(world, b).type), ta) != 0 do implied = true
 		}
-		if !implied do append(&kept, world_kind_info(self.world, a).type)
+		if !implied do append(&kept, world_kind_info(world, a).type)
 	}
 	if len(kept) == 1 do return string(kept[0])
 	s = strings.builder_make(context.temp_allocator)

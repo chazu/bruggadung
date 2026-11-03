@@ -282,43 +282,18 @@ play_perform :: proc(self: ^Play, action: Action, amount: i64) -> ^Proposal_Grou
 
 
 
+/* A character of the text theme (content/looks/text.tri) for a look; `none`
+ * if the theme has nothing for it. */
 @(private = "file")
-Glyph :: struct {
-	kind:  cstring,
-	glyph: u8,
-}
-
-@(private = "file", rodata)
-glyphs := [?]Glyph {
-	{"Agent", 'A'}, {"Assembly", 'm'}, {"Container", 'u'}, {"WaterStore", 'w'}, {"Stack", '*'},
-	{"Body", 'o'},
-}
-
-@(private = "file")
-play_glyph_of :: proc(self: ^Play, e: Entity_ID) -> u8 {
-	if e == self.actor do return '@'
-	for i := 0; i < len(glyphs); i += 1 {
-		if world_record(self.world, world_kind_named(self.world, glyphs[i].kind), e) != nil do return glyphs[i].glyph
-	}
-	return '?'
-}
-
-
-@(private = "file")
-glyph_of_kind :: proc(kind: cstring) -> u8 {
-	k := string(kind)
-	if strings.contains(k, "WaterStore") && !strings.contains(k, "Assembly") do return 'w'
-	if k == "#Agent" do return 'A'
-	if strings.contains(k, "Assembly") do return 'm'
-	if k == "#Container" || k == "#Tap" do return 'u'
-	if k == "#Stack" do return '*'
-	return 'o'
+text_glyph :: proc(glyphs: []Glyph_Entry, look: string, none: u8) -> u8 {
+	g, ok := glyph_for(glyphs, look)
+	return u8(g.char) if ok && g.char < 0x80 else none
 }
 
 
 /* The map as the actor knows it: tiles it has seen, what it remembers on
- * them, and its age. Nothing here reads the world, except what is in sight
- * now (its tiles' water). */
+ * them, and its age, in the text theme (content/looks/text.tri). Nothing
+ * here reads the world, except what is in sight now (its tiles' water). */
 @(private = "file")
 play_look :: proc(self: ^Play) {
 	store:  ^Knowledge_Store
@@ -336,9 +311,11 @@ play_look :: proc(self: ^Play) {
 		strings.write_string(&self.out, "You know nothing yet.\n")
 		return
 	}
+	glyphs := looks_glyphs(world_tri(self.world), "text", context.temp_allocator)
 	for y := me.y - 3; y <= me.y + 3; y += 1 {
 		for x := me.x - 7; x <= me.x + 7; x += 1 {
 			g = ' '
+			solid := false
 			if knowledge_store_has_seen_x(store, x, y, me.level) {
 				kind: ^Terrain_Info
 				tile: Location
@@ -347,17 +324,19 @@ play_look :: proc(self: ^Play) {
 				kind = (terrain_kind_info(world_terrain(self.world),
 				                          knowledge_store_believed_terrain_at_x(store, x, y, me.level))
 				        if world_terrain(self.world) != nil else nil)
-				if kind != nil && kind.solid {
-					g = '#'
+				solid = kind != nil && kind.solid
+				if knowledge_sees(self.knowledge, tile, on_tile(me.x, me.y, me.level)) &&
+				   world_water_at_x(self.world, x, y, me.level) != 0 && (kind == nil || !kind.solid) {
+					g = text_glyph(glyphs, "water", '~')
 				} else {
-					g = '~' if (knowledge_sees(self.knowledge, tile, on_tile(me.x, me.y, me.level)) &&
-					            world_water_at_x(self.world, x, y, me.level) != 0) else '.'
+					g = text_glyph(glyphs, string(kind.look) if kind != nil else "floor",
+					               '#' if kind != nil && kind.solid else '.')
 				}
 			}
 			for i: uint = 0; i < knowledge_store_count(store); i += 1 {
 				r = knowledge_store_referent_at(store, i)
-				if r.present && r.form == .On_Tile && r.x == x && r.y == y && (g == '.' || g == '~' || g == ' ') {
-					g = '@' if r.id == me.id else glyph_of_kind(r.kind)
+				if r.present && r.form == .On_Tile && r.x == x && r.y == y && !solid {
+					g = '@' if r.id == me.id else text_glyph(glyphs, look_of_kind(self.world, string(r.kind)), 'o')
 				}
 			}
 			if me.x == x && me.y == y do g = '@'

@@ -169,6 +169,13 @@ watcher_describe :: proc(w: ^Watcher, e: Entity_ID) -> []string {
 }
 
 
+/* The tiles theme's glyphs (content/looks/tiles.tri), for the window:
+ * temporary. */
+watcher_glyphs :: proc(w: ^Watcher) -> []Glyph_Entry {
+	return looks_glyphs(world_tri(w.world), "tiles", context.temp_allocator)
+}
+
+
 /* The tile an entity is on, through whatever holds it. */
 watcher_tile_of :: proc(w: ^Watcher, e: Entity_ID) -> (x, y, level: i32, ok: bool) {
 	tile: Location

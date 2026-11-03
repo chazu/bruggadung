@@ -1,0 +1,20 @@
+// Looks: themes, what each backend draws for a look (TESSERA.md decisions
+// 6 and 7): glyphs for a terminal's map (text.tri) and for the watcher's
+// window (tiles.tri).
+//
+// Cut points:
+// - full, reduced, abstract, frozen: alike: how something looks to a
+//            viewer has nothing to do with how it is simulated.
+// - things:  a thing's look is its kind's (things.tri's #Look, declared
+//            beside each kind); a terrain kind's, its own (terrain.tri).
+// - code:    looks are resolved in src/looks.odin; `lab play` draws its map
+//            in the text theme, the watcher its window in the tiles theme
+//            (tessera/raylib's Theme matches a look by its name, then by the
+//            part before its first dot, and draws a look it has nothing for
+//            as its first letter). The view's own signs aren't looks: `@`
+//            for oneself in `lab play`, water drawn over a tile.
+
+// What a theme draws for a look, or a family of looks (the part of a look
+// before its first dot): a glyph (`char`), in `ink`, on `ground` if it
+// fills its tile (terrain), as red, green and blue, 0 to 255.
+#Glyph: #Looks & { theme: "text" | "tiles", char: text, ink: [...int], ground: [...int] }

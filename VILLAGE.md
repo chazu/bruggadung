@@ -8,7 +8,8 @@ and meet at a market. The watcher shows it (TESSERA.md), and `lab run
 village` checks it, as the other scenarios are checked.
 
 This document is a proposal, built a slice at a time: slices 1 (hunger
-over weeks) and 3 (the village and its homes) are built. Each slice below is a ticket: slice n is GitHub issue #n
+over weeks), 2 (looks in content) and 3 (the village and its homes) are
+built. Each slice below is a ticket: slice n is GitHub issue #n
 (label `village`). A slice moves into `lab/PLAN.md` when it is built.
 
 It is the first scenario that runs for weeks, not minutes. That forces two
@@ -229,7 +230,7 @@ when it is built:
 
 1. **Hunger over weeks**: satiety, reserves, nourishment, weakness
    (built).
-2. **Looks in content** (TESSERA.md slice 3).
+2. **Looks in content** (TESSERA.md slice 3; built).
 3. **The village and its homes**: the map, the households, beds, the day's
    commitments, sleeping at home (built).
 4. **Cooking and the larder**: meals, eating at home.

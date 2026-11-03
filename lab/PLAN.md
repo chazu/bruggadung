@@ -4473,3 +4473,28 @@ number in the trace; every scenario's printed trace is otherwise the same.
 116 tests, 3597 checks. The scenario hashes changed: the content's new
 types (a material, two colours, the terrain kinds) move type numbers in
 the traces and state; each scenario's printed trace is otherwise the same.
+
+
+### After the slice: looks in content (VILLAGE.md slice 2, TESSERA.md slice 3, issue #2)
+
+- A look is a `#Look` (content/things.tri), declared beside its kind: the
+  kind (a type, or a blueprint) and its appearance key. A thing looks as its
+  blueprint's look, else its type's, else that type's parents' in turn; a
+  kind several at once as the look that `prevails` (an assembly over a
+  water store over a body). A field refined down the types can't do it:
+  Triangle won't let a subtype's default override its parent's.
+- Themes in content (content/looks/): `text`, `lab play`'s map, which
+  draws as before (its glyph table is gone), and `tiles`, the watcher's
+  glyphs and colours (its table, and Tessera's terrain defaults, gone).
+  Terrain kinds share `look` with things through `#Looks`.
+- Truth scenes key each mark by its look (src/looks.odin); the `looks` test
+  checks the rules, and that every physical thing in the workshop, the
+  cistern and the village, and every terrain kind, has a look the tiles
+  theme draws.
+- Found on the way: the watcher's clock stopped whenever the world had no
+  boundary due (it was held a quarter second past the last), so a world
+  with nothing to do sat at its last boundary's time; now it is held only
+  while the world is behind.
+
+117 tests, 3696 checks. The scenario hashes changed by type numbers only:
+each scenario's printed trace is otherwise the same.

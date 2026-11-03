@@ -5,11 +5,10 @@ package lab
  * 2, slice 2), built from world state at a boundary. A backend draws them;
  * nothing here draws.
  *
- * Cut points: until looks are declared in content (TESSERA.md slice 3), a
- * mark's appearance key is its entity's blueprint name ("worker", "bucket"),
- * and a viewer's theme gives each name its glyph. A terrain kind's key is its
- * `look` (content/terrain/terrain.tri). Light is light_at's 0, 1 or 2, as 0,
- * 128 or 255.
+ * Cut points: a mark's appearance key is its entity's look (looks.odin: its
+ * blueprint's, its kind's, content/things.tri's #Look); a terrain kind's is
+ * its own `look` (content/terrain/terrain.tri). One with none is keyed by its
+ * blueprint's name. Light is light_at's 0, 1 or 2, as 0, 128 or 255.
  */
 
 import "../../tessera"
@@ -63,6 +62,7 @@ scene_truth :: proc(world: ^World, extent: tessera.Extent, seq: u64,
 		}
 		loc := world_location_of(world, id)
 		is_agent := world_record(world, agent, id) != nil
+		look := look_of_entity(world, id)
 		tessera.mark_put(s, tessera.Mark {
 			id     = u64(id),
 			holder = u64(loc.place) if loc.form != .On_Tile else 0,
@@ -70,7 +70,7 @@ scene_truth :: proc(world: ^World, extent: tessera.Extent, seq: u64,
 			x      = tile.x,
 			y      = tile.y,
 			z      = tile.level,
-			look   = tessera.look(s, string(info.blueprint)),
+			look   = tessera.look(s, look if look != "" else string(info.blueprint)),
 			stack  = 10 if is_agent else 0,
 		})
 	}
