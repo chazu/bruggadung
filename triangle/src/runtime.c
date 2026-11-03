@@ -394,6 +394,147 @@ size_t tri_component_header(TriContent *c, const char *prefix, char *buf, size_t
     return n;
 }
 
+/* An Odin type name: the identifier in Ada_Case (GasStore: Gas_Store). */
+static void odin_type_ident(Buf *b, const char *s)
+{
+    Buf id = { 0 };
+    c_ident(&id, s, false);
+    for (size_t i = 0; id.s && id.s[i]; i++) {
+        char ch = id.s[i];
+        if (i > 0 && ch >= 'A' && ch <= 'Z' && id.s[i - 1] >= 'a' && id.s[i - 1] <= 'z') buf_putc(b, '_');
+        if (i == 0 && ch >= 'a' && ch <= 'z') ch = (char) (ch - 'a' + 'A');
+        buf_putc(b, ch);
+    }
+    buf_free(&id);
+}
+
+/* The same structs and registry as tri_component_header, as an Odin file of
+ * package `package`: types named without the prefix, in Ada_Case (Gas_Store), fields by
+ * their content names, enum members as constants (COLOUR_BEIGE), and the
+ * registry as Field_Info and Component_Info tables (COMPONENTS). Structure
+ * fields are ^tri.Node, with Triangle's Odin package imported from
+ * `triangle_import`. */
+size_t tri_component_odin(TriContent *c, const char *package, const char *triangle_import, char *buf, size_t len)
+{
+    Buf b = { 0 }, enums = { 0 }, reg = { 0 }, regtab = { 0 };
+    U64Map emitted = { 0 };
+    bool nodes = false;
+    size_t ncomp = 0;
+    for (uint32_t t = 0; t < c->types.n; t++) {
+        TypeInfo *ti = &c->types.v[t];
+        if (!ti->component) continue;
+        TriNode *e = type_expansion(c, t);
+        Buf sname = { 0 };
+        odin_type_ident(&sname, ti->component);
+        buf_printf(&b, "// %s, from %s\n%s :: struct {\n", ti->component, ti->name, sname.s);
+        buf_printf(&reg, "@(rodata) %s_fields := [?]Field_Info{\n", sname.s);
+        size_t nfields = 0;
+        for (uint32_t f = 0; f < c->feats.n; f++) {
+            if (c->feats.v[f].intro != t) continue;
+            TriNode *v = e ? node_arc(e, f) : NULL;
+            const char *flags = field_flags(c, f);
+            Buf fld = { 0 }, note = { 0 };
+            c_ident(&fld, c->feats.v[f].name, false);
+            const TypeInfo *vt = v ? &c->types.v[v->type] : NULL;
+            const char *otype, *vkind, *kname;
+            if (v && (v->flags & NF_DIM)) {
+                int dim = vt->dim;
+                kname = dim_names[dim];
+                if (dim == DIM_TEXT) { otype = "cstring"; vkind = "TEXT"; buf_puts(&note, "text"); }
+                else if (dim == DIM_REF) { otype = "u64"; vkind = "REF"; buf_puts(&note, "a referent"); }
+                else {
+                    otype = "i64";
+                    vkind = "QUANTITY";
+                    buf_printf(&note, "%s, in quanta of ", dim_names[dim]);
+                    units_format(&note, dim, 1);
+                }
+            } else if (v && c->tbool != TRI_BOTTOM && is_subtype(c, v->type, c->tbool)) {
+                otype = "bool";
+                vkind = "BOOL";
+                kname = "bool";
+                buf_puts(&note, "bool");
+            } else if (v && is_subtype(c, v->type, c->atomroot)) {
+                otype = "u32";
+                vkind = "TYPE";
+                kname = vt->name;
+                buf_printf(&note, "%s: a type ID", vt->name);
+                if (!u64map_get(&emitted, v->type, NULL)) {
+                    u64map_put(&emitted, v->type, 1);
+                    U32Vec members = { 0 };
+                    enum_members(c, v->type, &members);
+                    buf_printf(&enums, "// %s\n", vt->name);
+                    for (size_t m = 0; m < members.n; m++) {
+                        if (vt->kind == TK_ANON) {
+                            c_ident(&enums, ti->component, true);
+                            buf_putc(&enums, '_');
+                            c_ident(&enums, c->feats.v[f].name, true);
+                        } else {
+                            c_ident(&enums, vt->name, true);
+                        }
+                        buf_putc(&enums, '_');
+                        c_ident(&enums, c->types.v[members.v[m]].name, true);
+                        buf_printf(&enums, " :: %u\n", members.v[m]);
+                    }
+                    buf_puts(&enums, "\n");
+                    VEC_FREE(members);
+                }
+            } else {
+                otype = "^tri.Node";
+                vkind = "NODE";
+                kname = vt ? vt->name : "_";
+                nodes = true;
+                buf_printf(&note, "%s: a structure", kname);
+            }
+            buf_printf(&b, "\t%s: %s,    // %s%s%s\n", fld.s, otype, note.s ? note.s : "", flags ? "; " : "", flags ? flags : "");
+            buf_printf(&reg, "\t{\"%s\", offset_of(%s, %s), VALUE_%s, ", c->feats.v[f].name, sname.s, fld.s, vkind);
+            put_c_string(&reg, kname);
+            buf_puts(&reg, ", ");
+            put_c_string(&reg, flags ? flags : "");
+            buf_puts(&reg, "},\n");
+            nfields++;
+            buf_free(&fld);
+            buf_free(&note);
+        }
+        if (!nfields) buf_puts(&b, "\tunused_: u8,    // no fields\n");
+        buf_puts(&b, "}\n\n");
+        if (!nfields) buf_puts(&reg, "\t{},\n");
+        buf_puts(&reg, "}\n");
+        buf_printf(&regtab, "\t{\"%s\", ", ti->component);
+        put_c_string(&regtab, ti->name);
+        buf_printf(&regtab, ", size_of(%s), %zu, &%s_fields[0]},\n", sname.s, nfields, sname.s);
+        buf_free(&sname);
+        ncomp++;
+    }
+    Buf out = { 0 };
+    buf_printf(&out, "// Generated from Triangle content %016llx: do not edit. Type IDs are valid\n"
+                     "// only for this content; regenerate when it changes.\npackage %s\n\n",
+               (unsigned long long) c->hash, package);
+    if (nodes) buf_printf(&out, "import tri \"%s\"\n\n", triangle_import);
+    buf_printf(&out, "CONTENT_HASH :: 0x%016llx\n\n", (unsigned long long) c->hash);
+    if (b.s) buf_puts(&out, b.s);
+    if (enums.s) buf_puts(&out, enums.s);
+    buf_puts(&out, "// The field registry: what code needs to read and write any component\n// generically.\n\n");
+    buf_puts(&out, "VALUE_QUANTITY :: 0\nVALUE_TYPE :: 1\nVALUE_TEXT :: 2\nVALUE_REF :: 3\nVALUE_BOOL :: 4\nVALUE_NODE :: 5\n\n");
+    buf_puts(&out, "Field_Info :: struct {\n\tname:   cstring,    // the feature\n\toffset: uintptr,\n"
+                   "\tvalue:  i32,        // VALUE_...\n"
+                   "\tkind:   cstring,    // a quantity kind, an enum's type name, or a structure's type\n"
+                   "\tflags:  cstring,    // from @field\n}\n\n");
+    buf_puts(&out, "Component_Info :: struct {\n\tname:    cstring,    // the component\n\ttype:    cstring,    // its Triangle type\n"
+                   "\tsize:    uint,\n\tnfields: uint,\n\tfields:  [^]Field_Info,\n}\n\n");
+    buf_printf(&out, "COMPONENT_COUNT :: %zu\n\n", ncomp);
+    if (reg.s) buf_puts(&out, reg.s);
+    buf_printf(&out, "\nCOMPONENTS := [COMPONENT_COUNT + 1]Component_Info{\n%s\t{},\n}\n", regtab.s ? regtab.s : "");
+    buf_free(&b);
+    buf_free(&enums);
+    buf_free(&reg);
+    buf_free(&regtab);
+    u64map_free(&emitted);
+    size_t n = out.len;
+    if (len) snprintf(buf, len, "%s", out.s ? out.s : "");
+    buf_free(&out);
+    return n;
+}
+
 size_t tri_family_count(const TriContent *c) { return c->families.n; }
 
 const char *tri_family_name(const TriContent *c, size_t i)

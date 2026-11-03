@@ -1,4 +1,4 @@
-package lab
+package spike
 
 // Loading the content build: every .tri file under the content root, its
 // topic directories' too, skipping names that start with a dot, in byte
@@ -10,7 +10,7 @@ import "core:fmt"
 import "core:os"
 import "core:slice"
 import "core:strings"
-import tri "../../triangle/odin/triangle"
+import tri "../../../triangle/odin/triangle"
 
 content_dir := "content"
 

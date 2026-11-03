@@ -303,6 +303,11 @@ size_t      tri_family_suggest_quickcheck(TriContent *content, const char *famil
  * enums as type IDs with an enum of their members, other structures as
  * TriNode pointers. Field comments give units and @field flags. */
 size_t tri_component_header(TriContent *content, const char *prefix, char *buf, size_t len);
+/* The same as an Odin file of `package`: types named without a prefix, fields
+ * by their content names, the registry as COMPONENTS; structure fields are
+ * ^tri.Node, Triangle's Odin package imported from `triangle_import`. */
+size_t tri_component_odin(TriContent *content, const char *package, const char *triangle_import,
+                          char *buf, size_t len);
 
 /* A number of quanta of a quantity kind ("mass", "length", "int", ...) as
  * content would write it: tri_format_quantity("mass", 850, ...) is "850g".

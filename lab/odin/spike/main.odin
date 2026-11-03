@@ -1,6 +1,6 @@
 // The Odin spike: what a port of the lab rests on, checked on each platform.
 //
-//   cd lab && odin run odin            (or: make -C lab odin-spike)
+//   cd lab && odin run odin/spike      (or: make -C lab odin-spike)
 //
 // 1. The content build: Triangle, linked as a C library, loads lab/content
 //    and gives the content hash the Objective-C lab was generated against
@@ -8,14 +8,14 @@
 // 2. Formatting: the scenario hashes are of printed text, so Odin's fmt must
 //    print what the lab's printf formats print, for each kind of format the
 //    lab uses (tallied from lab/src).
-package lab
+package spike
 
 import "core:c/libc"
 import "core:fmt"
 import "core:os"
 import "core:strconv"
 import "core:strings"
-import tri "../../triangle/odin/triangle"
+import tri "../../../triangle/odin/triangle"
 
 main :: proc() {
 	failed := 0

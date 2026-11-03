@@ -8,7 +8,8 @@
 #                     hashes against ci/scenario-hashes.txt
 #   make asan         the tests under AddressSanitizer and UBSan (.../asan)
 #   make scenarios    each scenario's hashes, for ci/scenario-hashes.txt
-#   make gen          src/generated/BGComponents.h, from content/
+#   make gen          src/generated/BGComponents.h and odin/components.odin,
+#                     from content/
 #   make odin-spike   the Odin spike (odin/main.odin): Triangle linked into
 #                     Odin, the content hash, formatting against printf
 #   make clean
@@ -100,11 +101,13 @@ asan:
 gen:
 	$(MAKE) -C $(TRIANGLE) build/tri-components
 	$(TRIANGLE)/build/tri-components BG $$(find content -name '*.tri' -not -path '*/.*' | sort) > src/generated/BGComponents.h
+	$(TRIANGLE)/build/tri-components -odin lab ../../triangle/odin/triangle \
+	    $$(find content -name '*.tri' -not -path '*/.*' | sort) > odin/components.odin
 
 odin-spike:
 	$(MAKE) -C $(TRIANGLE) odin-lib
 	@mkdir -p $(BUILD)
-	odin build odin -vet -strict-style -out:$(BUILD)/odin-spike$(EXE)
+	odin build odin/spike -vet -strict-style -out:$(BUILD)/odin-spike$(EXE)
 	./$(BUILD)/odin-spike$(EXE)
 
 clean:
