@@ -12,7 +12,7 @@
 // - body:     eating sets body.tri's `fed` (50 more, at most 100) and `fedAt`;
 //             how much is the code's yet, not the food's.
 // - finding food: none yet: only food already in hand is eaten.
-// - code:     effect_eat (src/act/BGActions.m) feeds the actor and destroys
+// - code:     effect_eat (src/act_actions.odin) feeds the actor and destroys
 //             the food.
 
 // Hunger raises eating, worth what the agent feels of it.

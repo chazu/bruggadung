@@ -12,7 +12,7 @@ Confirmed direction:
 - Flesh out the systems first, build an engine or framework next, then build the
   game on that foundation.
 - Build the framework for this roguelike, extracting reusable modules where useful.
-- Use Objective-C, as specified in [STACK.md](STACK.md).
+- Use the language [STACK.md](STACK.md) specifies: Odin, and C for Triangle.
 - Support simulation advancing in time slices, continuous running, and strict
   pausing for player input.
 - Discard the proposed name and setting in [CHAT.md](CHAT.md). Examples here are
@@ -214,7 +214,7 @@ its consequences.
 2. **Define the framework contracts.** Identity, state ownership, spatial
    relationships, action lifecycle, time advancement, change commitment, and
    knowledge boundaries.
-3. **Build a simulation laboratory in Objective-C.** Include a small tile
+3. **Build a simulation laboratory** (in Odin; STACK.md). Include a small tile
    map, command interface, stepping/running controls, state inspection, and causal
    traces. Save/load and reproducibility should arrive early.
 4. **Prove interactions through several small scenarios.** Add only enough domain

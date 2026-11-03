@@ -9,7 +9,7 @@
 //            topic's to say.
 // - code:    the structs and the registry the lab uses are generated from all
 //            the content, every topic's fields with these (make gen:
-//            src/generated/BGComponents.h); the lab refuses to run on content
+//            src/components.odin); the lab refuses to run on content
 //            with another hash.
 
 // What things are made of, and the colours they come in: hierarchies, so a

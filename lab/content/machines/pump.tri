@@ -16,7 +16,7 @@
 // - talk:     a recipe or a diagram's claim is learned by reading or being
 //             told (#RecipeSays, #Serves).
 // - code:     effect_dismantle, effect_shut, effect_work;
-//             src/kinds/BGLatentKind.m.
+//             src/kinds_latent_kind.odin.
 
 // The miller's pump: open once dismantled.
 #Pump: #Assembly & {

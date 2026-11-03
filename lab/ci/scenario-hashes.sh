@@ -5,7 +5,7 @@
 # holds them, and `make check` compares. A change that means to change a
 # scenario regenerates the file: make scenarios > ci/scenario-hashes.txt
 #
-#   sh ci/scenario-hashes.sh ./build/lab
+#   sh ci/scenario-hashes.sh ./build/<platform>/lab
 LAB=${1:-./build/lab}
 
 if command -v sha256sum >/dev/null 2>&1; then

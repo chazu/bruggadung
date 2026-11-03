@@ -8,7 +8,7 @@
 //            actor. Risen, it is told: its timer comes back, and a stage long
 //            due ends at once, not when it would have; a checkpoint passed
 //            while frozen is skipped (REALITY.md step 4).
-// - code:    src/act/BGActivities.m.
+// - code:    src/act_activities.odin.
 
 #ActivityStatus: "running" | "suspended" | "completed" | "exhausted" | "failed" | "aborted"
 

@@ -1,8 +1,8 @@
 # Tessera, an Odin package (this directory). The Odin release is pinned in
-# ../lab/ci/odin.
+# ../ci (install-odin.sh, Dockerfile).
 #
 #   make test     the tests (tests/), with Odin's leak tracking
-#   make check    the package checked, as the tests build it
+#   make check    the Odin package checked, as the tests build it
 
 ODIN  ?= odin
 FLAGS  = -vet -strict-style

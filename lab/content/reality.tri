@@ -18,7 +18,7 @@
 // - domains:  air, heat, water, light, traces and the body's going without
 //             run over the whole world at every level of detail, frozen
 //             included: they don't yet step by region.
-// - code:     src/core/BGReality.m (anchors, levels, leases), BGWakes.m (the
+// - code:     src/core_reality.odin (anchors, levels, leases), core_wakes.odin (the
 //             cadence).
 
 // The reality bubble (REALITY.md): how exactly each part of the world is

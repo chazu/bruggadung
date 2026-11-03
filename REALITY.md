@@ -297,8 +297,10 @@ full.
    - **What decisions submit**: the committer's queue, whose order the
      contest shuffle starts from; nudges. An outbox per agent, merged in
      entity order.
-   - **Objective-C**: an autorelease pool per worker; thread-affinity checks on shared
-     objects in debug builds.
+   - **Memory**: a temporary allocator per worker (each thread has its own in
+     Odin), and an autorelease pool per worker for the objects that keep
+     reference counts; thread-affinity checks on shared objects in debug
+     builds.
    No direct world writes from either phase were found.
 7. **Outdoor plumes** (decision 9), with their first scenario.
 

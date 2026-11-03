@@ -6,7 +6,7 @@
 //            any of them.
 // - frozen:  a turn under way waits.
 // - code:    effect_rotate builds the chain and applies its torque;
-//            src/kinds/BGValveKind.m reacts (breaking free, a lever
+//            src/kinds_valve_kind.odin reacts (breaking free, a lever
 //            bending); effect_strike.
 
 // What valves add to an agent: what its hands can put into a turn

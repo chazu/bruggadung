@@ -8,41 +8,64 @@ will take your place.
 
 ## Building
 
-The lab is Objective-C with manual retain/release (`-fno-objc-arc`), built
-with clang and this directory's `Makefile`: Apple's Foundation on the Mac,
-GNUstep's (libobjc2, gnustep-base) on Linux and on Windows under MSYS2's
-clang64. ci/README.md says what each platform needs installed.
+The lab is Odin: `src/` is one Odin package, `lab`, linking Triangle's C library
+(`../triangle`, built by its Makefile). The Odin release is pinned in
+`../ci` (install-odin.sh, Dockerfile); `../ci/README.md` says what each
+platform needs.
 
 ```sh
-make              # build/<platform>/lab
+make              # build/<platform>/lab, with -vet -strict-style
 make test         # the tests (TEST=name for those whose names contain it)
-make check        # warnings as errors, the tests, every scenario's hashes
-make asan         # the tests under AddressSanitizer and UBSan
-make gen          # src/generated/BGComponents.h, after a content change to components
+make check        # the tests, and every scenario's hashes
+make asan         # the tests under AddressSanitizer (Linux)
+make gen          # src/components.odin, after a content change to components
 ```
 
-Run `make check` before committing a change to code. It must pass on every
-platform: write only what clang, Apple's Foundation and GNUstep's all
-accept.
+Run `make check` before committing a change to code. It must pass on macOS
+and Linux.
 
-## Writing portable code
+## Writing the code
 
-- Foundation only: no Apple-only frameworks or API. Check that what you use
-  exists in GNUstep's gnustep-base.
-- No blocks: they are off outside the Mac (`-fno-blocks`, see ci/README.md).
-- Print `int64_t` and `uint64_t` with a cast to `long long` or `unsigned
-  long long` for `%lld` and `%llu`: `int64_t` is `long` on Linux.
-- Never pass a null pointer to `memcpy`, `memset`, `qsort` and friends, even
-  with a count of 0: glibc declares them nonnull, and UBSan says so.
-- A `qsort` comparator orders ties fully (by ID, say): C libraries order
-  ties differently, and the simulation must come out the same everywhere.
-- Windows headers define macros with plain names (`near`, `far`, `min`,
-  `max`, `_daylight`, `interface`, ...). `BGTypes.h` undefines the ones
-  that collide; don't name things after the rest.
-- A selector has one signature in every class: keep it so, though only
-  mulle's runtime used to insist.
-- In tests, prefer `rangeOfString:` to `hasSuffix:` and the like on long
-  strings, and test under both Foundations when in doubt.
+The lab was ported from Objective-C literally (README.md, "Notes on the
+code"), and keeps its shape. Keep to it:
+
+- **Objects keep reference counts** (`object.odin`): a class's struct starts
+  with `using object: Object`, `object_new` makes one, and `retain`,
+  `release` and `autorelease` work as they did. Autorelease pools drain
+  once a test and at the end of main; each takes the temporary allocator
+  back to where it was, so a temp string lives until then.
+- **Never keep a temporary string or slice in an object**: clone it into
+  `context.allocator`, and free it in the dealloc.
+- **Protocols are structs of procedures** (`protocols.odin`), `data` first.
+  A nil procedure is a method the conformer doesn't have.
+- A `cstring` is for C's strings: interned names, Triangle's, records'
+  text. An Odin `==` on cstrings compares contents, and a nil cstring
+  equals `""`.
+
+## Printing what printf printed
+
+The scenario hashes are of printed text, which the Objective-C lab printed
+with printf. Odin's fmt is not printf. `make test` checks the rules below
+against libc (the `formatting` test, `test_formatting.odin`), so a new Odin
+release that changes them shows up there.
+
+- A width on a number pads with zeros unless the format has the space flag:
+  printf's `%10d` is `% 10d`, `%10.1f` is `% 10.1f`. A `0` flag (`%016x`)
+  pads with zeros in both. Strings pad with spaces (`%-14s`).
+- `{` starts a placeholder: a literal brace is `{{`, and `}}` for `}`.
+  Triangle descriptions are full of them: `"#A & {{ x: %d }}"`.
+- `%d` prints any integer; there's no `%lld` or `%llu`.
+
+## Writing Odin that does what it says
+
+- **A range loop's end is evaluated on every iteration**: `for _ in 0 ..<
+  f()` calls `f` each time round. Bind it to a variable first when it
+  costs or has a side effect.
+- `a if c else b` evaluates only the branch taken; it can't break before
+  `else` across lines.
+- A `@(private = "file")` name doesn't clash with the same name in another
+  file of the Odin package.
+- C's `context` is Odin's keyword: such a field or parameter is `context_`.
 
 ## The simulation is deterministic, everywhere
 
@@ -50,6 +73,12 @@ Every scenario must end in the same state on every platform.
 `ci/scenario-hashes.txt` holds each scenario's hashes and `make check`
 compares. A change meant to change a scenario regenerates it (`make
 scenarios > ci/scenario-hashes.txt`) and says so in the commit.
+
+- A sort orders ties fully (by ID, say): `slice.sort_by` isn't stable.
+- Odin's `map` iterates in no fixed order: sort the keys where the order
+  could reach output or state.
+- Integer arithmetic only, where the simulation is concerned: the same
+  widths and truncating division the C had.
 
 ## Content
 

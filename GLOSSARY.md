@@ -34,7 +34,7 @@ REALITY.md, TER = TERRAIN.md, TES = TESSERA.md. "d3" is a doc's decision
 - **Framework**: the common engine for actions and consequences, with the
   systems beneath it. *Avoid:* engine (reserved for Triangle's and
   Tessera's engines). (DES)
-- **The lab**: the Objective-C simulation laboratory in `lab/` that
+- **The lab**: the simulation laboratory in `lab/` (Odin) that
   implements the system contracts and proves them by scenarios; it has
   stepping, inspection, causal traces and `lab play`. *Avoid:* simulation
   lab, harness (for the whole). (DES, lab/README.md)
@@ -737,8 +737,9 @@ REALITY.md, TER = TERRAIN.md, TES = TESSERA.md. "d3" is a doc's decision
 - **Attribute**: `@name(...)`: `@component`, `@field`, `@family`,
   `@vary`, `@widen`, `@fn`, `@embed`, `@quickcheck`, `@variants`. (CL §1)
 - **Derived field**: a value computed by code named by `@fn`. (CL §5)
-- **Package**: a file or directory scoping names, not features. Not a
-  topic directory. (CL d12)
+- **Package**: a file or directory of content scoping names, not features.
+  Not a topic directory, and not Odin's unit of code (an **Odin package**,
+  such as the lab's `lab` in `lab/src`). (CL d12)
 - **Topic**: one subject of the content that crosses systems (hunger: a
   body field, a felt need, a goal and its methods, eating), kept in one
   directory of content with what it does at every level of detail. Not a
@@ -812,3 +813,4 @@ Each row says which term to use for which sense.
 | loyalty | a bond's weight | (not a disposition) |
 | office | a position in an organization | **organization** (the body) |
 | subject | a claim's subject | **topic** (what a content directory is about) |
+| package | Triangle's: content scoping names | **Odin package** (a directory of Odin code) |

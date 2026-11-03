@@ -4370,3 +4370,27 @@ it.
 
 112 tests, 3498 checks, on macOS, Linux and Windows; every scenario ends in
 the same state on each.
+
+
+### After the slice: the lab in Odin (STACK.md)
+
+- Ported from Objective-C to Odin, literally, by the rules in its guide
+  (in this file's commit history, `lab/odin/port/PORTING.md`): one package
+  in `src/`, names derived from the old selectors by a generated table,
+  reference counts and autorelease pools so every object kept its
+  lifetime, formats changed to print what printf printed.
+- Triangle generates the component records in Odin too (`tri-components
+  -odin`); its Objective-C wrapper is gone, and `triangle/odin/triangle`
+  serves the lab. Tessera, ported before the lab, is Odin.
+- Found on the way: Odin's fmt reads `{` as a placeholder and pads widths
+  on numbers with zeros (the `formatting` test holds both rules to libc);
+  a range loop's end is evaluated each time round; a C extent check in
+  Tessera that could wrap; buffers the C read past when Triangle cut a
+  text.
+- GNUstep, MSYS2's GNUstep and the Linux image built from source are gone:
+  macOS and Linux build with Odin's release and clang. Windows builds
+  Triangle only, until Odin's MSVC link is set up there.
+
+113 tests (the formatting test added), 3522 checks, on macOS and Linux,
+clean under AddressSanitizer; every scenario ends in the same state as the
+Objective-C lab's (the hashes in `ci/scenario-hashes.txt` are unchanged).

@@ -1,9 +1,9 @@
 # Embedding Triangle
 
-This document covers using the Triangle engine from C and Objective-C. The
+This document covers using the Triangle engine from C and Odin. The
 declarations are in [`include/triangle.h`](../include/triangle.h), and the
-Objective-C wrapper is [`objc/BGContent.h`](../objc/BGContent.h). The content
-language itself is in [GUIDE.md](GUIDE.md) and [REFERENCE.md](REFERENCE.md).
+Odin package is [`odin/triangle`](../odin/triangle). The content language
+itself is in [GUIDE.md](GUIDE.md) and [REFERENCE.md](REFERENCE.md).
 
 - [Building and linking](#building-and-linking)
 - [Rules that apply everywhere](#rules-that-apply-everywhere)
@@ -17,7 +17,7 @@ language itself is in [GUIDE.md](GUIDE.md) and [REFERENCE.md](REFERENCE.md).
 - [Definite clauses](#definite-clauses)
 - [Knowledge stores, saves and migration](#knowledge-stores-saves-and-migration)
 - [Generated component structs](#generated-component-structs)
-- [The Objective-C wrapper](#the-objective-c-wrapper)
+- [From Odin](#from-odin)
 - [The TDL front end](#the-tdl-front-end)
 
 ## Building and linking
@@ -373,43 +373,45 @@ for (size_t i = 0; i < BG_COMPONENT_COUNT; i++)
 `tri_format_quantity(kind, quanta, buf, len)` prints a stored value the way
 content writes it: `tri_format_quantity("mass", 850, …)` is `850g`.
 
-## The Objective-C wrapper
+## From Odin
 
-`BGContent` wraps a content object, and `BGSpec` wraps a blueprint. Both use
-manual retain/release, so they build under Apple's runtime with Foundation
-and under mulle-objc with MulleObjC and MulleFoundationBase. Feature
-structures stay `const TriNode *`, so the C calls above work on them directly
-through `[content content]`.
+The Odin package [`odin/triangle`](../odin/triangle) is the C API without its
+`tri_` prefix (`triangle.odin`: `tri.content_hash(c)`, `tri.unify(...)`), and
+a few procedures that take and give Odin strings (`content.odin`). It links
+the game's library (no TDL front end), which `make odin-lib` builds into
+`build/<platform>/`. Feature structures stay `^tri.Node`, so every C call
+works on them directly. A constant string converts to a `cstring` as it is.
 
-```objc
-NSError *error = nil;
-BGContent *c = [BGContent contentFromFiles:paths error:&error];   /* nil, with every diagnostic in error */
-BGSpec *nut = [c specNamed:@"nut"];
-NSArray *varies = [nut variationPaths];
-NSLog(@"%@", [nut inspection]);
+```odin
+import tri "../triangle/odin/triangle"
 
-TriArena *a = tri_arena_new();
-const TriNode *made = [nut constructWithSeed:7 arena:a];
-const TriNode *view = tri_value([c content], "#Roles & { ... }", a, NULL, 0);
-NSArray *residuals = nil;
-if ([c match:@"loosen" against:view residuals:&residuals] == TRI_UNKNOWN)
-    NSLog(@"find out: %@", residuals);
-tri_arena_free(a);
+c, err := tri.load_files(paths)         // nil, with every diagnostic in err
+defer tri.content_free(c)
+varies := tri.variation_paths(c, "nut")
+fmt.println(tri.inspection(c, "nut"))
+
+a := tri.arena_new()
+defer tri.arena_free(a)
+made := tri.construct(c, "nut", 7, a)
+view := tri.value(c, "#Roles & { ... }", a, nil, 0)
+if m, residuals := tri.match_with_residuals(c, "loosen", view); m == .Unknown {
+	fmt.println("find out:", residuals)
+}
 ```
 
-| Method | C equivalent |
+| Procedure | C equivalent |
 | --- | --- |
-| `+contentFromFiles:error:`, `+contentFromSources:error:` | `tri_content_load`, `tri_content_load_strings`; `nil` unless `tri_content_ok` |
-| `-content`, `-contentHash`, `-diagnostics` | the `TriContent *`, `tri_content_hash`, the diagnostic messages |
-| `-typeNamed:`, `-nameOfType:`, `-documentationFor:` | `tri_type_named`, `tri_type_name`, `tri_doc` |
-| `-specNamed:`, `-patternNamed:`, `-indexForFamily:` | `tri_spec` (as a `BGSpec`, or `nil`), `tri_pattern`, `tri_family_index` |
-| `-match:against:residuals:` | `tri_match_instance`, with the residuals as strings |
-| `-describe:` | `tri_print` |
-| `BGSpec -node`, `-variationPaths`, `-notes`, `-inspection` | `tri_spec`, `tri_spec_variation_path`, `tri_spec_note`, `tri_inspect` |
-| `BGSpec -constructWithSeed:arena:` | `tri_construct` |
+| `load_files`, `load_sources` | `tri_content_load`, `tri_content_load_strings`; nil unless `tri_content_ok` |
+| `diagnostics`, `name_of`, `documentation` | the diagnostic messages, `tri_type_name`, `tri_doc` |
+| `describe`, `inspection` | `tri_print`, `tri_inspect` |
+| `variation_paths`, `notes` | `tri_spec_variation_path`, `tri_spec_note` |
+| `match_with_residuals` | `tri_match_instance`, with the residuals as strings |
+| `saved` | `tri_save`, as an Odin string |
 
-`make objc` builds and tests the wrapper with Apple clang and Foundation. To
-build it under mulle-objc, see the notes in the [README](../README.md#status).
+`make odin` runs the package's tests. `tri-components -odin PACKAGE IMPORT
+file.tri ...` writes a content build's component structs and field
+registry as an Odin file (`tri_component_odin`), as the lab's `make gen`
+does.
 
 ## The TDL front end
 

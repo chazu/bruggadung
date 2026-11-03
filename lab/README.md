@@ -1,6 +1,6 @@
 # The simulation laboratory
 
-The first code of the bruggadung framework, in Objective-C: entities,
+The first code of the bruggadung framework, in Odin: entities,
 component stores, relations, change commitment, the clock and scheduler,
 saves, the action menu, and the first domain, with content loaded from
 Triangle. It runs COMPONENTS.md's first scenario, *The marked nail*, and
@@ -8,17 +8,16 @@ DOMAIN_SIMULATION.md's third, *Two draws on a dwindling stock*, headless,
 and checks their acceptance criteria. The plan
 and its status are in [PLAN.md](PLAN.md).
 
-It builds with clang and the `Makefile`, on macOS (Apple's Foundation),
-Linux and Windows (GNUstep's); [ci/README.md](ci/README.md) says what each
-needs installed. `build/<platform>` is `build/darwin`, `build/linux` or
-`build/windows` (where the binary is `lab.exe`).
+It builds with Odin and the `Makefile`, linking Triangle's C library, on
+macOS and Linux; [../ci/README.md](../ci/README.md) says what each needs
+installed. `build/<platform>` is `build/darwin` or `build/linux`.
 
 ```sh
 make                                     # build/<platform>/lab
 make test                                # unit tests and scenarios; non-zero exit on any failure
-make check                               # warnings as errors, the tests, and every scenario's hashes
-make asan                                # the tests under AddressSanitizer and UBSan
-make gen                                 # regenerate src/generated/BGComponents.h from content/
+make check                               # the tests, and every scenario's hashes
+make asan                                # the tests under AddressSanitizer (Linux)
+make gen                                 # regenerate src/components.odin from content/
 ./build/<platform>/lab run marked-nail   # one scenario: trace, entities, checks (also -a, -b)
 ./build/<platform>/lab save marked-nail  # the save of its end state
 ./build/<platform>/lab menu marked-nail 1000   # what the worker sees, and its menu, at 1000 ms
@@ -34,25 +33,27 @@ compares each one's hashes with `ci/scenario-hashes.txt`.
 | Path | Contents |
 | --- | --- |
 | `content/` | The Triangle content, laid out by `content/README.md`. At the root, the vocabulary every topic is written in: `things.tri` (the shared component kinds and their field registry, and what descriptions say besides fields), `actions.tri` (what an operation is, and the operations every topic uses), `activities.tri`, `agency.tri` (goals, methods, considerations), `knowledge.tri` (findings, rules, persistence, the shapes of claims), `reality.tri` (anchors and levels of detail). Beneath it, a directory per topic (`hunger/`, `air/`, `institutions/`, ...), each holding everything about its topic, its scenarios' blueprints too, with its cut points in each file's header |
-| `src/generated/BGComponents.h` | Generated from `content/` by `make gen`: one struct per component, enums, and the field registry. Committed; the lab refuses to run on content with another hash. |
-| `src/core/` | `BGTypes.h` (IDs, time, seeds, locations), `BGStore` (records of one kind, sorted by ID), `BGWorld` (all authoritative state, journaled for rollback) |
-| `src/commit/` | `BGProposalGroup` (proposals, handles, unit references), `BGCommitter` (ordering, individuation, apply, validation, events, reactions) |
-| `src/kinds/` | Component behaviour: `BGBodyKind`, the merge reaction |
-| `src/domains/` | `BGFluidDomain`: water through open taps, with checkout, exact allocation, and exhaustion as the horizon; `BGTraces` and `BGBodies`; `BGAtmosphere`: the air of a room and a stove's fire, conserved exactly, with fuel exhaustion and watch crossings as horizons; `BGThermal`: the heat of solids, coupled to the air by contributions |
-| `src/sched/` | `BGScheduler`, with the domain and input-source protocols; `BGCoupling`: the step-start snapshot and contributions between domains |
-| `src/act/` | `BGView` (reach and descriptions: the knowledge view's stub), `BGActions` (the menu, matching, effects, performing), `BGActivities` (activities under way: completion, watches, ending) |
-| `src/agency/` | `BGAgency`: agents that decide from their own knowledge, with intentions, a subgoal, and a decision log |
-| `src/know/` | `BGKnowledge`: agents' knowledge stores, the perception phase, recognition |
-| `src/save/` | `BGSave`: saves as text, and restoring them |
-| `src/scenario/` | `BGWorlds` (the worlds' setups), `BGMarkedNail` and `BGCistern`: the scenarios, their input logs, and their checks |
-| `src/play/` | `BGPlay`: the interactive session behind `lab play` |
-| `src/test/` | The test runner and the tests |
+| `src/` | The lab: one Odin package, `lab`, a file for each part, named for its area (`core_`, `commit_`, ...). |
+| `src/components.odin` | Generated from `content/` by `make gen`: one struct per component, enums, and the field registry. Committed; the lab refuses to run on content with another hash. |
+| `src/types.odin`, `object.odin`, `foundation.odin`, `protocols.odin` | IDs, time, seeds and locations; objects' reference counts and autorelease pools; the string and number handling the lab's output depends on; the protocols, as structs of procedures |
+| `src/core_*.odin` | `core_store` (records of one kind, sorted by ID), `core_world` (all authoritative state, journaled for rollback), `core_index`, `core_path`, `core_terrain`, `core_reality`, `core_wakes` |
+| `src/commit_*.odin` | `commit_proposal_group` (proposals, handles, unit references), `commit_committer` (ordering, individuation, apply, validation, events, reactions) |
+| `src/kinds_*.odin` | Component behaviour: the body kind's merge reaction, valves, latent assembly |
+| `src/domains_*.odin` | `domains_fluid_domain`: water through open taps, with checkout, exact allocation, and exhaustion as the horizon; `domains_traces` and `domains_bodies`; `domains_atmosphere`: the air of a room and a stove's fire, conserved exactly, with fuel exhaustion and watch crossings as horizons; `domains_thermal`: the heat of solids, coupled to the air by contributions; `domains_light` |
+| `src/sched_*.odin` | `sched_scheduler`, with the domain and input-source protocols; `sched_coupling`: the step-start snapshot and contributions between domains |
+| `src/act_*.odin` | `act_view` (reach and descriptions: the knowledge view's stub), `act_actions` (the menu, matching, effects, performing), `act_activities` (activities under way: completion, watches, ending) |
+| `src/agency_agency.odin` | Agents that decide from their own knowledge, with intentions, a subgoal, and a decision log |
+| `src/know_*.odin` | Agents' knowledge stores, the perception phase, recognition |
+| `src/save_save.odin` | Saves as text, and restoring them |
+| `src/scenario_*.odin` | The worlds' setups, and *The marked nail* and the cistern: the scenarios, their input logs, and their checks |
+| `src/play_play.odin` | The interactive session behind `lab play` |
+| `src/test_*.odin`, `main.odin` | The test runner and the tests; the command line |
 
 ## How an action happens
 
 Operations are content (`content/actions.tri`, and each topic's): patterns
 over the descriptions of the entities filling their roles, with tags
-carrying bindings between roles. An actor's view (`BGView`) can bind only
+carrying bindings between roles. An actor's view (`View`) can bind only
 what is in reach, and describes each entity by its type, id, place, and the
 component fields whose `@field` flags say they can be perceived. A hidden
 field stays open, so a match on it is unknown, and unknown never excludes.
@@ -252,13 +253,13 @@ original does.
 ## How a change happens
 
 Nothing writes world state except change commitment. A system builds a
-`BGProposalGroup` (create, move, set a field, split, merge, relate, emit)
+A proposal group (create, move, set a field, split, merge, relate, emit)
 and submits it. At the next boundary the committer:
 
 1. orders the groups by phase (process, action, system), then by a
    permutation seeded from the world seed, boundary, and round
 2. rewrites each group for automatic individuation: a proposal that names
-   one unit of a stack (`BGUnit(stack, 1)`) gets that unit split off first
+   one unit of a stack (`unit(stack, 1)`) gets that unit split off first
 3. applies the group with the world's journal open, and validates the
    result: entities exist, every physical entity has one location in a place
    that can hold it, and mass and each unit's count are conserved except
@@ -269,12 +270,12 @@ and submits it. At the next boundary the committer:
 
 Every step is in the trace: `lab run marked-nail` prints it.
 
-## Notes on portability
+## Notes on the code
 
-The code uses manual retain/release, no properties, and no blocks, and only
-what Apple's Foundation and GNUstep's both have: AGENTS.md lists the rules
-that keep it building, and coming out the same, on every platform. Some
-names are as they are from when the lab ran on mulle-objc, where a selector
-has one signature across every class: the world's content is
-`-contentBuild`, not `-content` (which `BGContent` has, returning
-`TriContent *`), and describing an entity is `-describeEntity:`.
+The lab was Objective-C until 2026-11, and was ported to Odin literally:
+the same algorithms, in the same order, so every test checks what it did
+and every scenario ends in the same state. Its shape still shows it:
+objects with reference counts (object.odin), protocols as structs of
+procedures, names derived from the old selectors (`world_describe_entity`,
+`world_content_build`). AGENTS.md has the rules that keep the output the
+same everywhere.

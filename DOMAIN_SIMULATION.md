@@ -345,8 +345,9 @@ from them, and the engine's unit structs will be generated from it.
 
 ### 13. Interface sketch
 
-Illustrative only; this has not been compiled. `BGHorizon` holds a `safeStep`
-and a `nextEvent`.
+Illustrative only; this has not been compiled. It is sketched in Objective-C,
+the lab's language when it was written (the lab's `Domain`, in Odin, is in
+lab/src/protocols.odin). `BGHorizon` holds a `safeStep` and a `nextEvent`.
 
 ```objc
 @protocol BGDomain
@@ -372,7 +373,7 @@ and a `nextEvent`.
 ```
 
 The protocol stays at the boundary. Inner loops are plain C over the domain's
-own arrays, so steps don't send an Objective-C message per participant.
+own arrays, so steps don't make a call through the protocol per participant.
 
 ## Scenarios
 

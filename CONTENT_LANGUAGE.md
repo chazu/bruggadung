@@ -95,13 +95,13 @@ Out of scope here:
    Against a referent with competing hypotheses, it returns the credence mass
    of each outcome.
 11. **The engine is DELPH-IN's technique stack in plain C.** Feature
-    structure nodes are C structs in arenas, never Objective-C objects. An
+    structure nodes are C structs in arenas, never the systems' objects. An
     optional TDL front end shares the internal tree, so the English Resource
     Grammar can serve as a large benchmark.
 12. **Packages scope names, not features.** A package (a file, or a
     directory of them) scopes type, component, and blueprint names, and
-    prefixes the C and Objective-C identifiers generated from them, so a
-    component can't clash with an engine class. Feature names stay global:
+    prefixes the identifiers generated from them, so a component can't clash
+    with an engine type. Feature names stay global:
     every feature is still introduced by exactly one type, so where two
     meanings truly coincide they share a supertype. This revises "Not
     adopted from CUE: ... packages" (§2).
@@ -591,8 +591,8 @@ r2: #Clause & { head: #Dist & { from: $x, to: $z, d: $a + $b },
 
 ### 12. The engine
 
-The engine is a plain C library, with an Objective-C wrapper for the
-systems.
+The engine is a plain C library, with an Odin package for the systems
+(`triangle/odin/triangle`).
 
 **Type hierarchy**
 
@@ -708,7 +708,8 @@ systems.
 ### 16. Interface sketch
 
 Illustrative only. The built interfaces are `triangle/include/triangle.h`
-and the Objective-C wrapper `triangle/objc/BGContent.h`.
+and the Odin package `triangle/odin/triangle`. The second block is sketched
+in Objective-C, the lab's language when it was written.
 
 ```c
 typedef uint32_t TriType;            // dense, assigned at load
@@ -852,8 +853,7 @@ questions (the last section):
 - path-keyed variation seeds and triangular ranges (`@vary(mode:)`)
 - generated component structs (`tri-components`), failure recording for
   choosing quick-check paths, store sizes, and migration between builds
-- the content hash, and the Objective-C wrapper (`BGContent`), run under
-  Apple's runtime and mulle-objc
+- the content hash, and the Odin package (`triangle/odin/triangle`)
 
 Tests cover each feature, the three scenarios below, and the example file of
 §17, read from this document. Randomised property tests check the algebra of
@@ -1162,7 +1162,8 @@ listed under it.
    content comes to lean on recursion over cyclic data.
 2. **Code generation.** Content is the source of truth; `tri-components`
    generates C structs for the component stores (§3), not Objective-C
-   classes. This also answers COMPONENTS.md open question 6.
+   classes; since the lab moved to Odin, Odin structs (`tri-components
+   -odin`). This also answers COMPONENTS.md open question 6.
 3. **Feature introduction friction.** Kept as an error, with both locations
    and a suggested supertype (§3).
 4. **Default ties.** Both are dropped, with a warning; the field becomes

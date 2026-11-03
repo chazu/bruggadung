@@ -7,7 +7,7 @@
 //             level of detail.
 // - perception: at dusk, beyond arm's reach, and at night, what an agent sees
 //             it sees less precisely (knowledge.tri).
-// - code:     src/domains/BGLight.m; the knowledge system's light at a tile.
+// - code:     src/domains_light.odin; the knowledge system's light at a tile.
 
 // Light (KNOWLEDGE.md §5's conditions, authored): a lamp, shining, makes it
 // day within `reach` tiles of where it is, held or set down. With the light

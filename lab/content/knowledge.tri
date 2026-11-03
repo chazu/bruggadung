@@ -10,7 +10,7 @@
 // - abstract: as reduced.
 // - frozen:   it perceives nothing; its memory's fading is reckoned from
 //             times, so it is caught up as it is read.
-// - code:     src/know/BGKnowledge.m: perception, recognition, memory, each
+// - code:     src/know_knowledge_*.odin: perception, recognition, memory, each
 //             premise's kind, and the findings no rule concludes (#Taken,
 //             #Struck, #Arrested, #Hires, #Owned, #Reserved).
 

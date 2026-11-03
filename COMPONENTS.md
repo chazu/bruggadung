@@ -29,8 +29,9 @@ Out of scope here, except where they touch components:
 
 ## Decisions so far
 
-1. **An entity is an ID.** Component kinds are Objective-C classes. Each
-   kind's instances live in a per-kind store keyed by entity ID. An entity is
+1. **An entity is an ID.** Component kinds are records generated from
+   content (CONTENT_LANGUAGE.md §3; first planned as Objective-C classes).
+   Each kind's instances live in a per-kind store keyed by entity ID. An entity is
    not an object that holds its components.
 2. **One registration per component kind** declares every field once. Saving,
    content loading, the inspectors, proposals, and perception are all derived
@@ -67,8 +68,8 @@ Out of scope here, except where they touch components:
 
 | Term | Meaning |
 | --- | --- |
-| Entity | Anything with identity: a creature, object, tile feature, organization, document's content, or claim. Represented by a `BGEntityID`. |
-| Component kind | An Objective-C class describing one kind of state and behaviour, such as `Body`, `ThermalBody`, `Stack`, or `Inscription`. |
+| Entity | Anything with identity: a creature, object, tile feature, organization, document's content, or claim. Represented by an `Entity_ID`. |
+| Component kind | One kind of state and behaviour, its record generated from content, such as `Body`, `ThermalBody`, `Stack`, or `Inscription`. |
 | Component | One instance of a component kind, attached to one entity. |
 | Store | All components of one kind, keyed by entity ID and iterated in ID order. |
 | Field | A declared piece of component state, with a unit and flags. |
@@ -136,8 +137,8 @@ Rules:
   including changes to the component's own state. A handler returns proposals;
   it never mutates anything. This keeps the causal trace complete. Components
   are cold data, so the extra step is cheap.
-- Whether the field registry can be derived from the Objective-C runtime's property
-  metadata, or has to be generated from declarations, is an open question.
+- The field registry is generated from the declarations in content, with the
+  records (`tri-components`; CONTENT_LANGUAGE.md, decision 2). Answered.
 
 ### 3. Stores and queries
 
@@ -380,7 +381,9 @@ requires it to provide:
 
 ### 13. Interface sketch
 
-Illustrative only; this has not been compiled.
+Illustrative only; this has not been compiled. It is sketched in Objective-C,
+the lab's language when it was written; the records are generated from
+content instead (decision 1).
 
 ```objc
 @interface BGThermalBody : BGComponent

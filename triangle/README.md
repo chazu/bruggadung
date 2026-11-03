@@ -12,7 +12,7 @@ Documentation:
   file, from types to blueprints, variation, patterns, arithmetic, and clauses
 - [docs/REFERENCE.md](docs/REFERENCE.md): the grammar, built-in types, units,
   every attribute, the rules for defaults and variation, and every diagnostic
-- [docs/API.md](docs/API.md): embedding the engine from C and Objective-C
+- [docs/API.md](docs/API.md): embedding the engine from C and Odin
 - [The command-line tool and the editor](#the-command-line-tool-and-the-editor):
   `triangle check`, `triangle inspect`, the language server, and Emacs
 
@@ -20,13 +20,15 @@ Documentation:
 make            # library and tests
 make test       # the leak check, then the tests
 make asan       # rebuild and test with AddressSanitizer and UBSan
-make objc       # the Objective-C wrapper and its test (macOS: Foundation)
+make odin       # the Odin package (odin/triangle) and its tests
+make odin-lib   # build/<platform>/: the game's library, for Odin to link
 make game       # build/libtriangle-game.a, without the TDL front end
 make install    # build/triangle into ~/.local/bin (PREFIX=... to change)
 make lsp-test   # drive the language server over stdio
 make emacs-test # the Emacs mode's tests
 make examples   # regenerate examples/workshop from docs/GUIDE.md
 ./build/tri-components BG content/*.tri > components.h   # C structs for the components
+./build/tri-components -odin lab ../triangle/odin/triangle content/*.tri > components.odin   # the same, in Odin
 TRI_PROPS_SCALE=10 ./build/test properties     # ten times the randomised cases
 ```
 
@@ -45,7 +47,7 @@ TRI_PROPS_SCALE=10 ./build/test properties     # ten times the randomised cases
 | `src/runtime.c` | Docstrings, pattern families and their compiled indexes, saves |
 | `src/arith.c` | Interval arithmetic over quantities, with units |
 | `src/clause.c` | Definite clauses: resolution with a depth limit |
-| `tools/tri-components.c` | Generates the C structs for a content build's components |
+| `tools/tri-components.c` | Generates the C (or Odin) structs for a content build's components |
 | `tools/triangle.c` | The `triangle` command: check, inspect, components, and the language server |
 | `tools/lsp.c`, `tools/json.c` | The language server, and the JSON it speaks |
 | `emacs/` | `triangle-mode`, the Emacs major mode, with its tests |
@@ -53,7 +55,7 @@ TRI_PROPS_SCALE=10 ./build/test properties     # ten times the randomised cases
 | `tools/guide-examples.py` | Writes `examples/workshop` from the guide (`make examples`) |
 | `src/xtree.c` | Syntax tree printing and construction |
 | `src/util.c` | Arenas, symbols, maps, diagnostics |
-| `objc/` | `BGContent`, the Objective-C wrapper, with its test; runs on Apple's Foundation and on GNUstep's |
+| `odin/` | The Odin package, `triangle`, with its tests |
 | `docs/` | The guide, the language reference, and the embedding API |
 | `tests/` | Core tests; the three scenarios and the example file from CONTENT_LANGUAGE.md; every feature; randomised property tests and source fuzzing; a small TDL grammar; a leak check against a counting allocator |
 | `bench/erg.c` | Benchmark against a TDL grammar such as the English Resource Grammar |
@@ -342,7 +344,7 @@ listed by area below.
 | Interval arithmetic is sound and exact; every clause solution is an instance of its query | `test_properties_arithmetic`, `test_properties_clauses` |
 | Fuzzed sources never crash the loader | `test_fuzz_sources` |
 | Every allocation is freed, error paths included | `tests/leakcheck` |
-| The Objective-C wrapper | `objc/test_objc.m` |
+| The Odin package | `odin/test` |
 
 The randomised tests were run at twenty times their usual size, under the
 sanitizers, and with sharing off. They found five bugs, now fixed:
@@ -359,11 +361,10 @@ blueprint errors appeared only when a spec was asked for; `bool`, `text`, and
 `ref` were missing; and content could set a field the registry does not mark
 `content`.
 
-**The wrapper.** `BGContent` uses manual retain/release, and needs only
-Foundation: `make objc` builds it and runs its test with Apple's Foundation on
-the Mac, and with GNUstep's (libobjc2, gnustep-base) on Linux and Windows. (It
-also ran under mulle-objc, which the lab used until it moved to clang and
-GNUstep; the record of that is in the history of this file.)
+**From Odin.** The lab and Tessera are Odin, and use Triangle through
+`odin/triangle` (`make odin`). It replaced `BGContent`, an Objective-C
+wrapper, when the lab moved to Odin in 2026-11; the record of that is in the
+history of this file.
 
 An independent audit (a separate agent reading only the spec and the code)
 then found eleven gaps, now closed or recorded. Residuals and bindings for a

@@ -1,4 +1,5 @@
-# The lab and Triangle on macOS, Linux and Windows (lab/ci/README.md).
+# Triangle (C), Tessera and the lab (Odin), on macOS and Linux; Triangle on
+# Windows too. What each platform needs is in ci/README.md.
 name: build
 
 on:
@@ -10,36 +11,30 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Odin
+        run: sh ci/install-odin.sh "$RUNNER_TEMP/odin" >> "$GITHUB_PATH"
       - name: Triangle
-        run: make -C triangle test cli-test lsp-test
+        run: make -C triangle test cli-test lsp-test odin
+      - name: Tessera
+        run: make -C tessera test
       - name: Lab
         run: make -C lab check
-      # Odin: Tessera, and the spike (lab/odin/spike). In this job, not one
-      # of its own: a second macOS job waited for a runner and was dropped.
-      - name: Odin
-        run: sh lab/ci/odin/install-odin.sh "$RUNNER_TEMP/odin" >> "$GITHUB_PATH"
-      - name: Tessera and the Odin spike
-        run: make -C tessera test && make -C triangle odin && make -C lab odin-spike
-      - name: Lab in Odin
-        run: make -C lab odin-check
 
   linux:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Toolchain image
-        run: docker build -t bruggadung-lab lab/ci/linux
+        run: docker build -t bruggadung ci
       - name: Triangle
-        run: docker run --rm -v "$PWD":/repo -w /repo bruggadung-lab make -C triangle CC=clang test cli-test lsp-test
+        run: docker run --rm -v "$PWD":/repo -w /repo bruggadung make -C triangle CC=clang test cli-test lsp-test odin
+      - name: Tessera
+        run: docker run --rm -v "$PWD":/repo -w /repo bruggadung make -C tessera test
       - name: Lab
-        run: docker run --rm -v "$PWD":/repo -w /repo bruggadung-lab make -C lab check
-      - name: Tessera and the Odin spike
-        run: |
-          docker build -t bruggadung-odin lab/ci/odin
-          docker run --rm -v "$PWD":/repo -w /repo bruggadung-odin sh -c 'make -C tessera test && make -C triangle odin && make -C lab odin-spike'
-      - name: Lab in Odin
-        run: docker run --rm -v "$PWD":/repo -w /repo/lab bruggadung-odin make odin-check
+        run: docker run --rm -v "$PWD":/repo -w /repo bruggadung make -C lab check
 
+  # Odin links for the MSVC ABI on Windows; the lab and Tessera aren't built
+  # there yet (triangle/Makefile's odin-lib has the untried MSVC build).
   windows:
     runs-on: windows-latest
     defaults:
@@ -52,9 +47,6 @@ jobs:
           msystem: CLANG64
           update: true
       - name: Toolchain
-        run: sh lab/ci/windows/setup-msys2.sh
+        run: sh ci/windows/setup-msys2.sh
       - name: Triangle
         run: make -C triangle CC=clang test cli-test lsp-test
-      - name: Lab
-        run: make -C lab check
-

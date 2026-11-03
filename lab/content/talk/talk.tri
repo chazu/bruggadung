@@ -14,7 +14,7 @@
 // - knowledge: the shapes of claims (#Utterance, #Telling, ...) are
 //              knowledge.tri's; a topic's own claims are in its directory.
 // - code:      effect_say, effect_write, effect_read; what a hearer makes of
-//              what it hears is src/know/BGKnowledge.m's.
+//              what it hears is src/know_knowledge_*.odin's.
 
 // Where is something like `what`?
 #WhereIs: #Question & {}

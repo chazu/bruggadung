@@ -11,8 +11,8 @@
 // - frozen:   nothing is perceived; traces fade on, read from their times.
 // - actions:  an operation's `leaves` and `removes` (actions.tri) make and
 //             remove traces, with its effect.
-// - code:     src/domains/BGTraces.m; perceiving traces, and the premises
-//             (#Sign, #Near, ...), in src/know/BGKnowledge.m; effect_tend,
+// - code:     src/domains_traces.odin; perceiving traces, and the premises
+//             (#Sign, #Near, ...), in src/know_knowledge_*.odin; effect_tend,
 //             effect_analyse, effect_investigate.
 
 // Traces (KNOWLEDGE.md §3): what committed effects leave on bodies and on

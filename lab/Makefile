@@ -1,92 +1,42 @@
-# The lab's build: clang, with Apple's Foundation on the Mac, and GNUstep's
-# (libobjc2, gnustep-base) on Linux and on Windows under MSYS2's clang64.
-# What each platform needs installed is in ci/README.md.
+# The lab's build: Odin (src/, one package), with Triangle's C library linked
+# in, built by ../triangle's Makefile (odin-lib). The Odin release is pinned
+# in ../ci (install-odin.sh, Dockerfile); ../ci/README.md says what each
+# platform needs.
 #
-#   make              build/<platform>/lab: darwin, linux or windows (lab.exe)
+#   make              build/<platform>/lab: darwin or linux
 #   make test         the tests; TEST=name runs those whose names contain it
-#   make check        warnings as errors, the tests, and every scenario's
-#                     hashes against ci/scenario-hashes.txt
-#   make asan         the tests under AddressSanitizer and UBSan (.../asan)
+#   make check        the tests, and every scenario's hashes against
+#                     ci/scenario-hashes.txt
+#   make asan         the tests under AddressSanitizer (.../asan; Linux)
 #   make scenarios    each scenario's hashes, for ci/scenario-hashes.txt
-#   make gen          src/generated/BGComponents.h and odin/components.odin,
-#                     from content/
-#   make odin-spike   the Odin spike (odin/spike): Triangle linked into
-#                     Odin, the content hash, formatting against printf
-#   make odin-lab     the lab's Odin port (odin/): build/<platform>/lab-odin
-#   make odin-check   the port's tests, and every scenario's hashes against
-#                     ci/scenario-hashes.txt, as `make check` does
+#   make gen          src/components.odin, from content/
 #   make clean
 #
-# XFLAGS adds flags to every compile and link (an -isysroot, say).
+# ODINFLAGS adds flags to `odin build` (-o:speed, say).
 
-TRIANGLE ?= ../triangle
-XFLAGS   ?=
-SANITIZE ?=
-TEST     ?=
+TRIANGLE  ?= ../triangle
+ODIN      ?= odin
+ODINFLAGS ?=
+TEST      ?=
 
-ifeq ($(origin CC),default)
-CC = clang
-endif
-
-ifeq ($(OS),Windows_NT)
-PLATFORM = windows
-EXE      = .exe
-else
-PLATFORM = $(shell uname -s | tr A-Z a-z)
-EXE      =
-endif
-
-ifeq ($(PLATFORM),darwin)
-OBJC_FLAGS =
-OBJC_LIBS  = -framework Foundation
-ASAN       = -fsanitize=address,undefined
-else
-# GNUstep's flags, then blocks off: the lab uses none, and with them on,
-# clang 20 and later reject a block-scoped ivar in gnustep-base's headers.
-# --base-libs turns them on again, so -fno-blocks comes last there too.
-OBJC_FLAGS = $(shell gnustep-config --objc-flags) -fno-blocks
-OBJC_LIBS  = $(shell gnustep-config --base-libs) -fno-blocks
-ASAN       = -fsanitize=address,undefined --rtlib=compiler-rt -unwindlib=libgcc -Wno-unused-command-line-argument
-endif
-ifeq ($(PLATFORM),windows)
-# clock_gettime is winpthreads'
-OBJC_LIBS += -lpthread
-endif
-
-# one build directory per platform, so a tree shared with a container or
-# another machine never links another platform's objects
+PLATFORM  = $(shell uname -s | tr A-Z a-z)
 BUILD    ?= build/$(PLATFORM)
+LAB       = $(BUILD)/lab
 
-WARN     = -Wall -Wextra -Wno-unused-parameter
-FLAGS    = -std=gnu11 -g -O1 $(WARN) -DTRI_NO_TDL $(SANITIZE) $(XFLAGS)
-INCLUDES = $(addprefix -I,$(shell find src -type d)) -I$(TRIANGLE)/include -I$(TRIANGLE)/objc
+# Odin's vet and strict style, on every build: what `make check` asks of a
+# change is that it builds this way.
+FLAGS     = -vet -strict-style $(ODINFLAGS)
 
-LAB_SRC  = $(shell find src -name '*.m')
-TRI_SRC  = $(wildcard $(TRIANGLE)/src/*.c)
-OBJ      = $(LAB_SRC:%.m=$(BUILD)/obj/%.o) $(BUILD)/obj/triangle/BGContent.o \
-           $(TRI_SRC:$(TRIANGLE)/src/%.c=$(BUILD)/obj/triangle/%.o)
-LAB      = $(BUILD)/lab$(EXE)
-
-.PHONY: all test check asan scenarios gen odin-spike odin-lab odin-check clean
+.PHONY: all test check asan scenarios gen triangle clean
 
 all: $(LAB)
 
-$(LAB): $(OBJ)
-	$(CC) $(FLAGS) $(OBJ) $(OBJC_LIBS) -o $@
+triangle:
+	$(MAKE) -C $(TRIANGLE) odin-lib
 
-$(BUILD)/obj/%.o: %.m
-	@mkdir -p $(dir $@)
-	$(CC) $(OBJC_FLAGS) $(FLAGS) -fno-objc-arc $(INCLUDES) -MMD -MP -c $< -o $@
-
-$(BUILD)/obj/triangle/BGContent.o: $(TRIANGLE)/objc/BGContent.m
-	@mkdir -p $(dir $@)
-	$(CC) $(OBJC_FLAGS) $(FLAGS) -fno-objc-arc $(INCLUDES) -MMD -MP -c $< -o $@
-
-$(BUILD)/obj/triangle/%.o: $(TRIANGLE)/src/%.c
-	@mkdir -p $(dir $@)
-	$(CC) $(FLAGS) -I$(TRIANGLE)/include -MMD -MP -c $< -o $@
-
--include $(OBJ:.o=.d)
+$(LAB): $(wildcard src/*.odin) | triangle
+	@mkdir -p $(BUILD)
+	$(ODIN) build src $(FLAGS) -out:$@
 
 test: $(LAB)
 	./$(LAB) test $(TEST)
@@ -94,35 +44,19 @@ test: $(LAB)
 scenarios: $(LAB)
 	@sh ci/scenario-hashes.sh ./$(LAB)
 
-check:
-	$(MAKE) BUILD=$(BUILD)/check XFLAGS="$(XFLAGS) -Werror" test
-	sh ci/scenario-hashes.sh ./$(BUILD)/check/lab$(EXE) | diff ci/scenario-hashes.txt - && echo "scenarios: as expected"
+check: $(LAB)
+	./$(LAB) test
+	sh ci/scenario-hashes.sh ./$(LAB) | diff ci/scenario-hashes.txt - && echo "scenarios: as expected"
 
-asan:
-	$(MAKE) BUILD=$(BUILD)/asan SANITIZE="$(ASAN)" test
+asan: triangle
+	@mkdir -p $(BUILD)/asan
+	$(ODIN) build src $(FLAGS) -debug -sanitize:address -out:$(BUILD)/asan/lab
+	./$(BUILD)/asan/lab test $(TEST)
 
 gen:
 	$(MAKE) -C $(TRIANGLE) build/tri-components
-	$(TRIANGLE)/build/tri-components BG $$(find content -name '*.tri' -not -path '*/.*' | sort) > src/generated/BGComponents.h
 	$(TRIANGLE)/build/tri-components -odin lab ../../triangle/odin/triangle \
-	    $$(find content -name '*.tri' -not -path '*/.*' | sort) > odin/components.odin
-
-odin-spike:
-	$(MAKE) -C $(TRIANGLE) odin-lib
-	@mkdir -p $(BUILD)
-	odin build odin/spike -vet -strict-style -out:$(BUILD)/odin-spike$(EXE)
-	./$(BUILD)/odin-spike$(EXE)
-
-ODIN_LAB = $(BUILD)/lab-odin$(EXE)
-
-odin-lab:
-	$(MAKE) -C $(TRIANGLE) odin-lib
-	@mkdir -p $(BUILD)
-	odin build odin -vet -strict-style -out:$(ODIN_LAB)
-
-odin-check: odin-lab
-	./$(ODIN_LAB) test $(TEST)
-	sh ci/scenario-hashes.sh ./$(ODIN_LAB) | diff ci/scenario-hashes.txt - && echo "scenarios: as expected"
+	    $$(find content -name '*.tri' -not -path '*/.*' | sort) > src/components.odin
 
 clean:
 	rm -rf $(BUILD)

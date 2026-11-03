@@ -9,7 +9,7 @@
 // - frozen:   nobody works it, so nothing wears.
 // - knowledge: a part seen wearing is found wanting servicing
 //             (`wearing_part`), which the diligent do.
-// - code:     src/kinds/BGLatentKind.m: opening, wear, failures, servicing;
+// - code:     src/kinds_latent_kind.odin: opening, wear, failures, servicing;
 //             effect_reveal, effect_replace, effect_service, effect_install,
 //             effect_cut, effect_shape.
 

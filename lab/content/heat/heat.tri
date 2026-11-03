@@ -11,7 +11,7 @@
 //             it (agency.tri).
 // - air:      a fire burns the oxygen of its room's air and heats its gas; a
 //             solid exchanges heat with the air around it (air/air.tri).
-// - code:     src/domains/BGThermal.m (solids), BGAtmosphere.m (fire, the
+// - code:     src/domains_thermal.odin (solids), domains_atmosphere.odin (fire, the
 //             gas's heat); effect_light.
 
 // A stove's firebox: lit or not, its damper open to the flue or not, and how

@@ -19,7 +19,7 @@ proven on COMPONENTS.md's first scenario.
 | --- | --- | --- |
 | [DESIGN.md](DESIGN.md) | The six systems, ambitions, and development sequence | Proposal |
 | [GLOSSARY.md](GLOSSARY.md) | The ubiquitous language: every term, in one sense | Kept current; used everywhere |
-| [STACK.md](STACK.md) | Language: Objective-C (clang; Apple Foundation, GNUstep) | Decided |
+| [STACK.md](STACK.md) | Language: Odin for the lab and Tessera, C for Triangle | Decided |
 | [DOMAIN_SIMULATION.md](DOMAIN_SIMULATION.md) | §3: domains, stocks, horizons, the scheduler | Contract proposed, 3 scenarios; all run in [lab/](lab/README.md), 2 on provisional latent assembly |
 | [COMPONENTS.md](COMPONENTS.md) | §2: entities, components, relations, identity on demand | Contract proposed, 3 scenarios; all run in [lab/](lab/README.md), 3 on provisional latent assembly |
 | [ACTIONS.md](ACTIONS.md) | §1: capabilities, actions, activities; change commitment | Contract proposed, 3 scenarios; all run in [lab/](lab/README.md), Scenario 3's latent-assembly steps aside |
@@ -278,13 +278,13 @@ A rebuilt world produces the same next step as one that never saved.
    culprit attribution, carried over from Dewdrop and simplified.
 3. **Content language (Triangle) prototype:** in [triangle/](triangle/README.md). Every
    feature the spec plans is built and tested, including randomised property
-   tests and a leak check, with an Objective-C wrapper. The TDL front end
+   tests and a leak check, with an Odin package for the lab. The TDL front end
    loads the whole English Resource Grammar in 0.57 s. Checked against ACE:
    the same meet types, the same result on every one of 597,000
    unifications, and about 1.5 times the speed. See
    [CONTENT_LANGUAGE.md](CONTENT_LANGUAGE.md) §18.
 4. **The simulation laboratory:** in [lab/](lab/README.md), in
-   Objective-C, with content from Triangle. The first slice is built:
+   Odin, with content from Triangle. The first slice is built:
    entities, component stores generated from content, relations, tombstones,
    change commitment with automatic individuation and reactions, the clock
    and scheduler, and a scenario harness that runs *The marked nail* and its
@@ -350,6 +350,6 @@ Each document has its own list. These questions span more than one system:
   consistency obligations similar to latent assembly's.
 - **Coordination and joint activities** across actions and agency.
   (ACTIONS.md, AGENCY.md)
-- **Code generation from content:** whether `@component` types generate the
-  Objective-C component classes and field registry. (CONTENT_LANGUAGE.md,
-  COMPONENTS.md)
+- **Code generation from content:** `@component` types generate the
+  component records and field registry (`tri-components`, C or Odin).
+  Answered. (CONTENT_LANGUAGE.md, COMPONENTS.md)

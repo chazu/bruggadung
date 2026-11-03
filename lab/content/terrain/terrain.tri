@@ -5,7 +5,7 @@
 // - full, reduced, abstract, frozen: alike; terrain changes only as it is
 //            built on or knocked through.
 // - air:     rooms, and so regions of air, are found from it (air/air.tri).
-// - code:    src/core/BGTerrain.m; a map's levels are files in maps/,
+// - code:    src/core_terrain.odin; a map's levels are files in maps/,
 //            brought in by @embed (a path from this directory).
 
 // Terrain (TERRAIN.md): what each tile at each level is. A wall fills its

@@ -18,9 +18,9 @@ Two things in the repository shape it:
   the truth. The player view is built only from perception and the
   character's knowledge store. A visualizer that reads world state directly
   would break this the first time it drew a player's map.
-- **The lab runs on three platforms.** It builds with Apple's Foundation on
-  the Mac and GNUstep's on Linux and Windows (STACK.md), so a frontend
-  linking Metal or AppKit would be the Mac's alone. A hardware-accelerated
+- **The lab runs on more than one platform.** It builds on macOS and Linux,
+  and is to build on Windows (STACK.md), so a frontend linking Metal or
+  AppKit would be the Mac's alone. A hardware-accelerated
   frontend has to draw through a cross-platform layer, or be another
   process. SDL, GLFW and wgpu come with Odin's vendor packages, and sokol
   has Odin bindings of its own.
@@ -46,9 +46,8 @@ Two things in the repository shape it:
 3. **Tessera is Odin, apart from the simulation.** The core is an Odin
    package that needs only Odin's core library. Backends are separate
    packages over it. Nothing in Tessera imports the lab, so another
-   simulation, or a tool, can produce scenes too. The lab's producers come
-   with the lab's own port to Odin: until then it is Objective-C, which
-   can't fill an Odin scene. The core was C11 until 2026-11; the port kept
+   simulation, or a tool, can produce scenes too. The lab, in Odin too since
+   2026-11, imports it for its producers. The core was C11 until 2026-11; the port kept
    its binary format byte for byte (tessera/tests/golden).
 4. **Scenes are frames and diffs, and serialisable.** A frame is complete.
    A diff lists what changed since an earlier frame, named by sequence

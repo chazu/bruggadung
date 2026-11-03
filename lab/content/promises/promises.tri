@@ -10,7 +10,7 @@
 // - frozen:   it doesn't decide.
 // - talk:     a promise is made by saying it (#Pledged, knowledge.tri).
 // - work:     a job's task is `deliver` (work/work.tri).
-// - code:     commitments, urgency and windows, in src/agency/BGAgency.m.
+// - code:     commitments, urgency and windows, in src/agency_agency.odin.
 
 // Delivering: the goods, and where they are to go.
 #Delivering: #Frame & { goods: #Body, dest: #Container }

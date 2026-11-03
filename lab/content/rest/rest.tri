@@ -13,7 +13,7 @@
 // - air:      a rest watches the air over it: it wakes when the carbon
 //             dioxide reaches the command's amount, or the temperature
 //             leaves what the breather rests easy in (air/air.tri).
-// - code:     effect_rest (src/act/BGActions.m).
+// - code:     effect_rest (src/act_actions.odin).
 
 // Tiredness raises resting: worth what the agent feels of it; done once a
 // rest has run its course.

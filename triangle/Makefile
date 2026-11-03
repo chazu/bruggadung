@@ -10,16 +10,6 @@ ifeq ($(OS),Windows_NT)
 LDLIBS  += -lpthread
 endif
 
-# Foundation for the Objective-C wrapper: Apple's on the Mac, GNUstep's
-# elsewhere (blocks off: see lab/Makefile)
-ifeq ($(shell uname -s),Darwin)
-OBJC_FLAGS =
-OBJC_LIBS  = -framework Foundation
-else
-OBJC_FLAGS = $(shell gnustep-config --objc-flags) -fno-blocks
-OBJC_LIBS  = $(shell gnustep-config --base-libs) -fno-blocks $(LDLIBS)
-endif
-
 all: build/libtriangle.a build/test build/tri-components build/triangle
 
 build/%.o: src/%.c src/internal.h include/triangle.h | build
@@ -95,13 +85,6 @@ asan:
 	$(MAKE) clean
 	$(MAKE) CFLAGS="-std=c11 -O1 -g -Wall -Wextra -Wno-unused-parameter -fsanitize=address,undefined" test
 
-# The Objective-C wrapper, built with the platform's compiler and Foundation
-# (manual retain/release).
-objc: build/libtriangle.a
-	$(CC) $(CPPFLAGS) $(OBJC_FLAGS) -Iobjc -fno-objc-arc -Wall objc/BGContent.m objc/test_objc.m build/libtriangle.a \
-	    $(OBJC_LIBS) -o build/test_objc
-	./build/test_objc
-
 # The game's library for Odin (odin/triangle), in a directory per platform:
 # an ar archive on the Mac and Linux; on Windows, a COFF library for the MSVC
 # ABI, the only one Odin links with there, compiled by clang for that target
@@ -139,4 +122,4 @@ odin: $(ODIN_LIB)
 clean:
 	rm -rf build
 
-.PHONY: cli-test all test asan objc odin odin-lib leakcheck game clean lsp-test emacs-test install examples
+.PHONY: cli-test all test asan odin odin-lib leakcheck game clean lsp-test emacs-test install examples

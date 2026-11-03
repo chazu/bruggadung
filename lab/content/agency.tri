@@ -13,7 +13,7 @@
 // - abstract: as reduced, until a schedule and an authored routine stand in
 //             for deciding (DETAIL_REGIMES.md).
 // - frozen:   it doesn't decide; risen, it looks, and so decides, at once.
-// - code:     src/agency/BGAgency.m: considerations by their kind (#Flat,
+// - code:     src/agency_agency.odin: considerations by their kind (#Flat,
 //             #Scaled, #Need, #Trait, ...), conditions, `order`, commitments.
 
 // What a goal and its methods are about: the agent itself, as `me`, and

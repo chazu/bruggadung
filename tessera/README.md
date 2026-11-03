@@ -48,7 +48,7 @@ make test       # the tests, with Odin's leak tracking
 make check      # the package, vetted
 ```
 
-Odin's release is pinned in `../lab/ci/odin` (Dockerfile, install-odin.sh).
+Odin's release is pinned in `../ci` (install-odin.sh, Dockerfile).
 
 The core was C11 until 2026-11. The port kept the binary format, format 1,
 byte for byte: `tests/golden` holds what the C encoder made of the tests'

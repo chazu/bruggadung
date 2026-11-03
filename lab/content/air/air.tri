@@ -12,7 +12,7 @@
 // - terrain:  a region's tiles are found from the terrain, bounded by what is
 //             solid and by doorways (terrain/terrain.tri).
 // - heat:     fire, and the heat of solids, are heat/heat.tri's.
-// - code:     src/domains/BGAtmosphere.m; effect_open_door, effect_pass.
+// - code:     src/domains_atmosphere.odin; effect_open_door, effect_pass.
 
 // Air, for DOMAIN_SIMULATION.md's first scenario, "The unattended stove".
 // Gas is a stock: whole millimoles of oxygen and carbon dioxide, and whole

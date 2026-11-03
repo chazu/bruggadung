@@ -71,7 +71,7 @@ with. It applies to all content, and to every agent and person adding to it.
 //             (DETAIL_REGIMES.md).
 // - frozen:   it doesn't decide, so it doesn't eat; ...
 // - body:     eating sets body.tri's `fed` (50 more, at most 100) and `fedAt`; ...
-// - code:     effect_eat (src/act/BGActions.m) feeds the actor and destroys
+// - code:     effect_eat (src/act_actions.odin) feeds the actor and destroys
 //             the food.
 ```
 
@@ -108,8 +108,8 @@ cut: the levels of detail first, then other topics, then code.
 ## Tools
 
 - The lab loads every `.tri` beneath `content/`, topic directories
-  included (`BGLoadContent`, `src/test/BGTest.m`).
-- `make gen` generates `src/generated/BGComponents.h` from all of them.
+  included (`load_content`, `src/test_test.odin`).
+- `make gen` generates `src/components.odin` from all of them.
 - `triangle check content` loads a directory with its subdirectories.
   Opened in the editor, a file in a topic directory loads with its content
   root, so the language server sees the root's types.

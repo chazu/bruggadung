@@ -564,6 +564,6 @@ change what the content means.
 - [REFERENCE.md](REFERENCE.md): the grammar, every attribute, the built-in
   types, units, and diagnostics.
 - [API.md](API.md): loading content, matching, construction, and saves from C
-  and Objective-C.
+  and Odin.
 - [CONTENT_LANGUAGE.md](../../CONTENT_LANGUAGE.md): the specification, with the
   reasoning, scenarios, and research behind each decision.

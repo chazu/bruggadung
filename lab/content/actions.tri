@@ -13,7 +13,7 @@
 //            is at any of them (REALITY.md step 3).
 // - frozen:  its activities wait; risen, a stage long due ends at once
 //            (REALITY.md step 4; activities.tri).
-// - code:    an `effect` names a function in src/act/BGActions.m
+// - code:    an `effect` names a function in src/act_actions.odin
 //            (effect_take, effect_eat, ...). #Effect lists them all: a
 //            topic's new effect is added there and in the code together.
 

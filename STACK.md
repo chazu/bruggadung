@@ -1,8 +1,11 @@
-Language: Objective-C, with manual retain/release, built with clang: Apple's
-Foundation on macOS, GNUstep's (the libobjc2 runtime, gnustep-base) on Linux
-and on Windows (MSYS2's clang64). Triangle is C11. Tessera is Odin (the release
-pinned in lab/ci/odin), and the lab is to follow it (see the Odin spike,
-lab/odin).
+Language: Odin for the lab and Tessera, the release pinned in ci/
+(install-odin.sh, Dockerfile); C11 for Triangle, which the lab links as a
+library (triangle/odin/triangle). Built with make and clang, on macOS and
+Linux; Triangle on Windows too (ci/README.md).
 
-The lab used mulle-objc and mulle-sde until 2026-11; it left for clang and
-GNUstep to build on Linux and Windows with standard tools (lab/ci/README.md).
+The lab was Objective-C until 2026-11: with mulle-objc and mulle-sde, then
+with clang and Apple's or GNUstep's Foundation, to build on Linux and
+Windows with standard tools. It moved to Odin for a smaller toolchain (one
+compiler download, in place of GNUstep built from source), for allocators in
+place of reference counts, and for Odin's vendor packages for Tessera's
+windows. The port kept every test's checks and every scenario's hashes.
