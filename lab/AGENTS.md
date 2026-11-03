@@ -86,3 +86,9 @@ scenarios > ci/scenario-hashes.txt`) and says so in the commit.
 
 Triangle content is laid out by topic: see content/README.md, and
 ../CLAUDE.md for the terminology rule.
+
+- Content is kept as `triangle fmt` writes it: Triangle's `cli-test` (in
+  CI) fails on any file it would change. `../triangle/build/triangle fmt
+  --check content` lists them; `fmt <file>` formats one.
+- After any change to content, comments included, `make gen`: the lab
+  refuses to run on content with another hash than src/components.odin's.

@@ -22,10 +22,10 @@
 #Weakness: { weakens: "attention" | "pace" | "perception" | "grip", lost: [...#Point] }
 
 weak_attention:  #Weakness & { weakens: "attention",
-                               lost:  [{ input: 0, output: 50 }, { input: 40, output: 25 }, { input: 80, output: 0 }] } @family(weakness)
+                               lost: [{ input: 0, output: 50 }, { input: 40, output: 25 }, { input: 80, output: 0 }] } @family(weakness)
 weak_pace:       #Weakness & { weakens: "pace",
-                               lost:  [{ input: 0, output: 60 }, { input: 20, output: 40 }, { input: 60, output: 0 }] } @family(weakness)
+                               lost: [{ input: 0, output: 60 }, { input: 20, output: 40 }, { input: 60, output: 0 }] } @family(weakness)
 weak_perception: #Weakness & { weakens: "perception",
-                               lost:  [{ input: 10, output: 100 }, { input: 40, output: 0 }] } @family(weakness)
+                               lost: [{ input: 10, output: 100 }, { input: 40, output: 0 }] } @family(weakness)
 weak_grip:       #Weakness & { weakens: "grip",
-                               lost:  [{ input: 0, output: 50 }, { input: 40, output: 0 }] } @family(weakness)
+                               lost: [{ input: 0, output: 50 }, { input: 40, output: 0 }] } @family(weakness)
