@@ -9,8 +9,8 @@ appearances, cameras and views. It does not know pumps, agents or water.
 Whatever it shows, it is told about in a **scene**.
 
 This document is a draft. Slice 1, the scene core, is built in
-[tessera/](tessera/README.md): C11 like `triangle/`, with the prefix
-`tess_`. Nothing draws yet.
+[tessera/](tessera/README.md): the Odin package `tessera`. Nothing draws
+yet.
 
 Two things in the repository shape it:
 
@@ -21,8 +21,9 @@ Two things in the repository shape it:
 - **The lab runs on three platforms.** It builds with Apple's Foundation on
   the Mac and GNUstep's on Linux and Windows (STACK.md), so a frontend
   linking Metal or AppKit would be the Mac's alone. A hardware-accelerated
-  frontend has to be plain C over a cross-platform layer, or another
-  process.
+  frontend has to draw through a cross-platform layer, or be another
+  process. SDL, GLFW and wgpu come with Odin's vendor packages, and sokol
+  has Odin bindings of its own.
 
 ## Decisions so far
 
@@ -42,11 +43,13 @@ Two things in the repository shape it:
    information shown over a player's map (a causal trace, the truth beside
    a belief) goes in an overlay or annotation tagged as developer-only. A
    backend in player mode refuses those.
-3. **Tessera is plain C, apart from the simulation.** The core is C11 with
-   no dependencies. Backends are separate libraries over it. The lab's
-   producer is Objective-C that fills Tessera's C structures. Nothing in
-   Tessera includes a lab header, so another simulation, or a tool, can
-   produce scenes too.
+3. **Tessera is Odin, apart from the simulation.** The core is an Odin
+   package that needs only Odin's core library. Backends are separate
+   packages over it. Nothing in Tessera imports the lab, so another
+   simulation, or a tool, can produce scenes too. The lab's producers come
+   with the lab's own port to Odin: until then it is Objective-C, which
+   can't fill an Odin scene. The core was C11 until 2026-11; the port kept
+   its binary format byte for byte (tessera/tests/golden).
 4. **Scenes are frames and diffs, and serialisable.** A frame is complete.
    A diff lists what changed since an earlier frame, named by sequence
    number. The same data serves in-process use, a pipe or socket to a viewer
@@ -97,46 +100,45 @@ Two things in the repository shape it:
 
 ## The scene model
 
-A sketch of the core structures. The names are provisional.
+The core structures, as built (tessera/scene.odin).
 
-```c
-typedef enum { TESS_TRUTH, TESS_KNOWLEDGE } tess_view;
+```odin
+View :: enum u8 { Truth, Knowledge }
 
-typedef struct {
-    int32_t x0, y0, w, h;      /* tiles */
-    int32_t z0, z1;            /* levels, inclusive */
-    int32_t focus;             /* the level being looked at */
-} tess_extent;
+Extent :: struct {
+	x0, y0, w, h: i32,     // tiles
+	z0, z1:       i32,     // levels, inclusive
+	focus:        i32,     // the level being looked at
+}
 
-typedef struct {
-    uint16_t terrain;          /* appearance key of what the cell is: floor, wall, open air, ... */
-    int64_t  seen;             /* ms it was last seen; -1 never (truth: the scene's time) */
-    uint8_t  light;            /* 0 dark .. 255 full daylight */
-    uint32_t fluid;            /* water depth, mL per tile */
-    uint16_t flags;            /* in sight now, door, ... */
-} tess_cell;
+Cell :: struct {
+	seen:    i64,          // ms it was last seen; -1 never (truth: the scene's time)
+	fluid:   u32,          // water depth, mL per tile
+	terrain: u16,          // appearance key of what the cell is: floor, wall, open air, ...
+	flags:   Cell_Flags,   // in sight now, open, door
+	light:   u8,           // 0 dark .. 255 full daylight
+}
 
-typedef struct {
-    uint64_t id;               /* entity ID (truth) or referent ID (knowledge) */
-    int32_t  x, y, z;
-    uint16_t look;             /* appearance key */
-    int16_t  stack;            /* order among marks on one cell */
-    uint16_t flags;            /* the actor, believed gone, remembered, in sight now, ... */
-    int64_t  seen;             /* knowledge: when last seen */
-    const char *label;         /* optional: "R7", a name */
-} tess_mark;
+Mark :: struct {
+	id, holder: u64,       // entity ID (truth) or referent ID (knowledge); what holds it
+	seen:       i64,       // knowledge: when last seen
+	x, y, z:    i32,
+	look:       u16,       // appearance key
+	stack:      i16,       // order among marks on one cell
+	flags:      Mark_Flags,   // the actor, believed gone, in sight now
+	label:      string,    // optional: "R7", a name
+}
 
-typedef struct {
-    tess_view    view;
-    uint64_t     seq;          /* frame sequence */
-    int64_t      time;         /* simulation ms */
-    uint64_t     content;      /* the content hash: appearance keys belong to it */
-    uint64_t     viewer;       /* knowledge: the entity whose store this is */
-    tess_extent  extent;
-    tess_cell   *cells;        /* w * h * (z1 - z0 + 1) */
-    tess_mark   *marks;   size_t nmarks;
-    /* overlays, annotations, the appearance key table */
-} tess_scene;
+Scene :: struct {
+	meta:        Meta,     // view, seq, simulation ms, content hash, viewer
+	extent:      Extent,
+	cells:       []Cell,   // w * h * (z1 - z0 + 1)
+	looks:       [dynamic]string,   // the appearance key table
+	marks:       [dynamic]Mark,
+	overlays:    [dynamic]Overlay,
+	annotations: [dynamic]Annotation,
+	allocator:   runtime.Allocator,
+}
 ```
 
 - **Appearance keys are small integers.** A scene carries the table from
@@ -146,7 +148,7 @@ typedef struct {
   diff carries only the keys added. Keys made in another order make a frame.
 - **Marks are kept by id, overlays by name.** A scene's order never depends
   on the order it was built in, so two scenes that show the same thing are
-  the same, and print the same (`tess_scene_text`).
+  the same, and print the same (`scene_text`).
 - **Things held or inside** are marks with no cell of their own: in a
   frame they hang off their holder's mark. A backend lists them (in an
   inspector, a tooltip), and the map shows the holder.

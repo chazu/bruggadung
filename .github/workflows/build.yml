@@ -44,10 +44,10 @@ jobs:
       - name: Lab
         run: make -C lab check
 
-  # The Odin spike (lab/odin): Triangle linked into Odin, the content hash,
-  # formatting against printf. Not on Windows yet (triangle/Makefile's
-  # odin-lib has the untried MSVC build).
-  odin-spike:
+  # Odin: Tessera, and the spike (lab/odin): Triangle linked into Odin, the
+  # content hash, formatting against printf. Not on Windows yet
+  # (triangle/Makefile's odin-lib has the untried MSVC build).
+  odin:
     strategy:
       fail-fast: false
       matrix:
@@ -58,11 +58,11 @@ jobs:
       - name: Odin (macOS)
         if: runner.os == 'macOS'
         run: sh lab/ci/odin/install-odin.sh "$RUNNER_TEMP/odin" >> "$GITHUB_PATH"
-      - name: Spike (macOS)
+      - name: Tessera and the spike (macOS)
         if: runner.os == 'macOS'
-        run: make -C triangle odin && make -C lab odin-spike
-      - name: Spike (Linux)
+        run: make -C tessera test && make -C triangle odin && make -C lab odin-spike
+      - name: Tessera and the spike (Linux)
         if: runner.os == 'Linux'
         run: |
           docker build -t bruggadung-odin lab/ci/odin
-          docker run --rm -v "$PWD":/repo -w /repo bruggadung-odin sh -c 'make -C triangle odin && make -C lab odin-spike'
+          docker run --rm -v "$PWD":/repo -w /repo bruggadung-odin sh -c 'make -C tessera test && make -C triangle odin && make -C lab odin-spike'

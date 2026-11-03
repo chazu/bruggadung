@@ -1,0 +1,28 @@
+tessera knowledge seq 2 time 2000 content 00000000000000ab viewer 4
+extent 3 2 4 3 levels 0 1 focus 1
+look 1 "floor"
+look 2 "wall.stone"
+look 3 "#Agent"
+look 4 "#Pump"
+look 5 "#Part"
+look 6 "#Door"
+cell 3 2 0 terrain 1 seen 1000 light 200 fluid 0 flags 1
+cell 4 2 0 terrain 1 seen 1000 light 200 fluid 0 flags 1
+cell 5 2 0 terrain 1 seen 1000 light 200 fluid 0 flags 1
+cell 6 2 0 terrain 2 seen 1000 light 200 fluid 0 flags 1
+cell 3 3 0 terrain 1 seen 1000 light 200 fluid 0 flags 1
+cell 4 3 0 terrain 1 seen 1000 light 200 fluid 500 flags 1
+cell 5 3 0 terrain 1 seen 1000 light 200 fluid 0 flags 1
+cell 6 3 0 terrain 2 seen 1000 light 200 fluid 0 flags 1
+cell 3 4 0 terrain 1 seen 1000 light 200 fluid 0 flags 1
+cell 4 4 0 terrain 1 seen 1000 light 200 fluid 0 flags 1
+cell 5 4 0 terrain 1 seen 1000 light 200 fluid 250 flags 1
+cell 6 4 0 terrain 2 seen 1000 light 200 fluid 0 flags 1
+cell 3 4 1 terrain 0 seen 2000 light 0 fluid 0 flags 0
+mark 4 at 4 3 0 look 3 stack 0 flags 5 seen 2000 holder 0 label "R4"
+mark 9 at 3 3 0 look 5 stack 0 flags 0 seen 1000 holder 4 label "a \"cup\""
+mark 12 at 6 3 0 look 6 stack 1 flags 0 seen 2000 holder 0
+overlay "age" lo 0 hi 60 flags 0
+overlay "heat" lo 270 hi 320 flags 1
+  at 4 2 0 280
+annotation path flags 0 look 0 points 3,3,0 4,3,0 5,2,0 text "to the pump"
