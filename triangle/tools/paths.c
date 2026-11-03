@@ -100,6 +100,8 @@ static char *parent_of(const char *dir)
     size_t n = strlen(dir);
     while (n > 1 && dir[n - 1] == '/') n--;
     if (n == 1 && dir[0] == '/') return NULL;
+    /* a drive's root, F: or F:/, has nothing above it */
+    if (n == 2 && dir[1] == ':') return NULL;
     const char *last = dir;
     for (size_t i = 0; i < n; i++) if (dir[i] == '/') last = dir + i + 1;
     size_t lastlen = (size_t) (dir + n - last);
@@ -114,6 +116,12 @@ static char *parent_of(const char *dir)
     if (last == dir) return dup_str(".");
     size_t keep = (size_t) (last - dir) - 1;
     if (keep == 0) return dup_str("/");
+    if (keep == 2 && dir[1] == ':') {
+        /* F:/a rises to F:/, not to F: (the drive's current directory) */
+        char *r = malloc(4);
+        snprintf(r, 4, "%c:/", dir[0]);
+        return r;
+    }
     char *s = malloc(keep + 1);
     memcpy(s, dir, keep);
     s[keep] = 0;

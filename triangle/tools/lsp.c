@@ -198,6 +198,11 @@ static char *uri_to_path(const char *uri)
             s += 2;
         } else str_putc(&b, *s);
     }
+#ifdef _WIN32
+    /* file:///F:/a/b.tri: the path is F:/a/b.tri, with / throughout */
+    if (b.s[0] == '/' && isalpha((unsigned char) b.s[1]) && b.s[2] == ':') memmove(b.s, b.s + 1, strlen(b.s));
+    for (char *t = b.s; *t; t++) if (*t == '\\') *t = '/';
+#endif
     return b.s;
 }
 
@@ -205,6 +210,11 @@ static void put_uri(Str *out, const char *path)
 {
     Str b = { 0 };
     str_puts(&b, "file://");
+    if (isalpha((unsigned char) path[0]) && path[1] == ':') {
+        /* a drive: file:///F:/... */
+        str_printf(&b, "/%c:", path[0]);
+        path += 2;
+    }
     for (const unsigned char *s = (const unsigned char *) path; *s; s++) {
         if (isalnum(*s) || strchr("/-._~", *s)) str_putc(&b, (char) *s);
         else str_printf(&b, "%%%02X", *s);

@@ -5,6 +5,7 @@
 """
 import json
 import os
+import pathlib
 import subprocess
 import sys
 import tempfile
@@ -89,6 +90,11 @@ class Server:
         return found
 
 
+def uri_of(path):
+    """A file URI, as editors send them: file:///tmp/a.tri, file:///F:/a.tri."""
+    return pathlib.Path(path).absolute().as_uri()
+
+
 def pos(text, needle, offset=0):
     i = text.index(needle) + offset
     line = text.count("\n", 0, i)
@@ -101,10 +107,10 @@ def main(exe):
     for name, text in files.items():
         with open(os.path.join(d, name), "w") as f:
             f.write(text)
-    uri = {name: "file://" + os.path.join(d, name) for name in list(files) + ["shop.tri"]}
+    uri = {name: uri_of(os.path.join(d, name)) for name in list(files) + ["shop.tri"]}
 
     s = Server(exe)
-    init = s.request("initialize", {"processId": None, "rootUri": "file://" + d, "capabilities": {}})
+    init = s.request("initialize", {"processId": None, "rootUri": uri_of(d), "capabilities": {}})
     caps = init["result"]["capabilities"]
     check(caps["hoverProvider"] and caps["definitionProvider"], "initialize advertises hover and definition")
     s.notify("initialized", {})
@@ -210,7 +216,7 @@ def main(exe):
                '#Tag: { mark: #Mark, note: text }\n'
                't1: #Tag & { note: #"x\\"# , mark: "a\\u0022b" }\n'
                't2: #Tag & { note: "say \\"wrench\\"", mark: "plain" }\n')
-    suri = "file://" + os.path.join(d, "strings.tri")
+    suri = uri_of(os.path.join(d, "strings.tri"))
     s.notify("textDocument/didOpen", {"textDocument": {"uri": suri, "languageId": "triangle",
                                                        "version": 1, "text": STRINGS}})
     check(s.diagnostics(suri) == [], "escapes and raw strings load")
@@ -253,7 +259,7 @@ def main(exe):
             '}\n'
             'other: #Fit & { instrument: { size: fit.instrument.size } }\n'
             'nested: #Fit & { instrument: { size: .instrument.wear } }\n')
-    ruri = "file://" + os.path.join(d, "refs.tri")
+    ruri = uri_of(os.path.join(d, "refs.tri"))
     s.notify("textDocument/didOpen", {"textDocument": {"uri": ruri, "languageId": "triangle",
                                                        "version": 1, "text": REFS}})
     dg = s.diagnostics(ruri)
@@ -325,7 +331,7 @@ def main(exe):
             '#Cv: { points: [...#Pt] }\n'
             'let table = [[1, 2], [3, 4]]\n'
             'cv: #Cv & { points: [for i, p in table if i >= 0 { input: p[0], output: p[1] }] }\n')
-    curi = "file://" + os.path.join(d, "comp.tri")
+    curi = uri_of(os.path.join(d, "comp.tri"))
     s.notify("textDocument/didOpen", {"textDocument": {"uri": curi, "languageId": "triangle",
                                                        "version": 1, "text": COMP}})
     check(s.diagnostics(curi) == [], "comprehensions load")
@@ -348,7 +354,7 @@ def main(exe):
           '    n: len([1, 2]) + _base\n'
           '    s: strings.ToUpper("a")\n'
           '}\n')
-    furi = "file://" + os.path.join(d, "fn.tri")
+    furi = uri_of(os.path.join(d, "fn.tri"))
     s.notify("textDocument/didOpen", {"textDocument": {"uri": furi, "languageId": "triangle",
                                                        "version": 1, "text": FN}})
     check(s.diagnostics(furi) == [], "built-ins and hidden fields load")
@@ -366,7 +372,7 @@ def main(exe):
     # a topic directory loads with the content root above it
     TOPIC = "// In a topic directory.\nkept: #Tool & { size: 22mm }\n"
     os.makedirs(os.path.join(d, "topic"))
-    turi = "file://" + os.path.join(d, "topic", "kept.tri")
+    turi = uri_of(os.path.join(d, "topic", "kept.tri"))
     with open(os.path.join(d, "topic", "kept.tri"), "w") as f:
         f.write(TOPIC)
     s.notify("textDocument/didOpen", {"textDocument": {"uri": turi, "languageId": "triangle",

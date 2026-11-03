@@ -4,3 +4,4 @@ mingw-w64-clang-x86_64-gnustep-make
 mingw-w64-clang-x86_64-python
 make
 git
+diffutils
