@@ -4394,3 +4394,24 @@ the same state on each.
 113 tests (the formatting test added), 3522 checks, on macOS and Linux,
 clean under AddressSanitizer; every scenario ends in the same state as the
 Objective-C lab's (the hashes in `ci/scenario-hashes.txt` are unchanged).
+
+
+### After the slice: the watcher (TESSERA.md slices 2 and 4, in part)
+
+- Truth scenes of a world (`src/scene_truth.odin`): terrain by its `look`,
+  water, light, and a mark for each entity on the ground or held, keyed by
+  its blueprint's name until looks are content (slice 3).
+- The first window backend, `tess_raylib` (`../tessera/raylib/`): glyph
+  tiles in raylib's font, camera, focus level, selection, a panel.
+  TESSERA.md's decision 8 now names raylib, which comes with Odin, not
+  sokol.
+- The watcher (`watcher/`, `make watcher`): a crowd on the yard, the
+  cistern or the marked nail, run on the viewer's clock, paused, stepped a
+  boundary at a time, or up to an hour a second; the inspector shows what
+  is selected, and an agent's concerns and latest decisions. It runs only
+  the boundaries due and puts none in, so watching changes nothing: the
+  `watcher` test runs a crowd in uneven slices, a pool drained after each,
+  and gets the state the same crowd reaches in one go. The lab itself
+  never links raylib.
+
+114 tests, 3565 checks, on macOS and Linux; the scenario hashes unchanged.

@@ -2,7 +2,8 @@
 # ../ci (install-odin.sh, Dockerfile).
 #
 #   make test     the tests (tests/), with Odin's leak tracking
-#   make check    the Odin package checked, as the tests build it
+#   make check    the Odin package checked, as the tests build it, and its
+#                 raylib backend (raylib/)
 
 ODIN  ?= odin
 FLAGS  = -vet -strict-style
@@ -12,5 +13,6 @@ test:
 
 check:
 	$(ODIN) check . $(FLAGS) -no-entry-point
+	$(ODIN) check raylib $(FLAGS) -no-entry-point
 
 .PHONY: test check

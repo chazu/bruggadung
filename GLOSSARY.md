@@ -776,7 +776,9 @@ REALITY.md, TER = TERRAIN.md, TES = TESSERA.md. "d3" is a doc's decision
   key**, mapped by a **theme** to glyphs, atlas cells and tints. (TES d6)
 - **Viewer**: the program that displays scenes; the scene's `viewer` field
   is the entity whose knowledge it shows. (TES d5)
-- **Watcher**: the lab process publishing scenes to a viewer. (TES)
+- **Watcher**: what runs a lab world and publishes its scenes to a viewer:
+  `lab/watcher/`, in one process with its window. Not an activity's
+  **watch**. (TES)
 
 ## Words with more than one sense
 

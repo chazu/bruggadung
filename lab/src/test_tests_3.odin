@@ -3750,4 +3750,5 @@ ALL_TESTS := [?]Test_Case{
 	{"save_deferred_groups",          test_save_deferred_groups},
 	{"restore_errors",                test_restore_errors},
 	{"formatting",                    test_formatting},
+	{"watcher",                       test_watcher},
 }

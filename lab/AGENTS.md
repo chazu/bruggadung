@@ -15,6 +15,7 @@ platform needs.
 
 ```sh
 make              # build/<platform>/lab, with -vet -strict-style
+make watcher      # build/<platform>/watcher: a world in a window (raylib)
 make test         # the tests (TEST=name for those whose names contain it)
 make check        # the tests, and every scenario's hashes
 make asan         # the tests under AddressSanitizer (Linux)
@@ -22,7 +23,8 @@ make gen          # src/components.odin, after a content change to components
 ```
 
 Run `make check` before committing a change to code. It must pass on macOS
-and Linux.
+and Linux. It type-checks the watcher, but doesn't link it: the lab itself
+never links raylib, so the tests need no display.
 
 ## Writing the code
 

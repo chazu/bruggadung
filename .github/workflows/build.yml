@@ -16,7 +16,7 @@ jobs:
       - name: Triangle
         run: make -C triangle test cli-test lsp-test odin
       - name: Tessera
-        run: make -C tessera test
+        run: make -C tessera test check
       - name: Lab
         run: make -C lab check
 
@@ -29,7 +29,7 @@ jobs:
       - name: Triangle
         run: docker run --rm -v "$PWD":/repo -w /repo bruggadung make -C triangle CC=clang test cli-test lsp-test odin
       - name: Tessera
-        run: docker run --rm -v "$PWD":/repo -w /repo bruggadung make -C tessera test
+        run: docker run --rm -v "$PWD":/repo -w /repo bruggadung make -C tessera test check
       - name: Lab
         run: docker run --rm -v "$PWD":/repo -w /repo bruggadung make -C lab check
 

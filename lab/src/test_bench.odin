@@ -26,10 +26,22 @@ bench_crowd :: proc(agents: i32, seconds: i64) -> i32 {
 }
 
 
-/* The same, spread: on plain_map (1024 x 1024), ten tiles apart, so each
- * has as many near it however many there are. */
-// anchored is a cstring, nil for none (the C string).
-bench_crowd_spread :: proc(agents: i32, seconds: i64, spread: bool, anchored: cstring) -> i32 {
+/* A crowd ready to run: `agents` workers made in the world's first second,
+ * every other one exploring, the rest idle with minds of their own; on
+ * yard_map, or spread ten tiles apart on plain_map. With `anchored`, the
+ * first anchors the reality bubble. The watcher (watcher/) runs one too. */
+Crowd :: struct {
+	world:     ^World,
+	committer: ^Committer,
+	scheduler: ^Scheduler,
+	knowledge: ^Knowledge,
+	agency:    ^Agency,
+	ids:       []Entity_ID,      // the workers, in the order made; the caller deletes it
+}
+
+// anchored is a cstring, nil for none (the C string). false (said) if the
+// world, its map or the anchor's kind can't be had.
+crowd_setup :: proc(agents: i32, spread: bool, anchored: cstring) -> (crowd: Crowd, ok: bool) {
 	side:       i32
 	w:          ^World
 	c:          ^Committer
@@ -38,21 +50,13 @@ bench_crowd_spread :: proc(agents: i32, seconds: i64, spread: bool, anchored: cs
 	knowledge:  ^Knowledge
 	agency:     ^Agency
 	g:          ^Proposal_Group
-	st:         Scheduler_Stats
-	st0:        Scheduler_Stats
-	p0:         u64
-	d0:         u64
-	e0:         uint
-	ids:        [^]Entity_ID
-	t0:         time.Tick
-	t1:         time.Tick
-	wall:       f64
+	ids:        []Entity_ID
 
 	w = test_world(211)
 	// a message to nil said NO
 	if w == nil || !world_set_terrain_map(w, "plain_map" if spread else "yard_map", nil) {
 		fmt.eprintf("bench: no map\n")
-		return 1
+		return {}, false
 	}
 	/* spread: as many to a stretch of plain however many there are, ten
 	 * tiles apart on a square; else all on the yard */
@@ -68,7 +72,7 @@ bench_crowd_spread :: proc(agents: i32, seconds: i64, spread: bool, anchored: cs
 	scheduler_set_activities(s, activities_as_activity_clock(activities))
 	scheduler_set_perception(s, knowledge_as_perception_phase(knowledge))
 	scheduler_set_decision(s, agency_as_decision_phase(agency))
-	ids = make([^]Entity_ID, int(agents + 1))
+	ids = make([]Entity_ID, int(agents))
 	g   = proposal_group_group_with_phase(.System, "bench: a crowd on the yard")
 	for i: i32 = 0; i < agents; i += 1 {
 		ids[i] = proposal_group_create(g, "worker", ns_utf8(fmt.tprintf("worker %d", i)),
@@ -92,10 +96,36 @@ bench_crowd_spread :: proc(agents: i32, seconds: i64, spread: bool, anchored: cs
 	if anchored != nil {
 		if !world_set_anchor(w, ids[0], anchored) {
 			fmt.eprintf("bench: no kind of anchor called %s\n", anchored)
-			return 1
+			delete(ids)
+			return {}, false
 		}
 		world_settle_anchors(w)
 	}
+	return Crowd{w, c, s, knowledge, agency, ids}, true
+}
+
+
+/* The same, spread: on plain_map (1024 x 1024), ten tiles apart, so each
+ * has as many near it however many there are. */
+// anchored is a cstring, nil for none (the C string).
+bench_crowd_spread :: proc(agents: i32, seconds: i64, spread: bool, anchored: cstring) -> i32 {
+	w:          ^World
+	s:          ^Scheduler
+	knowledge:  ^Knowledge
+	agency:     ^Agency
+	st:         Scheduler_Stats
+	st0:        Scheduler_Stats
+	p0:         u64
+	d0:         u64
+	e0:         uint
+	ids:        []Entity_ID
+	t0:         time.Tick
+	t1:         time.Tick
+	wall:       f64
+
+	crowd, ok := crowd_setup(agents, spread, anchored)
+	if !ok do return 1
+	w, s, knowledge, agency, ids = crowd.world, crowd.scheduler, crowd.knowledge, crowd.agency, crowd.ids
 	st0 = scheduler_stats(s)
 	p0  = knowledge_perceptions(knowledge)
 	d0  = agency_decisions(agency)
@@ -136,6 +166,6 @@ bench_crowd_spread :: proc(agents: i32, seconds: i64, spread: bool, anchored: cs
 	fmt.printf("  perception    % 10.1f ms\n", ms_of(st.perceptionNs))
 	fmt.printf("  decision      % 10.1f ms\n", ms_of(st.decisionNs))
 	fmt.printf("  events        % 10d\n", world_event_count(w) - e0)
-	free(ids)
+	delete(ids)
 	return 0
 }

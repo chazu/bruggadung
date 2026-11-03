@@ -1,0 +1,255 @@
+/*
+Package tess_raylib is Tessera's first window backend (TESSERA.md, slice 4):
+scenes drawn top-down as glyph tiles, through raylib, which comes with Odin
+(vendor:raylib).
+
+It draws a scene and takes the viewer's own input: the camera (pan, zoom),
+the focus level, and selecting a mark. It knows nothing of what a scene came
+from. Running a simulation, and what a selected mark is, are the caller's.
+
+The draw order is TESSERA.md's: terrain, fluid, marks by stack order, then
+light; levels below show, dimmed, through cells with no floor. Overlays and
+annotations aren't drawn yet (slice 5).
+*/
+package tess_raylib
+
+import "core:fmt"
+import "core:strings"
+import rl "vendor:raylib"
+
+import "../../tessera"
+
+// What the viewer looks at, and how. Change it freely between frames.
+Viewer :: struct {
+	centre:   [2]f32,          // the tile at the middle of the map
+	tile:     f32,             // px a tile is drawn
+	focus:    i32,             // the level looked at
+	levels:   [2]i32,          // the levels there are, inclusive: the focus stays in them
+	selected: u64,             // a mark's id, or 0
+	shade:    bool,            // darken by light
+	panel:    i32,             // px wide at most, the panel on the right (two fifths of a narrow window)
+}
+
+viewer_make :: proc(centre: [2]f32, focus: i32, levels: [2]i32) -> Viewer {
+	return Viewer{centre = centre, tile = 22, focus = focus, levels = levels, shade = true, panel = 380}
+}
+
+// The map's part of the window, left of the panel.
+map_pane :: proc(v: ^Viewer) -> rl.Rectangle {
+	return {0, 0, f32(rl.GetScreenWidth() - panel_width(v)), f32(rl.GetScreenHeight())}
+}
+
+@(private)
+panel_width :: proc(v: ^Viewer) -> i32 {
+	return min(v.panel, rl.GetScreenWidth() * 2 / 5)
+}
+
+// The tiles in view, a tile round them, and the focus level with the one
+// below it: the extent to ask a producer for.
+viewer_extent :: proc(v: ^Viewer) -> tessera.Extent {
+	pane := map_pane(v)
+	half := [2]f32{pane.width, pane.height} / (2 * v.tile)
+	x0 := i32(v.centre.x - half.x) - 1
+	y0 := i32(v.centre.y - half.y) - 1
+	return tessera.Extent {
+		x0 = x0, y0 = y0,
+		w = i32(2 * half.x) + 3, h = i32(2 * half.y) + 3,
+		z0 = max(v.focus - 1, v.levels[0]), z1 = v.focus,
+		focus = v.focus,
+	}
+}
+
+// The tile under a point of the window.
+tile_at :: proc(v: ^Viewer, p: [2]f32) -> [2]i32 {
+	pane := map_pane(v)
+	t := v.centre + (p - [2]f32{pane.width, pane.height} / 2) / v.tile
+	return {i32(t.x + 0.5) if t.x >= -0.5 else i32(t.x - 0.5), i32(t.y + 0.5) if t.y >= -0.5 else i32(t.y - 0.5)}
+}
+
+// Where a tile's top-left corner is drawn.
+tile_origin :: proc(v: ^Viewer, x, y: i32) -> [2]f32 {
+	pane := map_pane(v)
+	return ([2]f32{f32(x), f32(y)} - v.centre - 0.5) * v.tile + [2]f32{pane.width, pane.height} / 2
+}
+
+// The viewer's own input, against the scene on screen: arrows or WASD (or a
+// right-button drag) pan, the wheel zooms, Page Up and Page Down (or < and
+// >) change level, a click selects the top mark on a tile (again: the next
+// one down), Escape lets go of it. Returns whether the selection changed.
+viewer_input :: proc(v: ^Viewer, s: ^tessera.Scene) -> bool {
+	step := 24 / v.tile * rl.GetFrameTime() * 30
+	if rl.IsKeyDown(.LEFT) || rl.IsKeyDown(.A) do v.centre.x -= step
+	if rl.IsKeyDown(.RIGHT) || rl.IsKeyDown(.D) do v.centre.x += step
+	if rl.IsKeyDown(.UP) || rl.IsKeyDown(.W) do v.centre.y -= step
+	if rl.IsKeyDown(.DOWN) || rl.IsKeyDown(.S) do v.centre.y += step
+	if rl.IsMouseButtonDown(.RIGHT) do v.centre -= rl.GetMouseDelta() / v.tile
+	if wheel := rl.GetMouseWheelMove(); wheel != 0 {
+		v.tile = clamp(v.tile * (1.15 if wheel > 0 else 1 / 1.15), 6, 64)
+	}
+	shift := rl.IsKeyDown(.LEFT_SHIFT) || rl.IsKeyDown(.RIGHT_SHIFT)
+	if rl.IsKeyPressed(.PAGE_UP) || (shift && rl.IsKeyPressed(.PERIOD)) do v.focus = min(v.focus + 1, v.levels[1])
+	if rl.IsKeyPressed(.PAGE_DOWN) || (shift && rl.IsKeyPressed(.COMMA)) do v.focus = max(v.focus - 1, v.levels[0])
+	if rl.IsKeyPressed(.ESCAPE) && v.selected != 0 {
+		v.selected = 0
+		return true
+	}
+	mouse := rl.GetMousePosition()
+	if s == nil || !rl.IsMouseButtonPressed(.LEFT) || mouse.x >= map_pane(v).width do return false
+	t := tile_at(v, mouse)
+	on := marks_on(s, t.x, t.y, v.focus, context.temp_allocator)
+	before := v.selected
+	if len(on) == 0 {
+		v.selected = 0
+	} else {
+		next := 0         // the top one, or the one under the one selected
+		for m, i in on do if m.id == v.selected do next = (i + 1) % len(on)
+		v.selected = on[next].id
+	}
+	return v.selected != before
+}
+
+// The marks standing on a tile (not held), top first: by stack, then id.
+marks_on :: proc(s: ^tessera.Scene, x, y, z: i32, allocator := context.temp_allocator) -> []tessera.Mark {
+	on := make([dynamic]tessera.Mark, allocator)
+	for m in s.marks do if m.holder == 0 && m.x == x && m.y == y && m.z == z do append(&on, m)
+	for i in 1 ..< len(on) {   // few to a tile: an insertion sort, top first
+		for j := i; j > 0 && above(on[j], on[j - 1]); j -= 1 do on[j], on[j - 1] = on[j - 1], on[j]
+	}
+	return on[:]
+}
+
+@(private)
+above :: proc(a, b: tessera.Mark) -> bool {
+	return a.stack > b.stack || (a.stack == b.stack && a.id > b.id)
+}
+
+// Draws a scene into the map pane, and the panel: `header` lines at the top
+// left of the map, `panel` lines in the panel, wrapped to it.
+viewer_draw :: proc(v: ^Viewer, s: ^tessera.Scene, theme: ^Theme, header, panel: []string) {
+	rl.ClearBackground(theme.background)
+	pane := map_pane(v)
+	if s != nil do draw_map(v, s, theme)
+	if v.selected != 0 && s != nil {
+		if m := tessera.mark_find(s, v.selected); m != nil && m.z == v.focus {
+			for m.holder != 0 {             // held: its holder's tile shows it
+				h := tessera.mark_find(s, m.holder)
+				if h == nil do break
+				m = h
+			}
+			o := tile_origin(v, m.x, m.y)
+			rl.DrawRectangleLinesEx({o.x - 1, o.y - 1, v.tile + 2, v.tile + 2}, 2, {255, 220, 80, 255})
+		}
+	}
+	y: f32 = 6
+	for line in header {
+		rl.DrawRectangle(4, i32(y) - 2, rl.MeasureText(cstr(line), 20) + 8, 22, {0, 0, 0, 170})
+		rl.DrawText(cstr(line), 8, i32(y), 20, {230, 230, 220, 255})
+		y += 22
+	}
+	rl.DrawRectangle(i32(pane.width), 0, panel_width(v), rl.GetScreenHeight(), {18, 18, 24, 255})
+	rl.DrawLine(i32(pane.width), 0, i32(pane.width), rl.GetScreenHeight(), {70, 70, 80, 255})
+	y = 10
+	for line in panel {
+		for part in wrap(line, panel_width(v) - 20, 16) {
+			if y > f32(rl.GetScreenHeight()) - 16 do return
+			rl.DrawText(cstr(part), i32(pane.width) + 10, i32(y), 16, {210, 210, 200, 255})
+			y += 18
+		}
+		y += 4
+	}
+}
+
+@(private)
+draw_map :: proc(v: ^Viewer, s: ^tessera.Scene, theme: ^Theme) {
+	e := s.extent
+	font := rl.GetFontDefault()
+	for y in e.y0 ..< e.y0 + e.h {
+		for x in e.x0 ..< e.x0 + e.w {
+			o := tile_origin(v, x, y)
+			c := tessera.cell_at(s, x, y, v.focus)
+			if c == nil do continue
+			z := v.focus
+			dim: f32 = 1
+			if .Open in c.flags {        // no floor: the level below, dimmed
+				if below := tessera.cell_at(s, x, y, v.focus - 1); below != nil {
+					c, z, dim = below, v.focus - 1, 0.45
+				}
+			}
+			g := theme_glyph(theme, tessera.look_name(s, c.terrain))
+			if c.fluid > 0 {
+				depth := min(f32(c.fluid) / 20000, 1)   // mL on a tile: 20 L looks deep
+				g.bg = mix(g.bg, {30, 70, 160, 255}, 0.35 + 0.5 * depth)
+				g.fg, g.ch = {120, 170, 255, 255}, '~'
+			}
+			on := marks_on(s, x, y, z)
+			if len(on) > 0 {
+				top := theme_glyph(theme, tessera.look_name(s, on[0].look))
+				g.ch, g.fg = top.ch, top.fg
+			}
+			if v.shade do dim *= 0.6 + 0.4 * f32(c.light) / 255      // the night still readable
+			bg, fg := scale(g.bg, dim), scale(g.fg, dim)
+			rl.DrawRectangleV(o, {v.tile, v.tile}, bg)
+			if g.ch != ' ' && g.ch != 0 do draw_glyph(font, g.ch, o, v.tile, fg)
+			if len(on) > 1 do rl.DrawRectangleV(o + {v.tile - 4, 1}, {3, 3}, scale({255, 255, 255, 255}, dim))
+		}
+	}
+}
+
+@(private)
+draw_glyph :: proc(font: rl.Font, ch: rune, o: [2]f32, tile: f32, fg: rl.Color) {
+	buf: [8]u8
+	n := copy(buf[:], fmt.bprintf(buf[:7], "%c", ch))
+	buf[n] = 0
+	// the default font is 10 px: drawn at a whole multiple, it stays crisp
+	size := max(10, f32(int(tile * 0.9 / 10 + 0.5)) * 10)
+	w := rl.MeasureTextEx(font, cstring(&buf[0]), size, 0)
+	rl.DrawTextCodepoint(font, ch, o + ([2]f32{tile, tile} - w) / 2, size, fg)
+}
+
+@(private)
+scale :: proc(c: rl.Color, k: f32) -> rl.Color {
+	return {u8(f32(c.r) * k), u8(f32(c.g) * k), u8(f32(c.b) * k), c.a}
+}
+
+@(private)
+mix :: proc(a, b: rl.Color, k: f32) -> rl.Color {
+	return {
+		u8(f32(a.r) * (1 - k) + f32(b.r) * k),
+		u8(f32(a.g) * (1 - k) + f32(b.g) * k),
+		u8(f32(a.b) * (1 - k) + f32(b.b) * k),
+		255,
+	}
+}
+
+// A temporary C string.
+@(private)
+cstr :: proc(s: string) -> cstring {
+	return strings.clone_to_cstring(s, context.temp_allocator)
+}
+
+// A line broken at spaces into parts at most `width` px wide (a word wider
+// than that stands alone).
+@(private)
+wrap :: proc(line: string, width: i32, size: i32) -> []string {
+	parts := make([dynamic]string, context.temp_allocator)
+	rest := line
+	for len(rest) > 0 {
+		if rl.MeasureText(cstr(rest), size) <= width {
+			append(&parts, rest)
+			break
+		}
+		cut, i := 0, 0
+		for i < len(rest) {
+			j := strings.index_byte(rest[i:], ' ')
+			end := len(rest) if j < 0 else i + j
+			if rl.MeasureText(cstr(rest[:end]), size) > width do break
+			cut = end
+			if j < 0 do break
+			i = end + 1
+		}
+		if cut == 0 do cut = strings.index_byte(rest, ' ') if strings.index_byte(rest, ' ') > 0 else len(rest)
+		append(&parts, rest[:cut])
+		rest = strings.trim_left_space(rest[cut:])
+	}
+	return parts[:]
+}

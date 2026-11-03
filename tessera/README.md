@@ -3,8 +3,9 @@
 The visual engine of bruggadung: scenes of tile worlds with z-levels, for
 anything that draws them. The design is [TESSERA.md](../TESSERA.md).
 
-This is slice 1: the scene core, the Odin package `tessera` (this
-directory). Nothing draws yet.
+This is slice 1, the scene core: the Odin package `tessera` (this
+directory). The first backend, `tess_raylib` in `raylib/`, draws scenes in
+a window; the lab's watcher (`../lab/watcher/`) runs it.
 
 - **Scenes** (`scene.odin`): an extent of tiles over levels; a cell for
   each (terrain, when seen, light, fluid, flags); marks (the things drawn,
@@ -41,11 +42,24 @@ tess.mark_put(s, tess.Mark{id = 4, x = x, y = y, look = tess.look(s, "#Agent"), 
 data, is_frame, _ := tess.encode_diff(last, s)               // a frame, if last is nil
 ```
 
+## The raylib backend
+
+`raylib/` (package `tess_raylib`) draws a scene top-down as glyph tiles,
+through Odin's `vendor:raylib`, in TESSERA.md's order: terrain, fluid,
+marks by stack order, light; levels below show, dimmed, through cells with
+no floor. A `Viewer` holds the camera, the focus level and the selected
+mark; `viewer_input` takes the viewer's own input (pan, zoom, level,
+select), `viewer_extent` says what to ask a producer for, and
+`viewer_draw` draws the scene with a header and a panel of lines the
+caller gives. A `Theme` maps appearance keys to glyphs and colours, by
+name, then by the name's family before its first dot (`wall.stone`,
+`wall`). It knows nothing of where a scene came from.
+
 ## Building
 
 ```sh
 make test       # the tests, with Odin's leak tracking
-make check      # the package, vetted
+make check      # the package and its raylib backend, vetted
 ```
 
 Odin's release is pinned in `../ci` (install-odin.sh, Dockerfile).

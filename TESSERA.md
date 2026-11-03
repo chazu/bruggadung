@@ -9,8 +9,11 @@ appearances, cameras and views. It does not know pumps, agents or water.
 Whatever it shows, it is told about in a **scene**.
 
 This document is a draft. Slice 1, the scene core, is built in
-[tessera/](tessera/README.md): the Odin package `tessera`. Nothing draws
-yet.
+[tessera/](tessera/README.md): the Odin package `tessera`. Parts of slices
+2 and 4 are built too: the lab makes truth scenes
+(`lab/src/scene_truth.odin`), and the watcher (`lab/watcher/`) runs a lab
+world and draws them in a window through the raylib backend
+(`tessera/raylib/`).
 
 Two things in the repository shape it:
 
@@ -70,10 +73,15 @@ Two things in the repository shape it:
 7. **Glyphs come first.** The first GPU backend draws glyph tiles from a
    font atlas. It is the same pipeline that sprites will use (instanced
    textured quads), without the art.
-8. **The first GPU backend uses sokol.** sokol_app and sokol_gfx are C and
-   single-header, and drive Metal, OpenGL, D3D11 and WebGPU, including wasm
-   for a viewer in a browser.
-   - raylib was considered: quicker to start, but shaped like a game.
+8. **The first GPU backend uses raylib** (amended 2026-11; it was sokol).
+   Odin ships raylib (`vendor:raylib`): windowing, input, text and
+   textures, with nothing to install or bind, on macOS, Linux and Windows.
+   - sokol was chosen while the stack was C: single-header, and driving
+     Metal, OpenGL, D3D11 and WebGPU. From Odin it needs bindings from
+     outside and shaders of our own. It, or wgpu, remains the way to a
+     viewer in a browser (wasm): scenes don't depend on the backend.
+   - raylib was set aside then as shaped like a game. For glyph tiles, a
+     camera and a panel, that shape is what is needed.
    - wgpu-native was considered: modern but heavier.
 9. **Input goes through actions.** A viewer that controls a character
    sends it commands: the verbs BGPlay takes (a menu entry, walk, ask,
@@ -95,7 +103,7 @@ Two things in the repository shape it:
 | Overlay | A scalar field over cells, such as heat, CO₂, light, sound, knowledge age or water depth, with a range and a palette. |
 | Annotation | A line, arrow, path or callout: a causal chain, line of sight, a route. |
 | Producer | What builds scenes from a simulation (the lab's `BGScene`). |
-| Backend | What draws scenes: the terminal, a sokol window, a recorder. |
+| Backend | What draws scenes: the terminal, a raylib window, a recorder. |
 
 ## The scene model
 
@@ -185,37 +193,49 @@ isometric later.
 - **tess-term**: the terminal. It is BGPlay's text map re-based on a
   knowledge scene, with optional ANSI colour, and the first backend built,
   because it needs no graphics work to prove the model.
-- **tess-sokol**: a window with a camera that pans and zooms, the focus
-  level up and down, overlay toggles, and a developer panel. Selecting a
-  mark in a truth scene names its entity, which the lab's inspector can
-  show. Developer panels may use Dear ImGui (sokol_imgui).
-- **Later:** a browser viewer (sokol on wasm, reading scenes over a socket),
-  and a recording player.
+- **tess-raylib** (`tessera/raylib/`, built in part): a window with a
+  camera that pans and zooms, the focus level up and down, and a panel.
+  Selecting a mark in a truth scene names its entity, which the watcher's
+  inspector shows. Glyphs are raylib's own font for now, drawn at whole
+  multiples of its size, with a theme from appearance keys to glyphs and
+  colours; a key with no glyph is drawn as its first letter in a colour
+  of its own. To come: overlay toggles, a glyph atlas, and developer
+  panels (raygui comes with it).
+- **Later:** a browser viewer (sokol or wgpu on wasm, reading scenes over a
+  socket), and a recording player.
 
 ## How the lab uses it
 
-- **`BGScene`**, a lab class, is the producer:
-  - `truthOf:world extent:` builds a truth scene;
-  - `knowledgeOf:store extent:` builds a knowledge scene;
-  - each frame is diffed against the last one published.
+- **The producer**:
+  - `scene_truth(world, extent, seq)` builds a truth scene (built). Until
+    slice 3, a mark's appearance key is its blueprint's name, and a
+    terrain kind's is its `look`;
+  - a knowledge scene from one character's store (to come);
+  - each frame diffed against the last one published (to come: the
+    watcher is in-process, so it draws each frame whole).
 - **BGPlay's `look`** becomes a knowledge scene drawn by tess-term. Its
   output stays the same, which is the test that the model carries what the
   text map needs.
-- **A watcher** runs a lab scenario (the cistern, the tempting purse) and
-  publishes scenes at boundaries to a tess-sokol window, in the same process
-  first.
+- **The watcher** (`lab/watcher/`, `make -C lab watcher`) runs a lab
+  world (a crowd on the yard, the cistern, the marked nail) on its own
+  clock and draws a truth scene of what is in view each frame, in one
+  process with its tess-raylib window. It runs the boundaries due by its
+  clock and puts none in of its own, so the world goes where it would
+  have unwatched (the lab's `watcher` test). A world slower than the
+  clock makes the clock wait, a quarter of a second behind at most.
 
 ## The plan, in slices
 
 1. **Core** (built). `tessera/`: the scene structures, a builder API,
    frame and diff encoding (a compact binary form, plus a text form for
    tests), and tests, including truncated and corrupted input.
-2. **Producers in the lab.** `BGScene` for both views, and BGPlay's `look`
-   drawn through tess-term, with the same output.
+2. **Producers in the lab.** Scenes for both views, and BGPlay's `look`
+   drawn through tess-term, with the same output. Built: truth scenes.
 3. **Appearance in content.** A look declared beside blueprints, keys
    resolved by type, and a theme for tess-term. BGPlay's glyph table goes.
-4. **The first window.** tess-sokol watching a lab scenario: glyph atlas,
-   camera, focus level.
+4. **The first window.** tess-raylib watching a lab scenario: glyph atlas,
+   camera, focus level. Built: the watcher, with the camera, the focus
+   level, selection and an inspector, in raylib's font.
 5. **Overlays and the developer panel.** Fields from domains (heat, air,
    light, sound), knowledge age, causal traces.
 6. **Control.** A character played from the window, through the action
