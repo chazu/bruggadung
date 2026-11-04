@@ -23,7 +23,7 @@ Doc abbreviations: ACT = ACTIONS.md, AGE = AGENCY.md, ARC =
 ARCHITECTURE.md, CL = CONTENT_LANGUAGE.md, COM = COMPONENTS.md, DES =
 DESIGN.md, DOM = DOMAIN_SIMULATION.md, DR = DETAIL_REGIMES.md, INS =
 INSTITUTIONS.md, KNO = KNOWLEDGE.md, LAT = LATENT_ASSEMBLY.md, REA =
-REALITY.md, TER = TERRAIN.md, TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
+REALITY.md, PRF = PERFORMANCE.md, TER = TERRAIN.md, TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
 3; "§3" its numbered section.
 
 ## The project
@@ -244,6 +244,10 @@ REALITY.md, TER = TERRAIN.md, TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc'
   from the actor. (ACT §5)
 - **Checkpoint**: a point in a stage where partial effects commit; it
   makes a boundary. (ACT d6)
+- **Journey** (proposed): a walk to a place as one activity, its way
+  found when it starts, a stage per tile; a decision point only when it
+  ends: arrived, blocked, or interrupted. Today each tile is an activity
+  of its own. (PRF d1)
 - **Partial effect**: a stage's progress shown in the world (a half-sawn
   log), committed at checkpoints and on interruption. (ACT §5)
 - **Capability**: what a provider can contribute: kind, capacity,
@@ -394,7 +398,9 @@ REALITY.md, TER = TERRAIN.md, TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc'
 - **Interpretation**: a proposition drawn from observations and beliefs by
   an **interpretation rule**, gated by **expertise**; **immediate** (cheap,
   on perceiving) or **deliberate** (investigating, an activity). Retracted
-  only when a premise is contradicted. (KNO §9)
+  only when a premise is contradicted. (KNO §9) **Incremental
+  interpretation** (proposed): a rule weighed again for a referent only
+  when its evidence changed. (PRF d2)
 - **Telling**: the content of a claim made in speech or writing, with its
   **attribution** ("I saw", "Teodor told me"). (KNO §10, lab/content/knowledge.tri)
 - **Utterance**: the committed event of saying something; heard by event
