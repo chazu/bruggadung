@@ -4590,3 +4590,40 @@ numbers only.
 - Two new tests, `identity_lost_and_found` and `identity_own` (a hungry
   farmer takes from its own sack though the neighbour's is nearer); each
   fails with its part switched off.
+
+### After the slice: firewood (VILLAGE.md slice 5, issue #5)
+
+- content/firewood/: trees (oak, birch), an axe; `fell` (a tree into a
+  trunk where it stood), `buck` (a length off a trunk, a log of its own,
+  with sawing's effect; the log is related `splitFrom` the trunk, so its
+  mass is carved, not made), `split` (a log into twenty pieces of
+  firewood), `stoke` (firewood in hand into a stove's fuel), and a generic
+  `put_down` (actions.tri). A stove's fuel is seen.
+- The woodcutters' work is a kept commitment to stock their woodpile:
+  stack what is in hand, gather what is split, split, buck, fell, take up
+  the axe, and with no tree in sight go into the woods (`#Explore &
+  { beside: "woodland" }`, a new method step: toward the nearest unseen
+  tile beside ground of that kind). Every household stokes its stove for
+  the night (19:00–21:00), and a stove lit to cook is stoked first if it
+  is empty (cooking's `stove_lit`). The village runs the atmosphere
+  domain.
+- Agency, found on the way:
+  - Habit breaks ties only between methods of the same rank (AGENCY.md
+    §5's "habitual ways win ties"): it had been added to every score, so a
+    practised later way came before an earlier one (cooking's double
+    take, a saw put down and taken up in circles, felling all day).
+  - A kept goal found impossible is tried again ten minutes later, not
+    given up for its window (a woodcutter who lost the axe to the other
+    idled all day). Saved.
+  - A suspended activity binding what is gone or out of reach is given
+    up, once the agent is in reach of what its method names now.
+- The village: new checks, every stove has fuel at 02:00 each night and
+  the woodcutters' woodpile rises each working day (20 pieces at first,
+  over 600 a day); a woodcutter at work is one stocking its woodpile,
+  wherever in the woods. Plain-wood blueprints say oak, as "wood" now has
+  two kinds below it; birch firewood is its own stack.
+- Cost: 32,178 boundaries in three days (from 4,016), about 68 s: the
+  woodcutters walk between the woods and home all day. VILLAGE.md, open
+  questions.
+
+123 tests, 3798 checks; the other scenarios behave exactly as before.

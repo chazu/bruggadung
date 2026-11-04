@@ -99,6 +99,7 @@ BG_MARGIN          :: 5      /* what another goal must beat the current one by *
 BG_INTERRUPT       :: 5      /* and more, to interrupt an activity under way */
 BG_MAX_SETTLED     :: 16
 BG_MAX_COMMITMENTS :: 8
+BG_KEPT_RETRY :: i64(600000)     /* ms: a kept goal found impossible is tried again ten minutes later */
 BG_MAX_HABITS      :: 16
 BG_HABIT_GAIN      :: 10     /* each repetition */
 BG_HABIT_FADE      :: 1      /* a day */
@@ -149,6 +150,7 @@ Commitment :: struct {
 	source:  cstring,        /* interned: "employment", "promise", "self" */
 	every:   i64,            /* ms: it recurs, a window each period (a daily shift); 0, once */
 	settled: bool,           /* done, or given up, for this window */
+	resume:  i64,            /* ms: a kept goal found impossible is tried again from then; 0, now */
 	params:  [BG_MAX_SLOTS]Slot_Binding,
 	nparams: i32,
 }
@@ -374,6 +376,7 @@ Walk_Context :: struct {
 	world: ^World,
 	store: ^Knowledge_Store,
 	level: i32,
+	over:  Terrain_Kind,     /* exploring beside ground of this kind it has seen; 0, any */
 }
 
 
@@ -391,7 +394,18 @@ walkable :: proc(context_: rawptr, x: i32, y: i32) -> bool {
 @(private = "file")
 unseen :: proc(context_: rawptr, x: i32, y: i32) -> bool {
 	c := (^Walk_Context)(context_)
-	return !knowledge_store_has_seen_x(c.store, x, y, c.level)
+	if knowledge_store_has_seen_x(c.store, x, y, c.level) do return false
+	if c.over == 0 do return true
+	/* beside ground of the kind, as it saw it */
+	for dy: i32 = -1; dy <= 1; dy += 1 {
+		for dx: i32 = -1; dx <= 1; dx += 1 {
+			if (dx != 0 || dy != 0) && knowledge_store_has_seen_x(c.store, x + dx, y + dy, c.level) &&
+			   knowledge_store_believed_terrain_at_x(c.store, x + dx, y + dy, c.level) == c.over {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 
@@ -656,6 +670,17 @@ agency_log_of :: proc(self: ^Agency, agent: Entity_ID) -> []string {
 }
 
 
+/* Whether the agent has the goal among its intentions now (for checks and
+ * the developer; it makes no mind). */
+agency_intends :: proc(self: ^Agency, agent: Entity_ID, goal: string) -> bool {
+	for m in self.minds {
+		if m.agent != agent do continue
+		for k: i32 = 0; k < m.nintentions; k += 1 do if string(m.intentions[k].goal) == goal do return true
+	}
+	return false
+}
+
+
 /* The mind at i goes; its log stays, for the developer. */
 @(private = "file")
 agency_retire_mind_at :: proc(self: ^Agency, i: uint) {
@@ -765,6 +790,7 @@ agency_renew_commitments :: proc(self: ^Agency, m: ^Motivation) {
 			c.until += c.every
 		}
 		c.settled = false
+		c.resume  = 0
 	}
 }
 
@@ -858,7 +884,7 @@ agency_autopilot_explore :: proc(self: ^Agency, agent: Entity_ID, threshold: i32
  * it, to the nearest tile on its level it has never seen; false if there is
  * none within a search's reach (BG_PATH_BUDGET tiles). */
 @(private = "file")
-agency_explore :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Store) -> bool {
+agency_explore :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Store, over: Terrain_Kind = 0) -> bool {
 	c: Walk_Context
 	q: Path_Query
 
@@ -868,6 +894,7 @@ agency_explore :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Store) -
 	c.world    = self.world
 	c.store    = store
 	c.level    = me.level
+	c.over     = over
 	q.x        = me.x
 	q.y        = me.y
 	q.context_ = &c
@@ -1562,14 +1589,25 @@ agency_follow :: proc(self: ^Agency, m: ^Motivation, method: cstring, index: i32
 			return false
 		}
 
+		/* going where it hasn't been, beside ground of a kind (#Explore) */
+		if tri.node_type(step) == tri.type_named(tc, "#Explore") {
+			over: Terrain_Kind
+			if text_at(tc, step, "beside", slot[:]) && world_terrain(self.world) != nil {
+				over = terrain_kind_named(world_terrain(self.world), cstr(slot[:]))
+			}
+			if agency_explore(self, m, store, over) do return true
+			agency_fail(self, m, index, fmt.tprintf("%s: nowhere left to look", str(title[:])))
+			return false
+		}
 		/* the operation, within reach of what it names */
 		if !text_at(tc, step, "op", op[:]) do continue
 		/* an activity of it the agent suspended: resumed, not begun again;
 		 * put down out of reach (the bed, from the larder), walked back to
 		 * first */
 		resume_failed: string
+		suspended: Entity_ID
 		if self.activities != nil {
-			suspended := agency_activity(self, cstr(op[:]), m.agent, "suspended", 0)
+			suspended = agency_activity(self, cstr(op[:]), m.agent, "suspended", 0)
 			if suspended != NO_ENTITY {
 				if activities_resume(self.activities, suspended, &resume_failed) != nil {
 					agency_note(self, m, fmt.tprintf("%s: resuming %s", str(title[:]), str(op[:])))
@@ -1605,6 +1643,14 @@ agency_follow :: proc(self: ^Agency, m: ^Motivation, method: cstring, index: i32
 				agency_walk(self, m, str(title[:]), me, r, store)
 				return true
 			}
+		}
+		/* within reach of what it names, and the one put down binds what is
+		 * gone or out of reach (yesterday's half-sawn trunk): given up, and
+		 * begun again on this */
+		if resume_failed != "" && (strings.contains(resume_failed, "out of reach") || strings.contains(resume_failed, "is gone")) {
+			agency_note(self, m, fmt.tprintf("%s: giving up the %s put down: %s", str(title[:]), str(op[:]), resume_failed))
+			activities_abort(self.activities, suspended, "given up", nil)
+			resume_failed = ""
 		}
 		if resume_failed != "" {
 			agency_note(self, m, fmt.tprintf("%s: could not resume %s: %s", str(title[:]), str(op[:]), resume_failed))
@@ -2384,10 +2430,15 @@ goal_kept :: proc(tc: ^tri.Content, goal: cstring) -> bool {
 agency_settle :: proc(self: ^Agency, m: ^Motivation, intention: ^Intention, done := false) {
 	k: i32
 
-	/* a kept goal, done, is still to keep while the window is open */
-	if intention.commitment > 0 && intention.commitment <= m.ncommitments &&
-	   !(done && goal_kept(world_tri(self.world), intention.goal)) {
-		m.commitments[intention.commitment - 1].settled = true
+	/* a kept goal is still to keep while the window is open: done, until it
+	 * no longer holds; impossible for now, tried again a while later */
+	if intention.commitment > 0 && intention.commitment <= m.ncommitments {
+		c := &m.commitments[intention.commitment - 1]
+		if !goal_kept(world_tri(self.world), intention.goal) {
+			c.settled = true
+		} else if !done {
+			c.resume = world_time(self.world).ms + BG_KEPT_RETRY
+		}
 	}
 	if intention.pressed != 0 {
 		need: [32]u8
@@ -2512,6 +2563,7 @@ agency_weigh :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Store, bus
 
 		c := &m.commitments[k]
 		if c.settled || world_time(self.world).ms < c.from || world_time(self.world).ms >= c.until do continue
+		if world_time(self.world).ms < c.resume do continue      /* impossible a while ago: not yet */
 		for j2 = 0; j2 < m.nintentions && m.intentions[j2].commitment != k + 1; j2 += 1 {}
 		if j2 < m.nintentions do continue      /* under way already */
 		/* a kept goal that holds: nothing to do for it, for now */
@@ -2719,6 +2771,8 @@ agency_decide :: proc(self: ^Agency, m: ^Motivation) -> bool {
 	scores := make([dynamic]string, context.temp_allocator)
 	best    = 0
 	chosenN = 0
+	bestRank:  i64
+	bestHabit: i32
 
 	n = top.nparams
 	copy(b[:n], top.params[:n])
@@ -2766,25 +2820,30 @@ agency_decide :: proc(self: ^Agency, m: ^Motivation) -> bool {
 		}
 		parts := make([dynamic]string, context.temp_allocator)
 		score = agency_sum(self, methods[i], "score", raw_data(b[:]), n, store, &parts)
+		habit: i32
 		{
 			ctx: [128]u8
 
 			put(ctx[:], fmt.tprintf("%s:%s", top.goal, methods[i]))
-			habit := habit_strength(m, cstr(ctx[:]), 0, world_time(self.world).ms) / 10
-			if habit != 0 {
-				score += habit
-				append(&parts, fmt.tprintf("habit %+d", habit))
-			}
+			habit = habit_strength(m, cstr(ctx[:]), 0, world_time(self.world).ms) / 10
+			if habit != 0 do append(&parts, fmt.tprintf("habit %+d", habit))
 		}
 		if len(parts) != 0 {
 			append(&scores, fmt.tprintf("%s %+d (%s)",
 			                            str(method[:]) if text_at(world_tri(self.world), tri.pattern(world_tri(self.world), methods[i]), "title",
 			                                                      method[:]) else string(methods[i]),
-			                            score, strings.join(parts[:], ", ", context.temp_allocator)))
+			                            score + habit, strings.join(parts[:], ", ", context.temp_allocator)))
 		}
-		if score < 0 || (chosen >= 0 && score <= best) do continue
-		chosen  = i32(i)
-		best    = score
+		/* best first, then by rank; habit breaks a tie between ways of the
+		 * same rank (AGENCY.md §5: "habitual ways win ties"), and never puts
+		 * a later way before an earlier one */
+		rank := int_at(world_tri(self.world), tri.pattern(world_tri(self.world), methods[i]), "rank", 0)
+		if score < 0 do continue
+		if chosen >= 0 && !(score > best || (score == best && rank == bestRank && habit > bestHabit)) do continue
+		chosen    = i32(i)
+		best      = score
+		bestRank  = rank
+		bestHabit = habit
 		chosenN = n
 		copy(chosenB[:n], b[:n])
 	}
@@ -2849,6 +2908,7 @@ due_of_ :: proc(m: ^Motivation) -> i64 {
 	for k: i32 = 0; k < m.ncommitments; k += 1 {
 		if m.commitments[k].from > m.decidedAt && m.commitments[k].from < at do at = m.commitments[k].from
 		if m.commitments[k].until > m.decidedAt && m.commitments[k].until < at do at = m.commitments[k].until
+		if m.commitments[k].resume > m.decidedAt && m.commitments[k].resume < at do at = m.commitments[k].resume
 	}
 	return at
 }
@@ -3017,6 +3077,9 @@ agency_saved_state :: proc(self: ^Agency) -> []string {
 			if m.commitments[k].every != 0 {
 				append(&lines, fmt.tprintf("recurs %d %d %d", m.agent, k, m.commitments[k].every))
 			}
+			if m.commitments[k].resume != 0 {
+				append(&lines, fmt.tprintf("resume %d %d %d", m.agent, k, m.commitments[k].resume))
+			}
 		}
 		for k: i32 = 0; k < m.nsettled; k += 1 {
 			append(&lines, fmt.tprintf("settled %d %s %d", m.agent, m.settled[k].goal, m.settled[k].about))
@@ -3083,6 +3146,13 @@ agency_restore_saved_state :: proc(self: ^Agency, lines: []string) {
 			m = agency_mind_of(self, Entity_ID(ns_long_long_value(words[1])))
 			if ns_int_value(words[2]) < m.ncommitments {
 				m.commitments[ns_int_value(words[2])].every = ns_long_long_value(words[3])
+			}
+			continue
+		}
+		if len(words) == 4 && words[0] == "resume" {
+			m = agency_mind_of(self, Entity_ID(ns_long_long_value(words[1])))
+			if ns_int_value(words[2]) < m.ncommitments {
+				m.commitments[ns_int_value(words[2])].resume = ns_long_long_value(words[3])
 			}
 			continue
 		}

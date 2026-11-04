@@ -6,8 +6,11 @@
 //            checkpoint.
 // - frozen:  it waits; risen, a checkpoint passed meanwhile is skipped
 //            (REALITY.md step 4).
-// - code:    effect_saw; the partial effect and the grading in
-//            src/act_activities.odin.
+// - firewood: a trunk is a #Log too, bucked a length at a time with an
+//            axe (firewood/firewood.tri's `buck`, with this effect); a log
+//            gets what it splits into there.
+// - code:    effect_saw (a trunk's lengths too); the partial effect and the
+//            grading in src/act_activities.odin.
 
 // For ACTIONS.md §5's partial effects: a log, how far it is sawn through
 // (percent), and a saw.

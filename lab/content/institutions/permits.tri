@@ -98,7 +98,7 @@ content:        #Content & {}
 authorization:  #Authorization & {}
 paper_copy:     #Copy & { material: "paper", mass: 5g }
 ledger:         #Copy & { material: "paper", mass: 2kg }
-stamp:          #Stamp & { material: "wood", mass: 150g }
+stamp:          #Stamp & { material: "oak", mass: 150g }
 
 // Issue a permit (the office's procedure, COMPONENTS.md Scenario 2): an
 // office holder, its office's seal in hand, grants someone in reach entry

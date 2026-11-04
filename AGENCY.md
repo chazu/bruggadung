@@ -235,11 +235,15 @@ a disturbance generates no goal to investigate it.
 - **Methods inherit the recipe rule: they never bind hidden facts.**
 - **The method score** uses:
   - believed cost
-  - a habit strength bonus, so habitual ways win ties
+  - a habit strength bonus, so habitual ways win ties: between ways of the
+    same rank, never putting a later way before an earlier one (the lab's
+    rank is the author's order of preference)
   - dispositions: a dishonest agent may prefer *take* over *ask*
   - norms
 - **There is no general search.** A method may include bounded local choice,
-  such as ordering the places to look by the belief that the item is there.
+  such as ordering the places to look by the belief that the item is there,
+  or exploring: a step toward the nearest tile the agent has never seen,
+  beside ground of a kind it has (the woods' edge, to find trees).
 - Methods are content, in the content language
   ([CONTENT_LANGUAGE.md](CONTENT_LANGUAGE.md)). A precondition match is
   entailed, incompatible, or unknown; each method declares its credence
@@ -279,7 +283,12 @@ a disturbance generates no goal to investigate it.
   the evening). A commitment to one isn't settled when it is done: while
   its window is open it arises again whenever it no longer holds, and,
   having no deadline to meet, its urgency doesn't rise (lab
-  content/agency.tri's `kept`; VILLAGE.md decision 4).
+  content/agency.tri's `kept`; VILLAGE.md decision 4). Found impossible,
+  it isn't given up for the window but tried again a while later.
+- **A suspended activity** is resumed once the agent is back within reach
+  of what it names. One that binds what is gone or out of reach, when the
+  agent is in reach of what its method names now, is given up and begun
+  again.
 - **Promises** are commitments created by a *communicate* act, whose content
   is the promise itself. Hearers hold it as a claim.
   - Keeping or breaking a promise is a history event, which hearers perceive

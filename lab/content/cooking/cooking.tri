@@ -18,9 +18,9 @@
 //             its `nourishment` and makes it no longer `raw`. The body
 //             knows nothing of it (VILLAGE.md decision 2).
 // - heat:     a stove is heat/heat.tri's, lit by its `light`; cooking only
-//             needs it lit. Burning its fuel is the atmosphere domain's,
-//             which the village doesn't run yet, so a lit stove stays lit
-//             (firewood is slice 5).
+//             needs it lit. Burning its fuel is the atmosphere domain's; a
+//             stove with nothing in it is stoked before it is lit
+//             (firewood/firewood.tri).
 // - home:     a larder is a container, village/village.tri's, one to a
 //             household. One larder is told from another just like it by
 //             where it is (KNOWLEDGE.md decision 18), not its looks. Whose
@@ -100,8 +100,9 @@ eat_it_raw: #Method & {
 // then what it is used to (AGENCY.md §8), then the nearest: cook what the
 // agent holds at a stove,
 // lit first if it isn't; take raw food from where it is kept, a portion,
-// hands empty (one in hand, it is cooked before another is taken, however
-// used the agent is to taking), when there is a stove to cook it at; or,
+// a hand free, when there is a stove to cook it at (one in hand, it is
+// cooked before another is taken: an earlier way comes first, however used
+// the agent is to a later one, AGENCY.md §5); or,
 // with a stove to cook at, look for food in the nearest containers, two
 // at most.
 cook_what_i_hold: #Method & {
@@ -130,8 +131,17 @@ light_to_cook: #Method & {
     title: "light it to cook"
     goal:  "stove_lit"
     rank:  1
-    pre:   { find: ["stove"], match: #Cooking & { stove: #Combustor & #Body & { lit: false } } }
+    pre:   { find: ["stove"], match: #Cooking & { stove: #Stove & { lit: false, fuel: >=1g } } }
     steps: [#Do & { op: "light", object: "stove" }]
+} @family(methods)
+
+// Nothing in it to burn: stoked first (firewood/firewood.tri).
+stoke_to_cook: #Method & {
+    title: "stoke it to cook"
+    goal:  "stove_lit"
+    rank:  2
+    pre:   { find: ["stove"], match: #Cooking & { stove: #Stove & { lit: false } } }
+    steps: [#Achieve & { subgoal: "stove_stoked" }, #Do & { op: "light", object: "stove" }]
 } @family(methods)
 
 take_to_cook: #Method & {
@@ -141,7 +151,7 @@ take_to_cook: #Method & {
     pre: {
         find:  ["food", "stove"]
         match: #Cooking & {
-            me:    #Agent & { freeHands: 2 }
+            me:    #Agent & { freeHands: >=1 }
             food:  #Food & #Stack & { raw: true, place: #Inside }
             stove: #Combustor & #Body
         }

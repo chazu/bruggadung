@@ -2570,7 +2570,72 @@ effect_pass :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -
 /* Sawing's end: the log is sawn through. */
 @(private = "file")
 effect_saw :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
-	proposal_group_set_of_to(g, "Log.sawn", whole(a.roles[.Destination]), 100)
+	lengths, mass, unit_mass: i64
+
+	/* a trunk of more than one length: a length sawn off, a log of its own
+	 * (content/firewood/), and the trunk shorter, to saw again */
+	trunk := a.roles[.Destination]
+	if world_get_field(world, "Trunk.lengths", trunk, &lengths) && lengths > 1 {
+		cuts := world_text_field(world, "Trunk.cutsInto", trunk)
+		if cuts == nil || len(cuts) == 0 do return "it saws into nothing"
+		world_get_field(world, "Body.mass", trunk, &mass)
+		unit_mass = mass / lengths
+		/* the log is carved from the trunk, which is lighter by as much */
+		log := proposal_group_create(g, cuts, "a log sawn off", world_location_of(world, trunk))
+		proposal_group_relate(g, .Split_From, whole(log), whole(trunk))
+		proposal_group_set_of_to(g, "Trunk.lengths", whole(trunk), lengths - 1)
+		proposal_group_set_of_to(g, "Body.mass", whole(trunk), mass - unit_mass)
+		proposal_group_set_of_to(g, "Log.sawn", whole(trunk), 0)
+		return ""
+	}
+	proposal_group_set_of_to(g, "Log.sawn", whole(trunk), 100)
+	return ""
+}
+
+
+/* Felling: where the tree stood, its trunk lies (content/firewood/). */
+@(private = "file")
+effect_fell :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
+	tree  := a.roles[.Destination]
+	trunk := world_text_field(world, "Tree.fellsInto", tree)
+	if trunk == nil || len(trunk) == 0 do return "it fells into nothing"
+	proposal_group_create(g, trunk, "a felled trunk", world_location_of(world, tree))
+	proposal_group_destroy(g, whole(tree), "felled")
+	return ""
+}
+
+
+/* Splitting a log: it is firewood, a stack, lying where it was. */
+@(private = "file")
+effect_split :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
+	log  := a.roles[.Destination]
+	into := world_text_field(world, "Log.splitsInto", log)
+	if into == nil || len(into) == 0 do return "it splits into nothing"
+	proposal_group_create(g, into, "firewood", world_location_of(world, log))
+	proposal_group_destroy(g, whole(log), "split")
+	return ""
+}
+
+
+/* Stoking: the firewood in hand into the stove's fuel, by its mass. */
+@(private = "file")
+effect_stoke :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
+	fuel, mass: i64
+
+	if !world_get_field(world, "FuelContainer.fuel", a.roles[.Destination], &fuel) do return "it burns nothing"
+	world_get_field(world, "Body.mass", a.roles[.Item], &mass)
+	proposal_group_set_of_to(g, "FuelContainer.fuel", whole(a.roles[.Destination]), fuel + mass)
+	proposal_group_destroy(g, whole(a.roles[.Item]), "burned")
+	return ""
+}
+
+
+/* Putting down: what the actor holds, on the ground at its feet. */
+@(private = "file")
+effect_put_down :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
+	at := world_location_of(world, a.roles[.Actor])
+	if at.form != .On_Tile do return "there is no ground to put it on"
+	proposal_group_move_to(g, whole(a.roles[.Item]), at)
 	return ""
 }
 
@@ -2671,6 +2736,10 @@ effects := [?]Named_Effect{
 	{"read",      effect_read},
 	{"eat",       effect_eat},
 	{"cook",      effect_cook},
+	{"fell",      effect_fell},
+	{"split",     effect_split},
+	{"stoke",     effect_stoke},
+	{"put_down",  effect_put_down},
 	{"give",      effect_give},
 	{"investigate", effect_investigate},
 	{"tighten",   effect_tighten},

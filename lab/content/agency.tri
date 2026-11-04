@@ -107,6 +107,10 @@
 // (talk/talk.tri): after a question, the agent waits a while for the answer.
 #MethodStep: {}
 #Achieve:    #MethodStep & { subgoal: text }
+// Going where it hasn't been: a step toward the nearest tile it has never
+// seen, beside ground of the terrain kind `beside` that it has (the woods.
+// edge, to find trees).
+#Explore:    #MethodStep & { beside: text }
 #Do:         #MethodStep & { op: text, object: text, target: text, units: int, says: #Utterance, regarding: text }
 
 // A way to achieve a goal. Its alternatives are tried by `rank`, lowest first,

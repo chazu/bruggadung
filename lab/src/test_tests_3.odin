@@ -3759,4 +3759,5 @@ ALL_TESTS := [?]Test_Case{
 	{"identity_from_context",         test_identity_from_context},
 	{"identity_lost_and_found",       test_identity_lost_and_found},
 	{"identity_own",                  test_identity_own},
+	{"firewood",                      test_firewood},
 }

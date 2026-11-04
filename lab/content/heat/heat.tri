@@ -25,10 +25,11 @@
 
 combustor_seen: #Seen & { kindOf: "#Combustor" } @family(seen)
 
-// Fuel in a stove, a stock the atmosphere domain checks out while it burns.
+// Fuel in a stove, a stock the atmosphere domain checks out while it burns:
+// how much is in it is seen (firewood/firewood.tri stokes it).
 #FuelContainer: {
     @component(FuelContainer)
-    fuel: mass & >=0g & <=1000kg               @field(content, saved, proposable, inspect)
+    fuel: mass & >=0g & <=1000kg               @field(content, saved, proposable, inspect, perceive(sight))
 }
 
 // A solid's heat: whole joules, owned by the thermal domain while it

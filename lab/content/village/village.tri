@@ -11,8 +11,12 @@
 //             their larders (cooking/cooking.tri): what is in them is all
 //             the food there is (farming and hunting are slices to come), a
 //             sack of grain each, so a larder empties as its household eats.
-// - heat:     each house has a stove (heat/heat.tri), cold, with no domain
-//             running it in the scenario yet.
+// - heat:     each house has a stove (heat/heat.tri), cold; the scenario
+//             runs the atmosphere domain, which burns a lit stove's fuel.
+// - firewood: each woodpile holds firewood (firewood/firewood.tri): the
+//             woodcutters' a little, the others' what they had of them;
+//             the woodcutters' wood of oaks and birches north of their
+//             block, and an axe each by it, are the scenario's.
 // - terrain:  the map's kinds are terrain/terrain.tri's.
 // - code:     src/scenario_village.odin: where everyone and everything
 //             stands, the households' bonds and claims, the commitments,
@@ -50,15 +54,20 @@ hunter_look:     #Look & { kindOf: "hunter", look: "agent.hunter" } @family(look
 // In each house: a bed for each of its people, a larder (stocked with a
 // sack of grain, cooking/'s); by its door, a woodpile. (Its stove is
 // heat/heat.tri's.)
-bed:      #Bed & { material: "wood", mass: 40kg }
-larder:   #Container & { material: "wood", mass: 30kg, capacity: 50 }
-woodpile: #Container & { material: "wood", mass: 5kg, capacity: 100 }
+bed:      #Bed & { material: "oak", mass: 40kg }
+larder:   #Container & { material: "oak", mass: 30kg, capacity: 50 }
+woodpile: #Container & { material: "oak", mass: 5kg, capacity: 100 }
+
+// The firewood on a woodpile at first: a household's a hundred pieces, the
+// woodcutters' own twenty (firewood/firewood.tri).
+household_firewood:   #Stack & { material: "oak", unit: "firewood", unitMass: 1kg, count: 100 }
+woodcutters_firewood: #Stack & { material: "oak", unit: "firewood", unitMass: 1kg, count: 20 }
 
 // Where each household works: a scarecrow in a plot, a chopping block at
 // the woods' edge, a hunting blind in the east woods.
-scarecrow:      #Worksite & { material: "wood", mass: 8kg }
+scarecrow:      #Worksite & { material: "oak", mass: 8kg }
 chopping_block: #Worksite & { material: "oak", mass: 60kg }
-hunting_blind:  #Worksite & { material: "wood", mass: 30kg }
+hunting_blind:  #Worksite & { material: "oak", mass: 30kg }
 
 larder_look:         #Look & { kindOf: "larder", look: "container.larder" } @family(looks)
 woodpile_look:       #Look & { kindOf: "woodpile", look: "container.woodpile" } @family(looks)

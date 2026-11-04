@@ -21,7 +21,7 @@
 // remembered as wooden, then as made of something.
 #Material: "metal" | "wood" | "flesh" | "paper" | "food" | "cloth" | "rubber" | "stone" | "leather" | "earth"
 "metal":   "iron" | "brass" | "steel"
-"wood":    "oak"
+"wood":    "oak" | "birch"
 
 #Colour:  "dark" | "light" | "bright"
 "dark":   "black" | "grey" | "brown" | "navy"

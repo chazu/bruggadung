@@ -491,12 +491,17 @@ REALITY.md, TER = TERRAIN.md, TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc'
   (VIL slice 4, lab/content/cooking/cooking.tri)
 - **Larder**: a household's container of food, a plain container, known
   from its neighbours' by where it is. (VIL d3, lab/content/cooking/)
+- **Firewood**: split wood by the piece (a kilogram), a stack; stoked into
+  a stove, its fuel. A tree is **felled** into a **trunk**, **bucked** a
+  length at a time into **logs**, and a log **split** into firewood.
+  (VIL d6, lab/content/firewood/firewood.tri)
 - **Commitment**: a goal an agent is bound to (a shift, a promise, a
   debt), with a window or deadline and an **urgency curve**. Not change
   commitment. A commitment to a **kept** goal (an ongoing condition: at
   work through the shift) isn't settled when done: it arises again
   whenever the goal no longer holds, until the window closes, and its
-  urgency doesn't rise. (AGE d5, §7; VIL d4)
+  urgency doesn't rise; found impossible, it is tried again ten minutes
+  later. (AGE d5, §7; VIL d4)
 - **Promise**: a commitment made by saying it; hearers hold it as
   testimony (attributed `#Pledged`). *Avoid:* pledge, in prose. (AGE §7)
 - **Deal**: an agreement (employment, a loan, a posted offer), said or
@@ -514,7 +519,9 @@ REALITY.md, TER = TERRAIN.md, TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc'
   bound to it. *Avoid:* workplace, place of work (a **place** is
   DETAIL_REGIMES.md's). (VIL d4, lab/content/home/home.tri)
 - **Habit**: a learned preference in a context, with a strength that
-  rises with repetition and decays. (AGE §8)
+  rises with repetition and decays. A habitual method wins a tie with
+  another of the same rank; it never comes before an earlier way. (AGE §8,
+  §5)
 - **Disposition**: a per-agent weight: honesty, curiosity, diligence, risk
   tolerance, respect for reservations. *Avoid:* trait (in prose). (AGE §9)
 - **Norm**: an agent's own rule weighting kinds of action ("don't take
@@ -618,7 +625,8 @@ REALITY.md, TER = TERRAIN.md, TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc'
   entity order (`BGIndex`). (TER)
 - **Path search**: bounded A* or breadth-first over tiles (`BGPath`),
   within a budget. **Exploring**: searching for the nearest tile never
-  seen. (TER)
+  seen; a method step can explore (`#Explore`), beside ground of a kind
+  the agent has seen (a woodcutter finding trees). (TER, AGE §5)
 - **Sparse**: stored only where something is. (TER)
 
 ## The reality bubble and detail regimes

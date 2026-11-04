@@ -8,8 +8,8 @@ and meet at a market. The watcher shows it (TESSERA.md), and `lab run
 village` checks it, as the other scenarios are checked.
 
 This document is a proposal, built a slice at a time: slices 1 (hunger
-over weeks), 2 (looks in content), 3 (the village and its homes) and 4
-(cooking and the larder) are built. Each slice below is a ticket: slice n is GitHub issue #n
+over weeks), 2 (looks in content), 3 (the village and its homes), 4
+(cooking and the larder) and 5 (firewood) are built. Each slice below is a ticket: slice n is GitHub issue #n
 (label `village`). A slice moves into `lab/PLAN.md` when it is built.
 
 It is the first scenario that runs for weeks, not minutes. That forces two
@@ -99,6 +99,19 @@ things the lab put off:
    `#FuelContainer`). The atmosphere domain burns it and warms the room,
    cold is felt, and `get_warm` lights the stove. All of that after
    stoking exists already.
+   - Built (content/firewood/): the woodcutters work with an axe alone:
+     it fells, bucks a trunk a length at a time (`buck`, with sawing's
+     effect) and splits, so a hand is free for the firewood. Sawing with
+     a saw in the other hand meant putting it down and taking it up, which
+     ran in circles. Their work is a kept commitment to stock their
+     woodpile, past more than a day's work; with no tree in sight they go
+     into the woods to find one (an `#Explore` step, agency.tri).
+   - Built: every household stokes its stove for the night (19:00–21:00)
+     and before lighting it to cook if it is empty, from its woodpile. The
+     village runs the atmosphere domain, so a lit stove burns its fuel. The
+     other households' woodpiles start stocked: buying firewood is the
+     market's (slice 9). Cold isn't felt yet: villagers aren't thermal
+     bodies, so stoking for the night is a commitment, not a want.
 7. **Animals are agents with few goals, and can die** (slice 7). A deer or
    a hare is an `#Agent` with no hands and a short list of goals: wander
    its range, and keep away from people it perceives. Hunting is
@@ -248,7 +261,7 @@ when it is built:
 3. **The village and its homes**: the map, the households, beds, the day's
    commitments, sleeping at home (built).
 4. **Cooking and the larder**: meals, eating at home (built).
-5. **Firewood**: trees, felling, splitting, the woodpile, stoking.
+5. **Firewood**: trees, felling, splitting, the woodpile, stoking (built).
 6. **Farming**: plots, sowing, ripening, harvesting.
 7. **Hunting**: animals, death, butchering.
 8. **Perishing**: food that spoils.
@@ -306,5 +319,13 @@ New, and entered in the glossary with this document:
   portion a villager eats stays one, not present. Over three days that is
   a third of what a villager knows of; over weeks it will be most, and
   recognition compares each percept with them all.
+- **Cold.** Villagers aren't thermal bodies, so they don't feel the cold,
+  rooms have no air of their own, and a stove only burns. Making people
+  warm-blooded (the lodger's `#ThermalBody`) is a slice of its own, and
+  would make stoking a want rather than a commitment.
+- **What walking costs.** The woodcutters walk between the woods and home
+  all day, a boundary a step: the village runs 32,000 boundaries in three
+  days, eight times as many as before firewood. Slice 10 measures it;
+  carrying more at a time, or walking a path as one activity, would cut it.
 - **Children.** The households are all adults. Children who eat but don't
   work would test the market harder.

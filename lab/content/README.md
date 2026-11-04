@@ -94,6 +94,7 @@ cut: the levels of detail first, then other topics, then code.
 | `home/` | beds, worksites, and the day's commitments: to work, home, to bed |
 | `hunger/` | satiety and reserves (`body.tri`); what going without weakens (`weakness.tri`); eating and food's nourishment (`eating.tri`) |
 | `cooking/` | raw food and meals, the larder, cooking at a lit stove, and the ways from a larder to a meal (`cooking.tri`) |
+| `firewood/` | trees, felling, bucking and splitting with an axe, the woodpile, stoking a stove (`firewood.tri`) |
 | `institutions/` | laws and the watch (`law.tri`); content, copies, seals and permits (`permits.tri`) |
 | `light/` | daylight and lamps |
 | `looks/` | themes: what `lab play`'s map (`text.tri`) and the watcher (`tiles.tri`) draw for each look |

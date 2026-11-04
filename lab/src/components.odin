@@ -1,10 +1,10 @@
-// Generated from Triangle content ccc5d2f350178ef9: do not edit. Type IDs are valid
+// Generated from Triangle content 96ab102d2ebc571f: do not edit. Type IDs are valid
 // only for this content; regenerate when it changes.
 package lab
 
 import tri "../../triangle/odin/triangle"
 
-CONTENT_HASH :: 0xccc5d2f350178ef9
+CONTENT_HASH :: 0x96ab102d2ebc571f
 
 // Combustor, from #Combustor
 Combustor :: struct {
@@ -22,7 +22,7 @@ Food :: struct {
 
 // FuelContainer, from #FuelContainer
 Fuel_Container :: struct {
-	fuel: i64,    // mass, in quanta of 1g; content, saved, proposable, inspect
+	fuel: i64,    // mass, in quanta of 1g; content, saved, proposable, inspect, perceive(sight)
 }
 
 // GasStore, from #GasStore
@@ -255,6 +255,7 @@ Log :: struct {
 	finish: i64,    // int, in quanta of 1; content, saved, proposable, inspect, perceive(sight)
 	hardness: i64,    // int, in quanta of 1; content, saved, inspect
 	sawn: i64,    // int, in quanta of 1; content, saved, proposable, inspect, perceive(sight)
+	splitsInto: cstring,    // text; content, saved, inspect
 }
 
 // Part, from #Part
@@ -317,6 +318,17 @@ Trace :: struct {
 	traceKind: cstring,    // text; content, saved, proposable, inspect
 }
 
+// Tree, from #Tree
+Tree :: struct {
+	fellsInto: cstring,    // text; content, saved, inspect
+}
+
+// Trunk, from #Trunk
+Trunk :: struct {
+	cutsInto: cstring,    // text; content, saved, inspect
+	lengths: i64,    // int, in quanta of 1; content, saved, proposable, inspect, perceive(sight)
+}
+
 // Valve, from #Valve
 Valve :: struct {
 	breakaway: i64,    // torque, in quanta of 0.001Nm; content, saved, proposable, inspect
@@ -336,69 +348,71 @@ Fastener :: struct {
 }
 
 // #ActivityStatus
-ACTIVITYSTATUS_ABORTED :: 584
-ACTIVITYSTATUS_COMPLETED :: 585
-ACTIVITYSTATUS_EXHAUSTED :: 586
-ACTIVITYSTATUS_FAILED :: 587
-ACTIVITYSTATUS_RUNNING :: 588
-ACTIVITYSTATUS_SUSPENDED :: 589
+ACTIVITYSTATUS_ABORTED :: 625
+ACTIVITYSTATUS_COMPLETED :: 626
+ACTIVITYSTATUS_EXHAUSTED :: 627
+ACTIVITYSTATUS_FAILED :: 628
+ACTIVITYSTATUS_RUNNING :: 629
+ACTIVITYSTATUS_SUSPENDED :: 630
 
 // #Tie
-TIE_EMPLOY :: 678
-TIE_FRIEND :: 679
-TIE_KIN :: 680
-TIE_SWORN :: 681
+TIE_EMPLOY :: 723
+TIE_FRIEND :: 724
+TIE_KIN :: 725
+TIE_SWORN :: 726
 
 // #ClaimKind
-CLAIMKIND_CUSTODY :: 591
-CLAIMKIND_OWNERSHIP :: 592
-CLAIMKIND_RESERVATION :: 593
+CLAIMKIND_CUSTODY :: 632
+CLAIMKIND_OWNERSHIP :: 633
+CLAIMKIND_RESERVATION :: 634
 
 // #Penalty
-PENALTY_FINE :: 666
-PENALTY_ARREST :: 697
-PENALTY_CONFISCATE :: 698
+PENALTY_FINE :: 711
+PENALTY_ARREST :: 742
+PENALTY_CONFISCATE :: 743
 
 // #Wrong
-WRONG_ANOTHERS :: 689
-WRONG_UNAUTHORIZED :: 690
+WRONG_ANOTHERS :: 734
+WRONG_UNAUTHORIZED :: 735
 
 // #Material
-MATERIAL_CLOTH :: 651
-MATERIAL_EARTH :: 652
-MATERIAL_FOOD :: 653
-MATERIAL_LEATHER :: 654
-MATERIAL_RUBBER :: 655
-MATERIAL_STONE :: 656
-MATERIAL_FLESH :: 700
-MATERIAL_BRASS :: 702
-MATERIAL_IRON :: 703
-MATERIAL_PAPER :: 704
-MATERIAL_STEEL :: 705
-MATERIAL_OAK :: 707
+MATERIAL_CLOTH :: 696
+MATERIAL_EARTH :: 697
+MATERIAL_FOOD :: 698
+MATERIAL_LEATHER :: 699
+MATERIAL_RUBBER :: 700
+MATERIAL_STONE :: 701
+MATERIAL_FLESH :: 745
+MATERIAL_BRASS :: 747
+MATERIAL_IRON :: 748
+MATERIAL_PAPER :: 749
+MATERIAL_STEEL :: 750
+MATERIAL_BIRCH :: 752
+MATERIAL_OAK :: 753
 
 // "flesh" | "metal" | "natural" | "paper" | "wood"
-BODY_SURFACE_NATURAL :: 445
-BODY_SURFACE_FLESH :: 700
-BODY_SURFACE_BRASS :: 702
-BODY_SURFACE_IRON :: 703
-BODY_SURFACE_PAPER :: 704
-BODY_SURFACE_STEEL :: 705
-BODY_SURFACE_OAK :: 707
+BODY_SURFACE_NATURAL :: 472
+BODY_SURFACE_FLESH :: 745
+BODY_SURFACE_BRASS :: 747
+BODY_SURFACE_IRON :: 748
+BODY_SURFACE_PAPER :: 749
+BODY_SURFACE_STEEL :: 750
+BODY_SURFACE_BIRCH :: 752
+BODY_SURFACE_OAK :: 753
 
 // #Colour
-COLOUR_BLUE :: 596
-COLOUR_BLACK :: 598
-COLOUR_BROWN :: 599
-COLOUR_GREEN :: 600
-COLOUR_GREY :: 601
-COLOUR_NAVY :: 602
-COLOUR_ORANGE :: 603
-COLOUR_PURPLE :: 604
-COLOUR_RED :: 605
-COLOUR_YELLOW :: 606
-COLOUR_BEIGE :: 624
-COLOUR_WHITE :: 647
+COLOUR_BLUE :: 637
+COLOUR_BLACK :: 639
+COLOUR_BROWN :: 640
+COLOUR_GREEN :: 641
+COLOUR_GREY :: 642
+COLOUR_NAVY :: 643
+COLOUR_ORANGE :: 644
+COLOUR_PURPLE :: 645
+COLOUR_RED :: 646
+COLOUR_YELLOW :: 647
+COLOUR_BEIGE :: 666
+COLOUR_WHITE :: 692
 
 // The field registry: what code needs to read and write any component
 // generically.
@@ -426,7 +440,7 @@ Component_Info :: struct {
 	fields:  [^]Field_Info,
 }
 
-COMPONENT_COUNT :: 40
+COMPONENT_COUNT :: 42
 
 @(rodata) Combustor_fields := [?]Field_Info{
 	{"burnRate", offset_of(Combustor, burnRate), VALUE_QUANTITY, "int", "content, saved, inspect"},
@@ -439,7 +453,7 @@ COMPONENT_COUNT :: 40
 	{"raw", offset_of(Food, raw), VALUE_BOOL, "bool", "content, saved, proposable, inspect, perceive(sight)"},
 }
 @(rodata) Fuel_Container_fields := [?]Field_Info{
-	{"fuel", offset_of(Fuel_Container, fuel), VALUE_QUANTITY, "mass", "content, saved, proposable, inspect"},
+	{"fuel", offset_of(Fuel_Container, fuel), VALUE_QUANTITY, "mass", "content, saved, proposable, inspect, perceive(sight)"},
 }
 @(rodata) Gas_Store_fields := [?]Field_Info{
 	{"atLevel", offset_of(Gas_Store, atLevel), VALUE_QUANTITY, "int", "content, saved, inspect"},
@@ -620,6 +634,7 @@ COMPONENT_COUNT :: 40
 	{"finish", offset_of(Log, finish), VALUE_QUANTITY, "int", "content, saved, proposable, inspect, perceive(sight)"},
 	{"hardness", offset_of(Log, hardness), VALUE_QUANTITY, "int", "content, saved, inspect"},
 	{"sawn", offset_of(Log, sawn), VALUE_QUANTITY, "int", "content, saved, proposable, inspect, perceive(sight)"},
+	{"splitsInto", offset_of(Log, splitsInto), VALUE_TEXT, "text", "content, saved, inspect"},
 }
 @(rodata) Part_fields := [?]Field_Info{
 	{"attrition", offset_of(Part, attrition), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
@@ -665,6 +680,13 @@ COMPONENT_COUNT :: 40
 	{"tileY", offset_of(Trace, tileY), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
 	{"traceKind", offset_of(Trace, traceKind), VALUE_TEXT, "text", "content, saved, proposable, inspect"},
 }
+@(rodata) Tree_fields := [?]Field_Info{
+	{"fellsInto", offset_of(Tree, fellsInto), VALUE_TEXT, "text", "content, saved, inspect"},
+}
+@(rodata) Trunk_fields := [?]Field_Info{
+	{"cutsInto", offset_of(Trunk, cutsInto), VALUE_TEXT, "text", "content, saved, inspect"},
+	{"lengths", offset_of(Trunk, lengths), VALUE_QUANTITY, "int", "content, saved, proposable, inspect, perceive(sight)"},
+}
 @(rodata) Valve_fields := [?]Field_Info{
 	{"breakaway", offset_of(Valve, breakaway), VALUE_QUANTITY, "torque", "content, saved, proposable, inspect"},
 	{"rating", offset_of(Valve, rating), VALUE_QUANTITY, "torque", "content, saved, inspect, perceive(sight)"},
@@ -707,7 +729,7 @@ COMPONENTS := [COMPONENT_COUNT + 1]Component_Info{
 	{"HandSaw", "#HandSaw", size_of(Hand_Saw), 1, &Hand_Saw_fields[0]},
 	{"Lamp", "#Lamp", size_of(Lamp), 4, &Lamp_fields[0]},
 	{"Latent", "#Latent", size_of(Latent), 9, &Latent_fields[0]},
-	{"Log", "#Log", size_of(Log), 3, &Log_fields[0]},
+	{"Log", "#Log", size_of(Log), 4, &Log_fields[0]},
 	{"Part", "#Part", size_of(Part), 7, &Part_fields[0]},
 	{"Pump", "#Pump", size_of(Pump), 4, &Pump_fields[0]},
 	{"Record", "#Record", size_of(Record), 1, &Record_fields[0]},
@@ -716,6 +738,8 @@ COMPONENTS := [COMPONENT_COUNT + 1]Component_Info{
 	{"Stamp", "#Stamp", size_of(Stamp), 2, &Stamp_fields[0]},
 	{"Tap", "#Tap", size_of(Tap), 2, &Tap_fields[0]},
 	{"Trace", "#Trace", size_of(Trace), 8, &Trace_fields[0]},
+	{"Tree", "#Tree", size_of(Tree), 1, &Tree_fields[0]},
+	{"Trunk", "#Trunk", size_of(Trunk), 2, &Trunk_fields[0]},
 	{"Valve", "#Valve", size_of(Valve), 3, &Valve_fields[0]},
 	{"WaterStore", "#WaterStore", size_of(Water_Store), 2, &Water_Store_fields[0]},
 	{"Fastener", "#Fastener", size_of(Fastener), 1, &Fastener_fields[0]},

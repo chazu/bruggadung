@@ -30,3 +30,7 @@ tiles_worksite:  #Glyph & { theme: "tiles", look: "worksite", char: "Ω", ink: [
 tiles_scarecrow: #Glyph & { theme: "tiles", look: "worksite.scarecrow", char: "¥", ink: [220, 200, 120] } @family(glyphs)
 tiles_blind:     #Glyph & { theme: "tiles", look: "worksite.blind", char: "⌂", ink: [150, 170, 120] } @family(glyphs)
 tiles_food:      #Glyph & { theme: "tiles", look: "food", char: "%", ink: [214, 178, 96] } @family(glyphs)
+tiles_tree:      #Glyph & { theme: "tiles", look: "tree", char: "♣", ink: [70, 140, 60] } @family(glyphs)
+tiles_log:       #Glyph & { theme: "tiles", look: "log", char: "-", ink: [170, 120, 70] } @family(glyphs)
+tiles_trunk:     #Glyph & { theme: "tiles", look: "log.trunk", char: "=", ink: [150, 100, 60] } @family(glyphs)
+tiles_tool:      #Glyph & { theme: "tiles", look: "tool", char: "/", ink: [190, 190, 200] } @family(glyphs)
