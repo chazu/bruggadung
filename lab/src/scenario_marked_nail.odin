@@ -478,8 +478,8 @@ marked_nail_split_in_group_that_marked :: proc(self: ^Marked_Nail, unit: Entity_
 	split: ^Event
 
 	split = nil
-	for i: uint = 0; i < world_event_count(self.world); i += 1 {
-		ev = world_event_at(self.world, i)
+	for &kept in world_history(self.world) {
+		ev = &kept
 		if string(ev.kind) == "split" && ev.subject == unit && ev.other == self.handful && ev.amount == 1 do split = ev
 		if split != nil && string(ev.kind) == "changed" && ev.subject == unit && ev.group == split.group &&
 		   ev.detail != nil && string(ev.detail) == "Body.bent" {

@@ -104,6 +104,8 @@ village_init_with_world :: proc(world: ^World, committer: ^Committer) -> ^Villag
 	self.bodies     = bodies_init_with_world(world)
 	self.air        = atmosphere_init_with_world(world)
 	self.scheduler  = scheduler_init_with_world(world, committer)
+	/* a diagnostic event is kept a day, then counted (KNOWLEDGE.md decision 21) */
+	world_set_history_window(world, 86400000)
 	agency_set_activities(self.agency, self.activities)
 	scheduler_add_domain(self.scheduler, bodies_as_domain(self.bodies))
 	scheduler_add_domain(self.scheduler, atmosphere_as_domain(self.air))
@@ -300,6 +302,12 @@ village_counters :: proc(self: ^Village) -> []string {
 	lines := make([dynamic]string, context.temp_allocator)
 	append(&lines, fmt.tprintf("boundaries     %d", st.boundaries))
 	append(&lines, fmt.tprintf("events         %d", world_event_count(self.world)))
+	{
+		digested: u64
+		for d in world_digests(self.world) do digested += d.count
+		append(&lines, fmt.tprintf("  kept         %d (digested %d, in %d digests)", len(world_history(self.world)), digested,
+		                           len(world_digests(self.world))))
+	}
 	append(&lines, fmt.tprintf("perceptions    %d", knowledge_perceptions(self.knowledge)))
 	append(&lines, fmt.tprintf("decisions      %d (minds woken)", self.agency.decisions))
 	append(&lines, fmt.tprintf("deliberations  %d (not busy: choosing a way)", self.agency.deliberations))

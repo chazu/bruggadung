@@ -230,6 +230,8 @@ scheduler_boundary_at :: proc(self: ^Scheduler, bound: Time) {
 		free(world_take_vacated(self.world, &n))
 		free(world_take_risen(self.world, &n))
 	}
+	/* history, compacted when it is time, once this boundary's readers are done */
+	world_compact_history_if_due(self.world)
 	self.stats.boundaries += 1
 	if self.observer.data != nil do self.observer.did_commit_boundary(self.observer.data, self, world_boundary(self.world), groups)
 }

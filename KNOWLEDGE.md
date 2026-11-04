@@ -176,6 +176,33 @@ These were made while writing this document and have not yet been reviewed.
     reads only those things needs nothing more; one that reads anything
     else, or reads time, is weighed for every referent (as a misprint is),
     until something marks what it reads.
+21. **History keeps what has a bearing on the world; the rest is
+    diagnostic, or debug** (replacing §2's retention tiers). Of the
+    village's 157,033 events in three days, 82% were activities'
+    bookkeeping, and 15% the tiles of walks.
+    - **History**, kept for good: everything else. A walk's setting out,
+      its way, its arrival and how it ended are history.
+    - **Diagnostic**: an operation declares its stages diagnostic
+      (`diagnosticStages`, actions.tri): what each stage but the last does
+      is a step along the way, its events marked so. They are kept a
+      window, the world's own (the village's, a day), then compacted at the
+      next multiple of the window: removed, and counted into digests, each
+      the count of one kind, by one actor, in one chunk, over one window,
+      with its first and last index. A diagnostic event is kept a window at
+      least, and two at most.
+    - **Debug**: a field flagged `debug` (an activity's pace, progress,
+      started and due, reckoned again at every stage) is committed, saved
+      and perceived as any other, but its changes aren't logged unless the
+      world asks (`lab --debug-history`). Asked, every scenario ends exactly
+      as before.
+    - Indices are never reused or renumbered: a compacted event is looked
+      up and found gone. Nothing that runs the world reads a compacted
+      event: perception reads only the last boundary's, and activities only
+      a round's. With compaction or without, the world is the same, and so
+      is all of history; the state hash, which counts history too, differs.
+      Saves hold what is kept, the digests, and where history stands.
+    - Left out, until a larger world wants it: segmenting history by
+      region and rotating it out of memory; a window per region.
 
 ## Terms
 
@@ -230,20 +257,20 @@ hearing claims. History is never an agent input.
 
 - Every committed event from change commitment enters the history log, with
   its roles, cause, simulation time, location, and the committing group.
-- **Retention tiers**, following Shadows of Doubt's warning about memory
-  cost:
-  1. **Significant**: kept indefinitely. Event kinds can be declared
-     significant (deaths, transfers of ownership, institutional acts), or an
-     event can be marked significant by its consequences.
-  2. **Referenced**: kept while any trace, record, observation, belief, or
-     open activity references it.
-  3. **Routine**: compacted into per-region summaries once no reference
-     remains.
-- Compaction is deterministic and runs at declared intervals.
+- **What is kept** (decision 21, which replaced the retention tiers first
+  proposed here: significant, referenced, routine):
+  1. **History**: anything with a bearing on the world, kept for good.
+  2. **Diagnostic events**: steps along the way, such as a walk's tiles
+     before its arrival. Kept a window (a day, in the village), then
+     compacted: counted into **digests**, by chunk, kind and actor.
+  3. **Debug fields**: what is reckoned again and again, such as an
+     activity's timing. Their changes aren't logged unless the world asks.
+- History compaction is deterministic and runs at each multiple of the
+  window.
 - History serves the developer's causal inspector and the provenance of
   traces. It is never a gameplay input. A trace whose cause event has been
   compacted keeps everything about itself; only the developer link becomes a
-  summary.
+  digest.
 
 ### 3. Traces
 

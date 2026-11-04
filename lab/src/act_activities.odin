@@ -497,6 +497,9 @@ activities_complete_due_at :: proc(self: ^Activities, t: Time) {
 		proposal_group_set_cause(group, activities_start_of(self, a))
 		proposal_group_set_actor(group, Entity_ID(record.actorRef))
 		proposal_group_set_weight(group, contest_weight(self.world, Entity_ID(record.actorRef), operation))
+		/* a step along the way, of an operation whose stages are diagnostic:
+		 * the last, and how it ends, are history (KNOWLEDGE.md decision 21) */
+		if more && operation_diagnostic_stages(self.world, operation) do proposal_group_set_diagnostic(group, true)
 		if !activity_stage(self.world, a, record, record.stage, &duration, &effect) do effect = ""
 		/* what it needs must still hold when its effect commits: taken from
 		 * the bench by someone else meanwhile, the seal is not to be taken

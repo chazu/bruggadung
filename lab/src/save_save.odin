@@ -229,15 +229,27 @@ save :: proc(world: ^World, committer: ^Committer, domains: []Saved_System) -> s
 		put_string(&out, cstring(&stone.reason[0]))
 		strings.write_string(&out, "\n")
 	}
-	for i: uint = 0; i < world_event_count(world); i += 1 {
-		ev = world_event_at(world, i)
+	/* history's place (KNOWLEDGE.md decision 21), then what of it is kept,
+	 * and what was compacted, counted */
+	{
+		window, compactAt, whole, due, next := world_history_place(world)
+		fmt.sbprintf(&out, "history %d %d %d %d %d\n", window, compactAt, whole, due, next)
+	}
+	for d in world_digests(world) {
+		fmt.sbprintf(&out, "digest %d %d %d %d %d %d", d.from, d.until, 1 if d.placed else 0, d.cx, d.cy, d.level)
+		put_string(&out, d.kind)
+		put_string(&out, d.detail)
+		fmt.sbprintf(&out, " %d %d %d %d\n", d.actor, d.count, d.first, d.last)
+	}
+	for &kept in world_history(world) {
+		ev = &kept
 		fmt.sbprintf(&out, "event %d %d %d", ev.index, ev.boundary, ev.round)
 		put_string(&out, ev.kind)
 		fmt.sbprintf(&out, " %d %d %d", ev.subject, ev.other, ev.amount)
 		put_string(&out, ev.detail)
 		fmt.sbprintf(&out, " %d %d", ev.cause, ev.group)
 		put_location(&out, ev.location)
-		fmt.sbprintf(&out, " %d\n", ev.actor)
+		fmt.sbprintf(&out, " %d %d\n", ev.actor, 1 if ev.diagnostic else 0)
 	}
 	{
 		wet: [][3]i32
@@ -258,7 +270,8 @@ save :: proc(world: ^World, committer: ^Committer, domains: []Saved_System) -> s
 		fmt.sbprintf(&out, "group %d %d %d", i32(proposal_group_phase(group)), proposal_group_cause(group),
 		             proposal_group_handle_count(group))
 		put_string(&out, ns_utf8(proposal_group_source(group)))
-		fmt.sbprintf(&out, " %d %d\n", proposal_group_actor(group), proposal_group_weight(group))
+		fmt.sbprintf(&out, " %d %d %d\n", proposal_group_actor(group), proposal_group_weight(group),
+		             1 if proposal_group_diagnostic(group) else 0)
 		for j: uint = 0; j < proposal_group_count(group); j += 1 {
 			p = &proposal_group_proposals(group)[j]
 			fmt.sbprintf(&out, "proposal %d %d %d %d %d %d %d", i32(p.kind),
@@ -561,6 +574,24 @@ restore :: proc(text: string, content: ^tri.Content, deferred: ^[]^Proposal_Grou
 			stone.cause     = token_u64(&line, 4)
 			if token_string(&line, 5) != nil do copy_cut(stone.reason[:], token_string(&line, 5))
 			world_restore_tombstone(world, stone, token_u64(&line, 1))
+		} else if s == "history" {
+			world_restore_history(world, token_i64(&line, 1), token_i64(&line, 2), token_u64(&line, 3),
+			                      token_u64(&line, 4), token_u64(&line, 5))
+		} else if s == "digest" {
+			world_restore_digest(world, Digest{
+				from   = token_i64(&line, 1),
+				until  = token_i64(&line, 2),
+				placed = token_u64(&line, 3) != 0,
+				cx     = i32(token_i64(&line, 4)),
+				cy     = i32(token_i64(&line, 5)),
+				level  = i32(token_i64(&line, 6)),
+				kind   = world_intern(world, token_string(&line, 7) if token_string(&line, 7) != nil else ""),
+				detail = world_intern(world, token_string(&line, 8)) if token_string(&line, 8) != nil else nil,
+				actor  = token_u64(&line, 9),
+				count  = token_u64(&line, 10),
+				first  = token_u64(&line, 11),
+				last   = token_u64(&line, 12),
+			})
 		} else if s == "event" {
 			ev = {}
 			ev.boundary = token_u64(&line, 2)
@@ -574,7 +605,9 @@ restore :: proc(text: string, content: ^tri.Content, deferred: ^[]^Proposal_Grou
 			ev.group    = token_u64(&line, 10)
 			ev.location = token_location(&line, 11)
 			ev.actor    = token_u64(&line, 18)
-			if world_emit(world, ev) != token_u64(&line, 1) do problem = "events out of order"
+			ev.diagnostic = token_u64(&line, 19) != 0
+			ev.index    = token_u64(&line, 1)
+			if !world_restore_event(world, ev) do problem = "events out of order"
 		} else if s == "terrain" {
 			if token_string(&line, 1) != nil do world_set_terrain_map(world, token_string(&line, 1), &problem)
 		} else if s == "terrain-chunk" {
@@ -630,6 +663,7 @@ restore :: proc(text: string, content: ^tri.Content, deferred: ^[]^Proposal_Grou
 			proposal_group_set_handle_count(group, token_u64(&line, 3))
 			proposal_group_set_actor(group, token_u64(&line, 5))
 			proposal_group_set_weight(group, token_u64(&line, 6))
+			proposal_group_set_diagnostic(group, token_u64(&line, 7) != 0)
 			append(&groups, group)       // autoreleased: they live as long as the array would have
 		} else if s == "proposal" {
 			if group == nil {

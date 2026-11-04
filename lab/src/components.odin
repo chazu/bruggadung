@@ -1,10 +1,10 @@
-// Generated from Triangle content 58eae23a07ce925c: do not edit. Type IDs are valid
+// Generated from Triangle content 7be7ff0ad7016b96: do not edit. Type IDs are valid
 // only for this content; regenerate when it changes.
 package lab
 
 import tri "../../triangle/odin/triangle"
 
-CONTENT_HASH :: 0x58eae23a07ce925c
+CONTENT_HASH :: 0x7be7ff0ad7016b96
 
 // Combustor, from #Combustor
 Combustor :: struct {
@@ -93,13 +93,13 @@ Activity :: struct {
 	actorRef: u64,    // a referent; saved, proposable, inspect
 	amount: i64,    // int, in quanta of 1; content, saved, proposable, inspect
 	destinationRef: u64,    // a referent; saved, proposable, inspect
-	due: i64,    // time, in quanta of 1ms; content, saved, proposable, inspect
+	due: i64,    // time, in quanta of 1ms; content, saved, proposable, inspect, debug
 	itemRef: u64,    // a referent; saved, proposable, inspect
 	operation: cstring,    // text; saved, proposable, inspect
-	pace: i64,    // int, in quanta of 1; content, saved, proposable, inspect
-	progress: i64,    // time, in quanta of 1ms; content, saved, proposable, inspect
+	pace: i64,    // int, in quanta of 1; content, saved, proposable, inspect, debug
+	progress: i64,    // time, in quanta of 1ms; content, saved, proposable, inspect, debug
 	stage: i64,    // int, in quanta of 1; content, saved, proposable, inspect
-	started: i64,    // time, in quanta of 1ms; content, saved, proposable, inspect
+	started: i64,    // time, in quanta of 1ms; content, saved, proposable, inspect, debug
 	status: u32,    // #ActivityStatus: a type ID; content, saved, proposable, inspect
 	watchAtLeast: i64,    // volume, in quanta of 1mL; content, saved, proposable, inspect
 	watchCool: i64,    // int, in quanta of 1; content, saved, proposable, inspect
@@ -507,13 +507,13 @@ COMPONENT_COUNT :: 42
 	{"actorRef", offset_of(Activity, actorRef), VALUE_REF, "ref", "saved, proposable, inspect"},
 	{"amount", offset_of(Activity, amount), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
 	{"destinationRef", offset_of(Activity, destinationRef), VALUE_REF, "ref", "saved, proposable, inspect"},
-	{"due", offset_of(Activity, due), VALUE_QUANTITY, "time", "content, saved, proposable, inspect"},
+	{"due", offset_of(Activity, due), VALUE_QUANTITY, "time", "content, saved, proposable, inspect, debug"},
 	{"itemRef", offset_of(Activity, itemRef), VALUE_REF, "ref", "saved, proposable, inspect"},
 	{"operation", offset_of(Activity, operation), VALUE_TEXT, "text", "saved, proposable, inspect"},
-	{"pace", offset_of(Activity, pace), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
-	{"progress", offset_of(Activity, progress), VALUE_QUANTITY, "time", "content, saved, proposable, inspect"},
+	{"pace", offset_of(Activity, pace), VALUE_QUANTITY, "int", "content, saved, proposable, inspect, debug"},
+	{"progress", offset_of(Activity, progress), VALUE_QUANTITY, "time", "content, saved, proposable, inspect, debug"},
 	{"stage", offset_of(Activity, stage), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
-	{"started", offset_of(Activity, started), VALUE_QUANTITY, "time", "content, saved, proposable, inspect"},
+	{"started", offset_of(Activity, started), VALUE_QUANTITY, "time", "content, saved, proposable, inspect, debug"},
 	{"status", offset_of(Activity, status), VALUE_TYPE, "#ActivityStatus", "content, saved, proposable, inspect"},
 	{"watchAtLeast", offset_of(Activity, watchAtLeast), VALUE_QUANTITY, "volume", "content, saved, proposable, inspect"},
 	{"watchCool", offset_of(Activity, watchCool), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},

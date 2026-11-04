@@ -63,6 +63,8 @@ Event :: struct {
 	detail:   cstring,      /* interned: a field path, an edge kind, a reason; or nil */
 	cause:    u64,          /* the event this one follows from, or 0 */
 	group:    u64,          /* the commit position of its group */
+	diagnostic: bool,       /* a step along the way, not history: kept a while, then digested
+	                           (KNOWLEDGE.md decision 21) */
 }
 
 // BGEdgeKindNames, by edge kind (Kind_Count has none).
@@ -107,7 +109,19 @@ World :: struct {
 
 	edges:            [dynamic]Edge,    /* sorted by kind, from, to */
 
+	/* history (KNOWLEDGE.md decision 21): what is kept, in index order. From
+	 * `whole` on, every event is (dense: at windowAt + its index - whole);
+	 * before it, only history, diagnostic events digested. Indices are never
+	 * reused or renumbered */
 	events:           [dynamic]Event,
+	nextEvent:        u64,              /* the next event's index */
+	whole:            u64,              /* every event from this index on is kept */
+	windowAt:         int,              /* where the event with index `whole` is, or would be */
+	compactDue:       u64,              /* events before this are compacted next time */
+	historyWindow:    i64,              /* ms a diagnostic event is kept at least; 0, for good */
+	compactAt:        i64,              /* ms: when history is next compacted */
+	digests:          [dynamic]Digest,  /* what was compacted, counted */
+	debugHistory:     bool,             /* debug fields' changes logged too (KNOWLEDGE.md decision 21) */
 
 	strings:          [dynamic]cstring, /* interned, sorted */
 
@@ -387,6 +401,10 @@ world_init_with_content :: proc(content: ^tri.Content, seed: u64) -> ^World {
 
 	self.content = content
 	self.seed = seed
+	self.debugHistory = debug_history
+	self.nextEvent = 1
+	self.whole = 1
+	self.compactDue = 1
 	self.nextID = 1
 	self.nkinds = COMPONENT_COUNT
 	self.kinds = make([^]^Store, self.nkinds if self.nkinds != 0 else 1)
@@ -441,6 +459,7 @@ world_dealloc :: proc(self: ^World) {
 	release(self.tombstones)
 	delete(self.edges)
 	delete(self.events)
+	delete(self.digests)
 	for s in self.strings {
 		delete(s)
 	}
@@ -622,7 +641,9 @@ world_rollback_group :: proc(self: ^World) {
 			self.nextID = Entity_ID(j.value)
 
 		case .Events:
-			resize(&self.events, int(j.value))
+			/* the events from that index on go, and it is the next again */
+			for len(self.events) != 0 && self.events[len(self.events) - 1].index >= j.value do pop(&self.events)
+			self.nextEvent = j.value
 
 		case .Terrain:
 			terrain_set(self.terrain, j.tile.x, j.tile.y, j.tile.level, Terrain_Kind(j.value))
@@ -2242,15 +2263,29 @@ world_claim_allocation_resolved :: proc(self: ^World, claim: Entity_ID) -> bool 
 
 /* --- history --------------------------------------------------------------- */
 
+/* Whether worlds made from now on log their debug fields' changes in history
+ * (`lab --debug-history`): debug-level information, otherwise not kept
+ * (KNOWLEDGE.md decision 21). */
+debug_history: bool
+
+
+/* Whether a field's changes are logged in history: a debug field's are not,
+ * unless the world asks for them. */
+world_logs_field :: proc(self: ^World, f: ^Field_Info) -> bool {
+	return self.debugHistory || f.flags == nil || !strings.contains(string(f.flags), "debug")
+}
+
+
 /* Appends the event, giving it the next index, which it returns. */
 world_emit :: proc(self: ^World, event: Event) -> u64 {
 	event := event
 	if self.open {
 		j := journal_push(self)
 		j.op = .Events
-		j.value = u64(len(self.events))
+		j.value = self.nextEvent
 	}
-	event.index = u64(len(self.events)) + 1
+	event.index = self.nextEvent
+	self.nextEvent += 1
 	append(&self.events, event)
 	if event.subject != 0 && event.kind != nil && string(event.kind) == "created" {
 		index_add(self.creations, event.subject, Entity_ID(event.index))
@@ -2285,13 +2320,176 @@ world_creation_of :: proc(self: ^World, entity: Entity_ID) -> u64 {
 }
 
 
+/* How many events there have ever been: the last one's index. Some of the
+ * older may be compacted (world_event_at says nil). */
 world_event_count :: proc(self: ^World) -> uint {
-	return uint(len(self.events))
+	return uint(self.nextEvent - 1)
 }
 
 
+/* The events kept, in index order: for reading all of history. */
+world_history :: proc(self: ^World) -> []Event {
+	return self.events[:]
+}
+
+
+/* The event with index i + 1, or nil: none yet, or compacted. */
 world_event_at :: proc(self: ^World, i: uint) -> ^Event {
-	return &self.events[i] if i < uint(len(self.events)) else nil
+	index := u64(i) + 1
+	if index >= self.nextEvent do return nil
+	if index >= self.whole {
+		at := self.windowAt + int(index - self.whole)
+		return &self.events[at] if at < len(self.events) else nil
+	}
+	/* older: history, found by its index; a diagnostic one is gone */
+	lo, hi := 0, self.windowAt
+	for lo < hi {
+		mid := (lo + hi) / 2
+		if self.events[mid].index < index do lo = mid + 1
+		else do hi = mid
+	}
+	return &self.events[lo] if lo < self.windowAt && self.events[lo].index == index else nil
+}
+
+
+/* --- compacting history (KNOWLEDGE.md decision 21) -------------------------- */
+
+/* A diagnostic event's count, once it is compacted: how many of a kind,
+ * by an actor, in a chunk, over a window of time. */
+Digest :: struct {
+	from:   i64,            /* ms: the window it was emitted in */
+	until:  i64,
+	placed: bool,           /* on the ground: in the chunk at (cx, cy, level) */
+	cx:     i32,
+	cy:     i32,
+	level:  i32,
+	kind:   cstring,        /* interned */
+	detail: cstring,        /* interned, or nil */
+	actor:  Entity_ID,
+	count:  u64,
+	first:  u64,            /* the first and last event's index */
+	last:   u64,
+}
+
+
+/* Diagnostic events are kept `window` ms at least, then compacted: from then
+ * on, at each multiple of the window. 0: kept for good (the default). */
+world_set_history_window :: proc(self: ^World, window: i64) {
+	self.historyWindow = window
+	self.compactAt     = (self.time.ms / window + 1) * window if window > 0 else 0
+}
+
+
+world_history_window :: proc(self: ^World) -> i64 {
+	return self.historyWindow
+}
+
+
+/* Where history stands, for a save: its window, when it is next
+ * compacted, the first index kept whole, the first compacted next time, and
+ * the next index. */
+world_history_place :: proc(self: ^World) -> (window: i64, compactAt: i64, whole: u64, due: u64, next: u64) {
+	return self.historyWindow, self.compactAt, self.whole, self.compactDue, self.nextEvent
+}
+
+
+world_digests :: proc(self: ^World) -> []Digest {
+	return self.digests[:]
+}
+
+
+/* At a boundary: compacted, if it is time. The events before the last
+ * compaction are compacted now: what is diagnostic goes, counted into
+ * digests; history stays, with its index. So a diagnostic event is kept a
+ * window at least, and two at most. */
+world_compact_history_if_due :: proc(self: ^World) {
+	if self.historyWindow <= 0 || self.time.ms < self.compactAt do return
+	from := self.compactAt - 2 * self.historyWindow
+	until := self.compactAt - self.historyWindow
+	for self.compactAt <= self.time.ms do self.compactAt += self.historyWindow
+	if self.compactDue > self.whole do world_compact_before(self, self.compactDue, from, until)
+	self.compactDue = self.nextEvent
+}
+
+
+@(private = "file")
+Digest_Key :: struct {
+	placed: bool,
+	cx:     i32,
+	cy:     i32,
+	level:  i32,
+	kind:   cstring,
+	detail: cstring,
+	actor:  Entity_ID,
+}
+
+
+@(private = "file")
+world_compact_before :: proc(self: ^World, before: u64, from: i64, until: i64) {
+	counted := make(map[Digest_Key]int, context.temp_allocator)    /* to its digest, in `found` */
+	found   := make([dynamic]Digest, context.temp_allocator)
+	kept    := self.windowAt
+	n       := self.windowAt + int(before - self.whole)
+	for at := self.windowAt; at < n && at < len(self.events); at += 1 {
+		ev := self.events[at]
+		if !ev.diagnostic {
+			self.events[kept] = ev
+			kept += 1
+			continue
+		}
+		key := Digest_Key{kind = ev.kind, detail = ev.detail, actor = ev.actor, placed = ev.location.form == .On_Tile}
+		if key.placed {
+			key.cx, key.cy, key.level = ev.location.x / BG_CHUNK, ev.location.y / BG_CHUNK, ev.location.level
+		}
+		d, ok := counted[key]
+		if !ok {
+			d = len(found)
+			counted[key] = d
+			append(&found, Digest{from = from, until = until, placed = key.placed, cx = key.cx, cy = key.cy,
+			                      level = key.level, kind = ev.kind, detail = ev.detail, actor = ev.actor,
+			                      first = ev.index})
+		}
+		found[d].count += 1
+		found[d].last   = ev.index
+	}
+	/* the window after it, moved down */
+	copy(self.events[kept:], self.events[n:])
+	resize(&self.events, kept + len(self.events) - n)
+	self.windowAt = kept
+	self.whole    = before
+	/* digests in the order of their first event: the same every time */
+	slice.sort_by(found[:], proc(a, b: Digest) -> bool {return a.first < b.first})
+	append(&self.digests, ..found[:])
+}
+
+
+/* A saved history, put back: each kept event, in index order, with its own
+ * index (world_emit gives the next). */
+world_restore_event :: proc(self: ^World, event: Event) -> bool {
+	if len(self.events) != 0 && event.index <= self.events[len(self.events) - 1].index do return false
+	if event.index < self.whole do self.windowAt += 1      /* compacted history, before the whole */
+	append(&self.events, event)
+	if event.index >= self.nextEvent do self.nextEvent = event.index + 1
+	if event.subject != 0 && event.kind != nil && string(event.kind) == "created" {
+		index_add(self.creations, event.subject, Entity_ID(event.index))
+	}
+	return true
+}
+
+
+/* A saved history's place, put back, before its events. */
+world_restore_history :: proc(self: ^World, window: i64, compactAt: i64, whole: u64, due: u64, next: u64) {
+	self.historyWindow = window
+	self.compactAt     = compactAt
+	self.whole         = whole
+	self.compactDue    = due
+	self.nextEvent     = next
+	self.windowAt      = 0
+}
+
+
+world_restore_digest :: proc(self: ^World, d: Digest) {
+	append(&self.digests, d)
 }
 
 

@@ -291,11 +291,15 @@ the next to measure; recognition was 2.7 s (decision 4).
   everything that reads where someone is mid-walk would compute it.
   That is a larger change across perception, recognition and checks.
   Walks first; measure; then decide.
-- **History.** Whether history is compacted after a time (a snapshot,
-  and the events before it dropped), and whether an activity's own
-  bookkeeping (status, due, roles) needs to be world events at all.
-  Knowledge reads events only from the last perception on, and saves
-  hold them all.
+- **History** (settled: KNOWLEDGE.md decision 21). An activity's timing
+  is a debug field, not logged; a walk's tiles before its arrival are
+  diagnostic, compacted after a day into digests. The village's three
+  days: 157,033 events, now 62,169, of which 32,861 are kept at the end
+  (29,308 digested, in 84 digests); its save, 160,503 lines, now 36,416.
+  Over weeks, history grows by about 6,000 events a day (what has a
+  bearing on the world), plus a day or two of diagnostic ones. Segmenting
+  history by region, and rotating it out of memory, is for a larger
+  world.
 - **Detail for minds.** REALITY.md's reduced detail already slows
   agents' cadence; the village keeps everyone at full detail (VILLAGE.md
   decision 1). A mind that interprets incrementally and decides only at

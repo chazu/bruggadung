@@ -228,7 +228,8 @@ Rules that keep hidden state hidden:
 - stocks, all checked in to their holders
 - transit, ledgers, and carried remainders not yet dropped
 - activities, reservations, and watches
-- knowledge stores, retained history, and compaction summaries
+- knowledge stores, history as kept, and its digests (KNOWLEDGE.md
+  decision 21)
 - motivation stores and agency RNG state
 - deferred commit groups
 - the boundary index and RNG state

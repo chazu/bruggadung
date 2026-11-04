@@ -83,6 +83,7 @@ Proposal_Group :: struct {
 	actor:     Entity_ID,
 	weight:    u64,
 	cause:     u64,
+	diagnostic: bool,       /* its events are diagnostic (KNOWLEDGE.md decision 21) */
 	proposals: [dynamic]Proposal,        // _proposals, _count and _capacity
 	handles:   u64,
 	strings:   [dynamic]cstring,         // _strings and _nstrings
@@ -151,6 +152,17 @@ proposal_group_weight :: proc(self: ^Proposal_Group) -> u64 {
 
 proposal_group_set_weight :: proc(self: ^Proposal_Group, weight: u64) {
 	self.weight = weight
+}
+
+
+/* Its events are diagnostic: a step along the way, not history. */
+proposal_group_set_diagnostic :: proc(self: ^Proposal_Group, diagnostic: bool) {
+	self.diagnostic = diagnostic
+}
+
+
+proposal_group_diagnostic :: proc(self: ^Proposal_Group) -> bool {
+	return self.diagnostic
 }
 
 

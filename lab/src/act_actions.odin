@@ -2898,6 +2898,15 @@ operation_partial :: proc(world: ^World, operation: cstring, index: i64,
 }
 
 
+/* Whether the operation's stages but the last are diagnostic: what each
+ * does is a step along the way, not history (KNOWLEDGE.md decision 21). */
+operation_diagnostic_stages :: proc(world: ^World, operation: cstring) -> bool {
+	content := world_tri(world)
+	v := tri.at(content, tri.pattern(content, operation), "diagnosticStages") if operation != nil else nil
+	return v != nil && tri.node_type(v) == tri.type_named(content, "true")
+}
+
+
 /* The fatigue stage `index` adds to its actor when it completes. */
 operation_exertion :: proc(world: ^World, operation: cstring, index: i64) -> i64 {
 	pattern: ^tri.Node

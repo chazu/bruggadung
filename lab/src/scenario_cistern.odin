@@ -312,8 +312,8 @@ cistern_water_of :: proc(self: ^Cistern, e: Entity_ID) -> i64 {
 cistern_exhausted_boundary_of :: proc(self: ^Cistern, tap: Entity_ID) -> u64 {
 	ev: ^Event
 
-	for i: uint = 0; i < world_event_count(self.world); i += 1 {
-		ev = world_event_at(self.world, i)
+	for &kept in world_history(self.world) {
+		ev = &kept
 		if string(ev.kind) == "exhausted" && ev.subject == tap do return ev.boundary
 	}
 	return 0
@@ -334,8 +334,8 @@ cistern_activity_of :: proc(self: ^Cistern, agent: Entity_ID, boundary: ^u64) ->
 	free(mine)
 	boundary^ = 0
 	if a == 0 do return "none"
-	for i: uint = 0; i < world_event_count(self.world); i += 1 {
-		ev = world_event_at(self.world, i)
+	for &kept in world_history(self.world) {
+		ev = &kept
 		if string(ev.kind) == "changed" && ev.subject == a && ev.detail != nil && string(ev.detail) == "Activity.status" {
 			boundary^ = ev.boundary
 		}

@@ -235,6 +235,9 @@ What content can't say yet:
   agency forgets its mind, and its activities end.
 - **The scenario** (slice 10): `scenario_village.odin`, with its checks and
   hashes, run by `lab run village`, and watchable.
+- **Its history** is compacted daily (KNOWLEDGE.md decision 21): what has
+  a bearing on the world is kept; the tiles of walks are counted into
+  digests after a day.
 
 ## Testing
 

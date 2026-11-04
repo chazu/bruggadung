@@ -9,7 +9,9 @@
 //            due ends at once, not when it would have; a checkpoint passed
 //            while frozen is skipped (REALITY.md step 4).
 // - code:    src/act_activities.odin; a walk's stages are its way, not
-//            its operation's, and each is a walk of one tile.
+//            its operation's, and each is a walk of one tile. A `debug`
+//            field's changes aren't logged in history unless the world asks
+//            (src/commit_committer.odin; KNOWLEDGE.md decision 21).
 
 #ActivityStatus: "running" | "suspended" | "completed" | "exhausted" | "failed" | "aborted"
 
@@ -28,14 +30,16 @@
     // how fast the stage under way goes, in percent of its declared pace,
     // from the actor as it started (ACTIONS.md §5: rate = f(capabilities,
     // shortfall, actor modifiers); provisionally, modifiers only); 0 is 100
-    pace:           int & >=0 & <=100            @field(content, saved, proposable, inspect)
+    pace:           int & >=0 & <=100            @field(content, saved, proposable, inspect, debug)
     // the stage under way, the work done in it, and when it last started
     // running; due is when the stage completes (0ms while suspended, or for an
-    // activity that ends by a watch or an event)
+    // activity that ends by a watch or an event). Pace, progress, started and
+    // due are `debug`: reckoned again at every stage, their changes aren't
+    // history unless asked for (KNOWLEDGE.md decision 21)
     stage:          int & >=0 & <=4096           @field(content, saved, proposable, inspect)
-    progress:       time & >=0ms & <=100d        @field(content, saved, proposable, inspect)
-    started:        time & >=0ms & <=10000d      @field(content, saved, proposable, inspect)
-    due:            time & >=0ms & <=10000d      @field(content, saved, proposable, inspect)
+    progress:       time & >=0ms & <=100d        @field(content, saved, proposable, inspect, debug)
+    started:        time & >=0ms & <=10000d      @field(content, saved, proposable, inspect, debug)
+    due:            time & >=0ms & <=10000d      @field(content, saved, proposable, inspect, debug)
     status:         #ActivityStatus              @field(content, saved, proposable, inspect)
     // a watch (DOMAIN_SIMULATION.md §5): tell this activity when the holder's
     // water reaches watchAtLeast; no holder, no watch

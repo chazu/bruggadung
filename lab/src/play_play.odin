@@ -426,9 +426,10 @@ play_inspect :: proc(self: ^Play, e: Entity_ID) {
 	}
 	shown = 0
 	// for( i = count; i-- > 0 && shown < 8;)
-	for i := world_event_count(self.world); i > 0 && shown < 8; {
+	history := world_history(self.world)
+	for i := len(history); i > 0 && shown < 8; {
 		i -= 1
-		ev = world_event_at(self.world, i)
+		ev = &history[i]
 		if ev.subject != e && ev.other != e do continue
 		fmt.sbprintf(&self.out, "  event %d at boundary %d: %s%s%s (%s)\n", ev.index,
 		             ev.boundary, ev.kind, " " if ev.detail != nil else "", ev.detail if ev.detail != nil else "",
@@ -453,9 +454,10 @@ play_why :: proc(self: ^Play, e: Entity_ID) {
 
 	ev = nil
 	// for( i = count; i-- > 0 && ! ev;)
-	for i := world_event_count(self.world); i > 0 && ev == nil; {
+	history := world_history(self.world)
+	for i := len(history); i > 0 && ev == nil; {
 		i -= 1
-		if world_event_at(self.world, i).subject == e do ev = world_event_at(self.world, i)
+		if history[i].subject == e do ev = &history[i]
 	}
 	if ev == nil {
 		fmt.sbprintf(&self.out, "Nothing has happened to %d.\n", e)

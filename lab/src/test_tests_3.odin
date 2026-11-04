@@ -3762,5 +3762,6 @@ ALL_TESTS := [?]Test_Case{
 	{"identity_own",                  test_identity_own},
 	{"forgetting",                    test_forgetting},
 	{"habits_give_way",               test_habits_give_way},
+	{"history",                       test_history},
 	{"firewood",                      test_firewood},
 }

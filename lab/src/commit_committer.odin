@@ -457,6 +457,7 @@ committer_emit :: proc(self: ^Committer, kind: cstring, subject: Entity_ID, othe
 	ev.cause    = proposal_group_cause(group)
 	ev.actor    = proposal_group_actor(group)
 	ev.group    = self.position
+	ev.diagnostic = proposal_group_diagnostic(group)
 	return world_emit(self.world, ev)
 }
 
@@ -773,7 +774,9 @@ committer_apply :: proc(self: ^Committer, p: ^Proposal, g: ^Proposal_Group, tall
 			set = world_set_field_of_value(self.world, p.name, e, value)
 		}
 		if !set do return fmt.tprintf("%s cannot be set", p.name)
-		committer_emit(self, "changed", e, NO_ENTITY, p.value, p.name, location_make_none(), g)
+		if world_logs_field(self.world, f) {
+			committer_emit(self, "changed", e, NO_ENTITY, p.value, p.name, location_make_none(), g)
+		}
 		return ""
 
 	case .Move:

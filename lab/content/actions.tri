@@ -21,6 +21,9 @@
 //            walker, over the ground as it believes it, when it sets out,
 //            and the walker gives it up when the way or what it goes to
 //            changes (src/agency_agency.odin).
+// - code:    `diagnosticStages` marks the stage's events diagnostic
+//            (src/act_activities.odin); they are compacted into digests
+//            after the world's history window (src/core_world.odin).
 
 #Effect: "take" | "take_some" | "put_in" | "drive" | "open_tap" | "fill" | "walk" | "loosen" | "look" | "say" | "tend" | "analyse" | "write" | "read" | "eat" | "give" | "investigate" | "tighten" | "rotate" | "strike" | "shut" | "dismantle" | "light" | "rest" | "open_door" | "saw" | "pass" | "copy" | "reveal" | "replace" | "cut" | "shape" | "install" | "issue" | "confiscate" | "arrest" | "flee" | "hit" | "hire" | "work" | "service" | "cook" | "fell" | "split" | "stoke" | "put_down"
 
@@ -74,14 +77,18 @@
 // removed with its effect, when it completes: an operation that removes
 // traces leaves some of its own, so a cover-up can be found out. A stage
 // may leave its own, with its own effect (ACTIONS.md §2: costs are
-// committed per stage).
+// committed per stage). With `diagnosticStages`, what each stage but the
+// last does is a step along the way, not history: kept a day, then counted
+// into a digest (KNOWLEDGE.md decision 21); the last, and how it ends, are
+// history.
 #Operation: #Step & {
-    roles:     #Roles
-    stages:    [...#Stage]
-    uses:      [...#Provider]
-    attention: *0 | int & >=0 & <=100
-    contest:   text
-    graded:    #Graded
+    roles:            #Roles
+    stages:           [...#Stage]
+    uses:             [...#Provider]
+    attention:        *0 | int & >=0 & <=100
+    contest:          text
+    graded:           #Graded
+    diagnosticStages: *false | true
 }
 
 // A graded requirement (ACTIONS.md decision 11): what a role brings (the
@@ -207,8 +214,9 @@ walk_west:  #Walk @family(operations)
 
 // A walk (PERFORMANCE.md decision 1): going to a place as one activity,
 // its way found when it starts, a stage a tile, each a walk of a second in
-// the way's direction. A stage ending isn't a decision point; the walk
+// the way's direction. The tiles between are steps along the way, not
+// history: where it set out for, its way, its arrival and how it ended are. A stage ending isn't a decision point; the walk
 // ending is: arrived, blocked (a tile on the way turns out solid, and the
 // stage fails), or given up. Nothing to resume: put down, it is given up.
 // Not one of the menu's operations: it needs a way, which its walker finds.
-walk: #Walk & { hard: "fail" }
+walk: #Walk & { hard: "fail", diagnosticStages: true }

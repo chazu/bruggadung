@@ -4715,3 +4715,26 @@ checks fewer, as one walk is kept, not a one-tile walk each way.
   before. `lab run village --counters` shows interpretation's time.
 
 125 tests, 3808 checks.
+
+### After the slice: history compaction (KNOWLEDGE.md decision 21)
+
+- History keeps what has a bearing on the world, for good. A field
+  flagged `debug` (an activity's pace, progress, started, due) has its
+  changes committed and saved but not logged, unless `lab --debug-history`
+  asks; asked, every scenario's hashes are as before, and the village's
+  counters are the same either way.
+- An operation's `diagnosticStages` (actions.tri; `walk` has them) marks
+  what each stage but the last does diagnostic: a walk's tiles before its
+  arrival. A world with a history window (the village: a day) compacts at
+  each multiple of it: diagnostic events older than the last compaction
+  go, counted into digests by chunk, kind and actor. Indices stay;
+  `world_event_at` finds a compacted one gone, `world_history` is what is
+  kept. Saves hold history's place, the digests, and each event's mark.
+- Compaction changes nothing in the world: the village's save, history
+  apart, is the same with it or without, and so is every history event.
+- The village: 62,169 events from 157,033; 32,861 kept at the end, 29,308
+  digested; its save 36,416 lines from 160,503. A new test walks a worker
+  for five minutes with a minute's window, and saves and resumes across
+  compactions, to the last digest.
+
+126 tests, 3873 checks.

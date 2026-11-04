@@ -355,7 +355,13 @@ REALITY.md, PRF = PERFORMANCE.md, TER = TERRAIN.md, TES = TESSERA.md, VIL = VILL
 ## Knowledge
 
 - **World state / history**: the truth now / the log of committed events.
-  Agents read neither; history is developer truth. (KNO §1, §2)
+  Agents read neither; history is developer truth. (KNO §1, §2) History
+  keeps what has a bearing on the world, for good. A **diagnostic event**
+  is a step along the way (a walk's tiles before its arrival): kept a
+  **history window**, then **compacted** into **digests**, each the count
+  of one kind, by one actor, in one chunk, over one window. A **debug
+  field**'s changes (an activity's timing) aren't logged unless the world
+  asks. *Avoid:* summary (that is detail's), routine event. (KNO d21)
 - **Perception-only rule**: agents learn only by perceiving: events as
   they happen, state and traces examined, records read, claims heard.
   (KNO §1)
@@ -898,3 +904,4 @@ Each row says which term to use for which sense.
 | field | a component's field | **plot** (farmed ground) |
 | trade | a craft (`Agent.trade`) | **sale** (goods for coins) |
 | leg | the body's legs, a provider an activity uses | **leg of a journey** (reserved) |
+| compaction | a Triangle arena's (copying what is live) | **history compaction** (diagnostic events into digests) |

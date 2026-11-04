@@ -13,6 +13,8 @@
  *                            an interactive session on workshop or cistern;
  *                            the commands read are its replay log
  *   lab -C <dir> ...         read content from <dir> (default: content)
+ *   lab --debug-history ...  keep debug fields' changes in history, too
+ *                            (KNOWLEDGE.md decision 21)
  *
  * (ported from the Objective-C lab's main.m)
  */
@@ -26,7 +28,7 @@ import "core:strings"
 
 @(private = "file")
 usage :: proc() -> i32 {
-	fmt.eprintf("usage: lab [-C contentdir] test [name]\n" +
+	fmt.eprintf("usage: lab [-C contentdir] [--debug-history] test [name]\n" +
 	            "       lab [-C contentdir] run|save marked-nail|marked-nail-a|marked-nail-b|cistern...|village\n" +
 	            "       lab [-C contentdir] run village --counters\n" +
 	            "       lab [-C contentdir] menu marked-nail|marked-nail-a|marked-nail-b <ms>\n" +
@@ -234,6 +236,10 @@ main :: proc() {
 	if i + 1 < argc && argv[i] == "-C" {
 		content_dir = argv[i + 1]
 		i += 2
+	}
+	if i < argc && argv[i] == "--debug-history" {
+		debug_history = true      /* debug fields' changes kept in history, too */
+		i += 1
 	}
 	if i >= argc do os.exit(int(usage()))
 
