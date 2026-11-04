@@ -5,6 +5,8 @@
  *   lab run <scenario>       run a scenario and print its trace and checks:
  *                            marked-nail, marked-nail-a, marked-nail-b,
  *                            cistern, cistern-b, cistern-d, cistern-e, village
+ *   lab run village --counters
+ *                            and, on stderr, what it cost (PERFORMANCE.md)
  *   lab save <scenario>      run a scenario and print the save of its end state
  *   lab menu <scenario> <ms> run a scenario to a time and print the worker's menu
  *   lab play <world> [--seed n] [--log file]
@@ -26,6 +28,7 @@ import "core:strings"
 usage :: proc() -> i32 {
 	fmt.eprintf("usage: lab [-C contentdir] test [name]\n" +
 	            "       lab [-C contentdir] run|save marked-nail|marked-nail-a|marked-nail-b|cistern...|village\n" +
+	            "       lab [-C contentdir] run village --counters\n" +
 	            "       lab [-C contentdir] menu marked-nail|marked-nail-a|marked-nail-b <ms>\n" +
 	            "       lab [-C contentdir] play workshop|cistern|shed [--seed n] [--log file]\n" +
 	            "       lab [-C contentdir] bench crowd|spread [agents] [seconds] [anchor[=kind]]\n")
@@ -122,13 +125,16 @@ run_cistern :: proc(name: string) -> i32 {
 
 /* The village: three days and nights, its people, its checks. */
 @(private = "file")
-run_village :: proc(save_: bool) -> i32 {
+run_village :: proc(save_: bool, counters := false) -> i32 {
 	world := test_world(101)
 	if world == nil do return 1
 	release_shared_content_after_use()
 	c := test_committer(world)
 	village := autorelease(village_init_with_world(world, c))
 	village_run(village)
+	if counters {
+		for line in village_counters(village) do fmt.eprintf("%s\n", line)
+	}
 	if save_ {
 		fmt.printf("%s", save(world, c, nil))
 		return 1 if village_failure_count(village) != 0 else 0
@@ -234,6 +240,8 @@ main :: proc() {
 	pool_push()
 	if argv[i] == "test" {
 		status = 1 if run_tests(ALL_TESTS[:], argv[i + 1] if i + 1 < argc else "") != 0 else 0
+	} else if argv[i] == "run" && i + 2 < argc && argv[i + 1] == "village" && argv[i + 2] == "--counters" {
+		status = run_village(false, counters = true)
 	} else if argv[i] == "run" && i + 1 < argc {
 		status = run_scenario(argv[i + 1], false, -1)
 	} else if argv[i] == "save" && i + 1 < argc {

@@ -291,6 +291,28 @@ village_error :: proc(self: ^Village) -> string {return self.error}
 village_results :: proc(self: ^Village) -> []string {return self.results[:]}
 
 
+/* What the run cost (PERFORMANCE.md decision 6): the scheduler's counters,
+ * and its minds' and walks'. Wall times differ run to run; the counts don't. */
+village_counters :: proc(self: ^Village) -> []string {
+	ms :: proc(ns: u64) -> f64 {return f64(ns) / 1e6}
+
+	st    := scheduler_stats(self.scheduler)
+	lines := make([dynamic]string, context.temp_allocator)
+	append(&lines, fmt.tprintf("boundaries     %d", st.boundaries))
+	append(&lines, fmt.tprintf("events         %d", world_event_count(self.world)))
+	append(&lines, fmt.tprintf("perceptions    %d", knowledge_perceptions(self.knowledge)))
+	append(&lines, fmt.tprintf("decisions      %d (minds woken)", self.agency.decisions))
+	append(&lines, fmt.tprintf("deliberations  %d (not busy: choosing a way)", self.agency.deliberations))
+	append(&lines, fmt.tprintf("path searches  %d", self.agency.pathSearches))
+	append(&lines, fmt.tprintf("horizon        %.0f ms", ms(st.horizonNs)))
+	append(&lines, fmt.tprintf("domains        %.0f ms", ms(st.domainsNs)))
+	append(&lines, fmt.tprintf("commit         %.0f ms", ms(st.commitNs)))
+	append(&lines, fmt.tprintf("perception     %.0f ms", ms(st.perceptionNs)))
+	append(&lines, fmt.tprintf("decision       %.0f ms", ms(st.decisionNs)))
+	return lines[:]
+}
+
+
 village_failure_count :: proc(self: ^Village) -> uint {
 	n: uint
 	for r in self.results do if ns_has_prefix(r, "FAIL") do n += 1

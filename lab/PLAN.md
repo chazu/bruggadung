@@ -4680,3 +4680,17 @@ numbers only.
 
 125 tests, 3808 checks: a test of the activities kept after exploring
 checks fewer, as one walk is kept, not a one-tile walk each way.
+
+### After the slice: measuring (PERFORMANCE.md decisions 5 and 6)
+
+- `make check` builds its own lab with `-o:speed` (`build/<platform>/speed/lab`)
+  and runs the tests and scenarios on it: the same hashes, 44 s from
+  1 min 45 s on the Mac, plus 12 s to compile. `make` and `make test` stay
+  unoptimised.
+- `lab run village --counters` prints what the run cost on stderr:
+  boundaries, events, perceptions, decisions, deliberations, path searches,
+  and each phase's wall time. Agency counts deliberations and path
+  searches.
+- The village now: 18,262 boundaries, 157,033 events, 37,849 perceptions,
+  39,037 decisions, 2,860 deliberations, 832 path searches; perception
+  9.5 s, decision 2.2 s, commit 1.7 s at `-o:speed`.

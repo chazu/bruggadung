@@ -2,8 +2,8 @@
 
 ## Status and scope
 
-Measurements and proposals. Decision 1, a walk as one activity, is built
-(see "Walks, measured"); the rest are proposals. This document records
+Measurements and proposals. Decisions 1 (a walk as one activity, see
+"Walks, measured"), 5 and 6 are built; the rest are proposals. This document records
 where the lab's time goes, on the village (VILLAGE.md), and proposes what
 to change while the engine is small enough to change cheaply. The
 question it answers: does the engine need a larger refactor now, such as
@@ -225,12 +225,19 @@ What changed in behaviour, besides the numbers:
    same idea as decision 2, for later.
 4. **Recognition is indexed** by seen kind (KNOWLEDGE.md decision 17), so
    a percept is compared only with referents of its kind.
-5. **Optimised builds for checks.** `make check` and CI build with
-   `-o:speed`. The hashes are the same, so this is a change of build
-   flags only.
-6. **Measure as a matter of course.** The village prints the scheduler's
-   counters when asked, and each slice records them in lab/PLAN.md, as
-   slice 10 of VILLAGE.md proposes.
+5. **Optimised builds for checks** (built). `make check`, and so CI,
+   builds its own lab with `-o:speed` (`build/<platform>/speed/lab`) and
+   runs the tests and scenarios on it; `make` and `make test` stay
+   unoptimised, for debugging. The hashes are the same. On the Mac, the
+   tests and scenarios take 44 s, from 1 min 45 s, and the optimised
+   compile 12 s more.
+6. **Measure as a matter of course** (built). `lab run village
+   --counters` prints, on stderr, the scheduler's boundaries and phase
+   times, and the events, perceptions, decisions (minds woken),
+   deliberations (decisions not busy, which choose a way) and path
+   searches. The run's own output, and its hash, are unchanged. Each
+   slice records them in lab/PLAN.md, as slice 10 of VILLAGE.md
+   proposes.
 
 ## Open questions
 

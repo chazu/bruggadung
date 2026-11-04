@@ -249,6 +249,8 @@ Agency :: struct {
 	former:       [dynamic]Agency_Former,   /* pairs: an agent let go, its log */
 	deciding:     ^Motivation,         /* whose decision this is, for its habits */
 	decisions:    u64,                 /* a mind's deciding, counted, for measuring */
+	deliberations: u64,                /* of those, the ones not busy, which choose a way: counted */
+	pathSearches: u64,                 /* ways found, for walks and exploring: counted */
 	wakes:        ^Wakes,              /* each mind's next time due with nothing happening */
 	nudged:       [dynamic]Entity_ID,  /* minds looked up since the last boundary: checked at it (the
 	                                      realloc'd _nudged, _nnudged, _nudgedcap) */
@@ -950,6 +952,7 @@ agency_explore :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Store, o
 	q.goal     = unseen
 	way       := make([dynamic]Step, context.temp_allocator)
 	q.way      = &way
+	self.pathSearches += 1
 	r := path_find(&q)
 	if !r.found || r.step == .None do return false
 	agency_set_out(self, m, way[:], 0, r.x, r.y, me.level, "exploring", fmt.tprintf("toward (%d, %d)", r.x, r.y))
@@ -1526,6 +1529,7 @@ agency_walk :: proc(self: ^Agency, m: ^Motivation, why: string, me: ^Referent, t
 	q.context_ = &c
 	q.passable = walkable
 	q.way      = &way
+	self.pathSearches += 1
 	r := path_find(&q)
 	if r.step == .None {
 		agency_note(self, m, fmt.tprintf("%s: no way toward R%d at (%d, %d)", why, target.id, target.x, target.y))
@@ -2895,6 +2899,7 @@ agency_decide :: proc(self: ^Agency, m: ^Motivation) -> bool {
 	if m.waiting && len(knowledge_store_news(store)) == 0 do return true
 	m.waiting = false
 	m.decisions += 1
+	self.deliberations += 1
 	top    := &m.intentions[m.nintentions - 1]
 	scores := make([dynamic]string, context.temp_allocator)
 	best    = 0
