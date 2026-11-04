@@ -55,16 +55,12 @@ things the lab put off:
    household (ownership claims, things.tri). A household is its members'
    kin bonds (bonds.tri). No new entity is needed until abstract detail
    needs a **place** (DETAIL_REGIMES.md) to carry a larder's level.
-   - Built: a bed is known by its blanket, a colour of its own in the
-     village. Beds just alike were taken for one another: an agent passing
-     a neighbour's door saw a bed like its own and believed its own had
-     moved there.
-   - Built: a larder (`#Larder`, content/cooking/) is painted its
-     household's colour, for the same reason: larders and the sacks in
-     them just alike, the Brooks took the Hunts' larder for their own and
-     ate from it.
-   - Both colours are stopgaps until identity comes from place and
-     ownership before features (KNOWLEDGE.md decision 18, issue #13).
+   - Built: beds and larders just alike are told apart by where they are
+     (KNOWLEDGE.md decision 18). Before it, an agent passing a neighbour's
+     door saw a bed like its own and believed its own had moved there, and
+     the Brooks took the Hunts' larder for their own and ate from it; a
+     colour each (a bed's blanket, a larder's paint) held it off until
+     then, and is gone.
 4. **A day's shape is a routine of commitments.** Each agent has
    commitments that recur every day (AGENCY.md §8): sleep at home through
    the night, and its work in the day's hours. Its needs (hunger, cold,
@@ -285,7 +281,7 @@ New, and entered in the glossary with this document:
 | Household | The people of a home: kin bonds. Not a **place** (DETAIL_REGIMES.md's entity), until abstract detail needs one. |
 | Worksite | What a household's day's work is done at: a scarecrow in a plot, a chopping block, a hunting blind. *Avoid:* workplace. (Built.) |
 | Meal | Food that isn't raw: cooked, or never raw. (Built.) |
-| Larder | A household's container of food, known by its paint. (Built.) |
+| Larder | A household's container of food, known from its neighbours' by where it is. (Built.) |
 | Kept goal | An ongoing condition: a commitment to it arises again whenever it no longer holds, through its window. (Built.) |
 
 ## Open questions
@@ -304,9 +300,6 @@ New, and entered in the glossary with this document:
 - **How weakness is felt.** Strength and cognition fall with reserves, but
   does the agent know it is weak? The interoceptive belief is hunger's.
   Weakness might be felt as fatigue, or as a need of its own.
-- **Things just alike in different houses.** Decided: KNOWLEDGE.md
-  decision 18 (issue #13). Until it is built, beds and larders carry a
-  colour each, and a villager's habit keeps it at its own stove.
 - **Forgetting what was eaten.** Knowledge keeps every referent: each
   portion a villager eats stays one, not present. Over three days that is
   a third of what a villager knows of; over weeks it will be most, and

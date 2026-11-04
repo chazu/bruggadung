@@ -55,13 +55,6 @@ households := [4]Village_Household {
 	{"the Hunts", "hunter", 3, {{71, 61}, {73, 61}, {75, 61}, {}}, {77, 57}, {71, 57}, {75, 54}, "hunting_blind", {135, 50}},
 }
 
-// Each household's larder's paint, by its index.
-@(private = "file", rodata)
-PAINTS := [4]string{"red", "blue", "yellow", "green"}
-
-@(private = "file", rodata)
-BLANKETS := [12]string{"red", "yellow", "blue", "green", "purple", "orange", "black", "grey", "brown", "navy", "white", "beige"}
-
 Villager :: struct {
 	id:        Entity_ID,
 	household: int,
@@ -143,8 +136,6 @@ village_setup :: proc(self: ^Village) {
 		larder := proposal_group_create(g, "larder", ns_utf8(fmt.tprintf("%s' larder", h.name)),
 		                                on_tile(h.larder.x, h.larder.y, 0))
 		larders[k] = larder
-		paint := tri.type_named(world_tri(self.world), ns_utf8(fmt.tprintf("\"%s\"", PAINTS[k])))
-		proposal_group_set_of_to(g, "Larder.paint", whole(larder), i64(paint))
 		proposal_group_create(g, "grain_sack", ns_utf8(fmt.tprintf("%s' grain", h.name)), in_(larder))
 		woodpile := proposal_group_create(g, "woodpile", ns_utf8(fmt.tprintf("%s' woodpile", h.name)),
 		                                  on_tile(h.woodpile.x, h.woodpile.y, 0))
@@ -152,9 +143,6 @@ village_setup :: proc(self: ^Village) {
 		for i in 0 ..< h.people {
 			bed := proposal_group_create(g, "bed", ns_utf8(fmt.tprintf("%s' bed %d", h.name, i)),
 			                             on_tile(h.beds[i].x, h.beds[i].y, 0))
-			/* each blanket a colour of its own, in the whole village */
-			blanket := tri.type_named(world_tri(self.world), ns_utf8(fmt.tprintf("\"%s\"", BLANKETS[len(handles)])))
-			proposal_group_set_of_to(g, "Bed.blanket", whole(bed), i64(blanket))
 			/* first, by the worksite, a tile apart from each other */
 			person := proposal_group_create(g, h.trade, ns_utf8(fmt.tprintf("%s, %d", h.name, i)),
 			                                on_tile(h.works.x - 1 + i32(i), h.works.y + 1, 0))

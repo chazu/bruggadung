@@ -21,12 +21,13 @@
 //             needs it lit. Burning its fuel is the atmosphere domain's,
 //             which the village doesn't run yet, so a lit stove stays lit
 //             (firewood is slice 5).
-// - home:     a larder (#Larder, a container) is known by its paint;
-//             village/village.tri's are its households'. Whose it is
-//             (an ownership claim, things.tri) no method asks after yet: an
-//             agent takes from the larder it is used to (its habit, AGENCY.md
-//             §8), then the nearest. It knows at first only its own, so its
-//             own is what it gets used to.
+// - home:     a larder is a container, village/village.tri's, one to a
+//             household. One larder is told from another just like it by
+//             where it is (KNOWLEDGE.md decision 18), not its looks. Whose
+//             it is (an ownership claim, things.tri) no method asks after
+//             yet: an agent takes from the larder it is used to (its habit,
+//             AGENCY.md §8), then the nearest. It knows at first only its
+//             own, so its own is what it gets used to.
 // - code:     effect_cook (src/act_actions.odin); the scenario stocks the
 //             larders and undertakes the morning's commitment
 //             (src/scenario_village.odin).
@@ -37,17 +38,6 @@
     raw:     *false | true          @field(content, saved, proposable, inspect, perceive(sight))
     cooking: *0 | int & >=0 & <=100 @field(content, saved, inspect)
 }
-
-// A household's larder: a container of its food, painted the household's
-// colour. That is how a larder is told from another just like it, as a bed
-// is by its blanket (home/home.tri). A stopgap: when identity comes from
-// place and ownership (#13), the paint goes, and a larder is a container.
-#Larder: #Container & {
-    @component(Larder)
-    paint: #Colour @field(content, saved, proposable, inspect, perceive(sight))
-}
-
-larder_seen: #Seen & { kindOf: "#Larder" } @family(seen)
 
 food_look: #Look & { kindOf: "#Food", look: "food", prevails: 1 } @family(looks)
 

@@ -4552,3 +4552,22 @@ numbers only.
   type numbers. A new `seen_kinds` test.
 - Found on the way: the beds' blankets were never what made a bed seen (its
   blueprint's type was named `#Bed`); they only tell beds apart (#13).
+
+### After the slice: identity from context (KNOWLEDGE.md decision 18, issue #13)
+
+- Recognition: a thing like one believed still elsewhere is another thing.
+  It is taken for that one, moved, only if the agent believes it gone from
+  where it was, it goes about by itself (an agent), the agent sees where it
+  was now, or it saw it moved (src/know_knowledge_2.odin).
+- The village's stopgaps are gone: no blankets, no paint, no `#Bed` or
+  `#Larder` components (`#Bed` is a seen kind with no fields; a larder is a
+  plain container). Beds and larders are told apart by where they are, and
+  every check passes as before.
+- Every other scenario behaves exactly as before. A new
+  `identity_from_context` test: a bed like mine across the green is
+  another; a neighbour seen there is the neighbour; my bed seen gone from
+  home, then seen across the green, is mine, moved. With the rule off, it
+  fails.
+- Not yet: an identity hypothesis between a thing found gone and one like
+  it seen elsewhere before (so a thing moved unseen is taken for two until
+  it is seen moved), and ownership known as a relation a method asks after.

@@ -24,13 +24,10 @@
 //             (src/scenario_village.odin); a bed's owner is an ownership
 //             claim (things.tri), not yet something a method can ask after.
 
-// Something to sleep in, its blanket the colour it is known by: a bed is
-// told from another just like it by that, as an agent's own is. A
-// stopgap: when identity comes from place and ownership (#13), it goes.
-#Bed: #Body & {
-    @component(Bed)
-    blanket: #Colour @field(content, saved, proposable, inspect, perceive(sight))
-}
+// Something to sleep in. One bed is told from another just like it, an
+// agent's own from its neighbours', by where it is (KNOWLEDGE.md decision
+// 18), not its looks.
+#Bed: #Body & {}
 
 bed_seen: #Seen & { kindOf: "#Bed" } @family(seen)
 

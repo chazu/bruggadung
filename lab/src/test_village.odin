@@ -4,8 +4,9 @@ package lab
  * The village (VILLAGE.md slices 3 and 4, scenario_village.odin): three
  * days and nights of the day's commitments and meals, every check passing:
  * a meal taken to work and eaten there, each household eating from its own
- * larder, nobody going without; and each person's bed known to it by its
- * blanket, not taken for another like it.
+ * larder, nobody going without; and each person's bed and larder, just
+ * like its neighbours', known to it by where it is (KNOWLEDGE.md decision
+ * 18), not taken for another like it.
  */
 
 test_village :: proc() {

@@ -260,6 +260,15 @@ knowledge_perceive :: proc(self: ^Knowledge, store: ^Knowledge_Store, first: uin
 					        (container != 0 || (r.x == tile.x && r.y == tile.y))
 					d = 0 if exact else ((1 if r.present else 2) + i32(know_max64(i64(abs(r.x - tile.x)), i64(abs(r.y - tile.y)))))
 					if pass == 0 && !exact do continue
+					/* elsewhere, a thing can't be where it is still believed to be
+					 * (KNOWLEDGE.md decision 18): one like it is another, unless
+					 * the agent believes it gone from there, it goes about by
+					 * itself, the agent sees where it was, or saw it moved */
+					if !exact && r.present && !knowledge_moves_itself(r) &&
+					   !knowledge_sees(self, Location{form = .On_Tile, x = r.x, y = r.y, level = r.level}, here) &&
+					   !know_contains(raw_data(glimpsed[:]), nglimpsed, seen[i].entity) {
+						continue
+					}
 					/* elsewhere, a referent known by nothing matches anyone: weakly */
 					if !exact && !knowledge_knows_anything_of(self, r, store) do continue
 					/* elsewhere than believed, it must look the same: the crate isn't the chest;
@@ -2067,4 +2076,11 @@ knowledge_as_saved_system :: proc(self: ^Knowledge) -> Saved_System {
 			knowledge_restore_saved_state((^Knowledge)(data), lines)
 		},
 	}
+}
+
+
+/* Whether a referent is believed to go about by itself (KNOWLEDGE.md
+ * decision 18): an agent, which walks; a thing stays where it was put. */
+knowledge_moves_itself :: proc(r: ^Referent) -> bool {
+	return r.kind != nil && strings.contains(string(r.kind), "#Agent")
 }

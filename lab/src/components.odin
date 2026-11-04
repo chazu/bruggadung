@@ -1,10 +1,10 @@
-// Generated from Triangle content 204336b186751313: do not edit. Type IDs are valid
+// Generated from Triangle content d521c1fddd34db77: do not edit. Type IDs are valid
 // only for this content; regenerate when it changes.
 package lab
 
 import tri "../../triangle/odin/triangle"
 
-CONTENT_HASH :: 0x204336b186751313
+CONTENT_HASH :: 0xd521c1fddd34db77
 
 // Combustor, from #Combustor
 Combustor :: struct {
@@ -197,11 +197,6 @@ Assembly :: struct {
 	slots: i64,    // int, in quanta of 1; content, saved, inspect, perceive(sight)
 }
 
-// Bed, from #Bed
-Bed :: struct {
-	blanket: u32,    // #Colour: a type ID; content, saved, proposable, inspect, perceive(sight)
-}
-
 // Cock, from #Cock
 Cock :: struct {
 	serves: cstring,    // text; content, saved, inspect
@@ -240,11 +235,6 @@ Lamp :: struct {
 	oilAt: i64,    // time, in quanta of 1ms; content, saved, proposable, inspect
 	reach: i64,    // int, in quanta of 1; content, saved, inspect
 	shining: bool,    // bool; content, saved, proposable, inspect, perceive(sight)
-}
-
-// Larder, from #Larder
-Larder :: struct {
-	paint: u32,    // #Colour: a type ID; content, saved, proposable, inspect, perceive(sight)
 }
 
 // Latent, from #Latent
@@ -346,69 +336,69 @@ Fastener :: struct {
 }
 
 // #ActivityStatus
-ACTIVITYSTATUS_ABORTED :: 587
-ACTIVITYSTATUS_COMPLETED :: 588
-ACTIVITYSTATUS_EXHAUSTED :: 589
-ACTIVITYSTATUS_FAILED :: 590
-ACTIVITYSTATUS_RUNNING :: 591
-ACTIVITYSTATUS_SUSPENDED :: 592
+ACTIVITYSTATUS_ABORTED :: 585
+ACTIVITYSTATUS_COMPLETED :: 586
+ACTIVITYSTATUS_EXHAUSTED :: 587
+ACTIVITYSTATUS_FAILED :: 588
+ACTIVITYSTATUS_RUNNING :: 589
+ACTIVITYSTATUS_SUSPENDED :: 590
 
 // #Tie
-TIE_EMPLOY :: 680
-TIE_FRIEND :: 681
-TIE_KIN :: 682
-TIE_SWORN :: 683
+TIE_EMPLOY :: 678
+TIE_FRIEND :: 679
+TIE_KIN :: 680
+TIE_SWORN :: 681
 
 // #ClaimKind
-CLAIMKIND_CUSTODY :: 594
-CLAIMKIND_OWNERSHIP :: 595
-CLAIMKIND_RESERVATION :: 596
+CLAIMKIND_CUSTODY :: 592
+CLAIMKIND_OWNERSHIP :: 593
+CLAIMKIND_RESERVATION :: 594
 
 // #Penalty
-PENALTY_FINE :: 668
-PENALTY_ARREST :: 699
-PENALTY_CONFISCATE :: 700
+PENALTY_FINE :: 666
+PENALTY_ARREST :: 697
+PENALTY_CONFISCATE :: 698
 
 // #Wrong
-WRONG_ANOTHERS :: 691
-WRONG_UNAUTHORIZED :: 692
+WRONG_ANOTHERS :: 689
+WRONG_UNAUTHORIZED :: 690
 
 // #Material
-MATERIAL_CLOTH :: 654
-MATERIAL_EARTH :: 655
-MATERIAL_FOOD :: 656
-MATERIAL_LEATHER :: 657
-MATERIAL_RUBBER :: 658
-MATERIAL_STONE :: 659
-MATERIAL_FLESH :: 702
-MATERIAL_BRASS :: 704
-MATERIAL_IRON :: 705
-MATERIAL_PAPER :: 706
-MATERIAL_STEEL :: 707
-MATERIAL_OAK :: 709
+MATERIAL_CLOTH :: 652
+MATERIAL_EARTH :: 653
+MATERIAL_FOOD :: 654
+MATERIAL_LEATHER :: 655
+MATERIAL_RUBBER :: 656
+MATERIAL_STONE :: 657
+MATERIAL_FLESH :: 700
+MATERIAL_BRASS :: 702
+MATERIAL_IRON :: 703
+MATERIAL_PAPER :: 704
+MATERIAL_STEEL :: 705
+MATERIAL_OAK :: 707
 
 // "flesh" | "metal" | "natural" | "paper" | "wood"
-BODY_SURFACE_NATURAL :: 447
-BODY_SURFACE_FLESH :: 702
-BODY_SURFACE_BRASS :: 704
-BODY_SURFACE_IRON :: 705
-BODY_SURFACE_PAPER :: 706
-BODY_SURFACE_STEEL :: 707
-BODY_SURFACE_OAK :: 709
+BODY_SURFACE_NATURAL :: 445
+BODY_SURFACE_FLESH :: 700
+BODY_SURFACE_BRASS :: 702
+BODY_SURFACE_IRON :: 703
+BODY_SURFACE_PAPER :: 704
+BODY_SURFACE_STEEL :: 705
+BODY_SURFACE_OAK :: 707
 
 // #Colour
-COLOUR_BLUE :: 599
-COLOUR_BLACK :: 601
-COLOUR_BROWN :: 602
-COLOUR_GREEN :: 603
-COLOUR_GREY :: 604
-COLOUR_NAVY :: 605
-COLOUR_ORANGE :: 606
-COLOUR_PURPLE :: 607
-COLOUR_RED :: 608
-COLOUR_YELLOW :: 609
-COLOUR_BEIGE :: 627
-COLOUR_WHITE :: 650
+COLOUR_BLUE :: 597
+COLOUR_BLACK :: 599
+COLOUR_BROWN :: 600
+COLOUR_GREEN :: 601
+COLOUR_GREY :: 602
+COLOUR_NAVY :: 603
+COLOUR_ORANGE :: 604
+COLOUR_PURPLE :: 605
+COLOUR_RED :: 606
+COLOUR_YELLOW :: 607
+COLOUR_BEIGE :: 625
+COLOUR_WHITE :: 648
 
 // The field registry: what code needs to read and write any component
 // generically.
@@ -436,7 +426,7 @@ Component_Info :: struct {
 	fields:  [^]Field_Info,
 }
 
-COMPONENT_COUNT :: 42
+COMPONENT_COUNT :: 40
 
 @(rodata) Combustor_fields := [?]Field_Info{
 	{"burnRate", offset_of(Combustor, burnRate), VALUE_QUANTITY, "int", "content, saved, inspect"},
@@ -587,9 +577,6 @@ COMPONENT_COUNT :: 42
 @(rodata) Assembly_fields := [?]Field_Info{
 	{"slots", offset_of(Assembly, slots), VALUE_QUANTITY, "int", "content, saved, inspect, perceive(sight)"},
 }
-@(rodata) Bed_fields := [?]Field_Info{
-	{"blanket", offset_of(Bed, blanket), VALUE_TYPE, "#Colour", "content, saved, proposable, inspect, perceive(sight)"},
-}
 @(rodata) Cock_fields := [?]Field_Info{
 	{"serves", offset_of(Cock, serves), VALUE_TEXT, "text", "content, saved, inspect"},
 	{"shut", offset_of(Cock, shut), VALUE_BOOL, "bool", "content, saved, proposable, inspect, perceive(sight)"},
@@ -617,9 +604,6 @@ COMPONENT_COUNT :: 42
 	{"oilAt", offset_of(Lamp, oilAt), VALUE_QUANTITY, "time", "content, saved, proposable, inspect"},
 	{"reach", offset_of(Lamp, reach), VALUE_QUANTITY, "int", "content, saved, inspect"},
 	{"shining", offset_of(Lamp, shining), VALUE_BOOL, "bool", "content, saved, proposable, inspect, perceive(sight)"},
-}
-@(rodata) Larder_fields := [?]Field_Info{
-	{"paint", offset_of(Larder, paint), VALUE_TYPE, "#Colour", "content, saved, proposable, inspect, perceive(sight)"},
 }
 @(rodata) Latent_fields := [?]Field_Info{
 	{"abused", offset_of(Latent, abused), VALUE_QUANTITY, "time", "content, saved, proposable, inspect"},
@@ -716,14 +700,12 @@ COMPONENTS := [COMPONENT_COUNT + 1]Component_Info{
 	{"Body", "#Body", size_of(Body), 5, &Body_fields[0]},
 	{"Agent", "#Agent", size_of(Agent), 24, &Agent_fields[0]},
 	{"Assembly", "#Assembly", size_of(Assembly), 1, &Assembly_fields[0]},
-	{"Bed", "#Bed", size_of(Bed), 1, &Bed_fields[0]},
 	{"Cock", "#Cock", size_of(Cock), 2, &Cock_fields[0]},
 	{"Container", "#Container", size_of(Container), 1, &Container_fields[0]},
 	{"Inscription", "#Copy", size_of(Inscription), 6, &Inscription_fields[0]},
 	{"Door", "#Door", size_of(Door), 2, &Door_fields[0]},
 	{"HandSaw", "#HandSaw", size_of(Hand_Saw), 1, &Hand_Saw_fields[0]},
 	{"Lamp", "#Lamp", size_of(Lamp), 4, &Lamp_fields[0]},
-	{"Larder", "#Larder", size_of(Larder), 1, &Larder_fields[0]},
 	{"Latent", "#Latent", size_of(Latent), 9, &Latent_fields[0]},
 	{"Log", "#Log", size_of(Log), 3, &Log_fields[0]},
 	{"Part", "#Part", size_of(Part), 7, &Part_fields[0]},

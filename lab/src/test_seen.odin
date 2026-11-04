@@ -39,15 +39,14 @@ test_seen_kinds :: proc() {
 	committer_commit_boundary(c)
 	bg_check(kind_of_entity(w, proposal_group_id_for(g, claim)) == "#Claim")
 
-	/* a kind not listed shows as the listed kinds above it: a larder, the
-	 * larder struck from the list, is a container */
-	larder := test_commit_create(c, "larder", on_tile(5, 1, 0))
-	bg_check(kind_of_entity(w, larder) == "#Larder")
+	/* a kind not listed shows as the listed kinds above it: a stove, the
+	 * stove struck from the list, is a firebox and a body */
+	stove := test_commit_create(c, "stove", on_tile(5, 1, 0))
 	for s, i in w.seen {
-		if string(s.name) == "#Larder" {
+		if string(s.name) == "#Stove" {
 			ordered_remove(&w.seen, i)
 			break
 		}
 	}
-	bg_check(kind_of_entity(w, larder) == "#Container")
+	bg_check(kind_of_entity(w, stove) == "#Thing & #Combustor & #Body")
 }

@@ -380,8 +380,8 @@ REALITY.md, TER = TERRAIN.md, TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc'
   specific seen kinds it is; a kind not listed shows as the listed kinds
   above it. (KNO d17, lab/content/knowledge.tri)
 - **Identity from context**: which thing a percept is comes from
-  continuity, place and whose it is before looks; a like thing elsewhere
-  is a hypothesis, not the thing moved. (KNO d18)
+  continuity, place and whose it is before looks; a thing like one
+  believed still elsewhere is another thing, not that one moved. (KNO d18)
 - **Identity hypothesis**: a belief that two referents are one; past a
   threshold they **merge**. Errors of identity: merging, splitting,
   misbinding, invention. (KNO d13, §6)
@@ -488,8 +488,8 @@ REALITY.md, TER = TERRAIN.md, TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc'
 - **Meal**: food that isn't **raw**: cooked (at a lit stove, adding its
   `cooking` to its nourishment) or never raw (a supper). *Avoid:* dish.
   (VIL slice 4, lab/content/cooking/cooking.tri)
-- **Larder**: a household's container of food (`#Larder`), known by its
-  paint. (VIL d3, lab/content/cooking/cooking.tri)
+- **Larder**: a household's container of food, a plain container, known
+  from its neighbours' by where it is. (VIL d3, lab/content/cooking/)
 - **Commitment**: a goal an agent is bound to (a shift, a promise, a
   debt), with a window or deadline and an **urgency curve**. Not change
   commitment. A commitment to a **kept** goal (an ongoing condition: at
