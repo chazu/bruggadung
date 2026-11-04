@@ -6,7 +6,8 @@
 //             weighed as duty, against needs and whatever else the agent
 //             wants, as any commitment is (AGENCY.md §7, §8). Its slots are
 //             bound when it is undertaken: the agent's own bed, its
-//             household's worksite.
+//             household's worksite. Work and home are kept (agency.tri):
+//             left, to eat, they arise again.
 // - reduced:  the same, decided on the cadence's beat; sleeping runs its
 //             hours.
 // - abstract: as reduced. Where an abstract agent counts as being, by the
@@ -17,12 +18,16 @@
 // - village:  the houses, beds and worksites are the village's
 //             (village/village.tri); what the work is, is for the topics
 //             that do it (farming, firewood, hunting).
+// - cooking:  the day's meals are cooking's (cooking/cooking.tri): the
+//             morning's something to eat at work, and supper.
 // - code:     the scenario undertakes the commitments, binding their slots
 //             (src/scenario_village.odin); a bed's owner is an ownership
 //             claim (things.tri), not yet something a method can ask after.
 
 // Something to sleep in, its blanket the colour it is known by: a bed is
-// told from another just like it by that, as an agent's own is.
+// told from another just like it by that, as an agent's own is. A
+// stopgap: the blanket is there so that a bed is seen at all (#12) and
+// told from its neighbours' (#13); with those, it goes.
 #Bed: #Body & {
     @component(Bed)
     blanket: #Colour @field(content, saved, proposable, inspect, perceive(sight))
@@ -53,10 +58,12 @@ go_to_bed: #Method & {
     steps: [#Do & { op: "sleep", object: "bed" }]
 } @family(methods)
 
-// The afternoon's: home again, by one's bed.
+// The afternoon's: home again, by one's bed, and back by it after going
+// to the stove or the larder (kept, agency.tri).
 be_home: #Goal & {
     title: "go home"
     done:  #Reached & { reached: "bed" }
+    kept:  true
 } @family(goals)
 
 walk_home: #Method & {
@@ -67,10 +74,11 @@ walk_home: #Method & {
     steps: [#Do & { op: "look_over", object: "bed" }]
 } @family(methods)
 
-// The day's: at one's worksite.
+// The day's: at one's worksite, and back at it after going home to eat.
 be_at_work: #Goal & {
     title: "go to work"
     done:  #Reached & { reached: "worksite" }
+    kept:  true
 } @family(goals)
 
 walk_to_work: #Method & {

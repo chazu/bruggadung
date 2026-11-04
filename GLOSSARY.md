@@ -478,9 +478,17 @@ REALITY.md, TER = TERRAIN.md, TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc'
 - **Nourishment**: what a food (`#Food`) gives satiety when eaten; eating
   asks the body to be **nourished** by it, and the body's code applies it.
   (VIL d2)
+- **Meal**: food that isn't **raw**: cooked (at a lit stove, adding its
+  `cooking` to its nourishment) or never raw (a supper). *Avoid:* dish.
+  (VIL slice 4, lab/content/cooking/cooking.tri)
+- **Larder**: a household's container of food (`#Larder`), known by its
+  paint. (VIL d3, lab/content/cooking/cooking.tri)
 - **Commitment**: a goal an agent is bound to (a shift, a promise, a
   debt), with a window or deadline and an **urgency curve**. Not change
-  commitment. (AGE d5, §7)
+  commitment. A commitment to a **kept** goal (an ongoing condition: at
+  work through the shift) isn't settled when done: it arises again
+  whenever the goal no longer holds, until the window closes, and its
+  urgency doesn't rise. (AGE d5, §7; VIL d4)
 - **Promise**: a commitment made by saying it; hearers hold it as
   testimony (attributed `#Pledged`). *Avoid:* pledge, in prose. (AGE §7)
 - **Deal**: an agreement (employment, a loan, a posted offer), said or

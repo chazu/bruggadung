@@ -4498,3 +4498,38 @@ the traces and state; each scenario's printed trace is otherwise the same.
 
 117 tests, 3696 checks. The scenario hashes changed by type numbers only:
 each scenario's printed trace is otherwise the same.
+
+### After the slice: cooking and the larder (VILLAGE.md slice 4, issue #4)
+
+- content/cooking/: food is raw or not (cooking's fields on hunger's
+  `#Food`), and `cook`, twenty minutes at a lit stove, adds the food's
+  `cooking` to its nourishment (grain: 15 raw, 50 cooked). Each house's
+  `#Larder` holds a sack of grain, sixty portions, painted the household's
+  colour so that it is told from the others.
+- Hunger's ways to food: eat a meal in hand; else make one and eat it
+  (`have_a_meal`: cook what is in hand at a stove, lit first; take a
+  portion from where food is kept, hands empty; look in the nearest
+  containers, with a stove to cook at); else eat it raw. Taking from,
+  cooking at and looking in go by habit first, so a villager keeps to its
+  own larder and stove. The morning's commitment is something to eat at
+  work, the evening's supper, both made the same way.
+- Agency: a goal can be `kept`, an ongoing condition (work, home). Its
+  commitment arises again whenever it no longer holds, through its window,
+  and its urgency doesn't rise. Resuming a suspended activity walks back
+  within reach of what it names first (a sleep, after going to the larder
+  in the night, used to fail where it stood).
+- Commitment: a stack's split carries the stack's other components (its
+  food, say): the units are alike. Before, a portion split off a sack was a
+  body and nothing more.
+- The village: villagers' stomachs empty over 12 hours; the setup tour
+  takes each past its larder and its stove. Eight new checks: everyone
+  takes a meal to work at 07:30 and has eaten it there by 14:30, each
+  household ate from its own larder (three to five portions a person a
+  day; it is four), and nobody's reserves fell.
+- Cost: the village does 4016 boundaries in three days, not 891, at the
+  same 5 ms each: about 20 s. Walking to larders and stoves is a boundary a
+  step. Slice 10 measures it; a portion eaten stays a referent, so over
+  weeks recognition will slow (VILLAGE.md, open questions).
+
+118 tests, 3713 checks. The other scenarios' hashes changed by type
+numbers only.

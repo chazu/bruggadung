@@ -3754,4 +3754,5 @@ ALL_TESTS := [?]Test_Case{
 	{"watcher",                       test_watcher},
 	{"village",                       test_village},
 	{"looks",                         test_looks},
+	{"cooking",                       test_cooking},
 }

@@ -75,8 +75,11 @@
 // A committed goal's `urgency` (AGENCY.md §7) is a curve over how much of
 // its window has passed (thousandths); without one, it rises straight to 20
 // by the deadline.
+// A `kept` goal is an ongoing condition (at work through the shift): a
+// commitment to it isn't settled when it is done, but arises again
+// whenever it no longer holds, until its window closes.
 #Goal: #Intent & { done: #Condition, concerns: [...#Body], worth: [...#Consideration], arises: #Arising,
-                   pressed: #Pressing, urgency: [...#Point] }
+                   pressed: #Pressing, urgency: [...#Point], kept: *false | true }
 
 // Conditions of what the agent did, not of how things are: it has looked
 // into the slot's referent since adopting the goal; an activity of the

@@ -275,6 +275,11 @@ a disturbance generates no goal to investigate it.
   - a deadline or time window
   - a source: self, employment, or a promise
   - an urgency curve that rises toward the deadline
+- **A kept goal** is an ongoing condition (at work through a shift, home in
+  the evening). A commitment to one isn't settled when it is done: while
+  its window is open it arises again whenever it no longer holds, and,
+  having no deadline to meet, its urgency doesn't rise (lab
+  content/agency.tri's `kept`; VILLAGE.md decision 4).
 - **Promises** are commitments created by a *communicate* act, whose content
   is the promise itself. Hearers hold it as a claim.
   - Keeping or breaking a promise is a history event, which hearers perceive

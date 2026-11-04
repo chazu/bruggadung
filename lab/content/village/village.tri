@@ -7,10 +7,10 @@
 // - reduced, abstract, frozen: nobody is, yet.
 // - home:     beds and worksites are home/home.tri's kinds, and the
 //             day's commitments its goals.
-// - hunger:   the villagers get hungry (hunger/body.tri); there is no food
-//             in the village yet (cooking, farming and hunting are slices
-//             to come), so over its first days their reserves fall a
-//             little.
+// - hunger:   the villagers get hungry (hunger/body.tri) and eat from
+//             their larders (cooking/cooking.tri): what is in them is all
+//             the food there is (farming and hunting are slices to come), a
+//             sack of grain each, so a larder empties as its household eats.
 // - heat:     each house has a stove (heat/heat.tri), cold, with no domain
 //             running it in the scenario yet.
 // - terrain:  the map's kinds are terrain/terrain.tri's.
@@ -33,7 +33,10 @@ village_map: #Map & {
     fill:   "grass"
 }
 
-let person = #Hungry & { material: "flesh", hands: 2 }
+// A villager: a meal sees it through most of a morning (its stomach
+// empties over 12 hours, so hunger presses again some 5 hours after a
+// meal): breakfast, the meal it takes to work, supper.
+let person = #Hungry & { material: "flesh", hands: 2, emptiesIn: 12h }
 
 // The villagers, by their work.
 farmer:     #Agent & person & { mass: 75kg, coat: "green", trade: "farmer" }
@@ -44,10 +47,11 @@ farmer_look:     #Look & { kindOf: "farmer", look: "agent.farmer" } @family(look
 woodcutter_look: #Look & { kindOf: "woodcutter", look: "agent.woodcutter" } @family(looks)
 hunter_look:     #Look & { kindOf: "hunter", look: "agent.hunter" } @family(looks)
 
-// In each house: a bed for each of its people, a larder; by its door, a
-// woodpile. (Its stove is heat/heat.tri's.)
+// In each house: a bed for each of its people, a larder (cooking/'s,
+// painted the household's colour, stocked with a sack of grain); by its
+// door, a woodpile. (Its stove is heat/heat.tri's.)
 bed:      #Bed & { material: "wood", mass: 40kg, blanket: "grey" }
-larder:   #Container & { material: "wood", mass: 30kg, capacity: 50 }
+larder:   #Larder & { material: "wood", mass: 30kg, capacity: 50, paint: "grey" }
 woodpile: #Container & { material: "wood", mass: 5kg, capacity: 100 }
 
 // Where each household works: a scarecrow in a plot, a chopping block at

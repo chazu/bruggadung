@@ -1,10 +1,10 @@
-// Generated from Triangle content 58d3ab7e9e94ef69: do not edit. Type IDs are valid
+// Generated from Triangle content 225bf05aec6c5087: do not edit. Type IDs are valid
 // only for this content; regenerate when it changes.
 package lab
 
 import tri "../../triangle/odin/triangle"
 
-CONTENT_HASH :: 0x58d3ab7e9e94ef69
+CONTENT_HASH :: 0x225bf05aec6c5087
 
 // Combustor, from #Combustor
 Combustor :: struct {
@@ -15,7 +15,9 @@ Combustor :: struct {
 
 // Food, from #Food
 Food :: struct {
-	nourishment: i64,    // int, in quanta of 1; content, saved, inspect
+	cooking: i64,    // int, in quanta of 1; content, saved, inspect
+	nourishment: i64,    // int, in quanta of 1; content, saved, proposable, inspect
+	raw: bool,    // bool; content, saved, proposable, inspect, perceive(sight)
 }
 
 // FuelContainer, from #FuelContainer
@@ -240,6 +242,11 @@ Lamp :: struct {
 	shining: bool,    // bool; content, saved, proposable, inspect, perceive(sight)
 }
 
+// Larder, from #Larder
+Larder :: struct {
+	paint: u32,    // #Colour: a type ID; content, saved, proposable, inspect, perceive(sight)
+}
+
 // Latent, from #Latent
 Latent :: struct {
 	abused: i64,    // time, in quanta of 1ms; content, saved, proposable, inspect
@@ -339,69 +346,69 @@ Fastener :: struct {
 }
 
 // #ActivityStatus
-ACTIVITYSTATUS_ABORTED :: 547
-ACTIVITYSTATUS_COMPLETED :: 548
-ACTIVITYSTATUS_EXHAUSTED :: 549
-ACTIVITYSTATUS_FAILED :: 550
-ACTIVITYSTATUS_RUNNING :: 551
-ACTIVITYSTATUS_SUSPENDED :: 552
+ACTIVITYSTATUS_ABORTED :: 564
+ACTIVITYSTATUS_COMPLETED :: 565
+ACTIVITYSTATUS_EXHAUSTED :: 566
+ACTIVITYSTATUS_FAILED :: 567
+ACTIVITYSTATUS_RUNNING :: 568
+ACTIVITYSTATUS_SUSPENDED :: 569
 
 // #Tie
-TIE_EMPLOY :: 639
-TIE_FRIEND :: 640
-TIE_KIN :: 641
-TIE_SWORN :: 642
+TIE_EMPLOY :: 657
+TIE_FRIEND :: 658
+TIE_KIN :: 659
+TIE_SWORN :: 660
 
 // #ClaimKind
-CLAIMKIND_CUSTODY :: 554
-CLAIMKIND_OWNERSHIP :: 555
-CLAIMKIND_RESERVATION :: 556
+CLAIMKIND_CUSTODY :: 571
+CLAIMKIND_OWNERSHIP :: 572
+CLAIMKIND_RESERVATION :: 573
 
 // #Penalty
-PENALTY_FINE :: 627
-PENALTY_ARREST :: 658
-PENALTY_CONFISCATE :: 659
+PENALTY_FINE :: 645
+PENALTY_ARREST :: 676
+PENALTY_CONFISCATE :: 677
 
 // #Wrong
-WRONG_ANOTHERS :: 650
-WRONG_UNAUTHORIZED :: 651
+WRONG_ANOTHERS :: 668
+WRONG_UNAUTHORIZED :: 669
 
 // #Material
-MATERIAL_CLOTH :: 613
-MATERIAL_EARTH :: 614
-MATERIAL_FOOD :: 615
-MATERIAL_LEATHER :: 616
-MATERIAL_RUBBER :: 617
-MATERIAL_STONE :: 618
-MATERIAL_FLESH :: 661
-MATERIAL_BRASS :: 663
-MATERIAL_IRON :: 664
-MATERIAL_PAPER :: 665
-MATERIAL_STEEL :: 666
-MATERIAL_OAK :: 668
+MATERIAL_CLOTH :: 631
+MATERIAL_EARTH :: 632
+MATERIAL_FOOD :: 633
+MATERIAL_LEATHER :: 634
+MATERIAL_RUBBER :: 635
+MATERIAL_STONE :: 636
+MATERIAL_FLESH :: 679
+MATERIAL_BRASS :: 681
+MATERIAL_IRON :: 682
+MATERIAL_PAPER :: 683
+MATERIAL_STEEL :: 684
+MATERIAL_OAK :: 686
 
 // "flesh" | "metal" | "natural" | "paper" | "wood"
-BODY_SURFACE_NATURAL :: 412
-BODY_SURFACE_FLESH :: 661
-BODY_SURFACE_BRASS :: 663
-BODY_SURFACE_IRON :: 664
-BODY_SURFACE_PAPER :: 665
-BODY_SURFACE_STEEL :: 666
-BODY_SURFACE_OAK :: 668
+BODY_SURFACE_NATURAL :: 424
+BODY_SURFACE_FLESH :: 679
+BODY_SURFACE_BRASS :: 681
+BODY_SURFACE_IRON :: 682
+BODY_SURFACE_PAPER :: 683
+BODY_SURFACE_STEEL :: 684
+BODY_SURFACE_OAK :: 686
 
 // #Colour
-COLOUR_BLUE :: 559
-COLOUR_BLACK :: 561
-COLOUR_BROWN :: 562
-COLOUR_GREEN :: 563
-COLOUR_GREY :: 564
-COLOUR_NAVY :: 565
-COLOUR_ORANGE :: 566
-COLOUR_PURPLE :: 567
-COLOUR_RED :: 568
-COLOUR_YELLOW :: 569
-COLOUR_BEIGE :: 586
-COLOUR_WHITE :: 609
+COLOUR_BLUE :: 576
+COLOUR_BLACK :: 578
+COLOUR_BROWN :: 579
+COLOUR_GREEN :: 580
+COLOUR_GREY :: 581
+COLOUR_NAVY :: 582
+COLOUR_ORANGE :: 583
+COLOUR_PURPLE :: 584
+COLOUR_RED :: 585
+COLOUR_YELLOW :: 586
+COLOUR_BEIGE :: 604
+COLOUR_WHITE :: 627
 
 // The field registry: what code needs to read and write any component
 // generically.
@@ -429,7 +436,7 @@ Component_Info :: struct {
 	fields:  [^]Field_Info,
 }
 
-COMPONENT_COUNT :: 41
+COMPONENT_COUNT :: 42
 
 @(rodata) Combustor_fields := [?]Field_Info{
 	{"burnRate", offset_of(Combustor, burnRate), VALUE_QUANTITY, "int", "content, saved, inspect"},
@@ -437,7 +444,9 @@ COMPONENT_COUNT :: 41
 	{"lit", offset_of(Combustor, lit), VALUE_BOOL, "bool", "content, saved, proposable, inspect, perceive(sight)"},
 }
 @(rodata) Food_fields := [?]Field_Info{
-	{"nourishment", offset_of(Food, nourishment), VALUE_QUANTITY, "int", "content, saved, inspect"},
+	{"cooking", offset_of(Food, cooking), VALUE_QUANTITY, "int", "content, saved, inspect"},
+	{"nourishment", offset_of(Food, nourishment), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
+	{"raw", offset_of(Food, raw), VALUE_BOOL, "bool", "content, saved, proposable, inspect, perceive(sight)"},
 }
 @(rodata) Fuel_Container_fields := [?]Field_Info{
 	{"fuel", offset_of(Fuel_Container, fuel), VALUE_QUANTITY, "mass", "content, saved, proposable, inspect"},
@@ -609,6 +618,9 @@ COMPONENT_COUNT :: 41
 	{"reach", offset_of(Lamp, reach), VALUE_QUANTITY, "int", "content, saved, inspect"},
 	{"shining", offset_of(Lamp, shining), VALUE_BOOL, "bool", "content, saved, proposable, inspect, perceive(sight)"},
 }
+@(rodata) Larder_fields := [?]Field_Info{
+	{"paint", offset_of(Larder, paint), VALUE_TYPE, "#Colour", "content, saved, proposable, inspect, perceive(sight)"},
+}
 @(rodata) Latent_fields := [?]Field_Info{
 	{"abused", offset_of(Latent, abused), VALUE_QUANTITY, "time", "content, saved, proposable, inspect"},
 	{"blamed", offset_of(Latent, blamed), VALUE_TEXT, "text", "saved, proposable, inspect"},
@@ -684,7 +696,7 @@ COMPONENT_COUNT :: 41
 
 COMPONENTS := [COMPONENT_COUNT + 1]Component_Info{
 	{"Combustor", "#Combustor", size_of(Combustor), 3, &Combustor_fields[0]},
-	{"Food", "#Food", size_of(Food), 1, &Food_fields[0]},
+	{"Food", "#Food", size_of(Food), 3, &Food_fields[0]},
 	{"FuelContainer", "#FuelContainer", size_of(Fuel_Container), 1, &Fuel_Container_fields[0]},
 	{"GasStore", "#GasStore", size_of(Gas_Store), 8, &Gas_Store_fields[0]},
 	{"Hungry", "#Hungry", size_of(Hungry), 7, &Hungry_fields[0]},
@@ -711,6 +723,7 @@ COMPONENTS := [COMPONENT_COUNT + 1]Component_Info{
 	{"Door", "#Door", size_of(Door), 2, &Door_fields[0]},
 	{"HandSaw", "#HandSaw", size_of(Hand_Saw), 1, &Hand_Saw_fields[0]},
 	{"Lamp", "#Lamp", size_of(Lamp), 4, &Lamp_fields[0]},
+	{"Larder", "#Larder", size_of(Larder), 1, &Larder_fields[0]},
 	{"Latent", "#Latent", size_of(Latent), 9, &Latent_fields[0]},
 	{"Log", "#Log", size_of(Log), 3, &Log_fields[0]},
 	{"Part", "#Part", size_of(Part), 7, &Part_fields[0]},

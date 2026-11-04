@@ -1,33 +1,39 @@
 package lab
 
 /*
- * The village (VILLAGE.md, slice 3; content/village/village.tri): four
+ * The village (VILLAGE.md, slices 3 and 4; content/village/village.tri): four
  * households, twelve people, on a map of 160 by 100, living out the day's
  * commitments (content/home/home.tri): to work from 07:00 to 15:00, home
  * from 15:00 to 22:00, and a night's sleep in one's own bed from 22:00.
  * What the work is comes with later slices; for now each works by being at
- * the household's worksite.
+ * the household's worksite. Between, they eat (content/cooking/): from the
+ * household's larder, a sack of grain, cooked at its stove; a meal taken
+ * to work, packed from 06:00, and supper from 18:00.
  *
  * Each has seen its worksite and its home before the first morning:
- * set down by its worksite for the first boundary, then by its bed for
- * the second, so both are in what it knows when its commitments are
- * undertaken, bound to them. Its sight is four tiles: the rest of the way it
+ * set down by its worksite for the first boundary, by its larder and its
+ * stove for the next two, then by its bed, so all are in what it knows
+ * when its commitments are undertaken, bound to them. Its sight is four tiles: the rest of the way it
  * finds as it walks.
  *
  * The run goes boundary by boundary up to each check's time, putting none
  * in of its own (as the watcher runs it), so `lab run village` and a
  * watched village are the same run. The checks, for three days and nights:
- * everyone at work at 11:00, home by 21:00, asleep in their own bed at
- * 02:00.
+ * everyone taking a meal to work at 07:30, at work at 11:00, the meal
+ * eaten there by 14:30, home by 21:00, asleep in their own bed at 02:00;
+ * and at the end, each household's larder emptied by what it ate, and
+ * nobody's reserves fallen.
  */
 
 import "core:fmt"
+import "core:strings"
 import tri "../../triangle/odin/triangle"
 
 
 VILLAGE_DAY :: i64(86400000)
 VILLAGE_HOUR :: i64(3600000)
 VILLAGE_DAYS :: 3
+VILLAGE_GRAIN :: i64(60)               // portions in each larder's sack (village.tri's grain_sack)
 
 Village_Household :: struct {
 	name:      string,
@@ -49,6 +55,10 @@ households := [4]Village_Household {
 	{"the Hunts", "hunter", 3, {{71, 61}, {73, 61}, {75, 61}, {}}, {77, 57}, {71, 57}, {75, 54}, "hunting_blind", {135, 50}},
 }
 
+// Each household's larder's paint, by its index.
+@(private = "file", rodata)
+PAINTS := [4]string{"red", "blue", "yellow", "green"}
+
 @(private = "file", rodata)
 BLANKETS := [12]string{"red", "yellow", "blue", "green", "purple", "orange", "black", "grey", "brown", "navy", "white", "beige"}
 
@@ -69,6 +79,7 @@ Village :: struct {
 	agency:       ^Agency,
 	bodies:       ^Bodies,
 	people:       [dynamic]Villager,
+	larders:      [4]Entity_ID,      // each household's, by its index
 	results:      [dynamic]string,   // each cloned
 	error:        string,            // cloned; "" if it was set up
 }
@@ -124,13 +135,17 @@ village_setup :: proc(self: ^Village) {
 	c := self.committer
 	g := proposal_group_group_with_phase(.System, "setup: the village")
 	handles := make([dynamic]Villager, context.temp_allocator)
-	works: [4]Entity_ID
+	works, larders: [4]Entity_ID
 	for &h, k in households {
 		works[k] = proposal_group_create(g, h.worksite, ns_utf8(fmt.tprintf("%s' worksite", h.name)),
 		                                 on_tile(h.works.x, h.works.y, 0))
 		proposal_group_create(g, "stove", ns_utf8(fmt.tprintf("%s' stove", h.name)), on_tile(h.stove.x, h.stove.y, 0))
 		larder := proposal_group_create(g, "larder", ns_utf8(fmt.tprintf("%s' larder", h.name)),
 		                                on_tile(h.larder.x, h.larder.y, 0))
+		larders[k] = larder
+		paint := tri.type_named(world_tri(self.world), ns_utf8(fmt.tprintf("\"%s\"", PAINTS[k])))
+		proposal_group_set_of_to(g, "Larder.paint", whole(larder), i64(paint))
+		proposal_group_create(g, "grain_sack", ns_utf8(fmt.tprintf("%s' grain", h.name)), in_(larder))
 		woodpile := proposal_group_create(g, "woodpile", ns_utf8(fmt.tprintf("%s' woodpile", h.name)),
 		                                  on_tile(h.woodpile.x, h.woodpile.y, 0))
 		first := len(handles)
@@ -152,9 +167,22 @@ village_setup :: proc(self: ^Village) {
 	}
 	committer_submit(c, g)
 	scheduler_run_until(self.scheduler, time_make(1))     /* each sees its worksite */
+	for l, k in larders do self.larders[k] = proposal_group_id_for(g, l)
 	for v in handles {
 		append(&self.people, Villager{proposal_group_id_for(g, v.id), v.household, proposal_group_id_for(g, v.bed),
 		                              proposal_group_id_for(g, v.worksite)})
+	}
+
+	/* then round its house: beside the larder (against the west wall), then
+	 * the stove (the east), two to a tile's breadth */
+	for stop, k in ([2]string{"larder", "stove"}) {
+		tour := proposal_group_group_with_phase(.System, fmt.tprintf("setup: by the %s", stop))
+		for v, i in self.people {
+			at := households[v.household].larder if k == 0 else households[v.household].stove
+			proposal_group_move_to(tour, whole(v.id), on_tile(at.x + (1 if k == 0 else -1), at.y - 1 + i32(i % 2), 0))
+		}
+		committer_submit(c, tour)
+		scheduler_run_until(self.scheduler, time_make(2 + i64(k)))
 	}
 
 	/* then home, by its bed; and kin, each to each in a household */
@@ -171,7 +199,7 @@ village_setup :: proc(self: ^Village) {
 		}
 	}
 	committer_submit(c, home)
-	scheduler_run_until(self.scheduler, time_make(2))     /* and sees its home */
+	scheduler_run_until(self.scheduler, time_make(4))     /* and sees its bed */
 
 	/* the day's commitments, every day, bound to its own bed and its work */
 	for v in self.people {
@@ -187,7 +215,11 @@ village_setup :: proc(self: ^Village) {
 		      agency_undertake_every_with(self.agency, v.id, "be_home", 15 * VILLAGE_HOUR, 22 * VILLAGE_HOUR, "home",
 		                                  VILLAGE_DAY, {{"bed", bed}}) &&
 		      agency_undertake_every_with(self.agency, v.id, "sleep_in_bed", 22 * VILLAGE_HOUR, 30 * VILLAGE_HOUR, "home",
-		                                  VILLAGE_DAY, {{"bed", bed}})
+		                                  VILLAGE_DAY, {{"bed", bed}}) &&
+		      agency_undertake_every_with(self.agency, v.id, "food_along", 6 * VILLAGE_HOUR, 7 * VILLAGE_HOUR, "work",
+		                                  VILLAGE_DAY, {}) &&
+		      agency_undertake_every_with(self.agency, v.id, "eat_supper", 18 * VILLAGE_HOUR, 21 * VILLAGE_HOUR, "home",
+		                                  VILLAGE_DAY, {})
 		if !ok {
 			self.error = fmt.aprintf("%d couldn't take on its day", v.id)
 			return
@@ -241,19 +273,63 @@ village_run :: proc(self: ^Village) {
 		return
 	}
 	for d in 0 ..< i64(VILLAGE_DAYS) {
+		village_step_until(self, d * VILLAGE_DAY + 7 * VILLAGE_HOUR + VILLAGE_HOUR / 2)
+		village_check_each(self, fmt.tprintf("day %d, 07:30: everyone takes a meal to work", d + 1), .Packed)
 		village_step_until(self, d * VILLAGE_DAY + 11 * VILLAGE_HOUR)
 		village_check_each(self, fmt.tprintf("day %d, 11:00: everyone at work", d + 1), .Work)
+		village_step_until(self, d * VILLAGE_DAY + 14 * VILLAGE_HOUR + VILLAGE_HOUR / 2)
+		village_check_each(self, fmt.tprintf("day %d, 14:30: everyone has eaten it there", d + 1), .Lunched)
 		village_step_until(self, d * VILLAGE_DAY + 21 * VILLAGE_HOUR)
 		village_check_each(self, fmt.tprintf("day %d, 21:00: everyone home", d + 1), .Home)
 		village_step_until(self, (d + 1) * VILLAGE_DAY + 2 * VILLAGE_HOUR)
 		village_check_each(self, fmt.tprintf("night %d, 02:00: everyone asleep in their own bed", d + 1), .Asleep)
 	}
+	village_check_larders(self)
+	hungry := make([dynamic]string, context.temp_allocator)
+	for v in self.people {
+		if reserves(hungry_of(self.world, v.id), world_time(self.world).ms) < 100 do append(&hungry, fmt.tprintf("%d", v.id))
+	}
+	village_check(self, len(hungry) == 0, "nobody went without: everyone's reserves are full",
+	              fmt.tprintf("not: %s", strings.join(hungry[:], ", ", context.temp_allocator)))
+}
+
+
+/* What each household has taken from its larder, a portion at a time:
+ * three to five portions a person a day, as many meals as it ate, and none
+ * from another's. */
+@(private = "file")
+village_check_larders :: proc(self: ^Village) {
+	people: [4]i64
+	for v in self.people do people[v.household] += 1
+	wrong := make([dynamic]string, context.temp_allocator)
+	for l, k in self.larders {
+		taken := VILLAGE_GRAIN - village_portions_in(self.world, l)
+		if taken < 3 * people[k] * VILLAGE_DAYS || taken > 5 * people[k] * VILLAGE_DAYS {
+			append(&wrong, fmt.tprintf("%s took %d", households[k].name, taken))
+		}
+	}
+	village_check(self, len(wrong) == 0, "each household ate from its own larder, which emptied as it did",
+	              strings.join(wrong[:], ", ", context.temp_allocator))
+}
+
+
+/* The portions of grain in a container. */
+village_portions_in :: proc(world: ^World, container: Entity_ID) -> i64 {
+	inside: [16]Entity_ID
+	count, total: i64
+	n := world_entities_at(world, container, .In, raw_data(inside[:]), 16)
+	for e in inside[:n] {
+		if world_get_field(world, "Stack.count", e, &count) do total += count
+	}
+	return total
 }
 
 
 @(private = "file")
 Where :: enum {
+	Packed,
 	Work,
+	Lunched,
 	Home,
 	Asleep,
 }
@@ -264,15 +340,31 @@ village_check_each :: proc(self: ^Village, name: string, where_: Where) {
 	for v in self.people {
 		ok := false
 		switch where_ {
-		case .Work:   ok = village_within_reach(self.world, v.id, v.worksite)
-		case .Home:   ok = village_within_reach(self.world, v.id, v.bed)
-		case .Asleep: ok = village_within_reach(self.world, v.id, v.bed) && village_asleep_in(self.world, v.id, v.bed)
+		case .Packed:  ok = village_holds_meal(self.world, v.id) == 1
+		case .Work:    ok = village_within_reach(self.world, v.id, v.worksite)
+		case .Lunched: ok = village_within_reach(self.world, v.id, v.worksite) && village_holds_meal(self.world, v.id) == 0
+		case .Home:    ok = village_within_reach(self.world, v.id, v.bed)
+		case .Asleep:  ok = village_within_reach(self.world, v.id, v.bed) && village_asleep_in(self.world, v.id, v.bed)
 		}
 		if !ok do append(&missing, fmt.tprintf("%d", v.id))
 	}
 	why := "not: "
 	for m, i in missing do why = fmt.tprintf("%s%s%s", why, ", " if i > 0 else "", m)
 	village_check(self, len(missing) == 0, name, why)
+}
+
+
+// How many meals (food, not raw) an agent holds.
+@(private = "file")
+village_holds_meal :: proc(world: ^World, agent: Entity_ID) -> int {
+	held: [8]Entity_ID
+	raw: i64
+	meals := 0
+	n := world_entities_at(world, agent, .Held_By, raw_data(held[:]), 8)
+	for e in held[:n] {
+		if world_get_field(world, "Food.raw", e, &raw) && raw == 0 do meals += 1
+	}
+	return meals
 }
 
 

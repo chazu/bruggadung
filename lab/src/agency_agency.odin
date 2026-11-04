@@ -1556,24 +1556,25 @@ agency_follow :: proc(self: ^Agency, m: ^Motivation, method: cstring, index: i32
 
 		/* the operation, within reach of what it names */
 		if !text_at(tc, step, "op", op[:]) do continue
-		/* an activity of it the agent suspended: resumed, not begun again */
+		/* an activity of it the agent suspended: resumed, not begun again;
+		 * put down out of reach (the bed, from the larder), walked back to
+		 * first */
+		resume_failed: string
 		if self.activities != nil {
 			suspended := agency_activity(self, cstr(op[:]), m.agent, "suspended", 0)
 			if suspended != NO_ENTITY {
-				error: string
-
-				if activities_resume(self.activities, suspended, &error) != nil {
+				if activities_resume(self.activities, suspended, &resume_failed) != nil {
 					agency_note(self, m, fmt.tprintf("%s: resuming %s", str(title[:]), str(op[:])))
-				} else {
-					agency_note(self, m, fmt.tprintf("%s: could not resume %s: %s", str(title[:]), str(op[:]), error))
+					return true
 				}
-				return true
+				if resume_failed == "" do resume_failed = "it can't be"
 			}
 		}
 		for q := 0; q < 2; q += 1 {
 			roles[q] = 0
 			if !text_at(tc, step, names[q], slot[:]) do continue
 			roles[q] = bound(b, n, str(slot[:]))
+			if roles[q] == 0 && resume_failed != "" do break
 			if roles[q] == 0 {
 				agency_fail(self, m, index, fmt.tprintf("%s: %s names %s, which nothing fills", str(title[:]), str(op[:]),
 				                                        str(slot[:])))
@@ -1584,7 +1585,7 @@ agency_follow :: proc(self: ^Agency, m: ^Motivation, method: cstring, index: i32
 		for q := 0; q < 2; q += 1 {
 			if roles[q] == 0 do continue
 			r = knowledge_store_referent(store, roles[q])
-			if r != nil && !r.present {
+			if r != nil && !r.present && resume_failed == "" {
 				agency_fail(self, m, index, fmt.tprintf("%s: R%d is gone from where it was", str(title[:]), r.id))
 				return false
 			}
@@ -1592,10 +1593,14 @@ agency_follow :: proc(self: ^Agency, m: ^Motivation, method: cstring, index: i32
 		for q := 0; q < 2; q += 1 {
 			if roles[q] == 0 do continue
 			r = knowledge_store_referent(store, roles[q])
-			if !in_reach(me, r) && r != nil {
+			if !in_reach(me, r) && r != nil && r.present {
 				agency_walk(self, m, str(title[:]), me, r, store)
 				return true
 			}
+		}
+		if resume_failed != "" {
+			agency_note(self, m, fmt.tprintf("%s: could not resume %s: %s", str(title[:]), str(op[:]), resume_failed))
+			return true
 		}
 		/* what it says, if anything: after a question, it waits for the answer */
 		says := tri.at(tc, step, "says")
@@ -2224,6 +2229,8 @@ agency_urgency_of :: proc(self: ^Agency, c: ^Commitment) -> i32 {
 	tc     := world_tri(self.world)
 	passed := (world_time(self.world).ms - c.from) * 1000 / (c.until - c.from)
 	if curve_at(tc, tri.at(tc, tri.pattern(tc, c.goal), "urgency"), passed, &v) do return v
+	/* a kept goal has no deadline to rise to: its duty is the same all through */
+	if goal_kept(tc, c.goal) do return 0
 	return i32(BG_URGENCY * (world_time(self.world).ms - c.from) / (c.until - c.from))
 }
 
@@ -2357,12 +2364,21 @@ agency_has :: proc(self: ^Agency, list: [^]Arisen, n: i32, goal: cstring, about:
 }
 
 
+/* Whether a goal is kept (content/agency.tri): an ongoing condition. */
+goal_kept :: proc(tc: ^tri.Content, goal: cstring) -> bool {
+	kept := tri.at(tc, tri.pattern(tc, goal), "kept") if goal != nil else nil
+	return kept != nil && tri.node_type(kept) == tri.type_named(tc, "true")
+}
+
+
 /* A goal that arose about something, done or dropped, is settled with it. */
 @(private = "file")
-agency_settle :: proc(self: ^Agency, m: ^Motivation, intention: ^Intention) {
+agency_settle :: proc(self: ^Agency, m: ^Motivation, intention: ^Intention, done := false) {
 	k: i32
 
-	if intention.commitment > 0 && intention.commitment <= m.ncommitments {
+	/* a kept goal, done, is still to keep while the window is open */
+	if intention.commitment > 0 && intention.commitment <= m.ncommitments &&
+	   !(done && goal_kept(world_tri(self.world), intention.goal)) {
 		m.commitments[intention.commitment - 1].settled = true
 	}
 	if intention.pressed != 0 {
@@ -2489,7 +2505,14 @@ agency_weigh :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Store, bus
 		c := &m.commitments[k]
 		if c.settled || world_time(self.world).ms < c.from || world_time(self.world).ms >= c.until do continue
 		for j2 = 0; j2 < m.nintentions && m.intentions[j2].commitment != k + 1; j2 += 1 {}
-		if j2 < m.nintentions do continue      /* kept already */
+		if j2 < m.nintentions do continue      /* under way already */
+		/* a kept goal that holds: nothing to do for it, for now */
+		if goal_kept(world_tri(self.world), c.goal) {
+			kb: [BG_MAX_SLOTS]Slot_Binding
+			kn := c.nparams
+			copy(kb[:kn], c.params[:kn])
+			if agency_holds(self, c.goal, "done", 0, raw_data(kb[:]), &kn, store) do continue
+		}
 		worth = BG_DUTY + agency_urgency_of(self, c)
 		if best == nil || worth > bestWorth {
 			best           = c.goal
@@ -2693,7 +2716,7 @@ agency_decide :: proc(self: ^Agency, m: ^Motivation) -> bool {
 	copy(b[:n], top.params[:n])
 	if agency_holds(self, top.goal, "done", top.adopted, raw_data(b[:]), &n, store) {
 		agency_note(self, m, "done")
-		agency_settle(self, m, top)
+		agency_settle(self, m, top, done = true)
 		m.nintentions -= 1
 		if m.nintentions != 0 {
 			m.intentions[m.nintentions - 1].pending = -1

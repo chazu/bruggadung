@@ -29,3 +29,4 @@ tiles_bed:       #Glyph & { theme: "tiles", look: "bed", char: "Θ", ink: [190, 
 tiles_worksite:  #Glyph & { theme: "tiles", look: "worksite", char: "Ω", ink: [180, 130, 80] } @family(glyphs)
 tiles_scarecrow: #Glyph & { theme: "tiles", look: "worksite.scarecrow", char: "¥", ink: [220, 200, 120] } @family(glyphs)
 tiles_blind:     #Glyph & { theme: "tiles", look: "worksite.blind", char: "⌂", ink: [150, 170, 120] } @family(glyphs)
+tiles_food:      #Glyph & { theme: "tiles", look: "food", char: "%", ink: [214, 178, 96] } @family(glyphs)

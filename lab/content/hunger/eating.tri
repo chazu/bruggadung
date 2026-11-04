@@ -3,7 +3,8 @@
 //
 // Cut points:
 // - full:     felt hunger above 40 raises eating something, worth more the
-//             hungrier; the agent eats what it holds.
+//             hungrier; the agent eats a meal it holds (food not raw).
+//             The other ways to food are cooking's (cooking/cooking.tri).
 // - reduced:  the same, decided on the cadence's beat; eating runs at full
 //             pace.
 // - abstract: as reduced. How hunger and food work below reduced is open
@@ -12,7 +13,9 @@
 // - body:     eating nourishes the eater by the food's `nourishment`: the
 //             body's code raises its satiety (body.tri). Eating knows nothing
 //             of how the body keeps it, and the body nothing of food.
-// - finding food: none yet: only food already in hand is eaten.
+// - cooking: food raw or not, and what cooking adds, are cooking's
+//             fields on #Food (cooking/cooking.tri), as are the ways from a
+//             larder to a meal.
 // - code:     effect_eat (src/act_actions.odin) destroys the food and asks
 //             the body to be nourished (bodies_nourish, domains_bodies.odin).
 
@@ -32,7 +35,7 @@ eat_what_i_have: #Method & {
         find:  ["food"]
         match: #Supper & {
             me:   #Agent & { id: $me }
-            food: #Body & { material: "food", place: #Held & { by: $me } }
+            food: #Food & #Body & { material: "food", raw: false, place: #Held & { by: $me } }
         }
     }
     steps: [#Do & { op: "eat", object: "food" }]
@@ -56,7 +59,7 @@ eat_it: #Method & {
         find:  ["food"]
         match: #Supper & {
             me:   #Agent & { id: $me }
-            food: #Body & { material: "food", place: #Held & { by: $me } }
+            food: #Food & #Body & { material: "food", raw: false, place: #Held & { by: $me } }
         }
     }
     steps: [#Do & { op: "eat", object: "food" }]
@@ -68,7 +71,7 @@ supper: #Body & #Food & { material: "food", mass: 300g, nourishment: 50 }
 // Something eaten with none nourishes nothing.
 #Food: {
     @component(Food)
-    nourishment: *30 | int & >=0 & <=100 @field(content, saved, inspect)
+    nourishment: *30 | int & >=0 & <=100 @field(content, saved, proposable, inspect)
 }
 
 // Eat what the actor holds: a while, with the hands, easily put down. It

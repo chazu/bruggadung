@@ -8,8 +8,8 @@ and meet at a market. The watcher shows it (TESSERA.md), and `lab run
 village` checks it, as the other scenarios are checked.
 
 This document is a proposal, built a slice at a time: slices 1 (hunger
-over weeks), 2 (looks in content) and 3 (the village and its homes) are
-built. Each slice below is a ticket: slice n is GitHub issue #n
+over weeks), 2 (looks in content), 3 (the village and its homes) and 4
+(cooking and the larder) are built. Each slice below is a ticket: slice n is GitHub issue #n
 (label `village`). A slice moves into `lab/PLAN.md` when it is built.
 
 It is the first scenario that runs for weeks, not minutes. That forces two
@@ -59,6 +59,13 @@ things the lab put off:
      village. Beds just alike were taken for one another: an agent passing
      a neighbour's door saw a bed like its own and believed its own had
      moved there.
+   - Built: a larder (`#Larder`, content/cooking/) is painted its
+     household's colour, for the same reason: larders and the sacks in
+     them just alike, the Brooks took the Hunts' larder for their own and
+     ate from it.
+   - Both colours are stopgaps. KNOWLEDGE.md decisions 17 and 18 (issues
+     #12, #13): a kind seen without a field to show it, and identity from
+     place and ownership before features.
 4. **A day's shape is a routine of commitments.** Each agent has
    commitments that recur every day (AGENCY.md §8): sleep at home through
    the night, and its work in the day's hours. Its needs (hunger, cold,
@@ -74,6 +81,16 @@ things the lab put off:
      chopping block, a hunting blind). Sight reaches four tiles, so each
      villager is shown its worksite and its home before the first morning;
      the rest of the way it finds as it walks.
+   - Built (slice 4): work and home are **kept** goals (agency.tri): a
+     villager who goes home to eat in its working hours, or to the stove
+     in the evening, goes back. A kept goal has no deadline to rise
+     toward, so its urgency is nil: it is worth its duty, all through.
+   - Built (slice 4): something to eat at work, 06:00–07:00, and supper,
+     18:00–21:00, are commitments too. A villager's stomach empties over
+     12 hours (`village.tri`'s `person`), so hunger presses again some five
+     hours after a meal: breakfast, the meal it carries, a meal on coming
+     home, supper, and a night's sleep through. Over 8 hours it was five
+     meals a day, and it woke at night to eat.
 5. **Crops ripen in closed form** (slice 6). A crop is an entity on a plot
    tile, sown at a time. Its growth is a function of time since sowing,
    read when needed, with one wake when it ripens. Nothing steps it.
@@ -233,7 +250,7 @@ when it is built:
 2. **Looks in content** (TESSERA.md slice 3; built).
 3. **The village and its homes**: the map, the households, beds, the day's
    commitments, sleeping at home (built).
-4. **Cooking and the larder**: meals, eating at home.
+4. **Cooking and the larder**: meals, eating at home (built).
 5. **Firewood**: trees, felling, splitting, the woodpile, stoking.
 6. **Farming**: plots, sowing, ripening, harvesting.
 7. **Hunting**: animals, death, butchering.
@@ -268,6 +285,9 @@ New, and entered in the glossary with this document:
 | Market day | Every fourth day, when stalls are set out on the green. |
 | Household | The people of a home: kin bonds. Not a **place** (DETAIL_REGIMES.md's entity), until abstract detail needs one. |
 | Worksite | What a household's day's work is done at: a scarecrow in a plot, a chopping block, a hunting blind. *Avoid:* workplace. (Built.) |
+| Meal | Food that isn't raw: cooked, or never raw. (Built.) |
+| Larder | A household's container of food, known by its paint. (Built.) |
+| Kept goal | An ongoing condition: a commitment to it arises again whenever it no longer holds, through its window. (Built.) |
 
 ## Open questions
 
@@ -285,5 +305,12 @@ New, and entered in the glossary with this document:
 - **How weakness is felt.** Strength and cognition fall with reserves, but
   does the agent know it is weak? The interoceptive belief is hunger's.
   Weakness might be felt as fatigue, or as a need of its own.
+- **Things just alike in different houses.** Decided: KNOWLEDGE.md
+  decision 18 (issue #13). Until it is built, beds and larders carry a
+  colour each, and a villager's habit keeps it at its own stove.
+- **Forgetting what was eaten.** Knowledge keeps every referent: each
+  portion a villager eats stays one, not present. Over three days that is
+  a third of what a villager knows of; over weeks it will be most, and
+  recognition compares each percept with them all.
 - **Children.** The households are all adults. Children who eat but don't
   work would test the market harder.

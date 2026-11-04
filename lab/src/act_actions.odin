@@ -891,6 +891,26 @@ effect_eat :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) ->
 }
 
 
+/* Cooking (content/cooking/): at a lit stove, the food is no longer raw,
+ * and nourishes by what cooking adds to it, to 100 at most. */
+@(private = "file")
+effect_cook :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
+	lit, raw, nourishment, cooking: i64
+
+	if !world_get_field(world, "Combustor.lit", a.roles[.Destination], &lit) || lit == 0 {
+		return "the stove isn't lit"
+	}
+	if !world_get_field(world, "Food.raw", a.roles[.Item], &raw) || raw == 0 {
+		return "it isn't raw"
+	}
+	world_get_field(world, "Food.nourishment", a.roles[.Item], &nourishment)
+	world_get_field(world, "Food.cooking", a.roles[.Item], &cooking)
+	proposal_group_set_of_to(g, "Food.raw", whole(a.roles[.Item]), 0)
+	proposal_group_set_of_to(g, "Food.nourishment", whole(a.roles[.Item]), min(nourishment + cooking, 100))
+	return ""
+}
+
+
 /* Giving: into the receiver's free hand. */
 @(private = "file")
 effect_give :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
@@ -2650,6 +2670,7 @@ effects := [?]Named_Effect{
 	{"write",     effect_write},
 	{"read",      effect_read},
 	{"eat",       effect_eat},
+	{"cook",      effect_cook},
 	{"give",      effect_give},
 	{"investigate", effect_investigate},
 	{"tighten",   effect_tighten},

@@ -16,6 +16,7 @@ package lab
 // Objective-C).
 
 import "core:fmt"
+import "core:mem"
 import "core:strings"
 
 // _reactors' pairs: kind index, reactor.
@@ -824,6 +825,16 @@ committer_apply :: proc(self: ^Committer, p: ^Proposal, g: ^Proposal_Group, tall
 			world_set_record(self.world, &body, kbody, e)
 			world_set_record(self.world, &stack, kstack, e)
 			stack = (^Stack)(world_record(self.world, kstack, a))^
+		}
+		// the units are alike: what else the stack is (its food, say), so is
+		// what was split off
+		for kind: uint = 0; kind < world_kind_count(self.world); kind += 1 {
+			if kind == kbody || kind == kstack do continue
+			from := world_record(self.world, kind, a)
+			if from == nil do continue
+			buf := make([]u8, world_kind_info(self.world, kind).size, context.temp_allocator)
+			mem.copy(raw_data(buf), from, len(buf))
+			world_set_record(self.world, raw_data(buf), kind, e)
 		}
 		// what remains
 		stack.count -= p.value

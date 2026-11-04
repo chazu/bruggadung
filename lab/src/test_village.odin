@@ -1,9 +1,11 @@
 package lab
 
 /*
- * The village (VILLAGE.md slice 3, scenario_village.odin): three days and
- * nights of the day's commitments, every check passing; and each person's
- * bed known to it by its blanket, not taken for another like it.
+ * The village (VILLAGE.md slices 3 and 4, scenario_village.odin): three
+ * days and nights of the day's commitments and meals, every check passing:
+ * a meal taken to work and eaten there, each household eating from its own
+ * larder, nobody going without; and each person's bed known to it by its
+ * blanket, not taken for another like it.
  */
 
 test_village :: proc() {
@@ -11,7 +13,7 @@ test_village :: proc() {
 	village := autorelease(village_init_with_world(w, test_committer(w)))
 	bg_check(village_error(village) == "")
 	village_run(village)
-	bg_check(len(village_results(village)) == 9 && village_failure_count(village) == 0)
+	bg_check(len(village_results(village)) == 17 && village_failure_count(village) == 0)
 	/* asleep at 02:00 on the third night: everyone's sleep is of its own bed */
 	for v in village.people {
 		bed := world_location_of(w, v.bed)
