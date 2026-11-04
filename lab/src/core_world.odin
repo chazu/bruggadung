@@ -139,6 +139,7 @@ World :: struct {
 	reality:          ^Reality,         /* anchors, levels of detail, leases (REALITY.md) */
 	weakness:         Weakness_Table,   /* hunger's curves, from content (domains_bodies.odin) */
 	looks:            Looks,            /* what things look like, from content (looks.odin) */
+	seen:             [dynamic]Seen_Kind, /* the kinds seen at a glance, from content (act_view.odin) */
 	settled:          ^Anchors_Kept,    /* the anchors as last settled, to tell what rose */
 	risen:            [^]Entity_ID,     /* what rose from frozen since it was last taken */
 	nrisen:           uint,
@@ -413,6 +414,7 @@ world_init_with_content :: proc(content: ^tri.Content, seed: u64) -> ^World {
 	self.reality = reality_new(content)
 	self.weakness = weakness_load(content)
 	self.looks = looks_load(content)
+	self.seen  = seen_kinds_load(content)
 	self.arena = tri.arena_new()
 	self.tilesWide = 32
 	self.tilesHigh = 32
@@ -459,6 +461,7 @@ world_dealloc :: proc(self: ^World) {
 	index_free(self.creations)
 	reality_free(self.reality)
 	looks_free(&self.looks)
+	delete(self.seen)
 	free(self.settled)
 	free(self.risen)
 	delete(self.checkedOut)

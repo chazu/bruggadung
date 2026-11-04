@@ -20,17 +20,23 @@
     size: length & >=1mm & <=200mm @widen(1mm) @field(content, saved, inspect, perceive(sight))
 }
 
+sized_seen: #Seen & { kindOf: "#Sized" } @family(seen)
+
 // A nut, loose or tight. (Sized first: its size widens as #Sized says.)
 #Fastener: #Sized & #Body & {
     @component(Fastener)
     tight: *false | true @field(content, saved, proposable, inspect, perceive(sight))
 }
 
+fastener_seen: #Seen & { kindOf: "#Fastener" } @family(seen)
+
 // What turns a nut: a spanner, or a wrench.
 #Turner: {}
 
 // A spanner: its size is the nut it fits.
 #Spanner: #Sized & #Body & #Turner & {}
+
+spanner_seen: #Seen & { kindOf: "#Spanner" } @family(seen)
 
 // Tightening: the spanner, and the nut.
 #Tightening: #Frame & { spanner: #Body, nut: #Body }

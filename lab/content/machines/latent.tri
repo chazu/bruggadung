@@ -90,6 +90,8 @@ let worn_through = 60
     detached:  *false | true                   @field(content, saved, proposable, inspect)
 }
 
+part_seen: #Seen & { kindOf: "#Part" } @family(seen)
+
 // Open an assembly in reach a level further, with a wrench in hand.
 open_up: #Operation & {
     effect: "reveal"

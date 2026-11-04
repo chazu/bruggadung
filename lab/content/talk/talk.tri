@@ -69,12 +69,16 @@ say: #Operation & {
     writing: text @field(saved, proposable, inspect)
 }
 
+record_seen: #Seen & { kindOf: "#Record" } @family(seen)
+
 // A label (ACTIONS.md §7's tag on a shelf): a record whose writing anyone
 // within `legible` tiles of it reads at a glance, on sighting it.
 #Label: #Record & {
     @component(Label)
     legible: int & >=0 & <=8                @field(content, saved, inspect, perceive(sight))
 }
+
+label_seen: #Seen & { kindOf: "#Label" } @family(seen)
 
 // Claims, in order: written, or told one after another.
 #Entries: { entries: [...#Telling] }

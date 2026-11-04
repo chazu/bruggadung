@@ -47,6 +47,8 @@
     paint: #Colour @field(content, saved, proposable, inspect, perceive(sight))
 }
 
+larder_seen: #Seen & { kindOf: "#Larder" } @family(seen)
+
 food_look: #Look & { kindOf: "#Food", look: "food", prevails: 1 } @family(looks)
 
 // Grain, by the portion: raw, a little nourishment; cooked, a meal. A

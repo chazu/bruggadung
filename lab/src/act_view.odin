@@ -174,43 +174,78 @@ view_kind_of :: proc(self: ^View, entity: Entity_ID) -> string {
 }
 
 
-/* An entity's kind, as the senses can tell it: the type of the blueprint it
-   was built from. A generated type (a meet, glb[...]) has no name to write,
-   so the types of its components stand for it: those the senses can tell
-   (one with fields, none of them perceived, is nothing it looks like: a
-   stomach), and of those only the most specific (#Agent says #Body). One
-   left is the kind; more, their conjunction. "" for no entity. */
-kind_of_entity :: proc(world: ^World, entity: Entity_ID) -> string {
-	pattern: ^tri.Node
-	name:    cstring
-	s:       strings.Builder
-	k:       uint
+/* A kind seen at a glance (content/knowledge.tri's #Seen, KNOWLEDGE.md
+ * decision 17): its type, and where it stands among the components, which
+ * orders a conjunction of them. */
+Seen_Kind :: struct {
+	type:  tri.Type,
+	name:  cstring,
+	order: int,
+}
 
+/* The `seen` family, in the components' order, then the family's. */
+seen_kinds_load :: proc(content: ^tri.Content) -> [dynamic]Seen_Kind {
+	kinds  := make([dynamic]Seen_Kind)
+	family := tri.family_index(content, "seen")
+	for i: uint = 0; family != nil && i < tri.index_count(family); i += 1 {
+		node := tri.pattern(content, cstring(tri.index_tag(family, i)))
+		buf: [128]u8
+		v := tri.at(content, node, "kindOf") if node != nil else nil
+		n := tri.print(content, v, &buf[0], size_of(buf)) if v != nil else 0
+		if n < 3 do continue
+		buf[n - 1] = 0
+		t := tri.type_named(content, cstring(&buf[1]))
+		if t == tri.Type(0xFFFFFFFF) do continue
+		order := COMPONENT_COUNT + int(i)
+		for k in 0 ..< COMPONENT_COUNT do if tri.type_named(content, COMPONENTS[k].type) == t do order = k
+		append(&kinds, Seen_Kind{t, tri.type_name(content, t), order})
+	}
+	for i := 1; i < len(kinds); i += 1 {
+		for j := i; j > 0 && kinds[j].order < kinds[j - 1].order; j -= 1 do kinds[j], kinds[j - 1] = kinds[j - 1], kinds[j]
+	}
+	return kinds
+}
+
+/* What an entity is, as the senses can tell it (KNOWLEDGE.md decision 17):
+   the seen kinds its blueprint's type, or a component it has, is a kind
+   of, and of those only the most specific (#Agent says #Body). One left is
+   the kind; more, their conjunction; none, #Thing. An inner state (a
+   stomach) is no seen kind, so it doesn't show; a kind no list names shows
+   as the seen kinds above it. What has no body (a claim, a bond) is its
+   type. "" for no entity. */
+kind_of_entity :: proc(world: ^World, entity: Entity_ID) -> string {
 	info := world_info(world, entity)
 	if info == nil do return ""
-	tc     := world_tri(world)
-	pattern = tri.pattern(tc, info.blueprint)
-	name    = tri.type_name(tc, tri.node_type(pattern)) if pattern != nil else "#Thing"
-	if !strings.contains_any(string(name), "[ &") do return string(name)
-	shown := make([dynamic]uint, context.temp_allocator)
-	for k = 0; k < world_kind_count(world); k += 1 {
-		if world_record(world, k, entity) == nil do continue
-		kind := world_kind_info(world, k)
-		seen := kind.nfields == 0
-		for i: uint = 0; i < kind.nfields && !seen; i += 1 do seen = strings.contains(string(kind.fields[i].flags), "perceive(")
-		if seen do append(&shown, k)
+	tc      := world_tri(world)
+	pattern := tri.pattern(tc, info.blueprint)
+	if pattern == nil do return "#Thing"
+	blueprint := tri.node_type(pattern)
+	/* what has no body isn't seen at all: it is what it is (a claim, a
+	 * bond), for the views that describe it */
+	if world_record(world, world_kind_named(world, "Body"), entity) == nil {
+		name := tri.type_name(tc, blueprint)
+		return string(name) if name != nil && !strings.contains_any(string(name), "[ &") else "#Thing"
+	}
+	applies := make([dynamic]int, context.temp_allocator)
+	for s, i in world.seen {
+		is := tri.subtype(tc, blueprint, s.type) != 0
+		for k: uint = 0; !is && k < world_kind_count(world); k += 1 {
+			if world_record(world, k, entity) == nil do continue
+			is = tri.subtype(tc, tri.type_named(tc, world_kind_info(world, k).type), s.type) != 0
+		}
+		if is do append(&applies, i)
 	}
 	kept := make([dynamic]cstring, context.temp_allocator)
-	for a in shown {
-		ta := tri.type_named(tc, world_kind_info(world, a).type)
+	for a in applies {
 		implied := false
-		for b in shown {
-			if b != a && tri.subtype(tc, tri.type_named(tc, world_kind_info(world, b).type), ta) != 0 do implied = true
+		for b in applies {
+			if b != a && tri.subtype(tc, world.seen[b].type, world.seen[a].type) != 0 do implied = true
 		}
-		if !implied do append(&kept, world_kind_info(world, a).type)
+		if !implied do append(&kept, world.seen[a].name)
 	}
+	if len(kept) == 0 do return "#Thing"
 	if len(kept) == 1 do return string(kept[0])
-	s = strings.builder_make(context.temp_allocator)
+	s := strings.builder_make(context.temp_allocator)
 	strings.write_string(&s, "#Thing")
 	for t in kept do fmt.sbprintf(&s, " & %s", t)
 	return strings.to_string(s)

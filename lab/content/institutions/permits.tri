@@ -54,12 +54,16 @@
     fidelity:   *100 | int & >=0 & <=100       @field(content, saved, proposable, inspect)
 }
 
+copy_seen: #Seen & { kindOf: "#Copy" } @family(seen)
+
 // A seal: what it presses, and whose seal it is.
 #Stamp: #Body & {
     @component(Stamp)
     presses: text                              @field(saved, proposable, inspect, perceive(sight))
     sealOf:  text                              @field(saved, proposable, inspect, perceive(sight))
 }
+
+stamp_seen: #Seen & { kindOf: "#Stamp" } @family(seen)
 
 // Who writes, and in what hand.
 #Scribe: {
@@ -76,6 +80,8 @@
     // what shows it: a badge, a uniform, anyone can see
     badge:  text                               @field(content, saved, proposable, inspect, perceive(sight))
 }
+
+office_holder_seen: #Seen & { kindOf: "#OfficeHolder" } @family(seen)
 
 // Someone with two hands to work with.
 let person = #Hungry & { material: "flesh", hands: 2 }

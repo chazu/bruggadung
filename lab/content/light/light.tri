@@ -21,6 +21,8 @@
     oilAt:   *0ms | time & >=0ms & <=10000d    @field(content, saved, proposable, inspect)
 }
 
+lamp_seen: #Seen & { kindOf: "#Lamp" } @family(seen)
+
 // Daylight (KNOWLEDGE.md decision 14): day from `dawn` to `nightfall`,
 // twilight for `twilight` either side, night between, each day of the
 // clock. Indoors it is a step darker, in a room with no doorway open.

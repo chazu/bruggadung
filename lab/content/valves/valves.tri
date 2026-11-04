@@ -24,8 +24,16 @@
     limit:    torque & >=1Nm & <=100000Nm    @field(content, saved, proposable, inspect)
     sleeve:   *false | true                  @field(content, saved, inspect, perceive(sight))
 }
+
+lever_seen: #Seen & { kindOf: "#Lever" } @family(seen)
+
 #Wrench: #Body & #Lever & #Turner & {}
-#Pipe:   #Body & #Lever & {}
+
+wrench_seen: #Seen & { kindOf: "#Wrench" } @family(seen)
+
+#Pipe: #Body & #Lever & {}
+
+pipe_seen: #Seen & { kindOf: "#Pipe" } @family(seen)
 
 // A valve: the turn its rating says, what (hidden) it takes to break it
 // free, and whether it has turned.
@@ -35,6 +43,8 @@
     breakaway: torque & >=1Nm & <=100000Nm   @field(content, saved, proposable, inspect)
     turned:    *false | true                 @field(content, saved, proposable, inspect, perceive(sight))
 }
+
+valve_seen: #Seen & { kindOf: "#Valve" } @family(seen)
 
 // Turn a valve (ACTIONS.md Scenario 1): with the best chain of what the
 // actor can reach (taking up what it doesn't hold, a take_up's time each,

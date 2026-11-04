@@ -31,6 +31,8 @@
     lift:   *0 | int & >=0 & <=100000    @field(content, saved, proposable, inspect)
 }
 
+pump_seen: #Seen & { kindOf: "#Pump" } @family(seen)
+
 // A shutoff cock on a line (ACTIONS.md Scenario 3): which line it serves
 // can't be seen; a diagram may say, rightly or not.
 #Cock: #Body & {
@@ -38,6 +40,8 @@
     serves: text          @field(content, saved, inspect)
     shut:   *false | true @field(content, saved, proposable, inspect, perceive(sight))
 }
+
+cock_seen: #Seen & { kindOf: "#Cock" } @family(seen)
 
 pump_handle:  #Part & { material: "iron", mass: 2kg }
 pump_cover:   #Part & { material: "iron", mass: 3kg }

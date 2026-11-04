@@ -63,9 +63,8 @@ things the lab put off:
      household's colour, for the same reason: larders and the sacks in
      them just alike, the Brooks took the Hunts' larder for their own and
      ate from it.
-   - Both colours are stopgaps. KNOWLEDGE.md decisions 17 and 18 (issues
-     #12, #13): a kind seen without a field to show it, and identity from
-     place and ownership before features.
+   - Both colours are stopgaps until identity comes from place and
+     ownership before features (KNOWLEDGE.md decision 18, issue #13).
 4. **A day's shape is a routine of commitments.** Each agent has
    commitments that recur every day (AGENCY.md §8): sleep at home through
    the night, and its work in the day's hours. Its needs (hunger, cold,

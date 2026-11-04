@@ -51,6 +51,8 @@
     wide: int & >=0 & <=1000000                @field(content, saved, inspect)
 }
 
+door_seen: #Seen & { kindOf: "#Door" } @family(seen)
+
 // What breathes: the oxygen it takes from the air over it (mmol a thousand
 // seconds), at rest and at work, giving back four fifths as much carbon
 // dioxide and 448 J for each mmol to its body. And the air it rests easy in

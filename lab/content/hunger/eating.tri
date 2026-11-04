@@ -74,6 +74,8 @@ supper: #Body & #Food & { material: "food", mass: 300g, nourishment: 50 }
     nourishment: *30 | int & >=0 & <=100 @field(content, saved, proposable, inspect)
 }
 
+food_seen: #Seen & { kindOf: "#Food" } @family(seen)
+
 // Eat what the actor holds: a while, with the hands, easily put down. It
 // is gone, and the actor is fed.
 eat: #Operation & {

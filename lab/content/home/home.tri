@@ -26,16 +26,19 @@
 
 // Something to sleep in, its blanket the colour it is known by: a bed is
 // told from another just like it by that, as an agent's own is. A
-// stopgap: the blanket is there so that a bed is seen at all (#12) and
-// told from its neighbours' (#13); with those, it goes.
+// stopgap: when identity comes from place and ownership (#13), it goes.
 #Bed: #Body & {
     @component(Bed)
     blanket: #Colour @field(content, saved, proposable, inspect, perceive(sight))
 }
 
+bed_seen: #Seen & { kindOf: "#Bed" } @family(seen)
+
 // Where someone works: what a day's work is done at, or near. What the
 // work is, its topic says.
 #Worksite: #Body & {}
+
+worksite_seen: #Seen & { kindOf: "#Worksite" } @family(seen)
 
 bed_look:      #Look & { kindOf: "#Bed", look: "bed" } @family(looks)
 worksite_look: #Look & { kindOf: "#Worksite", look: "worksite" } @family(looks)

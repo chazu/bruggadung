@@ -106,12 +106,15 @@ These were made while writing this document and have not yet been reviewed.
 17. **What a thing is, is seen if its kind says so** (issue #12). A kind
     is declared **seen** (a bed, a stove, a container) or not (hunger, a
     solid's heat: inner states), apart from whether any of its fields are
-    perceived. Until now the lab inferred it: a kind was seen only through
-    a perceived field, which hid inner states rightly but left a kind with
-    nothing to show but itself unseeable, so a bed needed a blanket to be
-    seen as a bed. Seen is opt-in, so nothing hidden becomes visible by
-    accident. A seen kind may later have an appearance other than its
-    truth (a disguise, a fake), as fields do (§4).
+    perceived. A thing is seen as the most specific seen kinds it is. The
+    lab used to infer it, two ways depending on how a blueprint happened to
+    be written: a blueprint whose type was a named type was seen as that
+    name, inner states and all; one whose type was a meet was seen through
+    the components with a perceived field. Seen is listed, not inherited
+    (the lab's `seen` family, declared beside each kind as its look is): a
+    refinement not listed shows as the listed kind above it, so a forgery
+    typed beneath `#Copy` looks like a copy. That is a seen kind's
+    appearance other than its truth, as fields have theirs (§4).
 18. **Identity comes from context before features** (issue #13). A thing
     can't be in two places, so a percept like a referent believed
     elsewhere is a new referent with an identity hypothesis ("R9 may be

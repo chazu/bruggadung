@@ -4533,3 +4533,22 @@ each scenario's printed trace is otherwise the same.
 
 118 tests, 3713 checks. The other scenarios' hashes changed by type
 numbers only.
+
+### After the slice: seen kinds (KNOWLEDGE.md decision 17, issue #12)
+
+- What a thing is seen as comes from one rule: the most specific kinds it
+  is that the `seen` family lists (`#Seen`, content/knowledge.tri, each
+  entry declared beside its kind as its look is); none, `#Thing`; what has
+  no body (a claim, a bond), its type. Before, it depended on how a
+  blueprint was written: a named type was seen as its name, inner states
+  and all, and a meet through the components with a perceived field.
+- Listed, not inherited: a kind no entry names shows as the listed kinds
+  above it, which is how a seen kind will have an appearance other than its
+  truth. `#Look` and `#Seen` share `#OfKind`.
+- The list is what was seen before (the components with a perceived field,
+  and the named types blueprints were written with), so every kind comes
+  out as it did: checked for every blueprint and every entity of the
+  village after three days, and every scenario prints the same but for
+  type numbers. A new `seen_kinds` test.
+- Found on the way: the beds' blankets were never what made a bed seen (its
+  blueprint's type was named `#Bed`); they only tell beds apart (#13).

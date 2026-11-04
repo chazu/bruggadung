@@ -23,6 +23,8 @@
     burnRate: int & >=0 & <=100000             @field(content, saved, inspect)
 }
 
+combustor_seen: #Seen & { kindOf: "#Combustor" } @family(seen)
+
 // Fuel in a stove, a stock the atmosphere domain checks out while it burns.
 #FuelContainer: {
     @component(FuelContainer)
@@ -46,6 +48,8 @@
 // A stove's iron takes three tenths of its fire's heat; the rest goes up the
 // flue, or, damper closed, into the room.
 #Stove: #Body & #Combustor & #FuelContainer & #ThermalBody & {}
+
+stove_seen: #Seen & { kindOf: "#Stove" } @family(seen)
 
 // The stone of a room's walls, floor and ceiling, its inner layer: what
 // warms with the air.

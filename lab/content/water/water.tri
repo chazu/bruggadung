@@ -23,6 +23,8 @@
     waterCapacity: volume & >=0mL & <=10m3   @field(content, saved, inspect, perceive(sight))
 }
 
+water_store_seen: #Seen & { kindOf: "#WaterStore" } @family(seen)
+
 // An outlet on a water store: open, it delivers up to `rate` millilitres a
 // minute into what sits in it (a bucket), or onto its tile if nothing does.
 // It is installed in the store it draws from.
@@ -31,6 +33,8 @@
     open: *false | true         @field(content, saved, proposable, inspect, perceive(sight))
     rate: int & >=0 & <=100000  @field(content, saved, proposable, inspect)
 }
+
+tap_seen: #Seen & { kindOf: "#Tap" } @family(seen)
 
 water_store_look: #Look & { kindOf: "#WaterStore", look: "water.store", prevails: 1 } @family(looks)
 tap_look:         #Look & { kindOf: "#Tap", look: "tap" } @family(looks)

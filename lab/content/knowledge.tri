@@ -12,7 +12,9 @@
 //             times, so it is caught up as it is read.
 // - code:     src/know_knowledge_*.odin: perception, recognition, memory, each
 //             premise's kind, and the findings no rule concludes (#Taken,
-//             #Struck, #Arrested, #Hires, #Owned, #Reserved).
+//             #Struck, #Arrested, #Hires, #Owned, #Reserved). What a thing
+//             is seen as, from the `seen` family: kind_of_entity
+//             (src/act_view.odin).
 
 // Interpretation (KNOWLEDGE.md §9): rules that derive findings from what an
 // agent perceives and believes, run on what it perceives, as it perceives
@@ -102,6 +104,13 @@ usually_puts: #Rule & {
 // may be the same one, changed.
 // Something said of a feature of how things look.
 #OfFeature: { feature: text }
+
+// A kind seen at a glance (decision 17): what a thing is, as far as it shows,
+// is the most specific of these it is (several at once, their conjunction);
+// a kind not listed shows as the listed kinds it is a kind of, so an inner
+// state (hunger, a solid's heat) doesn't show, and a refinement of a seen kind
+// shows as that kind. Declared beside the kind, as its look is.
+#Seen: #OfKind & {}
 
 #Persistence: #OfFeature & { persists: time }
 

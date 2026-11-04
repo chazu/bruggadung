@@ -11,7 +11,7 @@
 
 // For ACTIONS.md §5's partial effects: a log, how far it is sawn through
 // (percent), and a saw.
-#Log:     #Body & {
+#Log: #Body & {
     @component(Log)
     sawn:     *0 | int & >=0 & <=100               @field(content, saved, proposable, inspect, perceive(sight))
     // how hard its wood is to cut, and how clean the cut came out (ACTIONS.md
@@ -19,10 +19,16 @@
     hardness: *60 | int & >=1 & <=100              @field(content, saved, inspect)
     finish:   *0 | int & >=0 & <=100               @field(content, saved, proposable, inspect, perceive(sight))
 }
+
+log_seen: #Seen & { kindOf: "#Log" } @family(seen)
+
 #HandSaw: #Body & {
     @component(HandSaw)
     sharpness: *60 | int & >=0 & <=100         @field(content, saved, proposable, inspect, perceive(sight))
 }
+
+hand_saw_seen: #Seen & { kindOf: "#HandSaw" } @family(seen)
+
 log:      #Log & { material: "oak", mass: 20kg }
 hand_saw: #HandSaw & { material: "steel", mass: 700g }
 

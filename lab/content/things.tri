@@ -9,6 +9,8 @@
 //            topic's to say.
 // - looks:   a kind's #Look is declared beside the kind, here or in its
 //            topic; what each theme draws for a look is looks/'s.
+// - seen:    whether a kind shows at a glance is its #Seen entry
+//            (knowledge.tri), declared beside the kind, here or in its topic.
 // - code:    the structs and the registry the lab uses are generated from all
 //            the content, every topic's fields with these (make gen:
 //            src/components.odin); the lab refuses to run on content
@@ -43,6 +45,10 @@
 // beside its kind.
 #Looks: { look: text }
 
+// Something said of a kind: `kindOf`, the kind, a type ("#Bed") or, where
+// it says so, a blueprint ("scarecrow").
+#OfKind: { kindOf: text }
+
 // What things of a kind look like: `kindOf`, the kind, a type ("#Bed") or a
 // blueprint ("scarecrow"). A thing looks as the most specific kind it is
 // with a look: its blueprint, then its blueprint's type, then that type's
@@ -50,7 +56,7 @@
 // defaults conflict). A thing several kinds at once (a cistern, an assembly
 // and a water store) looks as the one whose look `prevails` most; on a tie,
 // the first.
-#Look: #Looks & { kindOf: text, prevails: *0 | int }
+#Look: #Looks & #OfKind & { prevails: *0 | int }
 
 thing_look:     #Look & { kindOf: "#Thing", look: "thing", prevails: -2 } @family(looks)
 body_look:      #Look & { kindOf: "#Body", look: "body", prevails: -1 } @family(looks)
@@ -84,6 +90,8 @@ assembly_look:  #Look & { kindOf: "#Assembly", look: "assembly", prevails: 2 } @
     toolMarks: *0 | int & >=0 & <=100  @field(saved, proposable, inspect, perceive(sight))
 }
 
+body_seen: #Seen & { kindOf: "#Body" } @family(seen)
+
 // Identical units counted as one entity. The stack's mass is its units'.
 #Stack: #Body & {
     @component(Stack)
@@ -92,6 +100,8 @@ assembly_look:  #Look & { kindOf: "#Assembly", look: "assembly", prevails: 2 } @
     unit:     text                      @field(content, saved, inspect, perceive(sight))
     mass:     $u * $n
 }
+
+stack_seen: #Seen & { kindOf: "#Stack" } @family(seen)
 
 // Something that acts, with hands to hold things in, a coat to know it by
 // at a glance, and room in its memory for so many observations
@@ -147,17 +157,23 @@ assembly_look:  #Look & { kindOf: "#Assembly", look: "assembly", prevails: 2 } @
     numbness:      *0 | int & >=0 & <=100           @field(content, saved, proposable, inspect)
 }
 
+agent_seen: #Seen & { kindOf: "#Agent" } @family(seen)
+
 // Something entities can be put in.
 #Container: #Body & {
     @component(Container)
     capacity: int & >=1 & <=1000 @field(content, saved, inspect, perceive(sight))
 }
 
+container_seen: #Seen & { kindOf: "#Container" } @family(seen)
+
 // Something with parts installed in it.
 #Assembly: #Body & {
     @component(Assembly)
     slots: int & >=1 & <=64 @field(content, saved, inspect, perceive(sight))
 }
+
+assembly_seen: #Seen & { kindOf: "#Assembly" } @family(seen)
 
 #ClaimKind: "ownership" | "custody" | "reservation"
 
