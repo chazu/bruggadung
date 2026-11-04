@@ -816,7 +816,9 @@ knowledge_perceive :: proc(self: ^Knowledge, store: ^Knowledge_Store, first: uin
 	left = budget - int(ncandidates)
 	if left < 0 do left = 0
 	knowledge_perceive_traces(self, store, here, now, seen, assigned, nseen, closely, &left, news)
+	mark := now_ns()
 	knowledge_interpret(self, store, closely, left, news)
+	self.interpretationNs += now_ns() - mark
 	free(seen)
 	free(assigned)
 	free(taken)

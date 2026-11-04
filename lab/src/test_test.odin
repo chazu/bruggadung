@@ -159,16 +159,27 @@ run_tests :: proc(tests: []Test_Case, only: string) -> i32 {
 	before: i32
 
 	run = 0
+	verify_interpretation = true      /* what interpretation skips, it would not have changed */
 	for i := 0; i < len(tests); i += 1 {
 		if only != "" && !strings.contains(string(tests[i].name), only) do continue
 		before = failures
 		pool_push()
 		tests[i].function()
 		pool_drain()
+		if len(interpretation_missed) != 0 {
+			for line, k in interpretation_missed {
+				if k < 8 do fmt.printf("    interpretation: %s\n", line)
+				delete(line)
+			}
+			if len(interpretation_missed) > 8 do fmt.printf("    interpretation: and %d more\n", len(interpretation_missed) - 8)
+			clear(&interpretation_missed)
+			failures += 1
+		}
 		fmt.printf("%s %s\n", "ok  " if failures == before else "FAIL", tests[i].name)
 		run += 1
 	}
 	fmt.printf("%d tests, %d checks, %d failed\n", run, checks, failures)
+	delete(interpretation_missed)
 	if shared_content != nil do tri.content_free(shared_content)
 	shared_content = nil
 	free_released_content()

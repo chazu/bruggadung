@@ -111,8 +111,8 @@ scheduler_set_observer :: proc(self: ^Scheduler, observer: Scheduler_Observer) {
 }
 
 
-// clock_gettime( CLOCK_MONOTONIC): the monotonic clock, in ns.
-@(private = "file")
+// clock_gettime( CLOCK_MONOTONIC): the monotonic clock, in ns. For
+// measuring only: nothing simulated may read it.
 now_ns :: proc() -> u64 {
 	return u64(time.tick_now()._nsec)
 }

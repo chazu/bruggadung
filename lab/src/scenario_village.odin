@@ -308,6 +308,7 @@ village_counters :: proc(self: ^Village) -> []string {
 	append(&lines, fmt.tprintf("domains        %.0f ms", ms(st.domainsNs)))
 	append(&lines, fmt.tprintf("commit         %.0f ms", ms(st.commitNs)))
 	append(&lines, fmt.tprintf("perception     %.0f ms", ms(st.perceptionNs)))
+	append(&lines, fmt.tprintf("  interpreting %.0f ms", ms(self.knowledge.interpretationNs)))
 	append(&lines, fmt.tprintf("decision       %.0f ms", ms(st.decisionNs)))
 	return lines[:]
 }

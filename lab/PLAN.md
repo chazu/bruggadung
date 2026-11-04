@@ -4694,3 +4694,24 @@ checks fewer, as one walk is kept, not a one-tile walk each way.
 - The village now: 18,262 boundaries, 157,033 events, 37,849 perceptions,
   39,037 decisions, 2,860 deliberations, 832 path searches; perception
   9.5 s, decision 2.2 s, commit 1.7 s at `-o:speed`.
+
+### After the slice: incremental interpretation (PERFORMANCE.md decision 2, KNOWLEDGE.md decision 20)
+
+- Interpretation's rules are read once (`Read_Rule`), not re-read from
+  content for every referent at every perception.
+- A rule is weighed again for a referent only when what it reads of it
+  changed: the store marks a referent when a trace it bears comes or goes,
+  an observation of it is added or let go, or a finding about it changes;
+  its looks are compared by hash. Weighed for everyone: a rule newly
+  within expertise, a misprint, `near` when the floor changed, a usual
+  place when a kind changed or a referent is new, and everything when
+  investigating or after a merge or a forgetting.
+- A misprint checks for a claim, and a seal, in what is known before
+  describing anything: memory never adds a key.
+- Every test weighs what interpretation skips and fails if anything would
+  have changed; the whole village was checked once the same way.
+- The village at `-o:speed`: 7.7 s (from 13.3 s); interpretation 0.5 s
+  (from about 6.3 s, inferred). Unoptimised, 20.2 s. Every scenario's hashes as
+  before. `lab run village --counters` shows interpretation's time.
+
+125 tests, 3808 checks.

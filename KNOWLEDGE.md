@@ -159,6 +159,23 @@ These were made while writing this document and have not yet been reviewed.
       about it, and go with it (that a portion eaten was the agent's own).
     - Left out: the store's capacity (§12's eviction by salience), and
       forgetting someone.
+20. **Interpretation weighs only what changed** (PERFORMANCE.md decision
+    2). A rule is weighed again for a referent only when weighing it could
+    come out otherwise than it did. Its premises read the referent's looks
+    and place, the traces it bears, the observations of what it did or had
+    done to it, and the findings about it: each change to those marks it,
+    and its looks are compared with how they were. Some are weighed for
+    every referent: a rule newly within the agent's expertise; a misprint,
+    which reads every description as memory fades it; a `near` premise
+    when the floor's traces changed; a usual place when a kind changed or
+    a referent is new; everything when investigating, or after a merge or
+    a forgetting. A finding that waited for attention is weighed again.
+    Interpretation is the same as weighing everything every time, and the
+    tests check it: they weigh what it skips, and fail if anything would
+    have changed. **A new kind of premise says what it reads**: one that
+    reads only those things needs nothing more; one that reads anything
+    else, or reads time, is weighed for every referent (as a misprint is),
+    until something marks what it reads.
 
 ## Terms
 
@@ -388,6 +405,8 @@ explicit attention.
     and runs costlier rules over the knowledge store.
 - An interpretation's provenance records the rule and its premises, so
   interpretations can be retracted when a premise is.
+- Rules are weighed again for a referent only when what they read of it
+  changed (decision 20).
 
 ### 10. Claims and communication
 

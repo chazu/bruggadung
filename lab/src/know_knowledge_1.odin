@@ -69,8 +69,16 @@ knowledge_init_with_world :: proc(world: ^World) -> ^Knowledge {
 	self.stores     = make([dynamic]^Knowledge_Store)
 	self.eventsSeen = world_event_count(world)
 	self.ambient    = 2
+	self.verifyInterpretation = verify_interpretation
 	return self
 }
+
+
+/* Set by the tests: every Knowledge made weighs what incremental
+ * interpretation skips, and says here what it would have changed
+ * (PERFORMANCE.md decision 2). Each line the array's own. */
+verify_interpretation: bool
+interpretation_missed: [dynamic]string
 
 
 knowledge_dealloc :: proc(self: ^Knowledge) {
@@ -91,6 +99,8 @@ knowledge_dealloc :: proc(self: ^Knowledge) {
 	wakes_free(self.forgetWakes)
 	object_release(self.light)
 	free(self.ancestry)
+	for rule in self.rules do delete(rule.premises)
+	delete(self.rules)
 }
 
 
@@ -1557,7 +1567,7 @@ knowledge_perceive_traces :: proc(self: ^Knowledge, store: ^Knowledge_Store, her
 	found = make([^]bool, knowledge_store_trace_count(store) + 1)
 	for i = 0; i < knowledge_store_trace_count(store); i += 1 do found[i] = knowledge_store_trace_at(store, i).seen == now
 	for i = 0; i < knowledge_store_trace_count(store); i += 1 {
-		old = knowledge_store_mutable_trace_at(store, i)
+		old = knowledge_store_trace_at(store, i)
 		if found[i] || !old.present do continue
 		if !closely && old.strength < BG_TRACE_FLOOR {
 			continue      /* caught only on a close look: a glance can't miss it */
@@ -1581,6 +1591,7 @@ knowledge_perceive_traces :: proc(self: ^Knowledge, store: ^Knowledge_Store, her
 		                        abs(tile.y - here.y) > range[sensed]) {
 			continue
 		}
+		old = knowledge_store_mutable_trace_at(store, i)
 		old.present = false
 		old.seen    = now
 		k1_say(news, fmt.tprintf("the %s on R%d is gone", old.kind, old.bearer) if old.bearer != 0 else fmt.tprintf("the %s at (%d, %d) is gone", old.kind, old.x, old.y))
@@ -1609,6 +1620,16 @@ know_quoted_feature :: proc(description: string, name: string) -> (string, bool)
 }
 
 
+/* Whether the referent's description may hold the text: its kind, or what
+ * it knows of the thing, does. */
+@(private)
+know_may_say :: proc(r: ^Referent, text: string) -> bool {
+	return r != nil && ((r.kind != nil && strings.contains(string(r.kind), text)) ||
+	                    (r.features != nil && strings.contains(string(r.features), text)) ||
+	                    (r.deeper != nil && strings.contains(string(r.deeper), text)))
+}
+
+
 /* Whether the referent is a copy claiming an issuer whose seal the agent has
  * seen, with an impression not that seal's. */
 @(private)
@@ -1620,11 +1641,17 @@ know_misprinted :: proc(store: ^Knowledge_Store, referent: u32) -> bool {
 	seal: string
 	i: uint
 
+	/* what memory recalls of a thing is generalized from what it knows, key
+	 * by key, and never adds a key: without the text in what it knows, the
+	 * description won't have it (and describing everything, as memory
+	 * fades it, is what costs) */
+	if !know_may_say(knowledge_store_referent(store, referent), "claims: \"") do return false
 	copy_                      = knowledge_store_describe_referent(store, referent)
 	claims                     = know_quoted_feature(copy_, "claims")
 	impression, has_impression = know_quoted_feature(copy_, "impression")
 	if len(claims) == 0 || !has_impression do return false
 	for i = 0; i < knowledge_store_count(store); i += 1 {
+		if !know_may_say(knowledge_store_referent_at(store, i), "sealOf: \"") do continue
 		seal = knowledge_store_describe_referent(store, knowledge_store_referent_at(store, i).id)
 		seal_of, has_seal_of := know_quoted_feature(seal, "sealOf")
 		presses, has_presses := know_quoted_feature(seal, "presses")
@@ -1821,115 +1848,256 @@ know_usual_place :: proc(store: ^Knowledge_Store, actor: u32, times: i64) -> u32
 }
 
 
-/* Immediate interpretation: each rule the agent has the expertise for, over
- * each referent; a rule whose premises all hold adds its finding. */
-knowledge_interpret :: proc(self: ^Knowledge, store: ^Knowledge_Store, deliberately: bool, budget: int, news: ^[dynamic]string) {
-	rule: ^tri.Node
-	list: ^tri.Node
-	premise: ^tri.Node
-	v: ^tri.Node
-	r: ^Referent
-	tc: ^tri.Content
-	family: ^tri.Index
-	f: Finding
-	i: uint
-	j: uint
-	lo: i64
-	hi: i64
-	skill: i64
-	mastery: i64
+/* A rule's premise, as interpretation reads it. */
+Premise_Kind :: enum u8 {
+	Unreadable,         /* a premise it can't read never holds */
+	Sign,               /* a trace of the kind on the referent, there now */
+	Formerly,           /* one there before, and not any more */
+	Misprinted,
+	Unworn,
+	Repeated,           /* `n` times put in the same place: the usual place */
+	Wearing,            /* wear seen at least `n` */
+	Near,               /* a trace of the kind on the floor at it or beside it */
+}
+
+Read_Premise :: struct {
+	kind: Premise_Kind,
+	text: cstring,      /* interned: the trace kind, or the field */
+	n:    i64,
+}
+
+/* An interpretation rule (content/knowledge.tri's #Rule), read from content
+ * once, as it is: content doesn't change while the world runs. */
+Read_Rule :: struct {
+	node:       ^tri.Node,
+	tag:        cstring,            /* interned: the rule's name */
+	concludes:  cstring,            /* interned: what it concludes; nil, a rule it can't use */
+	deliberate: bool,
+	skill:      cstring,            /* interned: the agent's field (Agent.<skill>), or nil */
+	mastery:    i64,
+	weight:     i32,
+	repeated:   bool,               /* weighed again as what it watches changes */
+	premises:   []Read_Premise,
+	/* what its premises read beyond the referent's own looks and evidence
+	 * (PERFORMANCE.md decision 2) */
+	misprint:   bool,               /* every referent's description, as memory fades it: weighed always */
+	nearby:     bool,               /* the floor's traces: weighed for all when one came or went */
+	usual:      bool,               /* others' kinds: weighed for all when a kind changed, or one is new */
+}
+
+
+/* The rules, read (once). */
+@(private)
+know_rules :: proc(self: ^Knowledge) -> []Read_Rule {
+	v:    ^tri.Node
+	lo:   i64
+	hi:   i64
+	n:    uint
 	text: [64]u8
-	concludes: [64]u8
-	n: uint
-	choice: u32
-	holds: bool
-	repeated: bool
+
+	if self.rulesRead do return self.rules[:]
+	self.rulesRead = true
+	tc     := world_tri(self.world)
+	family := tri.family_index(tc, "rules")
+	for i: uint = 0; family != nil && i < tri.index_count(family); i += 1 {
+		rule := Read_Rule{}
+		rule.node = tri.pattern(tc, cstring(tri.index_tag(family, i)))
+		rule.tag  = world_intern(self.world, cstring(tri.index_tag(family, i)))
+		v = tri.at(tc, rule.node, "deliberate")
+		rule.deliberate = v != nil && tri.node_type(v) == tri.type_named(tc, "true")
+		v = tri.at(tc, rule.node, "concludes")
+		n = tri.print(tc, v, &text[0], size_of(text)) if v != nil else 0
+		if n >= 3 {
+			text[n - 1] = 0
+			rule.concludes = world_intern(self.world, cstring(&text[1]))
+		}
+		v = tri.at(tc, rule.node, "mastery")
+		rule.mastery = lo if v != nil && tri.node_interval(v, &lo, &hi) != 0 && lo == hi else 0
+		v = tri.at(tc, rule.node, "skill")
+		if v != nil && tri.print(tc, v, &text[0], size_of(text)) > 2 && text[0] == '"' {
+			text[len(k1_buf(text[:])) - 1] = 0
+			rule.skill = world_intern(self.world, ns_utf8(k1_clip(fmt.tprintf("Agent.%s", cstring(&text[1])), 96)))
+		}
+		v = tri.at(tc, rule.node, "weight")
+		rule.weight = i32(lo) if v != nil && tri.node_interval(v, &lo, &hi) != 0 && lo == hi else 0
+		premises := make([dynamic]Read_Premise)
+		for list := tri.at(tc, rule.node, "premises"); list != nil; list = tri.at(tc, list, "rest") {
+			premise := tri.at(tc, list, "first")
+			if premise == nil do break
+			p := Read_Premise{}
+			if tri.at(tc, premise, "repeated") != nil || tri.at(tc, premise, "wearing") != nil {
+				rule.repeated = true      /* and how worn a part is seen to be: serviced, it is less */
+			}
+			/* the first of its features that reads, in this order */
+			if v = tri.at(tc, premise, "sign"); v != nil && tri.print(tc, v, &text[0], size_of(text)) > 2 {
+				p.kind = .Sign
+			} else if v = tri.at(tc, premise, "formerly"); v != nil && tri.print(tc, v, &text[0], size_of(text)) > 2 {
+				p.kind = .Formerly
+			} else if v = tri.at(tc, premise, "misprinted"); v != nil {
+				p.kind = .Misprinted
+			} else if v = tri.at(tc, premise, "unworn"); v != nil && tri.print(tc, v, &text[0], size_of(text)) > 2 {
+				p.kind = .Unworn
+			} else if v = tri.at(tc, premise, "repeated"); v != nil && tri.node_interval(v, &lo, &hi) != 0 && lo == hi {
+				p.kind = .Repeated
+				p.n    = lo
+			} else if v = tri.at(tc, premise, "wearing"); v != nil && tri.node_interval(v, &lo, &hi) != 0 && lo == hi {
+				p.kind = .Wearing
+				p.n    = lo
+			} else if v = tri.at(tc, premise, "near"); v != nil && tri.print(tc, v, &text[0], size_of(text)) > 2 {
+				p.kind = .Near
+			}
+			if p.kind == .Sign || p.kind == .Formerly || p.kind == .Unworn || p.kind == .Near {
+				text[len(k1_buf(text[:])) - 1] = 0
+				p.text = world_intern(self.world, cstring(&text[1]))
+			}
+			rule.misprint ||= p.kind == .Misprinted
+			rule.nearby   ||= p.kind == .Near
+			rule.usual    ||= p.kind == .Repeated
+			append(&premises, p)
+		}
+		shrink(&premises)
+		rule.premises = premises[:]
+		append(&self.rules, rule)
+	}
+	return self.rules[:]
+}
+
+
+/* Whether the rule's premises hold of the referent, and what the last one
+ * that chooses chose (a usual place). */
+@(private)
+know_premises_hold :: proc(store: ^Knowledge_Store, rule: ^Read_Rule, r: ^Referent) -> (holds: bool, choice: u32) {
+	holds = true
+	for &p in rule.premises {
+		if !holds do break
+		switch p.kind {
+		case .Sign:       holds = know_bears(store, r.id, p.text, false)
+		case .Formerly:   holds = know_bears(store, r.id, p.text, true)
+		case .Misprinted: holds = know_misprinted(store, r.id)
+		case .Unworn:     holds = know_unworn(store, r.id, p.text)
+		case .Repeated:
+			choice = know_usual_place(store, r.id, p.n)
+			holds  = choice != 0
+		case .Wearing:
+			worn: i64
+
+			holds = r.features != nil && know_int_feature(r.features, "wear", &worn) && worn >= p.n
+		case .Near:       holds = r.present && know_near(store, r, p.text)
+		case .Unreadable: holds = false      /* a premise it can't read never holds */
+		}
+	}
+	return
+}
+
+
+/* What premises read of a referent itself, hashed (FNV-1a): its kind
+ * alone, and with its features and place. */
+@(private)
+know_looks_of :: proc(r: ^Referent) -> (looks: u64, kind: u64) {
+	fnv :: proc(h: u64, s: cstring) -> u64 {
+		h := h
+		if s == nil do return (h ~ 0xff) * 0x100000001b3
+		for b in transmute([]u8)string(s) do h = (h ~ u64(b)) * 0x100000001b3
+		return (h ~ 0xfe) * 0x100000001b3
+	}
+	kind  = fnv(0xcbf29ce484222325, r.kind)
+	looks = fnv(kind, r.features)
+	looks = mix(looks ~ (u64(u32(r.x)) | u64(u32(r.y)) << 32))
+	looks = mix(looks ~ (u64(u32(r.level)) | (u64(1) << 32 if r.present else 0)))
+	return
+}
+
+
+/* Immediate interpretation: each rule the agent has the expertise for, over
+ * each referent; a rule whose premises all hold adds its finding.
+ *
+ * Incrementally (PERFORMANCE.md decision 2): a rule is weighed again for a
+ * referent only when weighing it could come out otherwise than it did. What
+ * premises read is the referent's looks and place, the traces it bears, the
+ * observations of what it did or had done to it, and the findings about it;
+ * each change to those marks it (knowledge_store_evidence_changed), and its
+ * looks are compared with how they were. Weighed for every referent: a rule
+ * newly within the agent's expertise; a misprint, which reads every
+ * description as memory fades it; a `near` premise when the floor's traces
+ * changed; a usual place when a kind changed or a referent is new; and
+ * everything when investigating, or after a merge or a forgetting. A
+ * finding that waited for attention is weighed again. Nothing it skips
+ * would have changed: `verifyInterpretation` weighs the skipped too, and
+ * counts any that would. */
+knowledge_interpret :: proc(self: ^Knowledge, store: ^Knowledge_Store, deliberately: bool, budget: int, news: ^[dynamic]string) {
+	r:        ^Referent
+	f:        Finding
+	j:        uint
+	skill:    i64
+	choice:   u32
+	holds:    bool
 	existing: ^Finding
 	budget := budget
 
-	tc     = world_tri(self.world)
-	family = tri.family_index(tc, "rules")
-	for i = 0; family != nil && i < tri.index_count(family); i += 1 {
-		rule = tri.pattern(tc, cstring(tri.index_tag(family, i)))
-		v    = tri.at(tc, rule, "deliberate")
-		if v != nil && !deliberately && tri.node_type(v) == tri.type_named(tc, "true") {
-			continue      /* it takes thought: only when investigating */
-		}
-		v    = tri.at(tc, rule, "concludes")
-		n    = tri.print(tc, v, &concludes[0], size_of(concludes)) if v != nil else 0
-		if n < 3 do continue
-		mem.copy(&concludes[0], &concludes[1], int(n - 2))      /* memmove */
-		concludes[n - 2] = 0
+	rules := know_rules(self)
+	if len(store.eligible) != len(rules) do resize(&store.eligible, len(rules))
+	/* each referent: whether anything its rules read changed since they were
+	 * last weighed for it */
+	n            := knowledge_store_count(store)
+	changed      := make([]bool, n, context.temp_allocator)
+	now          := make([]Weighing, n, context.temp_allocator)
+	kindsChanged := false
+	for j = 0; j < n; j += 1 {
+		r = knowledge_store_referent_at(store, j)
+		now[j].looks, now[j].kind = know_looks_of(r)
+		was, ok := store.weighed[r.id]
+		changed[j] = !ok || was.retry || was.looks != now[j].looks || store.staleAll || r.id in store.stale
+		kindsChanged ||= !ok || was.kind != now[j].kind
+	}
+	floorChanged := store.floorChanged
+	store.staleAll     = false
+	store.floorChanged = false
+	clear(&store.stale)      /* what changes from here on is for the next time */
+
+	for &rule, ri in rules {
+		if rule.deliberate && !deliberately do continue      /* it takes thought: only when investigating */
+		if rule.concludes == nil do continue
 		/* expertise: the agent's own skill, which it knows */
-		v       = tri.at(tc, rule, "mastery")
-		mastery = lo if v != nil && tri.node_interval(v, &lo, &hi) != 0 && lo == hi else 0
-		v       = tri.at(tc, rule, "skill")
-		if v != nil && tri.print(tc, v, &text[0], size_of(text)) > 2 && text[0] == '"' {
-			text[len(k1_buf(text[:])) - 1] = 0
-			path := k1_clip(fmt.tprintf("Agent.%s", cstring(&text[1])), 96)
+		if rule.skill != nil {
 			skill = 0
-			if !world_get_field(self.world, ns_utf8(path), knowledge_store_agent(store), &skill) || skill < mastery do continue
+			if !world_get_field(self.world, rule.skill, knowledge_store_agent(store), &skill) || skill < rule.mastery {
+				store.eligible[ri] = false
+				continue
+			}
 		}
+		all := deliberately || !store.eligible[ri] || rule.misprint || (rule.nearby && floorChanged) ||
+		       (rule.usual && kindsChanged)
+		store.eligible[ri] = true
 		/* a rule over repetition is weighed again as what it is seen to do
 		 * changes (provisionally, the one kind of premise that can stop
 		 * holding without merely fading: the usual place moves on) */
-		repeated = false
-		for list = tri.at(tc, rule, "premises"); list != nil; list = tri.at(tc, list, "rest") {
-			premise = tri.at(tc, list, "first")
-			if premise == nil do break
-			if tri.at(tc, premise, "repeated") != nil || tri.at(tc, premise, "wearing") != nil {
-				repeated = true      /* and how worn a part is seen to be: serviced, it is less */
-			}
-		}
-		for j = 0; j < knowledge_store_count(store); j += 1 {
+		for j = 0; j < n; j += 1 {
 			r = knowledge_store_referent_at(store, j)
 			if r.id == knowledge_store_self_referent(store) do continue
-			existing = knowledge_store_finding(store, k1_buf(concludes[:]), r.id)
-			/* contradicted (KNOWLEDGE.md decision 11): looking closely, no trace
-			 * where one should still be; a trace merely faded, it stands */
-			if existing != nil && !repeated && deliberately && knowledge_contradicted(self, rule, r, store, world_time(self.world).ms) {
-				k1_say(news, fmt.tprintf("R%d: no longer %s: the signs should still be there, and aren't",
-				                         r.id, existing.kind))
-				knowledge_store_retract_finding(store, k1_buf(concludes[:]), r.id)
+			/* unchanged, and not changed by this pass either (a finding about
+			 * it another rule drew): weighing it again would come out the same */
+			if !all && !changed[j] && !(r.id in store.stale) {
+				if self.verifyInterpretation do know_verify_skipped(self, store, &rule, r)
 				continue
 			}
-			if existing != nil && !repeated do continue
-			holds  = true
-			choice = 0
-			for list = tri.at(tc, rule, "premises"); holds && list != nil; list = tri.at(tc, list, "rest") {
-				premise = tri.at(tc, list, "first")
-				if premise == nil do break
-				if v = tri.at(tc, premise, "sign"); v != nil && tri.print(tc, v, &text[0], size_of(text)) > 2 {
-					text[len(k1_buf(text[:])) - 1] = 0
-					holds = know_bears(store, r.id, cstring(&text[1]), false)
-				} else if v = tri.at(tc, premise, "formerly"); v != nil && tri.print(tc, v, &text[0], size_of(text)) > 2 {
-					text[len(k1_buf(text[:])) - 1] = 0
-					holds = know_bears(store, r.id, cstring(&text[1]), true)
-				} else if v = tri.at(tc, premise, "misprinted"); v != nil {
-					holds = know_misprinted(store, r.id)
-				} else if v = tri.at(tc, premise, "unworn"); v != nil && tri.print(tc, v, &text[0], size_of(text)) > 2 {
-					text[len(k1_buf(text[:])) - 1] = 0
-					holds = know_unworn(store, r.id, cstring(&text[1]))
-				} else if v = tri.at(tc, premise, "repeated"); v != nil && tri.node_interval(v, &lo, &hi) != 0 && lo == hi {
-					choice = know_usual_place(store, r.id, lo)
-					holds = choice != 0
-				} else if v = tri.at(tc, premise, "wearing"); v != nil && tri.node_interval(v, &lo, &hi) != 0 && lo == hi {
-					worn: i64
-
-					holds = r.features != nil && know_int_feature(r.features, "wear", &worn) && worn >= lo
-				} else if v = tri.at(tc, premise, "near"); v != nil && tri.print(tc, v, &text[0], size_of(text)) > 2 {
-					text[len(k1_buf(text[:])) - 1] = 0
-					holds = r.present && know_near(store, r, cstring(&text[1]))
-				} else {
-					holds = false      /* a premise it can't read never holds */
-				}
+			existing = knowledge_store_finding(store, rule.concludes, r.id)
+			/* contradicted (KNOWLEDGE.md decision 11): looking closely, no trace
+			 * where one should still be; a trace merely faded, it stands */
+			if existing != nil && !rule.repeated && deliberately &&
+			   knowledge_contradicted(self, rule.node, r, store, world_time(self.world).ms) {
+				k1_say(news, fmt.tprintf("R%d: no longer %s: the signs should still be there, and aren't",
+				                         r.id, existing.kind))
+				knowledge_store_retract_finding(store, rule.concludes, r.id)
+				continue
 			}
+			if existing != nil && !rule.repeated do continue
+			holds, choice = know_premises_hold(store, &rule, r)
 			if existing != nil {
 				if holds && choice == existing.choice do continue
 				/* its premise no longer holds as it did: retracted (KNOWLEDGE.md §9) */
 				k1_say(news, fmt.tprintf("R%d: no longer %s (R%d), by %s", r.id, existing.kind,
 				                         existing.choice, existing.rule))
-				knowledge_store_retract_finding(store, k1_buf(concludes[:]), r.id)
+				knowledge_store_retract_finding(store, rule.concludes, r.id)
 			}
 			if !holds do continue
 			/* immediate interpretation spends attention (KNOWLEDGE.md §9): with
@@ -1940,21 +2108,39 @@ knowledge_interpret :: proc(self: ^Knowledge, store: ^Knowledge_Store, deliberat
 				if left <= 0 {
 					k1_say(news, fmt.tprintf("no attention left to think R%d over", r.id))
 					self.short = true      /* attended to later: it perceives again next */
+					now[j].retry = true
 					continue
 				}
 			}
 			f = {}
-			f.kind   = world_intern(self.world, k1_buf(concludes[:]))
-			f.about  = r.id
-			f.choice = choice
-			v       = tri.at(tc, rule, "weight")
-			f.credence = i32(lo) if v != nil && tri.node_interval(v, &lo, &hi) != 0 && lo == hi else 0
-			f.rule  = world_intern(self.world, cstring(tri.index_tag(family, i)))
-			f.time  = world_time(self.world).ms
+			f.kind     = rule.concludes
+			f.about    = r.id
+			f.choice   = choice
+			f.credence = rule.weight
+			f.rule     = rule.tag
+			f.time     = world_time(self.world).ms
 			knowledge_store_add_finding(store, f)
 			k1_say(news, fmt.tprintf("R%d: %s, by %s (%+d dB)", r.id, f.kind, f.rule, f.credence))
 		}
 	}
+	/* as they were weighed */
+	for j = 0; j < n; j += 1 do store.weighed[knowledge_store_referent_at(store, j).id] = now[j]
+}
+
+
+/* A pair interpretation skipped, weighed anyway: had it changed anything,
+ * a miss is counted (for tests: PERFORMANCE.md decision 2). */
+@(private)
+know_verify_skipped :: proc(self: ^Knowledge, store: ^Knowledge_Store, rule: ^Read_Rule, r: ^Referent) {
+	existing := knowledge_store_finding(store, rule.concludes, r.id)
+	if existing != nil && !rule.repeated do return
+	holds, choice := know_premises_hold(store, rule, r)
+	if existing == nil && !holds do return
+	if existing != nil && holds && choice == existing.choice do return
+	self.interpretationMisses += 1
+	append(&interpretation_missed, fmt.aprintf("agent %d, R%d, by %s at %dms: skipped, but it would %s",
+	                                           knowledge_store_agent(store), r.id, rule.tag, world_time(self.world).ms,
+	                                           "conclude" if existing == nil else "retract"))
 }
 
 

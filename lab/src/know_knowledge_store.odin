@@ -383,6 +383,21 @@ Knowledge_Store :: struct {
 	used:          map[string]struct{},   /* the texts parsed or used since the last compaction: what is live (keys the set's own) */
 	liveBytes:     uint,             /* the arena's bytes after the last compaction */
 	compactions:   uint,
+	/* incremental interpretation (PERFORMANCE.md decision 2): not saved; a
+	 * store restored weighs everything once */
+	weighed:       map[u32]Weighing,  /* each referent, as it was when its rules were last weighed */
+	stale:         map[u32]struct{},  /* referents whose traces, observations or findings changed since */
+	staleAll:      bool,             /* every referent: one merged, or forgotten */
+	floorChanged:  bool,             /* a trace on the floor came or went: `near` premises, everywhere */
+	eligible:      [dynamic]bool,    /* each rule: whether the agent had the expertise when last weighed */
+}
+
+
+/* A referent as interpretation last weighed it (PERFORMANCE.md decision 2). */
+Weighing :: struct {
+	looks: u64,                      /* a hash of what premises read of it: kind, features, place */
+	kind:  u64,                      /* of its kind alone: another's usual place reads it */
+	retry: bool,                     /* a finding about it waited for attention */
 }
 
 
@@ -393,6 +408,7 @@ Knowledge :: struct {
 	stores:           [dynamic]^Knowledge_Store, /* sorted by agent */
 	eventsSeen:       uint,
 	perceptions:      u64,                      /* an agent's perceiving, counted, for measuring */
+	interpretationNs: u64,                      /* the wall time of their interpretation, for measuring */
 	touched:          [^]Entity_ID,             /* what changed by this boundary, sorted */
 	short:            bool,                     /* the agent perceiving ran out of attention */
 	blurred:          map[string]string,        /* blur's answers, by kind, distance and features: content is fixed (keys and values the map's own) */
@@ -408,6 +424,10 @@ Knowledge :: struct {
 	ambient:          i32,                      /* the light where no lamp shines: 2 day, 1 dusk, 0 night */
 	light:            rawptr,                   /* the light domain, if light is simulated (KNOWLEDGE.md decision 14); retained */
 	compactAlways:    bool,
+	rules:            [dynamic]Read_Rule,       /* the interpretation rules, read once (PERFORMANCE.md decision 2) */
+	rulesRead:        bool,
+	verifyInterpretation: bool,                 /* weigh what incremental interpretation skips, and count misses (tests) */
+	interpretationMisses: u64,
 	ancestry:         [^]Ancestry,              /* developer-only, by utterance */
 	nancestry:        uint,
 	acapacity:        uint,
@@ -681,6 +701,16 @@ knowledge_store_dealloc :: proc(self: ^Knowledge_Store) {
 	delete(self.used)
 	for line in self.news do delete(line)
 	delete(self.news)
+	delete(self.weighed)
+	delete(self.stale)
+	delete(self.eligible)
+}
+
+
+/* Its traces, observations or findings changed: its rules are weighed
+ * again (PERFORMANCE.md decision 2). */
+knowledge_store_evidence_changed :: proc(self: ^Knowledge_Store, referentID: u32) {
+	if referentID != 0 do self.stale[referentID] = {}
 }
 
 
@@ -716,6 +746,8 @@ knowledge_store_forget_referent :: proc(self: ^Knowledge_Store, referentID: u32)
 		}
 	}
 	self.nfindings = n
+	self.staleAll = true      /* what named it, its findings, others' usual places */
+	delete_key(&self.weighed, referentID)
 	a := &self.referents[k]
 	delete(a.kind)
 	delete(a.features)
@@ -990,6 +1022,8 @@ knowledge_store_add_observation :: proc(self: ^Knowledge_Store, o: Observation, 
 	o.content = strdup(string(o.content)) if o.content != nil else nil
 	self.observations[self.nobservations] = o
 	self.nobservations += 1
+	knowledge_store_evidence_changed(self, o.actor)
+	knowledge_store_evidence_changed(self, o.subject)
 }
 
 
@@ -1003,6 +1037,8 @@ knowledge_store_keep_at_most :: proc(self: ^Knowledge_Store, capacity: uint) {
 		for i = 1; i < self.nobservations; i += 1 {
 			if self.observations[i].salience < self.observations[least].salience do least = i
 		}
+		knowledge_store_evidence_changed(self, self.observations[least].actor)
+		knowledge_store_evidence_changed(self, self.observations[least].subject)
 		delete(self.observations[least].content)
 		mem.copy(&self.observations[least], &self.observations[least + 1],
 		         size_of(Observation) * int(self.nobservations - least - 1))
@@ -1046,8 +1082,21 @@ knowledge_store_trace_at :: proc(self: ^Knowledge_Store, i: uint) -> ^Trace_Seen
 }
 
 
+/* A trace to change: its bearer's rules are weighed again, or, on the
+ * floor, every `near` premise. */
 knowledge_store_mutable_trace_at :: proc(self: ^Knowledge_Store, i: uint) -> ^Trace_Seen {
+	knowledge_store_trace_changed(self, self.traces[i])
 	return &self.traces[i]
+}
+
+
+@(private = "file")
+knowledge_store_trace_changed :: proc(self: ^Knowledge_Store, t: Trace_Seen) {
+	if t.bearer != 0 {
+		knowledge_store_evidence_changed(self, t.bearer)
+	} else {
+		self.floorChanged = true
+	}
 }
 
 
@@ -1072,10 +1121,13 @@ knowledge_store_note_trace :: proc(self: ^Knowledge_Store, t: Trace_Seen) -> boo
 	for i = 0; i < self.ntraces; i += 1 {
 		if rawptr(self.traces[i].kind) == rawptr(t.kind) && self.traces[i].bearer == t.bearer &&
 		   (t.bearer != 0 || (self.traces[i].x == t.x && self.traces[i].y == t.y && self.traces[i].level == t.level)) {
+			/* seen again: only its coming or going is evidence; its strength isn't */
+			if self.traces[i].present != t.present do knowledge_store_trace_changed(self, t)
 			self.traces[i] = t
 			return false
 		}
 	}
+	knowledge_store_trace_changed(self, t)
 	if self.ntraces == self.trcapacity {
 		old := self.trcapacity
 		self.trcapacity = self.trcapacity * 2 if self.trcapacity != 0 else 16
@@ -1154,6 +1206,7 @@ knowledge_store_merge_referent :: proc(self: ^Knowledge_Store, from: u32, into: 
 	n: uint
 	h: int
 
+	self.staleAll = true      /* its traces, observations and findings, now another's */
 	a = knowledge_store_mutable_referent(self, from)
 	b = knowledge_store_mutable_referent(self, into)
 	if a == nil || b == nil || from == into || from == self.self || into == self.self do return
@@ -1291,6 +1344,7 @@ knowledge_store_add_finding :: proc(self: ^Knowledge_Store, f: Finding) {
 	}
 	self.findings[self.nfindings] = f
 	self.nfindings += 1
+	knowledge_store_evidence_changed(self, f.about)
 }
 
 
@@ -1299,6 +1353,7 @@ knowledge_store_retract_finding :: proc(self: ^Knowledge_Store, kind: cstring, r
 
 	for i = 0; i < self.nfindings; i += 1 {
 		if string(self.findings[i].kind) == string(kind) && self.findings[i].about == referentID {
+			knowledge_store_evidence_changed(self, referentID)
 			mem.copy(&self.findings[i], &self.findings[i + 1], size_of(Finding) * int(self.nfindings - i - 1))
 			self.nfindings -= 1
 			return

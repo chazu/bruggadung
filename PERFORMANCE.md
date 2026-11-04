@@ -3,7 +3,8 @@
 ## Status and scope
 
 Measurements and proposals. Decisions 1 (a walk as one activity, see
-"Walks, measured"), 5 and 6 are built; the rest are proposals. This document records
+"Walks, measured"), 2 (incremental interpretation, see "Interpretation,
+measured"), 5 and 6 are built; 3 and 4 are proposals. This document records
 where the lab's time goes, on the village (VILLAGE.md), and proposes what
 to change while the engine is small enough to change cheaply. The
 question it answers: does the engine need a larger refactor now, such as
@@ -200,6 +201,48 @@ What changed in behaviour, besides the numbers:
 - Saves carry a walk: the activity its way and stage, the mind what it
   set out for.
 
+## Interpretation, measured
+
+Built as decision 2 says (KNOWLEDGE.md decision 20), in two steps, each
+ending in the same hashes for every scenario. The village at
+`-o:speed`, by `lab run village --counters`:
+
+| | Walks | Rules read once | Weighed only when changed |
+| --- | --- | --- | --- |
+| Interpretation | about 6.3 s (not timed: perception fell by 3.0 s) | 3.3 s | 0.5 s |
+| Perception | 9.3 s | 6.3 s | 3.5 s |
+| Whole run | 13.3 s | 10.5 s | 7.7 s |
+
+Unoptimised, the whole run is 20.2 s (from 32.1 s with walks, and 57.2 s
+before them).
+
+- **Reading rules once.** Interpretation re-read every rule from content
+  (`tri.at`, which parses a path, and `tri.print`) for every referent at
+  every perception, several times a premise. The rules are now read when
+  interpretation first runs, into plain structures.
+- **Weighing what changed.** The store marks a referent when a trace it
+  bears comes or goes, an observation of it is added or let go, or a
+  finding about it is drawn or retracted; interpretation compares each
+  referent's looks (a hash of its kind, features and place) with how they
+  were. Of the 1.78 million pairs of a rule and a referent in the run,
+  about 94% are skipped.
+- **The misprint was most of what remained.** A misprint reads every
+  referent's description as memory fades it, so its rule is weighed for
+  every referent every time, and each weighing described every referent:
+  2.4 s of 2.7 s. Memory generalizes what it knows key by key and never
+  adds a key, so a referent whose kind and features don't mention a claim
+  can't be a misprinted copy, and one that doesn't mention a seal can't
+  be the seal. Checked first, the rule costs 0.2 s, and says the same.
+- **Checked, not assumed.** The tests weigh every pair interpretation
+  skips and fail if any would have concluded or retracted something; so
+  did one run of the whole village. Breaking the marking on purpose (not
+  marking a referent when an observation of it is added) fails the trace
+  tests, naming the pairs.
+
+Now: perception 3.5 s, decision 2.2 s, commit 1.7 s. Of perception, what
+isn't interpretation (recognition, the visible set, absence, traces) is
+the next to measure; recognition was 2.7 s (decision 4).
+
 ## Proposed decisions
 
 1. **A walk is one activity** (above; built, AGENCY.md decision 20).
@@ -210,8 +253,8 @@ What changed in behaviour, besides the numbers:
    arises from what the walker perceives or feels, not from the walk.
    Expected: most of the decisions made while walking go, and most of
    the path searches with them. Boundaries stay, one a tile.
-2. **Interpretation is incremental.** Rules are compiled once, when
-   content loads: premise kinds, their arguments, what they conclude, and
+2. **Interpretation is incremental** (above; built, KNOWLEDGE.md decision
+   20). Rules are read once, when interpretation first runs: premise kinds, their arguments, what they conclude, and
    the expertise they need. A rule is weighed again for a referent only
    when its evidence changed since it was last weighed: the referent was
    perceived differently, a trace on it appeared or went, an observation
@@ -278,4 +321,4 @@ What changed in behaviour, besides the numbers:
 | --- | --- |
 | Walk | Going to a place on foot as one activity: its way found when it starts, a stage per tile; a decision point only when it ends (arrived, blocked, given up). Built (decision 1; AGENCY.md decision 20). |
 | Journey | Travel by any means, in legs (walks, rides). Reserved, not built (open questions). |
-| Incremental interpretation | Rules weighed again for a referent only when its evidence changed. Proposed (decision 2). |
+| Incremental interpretation | Rules weighed again for a referent only when what their premises read of it changed. Built (decision 2; KNOWLEDGE.md decision 20). |

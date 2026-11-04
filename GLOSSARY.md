@@ -406,8 +406,8 @@ REALITY.md, PRF = PERFORMANCE.md, TER = TERRAIN.md, TES = TESSERA.md, VIL = VILL
   an **interpretation rule**, gated by **expertise**; **immediate** (cheap,
   on perceiving) or **deliberate** (investigating, an activity). Retracted
   only when a premise is contradicted. (KNO §9) **Incremental
-  interpretation** (proposed): a rule weighed again for a referent only
-  when its evidence changed. (PRF d2)
+  interpretation**: a rule weighed again for a referent only when what its
+  premises read of it changed. (KNO d20, PRF d2)
 - **Telling**: the content of a claim made in speech or writing, with its
   **attribution** ("I saw", "Teodor told me"). (KNO §10, lab/content/knowledge.tri)
 - **Utterance**: the committed event of saying something; heard by event

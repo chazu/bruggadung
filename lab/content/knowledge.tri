@@ -14,7 +14,10 @@
 //             premise's kind, and the findings no rule concludes (#Taken,
 //             #Struck, #Arrested, #Hires, #Owned, #Reserved). What a thing
 //             is seen as, from the `seen` family: kind_of_entity
-//             (src/act_view.odin).
+//             (src/act_view.odin). Rules are read once, and weighed again
+//             for a referent only when what they read of it changed
+//             (KNOWLEDGE.md decision 20): a new kind of premise is wired
+//             into what marks a referent changed, or weighed always.
 
 // Interpretation (KNOWLEDGE.md §9): rules that derive findings from what an
 // agent perceives and believes, run on what it perceives, as it perceives
