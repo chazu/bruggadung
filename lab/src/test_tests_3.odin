@@ -809,7 +809,7 @@ test_unknown_nut :: proc() {
 	bg_check(ns_contains(base.fromAfar, "size: >=16mm & <=22mm"))
 	/* 2: the residual becomes a goal: it looks closer, and then tightens it */
 	bg_check(test_logged_by(base.agency, 1, "[tighten the nut] tighten it: unknown at nut.size: look closer first"))
-	bg_check(test_logged_by(base.agency, 1, "[look closer] go and peer at it: walk_east"))
+	bg_check(test_logged_by(base.agency, 1, "[look closer] go and peer at it: a walk of "))
 	bg_check(ns_contains(knowledge_store_describe_referent(knowledge_store_of(base.knowledge, 1),
 	                                                        test_referent_of(knowledge_store_of(base.knowledge, 1), base.nut)),
 	                     "size: 19mm"))     /* within reach, it sees it plainly */

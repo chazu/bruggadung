@@ -107,6 +107,21 @@ Out of scope here, except where they touch agency:
     settled arises again about the same thing only from a finding drawn
     since: a part serviced stops looking worn, and seen worn again, it is
     seen to again.
+20. **Going somewhere on foot is one walk** (PERFORMANCE.md decision 1).
+    To get within reach of what a method names, or to explore, the agent
+    finds its way once, over the ground as it believes it, and sets out: one
+    activity, a stage a tile. A tile walked isn't a decision point; the
+    walk ending is (arrived, or a stage failed on ground that turned
+    out solid). On the way the agent is busy, as with any activity: it
+    hears questions and weighs what arises against its intention plus the
+    interruption cost, and at each perception it checks that the walk
+    still makes sense. It gives the walk up, and decides afresh, when
+    its intention changed, when what it goes to is believed elsewhere or
+    gone, when the unseen tile it explores toward has been seen, or when a
+    tile ahead is now believed solid. Put down for something else, a
+    walk is given up, not suspended: there is only a way to find again.
+    A walk is not a journey: that word is kept for travel by any means,
+    in legs, which isn't built (GLOSSARY.md).
 
 ## Terms
 
@@ -242,7 +257,7 @@ a disturbance generates no goal to investigate it.
   - norms
 - **There is no general search.** A method may include bounded local choice,
   such as ordering the places to look by the belief that the item is there,
-  or exploring: a step toward the nearest tile the agent has never seen,
+  or exploring: a walk toward the nearest tile the agent has never seen,
   beside ground of a kind it has (the woods' edge, to find trees).
 - Methods are content, in the content language
   ([CONTENT_LANGUAGE.md](CONTENT_LANGUAGE.md)). A precondition match is

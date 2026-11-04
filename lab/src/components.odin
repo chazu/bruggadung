@@ -1,10 +1,10 @@
-// Generated from Triangle content 5d1083d29149ba9a: do not edit. Type IDs are valid
+// Generated from Triangle content 58eae23a07ce925c: do not edit. Type IDs are valid
 // only for this content; regenerate when it changes.
 package lab
 
 import tri "../../triangle/odin/triangle"
 
-CONTENT_HASH :: 0x5d1083d29149ba9a
+CONTENT_HASH :: 0x58eae23a07ce925c
 
 // Combustor, from #Combustor
 Combustor :: struct {
@@ -110,6 +110,7 @@ Activity :: struct {
 	watchWarm: i64,    // int, in quanta of 1; content, saved, proposable, inspect
 	watchX: i64,    // int, in quanta of 1; content, saved, proposable, inspect
 	watchY: i64,    // int, in quanta of 1; content, saved, proposable, inspect
+	way: cstring,    // text; saved, proposable, inspect
 	words: cstring,    // text; saved, proposable, inspect
 }
 
@@ -523,6 +524,7 @@ COMPONENT_COUNT :: 42
 	{"watchWarm", offset_of(Activity, watchWarm), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
 	{"watchX", offset_of(Activity, watchX), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
 	{"watchY", offset_of(Activity, watchY), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
+	{"way", offset_of(Activity, way), VALUE_TEXT, "text", "saved, proposable, inspect"},
 	{"words", offset_of(Activity, words), VALUE_TEXT, "text", "saved, proposable, inspect"},
 }
 @(rodata) Authorization_fields := [?]Field_Info{
@@ -712,7 +714,7 @@ COMPONENTS := [COMPONENT_COUNT + 1]Component_Info{
 	{"Scribe", "#Scribe", size_of(Scribe), 1, &Scribe_fields[0]},
 	{"Sized", "#Sized", size_of(Sized), 1, &Sized_fields[0]},
 	{"ThermalBody", "#ThermalBody", size_of(Thermal_Body), 5, &Thermal_Body_fields[0]},
-	{"Activity", "#Activity", size_of(Activity), 21, &Activity_fields[0]},
+	{"Activity", "#Activity", size_of(Activity), 22, &Activity_fields[0]},
 	{"Authorization", "#Authorization", size_of(Authorization), 3, &Authorization_fields[0]},
 	{"Bond", "#Bond", size_of(Bond), 4, &Bond_fields[0]},
 	{"Claim", "#Claim", size_of(Claim), 2, &Claim_fields[0]},

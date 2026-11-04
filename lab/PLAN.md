@@ -4654,3 +4654,29 @@ numbers only.
   people now choose differently: 33,620 boundaries.
 
 125 tests; the other scenarios behave exactly as before.
+
+### After the slice: a walk as one activity (PERFORMANCE.md decision 1, AGENCY.md decision 20)
+
+- Going somewhere on foot is one `walk` (actions.tri, a `#Walk` that
+  fails on a hard interruption, off the menu as it needs a way), whose
+  activity carries its way (`Activity.way`, a letter a tile) and runs a
+  stage a tile, each a one-tile walk (src/act_activities.odin). The path
+  search gives the whole way (`Path_Query.way`). An activity's stage limit
+  is now 4,096, a search's budget. "Journey" is kept for travel by any
+  means, in legs (GLOSSARY.md), and isn't built.
+- Agency finds the way once, toward what a method names or the nearest
+  unseen tile, and sets out. Woken on the way, the walker is busy; at each
+  perception it gives the walk up if its intention changed, what it
+  goes to is believed elsewhere or gone, the tile it explores toward was
+  seen, or a tile ahead is believed solid. Put down for something else, a
+  walk is aborted, not suspended. A mind's save holds what its walk
+  was set out for.
+- The village: 32.1 s (from 57.2 s), 13.3 s at `-o:speed` (from 27.3 s);
+  18,262 boundaries (from 33,620); 2,860 deliberations (from 26,147); 832
+  path searches (from 30,507). Its checks all pass. PERFORMANCE.md,
+  "Walks, measured".
+- Saves change for every scenario (an activity's new field); only the
+  village behaves differently.
+
+125 tests, 3808 checks: a test of the activities kept after exploring
+checks fewer, as one walk is kept, not a one-tile walk each way.

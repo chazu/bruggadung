@@ -1379,10 +1379,15 @@ test_missing_nails :: proc() {
 	 * but when the bin it believed held nails is empty, its search goes to
 	 * the sack first, before the nearer crate, and finds them */
 	glimpsed = test_missing_nails_(false, false, .Stranger_Glimpsed, 0, 0, 0)
-	bg_check(test_log_index(glimpsed.agency, 4, "search for nails: ") != NOT_FOUND &&
-	         test_log_index(glimpsed.agency, 4, "search for nails: ") ==
-	         test_log_index(glimpsed.agency, 4, "search for nails: walk_east, toward R7 at (13, 8)"))
-	bg_check(test_log_index(glimpsed.agency, 4, "fetch nails: walk_east, toward R7") == NOT_FOUND)
+	{
+		log := agency_log_of(glimpsed.agency, 4)
+		first := test_log_index(glimpsed.agency, 4, "search for nails: ")
+		bg_check(first != NOT_FOUND && ns_contains(log[first], "search for nails: a walk of ") &&
+		         ns_contains(log[first], ", toward R7 at (13, 8)"))
+		fetched := false
+		for line in log do fetched ||= ns_contains(line, "fetch nails: a walk of ") && ns_contains(line, "toward R7")
+		bg_check(!fetched)
+	}
 	bg_check(test_happened(glimpsed.world, "looked", 4, crate + 1))
 	bg_check(!test_happened(glimpsed.world, "looked", 4, crate) ||
 	         test_first_at(glimpsed.world, "looked", 4, crate + 1) < test_first_at(glimpsed.world, "looked", 4, crate))
@@ -1394,11 +1399,11 @@ test_missing_nails :: proc() {
 	bg_check(test_first_at(curious.world, "looked", 4, crate) < test_first_at(curious.world, "looked", 4, crate + 1))
 	bg_check(test_wedged(curious.world))
 
-	/* saved mid-search, mid-stride (a boundary the run has anyway: the walk
-	 * toward the crate just committed), the commitment and the subgoal stacked,
-	 * fetching passed over: restored, the agent carries on exactly as it would
-	 * have */
-	resumed = test_missing_nails_(true, false, .No_Apprentice, 20005, 0, -1)
+	/* saved mid-search, mid-walk (a boundary the run has anyway: a tile of
+	 * the walk toward the crate just committed), the commitment and the
+	 * subgoal stacked, fetching passed over: restored, the agent carries on
+	 * exactly as it would have */
+	resumed = test_missing_nails_(true, false, .No_Apprentice, 20004, 0, -1)
 	bg_check(world_state_hash(resumed.world) == world_state_hash(spares.world))
 	bg_check(resumed.text == spares.text)
 	full = agency_log_of(spares.agency, 4)

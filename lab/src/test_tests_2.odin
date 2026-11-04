@@ -3793,7 +3793,7 @@ test_explore_autopilot :: proc() {
 
 	/* midway: under way, and the mode saved */
 	scheduler_run_until(st.s, time_make(10000))
-	bg_check(len(agency_take_notices(agency)) == 0 && test_logged_by(agency, worker, "exploring: walk_"))
+	bg_check(len(agency_take_notices(agency)) == 0 && test_logged_by(agency, worker, "exploring: a walk of "))
 	text     = save(st.w, st.c, []Saved_System{knowledge_as_saved_system(knowledge), agency_as_saved_system(agency)})
 	mode     = fmt.tprintf("explore %d", u64(worker))
 	bg_check(ns_contains(text, mode))
@@ -3863,12 +3863,12 @@ test_explore_rooms :: proc() {
 		}
 	}
 	bg_check(unseen == 0)                                     /* every floor tile of the building */
-	bg_check(!test_logged_by(agency, worker, "could not walk"))
+	bg_check(!test_logged_by(agency, worker, "could not set out"))
 	notices = agency_take_notices(agency)
 	bg_check(len(notices) == 1)
-	/* a walk is an activity of a second: of the dozens it walked, what stays
-	 * is what is still asked of, a completed walk each way at most, and its
-	 * latest (BGActivities letGo) */
+	/* a walk is an activity: of the dozens it set out on, what stays is what
+	 * is still asked of, the last completed and its latest (BGActivities
+	 * letGo) */
 	bg_check(world_activities_of(st.w, worker, nil, 0) <= 5 &&
 	         store_count(world_store_for_kind(st.w, world_kind_named(st.w, "Activity"))) <= 5)
 	{

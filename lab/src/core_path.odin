@@ -21,6 +21,7 @@ package lab
 
 import "base:runtime"
 import "core:mem"
+import "core:slice"
 
 BG_PATH_BUDGET :: 4096        /* tiles a search expands, at most */
 
@@ -42,6 +43,7 @@ Path_Query :: struct {
 	context_: rawptr,                   // `context` is Odin's keyword
 	passable: proc(context_: rawptr, x: i32, y: i32) -> bool,
 	goal:     proc(context_: rawptr, x: i32, y: i32) -> bool,    /* untargeted: what it looks for */
+	way:      ^[dynamic]Step,           /* if set, filled with every step of the way, first to last */
 }
 
 Path_Result :: struct {
@@ -302,7 +304,26 @@ path_find :: proc(q: ^Path_Query) -> Path_Result {
 	r.y = nodes[best].y
 	r.steps = nodes[best].g
 	r.step = first_step(best)
+	if q.way != nil do way_to(best, q.way)
 	return r
+}
+
+
+/* Every step from the start to node n, first to last. */
+@(private = "file")
+way_to :: proc(n: i32, way: ^[dynamic]Step) {
+	p: i32
+	d: i32
+
+	clear(way)
+	for n := n; nodes[n].parent >= 0; n = p {
+		p = nodes[n].parent
+		for d = 0; d < 4; d += 1 {
+			if nodes[n].x == nodes[p].x + dx[d] && nodes[n].y == nodes[p].y + dy[d] do break
+		}
+		append(way, Step(d))
+	}
+	slice.reverse(way[:])
 }
 
 // realloc: the block resized. The search's buffers live as long as the

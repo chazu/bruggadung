@@ -2,7 +2,8 @@
 
 ## Status and scope
 
-Measurements and proposals, nothing built yet. This document records
+Measurements and proposals. Decision 1, a walk as one activity, is built
+(see "Walks, measured"); the rest are proposals. This document records
 where the lab's time goes, on the village (VILLAGE.md), and proposes what
 to change while the engine is small enough to change cheaply. The
 question it answers: does the engine need a larger refactor now, such as
@@ -13,8 +14,8 @@ cost is agents' minds, which redo all of their work from scratch, and the
 number of times they run. Two changes deserve doing now, while there are
 four topics and not ten:
 
-- **journeys**: a walk to a place as one activity, so a mind isn't asked
-  to decide at every tile;
+- **a walk as one activity**: going to a place on foot is one activity,
+  so a mind isn't asked to decide at every tile;
 - **incremental interpretation**: knowledge's rules re-run only for what
   changed.
 
@@ -134,7 +135,7 @@ name, a sudden hunger. The engine already has the parts for this:
   (AGENCY.md §10), a need crossing a band, a commitment's window opening:
   these already wake a mind by themselves.
 
-So walking should be a **journey**: one activity toward a place, its way
+So going to a place should be one **walk**: one activity, its way
 found once when it starts, with a stage per tile. Each stage moves the
 walker one tile and commits the move, so the world, and everyone who sees
 the walker, sees it move as now. The walker still perceives at each tile:
@@ -148,10 +149,62 @@ requirement (stumble), so it has more decision points, not fewer. The
 model decides how often a mind is needed, by the state of the body and
 the world, not by the clock.
 
+## Walks, measured
+
+Built as decision 1 says (AGENCY.md decision 20). The village again,
+before (a9858de) and after, by the same counters; a temporary probe also
+counted path searches. Both end with all 23 of the village's checks
+passing.
+
+| | Before | Walks |
+| --- | --- | --- |
+| Whole run, unoptimised | 57.2 s | 32.1 s |
+| Whole run, `-o:speed` | 27.3 s | 13.3 s |
+| Perception (`-o:speed`) | 13.8 s | 9.3 s |
+| Decision (`-o:speed`) | 11.6 s | 2.1 s |
+| Commit (`-o:speed`) | 1.5 s | 1.7 s |
+| Boundaries | 33,620 | 18,262 |
+| Perceptions | 59,465 | 37,849 |
+| Minds woken (decisions) | 60,653 | 39,037 |
+| Deliberations (not busy: goals, methods, a step) | 26,147 | 2,860 |
+| Path searches | 30,507 | 832 |
+| Events in history | 301,047 | 157,033 |
+
+- **Deliberation fell ninefold, path searches 37-fold.** A walker woken
+  on the way is busy: it hears questions and weighs what has arisen, and
+  checks its walk, which is cheap.
+- **Boundaries nearly halved**, which the proposal didn't expect. A
+  one-tile walk took two: one where it completed, and one where the next
+  was committed after the walker decided on it. A walk's stages follow
+  one another at the boundary where each completes. A tile now takes
+  1,000 ms, not 1,001.
+- **Events halved**: no activity created, started and ended for each
+  tile.
+- **832 walks in three days; 32 given up and found again**: 13 because
+  a tile ahead was now believed solid, 17 because what the walker went to
+  was not where it believed, 2 because it moved. Changes of intention
+  mid-walk come through weighing, which puts the walk down itself.
+- **Perception is now the cost**: 70% of the optimised run. Decision 2 is
+  next.
+
+What changed in behaviour, besides the numbers:
+
+- A walker is busy, so something that arises on the way must beat its
+  intention by the interruption cost as well as the margin. Between
+  one-tile walks it had needed only the margin.
+- A walk's way is any shortest one the search finds, not "the longer
+  way first" that each one-tile choice preferred.
+- A walk's intention isn't asked whether it is done before arrival. A
+  worker going to peer at a nut walks all the way, though it may see the
+  nut plainly a tile or two short. See the open questions.
+- Saves carry a walk: the activity its way and stage, the mind what it
+  set out for.
+
 ## Proposed decisions
 
-1. **Journeys** (above). A walk to a place is one activity with a stage
-   per tile and a way found when it starts. It is a decision point only
+1. **A walk is one activity** (above; built, AGENCY.md decision 20).
+   Going to a place on foot is one activity with a stage per tile and a
+   way found when it starts. It is a decision point only
    when it ends: arrived, blocked (a tile believed open is solid: found
    again from there, or given up), or interrupted. A soft interruption
    arises from what the walker perceives or feels, not from the walk.
@@ -181,13 +234,13 @@ the world, not by the clock.
 
 ## Open questions
 
-- **Continuous movement.** A journey keeps a boundary per tile. Movement
+- **Continuous movement.** A walk keeps a boundary per tile. Movement
   in closed form (position as a function of time, as satiety is) would
   remove those too. Perception would then need to work out when a moving
   thing comes into or goes out of someone's sight, as a horizon, and
-  everything that reads where someone is mid-journey would compute it.
+  everything that reads where someone is mid-walk would compute it.
   That is a larger change across perception, recognition and checks.
-  Journeys first; measure; then decide.
+  Walks first; measure; then decide.
 - **History.** Whether history is compacted after a time (a snapshot,
   and the events before it dropped), and whether an activity's own
   bookkeeping (status, due, roles) needs to be world events at all.
@@ -197,8 +250,18 @@ the world, not by the clock.
   agents' cadence; the village keeps everyone at full detail (VILLAGE.md
   decision 1). A mind that interprets incrementally and decides only at
   real decision points may make that unnecessary for a village's size.
+- **Done before arriving.** A walker doesn't ask whether its intention is
+  done until it arrives. Asking at each perception would cost a
+  condition's match per tile, which walks removed. Asking only when the
+  perception made news about what the intention concerns may be cheap
+  enough.
+- **Journeys.** Travel by any means: walks, and rides on a coach or a
+  ship, as legs of one journey that agency plans, perhaps across regions
+  and levels of detail. The word is reserved for it (GLOSSARY.md); a walk
+  is one leg on foot. A ride would be an activity like a walk, its stages
+  the conveyance's, the rider carried.
 - **When a mind looks again.** A perception that makes news makes the
-  agent perceive again at the next boundary. During a journey, the
+  agent perceive again at the next boundary. During a walk, the
   walker's own change of place shouldn't count as news that asks for a
   second look.
 
@@ -206,5 +269,6 @@ the world, not by the clock.
 
 | Term | Meaning |
 | --- | --- |
-| Journey | A walk to a place as one activity: its way found when it starts, a stage per tile; a decision point only when it ends (arrived, blocked, interrupted). Proposed (decision 1). |
+| Walk | Going to a place on foot as one activity: its way found when it starts, a stage per tile; a decision point only when it ends (arrived, blocked, given up). Built (decision 1; AGENCY.md decision 20). |
+| Journey | Travel by any means, in legs (walks, rides). Reserved, not built (open questions). |
 | Incremental interpretation | Rules weighed again for a referent only when its evidence changed. Proposed (decision 2). |

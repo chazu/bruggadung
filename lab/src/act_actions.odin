@@ -35,6 +35,7 @@ Action :: struct {
 	operation: cstring,                     /* interned */
 	roles:     [Role]Entity_ID,             /* NO_ENTITY for a role the operation doesn't have */
 	content:   cstring,                     /* interned: what is said, for say; or nil */
+	way:       cstring,                     /* interned: a walk's way, a letter a tile; or nil */
 }
 
 action_make :: #force_inline proc "contextless" (operation: cstring, actor, item, destination: Entity_ID) -> Action {
@@ -84,7 +85,6 @@ bounded :: proc(s: string, size: int) -> cstring {
 }
 
 // Whether a C string has text: `s && *s`.
-@(private = "file")
 has_text :: proc(s: cstring) -> bool {
 	return s != nil && ([^]u8)(s)[0] != 0
 }
@@ -729,9 +729,10 @@ effect_walk :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -
 	at        = world_location_of(world, a.roles[.Actor])
 	op        = string(a.operation)
 	direction = strings.index_byte(op, '_')
-	if at.form != .On_Tile || direction < 0 {
+	if at.form != .On_Tile {
 		return "one can walk only on the ground"
 	}
+	if direction < 0 do return "walk where?"
 	switch op[direction + 1] if direction + 1 < len(op) else 0 {
 	case 'n': at.y -= 1
 	case 's': at.y += 1
@@ -3223,6 +3224,9 @@ start_activity :: proc(world: ^World, action: Action, amount: i64, g: ^Proposal_
 	if has_text(action.content) {
 		proposal_group_set_of_to_text(g, "Activity.words", whole(a), action.content)
 	}
+	if has_text(action.way) {
+		proposal_group_set_of_to_text(g, "Activity.way", whole(a), action.way)
+	}
 	return a
 }
 
@@ -3365,6 +3369,13 @@ perform :: proc(world: ^World, committer: ^Committer, action: Action, amount: i6
 	if match_action(world, action, &result, &reason) == .Incompatible {
 		if error != nil {
 			error^ = reason
+		}
+		return nil
+	}
+	/* a walk goes by its way, and only a walk has one */
+	if (string(action.operation) == "walk") != has_text(action.way) {
+		if error != nil {
+			error^ = "only a walk has a way" if has_text(action.way) else "a walk needs a way"
 		}
 		return nil
 	}

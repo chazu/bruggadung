@@ -8,49 +8,53 @@
 //            actor. Risen, it is told: its timer comes back, and a stage long
 //            due ends at once, not when it would have; a checkpoint passed
 //            while frozen is skipped (REALITY.md step 4).
-// - code:    src/act_activities.odin.
+// - code:    src/act_activities.odin; a walk's stages are its way, not
+//            its operation's, and each is a walk of one tile.
 
 #ActivityStatus: "running" | "suspended" | "completed" | "exhausted" | "failed" | "aborted"
 
 #Activity: #Thing & {
     @component(Activity)
-    operation:      text                       @field(saved, proposable, inspect)
-    actorRef:       ref                        @field(saved, proposable, inspect)
-    itemRef:        ref                        @field(saved, proposable, inspect)
-    destinationRef: ref                        @field(saved, proposable, inspect)
-    amount:         int & >=0 & <=1000000      @field(content, saved, proposable, inspect)
+    operation:      text                         @field(saved, proposable, inspect)
+    actorRef:       ref                          @field(saved, proposable, inspect)
+    itemRef:        ref                          @field(saved, proposable, inspect)
+    destinationRef: ref                          @field(saved, proposable, inspect)
+    amount:         int & >=0 & <=1000000        @field(content, saved, proposable, inspect)
     // what is being said, for an utterance under way
-    words:          text                       @field(saved, proposable, inspect)
+    words:          text                         @field(saved, proposable, inspect)
+    // a walk's way (PERFORMANCE.md decision 1): a letter a tile, n, s, e
+    // or w, found when it started; its stage is the tile under way
+    way:            text                         @field(saved, proposable, inspect)
     // how fast the stage under way goes, in percent of its declared pace,
     // from the actor as it started (ACTIONS.md §5: rate = f(capabilities,
     // shortfall, actor modifiers); provisionally, modifiers only); 0 is 100
-    pace:           int & >=0 & <=100          @field(content, saved, proposable, inspect)
+    pace:           int & >=0 & <=100            @field(content, saved, proposable, inspect)
     // the stage under way, the work done in it, and when it last started
     // running; due is when the stage completes (0ms while suspended, or for an
     // activity that ends by a watch or an event)
-    stage:          int & >=0 & <=64           @field(content, saved, proposable, inspect)
-    progress:       time & >=0ms & <=100d      @field(content, saved, proposable, inspect)
-    started:        time & >=0ms & <=10000d    @field(content, saved, proposable, inspect)
-    due:            time & >=0ms & <=10000d    @field(content, saved, proposable, inspect)
-    status:         #ActivityStatus            @field(content, saved, proposable, inspect)
+    stage:          int & >=0 & <=4096           @field(content, saved, proposable, inspect)
+    progress:       time & >=0ms & <=100d        @field(content, saved, proposable, inspect)
+    started:        time & >=0ms & <=10000d      @field(content, saved, proposable, inspect)
+    due:            time & >=0ms & <=10000d      @field(content, saved, proposable, inspect)
+    status:         #ActivityStatus              @field(content, saved, proposable, inspect)
     // a watch (DOMAIN_SIMULATION.md §5): tell this activity when the holder's
     // water reaches watchAtLeast; no holder, no watch
-    watchHolder:    ref                        @field(saved, proposable, inspect)
-    watchAtLeast:   volume & >=0mL & <=10m3    @field(content, saved, proposable, inspect)
+    watchHolder:    ref                          @field(saved, proposable, inspect)
+    watchAtLeast:   volume & >=0mL & <=10m3      @field(content, saved, proposable, inspect)
     // a watch on the air (the atmosphere domain): tell this activity when
     // the holder's carbon dioxide reaches watchDioxide (mmol), or its
     // temperature falls below watchCool or rises above watchWarm (mK); 0, no
     // watch
-    watchDioxide:   int & >=0 & <=100000000    @field(content, saved, proposable, inspect)
-    watchCool:      int & >=0 & <=400000       @field(content, saved, proposable, inspect)
-    watchWarm:      int & >=0 & <=400000       @field(content, saved, proposable, inspect)
+    watchDioxide:   int & >=0 & <=100000000      @field(content, saved, proposable, inspect)
+    watchCool:      int & >=0 & <=400000         @field(content, saved, proposable, inspect)
+    watchWarm:      int & >=0 & <=400000         @field(content, saved, proposable, inspect)
     // a watch on the floor (ACTIONS.md Scenario 3): water on the tile at
     // (watchX, watchY, watchLevel) reaching watchFloor (mL) interrupts it; 0,
     // no watch
-    watchFloor:     int & >=0 & <=1000000      @field(content, saved, proposable, inspect)
-    watchX:         int & >=0 & <=1000         @field(content, saved, proposable, inspect)
-    watchY:         int & >=0 & <=1000         @field(content, saved, proposable, inspect)
-    watchLevel:     int & >=0 & <=64           @field(content, saved, proposable, inspect)
+    watchFloor:     int & >=0 & <=1000000        @field(content, saved, proposable, inspect)
+    watchX:         int & >=0 & <=1000           @field(content, saved, proposable, inspect)
+    watchY:         int & >=0 & <=1000           @field(content, saved, proposable, inspect)
+    watchLevel:     int & >=0 & <=64             @field(content, saved, proposable, inspect)
 }
 
 activity: #Activity & { amount: 0, stage: 0, progress: 0ms, started: 0ms, due: 0ms, status: "running", watchAtLeast: 0mL,

@@ -139,6 +139,43 @@ action_of :: proc(world: ^World, a: Entity_ID, record: ^Activity) -> Action {
 }
 
 
+/* Stage `index` of an activity: a walk's stages are its way, a tile
+ * each, each its operation's one stage (PERFORMANCE.md decision 1); any
+ * other's are its operation's. false past the last. */
+activity_stage :: proc(world: ^World, a: Entity_ID, record: ^Activity, index: i64, duration: ^i64, effect: ^string) -> bool {
+	operation := world_text_field(world, "Activity.operation", a)
+	if has_text(record.way) {
+		if index < 0 || index >= i64(len(record.way)) do return false
+		return operation_stage(world, operation, 0, duration, effect)
+	}
+	return operation_stage(world, operation, index, duration, effect)
+}
+
+
+/* What the stage under way does: a walk's, a walk of one tile in its
+ * way's direction; any other's, the activity's own action. */
+@(private = "file")
+stage_action_of :: proc(world: ^World, a: Entity_ID, record: ^Activity) -> Action {
+	action := action_of(world, a, record)
+	if has_text(record.way) && record.stage < i64(len(record.way)) {
+		action.operation = tile_walk(world, string(record.way)[record.stage])
+	}
+	return action
+}
+
+
+/* The one-tile walk a letter of a walk's way names. */
+tile_walk :: proc(world: ^World, letter: u8) -> cstring {
+	switch letter {
+	case 'n': return world_intern(world, "walk_north")
+	case 's': return world_intern(world, "walk_south")
+	case 'e': return world_intern(world, "walk_east")
+	case 'w': return world_intern(world, "walk_west")
+	}
+	return world_intern(world, "walk")
+}
+
+
 /* --- partial effects ---------------------------------------------------------- */
 
 /* The stage's progress at `t`: kept, plus its running since it started. */
@@ -165,7 +202,7 @@ next_checkpoint :: proc(world: ^World, a: Entity_ID, record: ^Activity, t: i64) 
 	role:      i32
 
 	operation = world_text_field(world, "Activity.operation", a)
-	if record.due == 0 || !operation_stage(world, operation, record.stage, &duration, &effect) ||
+	if record.due == 0 || !activity_stage(world, a, record, record.stage, &duration, &effect) ||
 	   !operation_partial(world, operation, record.stage, &field, &role, &whole_, &n) {
 		return TIME_NEVER.ms
 	}
@@ -192,7 +229,7 @@ activities_partial_of :: proc(self: ^Activities, a: Entity_ID, record: ^Activity
 	role:      i32
 
 	operation = world_text_field(self.world, "Activity.operation", a)
-	if !operation_stage(self.world, operation, record.stage, &duration, &effect) ||
+	if !activity_stage(self.world, a, record, record.stage, &duration, &effect) ||
 	   !operation_partial(self.world, operation, record.stage, &field, &role, &whole_, &n) {
 		return
 	}
@@ -452,7 +489,7 @@ activities_complete_due_at :: proc(self: ^Activities, t: Time) {
 			continue
 		}
 		operation = world_text_field(self.world, "Activity.operation", a)
-		more      = operation_stage(self.world, operation, record.stage + 1, &duration, &effect)
+		more      = activity_stage(self.world, a, record, record.stage + 1, &duration, &effect)
 		group     = proposal_group_group_with_phase(.Action,
 		                                            fmt.tprintf("activity %d: %s %s",
 		                                                        a, operation,
@@ -460,13 +497,13 @@ activities_complete_due_at :: proc(self: ^Activities, t: Time) {
 		proposal_group_set_cause(group, activities_start_of(self, a))
 		proposal_group_set_actor(group, Entity_ID(record.actorRef))
 		proposal_group_set_weight(group, contest_weight(self.world, Entity_ID(record.actorRef), operation))
-		if !operation_stage(self.world, operation, record.stage, &duration, &effect) do effect = ""
+		if !activity_stage(self.world, a, record, record.stage, &duration, &effect) do effect = ""
 		/* what it needs must still hold when its effect commits: taken from
 		 * the bench by someone else meanwhile, the seal is not to be taken
 		 * from their hand */
 		reason = activities_requirements_of(self, a, record)
 		if reason == "" {
-			reason = apply_named_effect(self.world, effect, action_of(self.world, a, record), record.amount, group)
+			reason = apply_named_effect(self.world, effect, stage_action_of(self.world, a, record), record.amount, group)
 		}
 		/* the effort tells on the actor */
 		if reason == "" && operation_exertion(self.world, operation, record.stage) != 0 {
@@ -483,7 +520,7 @@ activities_complete_due_at :: proc(self: ^Activities, t: Time) {
 		}
 		/* the stage's own traces, with its effect */
 		leave_stage_traces(self.world, action_of(self.world, a, record), record.stage, group)
-		if operation_stage(self.world, operation, record.stage + 1, &duration, &effect) {
+		if activity_stage(self.world, a, record, record.stage + 1, &duration, &effect) {
 			/* the next stage starts now */
 			proposal_group_set_of_to(group, "Activity.stage", whole(a), record.stage + 1)
 			proposal_group_set_of_to(group, "Activity.progress", whole(a), 0)
@@ -643,7 +680,7 @@ activities_resume :: proc(self: ^Activities, a: Entity_ID, error: ^string) -> ^P
 	}
 	if reason == "" do reason = activities_requirements_of(self, a, record)
 	if reason != "" ||
-	   !operation_stage(self.world, world_text_field(self.world, "Activity.operation", a), record.stage, &duration, &effect) {
+	   !activity_stage(self.world, a, record, record.stage, &duration, &effect) {
 		if error != nil do error^ = reason if reason != "" else "it has no stage to resume"
 		return nil
 	}
@@ -711,7 +748,7 @@ activities_repace :: proc(self: ^Activities, a: Entity_ID, record: ^Activity, ca
 	now:       i64
 
 	operation = world_text_field(self.world, "Activity.operation", a)
-	if !operation_stage(self.world, operation, record.stage, &duration, &effect) do return
+	if !activity_stage(self.world, a, record, record.stage, &duration, &effect) do return
 	pace = graded_rate(self.world, action_of(self.world, a, record),
 	                   work_rate(self.world, Entity_ID(record.actorRef), operation, record.stage))
 	if pace == (record.pace if record.pace > 0 else 100) do return

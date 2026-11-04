@@ -73,6 +73,17 @@ package lab
  * arises worth more than the threshold, or the goal is done or can't be,
  * control returns to the player, with a notice saying why.
  *
+ * Walks (PERFORMANCE.md decision 1): to go to a place, the agent finds its
+ * way once, over the ground as it believes it, and sets out on a walk: one
+ * activity, a stage a tile. While it walks it decides only what any busy
+ * agent does (questions, and what else might matter more); and at each
+ * perception it checks the walk still makes sense: the way ahead still
+ * believed open, what it goes to still where it was, still present, its
+ * intention still the same, an unseen tile it explores toward still
+ * unseen. If not, it gives the walk up, and decides afresh once it has
+ * stopped. Put down for something else, a walk is given up, not
+ * suspended: there is nothing to resume, only a way to find again.
+ *
  * Each agent's motivation store (its intentions, with their bindings and
  * failed methods, what it waits for, and the decision count) is private and
  * saved, and every decision is logged for the developer.
@@ -174,6 +185,18 @@ Question :: struct {
 }
 
 
+/* What a walk was set out on for (PERFORMANCE.md decision 1), to tell
+ * when it no longer makes sense. */
+Walk_Purpose :: struct {
+	set:    bool,
+	toward: u32,             /* the referent it goes to; 0, exploring */
+	x:      i32,             /* where that was believed to be; exploring, the unseen tile */
+	y:      i32,
+	level:  i32,
+	goal:   cstring,         /* interned: the intention it serves; nil, none */
+}
+
+
 Motivation :: struct {
 	using object: Object,
 	agent:        Entity_ID,
@@ -203,6 +226,7 @@ Motivation :: struct {
 	recipe:       cstring,             /* interned: the method to carry out its goal by, or nil */
 	threshold:    i32,                 /* worth above which control returns */
 	handedBack:   bool,
+	walking:      Walk_Purpose,        /* what the walk under way is for, if it set out on one */
 	log:          [dynamic]string,     /* each line in context.allocator */
 }
 
@@ -924,9 +948,11 @@ agency_explore :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Store, o
 	q.context_ = &c
 	q.passable = walkable
 	q.goal     = unseen
+	way       := make([dynamic]Step, context.temp_allocator)
+	q.way      = &way
 	r := path_find(&q)
 	if !r.found || r.step == .None do return false
-	agency_take_step(self, m, r.step, "exploring", fmt.tprintf("toward R0 at (%d, %d)", r.x, r.y))
+	agency_set_out(self, m, way[:], 0, r.x, r.y, me.level, "exploring", fmt.tprintf("toward (%d, %d)", r.x, r.y))
 	return true
 }
 
@@ -1383,43 +1409,111 @@ agency_act :: proc(self: ^Agency, m: ^Motivation, why: string, store: ^Knowledge
 
 
 @(private = "file")
-step_ops := [4]cstring{"walk_north", "walk_south", "walk_east", "walk_west"}
+way_letters := [4]u8{'n', 's', 'e', 'w'}
 
 
+/* Sets out on a walk by `way` (PERFORMANCE.md decision 1), for the
+ * current intention: toward referent `toward` believed at (x, y, level), or,
+ * exploring (toward 0), to the unseen tile there. */
 @(private = "file")
-agency_take_step :: proc(self: ^Agency, m: ^Motivation, step: Step, why: string, note: string) {
+agency_set_out :: proc(self: ^Agency, m: ^Motivation, way: []Step, toward: u32, x: i32, y: i32, level: i32,
+                       why: string, note: string) {
 	error: string
 
-	op := step_ops[int(step)]
-	if perform(self.world, self.committer, action_make(world_intern(self.world, op), m.agent, NO_ENTITY, NO_ENTITY), 0,
-	           &error) == nil {
-		agency_note(self, m, fmt.tprintf("%s: could not %s: %s", why, op, error))
-	} else {
-		agency_note(self, m, fmt.tprintf("%s: %s, %s", why, op, note))
+	letters := make([]u8, len(way) + 1, context.temp_allocator)
+	for step, i in way do letters[i] = way_letters[int(step)]
+	action    := action_make(world_intern(self.world, "walk"), m.agent, NO_ENTITY, NO_ENTITY)
+	action.way = world_intern(self.world, cstring(raw_data(letters)))
+	if perform(self.world, self.committer, action, 0, &error) == nil {
+		agency_note(self, m, fmt.tprintf("%s: could not set out: %s", why, error))
+		return
 	}
+	m.walking = Walk_Purpose{set = true, toward = toward, x = x, y = y, level = level,
+	                    goal = m.intentions[m.nintentions - 1].goal if m.nintentions != 0 else nil}
+	agency_note(self, m, fmt.tprintf("%s: a walk of %d tiles, %s", why, len(way), note))
 }
 
 
-/* One step toward a believed place, on the shortest way over the ground as
- * it believes it (BGPath: a tile never seen it guesses open). Where the
- * way straight there is as short as any, the longer way first, as ever;
- * with no way within a search's reach, toward the nearest it came. */
+/* The agent's walk under way, if any (a walk by a way, not of one tile). */
+@(private = "file")
+agency_walk_under_way :: proc(self: ^Agency, agent: Entity_ID) -> Entity_ID {
+	n: uint
+
+	walk    := world_intern(self.world, "walk")
+	mine    := world_copy_activities_of(self.world, agent, &n)
+	defer free(mine)
+	for i: uint = 0; i < n; i += 1 {
+		record := (^Activity)(world_record(self.world, world_kind_named(self.world, "Activity"), mine[i]))
+		if record != nil && record.status == ACTIVITYSTATUS_RUNNING &&
+		   world_text_field(self.world, "Activity.operation", mine[i]) == walk {
+			return mine[i]
+		}
+	}
+	return NO_ENTITY
+}
+
+
+/* Why the walk under way no longer makes sense, or "" (PERFORMANCE.md
+ * decision 1): its intention changed, what it goes to moved or is gone, the
+ * tile it explores toward was seen, or the way ahead is believed solid. */
+@(private = "file")
+agency_walk_stale :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Store, me: ^Referent, a: Entity_ID) -> string {
+	c: Walk_Context
+
+	j    := &m.walking
+	goal := m.intentions[m.nintentions - 1].goal if m.nintentions != 0 else nil
+	if !j.set do return "it doesn't know what for"
+	if goal != j.goal do return "it is doing something else now"
+	if j.toward != 0 {
+		r := knowledge_store_referent(store, j.toward)
+		if r == nil || !r.present do return fmt.tprintf("R%d is gone from where it was", j.toward)
+		if r.x != j.x || r.y != j.y || r.level != j.level do return fmt.tprintf("R%d has moved", j.toward)
+	} else if knowledge_store_has_seen_x(store, j.x, j.y, j.level) {
+		return "it has seen where it was going"
+	}
+	record := (^Activity)(world_record(self.world, world_kind_named(self.world, "Activity"), a))
+	if record == nil || !has_text(record.way) do return ""
+	c.world = self.world
+	c.store = store
+	c.level = me.level
+	x, y   := me.x, me.y
+	way    := string(record.way)
+	for i := int(record.stage); i < len(way); i += 1 {
+		switch way[i] {
+		case 'n': y -= 1
+		case 's': y += 1
+		case 'e': x += 1
+		case 'w': x -= 1
+		}
+		if !walkable(&c, x, y) do return fmt.tprintf("the way is blocked at (%d, %d)", x, y)
+	}
+	return ""
+}
+
+
+/* What it does with an activity it puts down: a walk is given up, there
+ * being nothing to resume; anything else suspended. */
+@(private = "file")
+agency_put_aside :: proc(self: ^Agency, a: Entity_ID, why: string, error: ^string) -> ^Proposal_Group {
+	if world_text_field(self.world, "Activity.operation", a) == world_intern(self.world, "walk") {
+		return activities_abort(self.activities, a, why, error)
+	}
+	return activities_suspend(self.activities, a, why, error)
+}
+
+
+/* A walk toward a believed place, on the shortest way over the ground
+ * as it believes it (BGPath: a tile never seen it guesses open), to within
+ * reach of it; with no way within a search's reach, toward the nearest it
+ * came. */
 @(private = "file")
 agency_walk :: proc(self: ^Agency, m: ^Motivation, why: string, me: ^Referent, target: ^Referent,
                     store: ^Knowledge_Store) {
-	c:        Walk_Context
-	q:        Path_Query
-	r:        Path_Result
-	straight: Path_Result
-	greedy:   Step
+	c:   Walk_Context
+	q:   Path_Query
+	way: [dynamic]Step
 
-	dx := target.x - me.x
-	dy := target.y - me.y
-	if abs(dx) >= abs(dy) {
-		greedy = .East if dx > 0 else .West
-	} else {
-		greedy = .South if dy > 0 else .North
-	}
+	way        = make([dynamic]Step, context.temp_allocator)
 	q          = {}
 	c.world    = self.world
 	c.store    = store
@@ -1431,24 +1525,14 @@ agency_walk :: proc(self: ^Agency, m: ^Motivation, why: string, me: ^Referent, t
 	q.ty       = target.y
 	q.context_ = &c
 	q.passable = walkable
-	r = path_find(&q)
+	q.way      = &way
+	r := path_find(&q)
 	if r.step == .None {
 		agency_note(self, m, fmt.tprintf("%s: no way toward R%d at (%d, %d)", why, target.id, target.x, target.y))
 		return
 	}
-	ax     := i64(abs(dx) - 1)
-	ay     := i64(abs(dy) - 1)
-	direct := (ax if ax > 0 else 0) + (ay if ay > 0 else 0)
-	if r.found && r.steps == direct && greedy != r.step {
-		/* the longer way first, if it too is as short as any */
-		q.x = me.x + (1 if greedy == .East else (-1 if greedy == .West else 0))
-		q.y = me.y + (1 if greedy == .South else (-1 if greedy == .North else 0))
-		if walkable(&c, q.x, q.y) {
-			straight = path_find(&q)
-			if straight.found && straight.steps == direct - 1 do r.step = greedy
-		}
-	}
-	agency_take_step(self, m, r.step, why, fmt.tprintf("toward R%d at (%d, %d)", target.id, target.x, target.y))
+	agency_set_out(self, m, way[:], target.id, target.x, target.y, target.level, why,
+	               fmt.tprintf("toward R%d at (%d, %d)", target.id, target.x, target.y))
 }
 
 
@@ -1526,7 +1610,7 @@ agency_put_down :: proc(self: ^Agency, m: ^Motivation, why: string) {
 		record := (^Activity)(world_record(self.world, world_kind_named(self.world, "Activity"), mine[i]))
 		if record == nil || record.status != u32(tri.type_named(world_tri(self.world), "\"running\"")) do continue
 		error: string
-		if activities_suspend(self.activities, mine[i], why, &error) != nil {
+		if agency_put_aside(self, mine[i], why, &error) != nil {
 			agency_note(self, m, fmt.tprintf("%s: putting %s down", why,
 			                                 world_text_field(self.world, "Activity.operation", mine[i])))
 		}
@@ -2713,7 +2797,7 @@ agency_weigh :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Store, bus
 		record := (^Activity)(world_record(self.world, world_kind_named(self.world, "Activity"), mine[i]))
 		if record == nil || record.status != u32(tri.type_named(tc, "\"running\"")) do continue
 		error: string
-		if activities_suspend(self.activities, mine[i], "something else matters more", &error) != nil {
+		if agency_put_aside(self, mine[i], "something else matters more", &error) != nil {
 			agency_note(self, m, fmt.tprintf("suspending %s", world_text_field(self.world, "Activity.operation", mine[i])))
 		}
 	}
@@ -2784,6 +2868,19 @@ agency_decide :: proc(self: ^Agency, m: ^Motivation) -> bool {
 	agency_renew_commitments(self, m)
 	busy := agency_busy(self, m.agent)
 	if agency_weigh(self, m, store, busy) do return false      /* something else won: decide again, for it */
+	/* on a walk: given up if it no longer makes sense, and decided afresh
+	 * once it has stopped (its ending is perceived) */
+	if walk := agency_walk_under_way(self, m.agent); walk != NO_ENTITY && self.activities != nil {
+		if why := agency_walk_stale(self, m, store, me, walk); why != "" {
+			if activities_abort(self.activities, walk, why, nil) != nil {
+				agency_note(self, m, fmt.tprintf("giving up the walk: %s", why))
+			}
+			m.walking = {}
+			return true
+		}
+	} else {
+		m.walking = {}
+	}
 	if m.autopilot && m.nintentions == 0 {
 		if m.routine && agency_has_routine(self, m) do return true      /* waiting for its routine */
 		if m.explore {
@@ -3092,6 +3189,11 @@ agency_saved_state :: proc(self: ^Agency) -> []string {
 		if m.explore do append(&lines, fmt.tprintf("explore %d", m.agent))
 		if m.recipe != nil do append(&lines, fmt.tprintf("recipe %d %s", m.agent, m.recipe))
 		if m.wake != 0 do append(&lines, fmt.tprintf("wake %d %d", m.agent, m.wake))
+		if m.walking.set {
+			j := m.walking
+			append(&lines, fmt.tprintf("walking %d %d %d %d %d %s", m.agent, j.toward, j.x, j.y, j.level,
+			                           j.goal if j.goal != nil else "-"))
+		}
 		for k: i32 = 0; k < m.nhabits; k += 1 {
 			append(&lines, fmt.tprintf("habit %d %s %d %d %d", m.agent, m.habits[k].context_, m.habits[k].choice,
 			                           m.habits[k].strength, m.habits[k].at))
@@ -3184,6 +3286,17 @@ agency_restore_saved_state :: proc(self: ^Agency, lines: []string) {
 			m = agency_mind_of(self, Entity_ID(ns_long_long_value(words[1])))
 			if ns_int_value(words[2]) < m.ncommitments {
 				m.commitments[ns_int_value(words[2])].resume = ns_long_long_value(words[3])
+			}
+			continue
+		}
+		if len(words) == 7 && words[0] == "walking" {
+			agency_mind_of(self, Entity_ID(ns_long_long_value(words[1]))).walking = Walk_Purpose{
+				set    = true,
+				toward = u32(ns_long_long_value(words[2])),
+				x      = i32(ns_long_long_value(words[3])),
+				y      = i32(ns_long_long_value(words[4])),
+				level  = i32(ns_long_long_value(words[5])),
+				goal   = nil if words[6] == "-" else world_intern(self.world, ns_utf8(words[6])),
 			}
 			continue
 		}

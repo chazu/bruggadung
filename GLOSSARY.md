@@ -244,10 +244,17 @@ REALITY.md, PRF = PERFORMANCE.md, TER = TERRAIN.md, TES = TESSERA.md, VIL = VILL
   from the actor. (ACT §5)
 - **Checkpoint**: a point in a stage where partial effects commit; it
   makes a boundary. (ACT d6)
-- **Journey** (proposed): a walk to a place as one activity, its way
-  found when it starts, a stage per tile; a decision point only when it
-  ends: arrived, blocked, or interrupted. Today each tile is an activity
-  of its own. (PRF d1)
+- **Walk**: going to a place on foot as one activity (`walk`), its
+  **way** (a letter a tile) found by the walker when it sets out, a stage
+  per tile; a decision point only when it ends: arrived, blocked, or given
+  up. Given up, not suspended, when the walker no longer believes in it.
+  A walk of one tile is `walk_north` and the rest; both are a `#Walk`.
+  *Avoid:* journey (that is travel), route (news), path (the search).
+  (PRF d1, AGE d20)
+- **Journey** (reserved, not built): travel from place to place by any
+  means, in **legs**: walks, and rides on a coach or a ship; planned by
+  agency, possibly across regions and levels of detail. *Avoid* it for a
+  walk. (PRF, open questions)
 - **Partial effect**: a stage's progress shown in the world (a half-sawn
   log), committed at checkpoints and on interruption. (ACT §5)
 - **Capability**: what a provider can contribute: kind, capacity,
@@ -634,9 +641,10 @@ REALITY.md, PRF = PERFORMANCE.md, TER = TERRAIN.md, TES = TESSERA.md, VIL = VILL
 - **Spatial index**: what stands where, filed by chunk or holder, read in
   entity order (`BGIndex`). (TER)
 - **Path search**: bounded A* or breadth-first over tiles (`BGPath`),
-  within a budget. **Exploring**: searching for the nearest tile never
-  seen; a method step can explore (`#Explore`), beside ground of a kind
-  the agent has seen (a woodcutter finding trees). (TER, AGE §5)
+  within a budget; it gives a walk its way. **Exploring**: a walk to the
+  nearest tile never seen; a method step can explore (`#Explore`), beside
+  ground of a kind the agent has seen (a woodcutter finding trees). (TER,
+  AGE §5)
 - **Sparse**: stored only where something is. (TER)
 
 ## The reality bubble and detail regimes
@@ -889,3 +897,4 @@ Each row says which term to use for which sense.
 | package | Triangle's: content scoping names | **Odin package** (a directory of Odin code) |
 | field | a component's field | **plot** (farmed ground) |
 | trade | a craft (`Agent.trade`) | **sale** (goods for coins) |
+| leg | the body's legs, a provider an activity uses | **leg of a journey** (reserved) |

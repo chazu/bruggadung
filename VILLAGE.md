@@ -324,8 +324,10 @@ New, and entered in the glossary with this document:
   warm-blooded (the lodger's `#ThermalBody`) is a slice of its own, and
   would make stoking a want rather than a commitment.
 - **What walking costs.** The woodcutters walk between the woods and home
-  all day, a boundary a step: the village runs 32,000 boundaries in three
-  days, eight times as many as before firewood. Slice 10 measures it;
-  carrying more at a time, or walking a path as one activity, would cut it.
+  all day, a boundary a step. Walking to a place as one activity
+  (AGENCY.md decision 20) halved the boundaries, to 18,000 in three days,
+  and left a mind deciding only where a walk ends (PERFORMANCE.md).
+  A boundary a step remains; carrying more at a time, or movement in
+  closed form (PERFORMANCE.md, open questions), would cut it further.
 - **Children.** The households are all adults. Children who eat but don't
   work would test the market harder.

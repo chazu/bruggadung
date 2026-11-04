@@ -16,6 +16,11 @@
 // - code:    an `effect` names a function in src/act_actions.odin
 //            (effect_take, effect_eat, ...). #Effect lists them all: a
 //            topic's new effect is added there and in the code together.
+// - code:    a walk's stages come from its activity's way, not from the
+//            operation (src/act_activities.odin); its way is found by the
+//            walker, over the ground as it believes it, when it sets out,
+//            and the walker gives it up when the way or what it goes to
+//            changes (src/agency_agency.odin).
 
 #Effect: "take" | "take_some" | "put_in" | "drive" | "open_tap" | "fill" | "walk" | "loosen" | "look" | "say" | "tend" | "analyse" | "write" | "read" | "eat" | "give" | "investigate" | "tighten" | "rotate" | "strike" | "shut" | "dismantle" | "light" | "rest" | "open_door" | "saw" | "pass" | "copy" | "reveal" | "replace" | "cut" | "shape" | "install" | "issue" | "confiscate" | "arrest" | "flee" | "hit" | "hire" | "work" | "service" | "cook" | "fell" | "split" | "stoke" | "put_down"
 
@@ -185,9 +190,9 @@ look_in: #Operation & {
     }
 } @family(operations)
 
-// Walk one tile, an activity of a second; the direction is in the
-// operation's name. The walker arrives when it is done. What the actor holds
-// goes along: it is held by the actor, wherever the actor is.
+// Walking, a second a tile. A walk of one tile names its direction in the
+// operation's name; the walker arrives when it is done. What the actor
+// holds goes along: it is held by the actor, wherever the actor is.
 #Walk: #Operation & {
     effect:   "walk"
     duration: 1s
@@ -199,3 +204,11 @@ walk_north: #Walk @family(operations)
 walk_south: #Walk @family(operations)
 walk_east:  #Walk @family(operations)
 walk_west:  #Walk @family(operations)
+
+// A walk (PERFORMANCE.md decision 1): going to a place as one activity,
+// its way found when it starts, a stage a tile, each a walk of a second in
+// the way's direction. A stage ending isn't a decision point; the walk
+// ending is: arrived, blocked (a tile on the way turns out solid, and the
+// stage fails), or given up. Nothing to resume: put down, it is given up.
+// Not one of the menu's operations: it needs a way, which its walker finds.
+walk: #Walk & { hard: "fail" }
