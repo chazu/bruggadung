@@ -517,6 +517,14 @@ compare_candidates :: proc(c: ^Condition, a: ^Referent, b: ^Referent) -> int {
 			da := knowledge_store_loyalty_to(c.store, a.id)
 			db := knowledge_store_loyalty_to(c.store, b.id)
 			if da != db do return -1 if da > db else 1
+		} else if str(c.order[k][:]) == "own" {
+			/* what it believes its own first (KNOWLEDGE.md decision 18) */
+			me := knowledge_store_self_referent(c.store)
+			fa := knowledge_store_finding(c.store, "#Owned", a.id)
+			fb := knowledge_store_finding(c.store, "#Owned", b.id)
+			da := fa != nil && fa.choice == me
+			db := fb != nil && fb.choice == me
+			if da != db do return -1 if da else 1
 		} else if str(c.order[k][:]) == "likely" {
 			da := likely_in(c, a.id)
 			db := likely_in(c, b.id)

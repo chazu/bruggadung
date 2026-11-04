@@ -22,7 +22,8 @@
 //             morning's something to eat at work, and supper.
 // - code:     the scenario undertakes the commitments, binding their slots
 //             (src/scenario_village.odin); a bed's owner is an ownership
-//             claim (things.tri), not yet something a method can ask after.
+//             claim (things.tri), which the owner knows when it sees the bed
+//             (a method can ask for its own: agency.tri's `own` order).
 
 // Something to sleep in. One bed is told from another just like it, an
 // agent's own from its neighbours', by where it is (KNOWLEDGE.md decision

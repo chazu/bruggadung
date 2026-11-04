@@ -56,7 +56,9 @@ things the lab put off:
    kin bonds (bonds.tri). No new entity is needed until abstract detail
    needs a **place** (DETAIL_REGIMES.md) to carry a larder's level.
    - Built: beds and larders just alike are told apart by where they are
-     (KNOWLEDGE.md decision 18). Before it, an agent passing a neighbour's
+     (KNOWLEDGE.md decision 18), and each of a household's people owns its
+     stove, larder, grain and woodpile, knows them as its own, and takes
+     from its own first. Before it, an agent passing a neighbour's
      door saw a bed like its own and believed its own had moved there, and
      the Brooks took the Hunts' larder for their own and ate from it; a
      colour each (a bed's blanket, a larder's paint) held it off until

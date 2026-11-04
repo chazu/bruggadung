@@ -158,6 +158,7 @@ BG_CONFIRMED :: 5            /* trust gained when a claim is seen to be true */
 BG_REFUTED :: 15             /* trust lost when a claim is found false */
 BG_WRONGED :: 10             /* trust lost in one who harms it, or is seen to wrong another (KNOWLEDGE.md decision 15) */
 BG_SEEN :: 30                /* the strength of a belief of where a thing is, seen just now */
+BG_FOUND :: 20               /* dB that a thing found gone is the one like it seen elsewhere since, if only one is */
 BG_FADE :: 2                 /* strength lost each memory step */
 BG_UNSTATED :: max(i32)      /* a claim that says nothing of how sure */
 
@@ -191,6 +192,7 @@ Referent :: struct {
 	slot:         i32,
 	role:         [16]u8,
 	seen:         i64,                       /* ms */
+	first:        i64,                       /* when it was first seen (ms), or -1 */
 	insideSeen:   i64,                       /* when it last saw inside it (ms), or -1 */
 	toldBy:       u32,                       /* the referent who said it is where it is believed; 0 if seen */
 	trust:        i32,                       /* dB: in what it says, if it is someone, from its conduct */
@@ -915,6 +917,7 @@ knowledge_store_add_referent :: proc(self: ^Knowledge_Store, referentID: u32) ->
 	self.count += 1
 	r^ = {}
 	r.insideSeen = -1
+	r.first = -1
 	r.trust = BG_TRUST
 	r.id = referentID if referentID != 0 else self.next
 	if r.id >= self.next do self.next = r.id + 1
@@ -1143,6 +1146,7 @@ knowledge_store_merge_referent :: proc(self: ^Knowledge_Store, from: u32, into: 
 		b.truth = a.truth
 		b.insideSeen = a.insideSeen if a.insideSeen > keep.insideSeen else keep.insideSeen
 	}
+	if a.first >= 0 && (b.first < 0 || a.first < b.first) do b.first = a.first
 	b.sightings += a.sightings
 	b.salience = a.salience if a.salience > b.salience else b.salience
 	b.loyalty = a.loyalty if a.loyalty > b.loyalty else b.loyalty

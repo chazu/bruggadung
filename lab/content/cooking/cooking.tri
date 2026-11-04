@@ -24,10 +24,10 @@
 // - home:     a larder is a container, village/village.tri's, one to a
 //             household. One larder is told from another just like it by
 //             where it is (KNOWLEDGE.md decision 18), not its looks. Whose
-//             it is (an ownership claim, things.tri) no method asks after
-//             yet: an agent takes from the larder it is used to (its habit,
-//             AGENCY.md §8), then the nearest. It knows at first only its
-//             own, so its own is what it gets used to.
+//             it is (an ownership claim, things.tri, each of the
+//             household's people its owner) its owners know when they see
+//             it, and take from their own first, then what they are used to
+//             (habit, AGENCY.md §8), then the nearest.
 // - code:     effect_cook (src/act_actions.odin); the scenario stocks the
 //             larders and undertakes the morning's commitment
 //             (src/scenario_village.odin).
@@ -96,8 +96,9 @@ eat_it_raw: #Method & {
 } @family(methods)
 
 // The ways to a meal, each taking from, cooking at and looking in what the
-// agent is used to first (its own larder and stove, AGENCY.md §8), then
-// the nearest: cook what the agent holds at a stove,
+// agent knows is its own first (its household's larder, sack and stove),
+// then what it is used to (AGENCY.md §8), then the nearest: cook what the
+// agent holds at a stove,
 // lit first if it isn't; take raw food from where it is kept, a portion,
 // hands empty (one in hand, it is cooked before another is taken, however
 // used the agent is to taking), when there is a stove to cook it at; or,
@@ -115,7 +116,7 @@ cook_what_i_hold: #Method & {
             stove: #Combustor & #Body
         }
     }
-    order: ["habit", "near"]
+    order: ["own", "habit", "near"]
     steps: [#Achieve & { subgoal: "stove_lit" }, #Do & { op: "cook", object: "food", target: "stove" }]
 } @family(methods)
 
@@ -145,7 +146,7 @@ take_to_cook: #Method & {
             stove: #Combustor & #Body
         }
     }
-    order: ["habit", "near"]
+    order: ["own", "habit", "near"]
     steps: [#Do & { op: "take_some", object: "food", units: 1 }]
 } @family(methods)
 
@@ -154,7 +155,7 @@ look_for_food: #Method & {
     goal:   "have_a_meal"
     rank:   3
     pre:    { find: ["larder", "stove"], match: #Cooking & { larder: #Container, stove: #Combustor & #Body } }
-    order:  ["habit", "likely", "near"]
+    order:  ["own", "habit", "likely", "near"]
     seeks:  #Food & #Body
     search: "larder"
     places: 2
@@ -193,7 +194,7 @@ take_some_along: #Method & {
             food: #Food & #Stack & { place: #Inside }
         }
     }
-    order: ["habit", "near"]
+    order: ["own", "habit", "near"]
     steps: [#Do & { op: "take_some", object: "food", units: 1 }]
 } @family(methods)
 

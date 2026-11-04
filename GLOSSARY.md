@@ -381,7 +381,8 @@ REALITY.md, TER = TERRAIN.md, TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc'
   above it. (KNO d17, lab/content/knowledge.tri)
 - **Identity from context**: which thing a percept is comes from
   continuity, place and whose it is before looks; a thing like one
-  believed still elsewhere is another thing, not that one moved. (KNO d18)
+  believed still elsewhere is another thing, not that one moved, until the
+  first is found gone. An owner knows its own things as its own. (KNO d18)
 - **Identity hypothesis**: a belief that two referents are one; past a
   threshold they **merge**. Errors of identity: merging, splitting,
   misbinding, invention. (KNO d13, §6)

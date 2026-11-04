@@ -132,11 +132,11 @@ village_setup :: proc(self: ^Village) {
 	for &h, k in households {
 		works[k] = proposal_group_create(g, h.worksite, ns_utf8(fmt.tprintf("%s' worksite", h.name)),
 		                                 on_tile(h.works.x, h.works.y, 0))
-		proposal_group_create(g, "stove", ns_utf8(fmt.tprintf("%s' stove", h.name)), on_tile(h.stove.x, h.stove.y, 0))
+		stove := proposal_group_create(g, "stove", ns_utf8(fmt.tprintf("%s' stove", h.name)), on_tile(h.stove.x, h.stove.y, 0))
 		larder := proposal_group_create(g, "larder", ns_utf8(fmt.tprintf("%s' larder", h.name)),
 		                                on_tile(h.larder.x, h.larder.y, 0))
 		larders[k] = larder
-		proposal_group_create(g, "grain_sack", ns_utf8(fmt.tprintf("%s' grain", h.name)), in_(larder))
+		sack := proposal_group_create(g, "grain_sack", ns_utf8(fmt.tprintf("%s' grain", h.name)), in_(larder))
 		woodpile := proposal_group_create(g, "woodpile", ns_utf8(fmt.tprintf("%s' woodpile", h.name)),
 		                                  on_tile(h.woodpile.x, h.woodpile.y, 0))
 		first := len(handles)
@@ -149,9 +149,13 @@ village_setup :: proc(self: ^Village) {
 			append(&handles, Villager{person, k, bed, works[k]})
 			village_own(g, person, bed, "a bed of one's own")
 		}
-		/* the household's things, its eldest's */
-		village_own(g, handles[first].id, larder, "the household's larder")
-		village_own(g, handles[first].id, woodpile, "the household's woodpile")
+		/* the household's things, each of its people's */
+		for v in handles[first:] {
+			village_own(g, v.id, stove, "the household's stove")
+			village_own(g, v.id, larder, "the household's larder")
+			village_own(g, v.id, sack, "the household's grain")
+			village_own(g, v.id, woodpile, "the household's woodpile")
+		}
 	}
 	committer_submit(c, g)
 	scheduler_run_until(self.scheduler, time_make(1))     /* each sees its worksite */

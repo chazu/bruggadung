@@ -120,12 +120,13 @@ These were made while writing this document and have not yet been reviewed.
     elsewhere is another thing, not the referent moved, unless the agent
     believes it gone from there (it has seen its old place empty since),
     it goes about by itself (an agent), the agent can see its old place
-    now (so would see it go), or it saw it moved. Built so (the lab's
-    recognition). Not yet built: an identity hypothesis ("R9 may be R4",
-    decision 13) between a thing found gone and one like it seen
-    elsewhere before, so that a thing moved while the agent wasn't looking
-    is taken for two (a split, §6) until it is seen moved; and ownership
-    known as a relation a method can ask after. What tells a thing from
+    now (so would see it go), or it saw it moved. A thing moved while the
+    agent wasn't looking is two to it (a split, §6) until it finds the
+    first gone: then each thing like it first seen since is an identity
+    hypothesis ("R9 may be R4", decision 13), strong enough to merge at
+    once if there is only one. What an agent owns it knows as its own when
+    it sees it (as it knows whom it is bound to), and a method can ask for
+    its own first (the lab's `own` order). Built so (issues #13, #14). What tells a thing from
     another just like it is, in order: continuity (it stayed in view),
     place (it is where it was), relations (it is mine, as the agent knows
     or was told: an ownership finding about itself), names, and only then

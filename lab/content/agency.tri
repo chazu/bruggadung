@@ -93,11 +93,12 @@
 // nearest first, most recently seen first, the one the agent has most
 // often chosen for the slot (its habit, AGENCY.md §8), the one it is most
 // loyal to (AGENCY.md decision 12), one it believes hiring (a #Hires
-// finding: decision 15), or the one it most
+// finding: decision 15), one it believes its own (an #Owned finding, its
+// own the choice: KNOWLEDGE.md decision 18), or the one it most
 // believes holds what the method `seeks` (AGENCY.md §5: "ordering the
 // places to look by the belief that the item is there"), told so if not
 // believing it. Ties go to the lower referent.
-#Order: "near" | "recent" | "habit" | "loyal" | "hiring" | "likely"
+#Order: "near" | "recent" | "habit" | "loyal" | "hiring" | "own" | "likely"
 
 // A method's steps, done in order and re-read at every decision: a subgoal
 // whose goal is already done is passed over, and its bindings join the

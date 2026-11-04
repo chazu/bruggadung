@@ -381,11 +381,14 @@ knowledge_perceive :: proc(self: ^Knowledge, store: ^Knowledge_Store, first: uin
 				}
 			}
 			r.seen    = now
+			if r.first < 0 do r.first = now
 			r.present = true
 			r.truth   = seen[i].entity                /* developer-only */
 			r.toldBy  = 0
 			/* whom it is bound to, it knows when it recognizes them */
 			r.loyalty = know_loyalty(self.world, agent, seen[i].entity)
+			/* and what it owns, as its own (KNOWLEDGE.md decision 18) */
+			know_own(self, store, agent, seen[i].entity, r.id, now)
 			if self.omniscient || know_contains(raw_data(lookedIn[:]), nlooked, seen[i].entity) do r.insideSeen = now
 			if r.form == .In || r.form == .Held_By do know_settle(store, r.id, r.container, true, now, news)
 			assigned[i] = r.id
@@ -527,6 +530,7 @@ knowledge_perceive :: proc(self: ^Knowledge, store: ^Knowledge_Store, first: uin
 		}
 		r.present = false
 		append(news, fmt.aprintf("R%d is not where it was", r.id))
+		know_lost(self, store, r, news)
 	}
 
 	/* what has faded too far, forgotten */
@@ -1715,9 +1719,9 @@ knowledge_saved_state :: proc(self: ^Knowledge) -> []string {
 		}
 		for j = 0; j < knowledge_store_count(store); j += 1 {
 			r = knowledge_store_referent_at(store, j)
-			append(&lines, fmt.tprintf("ref %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %s %s %s %s",
+			append(&lines, fmt.tprintf("ref %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %s %s %s %s",
 			                           knowledge_store_agent(store), r.id, i32(r.form),
-			                           r.container, r.x, r.y, r.level, r.slot, r.seen,
+			                           r.container, r.x, r.y, r.level, r.slot, r.seen, r.first,
 			                           r.insideSeen, r.toldBy, r.trust, r.loyalty, 1 if r.present else 0,
 			                           r.truth,
 			                           encode_word(cstring(&r.role[0])), encode_word(r.kind), encode_word(r.features),
@@ -1818,6 +1822,7 @@ knowledge_restore_saved_state :: proc(self: ^Knowledge, lines: []string) {
 	truth:       u64
 	seen:        i64
 	inside:      i64
+	first:       i64
 	told:        u32
 	origin:      u64
 	parent:      u64
@@ -2007,9 +2012,9 @@ knowledge_restore_saved_state :: proc(self: ^Knowledge, lines: []string) {
 			a.relayed    = form != 0
 			a.fabricated = present != 0
 			knowledge_add_ancestry(self, a)
-		} else if libc.sscanf(text, "ref %llu %u %d %u %d %d %d %d %lld %lld %u %d %d %d %llu %63s %511s %4095s %511s", &agent,
-		                      &id, &form, &container, &x, &y, &level, &slot, &seen, &inside, &told, &trust, &loyal, &present,
-		                      &truth, &role[0], &kind[0], &features[0], &deeper[0]) == 19 {
+		} else if libc.sscanf(text, "ref %llu %u %d %u %d %d %d %d %lld %lld %lld %u %d %d %d %llu %63s %511s %4095s %511s", &agent,
+		                      &id, &form, &container, &x, &y, &level, &slot, &seen, &first, &inside, &told, &trust, &loyal, &present,
+		                      &truth, &role[0], &kind[0], &features[0], &deeper[0]) == 20 {
 			decoded: cstring
 
 			store        = knowledge_store_of(self, Entity_ID(agent))
@@ -2022,6 +2027,7 @@ knowledge_restore_saved_state :: proc(self: ^Knowledge, lines: []string) {
 			r.level      = level
 			r.slot       = slot
 			r.seen       = seen
+			r.first      = first
 			r.insideSeen = inside
 			r.toldBy     = told
 			r.trust      = trust
@@ -2084,3 +2090,68 @@ knowledge_as_saved_system :: proc(self: ^Knowledge) -> Saved_System {
 knowledge_moves_itself :: proc(r: ^Referent) -> bool {
 	return r.kind != nil && strings.contains(string(r.kind), "#Agent")
 }
+
+
+/* A thing found gone from where it was (KNOWLEDGE.md decision 18) may be
+ * one like it the agent has seen elsewhere since it last saw it there, first
+ * seen then: an identity hypothesis each (decision 13), believed as much as
+ * BG_FOUND if there is only one, less for each other. A thing that goes
+ * about by itself isn't lost; one known alongside it is another. */
+@(private)
+know_lost :: proc(self: ^Knowledge, store: ^Knowledge_Store, r: ^Referent, news: ^[dynamic]string) {
+	if r.kind == nil || knowledge_moves_itself(r) do return
+	found := make([dynamic]u32, context.temp_allocator)
+	for j: uint = 0; j < knowledge_store_count(store); j += 1 {
+		c := knowledge_store_referent_at(store, j)
+		if c.id == r.id || c.id == knowledge_store_self_referent(store) || !c.present || c.kind == nil ||
+		   string(c.kind) != string(r.kind) || c.first < 0 || c.first <= r.seen {
+			continue
+		}
+		if !knowledge_looks_alike(self, r, store, string(c.kind), string(c.features) if c.features != nil else "") do continue
+		append(&found, c.id)
+	}
+	for c in found {
+		h: Identity
+		h.a        = c
+		h.b        = r.id
+		h.credence = BG_FOUND - 10 * i32(len(found) - 1)
+		h.time     = world_time(self.world).ms
+		knowledge_store_add_identity(store, h)
+		append(news, fmt.aprintf("R%d may be R%d (%+d dB): gone from where it was, and one like it seen since", c, r.id,
+		                         h.credence))
+	}
+}
+
+
+/* What the agent owns, it knows as its own when it sees it (KNOWLEDGE.md
+ * decision 18), as it knows whom it is bound to: an #Owned finding, its own
+ * the choice. */
+@(private)
+know_own :: proc(self: ^Knowledge, store: ^Knowledge_Store, agent: Entity_ID, e: Entity_ID, referent: u32, now: i64) {
+	claims: [64]Entity_ID
+	claimant: [1]Entity_ID
+	me := knowledge_store_self_referent(store)
+	if me == 0 do return
+	held := knowledge_store_finding(store, "#Owned", referent)
+	if held != nil && held.choice == me do return
+	ownership := u32(tri.type_named(world_tri(self.world), "\"ownership\""))
+	kclaim := world_kind_named(self.world, "Claim")
+	n := world_edges_to(self.world, .Claim_Subject, e, &claims[0], 64)
+	for i: uint = 0; i < n && i < 64; i += 1 {
+		claim := (^Claim)(world_record(self.world, kclaim, claims[i]))
+		if claim == nil || u32(claim.kind) != ownership do continue
+		if world_edges_from(self.world, .Claimant, claims[i], &claimant[0], 1) == 0 || claimant[0] != agent do continue
+		/* told it was another's: it knows better */
+		if held != nil do knowledge_store_retract_finding(store, "#Owned", referent)
+		f: Finding
+		f.kind     = world_intern(self.world, "#Owned")
+		f.about    = referent
+		f.choice   = me
+		f.credence = BG_SEEN
+		f.rule     = world_intern(self.world, "own")
+		f.time     = now
+		knowledge_store_add_finding(store, f)
+		return
+	}
+}
+

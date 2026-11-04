@@ -4571,3 +4571,22 @@ numbers only.
 - Not yet: an identity hypothesis between a thing found gone and one like
   it seen elsewhere before (so a thing moved unseen is taken for two until
   it is seen moved), and ownership known as a relation a method asks after.
+
+### After the slice: lost and found, and one's own (KNOWLEDGE.md decision 18, issue #14)
+
+- Lost and found: a referent keeps when it was first seen. Finding a thing
+  gone from where it was, the agent holds each thing like it first seen
+  since as an identity hypothesis (`BG_FOUND`, 20 dB, if there is only
+  one, so it merges at once; less for each other), so a thing moved while
+  it wasn't looking is found again as itself. Knowledge saves the
+  first-seen time.
+- One's own: what an agent owns it knows as its own when it sees it (an
+  `#Owned` finding, itself the choice), as it knows whom it is bound to.
+  Agency's `own` order puts what it believes its own first; cooking's
+  methods order by it, then habit, then nearness.
+- The village: each of a household's people owns its stove, larder, grain
+  and woodpile. Every check passes; the other scenarios behave exactly as
+  before.
+- Two new tests, `identity_lost_and_found` and `identity_own` (a hungry
+  farmer takes from its own sack though the neighbour's is nearer); each
+  fails with its part switched off.
