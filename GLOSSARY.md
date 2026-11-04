@@ -375,6 +375,12 @@ REALITY.md, TER = TERRAIN.md, TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc'
   it. *Avoid:* truth projection (for this). (KNO §6)
 - **Recognition**: matching a percept to the agent's referents by
   unification, weighing conflicts by persistence. (KNO §6, CL §11)
+- **Seen kind**: a kind that shows at a glance (a bed, a stove), declared
+  so; an inner state's (hunger) doesn't. What a thing is, is seen through
+  its seen kinds, not inferred from its perceived fields. (KNO d17)
+- **Identity from context**: which thing a percept is comes from
+  continuity, place and whose it is before looks; a like thing elsewhere
+  is a hypothesis, not the thing moved. (KNO d18)
 - **Identity hypothesis**: a belief that two referents are one; past a
   threshold they **merge**. Errors of identity: merging, splitting,
   misbinding, invention. (KNO d13, §6)

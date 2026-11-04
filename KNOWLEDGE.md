@@ -103,6 +103,28 @@ These were made while writing this document and have not yet been reviewed.
     the same rate its strength fades (§12), slower for what was salient or
     seen again and again, so a vivid or familiar thing keeps its
     specifics longer.
+17. **What a thing is, is seen if its kind says so** (issue #12). A kind
+    is declared **seen** (a bed, a stove, a container) or not (hunger, a
+    solid's heat: inner states), apart from whether any of its fields are
+    perceived. Until now the lab inferred it: a kind was seen only through
+    a perceived field, which hid inner states rightly but left a kind with
+    nothing to show but itself unseeable, so a bed needed a blanket to be
+    seen as a bed. Seen is opt-in, so nothing hidden becomes visible by
+    accident. A seen kind may later have an appearance other than its
+    truth (a disguise, a fake), as fields do (§4).
+18. **Identity comes from context before features** (issue #13). A thing
+    can't be in two places, so a percept like a referent believed
+    elsewhere is a new referent with an identity hypothesis ("R9 may be
+    R4", decision 13), not the referent moved, unless the agent saw it
+    leave or has seen its old place empty since. What tells a thing from
+    another just like it is, in order: continuity (it stayed in view),
+    place (it is where it was), relations (it is mine, as the agent knows
+    or was told: an ownership finding about itself), names, and only then
+    features such as a mark. This is how Dwarf Fortress and MOOs get
+    identity: from assignment and scope, never from looks; their kinds are
+    given outright (decision 17). The village found the need: four
+    households' beds, larders and stoves just alike, and villagers
+    believing their own had moved next door (VILLAGE.md decision 3).
 
 ## Terms
 
@@ -117,6 +139,7 @@ These were made while writing this document and have not yet been reviewed.
 | Conditions | What limits perception: light, distance, noise, occlusion, attention |
 | Percept | What one act of perception yields: features with precision |
 | Referent | An agent-local handle for something the agent thinks exists |
+| Seen kind | A kind that shows at a glance, declared so (decision 17); an inner state's doesn't |
 | Truth link | A referent's hidden link to zero or more true entities. Developer only. |
 | Observation | A stored percept: observer, time, modality, conditions, the referents involved, and features |
 | Proposition | A typed, time-indexed statement about referents and values |
@@ -266,6 +289,10 @@ they remember is their character's time-stamped beliefs.
   referent actually tracks: one, several (two people confused for one), or
   none (an invention). **Agent reasoning never consults the truth link**, not
   even as an optimization.
+- **A kind seen, and identity from context** (decisions 17 and 18): what
+  a thing is shows if its kind is seen, and which one it is comes from
+  where it is, what stayed in view, and whose it is, before its looks. A
+  match on looks alone, elsewhere, is a hypothesis.
 - **Identification errors are first-class:**
   - *merging*: two people taken for one
   - *splitting*: one person taken for two
