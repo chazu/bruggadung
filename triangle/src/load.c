@@ -532,6 +532,24 @@ static TriNode *build_raw(Build *b, X *x)
             if (t == TRI_BOTTOM) { build_error(b, x->loc, "unknown enum %s", an); return NULL; }
             return node_new(c, c->scratch, t);
         }
+        if (!all_num && x_text_or(x)) {
+            /* text, and strings it covers: text (a string an enum lists is
+             * no free text, so not among it) */
+            XPtrVec ts = { 0 };
+            flatten_or(x, &ts);
+            for (size_t i = 0; i < ts.n; i++) {
+                X *a = ts.v[i]->k == X_DEFAULT ? ts.v[i]->u.sub : ts.v[i];
+                uint32_t t = a->k == X_ATOM ? type_lookup(c, a->u.name) : TRI_BOTTOM;
+                if (t != TRI_BOTTOM && !c->tdl && !(c->types.v[t].kind == TK_ATOM && c->types.v[t].parents.n == 1 &&
+                                                    c->types.v[t].parents.v[0] == c->atomroot)) {
+                    build_error(b, a->loc, "%s is an enum's atom, not text: it can't be an alternative to text", a->u.name);
+                    VEC_FREE(ts);
+                    return NULL;
+                }
+            }
+            VEC_FREE(ts);
+            return leaf_new(c, c->scratch, c->dimtype[DIM_TEXT], TRI_NINF, TRI_INF);
+        }
         if (all_num) {
             int d2;
             int64_t l2, h2;

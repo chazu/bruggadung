@@ -1,10 +1,10 @@
-// Generated from Triangle content 96ab102d2ebc571f: do not edit. Type IDs are valid
+// Generated from Triangle content 5d1083d29149ba9a: do not edit. Type IDs are valid
 // only for this content; regenerate when it changes.
 package lab
 
 import tri "../../triangle/odin/triangle"
 
-CONTENT_HASH :: 0x96ab102d2ebc571f
+CONTENT_HASH :: 0x5d1083d29149ba9a
 
 // Combustor, from #Combustor
 Combustor :: struct {

@@ -132,6 +132,37 @@ void test_string_errors(void)
     tri_content_free(c);
 }
 
+/* A default among text: `*"a" | text` is text, its default the string,
+ * through a subtype too, and constructed as it; an instance's own string
+ * wins. Alternatives text covers (a regex) are text too. A string an enum
+ * lists is an atom, not text, and can't stand beside it. */
+void test_text_defaults(void)
+{
+    TriContent *c = load1_ok(
+        "#Log: { splitsInto: *\"firewood_20\" | text }\n"
+        "#Trunk: #Log & { lengths: int }\n"
+        "#Rx: { r: *\"ab\" | =~\"^z\" | text }\n"
+        "log1: #Log & {}\n"
+        "log2: #Log & { splitsInto: \"kindling\" }\n"
+        "trunk1: #Trunk & { lengths: 3 }\n"
+        "rx1: #Rx & {}\n"
+        "rx2: #Rx & { r: \"zz\" }\n");
+    CHECK_STR(text_of(c, tri_at(c, tri_spec(c, "log1"), "splitsInto")), "firewood_20");
+    CHECK_STR(text_of(c, tri_at(c, tri_spec(c, "log2"), "splitsInto")), "kindling");
+    CHECK_STR(text_of(c, tri_at(c, tri_spec(c, "trunk1"), "splitsInto")), "firewood_20");
+    CHECK_STR(text_of(c, tri_at(c, tri_spec(c, "rx1"), "r")), "ab");
+    CHECK_STR(text_of(c, tri_at(c, tri_spec(c, "rx2"), "r")), "zz");
+    TriArena *a = tri_arena_new();
+    CHECK_STR(text_of(c, tri_at(c, tri_construct(c, "trunk1", 7, a), "splitsInto")), "firewood_20");
+    tri_arena_free(a);
+    tri_content_free(c);
+
+    c = load1("\"wood\": \"oak\" | \"birch\"\n#M: { m: *\"oak\" | text }\nm1: #M & {}\n");
+    CHECK(!tri_content_ok(c));
+    CHECK(has_diag(c, "s.tri:2:11: error: \"oak\" is an enum's atom, not text", 1));
+    tri_content_free(c);
+}
+
 /* --- regex constraints ----------------------------------------------------------------- */
 
 static const char *rx_content =

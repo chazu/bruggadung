@@ -361,7 +361,7 @@ static void scan_expr(Content *c, X *x, bool typebody)
                 if (!contiguous)
                     diag(c, true, x->loc, "a disjunction of separate numbers is not a type; "
                          "use a range, or an enum of atoms");
-            } else {
+            } else if (!x_text_or(x)) {
                 register_disj(c, x, NULL);
                 break;
             }

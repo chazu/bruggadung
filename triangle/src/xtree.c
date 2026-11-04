@@ -181,6 +181,24 @@ static int cmp_iv(const void *a, const void *b)
     return x[0] < y[0] ? -1 : x[0] > y[0];
 }
 
+/* A disjunction of text: `text` itself among the alternatives, the rest
+ * string literals or regular expressions, which it covers. The hull is
+ * `text`, so it is no disjunction of structures; a default among it picks
+ * a string (`*"firewood_20" | text`). */
+bool x_text_or(X *x)
+{
+    XPtrVec ds = { 0 };
+    x_flatten(x, X_OR, &ds);
+    bool text = false, ok = ds.n > 1;
+    for (size_t i = 0; i < ds.n && ok; i++) {
+        X *a = ds.v[i]->k == X_DEFAULT ? ds.v[i]->u.sub : ds.v[i];
+        if (a->k == X_NAME && strcmp(a->u.name, dim_names[DIM_TEXT]) == 0) text = true;
+        else if (a->k != X_ATOM && a->k != X_REGEX) ok = false;
+    }
+    VEC_FREE(ds);
+    return ok && text;
+}
+
 /* A disjunction of numeric expressions: its hull, and whether the hull adds
  * nothing (the alternatives cover it without gaps). */
 bool x_numeric_or(X *x, int *dim, int64_t *lo, int64_t *hi, bool *contiguous)

@@ -51,9 +51,10 @@ tree_look: #Look & { kindOf: "#Tree", look: "tree" } @family(looks)
 
 trunk_seen: #Seen & { kindOf: "#Trunk" } @family(seen)
 
-// What a log is split into: a stack's blueprint.
+// What a log is split into: a stack's blueprint (oak firewood, unless
+// it says otherwise).
 #Log: {
-    splitsInto: text @field(content, saved, inspect)
+    splitsInto: *"firewood_20" | text @field(content, saved, inspect)
 }
 
 log_look:   #Look & { kindOf: "#Log", look: "log" } @family(looks)
@@ -69,9 +70,9 @@ tool_look: #Look & { kindOf: "#Axe", look: "tool" } @family(looks)
 oak:   #Tree & { material: "oak", mass: 600kg, fellsInto: "oak_trunk" }
 birch: #Tree & { material: "birch", mass: 300kg, fellsInto: "birch_trunk" }
 
-oak_trunk:   #Trunk & { material: "oak", mass: 120kg, hardness: 70, lengths: 6, cutsInto: "oak_log", splitsInto: "firewood_20" }
+oak_trunk:   #Trunk & { material: "oak", mass: 120kg, hardness: 70, lengths: 6, cutsInto: "oak_log" }
 birch_trunk: #Trunk & { material: "birch", mass: 60kg, hardness: 45, lengths: 3, cutsInto: "birch_log", splitsInto: "birch_firewood_20" }
-oak_log:     #Log & { material: "oak", mass: 20kg, hardness: 70, sawn: 100, splitsInto: "firewood_20" }
+oak_log:     #Log & { material: "oak", mass: 20kg, hardness: 70, sawn: 100 }
 birch_log:   #Log & { material: "birch", mass: 20kg, hardness: 45, sawn: 100, splitsInto: "birch_firewood_20" }
 
 // Firewood, by the piece: a kilogram of split wood, of the tree it came

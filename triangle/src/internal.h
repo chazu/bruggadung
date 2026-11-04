@@ -188,6 +188,7 @@ X    *x_and(Content *c, X *a, X *b);
 void  x_flatten(X *x, XKind k, XPtrVec *out);
 bool  x_interval(const X *x, int *dim, int64_t *lo, int64_t *hi);
 bool  x_numeric_or(X *x, int *dim, int64_t *lo, int64_t *hi, bool *contiguous);
+bool  x_text_or(X *x);
 
 /* arith.c */
 extern const char *const ARITH_UNKNOWN;

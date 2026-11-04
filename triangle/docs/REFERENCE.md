@@ -369,6 +369,7 @@ What a disjunction means depends on where it is.
 | Type | Structures (and type names) | A disjunction type, with one subtype per alternative. Unification chooses an alternative when the types decide it. If one alternative is a supertype of all the others, the disjunction is just that type. |
 | Type | Numbers that touch or overlap | Their hull: `1 \| 2` is `>=1 & <=2`. |
 | Type | Separate numbers | An error. Use a range, or an enum of atoms. |
+| Type, instance | `text`, and strings or regexes | `text`, which covers them: `splitsInto: *"firewood_20" \| text` is text, and its default is the string. A string an enum lists is an atom, not text, and is an error here. |
 | Instance | Atoms, overlapping ranges | Variation, chosen at construction. |
 | Instance | Structures, separate numbers | **Variants**: one version of the instance per combination of alternatives. Combinations that can't hold are dropped; if none holds, that is an error. More than the cap (`@variants`, default 64) is an error. |
 | Runtime value | Structures, separate numbers | An error: a runtime value must be one description. |
@@ -791,6 +792,7 @@ location of the other declaration where there is one.
 | `a disjunction of separate numbers is not a type; use a range, or an enum of atoms` | `1 \| 3` in a type. |
 | `an alternative may conjoin only names and structures` | An alternative of a type-level disjunction holds something else, such as numbers. |
 | `more than one default in a disjunction` | Two `*` alternatives. |
+| `"a" is an enum's atom, not text: it can't be an alternative to text` | `*"oak" \| text` where an enum lists `"oak"`. |
 | `#T is already component C` | Two `@component` attributes. |
 | `instance name X is a built-in type` | An instance named `int`, `bool`, and so on. |
 | `no type has all of these features (at 'f')` | A structure whose features belong to no single type. |
