@@ -135,6 +135,30 @@ These were made while writing this document and have not yet been reviewed.
     given outright (decision 17). The village found the need: four
     households' beds, larders and stoves just alike, and villagers
     believing their own had moved next door (VILLAGE.md decision 3).
+19. **A referent nothing holds is forgotten** (VILLAGE.md's open question
+    "Forgetting what was eaten"). Its features fading (decision 16) and
+    where it was (§12) were forgotten before; the referent itself never
+    was, so a villager knew of every portion it had eaten, a third of all
+    it knew after three days, and recognition weighed each percept against
+    them all. Now:
+    - **Seen to end.** A thing that ends (eaten, burned, split, merged into
+      a stack, felled) ends where it was, and the event says where. An
+      agent that perceives the event (its actor in sight, or itself) and
+      finds a thing it believed just there gone, in the same perception,
+      knows that thing ended: as many referents as things ended there, or
+      none if more are gone than ended (it can't tell which). This is
+      identity from context (decision 18); the truth link is never read.
+      An ended referent is no candidate for recognition.
+    - **Forgotten when nothing holds it.** A referent not believed
+      anywhere is forgotten, removed, once it ended, or once it has faded
+      below belief (the strength that forgets where it is, §12), and only
+      if nothing holds it: an observation, testimony or identity
+      hypothesis about it, a referent believed in or on it, the agent's
+      intentions, commitments or habits (agency says), or its being
+      someone (people known are kept). Findings don't hold it: they are
+      about it, and go with it (that a portion eaten was the agent's own).
+    - Left out: the store's capacity (§12's eviction by salience), and
+      forgetting someone.
 
 ## Terms
 
@@ -149,6 +173,7 @@ These were made while writing this document and have not yet been reviewed.
 | Conditions | What limits perception: light, distance, noise, occlusion, attention |
 | Percept | What one act of perception yields: features with precision |
 | Referent | An agent-local handle for something the agent thinks exists |
+| Ended | Of a referent: the agent perceived the thing end (decision 19). It is forgotten unless something holds it. |
 | Seen kind | A kind that shows at a glance, declared so (decision 17); an inner state's doesn't |
 | Truth link | A referent's hidden link to zero or more true entities. Developer only. |
 | Observation | A stored percept: observer, time, modality, conditions, the referents involved, and features |
@@ -435,6 +460,8 @@ acquired, when it was last confirmed, and its salience.
   - **Strength** decays at a rate set by salience and repetition.
 - When a belief's strength would fall below the forgetting threshold, it is
   forgotten at a scheduled time, which is a `nextEvent`.
+- A referent no longer believed anywhere is forgotten once it ended or has
+  faded below belief, if nothing holds it (decision 19).
 - **Each knowledge store is bounded.** An agent kind declares a capacity.
   When it is exceeded, the least salient items are evicted first, ties broken
   by acquisition order. Eviction is deterministic.

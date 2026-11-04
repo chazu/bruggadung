@@ -304,6 +304,11 @@ a disturbance generates no goal to investigate it.
   - Strength rises with repetition and decays analytically.
   - Habits supply method defaults: where to put things, which route to
     take.
+  - An agent holds at most so many (the lab's sixteen). A new habit takes
+    the place of the weakest, the oldest of equals, so one-off choices (a
+    portion eaten) give way, and the habits never freeze. A habit of
+    something forgotten (KNOWLEDGE.md decision 19) is moot: it fades and
+    gives way.
 - **Others form beliefs about habits.** Interpretation rules turn repeated
   observations into propositions such as "Piet usually leaves by the front".
   **Breaking a habit is salient** to anyone who holds such a belief. This is

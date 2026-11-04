@@ -113,4 +113,7 @@ Scheduler_Observer :: struct {
 Concerns :: struct {
 	data:        rawptr,
 	concerns_of: proc(data: rawptr, agent: Entity_ID) -> []string,
+	/* whether the agent's intentions, commitments or habits name the
+	 * referent: then it isn't forgotten (KNOWLEDGE.md decision 19) */
+	holds:       proc(data: rawptr, agent: Entity_ID, referent: u32) -> bool,
 }

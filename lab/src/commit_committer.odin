@@ -747,7 +747,8 @@ committer_apply :: proc(self: ^Committer, p: ^Proposal, g: ^Proposal_Group, tall
 		if world_is_physical(self.world, e) {
 			declare(tally, world_unit_of(self.world, e), -world_units_of(self.world, e), -world_mass_of(self.world, e))
 		}
-		ev = committer_emit(self, "destroyed", e, NO_ENTITY, 0, p.name, location_make_none(), g)
+		/* where it was: a witness knows the thing that ended there (KNOWLEDGE.md decision 19) */
+		ev = committer_emit(self, "destroyed", e, NO_ENTITY, 0, p.name, world_location_of(self.world, e), g)
 		world_destroy(self.world, e, NO_ENTITY, ev, p.name if p.name != nil else "destroyed")
 		return ""
 

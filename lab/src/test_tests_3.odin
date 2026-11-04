@@ -2899,7 +2899,8 @@ test_remembered :: proc(sightings: i32, moves: bool, days: i64, recall: ^string)
 /* Forgetting is a scheduled `nextEvent` (KNOWLEDGE.md §12): a stone seen
  * once fades below belief on the sixteenth day after it was last seen;
  * with nothing else happening, a boundary comes then, and it is forgotten
- * there, not at the next boundary something else brings. */
+ * there, not at the next boundary something else brings: with nothing
+ * holding it, the stone itself (KNOWLEDGE.md decision 19). */
 test_scheduled_forgetting :: proc() {
 	st: Stage
 	knowledge: ^Knowledge
@@ -2934,7 +2935,7 @@ test_scheduled_forgetting :: proc() {
 	bg_check(scheduler_run_until(st.s, time_make(when_ - 1)) == 1)
 	bg_check(knowledge_store_referent(store, test_referent_of(store, stone)).present)
 	bg_check(scheduler_run_until(st.s, time_make(when_ + 3600000)) == 2)
-	bg_check(!knowledge_store_referent(store, test_referent_of(store, stone)).present)
+	bg_check(test_referent_of(store, stone) == 0)
 	bg_check(perception.next_forgetting(perception.data).ms == TIME_NEVER.ms)
 }
 
@@ -3759,5 +3760,7 @@ ALL_TESTS := [?]Test_Case{
 	{"identity_from_context",         test_identity_from_context},
 	{"identity_lost_and_found",       test_identity_lost_and_found},
 	{"identity_own",                  test_identity_own},
+	{"forgetting",                    test_forgetting},
+	{"habits_give_way",               test_habits_give_way},
 	{"firewood",                      test_firewood},
 }

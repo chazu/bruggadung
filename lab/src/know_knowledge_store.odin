@@ -55,6 +55,14 @@ package lab
  * restores both. A claim of what the speaker saw says how sure it is, its
  * memory's strength, and weighs no more than that.
  *
+ * Forgetting a referent (KNOWLEDGE.md decision 19): a thing it perceived
+ * end where it believed it (a destroyed or merged event, by an actor in
+ * sight), found gone, ended. A referent not believed anywhere, ended or
+ * faded below belief, is forgotten, its findings with it, unless something
+ * holds it: an observation, testimony or identity hypothesis about it, a
+ * referent in or on it, the agent's agency (Concerns.holds), or its being
+ * someone.
+ *
  * Perception reads appearance (KNOWLEDGE.md §4): a plated fitting looks
  * brass. What an analysis the agent did found beneath it is kept with the
  * referent and overrides its looks, however often it is seen again.
@@ -198,6 +206,7 @@ Referent :: struct {
 	trust:        i32,                       /* dB: in what it says, if it is someone, from its conduct */
 	loyalty:      i32,                       /* 0 to 100: the agent's to it, if someone it is bound to (AGENCY.md §12) */
 	present:      bool,                      /* still believed where it was last seen */
+	ended:        bool,                      /* it perceived the thing end (KNOWLEDGE.md decision 19): gone for good */
 	sightings:    i32,                       /* how often it was sighted (not seen for a minute before) */
 	salience:     i32,                       /* the most salient thing it was kept in an observation for */
 	truth:        Entity_ID,                 /* developer-only */
@@ -690,6 +699,33 @@ knowledge_store_count :: proc(self: ^Knowledge_Store) -> uint {
 }
 
 
+/* Forgets a referent (KNOWLEDGE.md decision 19), and its findings: what it
+ * concluded about it, or that something usually chooses it. Nothing else
+ * of the store may still name it. */
+knowledge_store_forget_referent :: proc(self: ^Knowledge_Store, referentID: u32) {
+	k: uint
+	n: uint
+
+	for k = 0; k < self.count && self.referents[k].id != referentID; k += 1 {
+	}
+	if k == self.count || referentID == self.self do return
+	for i: uint = 0; i < self.nfindings; i += 1 {
+		if self.findings[i].about != referentID && self.findings[i].choice != referentID {
+			self.findings[n] = self.findings[i]
+			n += 1
+		}
+	}
+	self.nfindings = n
+	a := &self.referents[k]
+	delete(a.kind)
+	delete(a.features)
+	delete(a.deeper)
+	for h := 0; h < BG_HYPOTHESES; h += 1 do delete(a.supposed[h])
+	mem.copy(&self.referents[k], &self.referents[k + 1], size_of(Referent) * int(self.count - k - 1))
+	self.count -= 1
+}
+
+
 knowledge_store_referent_at :: proc(self: ^Knowledge_Store, i: uint) -> ^Referent {
 	return &self.referents[i]
 }
@@ -1143,6 +1179,7 @@ knowledge_store_merge_referent :: proc(self: ^Knowledge_Store, from: u32, into: 
 		b.seen = a.seen
 		b.toldBy = a.toldBy
 		b.present = a.present
+		b.ended = a.ended
 		b.truth = a.truth
 		b.insideSeen = a.insideSeen if a.insideSeen > keep.insideSeen else keep.insideSeen
 	}
@@ -1723,13 +1760,18 @@ knowledge_store_generalize :: proc(self: ^Knowledge_Store, known: string, kind: 
 
 
 knowledge_store_strength_of :: proc(self: ^Knowledge_Store, referentID: u32) -> i32 {
-	r: ^Referent
+	r := knowledge_store_referent(self, referentID)
+	if r == nil do return BG_PRIOR
+	return knowledge_store_strength_of_referent(self, r)
+}
+
+
+/* As strengthOf, for a referent in hand: no lookup. */
+knowledge_store_strength_of_referent :: proc(self: ^Knowledge_Store, r: ^Referent) -> i32 {
 	base: i32
 	sightings: i32
 	salience: i32
 
-	r = knowledge_store_referent(self, referentID)
-	if r == nil do return BG_PRIOR
 	base = BG_SEEN
 	if r.toldBy != 0 && r.form == .In do base = knowledge_store_credence_that(self, r.id, r.container)
 	/* seen once, nothing salient: BG_FADE a step; slower for repetition and salience */

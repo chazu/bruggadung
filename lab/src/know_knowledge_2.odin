@@ -255,7 +255,7 @@ knowledge_perceive :: proc(self: ^Knowledge, store: ^Knowledge_Store, first: uin
 				maybePaths[0] = 0
 				for j = 0; j < knowledge_store_count(store); j += 1 {
 					r = knowledge_store_referent_at(store, j)
-					if taken[j] != 0 || r.id == knowledge_store_self_referent(store) || r.kind == nil || string(r.kind) != kind do continue
+					if taken[j] != 0 || r.ended || r.id == knowledge_store_self_referent(store) || r.kind == nil || string(r.kind) != kind do continue
 					exact = r.present && r.form == at.form && r.container == container &&
 					        (container != 0 || (r.x == tile.x && r.y == tile.y))
 					d = 0 if exact else ((1 if r.present else 2) + i32(know_max64(i64(abs(r.x - tile.x)), i64(abs(r.y - tile.y)))))
@@ -509,7 +509,10 @@ knowledge_perceive :: proc(self: ^Knowledge, store: ^Knowledge_Store, first: uin
 		append(news, fmt.aprintf("R%d, beneath its looks: %s", r.id, ev.detail))
 	}
 
-	/* absence: believed at a place in sight, and not seen there */
+	/* absence: believed at a place in sight, and not seen there; what it
+	 * saw end there ended (KNOWLEDGE.md decision 19), the rest is lost */
+	ends := know_ends_witnessed(self, store, agent, here, first, last, seen, assigned, nseen)
+	gone := make([dynamic]u32, context.temp_allocator)
 	for j = 0; j < knowledge_store_count(store); j += 1 {
 		holder: ^Referent
 
@@ -530,7 +533,12 @@ knowledge_perceive :: proc(self: ^Knowledge, store: ^Knowledge_Store, first: uin
 		}
 		r.present = false
 		append(news, fmt.aprintf("R%d is not where it was", r.id))
-		know_lost(self, store, r, news)
+		append(&gone, r.id)
+	}
+	know_ended(store, ends[:], gone[:], news)
+	for id in gone {
+		r = knowledge_store_mutable_referent(store, id)
+		if r != nil && !r.ended do know_lost(self, store, r, news)
 	}
 
 	/* what has faded too far, forgotten */
@@ -538,7 +546,7 @@ knowledge_perceive :: proc(self: ^Knowledge, store: ^Knowledge_Store, first: uin
 		habit: u32
 
 		r = knowledge_store_referent_at(store, j)
-		if !r.present || r.id == knowledge_store_self_referent(store) || knowledge_store_strength_of(store, r.id) >= BG_BELIEVE do continue
+		if !r.present || r.id == knowledge_store_self_referent(store) || knowledge_store_strength_of_referent(store, r) >= BG_BELIEVE do continue
 		/* what it always puts in the same place, it believes is there (AGENCY.md
 		 * Scenario 1: Oskar always hangs the wrench on the hook) */
 		habit = know_own_usual_place(store, r.id, 3)
@@ -553,6 +561,7 @@ knowledge_perceive :: proc(self: ^Knowledge, store: ^Knowledge_Store, first: uin
 		r.present = false
 		append(news, fmt.aprintf("R%d: forgotten where it was", r.id))
 	}
+	know_forget(self, store, now, news)
 
 	/* promised into someone's hand, and due: the holder, in sight now,
 	 * hasn't it, so the promise is broken (in its hand, it was kept when
@@ -1722,7 +1731,7 @@ knowledge_saved_state :: proc(self: ^Knowledge) -> []string {
 			append(&lines, fmt.tprintf("ref %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %s %s %s %s",
 			                           knowledge_store_agent(store), r.id, i32(r.form),
 			                           r.container, r.x, r.y, r.level, r.slot, r.seen, r.first,
-			                           r.insideSeen, r.toldBy, r.trust, r.loyalty, 1 if r.present else 0,
+			                           r.insideSeen, r.toldBy, r.trust, r.loyalty, 1 if r.present else (2 if r.ended else 0),
 			                           r.truth,
 			                           encode_word(cstring(&r.role[0])), encode_word(r.kind), encode_word(r.features),
 			                           encode_word(r.deeper)))
@@ -2032,7 +2041,8 @@ knowledge_restore_saved_state :: proc(self: ^Knowledge, lines: []string) {
 			r.toldBy     = told
 			r.trust      = trust
 			r.loyalty    = loyal
-			r.present    = present != 0
+			r.present    = present == 1
+			r.ended      = present == 2      /* 2: it ended (KNOWLEDGE.md decision 19) */
 			r.truth      = Entity_ID(truth)
 			decoded      = decode_word(cstring(&role[0]))
 			strncpy(raw_data(r.role[:]), ([^]u8)(decoded), size_of(r.role) - 1)
@@ -2155,3 +2165,131 @@ know_own :: proc(self: ^Knowledge, store: ^Knowledge_Store, agent: Entity_ID, e:
 	}
 }
 
+
+
+/* --- forgetting a referent (KNOWLEDGE.md decision 19) ------------------------------------ */
+
+/* Where things it perceived end ended: at a place (on a tile, in or held by
+ * a referent), by an actor (whose hands it may have been in a moment ago:
+ * a stack put in a bin merges there). */
+@(private = "file")
+Ended_Place :: struct {
+	form:  Location_Form,
+	place: u32,              /* the referent it was in or held by */
+	x:     i32,
+	y:     i32,
+	level: i32,
+	hands: u32,              /* the actor, as a referent, or 0 */
+	ends:  int,              /* things that ended there */
+}
+
+
+/* The things the agent perceived end this boundary: by an actor in sight,
+ * or itself, where they were. */
+@(private = "file")
+know_ends_witnessed :: proc(self: ^Knowledge, store: ^Knowledge_Store, agent: Entity_ID, here: Location, first: uint, last: uint,
+                            seen: [^]Seen, assigned: [^]u32, nseen: uint) -> [dynamic]Ended_Place {
+	ends := make([dynamic]Ended_Place, context.temp_allocator)
+	me := knowledge_store_self_referent(store)
+	for i := first; i < last; i += 1 {
+		tile: Location
+
+		ev := world_event_at(self.world, i)
+		if (string(ev.kind) != "destroyed" && string(ev.kind) != "merged") || ev.location.form == .None do continue
+		/* a reaction's (a stack merging in the bin it was put in): whoever did what it follows from */
+		actor := ev.actor
+		for c, hops := ev.cause, 0; actor == 0 && c != 0 && hops < 8; hops += 1 {
+			cause := world_event_at(self.world, uint(c - 1))      /* indices count from 1 */
+			if cause == nil do break
+			actor, c = cause.actor, cause.cause
+		}
+		if actor != agent && !self.omniscient &&
+		   (actor == 0 || !know_ground_tile(self.world, actor, &tile) || !knowledge_in_sight(self, tile, here)) {
+			continue
+		}
+		p := Ended_Place{form = ev.location.form, ends = 1}
+		p.hands = know_bound_to(actor, agent, me, seen, assigned, nseen) if actor != 0 else 0
+		if p.form == .On_Tile {
+			if !self.omniscient && !knowledge_sees(self, ev.location, here) do continue
+			p.x, p.y, p.level = ev.location.x, ev.location.y, ev.location.level
+		} else {
+			p.place = know_bound_to(ev.location.place, agent, me, seen, assigned, nseen)
+			if p.place == 0 && p.hands == 0 do continue
+		}
+		merged := false
+		for &q in ends {
+			if q.form == p.form && q.place == p.place && q.x == p.x && q.y == p.y && q.level == p.level && q.hands == p.hands {
+				q.ends += 1
+				merged = true
+			}
+		}
+		if !merged do append(&ends, p)
+	}
+	return ends
+}
+
+
+/* Of what it found gone just now, what it saw end where it believed it: as
+ * many as ended at each place, or none if more are gone from there than
+ * ended (it can't tell which). */
+@(private = "file")
+know_ended :: proc(store: ^Knowledge_Store, ends: []Ended_Place, gone: []u32, news: ^[dynamic]string) {
+	if len(ends) == 0 do return
+	claimed := make([]bool, len(gone), context.temp_allocator)
+	for p in ends {
+		matched := make([dynamic]int, context.temp_allocator)
+		for id, k in gone {
+			r := knowledge_store_referent(store, id)
+			if claimed[k] || r == nil do continue
+			at_place := r.form == p.form &&
+			            (r.container == p.place if p.form != .On_Tile else (r.x == p.x && r.y == p.y && r.level == p.level))
+			in_hands := p.hands != 0 && r.form == .Held_By && r.container == p.hands
+			if at_place || in_hands do append(&matched, k)
+		}
+		if len(matched) == 0 || len(matched) > p.ends do continue
+		for k in matched {
+			claimed[k] = true
+			r := knowledge_store_mutable_referent(store, gone[k])
+			r.ended = true
+			append(news, fmt.aprintf("R%d is no more", r.id))
+		}
+	}
+}
+
+
+/* A referent not believed anywhere, ended or faded below belief, is
+ * forgotten if nothing holds it: what it observed, was told, or supposes
+ * of it, what it believes in or on it, what its agency holds, or its being
+ * someone. Its findings go with it. */
+@(private = "file")
+know_forget :: proc(self: ^Knowledge, store: ^Knowledge_Store, now: i64, news: ^[dynamic]string) {
+	me := knowledge_store_self_referent(store)
+	going := make([dynamic]u32, context.temp_allocator)
+	for j: uint = 0; j < store.count; j += 1 {
+		r := &store.referents[j]
+		if r.present || r.id == me || knowledge_moves_itself(r) do continue
+		if !r.ended && knowledge_store_strength_of_referent(store, r) >= BG_BELIEVE do continue
+		append(&going, r.id)
+	}
+	if len(going) == 0 do return
+	held := make(map[u32]struct{}, context.temp_allocator)
+	for j: uint = 0; j < store.count; j += 1 do if store.referents[j].container != 0 do held[store.referents[j].container] = {}
+	for j: uint = 0; j < store.nobservations; j += 1 {
+		o := &store.observations[j]
+		held[o.actor] = {}; held[o.subject] = {}; held[o.other] = {}
+	}
+	for j: uint = 0; j < store.ntestimony; j += 1 {
+		t := &store.testimony[j]
+		held[t.thing] = {}; held[t.container] = {}; held[t.source] = {}; held[t.root] = {}; held[t.via] = {}
+	}
+	for j: uint = 0; j < store.nidentities; j += 1 {
+		held[store.identities[j].a] = {}; held[store.identities[j].b] = {}
+	}
+	for j: uint = 0; j < store.ntraces; j += 1 do held[store.traces[j].bearer] = {}
+	for id in going {
+		if id in held do continue
+		if self.concerns.holds != nil && self.concerns.holds(self.concerns.data, store.agent, id) do continue
+		knowledge_store_forget_referent(store, id)
+		append(news, fmt.aprintf("R%d: forgotten", id))
+	}
+}

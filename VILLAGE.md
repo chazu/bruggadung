@@ -315,10 +315,10 @@ New, and entered in the glossary with this document:
 - **How weakness is felt.** Strength and cognition fall with reserves, but
   does the agent know it is weak? The interoceptive belief is hunger's.
   Weakness might be felt as fatigue, or as a need of its own.
-- **Forgetting what was eaten.** Knowledge keeps every referent: each
-  portion a villager eats stays one, not present. Over three days that is
-  a third of what a villager knows of; over weeks it will be most, and
-  recognition compares each percept with them all.
+- **Forgetting what was eaten.** Settled (KNOWLEDGE.md decision 19): a
+  villager sees what it eats end, and forgets it; what it lost, it forgets
+  once its memory of it fades. Its referents level off by the second day
+  (360 across the village after three, from 790).
 - **Cold.** Villagers aren't thermal bodies, so they don't feel the cold,
   rooms have no air of their own, and a stove only burns. Making people
   warm-blooded (the lodger's `#ThermalBody`) is a slice of its own, and

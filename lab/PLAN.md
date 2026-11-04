@@ -4627,3 +4627,30 @@ numbers only.
   questions.
 
 123 tests, 3798 checks; the other scenarios behave exactly as before.
+
+### After the slice: forgetting, and text defaults (KNOWLEDGE.md decision 19)
+
+- Triangle: a default among text, `*"firewood_20" | text`, was read as a
+  disjunction of structures, and its default never became text (the lab
+  saw `Log.splitsInto` empty). Text with strings or regexes beside it is
+  now text, its default the string; a string an enum lists beside text is
+  an error. `#Log` has its default back.
+- A referent nothing holds is forgotten (KNOWLEDGE.md decision 19). A
+  destroyed thing's event says where it was; an agent that perceives
+  things end where it believed them, and finds them gone, knows they
+  ended (as many as ended there, none if it can't tell which), and an
+  ended referent is no candidate for recognition. A referent not believed
+  anywhere is forgotten once it ended or has faded below belief, unless an
+  observation, testimony, identity hypothesis, a referent in or on it,
+  agency (intentions, commitments, questions) or its being someone holds
+  it; findings go with it. A reaction's event (a stack merging in the bin
+  it was put in) is perceived as its cause's actor's.
+- Found on the way: an agent's sixteen habits filled within a day with
+  portions eaten, and nothing could be learned after; now a new habit
+  takes the weakest's place, the oldest of equals (AGENCY.md §8). Habits
+  no longer keep a referent from being forgotten.
+- The village: referents across its twelve people after three days, 360
+  (from 790), level from the second day; 58.9 s (from 69.4 s), though its
+  people now choose differently: 33,620 boundaries.
+
+125 tests; the other scenarios behave exactly as before.

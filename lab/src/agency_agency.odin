@@ -445,7 +445,6 @@ Condition :: struct {
 
 
 /* How strong the habit is at `now`: faded a point a day since. */
-@(private = "file")
 habit_strength :: proc(m: ^Motivation, context_: cstring, choice: u32, now: i64) -> i32 {
 	for k: i32 = 0; m != nil && k < m.nhabits; k += 1 {
 		if string(m.habits[k].context_) == string(context_) && m.habits[k].choice == choice {
@@ -616,7 +615,32 @@ agency_as_concerns :: proc(self: ^Agency) -> Concerns {
 	return Concerns{
 		data        = self,
 		concerns_of = proc(data: rawptr, agent: Entity_ID) -> []string {return agency_concerns_of((^Agency)(data), agent)},
+		holds       = proc(data: rawptr, agent: Entity_ID, referent: u32) -> bool {return agency_names_referent((^Agency)(data), agent, referent)},
 	}
+}
+
+
+/* Whether the agent's mind names the referent: an intention's binding or
+ * what it arose about, a commitment's, one it awaits or that asked it, what
+ * it settled or weighed about. Not a habit's choice: a habit of something
+ * forgotten is moot, and gives way to others (AGENCY.md §8). Without a
+ * mind, nothing. */
+agency_names_referent :: proc(self: ^Agency, agent: Entity_ID, referent: u32) -> bool {
+	m: ^Motivation
+	for mind in self.minds do if mind.agent == agent do m = mind
+	if m == nil do return false
+	if m.awaiting == referent do return true
+	for i in 0 ..< m.nintentions {
+		if m.intentions[i].arose == referent do return true
+		for k in 0 ..< m.intentions[i].nparams do if m.intentions[i].params[k].referent == referent do return true
+	}
+	for i in 0 ..< m.ncommitments {
+		for k in 0 ..< m.commitments[i].nparams do if m.commitments[i].params[k].referent == referent do return true
+	}
+	for i in 0 ..< m.nquestions do if m.questions[i].asker == referent do return true
+	for i in 0 ..< m.nsettled do if m.settled[i].about == referent do return true
+	for i in 0 ..< m.nweighed do if m.weighed[i].about == referent do return true
+	return false
 }
 
 
@@ -1466,15 +1490,22 @@ agency_busy :: proc(self: ^Agency, agent: Entity_ID) -> bool {
 /* --- deciding ----------------------------------------------------------------------- */
 
 /* A repetition: the habit grows, from what is left of it. */
-@(private = "file")
 agency_practise :: proc(self: ^Agency, m: ^Motivation, context_in: cstring, choice: u32) {
 	k: i32
 
 	context_ := world_intern(self.world, context_in)
 	s := habit_strength(m, context_, choice, world_time(self.world).ms)
 	for k = 0; k < m.nhabits && !(m.habits[k].context_ == context_ && m.habits[k].choice == choice); k += 1 {}
-	if k == m.nhabits {
-		if m.nhabits == BG_MAX_HABITS do return
+	if k == m.nhabits && m.nhabits == BG_MAX_HABITS {
+		/* full: the weakest goes, the oldest of the weakest (AGENCY.md §8) */
+		now := world_time(self.world).ms
+		k = 0
+		for q: i32 = 1; q < m.nhabits; q += 1 {
+			sq := habit_strength(m, m.habits[q].context_, m.habits[q].choice, now)
+			sk := habit_strength(m, m.habits[k].context_, m.habits[k].choice, now)
+			if sq < sk || (sq == sk && m.habits[q].at < m.habits[k].at) do k = q
+		}
+	} else if k == m.nhabits {
 		m.nhabits += 1
 	}
 	h         := &m.habits[k]

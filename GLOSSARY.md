@@ -423,7 +423,11 @@ REALITY.md, TER = TERRAIN.md, TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc'
 - **Memory**: a knowledge store as it decays: **detail** degrades by
   generalising, **strength** fades by salience and repetition until
   forgotten; a **capacity** evicts the least salient. **Confirmation**
-  restores detail. (KNO d10, d16, §12)
+  restores detail. A referent nothing holds is forgotten once it
+  **ended** or faded below belief. (KNO d10, d16, d19, §12)
+- **Ended**: of a referent: its agent perceived the thing end (eaten,
+  burned, split, merged, felled) where it believed it. Forgotten unless
+  something holds it. (KNO d19)
 - **Generalise**: of a feature in memory or news: step to its primary
   parent ("grey wool coat", "dark coat", "a coat"). (KNO §12, CL §11)
 - **Knowledge store**: one agent's private referents, observations and
