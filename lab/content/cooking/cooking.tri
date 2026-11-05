@@ -48,7 +48,11 @@ grain:      #Body & #Food & raw_grain & { mass: 250g }
 grain_sack: #Stack & #Food & raw_grain & { unit: "grain", unitMass: 250g, count: 60 }
 
 // Cooking: the food, the stove it is cooked at, and where it is kept.
-#Cooking: #Supper & #Warming & { larder: #Body }
+#Cooking: #Supper & #Warming & #Keeping
+
+// Where a household keeps its food: its larder (farming/'s harvest goes
+// there too).
+#Keeping: #Frame & { larder: #Body }
 
 // A meal in hand: food the agent holds that isn't raw.
 have_a_meal: #Goal & {

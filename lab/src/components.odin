@@ -1,10 +1,10 @@
-// Generated from Triangle content 7be7ff0ad7016b96: do not edit. Type IDs are valid
+// Generated from Triangle content 53cef0ce45978320: do not edit. Type IDs are valid
 // only for this content; regenerate when it changes.
 package lab
 
 import tri "../../triangle/odin/triangle"
 
-CONTENT_HASH :: 0x7be7ff0ad7016b96
+CONTENT_HASH :: 0x53cef0ce45978320
 
 // Combustor, from #Combustor
 Combustor :: struct {
@@ -72,6 +72,11 @@ Respirator :: struct {
 // Scribe, from #Scribe
 Scribe :: struct {
 	handwriting: cstring,    // text; saved, proposable, inspect
+}
+
+// Seed, from #Seed
+Seed :: struct {
+	sows: cstring,    // text; content, saved, inspect, perceive(sight)
 }
 
 // Sized, from #Sized
@@ -193,6 +198,12 @@ Agent :: struct {
 	trusting: i64,    // int, in quanta of 1; content, saved, proposable, inspect
 }
 
+// Area, from #Area
+Area :: struct {
+	east: i64,    // int, in quanta of 1; content, saved, proposable, inspect, perceive(sight)
+	south: i64,    // int, in quanta of 1; content, saved, proposable, inspect, perceive(sight)
+}
+
 // Assembly, from #Assembly
 Assembly :: struct {
 	slots: i64,    // int, in quanta of 1; content, saved, inspect, perceive(sight)
@@ -268,6 +279,17 @@ Part :: struct {
 	grade: i64,    // int, in quanta of 1; content, saved, proposable, inspect
 	tended: i64,    // int, in quanta of 1; content, saved, proposable, inspect
 	wear: i64,    // int, in quanta of 1; content, saved, proposable, inspect, perceive(sight)
+}
+
+// Plot, from #Plot
+Plot :: struct {
+	grows: cstring,    // text; content, saved, inspect, perceive(sight)
+	reaped: i64,    // int, in quanta of 1; content, saved, proposable, inspect
+	ripensIn: i64,    // time, in quanta of 1ms; content, saved, inspect
+	sown: i64,    // int, in quanta of 1; content, saved, proposable, inspect
+	sownAt: i64,    // time, in quanta of 1ms; content, saved, proposable, inspect
+	stands: u32,    // "bare" | "ripe" | "sown": a type ID; content, saved, proposable, inspect, perceive(sight)
+	yields: cstring,    // text; content, saved, inspect
 }
 
 // Pump, from #Pump
@@ -349,71 +371,78 @@ Fastener :: struct {
 }
 
 // #ActivityStatus
-ACTIVITYSTATUS_ABORTED :: 625
-ACTIVITYSTATUS_COMPLETED :: 626
-ACTIVITYSTATUS_EXHAUSTED :: 627
-ACTIVITYSTATUS_FAILED :: 628
-ACTIVITYSTATUS_RUNNING :: 629
-ACTIVITYSTATUS_SUSPENDED :: 630
+ACTIVITYSTATUS_ABORTED :: 655
+ACTIVITYSTATUS_COMPLETED :: 656
+ACTIVITYSTATUS_EXHAUSTED :: 657
+ACTIVITYSTATUS_FAILED :: 658
+ACTIVITYSTATUS_RUNNING :: 659
+ACTIVITYSTATUS_SUSPENDED :: 660
 
 // #Tie
-TIE_EMPLOY :: 723
-TIE_FRIEND :: 724
-TIE_KIN :: 725
-TIE_SWORN :: 726
+TIE_EMPLOY :: 758
+TIE_FRIEND :: 759
+TIE_KIN :: 760
+TIE_SWORN :: 761
 
 // #ClaimKind
-CLAIMKIND_CUSTODY :: 632
-CLAIMKIND_OWNERSHIP :: 633
-CLAIMKIND_RESERVATION :: 634
+CLAIMKIND_CUSTODY :: 662
+CLAIMKIND_OWNERSHIP :: 663
+CLAIMKIND_RESERVATION :: 664
 
 // #Penalty
-PENALTY_FINE :: 711
-PENALTY_ARREST :: 742
-PENALTY_CONFISCATE :: 743
+PENALTY_FINE :: 746
+PENALTY_ARREST :: 777
+PENALTY_CONFISCATE :: 778
 
 // #Wrong
-WRONG_ANOTHERS :: 734
-WRONG_UNAUTHORIZED :: 735
+WRONG_ANOTHERS :: 769
+WRONG_UNAUTHORIZED :: 770
 
 // #Material
-MATERIAL_CLOTH :: 696
-MATERIAL_EARTH :: 697
-MATERIAL_FOOD :: 698
-MATERIAL_LEATHER :: 699
-MATERIAL_RUBBER :: 700
-MATERIAL_STONE :: 701
-MATERIAL_FLESH :: 745
-MATERIAL_BRASS :: 747
-MATERIAL_IRON :: 748
-MATERIAL_PAPER :: 749
-MATERIAL_STEEL :: 750
-MATERIAL_BIRCH :: 752
-MATERIAL_OAK :: 753
+MATERIAL_CLOTH :: 728
+MATERIAL_EARTH :: 729
+MATERIAL_FOOD :: 730
+MATERIAL_LEATHER :: 731
+MATERIAL_GRAIN :: 733
+MATERIAL_RUBBER :: 734
+MATERIAL_STONE :: 735
+MATERIAL_TURNIP :: 736
+MATERIAL_FLESH :: 780
+MATERIAL_BRASS :: 782
+MATERIAL_IRON :: 783
+MATERIAL_PAPER :: 784
+MATERIAL_STEEL :: 785
+MATERIAL_BIRCH :: 787
+MATERIAL_OAK :: 788
 
 // "flesh" | "metal" | "natural" | "paper" | "wood"
-BODY_SURFACE_NATURAL :: 472
-BODY_SURFACE_FLESH :: 745
-BODY_SURFACE_BRASS :: 747
-BODY_SURFACE_IRON :: 748
-BODY_SURFACE_PAPER :: 749
-BODY_SURFACE_STEEL :: 750
-BODY_SURFACE_BIRCH :: 752
-BODY_SURFACE_OAK :: 753
+BODY_SURFACE_NATURAL :: 488
+BODY_SURFACE_FLESH :: 780
+BODY_SURFACE_BRASS :: 782
+BODY_SURFACE_IRON :: 783
+BODY_SURFACE_PAPER :: 784
+BODY_SURFACE_STEEL :: 785
+BODY_SURFACE_BIRCH :: 787
+BODY_SURFACE_OAK :: 788
 
 // #Colour
-COLOUR_BLUE :: 637
-COLOUR_BLACK :: 639
-COLOUR_BROWN :: 640
-COLOUR_GREEN :: 641
-COLOUR_GREY :: 642
-COLOUR_NAVY :: 643
-COLOUR_ORANGE :: 644
-COLOUR_PURPLE :: 645
-COLOUR_RED :: 646
-COLOUR_YELLOW :: 647
-COLOUR_BEIGE :: 666
-COLOUR_WHITE :: 692
+COLOUR_BLUE :: 667
+COLOUR_BLACK :: 669
+COLOUR_BROWN :: 670
+COLOUR_GREEN :: 671
+COLOUR_GREY :: 672
+COLOUR_NAVY :: 673
+COLOUR_ORANGE :: 674
+COLOUR_PURPLE :: 675
+COLOUR_RED :: 676
+COLOUR_YELLOW :: 677
+COLOUR_BEIGE :: 697
+COLOUR_WHITE :: 724
+
+// "bare" | "ripe" | "sown"
+PLOT_STANDS_BARE :: 347
+PLOT_STANDS_RIPE :: 538
+PLOT_STANDS_SOWN :: 564
 
 // The field registry: what code needs to read and write any component
 // generically.
@@ -441,7 +470,7 @@ Component_Info :: struct {
 	fields:  [^]Field_Info,
 }
 
-COMPONENT_COUNT :: 42
+COMPONENT_COUNT :: 45
 
 @(rodata) Combustor_fields := [?]Field_Info{
 	{"burnRate", offset_of(Combustor, burnRate), VALUE_QUANTITY, "int", "content, saved, inspect"},
@@ -492,6 +521,9 @@ COMPONENT_COUNT :: 42
 }
 @(rodata) Scribe_fields := [?]Field_Info{
 	{"handwriting", offset_of(Scribe, handwriting), VALUE_TEXT, "text", "saved, proposable, inspect"},
+}
+@(rodata) Seed_fields := [?]Field_Info{
+	{"sows", offset_of(Seed, sows), VALUE_TEXT, "text", "content, saved, inspect, perceive(sight)"},
 }
 @(rodata) Sized_fields := [?]Field_Info{
 	{"size", offset_of(Sized, size), VALUE_QUANTITY, "length", "content, saved, inspect, perceive(sight)"},
@@ -590,6 +622,10 @@ COMPONENT_COUNT :: 42
 	{"trade", offset_of(Agent, trade), VALUE_TEXT, "text", "content, saved, proposable, inspect"},
 	{"trusting", offset_of(Agent, trusting), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
 }
+@(rodata) Area_fields := [?]Field_Info{
+	{"east", offset_of(Area, east), VALUE_QUANTITY, "int", "content, saved, proposable, inspect, perceive(sight)"},
+	{"south", offset_of(Area, south), VALUE_QUANTITY, "int", "content, saved, proposable, inspect, perceive(sight)"},
+}
 @(rodata) Assembly_fields := [?]Field_Info{
 	{"slots", offset_of(Assembly, slots), VALUE_QUANTITY, "int", "content, saved, inspect, perceive(sight)"},
 }
@@ -646,6 +682,15 @@ COMPONENT_COUNT :: 42
 	{"grade", offset_of(Part, grade), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
 	{"tended", offset_of(Part, tended), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
 	{"wear", offset_of(Part, wear), VALUE_QUANTITY, "int", "content, saved, proposable, inspect, perceive(sight)"},
+}
+@(rodata) Plot_fields := [?]Field_Info{
+	{"grows", offset_of(Plot, grows), VALUE_TEXT, "text", "content, saved, inspect, perceive(sight)"},
+	{"reaped", offset_of(Plot, reaped), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
+	{"ripensIn", offset_of(Plot, ripensIn), VALUE_QUANTITY, "time", "content, saved, inspect"},
+	{"sown", offset_of(Plot, sown), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
+	{"sownAt", offset_of(Plot, sownAt), VALUE_QUANTITY, "time", "content, saved, proposable, inspect"},
+	{"stands", offset_of(Plot, stands), VALUE_TYPE, "\"bare\" | \"ripe\" | \"sown\"", "content, saved, proposable, inspect, perceive(sight)"},
+	{"yields", offset_of(Plot, yields), VALUE_TEXT, "text", "content, saved, inspect"},
 }
 @(rodata) Pump_fields := [?]Field_Info{
 	{"draws", offset_of(Pump, draws), VALUE_REF, "ref", "saved, proposable, inspect"},
@@ -712,6 +757,7 @@ COMPONENTS := [COMPONENT_COUNT + 1]Component_Info{
 	{"OfficeHolder", "#OfficeHolder", size_of(Office_Holder), 2, &Office_Holder_fields[0]},
 	{"Respirator", "#Respirator", size_of(Respirator), 4, &Respirator_fields[0]},
 	{"Scribe", "#Scribe", size_of(Scribe), 1, &Scribe_fields[0]},
+	{"Seed", "#Seed", size_of(Seed), 1, &Seed_fields[0]},
 	{"Sized", "#Sized", size_of(Sized), 1, &Sized_fields[0]},
 	{"ThermalBody", "#ThermalBody", size_of(Thermal_Body), 5, &Thermal_Body_fields[0]},
 	{"Activity", "#Activity", size_of(Activity), 22, &Activity_fields[0]},
@@ -723,6 +769,7 @@ COMPONENTS := [COMPONENT_COUNT + 1]Component_Info{
 	{"Organization", "#Organization", size_of(Organization), 1, &Organization_fields[0]},
 	{"Body", "#Body", size_of(Body), 5, &Body_fields[0]},
 	{"Agent", "#Agent", size_of(Agent), 24, &Agent_fields[0]},
+	{"Area", "#Area", size_of(Area), 2, &Area_fields[0]},
 	{"Assembly", "#Assembly", size_of(Assembly), 1, &Assembly_fields[0]},
 	{"Cock", "#Cock", size_of(Cock), 2, &Cock_fields[0]},
 	{"Container", "#Container", size_of(Container), 1, &Container_fields[0]},
@@ -733,6 +780,7 @@ COMPONENTS := [COMPONENT_COUNT + 1]Component_Info{
 	{"Latent", "#Latent", size_of(Latent), 9, &Latent_fields[0]},
 	{"Log", "#Log", size_of(Log), 4, &Log_fields[0]},
 	{"Part", "#Part", size_of(Part), 7, &Part_fields[0]},
+	{"Plot", "#Plot", size_of(Plot), 7, &Plot_fields[0]},
 	{"Pump", "#Pump", size_of(Pump), 4, &Pump_fields[0]},
 	{"Record", "#Record", size_of(Record), 1, &Record_fields[0]},
 	{"Label", "#Label", size_of(Label), 1, &Label_fields[0]},

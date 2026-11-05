@@ -16,13 +16,18 @@ package lab
  * what it knows when its commitments are undertaken, bound to them. Its sight is four tiles: the rest of the way it
  * finds as it walks.
  *
+ * The farmers tend their plots (content/farming/), each household's tilled
+ * block two of them, a farmer to one, with seed kept back in the larder: all
+ * sown the first day, ripe a fortnight on.
+ *
  * The run goes boundary by boundary up to each check's time, putting none
  * in of its own (as the watcher runs it), so `lab run village` and a
  * watched village are the same run. The checks, for three days and nights:
  * everyone taking a meal to work at 07:30, at work at 11:00 (about its
  * worksite, or about its work: a woodcutter in the woods, or on its way
  * home with firewood), the meal
- * eaten there by 14:30, home by 21:00, asleep in their own bed at 02:00;
+ * eaten there by 14:30, every plot sown by 15:00 the first day, home by
+ * 21:00, asleep in their own bed at 02:00;
  * and at the end, each household's larder emptied by what it ate, and
  * nobody's reserves fallen.
  */
@@ -57,6 +62,35 @@ households := [4]Village_Household {
 	{"the Hunts", "hunter", 3, {{71, 61}, {73, 61}, {75, 61}, {}}, {77, 57}, {71, 57}, {75, 54}, "hunting_blind", {135, 50}},
 }
 
+/* The farmers' plots (VILLAGE.md: the Ashes two of grain, the Brooks
+ * grain and turnips): each household's tilled block, halved east of the
+ * other's west. */
+@(private = "file")
+Village_Plot :: struct {
+	household: int,
+	blueprint: cstring,
+	corner:    [2]i32,
+	east:      i32,
+	south:     i32,
+}
+
+@(private = "file", rodata)
+village_plots := [4]Village_Plot {
+	{0, "grain_plot", {22, 76}, 14, 17},
+	{0, "grain_plot", {36, 76}, 15, 17},
+	{1, "grain_plot", {62, 76}, 17, 17},
+	{1, "turnip_plot", {79, 76}, 18, 17},
+}
+
+/* The seed each household keeps back, by blueprint (village.tri). */
+@(private = "file", rodata)
+village_seed := [4][2]cstring {
+	{"ashes_seed", ""},
+	{"brooks_seed", "brooks_turnip_seed"},
+	{"", ""},
+	{"", ""},
+}
+
 Villager :: struct {
 	id:        Entity_ID,
 	household: int,
@@ -74,10 +108,12 @@ Village :: struct {
 	agency:       ^Agency,
 	bodies:       ^Bodies,
 	air:          ^Atmosphere,       // burns what is in the stoves
+	farming:      ^Farming,          // ripens the crops
 	people:       [dynamic]Villager,
 	larders:      [4]Entity_ID,      // each household's, by its index
 	stoves:       [4]Entity_ID,
 	woodpiles:    [4]Entity_ID,
+	plots:        [4][dynamic]Entity_ID,  // each farming household's
 	results:      [dynamic]string,   // each cloned
 	error:        string,            // cloned; "" if it was set up
 }
@@ -103,12 +139,14 @@ village_init_with_world :: proc(world: ^World, committer: ^Committer) -> ^Villag
 	self.agency     = agency_init_with_world(world, committer, self.knowledge)
 	self.bodies     = bodies_init_with_world(world)
 	self.air        = atmosphere_init_with_world(world)
+	self.farming    = farming_init_with_world(world)
 	self.scheduler  = scheduler_init_with_world(world, committer)
 	/* a diagnostic event is kept a day, then counted (KNOWLEDGE.md decision 21) */
 	world_set_history_window(world, 86400000)
 	agency_set_activities(self.agency, self.activities)
 	scheduler_add_domain(self.scheduler, bodies_as_domain(self.bodies))
 	scheduler_add_domain(self.scheduler, atmosphere_as_domain(self.air))
+	scheduler_add_domain(self.scheduler, farming_as_domain(self.farming))
 	scheduler_set_activities(self.scheduler, activities_as_activity_clock(self.activities))
 	scheduler_set_perception(self.scheduler, knowledge_as_perception_phase(self.knowledge))
 	scheduler_set_decision(self.scheduler, agency_as_decision_phase(self.agency))
@@ -126,7 +164,9 @@ village_dealloc :: proc(self: ^Village) {
 	release(self.agency)
 	release(self.bodies)
 	release(self.air)
+	release(self.farming)
 	delete(self.people)
+	for list in self.plots do delete(list)
 	for r in self.results do delete(r)
 	delete(self.results)
 	delete(self.error)
@@ -139,6 +179,7 @@ village_setup :: proc(self: ^Village) {
 	g := proposal_group_group_with_phase(.System, "setup: the village")
 	handles := make([dynamic]Villager, context.temp_allocator)
 	works, larders, stoves, woodpiles: [4]Entity_ID
+	self_plots: [4][dynamic]Entity_ID
 	for &h, k in households {
 		works[k] = proposal_group_create(g, h.worksite, ns_utf8(fmt.tprintf("%s' worksite", h.name)),
 		                                 on_tile(h.works.x, h.works.y, 0))
@@ -148,6 +189,21 @@ village_setup :: proc(self: ^Village) {
 		                                on_tile(h.larder.x, h.larder.y, 0))
 		larders[k] = larder
 		sack := proposal_group_create(g, "grain_sack", ns_utf8(fmt.tprintf("%s' grain", h.name)), in_(larder))
+		/* the farmers' plots, their tilled block halved, and the seed kept
+		 * back for them (village.tri) */
+		seeds := make([dynamic]Entity_ID, context.temp_allocator)
+		plots := make([dynamic]Entity_ID, context.temp_allocator)
+		for pl in village_plots do if pl.household == k {
+			plot := proposal_group_create(g, pl.blueprint, ns_utf8(fmt.tprintf("%s' plot at %d", h.name, pl.corner.x)),
+			                              on_tile(pl.corner.x, pl.corner.y, 0))
+			proposal_group_set_of_to(g, "Area.east", whole(plot), i64(pl.east))
+			proposal_group_set_of_to(g, "Area.south", whole(plot), i64(pl.south))
+			append(&plots, plot)
+		}
+		for blueprint in village_seed[k] do if blueprint != "" {
+			append(&seeds, proposal_group_create(g, blueprint, ns_utf8(fmt.tprintf("%s' %s", h.name, blueprint)), in_(larder)))
+		}
+		for plot in plots do append(&self_plots[k], plot)
 		woodpile := proposal_group_create(g, "woodpile", ns_utf8(fmt.tprintf("%s' woodpile", h.name)),
 		                                  on_tile(h.woodpile.x, h.woodpile.y, 0))
 		woodpiles[k] = woodpile
@@ -172,6 +228,8 @@ village_setup :: proc(self: ^Village) {
 			village_own(g, v.id, sack, "the household's grain")
 			village_own(g, v.id, woodpile, "the household's woodpile")
 			village_own(g, v.id, wood, "the household's firewood")
+			for seed in seeds do village_own(g, v.id, seed, "the household's seed")
+			for plot in plots do village_own(g, v.id, plot, "the household's plot")
 		}
 		/* at the woods' edge, the woodcutters' trees, and an axe each by the block */
 		if h.worksite == "chopping_block" {
@@ -193,6 +251,10 @@ village_setup :: proc(self: ^Village) {
 	for l, k in larders do self.larders[k] = proposal_group_id_for(g, l)
 	for e, k in stoves do self.stoves[k] = proposal_group_id_for(g, e)
 	for e, k in woodpiles do self.woodpiles[k] = proposal_group_id_for(g, e)
+	for &list, k in self_plots {
+		for e in list do append(&self.plots[k], proposal_group_id_for(g, e))
+		delete(list)
+	}
 	for v in handles {
 		append(&self.people, Villager{proposal_group_id_for(g, v.id), v.household, proposal_group_id_for(g, v.bed),
 		                              proposal_group_id_for(g, v.worksite)})
@@ -234,12 +296,14 @@ village_setup :: proc(self: ^Village) {
 	scheduler_run_until(self.scheduler, time_make(5))     /* and sees its bed */
 
 	/* the day's commitments, every day, bound to its own bed and its work */
+	farmer_index: [4]int
 	for v in self.people {
 		store := knowledge_store_of(self.knowledge, v.id)
 		bed   := village_referent_of(store, v.bed)
 		work  := village_referent_of(store, v.worksite)
 		stove := village_referent_of(store, self.stoves[v.household])
 		pile  := village_referent_of(store, self.woodpiles[v.household])
+		larder := village_referent_of(store, self.larders[v.household])
 		if bed == 0 || work == 0 || stove == 0 || pile == 0 {
 			self.error = fmt.aprintf("%d hasn't seen its %s", v.id,
 			                         "bed" if bed == 0 else ("worksite" if work == 0 else ("stove" if stove == 0 else "woodpile")))
@@ -260,6 +324,17 @@ village_setup :: proc(self: ^Village) {
 		      (households[v.household].worksite != "chopping_block" ||
 		       agency_undertake_every_with(self.agency, v.id, "woodpile_stocked", 7 * VILLAGE_HOUR, 15 * VILLAGE_HOUR, "work",
 		                                   VILLAGE_DAY, {{"woodpile", pile}}))
+		/* a farmer's plot: one of its household's, by turns (the Ashes' three
+		 * over their two, two Brooks to each of theirs), so it carries one
+		 * kind of seed; bound to the plot as it knows it, and the household's
+		 * larder, where its seed is kept */
+		if plots := self.plots[v.household][:]; len(plots) > 0 {
+			known := village_referent_of(store, plots[farmer_index[v.household] % len(plots)])
+			farmer_index[v.household] += 1
+			ok = ok && known != 0 &&
+			     agency_undertake_every_with(self.agency, v.id, "plot_tended", 7 * VILLAGE_HOUR, 15 * VILLAGE_HOUR, "work",
+			                                 VILLAGE_DAY, {{"plot", known}, {"larder", larder}})
+		}
 		if !ok {
 			self.error = fmt.aprintf("%d couldn't take on its day", v.id)
 			return
@@ -356,6 +431,17 @@ village_run :: proc(self: ^Village) {
 		village_check(self, now > stocked, fmt.tprintf("day %d, 15:00: the woodcutters' woodpile rose with their work", d + 1),
 		              fmt.tprintf("%d pieces, %d before", now, stocked))
 		stocked = now
+		if d == 0 {
+			/* the farmers' work: every plot sown the first day, growing */
+			bare := make([dynamic]string, context.temp_allocator)
+			for list, k in self.plots {
+				for plot in list do if plot_of(self.world, plot).stands != plot_stands(self.world, "sown") {
+					append(&bare, fmt.tprintf("%s' at %d", households[k].name, world_location_of(self.world, plot).x))
+				}
+			}
+			village_check(self, len(bare) == 0, "day 1, 15:00: the farmers sowed every plot",
+			              fmt.tprintf("not: %s", strings.join(bare[:], ", ", context.temp_allocator)))
+		}
 		village_step_until(self, d * VILLAGE_DAY + 21 * VILLAGE_HOUR)
 		village_check_each(self, fmt.tprintf("day %d, 21:00: everyone home", d + 1), .Home)
 		village_step_until(self, (d + 1) * VILLAGE_DAY + 2 * VILLAGE_HOUR)
@@ -407,14 +493,12 @@ village_firewood_in :: proc(world: ^World, container: Entity_ID) -> i64 {
 }
 
 
-/* The portions of grain in a container. */
+/* The portions of grain in a container (not the seed grain kept there). */
 village_portions_in :: proc(world: ^World, container: Entity_ID) -> i64 {
 	inside: [16]Entity_ID
-	count, total: i64
+	total: i64
 	n := world_entities_at(world, container, .In, raw_data(inside[:]), 16)
-	for e in inside[:n] {
-		if world_get_field(world, "Stack.count", e, &count) do total += count
-	}
+	for e in inside[:n] do if world_unit_of(world, e) == "grain" do total += world_units_of(world, e)
 	return total
 }
 
@@ -458,7 +542,7 @@ village_at_work :: proc(self: ^Village, v: Villager) -> bool {
 	if la.form == .On_Tile && lw.form == .On_Tile && la.level == lw.level && abs(la.x - lw.x) <= 6 && abs(la.y - lw.y) <= 6 {
 		return true
 	}
-	return agency_intends(self.agency, v.id, "woodpile_stocked")
+	return agency_intends(self.agency, v.id, "woodpile_stocked") || agency_intends(self.agency, v.id, "plot_tended")
 }
 
 

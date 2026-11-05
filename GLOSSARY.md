@@ -142,6 +142,11 @@ REALITY.md, PRF = PERFORMANCE.md, TER = TERRAIN.md, TES = TESSERA.md, VIL = VILL
   aggregate parameters that domains read. (COM §7)
 - **Stack**: one entity standing for a count of identical units (30 nails).
   An **individual** is one unit with its own identity. (COM §9)
+- **Area**: a thing that covers ground (`#Area`): placed on its
+  north-west tile, it covers so many tiles east and south. It is near,
+  seen and in reach by the nearest of its tiles, so an agent knows it by
+  one referent. A plot is one. *Avoid:* region (an air region's), zone.
+  (VIL d5)
 - **Identity on demand**: things stay stocks or stacks until something
   needs to tell one unit apart; then it splits off (**individuation**), and
   merges back only when **physically indistinguishable**. **Automatic
@@ -849,10 +854,16 @@ REALITY.md, PRF = PERFORMANCE.md, TER = TERRAIN.md, TES = TESSERA.md, VIL = VILL
 
 ## The village (proposed)
 
-- **Plot**: tilled ground a household farms. *Avoid:* field (a
-  component's field). (VIL d5)
-- **Crop**: a plant on a plot tile, sown at a time, ripe after its growth,
-  read lazily. (VIL d5)
+- **Plot**: tilled ground a household farms (`#Plot`): an **area**, known
+  to an agent as a whole, by one referent. It **stands** bare, sown or
+  ripe; it is sown and reaped a **row** (its width in tiles) at a time.
+  *Avoid:* field (a component's field). (VIL d5)
+- **Crop**: what a plot grows, kept as the plot's state: sown a row at a
+  time, growing from its last row, ripe after its growth, read lazily. Not
+  an entity of its own. (VIL d5)
+- **Seed to sow**: `#Seed`, a stack of what sows a crop (seed grain,
+  turnip seed), a unit to a tile, **kept back** in a larder. See *Words
+  with more than one sense*. (VIL d5)
 - **Perishable**: good for so long after it was made, then spoiled. (VIL
   d8)
 - **Carcass**: what an animal's body is once it has died, to butcher.
@@ -895,7 +906,7 @@ Each row says which term to use for which sense.
 | hypothesis | competing beliefs | **identity hypothesis**; design hypotheses are not domain terms |
 | generalise | memory decay and news, along primary parents | **anti-unify** (`tri_generalize`, structures) |
 | spec | a resolved blueprint | **design doc** |
-| seed | an entity's seed | **world seed**; a unit's seed (latent) |
+| seed | an entity's seed | **world seed**; a unit's seed (latent); **seed to sow** (`#Seed`), named by what it sows: seed grain, turnip seed |
 | fidelity | how faithfully a route carries news | **detail** (AGENCY.md's "fidelity levels" are levels of detail) |
 | loyalty | a bond's weight | (not a disposition) |
 | office | a position in an organization | **organization** (the body) |

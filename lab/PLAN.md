@@ -4738,3 +4738,45 @@ checks fewer, as one walk is kept, not a one-tile walk each way.
   compactions, to the last digest.
 
 126 tests, 3873 checks.
+
+### After the slice: farming (VILLAGE.md slice 6, issue #6)
+
+- content/farming/: a plot is an **area** (things.tri's `#Area`: placed on
+  its north-west tile, so many tiles east and south), and its crop is its
+  state: what it grows, how it stands (bare, sown, ripe), the tiles sown or
+  reaped so far, and when its last row was sown. Seed (`#Seed`) sows a
+  crop, a unit to a tile. `sow` and `harvest` work a row at a time
+  (effect_sow, effect_harvest); the last row sown, the plot grows in closed
+  form from then, and the farming domain (src/domains_farming.odin) sets it
+  ripe at the moment it is grown, its one wake.
+- An area is near, seen and in reach by the nearest of its tiles
+  (world_entities_near, perception, view_can_reach, and a referent's believed
+  reach from its seen `east` and `south`); agency walks to its nearest tile.
+  An agent knows a plot by one referent (KNOWLEDGE.md decision 22).
+- A crop on every tile was tried first: about 1,086 crop entities took the
+  three-day village from 7.7 s to 4 min 18 s at `-o:speed` (perception
+  190 s: recognition weighs every percept against every referent), and
+  farmers deciding at once sowed the same tile together.
+- Commitment: a field may be set expecting the value it was read with
+  (`proposal_group_set_of_to_expecting`): two farmers sowing a plot at once
+  don't both count a row; the second's group fails.
+- Agency: a `search` slot bound already (a commitment's larder) is passed
+  over once its inside was seen, as one found is; a farmer whose household's
+  seed others held looked in its larder every millisecond.
+- The village: each household's tilled block is two plots (the Ashes' two
+  of grain, the Brooks' grain and turnips), each farmer committed to one,
+  bound to it and the larder; seed is kept back in the larder, enough for
+  each to take a plot's worth (300), the rest put back. A new check: every
+  plot sown the first day. 8.8 s at `-o:speed` (from 7.7 s): 19,039
+  boundaries, 66,302 events, 40,830 perceptions, 42,383 decisions;
+  perception 4.1 s, decision 2.5 s.
+- Three weeks of a plot (test_farming_weeks): sown the first day, the seed
+  left put back, ripe exactly when grown at every boundary and growing as
+  its closed form says between, harvested once into the larder, and sown
+  again. The village run three weeks (35 s, by hand) shows it hungry from
+  the fifth day, with no market; VILLAGE.md, open questions.
+- Every scenario's hashes change: three new component kinds and a new
+  material renumber the content's types (an activity's status, as saved and
+  traced); only the village behaves differently.
+
+128 tests, 3937 checks.

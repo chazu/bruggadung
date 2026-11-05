@@ -11,6 +11,9 @@
 //            topic; what each theme draws for a look is looks/'s.
 // - seen:    whether a kind shows at a glance is its #Seen entry
 //            (knowledge.tri), declared beside the kind, here or in its topic.
+// - code:    an #Area's tiles are the world's to say: what is near, what is
+//            seen and what is in reach (src/core_world.odin, src/act_view.odin,
+//            src/know_knowledge_2.odin, src/agency_agency.odin).
 // - code:    the structs and the registry the lab uses are generated from all
 //            the content, every topic's fields with these (make gen:
 //            src/components.odin); the lab refuses to run on content
@@ -19,9 +22,10 @@
 // What things are made of, and the colours they come in: hierarchies, so a
 // memory loses detail along them (KNOWLEDGE.md §12): an oak chest is
 // remembered as wooden, then as made of something.
-#Material: "metal" | "wood" | "flesh" | "paper" | "food" | "cloth" | "rubber" | "stone" | "leather" | "earth"
+#Material: "metal" | "wood" | "flesh" | "paper" | "food" | "cloth" | "rubber" | "stone" | "leather" | "earth" | "plant"
 "metal":   "iron" | "brass" | "steel"
 "wood":    "oak" | "birch"
+"plant":   "grain" | "turnip"
 
 #Colour:  "dark" | "light" | "bright"
 "dark":   "black" | "grey" | "brown" | "navy"
@@ -91,6 +95,17 @@ assembly_look:  #Look & { kindOf: "#Assembly", look: "assembly", prevails: 2 } @
 }
 
 body_seen: #Seen & { kindOf: "#Body" } @family(seen)
+
+// A thing that covers ground: `east` tiles east and `south` tiles south
+// from the tile it is placed on (its north-west corner), as a plot does
+// (farming/farming.tri). It is seen when any of its tiles is in sight, and
+// in reach from on it or beside it; an agent knows it by one referent, the
+// area as a whole.
+#Area: #Body & {
+    @component(Area)
+    east:  *1 | int & >=1 & <=256 @field(content, saved, proposable, inspect, perceive(sight))
+    south: *1 | int & >=1 & <=256 @field(content, saved, proposable, inspect, perceive(sight))
+}
 
 // Identical units counted as one entity. The stack's mass is its units'.
 #Stack: #Body & {

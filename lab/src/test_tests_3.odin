@@ -3764,4 +3764,6 @@ ALL_TESTS := [?]Test_Case{
 	{"habits_give_way",               test_habits_give_way},
 	{"history",                       test_history},
 	{"firewood",                      test_firewood},
+	{"farming",                       test_farming},
+	{"farming_weeks",                 test_farming_weeks},
 }

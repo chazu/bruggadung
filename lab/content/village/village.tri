@@ -8,9 +8,15 @@
 // - home:     beds and worksites are home/home.tri's kinds, and the
 //             day's commitments its goals.
 // - hunger:   the villagers get hungry (hunger/body.tri) and eat from
-//             their larders (cooking/cooking.tri): what is in them is all
-//             the food there is (farming and hunting are slices to come), a
-//             sack of grain each, so a larder empties as its household eats.
+//             their larders (cooking/cooking.tri): a sack of grain each, so
+//             a larder empties as its household eats, until a harvest
+//             (farming/) fills the farmers' again, a fortnight on (hunting
+//             is a slice to come).
+// - farming:  the map's tilled ground is the two farming households'
+//             plots, each household's block two of them, its scarecrow in
+//             one; their seed is in their larders, and their work is to
+//             tend their plots (farming/farming.tri). Where each plot lies
+//             is the scenario's.
 // - heat:     each house has a stove (heat/heat.tri), cold; the scenario
 //             runs the atmosphere domain, which burns a lit stove's fuel.
 // - firewood: each woodpile holds firewood (firewood/firewood.tri): the
@@ -62,6 +68,15 @@ woodpile: #Container & { material: "oak", mass: 5kg, capacity: 100 }
 // woodcutters' own twenty (firewood/firewood.tri).
 household_firewood:   #Stack & { material: "oak", unit: "firewood", unitMass: 1kg, count: 100 }
 woodcutters_firewood: #Stack & { material: "oak", unit: "firewood", unitMass: 1kg, count: 20 }
+
+// The seed each farming household kept back (farming/farming.tri), in its
+// larder: for the Ashes' two plots of grain, the Brooks' one of grain and
+// one of turnips. Each of its farmers takes a plot's worth (300) at once,
+// what is left over put back, so there is enough for all of them to sow
+// at once: with less, one goes back and forth for seed the others hold.
+ashes_seed:         #Stack & #Seed & { material: "food", unit: "seed grain", unitMass: 25g, count: 900, sows: "grain" }
+brooks_seed:        #Stack & #Seed & { material: "food", unit: "seed grain", unitMass: 25g, count: 1200, sows: "grain" }
+brooks_turnip_seed: #Stack & #Seed & { material: "food", unit: "turnip seed", unitMass: 5g, count: 1200, sows: "turnip" }
 
 // Where each household works: a scarecrow in a plot, a chopping block at
 // the woods' edge, a hunting blind in the east woods.

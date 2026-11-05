@@ -1759,10 +1759,47 @@ world_entities_near :: proc(self: ^World, tile: Location, radius: i32, out: [^]E
 			}
 		}
 	}
+	/* an area whose corner is farther, but some of whose tiles are within
+	 * it (content/things.tri's #Area) */
+	areas := world_store_for_kind(self, world_kind_named(self, "Area"))
+	for i: uint = 0; areas != nil && i < store_count(areas); i += 1 {
+		e   := store_entity_at_index(areas, i)
+		a   := (^Area)(store_record_at_index(areas, i))
+		loc := (^Location)(store_record_for(self.locations, e))
+		if loc == nil || loc.form != .On_Tile || loc.level != tile.level ||
+		   (abs(loc.x - tile.x) <= radius && abs(loc.y - tile.y) <= radius) {
+			continue       /* not on the ground, or counted already */
+		}
+		near := area_nearest(loc^, i32(a.east), i32(a.south), tile)
+		if abs(near.x - tile.x) > radius || abs(near.y - tile.y) > radius do continue
+		if n < max_ {
+			if n != 0 && out[n - 1] > e do sorted = false
+			out[n] = e
+		}
+		n += 1
+	}
 	if !sorted {
 		slice.sort(out[:n if n < max_ else max_])
 	}
 	return n
+}
+
+
+/* An #Area's extent (content/things.tri): tiles east and south from the
+ * tile it is placed on; 1 by 1 for anything else. */
+world_area_extent :: proc(self: ^World, e: Entity_ID) -> (east: i32, south: i32) {
+	a := (^Area)(world_record(self, world_kind_named(self, "Area"), e))
+	if a == nil do return 1, 1
+	return i32(a.east), i32(a.south)
+}
+
+
+/* The tile of an area, placed at `corner`, nearest a tile. */
+area_nearest :: proc(corner: Location, east: i32, south: i32, to: Location) -> Location {
+	t  := corner
+	t.x = clamp(to.x, corner.x, corner.x + max(east, 1) - 1)
+	t.y = clamp(to.y, corner.y, corner.y + max(south, 1) - 1)
+	return t
 }
 
 

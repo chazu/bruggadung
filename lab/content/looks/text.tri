@@ -19,3 +19,4 @@ text_food:        #Glyph & { theme: "text", look: "food", char: "%" } @family(gl
 text_tree:        #Glyph & { theme: "text", look: "tree", char: "T" } @family(glyphs)
 text_log:         #Glyph & { theme: "text", look: "log", char: "-" } @family(glyphs)
 text_tool:        #Glyph & { theme: "text", look: "tool", char: "/" } @family(glyphs)
+text_plot:        #Glyph & { theme: "text", look: "plot", char: "\"" } @family(glyphs)

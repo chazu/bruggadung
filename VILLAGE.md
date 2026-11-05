@@ -9,7 +9,7 @@ village` checks it, as the other scenarios are checked.
 
 This document is a proposal, built a slice at a time: slices 1 (hunger
 over weeks), 2 (looks in content), 3 (the village and its homes), 4
-(cooking and the larder) and 5 (firewood) are built. Each slice below is a ticket: slice n is GitHub issue #n
+(cooking and the larder), 5 (firewood) and 6 (farming) are built. Each slice below is a ticket: slice n is GitHub issue #n
 (label `village`). A slice moves into `lab/PLAN.md` when it is built.
 
 It is the first scenario that runs for weeks, not minutes. That forces two
@@ -92,6 +92,24 @@ things the lab put off:
    tile, sown at a time. Its growth is a function of time since sowing,
    read when needed, with one wake when it ripens. Nothing steps it.
    Watering and weeds are left out.
+   - Built, as a plot, not a tile (content/farming/): a crop on every tile
+     was a thousand entities a farmer saw and kept referents of, and took
+     the village from 7.7 s to 4 min 18 s for three days, nearly all of it
+     perception. A farmer reasons about a plot as a whole: a plot is an
+     **area** (things.tri's `#Area`), one entity covering its tiles, seen
+     when any of them is in sight and in reach from on it or beside it, so
+     an agent knows it by one referent. The crop is the plot's state:
+     what it grows, how it **stands** (bare, sown, ripe), the tiles sown or
+     reaped so far, and when its last row was sown. Sowing and harvesting
+     go a row at a time; its growth runs from its last row, and it stands
+     ripe once grown: the plot's one wake. Two farmers working a plot at
+     once can't both count the same row: each sets its count expecting the
+     value it read, and the second's group fails.
+   - Each household's tilled block is two plots: the Ashes' two of grain,
+     the Brooks' grain and turnips. Each farmer tends one of them (a kept
+     commitment, bound to the plot and the larder), so it carries one kind
+     of seed. Seed is kept back in the larder, enough for each farmer to
+     take a plot's worth; what is left is put back.
 6. **Firewood is the stove's fuel, end to end** (slice 5). A tree is felled
    into a trunk, the trunk sawn into logs (sawing.tri's `saw_through`), and
    each log split into firewood: a stack. Firewood carried home goes on
@@ -244,7 +262,8 @@ What content can't say yet:
 `lab run village` runs a week of world time and checks:
 
 - everyone ate every day and nobody's reserves fell below 50;
-- every crop sown was harvested or is still growing;
+- every plot sown the first day (built), and every one harvested once
+  ripe, or still growing;
 - every stove had fuel each night;
 - at least one sale was struck on each market day;
 - no meat was eaten spoiled;
@@ -265,7 +284,7 @@ when it is built:
    commitments, sleeping at home (built).
 4. **Cooking and the larder**: meals, eating at home (built).
 5. **Firewood**: trees, felling, splitting, the woodpile, stoking (built).
-6. **Farming**: plots, sowing, ripening, harvesting.
+6. **Farming**: plots, sowing, ripening, harvesting (built).
 7. **Hunting**: animals, death, butchering.
 8. **Perishing**: food that spoils.
 9. **The market**: coins, stalls, posted prices, sales.
@@ -288,8 +307,8 @@ New, and entered in the glossary with this document:
 | Satiety | How full the stomach is: hours of it, felt as hunger. (Built.) |
 | Reserves | What the body has to draw on: falls while satiety is empty, over weeks; weakness comes from it. (Built.) |
 | Nourishment | What a food gives satiety when eaten (`nourish by N`). (Built.) |
-| Plot | Tilled ground a household farms. *Avoid:* field, which is a component's field. |
-| Crop | A plant growing on a plot tile: sown at a time, ripe after its growth. |
+| Plot | Tilled ground a household farms: an area, known as a whole. *Avoid:* field, which is a component's field. (Built.) |
+| Crop | What a plot grows: sown a row at a time, growing from its last row, ripe after its growth. (Built, as the plot's state.) |
 | Perishable | Good for so long after it was made, then spoiled. |
 | Carcass | What an animal's body is once it dies: something to butcher. |
 | Stall | Where a seller sets out goods on market day, with its posted prices. |
@@ -332,5 +351,23 @@ New, and entered in the glossary with this document:
   and left a mind deciding only where a walk ends (PERFORMANCE.md).
   A boundary a step remains; carrying more at a time, or movement in
   closed form (PERFORMANCE.md, open questions), would cut it further.
+- **Three weeks of the village.** A plot sown the first day ripens in a
+  fortnight, so the village's own checks see sowing, not harvest; a plot
+  of its own (src/test_farming.odin) is checked for three weeks. Run for
+  three weeks (35 s), the village finds what happens past its food: each
+  larder holds 60 portions and there is no market, so households go
+  hungry from the fifth day. Some farmers then hold firewood fetched for a
+  stove they couldn't stoke, and a raw portion, and with no hand free
+  can't harvest a ripe plot. A slice that runs that long (10) wants the
+  market first, and something that puts down what a finished goal left in
+  hand.
+- **Seed from the harvest.** Seed is kept back at the start and isn't
+  made: a harvest yields food only, so a household sows again from what
+  is left, and the Ashes' second plot runs short. Keeping back part of a
+  harvest as seed is a method of its own.
+- **Grouped perception.** A plot is one entity, so it is one referent. Many
+  like things seen as one (a stand of trees, a herd) would be knowledge's
+  to group, a larger change (KNOWLEDGE.md); the herds of slice 7 may want
+  it.
 - **Children.** The households are all adults. Children who eat but don't
   work would test the market harder.

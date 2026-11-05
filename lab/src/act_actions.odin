@@ -260,7 +260,7 @@ match_believed_supposing :: proc(world: ^World, store: ^Knowledge_Store, action:
 		ref = knowledge_store_referent(store, u32(action.roles[r]))
 		/* formulate, from the store: the actor is itself; the rest are believed there, in reach */
 		if ref == nil || me == nil || (r == .Actor) != (ref.id == me.id) || !ref.present ||
-		   ref.level != me.level || abs(ref.x - me.x) > 1 || abs(ref.y - me.y) > 1 {
+		   (ref.id != me.id && !referent_in_reach(me, ref)) {
 			if reason != nil {
 				reason^ = fmt.tprintf("you don't know of a %s in reach", ROLE_NAMES[r])
 			}
@@ -542,8 +542,7 @@ menu_for_world_believed :: proc(store: ^Knowledge_Store, world: ^World, believed
 	nreach = 0
 	for i = 0; i < knowledge_store_count(store) && nreach < 256; i += 1 {
 		ref = knowledge_store_referent_at(store, i)
-		if ref.present && ref.id != me.id && ref.level == me.level &&
-		   abs(ref.x - me.x) <= 1 && abs(ref.y - me.y) <= 1 {
+		if ref.present && ref.id != me.id && referent_in_reach(me, ref) {
 			reach[nreach] = Entity_ID(ref.id)
 			nreach += 1
 		}
@@ -2631,6 +2630,106 @@ effect_stoke :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) 
 }
 
 
+/* A blueprint's text field ("unit"), or "": a temporary string. */
+@(private = "file")
+blueprint_text :: proc(world: ^World, blueprint: cstring, field: cstring) -> string {
+	buf: [256]u8
+
+	tc      := world_tri(world)
+	pattern := tri.pattern(tc, blueprint)
+	v       := tri.at(tc, pattern, field) if pattern != nil else nil
+	if v == nil do return ""
+	tri.print(tc, v, raw_data(buf[:]), size_of(buf))
+	s := string(cstring(raw_data(buf[:])))
+	if len(s) < 2 || s[0] != '"' || s[len(s) - 1] != '"' do return ""
+	return strings.clone(s[1:len(s) - 1], context.temp_allocator)
+}
+
+
+/* Sowing a row (content/farming/): as many tiles of the bare plot as a row
+ * has, or as the seed in hand or the plot have left, a unit of the seed to
+ * each. The last row sown, the plot stands sown, growing from now. Two
+ * sowing it at once can't both count on the rows they read: the second
+ * fails. */
+@(private = "file")
+effect_sow :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
+	seed := a.roles[.Item]
+	at   := a.roles[.Destination]
+	plot := plot_of(world, at)
+	if plot == nil do return "it is no plot"
+	if plot.stands != plot_stands(world, "bare") do return "it is sown already"
+	sows  := world_text_field(world, "Seed.sows", seed)
+	grows := world_text_field(world, "Plot.grows", at)
+	if sows == nil || grows == nil || string(sows) != string(grows) do return "that seed doesn't sow it"
+	east, south := world_area_extent(world, at)
+	tiles := i64(east) * i64(south)
+	n     := min(i64(east), tiles - plot.sown, world_units_of(world, seed))
+	if n <= 0 do return "there is nothing to sow"
+	if plot.sown + n >= tiles {
+		proposal_group_set_of_to_expecting(g, "Plot.sown", whole(at), 0, plot.sown)
+		proposal_group_set_of_to(g, "Plot.stands", whole(at), i64(plot_stands(world, "sown")))
+		proposal_group_set_of_to(g, "Plot.sownAt", whole(at), world_time(world).ms)
+	} else {
+		proposal_group_set_of_to_expecting(g, "Plot.sown", whole(at), plot.sown + n, plot.sown)
+	}
+	if n >= world_units_of(world, seed) {
+		proposal_group_destroy(g, whole(seed), "sown")
+	} else {
+		proposal_group_destroy(g, whole(proposal_group_split(g, whole(seed), n, location_make_none())), "sown")
+	}
+	return ""
+}
+
+
+/* Harvesting a row of a ripe plot (content/farming/): what its tiles yield
+ * is in the harvester's hand, with a stack of the kind it holds already,
+ * else in a free one. The last row reaped, the plot is bare. */
+@(private = "file")
+effect_harvest :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
+	held: [8]Entity_ID
+
+	at   := a.roles[.Item]
+	plot := plot_of(world, at)
+	if plot == nil do return "it is no plot"
+	if plot.stands != plot_stands(world, "ripe") do return "it isn't ripe"
+	yields := world_text_field(world, "Plot.yields", at)
+	if yields == nil || len(yields) == 0 do return "it yields nothing"
+	east, south := world_area_extent(world, at)
+	tiles := i64(east) * i64(south)
+	n     := min(i64(east), tiles - plot.reaped)
+	if n <= 0 do return "there is nothing to reap"
+	unit_ := blueprint_text(world, yields, "unit")
+	with  := NO_ENTITY
+	nheld := world_entities_at(world, a.roles[.Actor], .Held_By, raw_data(held[:]), 8)
+	for e in held[:nheld] {
+		u := world_unit_of(world, e)
+		if world_is_stack(world, e) && u != nil && string(u) == unit_ && with == NO_ENTITY do with = e
+	}
+	where_: Location
+	if with != NO_ENTITY {
+		where_ = world_location_of(world, with)
+	} else {
+		hand := free_hand(world, a.roles[.Actor])
+		if hand < 0 do return "no hand is free"
+		where_ = held_by(a.roles[.Actor], hand)
+	}
+	/* a tile's yield each, gathered into one stack */
+	into := with
+	for _ in 0 ..< n {
+		got := proposal_group_create(g, yields, "a harvest", where_)
+		if into == NO_ENTITY do into = got
+		else do proposal_group_merge(g, whole(got), whole(into))
+	}
+	if plot.reaped + n >= tiles {
+		proposal_group_set_of_to_expecting(g, "Plot.reaped", whole(at), 0, plot.reaped)
+		proposal_group_set_of_to(g, "Plot.stands", whole(at), i64(plot_stands(world, "bare")))
+	} else {
+		proposal_group_set_of_to_expecting(g, "Plot.reaped", whole(at), plot.reaped + n, plot.reaped)
+	}
+	return ""
+}
+
+
 /* Putting down: what the actor holds, on the ground at its feet. */
 @(private = "file")
 effect_put_down :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
@@ -2741,6 +2840,8 @@ effects := [?]Named_Effect{
 	{"split",     effect_split},
 	{"stoke",     effect_stoke},
 	{"put_down",  effect_put_down},
+	{"sow",       effect_sow},
+	{"harvest",   effect_harvest},
 	{"give",      effect_give},
 	{"investigate", effect_investigate},
 	{"tighten",   effect_tighten},

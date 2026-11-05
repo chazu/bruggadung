@@ -213,6 +213,28 @@ Referent :: struct {
 }
 
 
+/* The tiles a referent covers east and south from where it is believed,
+ * as the agent saw them: an area's (content/things.tri's #Area), else one. */
+referent_extent :: proc(r: ^Referent) -> (east: i32, south: i32) {
+	v: i64
+
+	east, south = 1, 1
+	if r == nil || r.features == nil || !strings.contains(string(r.features), "south: ") do return
+	if know_int_feature(r.features, "east", &v) do east = i32(v)
+	if know_int_feature(r.features, "south", &v) do south = i32(v)
+	return
+}
+
+
+/* Whether `me` is believed within reach of a referent: on its tile or
+ * beside it, or an area's, any of them. */
+referent_in_reach :: proc(me: ^Referent, r: ^Referent) -> bool {
+	if r == nil || me == nil || me.level != r.level do return false
+	east, south := referent_extent(r)
+	return me.x >= r.x - 1 && me.x <= r.x + east && me.y >= r.y - 1 && me.y <= r.y + south
+}
+
+
 /* What the agent perceived happen (KNOWLEDGE.md §7), in its referents. */
 Observation :: struct {
 	time:       i64,           /* ms */

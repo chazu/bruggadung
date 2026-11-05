@@ -110,6 +110,11 @@ view_can_reach :: proc(self: ^View, entity: Entity_ID) -> bool {
 
 	if !world_is_live(self.world, entity) || !world_is_physical(self.world, entity) do return false
 	if !ground_tile(self.world, self.actor, &here) || !ground_tile(self.world, entity, &there) do return false
+	/* an area, from on it or beside it (content/things.tri) */
+	if world_location_of(self.world, entity).form == .On_Tile {
+		east, south := world_area_extent(self.world, entity)
+		there = area_nearest(there, east, south, here)
+	}
 	return here.level == there.level && abs(here.x - there.x) <= 1 && abs(here.y - there.y) <= 1
 }
 

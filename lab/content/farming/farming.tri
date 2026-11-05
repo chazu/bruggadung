@@ -1,0 +1,239 @@
+// Farming: plots, their crops, seed, sowing, ripening and harvesting
+// (VILLAGE.md decision 5, slice 6).
+//
+// Cut points:
+// - full:     a farmer tends a plot of its household's through its
+//             working hours (a kept goal, agency.tri), the plot as a
+//             whole: one referent, an area (things.tri's #Area). Holding a
+//             harvest's worth, it takes it to the larder; else it harvests
+//             a row of a ripe plot, a hand free; else takes in what it
+//             harvested; else sows a row of a bare plot, its seed in hand
+//             (fetched from where it is kept first); else puts the seed
+//             back. A plot is tended while it stands sown, its farmer's
+//             hands empty.
+// - reduced:  the same, decided on the cadence's beat; each row's activity
+//             runs its time.
+// - abstract: as reduced. A household's plots as a yield at a place,
+//             below reduced, are open (VILLAGE.md decision 3).
+// - frozen:   it doesn't decide; what is under way waits. A plot ripens
+//             frozen or not: its growth is a function of time.
+// - growth:   a plot's crop grows from when its last row was sown
+//             (`sownAt`, `ripensIn`), read when needed, never stepped; it
+//             stands ripe once grown, set then: the plot's one wake. How
+//             far it has grown isn't seen; how it stands is.
+// - cooking:  what a harvest yields is food (cooking/cooking.tri's raw
+//             grain, and turnips), raw, cooked as any is; in a larder it
+//             merges with a sack of its kind.
+// - home:     a farmer's worksite is a scarecrow (home/home.tri) in one of
+//             its plots.
+// - village:  the plots, the seed in each larder, and who farms which are
+//             the scenario's (village/village.tri, src/scenario_village.odin).
+// - code:     effect_sow and effect_harvest (src/act_actions.odin), a row a
+//             time, each counting on the plot's rows as it read them (two
+//             at once, the second fails); the plots' growth and their wake
+//             (src/domains_farming.odin). Where a plot is seen and reached
+//             from is an area's (things.tri).
+
+// A plot: tilled ground a household farms, an area of it, and its crop:
+// what it grows, how it stands (bare, sown, ripe), how many of its tiles
+// are sown so far (bare) or reaped (ripe), and when its last row was sown;
+// it ripens `ripensIn` after. A tile reaped yields a stack (`yields`, a
+// blueprint).
+#Plot: #Area & {
+    @component(Plot)
+    grows:    text                           @field(content, saved, inspect, perceive(sight))
+    stands:   *"bare" | "sown" | "ripe"      @field(content, saved, proposable, inspect, perceive(sight))
+    sown:     *0 | int & >=0 & <=65536       @field(content, saved, proposable, inspect)
+    reaped:   *0 | int & >=0 & <=65536       @field(content, saved, proposable, inspect)
+    sownAt:   *0ms | time & >=0ms & <=10000d @field(content, saved, proposable, inspect)
+    ripensIn: *14d | time & >=1s & <=1000d   @field(content, saved, inspect)
+    yields:   text                           @field(content, saved, inspect)
+}
+
+plot_seen: #Seen & { kindOf: "#Plot" } @family(seen)
+
+plot_look: #Look & { kindOf: "#Plot", look: "plot" } @family(looks)
+
+// Seed: the crop it sows (a plot's `grows`), a unit to a tile.
+#Seed: {
+    @component(Seed)
+    sows: text @field(content, saved, inspect, perceive(sight))
+}
+
+seed_seen: #Seen & { kindOf: "#Seed" } @family(seen)
+
+// The plots: grain, ripe in a fortnight, and turnips, in twelve days, each
+// tile yielding two portions (cooking/cooking.tri's grain) or two turnips.
+// How big each is, the scenario says.
+grain_plot:  #Plot & { material: "earth", mass: 1kg, grows: "grain", ripensIn: 14d, yields: "grain_harvest" }
+turnip_plot: #Plot & { material: "earth", mass: 1kg, grows: "turnip", ripensIn: 12d, yields: "turnip_harvest" }
+
+// What a tile's harvest is: raw food, a stack, as grain is kept.
+let raw_grain  = { material: "food", raw: true, nourishment: 15, cooking: 35 }
+let raw_turnip = { material: "food", raw: true, nourishment: 10, cooking: 30 }
+grain_harvest:  #Stack & #Food & raw_grain & { unit: "grain", unitMass: 250g, count: 2 }
+turnip_harvest: #Stack & #Food & raw_turnip & { unit: "turnip", unitMass: 250g, count: 2 }
+
+// Seed, kept back from the last harvest: a sack, by the tile's worth.
+seed_grain:  #Stack & #Seed & { material: "food", unit: "seed grain", unitMass: 25g, count: 500, sows: "grain" }
+turnip_seed: #Stack & #Seed & { material: "food", unit: "turnip seed", unitMass: 5g, count: 300, sows: "turnip" }
+
+// Farming: the plot, the seed sown on it, what was harvested, and the
+// larder it goes to.
+#Farming: #Keeping & { plot: #Plot, seed: #Body, harvest: #Body }
+
+// The day's work, for a farmer: a plot of its household's tended, kept
+// through its working hours (bound when undertaken: the plot, and the
+// larder its seed is kept in and its harvest goes to). Tended, it stands
+// sown, and nothing of it is left in the farmer's hands.
+plot_tended: #Goal & {
+    title: "tend the plot"
+    done:  { find: ["plot"], match: #Farming & { me: #Agent & { freeHands: 2 }, plot: #Plot & { stands: "sown" } } }
+    kept:  true
+} @family(goals)
+
+// A harvest's worth in hand (ten kilograms, forty portions: what is held is
+// weighed by its mass, its count unseen): to the larder.
+bring_it_in: #Method & {
+    title: "bring it in"
+    goal:  "plot_tended"
+    rank:  1
+    pre: {
+        find:  ["harvest", "larder"]
+        match: #Farming & { me: #Agent & { id: $me },
+                            harvest: #Food & #Stack & { raw: true, mass: >=10kg, place: #Held & { by: $me } },
+                            larder: #Container }
+    }
+    order: ["own", "habit", "near"]
+    steps: [#Do & { op: "put_in", object: "harvest", target: "larder" }]
+} @family(methods)
+
+harvest_it: #Method & {
+    title: "harvest it"
+    goal:  "plot_tended"
+    rank:  2
+    pre: {
+        find:  ["plot"]
+        match: #Farming & { me: #Agent & { freeHands: >=1 }, plot: #Plot & { stands: "ripe" } }
+    }
+    steps: [#Do & { op: "harvest", object: "plot" }]
+} @family(methods)
+
+// The plot reaped, or no hand free to reap it: what was harvested, taken
+// in. (A portion alone in hand, 250 grams, is the meal taken to work,
+// cooking/'s.)
+bring_in_the_rest: #Method & {
+    title: "bring in the rest"
+    goal:  "plot_tended"
+    rank:  3
+    pre: {
+        find:  ["harvest", "larder"]
+        match: #Farming & { me: #Agent & { id: $me },
+                            harvest: #Food & #Stack & { raw: true, mass: >=500g, place: #Held & { by: $me } },
+                            larder: #Container }
+    }
+    order: ["own", "habit", "near"]
+    steps: [#Do & { op: "put_in", object: "harvest", target: "larder" }]
+} @family(methods)
+
+sow_it: #Method & {
+    title: "sow it"
+    goal:  "plot_tended"
+    rank:  4
+    pre:   { find: ["plot"], match: #Farming & { plot: #Plot & { stands: "bare" } } }
+    steps: [#Achieve & { subgoal: "seed_in_hand" }, #Do & { op: "sow", object: "seed", target: "plot" }]
+} @family(methods)
+
+// Nothing to sow: the seed put back where it is kept.
+put_back_the_seed: #Method & {
+    title: "put back the seed"
+    goal:  "plot_tended"
+    rank:  5
+    pre: {
+        find:  ["seed", "larder"]
+        match: #Farming & { me: #Agent & { id: $me },
+                            seed: #Seed & #Stack & { place: #Held & { by: $me } },
+                            larder: #Container }
+    }
+    order: ["own", "habit", "near"]
+    steps: [#Do & { op: "put_in", object: "seed", target: "larder" }]
+} @family(methods)
+
+// Seed in hand for the plot's crop, to sow with (the plot is bound: a
+// condition describes only the slots it finds): a plot's worth fetched at a
+// time.
+seed_in_hand: #Goal & {
+    title: "take seed"
+    done: {
+        find:  ["plot", "seed"]
+        match: #Farming & { me: #Agent & { id: $me },
+                            seed: #Seed & #Stack & { sows: $c, place: #Held & { by: $me } },
+                            plot: #Plot & { grows: $c } }
+    }
+} @family(goals)
+
+fetch_seed: #Method & {
+    title: "fetch seed"
+    goal:  "seed_in_hand"
+    rank:  1
+    pre: {
+        find:  ["plot", "seed"]
+        match: #Farming & { me: #Agent & { freeHands: >=1 },
+                            seed: #Seed & #Stack & { sows: $c, place: #Inside },
+                            plot: #Plot & { grows: $c } }
+    }
+    order: ["own", "habit", "near"]
+    steps: [#Do & { op: "take_some", object: "seed", units: 300 }]
+} @family(methods)
+
+look_for_seed: #Method & {
+    title:  "look for seed"
+    goal:   "seed_in_hand"
+    rank:   2
+    pre:    { find: ["larder"], match: #Farming & { larder: #Container } }
+    order:  ["own", "habit", "likely", "near"]
+    seeks:  #Seed & #Stack
+    search: "larder"
+    places: 2
+    steps:  [#Do & { op: "look_in", object: "larder" }]
+} @family(methods)
+
+// Sow a row of a bare plot in reach, seed for its crop in hand: a quarter
+// of an hour, with the hands. As many tiles as a row has, or as the seed
+// or the plot have left, are sown, a unit of the seed to each; the last
+// row sown, the plot stands sown, growing from then.
+sow: #Operation & {
+    effect:   "sow"
+    duration: 900s
+    uses:     ["hands"]
+    roles: {
+        actor:       #Agent & { id: $a }
+        item:        #Seed & #Stack & { sows: $c, place: #Held & { by: $a } }
+        destination: #Plot & { grows: $c, stands: "bare" }
+    }
+} @family(operations)
+
+// Harvest a row of a ripe plot in reach: half an hour, with the hands, and
+// work. What the row yields is in the harvester's hand, with what it holds
+// of the kind already; the last row reaped, the plot is bare.
+harvest: #Operation & {
+    effect:   "harvest"
+    duration: 1800s
+    uses:     ["hands"]
+    exertion: 1
+    roles: {
+        actor: #Agent
+        item:  #Plot & { stands: "ripe" }
+    }
+} @family(operations)
+
+// The three weeks' test (src/test_farming.odin): a plot of 8 by 4 in a
+// meadow of 20 by 10, and a farmhand who tends it, who needn't eat.
+farm_map: #Map & {
+    legend: [{ glyph: ",", terrain: "grass" },
+             { glyph: "%", terrain: "tilled_soil" }]
+    levels: [{ z: 0, rows: _ @embed(file="maps/farm.0.map", type=text) }]
+    fill:   "grass"
+}
+
+farmhand: #Agent & { material: "flesh", mass: 75kg, hands: 2, coat: "green", trade: "farmer" }

@@ -203,6 +203,17 @@ These were made while writing this document and have not yet been reviewed.
       Saves hold what is kept, the digests, and where history stands.
     - Left out, until a larger world wants it: segmenting history by
       region and rotating it out of memory; a window per region.
+22. **An area is known as a whole** (VILLAGE.md decision 5). A thing that
+    covers ground, an **area** (a plot), is one entity placed on its
+    north-west tile, covering so many tiles east and south, which are
+    seen. It is a candidate for sight when any of its tiles is within it,
+    seen when the nearest of them is, and in reach from on it or beside it,
+    so an agent has one referent for it, recognized at the tile it is
+    placed on, and walks to its nearest tile. A crop on every tile of a
+    plot was a thousand referents a farmer recognized at every look.
+    - Left out: many like things seen as one (a stand of trees, a herd),
+      which would be grouping in perception; an area's light and distance
+      for how precisely it is seen are its placed tile's.
 
 ## Terms
 

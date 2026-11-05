@@ -116,7 +116,8 @@
 // A way to achieve a goal. Its alternatives are tried by `rank`, lowest first,
 // skipping those that have failed since the goal was adopted; the first whose
 // `pre` holds is followed. A `search` slot is somewhere to look: a referent
-// whose inside the agent has seen since the goal was adopted is passed over.
+// whose inside the agent has seen since the goal was adopted is passed over,
+// the slot bound already (a commitment's larder) or not.
 // An agent asked the same kind of thing (the method's first `says`) since
 // the goal was adopted is passed over too. A search
 // looks into so many `places` (0, no end), counting those seen into or asked

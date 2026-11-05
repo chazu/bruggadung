@@ -390,7 +390,7 @@ bound :: proc(b: [^]Slot_Binding, n: i32, slot: string) -> u32 {
 
 @(private = "file")
 in_reach :: proc(me: ^Referent, r: ^Referent) -> bool {
-	return r != nil && me.level == r.level && abs(me.x - r.x) <= 1 && abs(me.y - r.y) <= 1
+	return referent_in_reach(me, r)
 }
 
 
@@ -1190,7 +1190,18 @@ agency_bind :: proc(self: ^Agency, c: ^Condition, k: uint, b: [^]Slot_Binding, n
 		return m == .Entailed
 	}
 	slot := cstr(c.find[k][:])
-	if bound(b, n^, string(slot)) != 0 do return agency_bind(self, c, k + 1, b, n)
+	if r := bound(b, n^, string(slot)); r != 0 {
+		/* somewhere to look, bound already (a commitment's larder): searched
+		 * since, it is passed over, as one found would be */
+		if c.search[0] != 0 && string(slot) == str(c.search[:]) {
+			ref := knowledge_store_referent(c.store, r)
+			if ref != nil && (ref.insideSeen >= c.since ||
+			                  knowledge_store_last_said_to_like(c.store, r, cstr(c.asks[:]) if c.asks[0] != 0 else nil) >= c.since) {
+				return false
+			}
+		}
+		return agency_bind(self, c, k + 1, b, n)
+	}
 	if n^ >= BG_MAX_SLOTS do return false
 
 	ncandidates: uint = 0
@@ -1523,9 +1534,13 @@ agency_walk :: proc(self: ^Agency, m: ^Motivation, why: string, me: ^Referent, t
 	c.level    = me.level
 	q.x        = me.x
 	q.y        = me.y
+	/* toward the nearest of an area's tiles (content/things.tri) */
+	east, south := referent_extent(target)
+	near       := area_nearest(Location{form = .On_Tile, x = target.x, y = target.y, level = target.level}, east, south,
+	                           Location{form = .On_Tile, x = me.x, y = me.y, level = me.level})
 	q.targeted = true
-	q.tx       = target.x
-	q.ty       = target.y
+	q.tx       = near.x
+	q.ty       = near.y
 	q.context_ = &c
 	q.passable = walkable
 	q.way      = &way

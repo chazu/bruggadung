@@ -166,7 +166,14 @@ knowledge_perceive :: proc(self: ^Knowledge, store: ^Knowledge_Store, first: uin
 		e: Entity_ID
 
 		e = near[i]
-		if world_record(self.world, kbody, e) == nil || !know_ground_tile(self.world, e, &tile) || !knowledge_sees(self, tile, here) do continue
+		if world_record(self.world, kbody, e) == nil || !know_ground_tile(self.world, e, &tile) do continue
+		/* an area, by the nearest of its tiles (content/things.tri) */
+		sight := tile
+		if world_location_of(self.world, e).form == .On_Tile {
+			east, south := world_area_extent(self.world, e)
+			sight = area_nearest(tile, east, south, here)
+		}
+		if !knowledge_sees(self, sight, here) do continue
 		at = world_location_of(self.world, e)
 		if at.form == .In && !self.omniscient && !know_contains(raw_data(lookedIn[:]), nlooked, at.place) &&
 		   !know_contains(raw_data(glimpsed[:]), nglimpsed, e) {

@@ -57,14 +57,15 @@ Proposal_Kind :: enum i32 {
 Proposal :: struct {
 	kind:     Proposal_Kind,
 	target:   Ref,
-	other:    Ref,        // merge: the stack to merge into; edges: the far end; events: the other role
+	other:    Ref,        // merge: the stack to merge into; edges: the far end; events: the other role;
+	                      // set field, if `expects`: the value it must still have, as other.entity
 	location: Location,   // create, move, split; place may be a handle
 	value:    i64,        // set field: the value; split: the count
 	edge:     Edge_Kind,
 	name:     cstring,    // create: blueprint; set field: "Kind.field"; event: its kind; destroy: reason
 	key:      cstring,    // create: the stable key the seed derives from
 	handle:   Entity_ID,  // create, split: the new entity
-	expected: Location,   // move: where the target must still be, if `expects`
+	expected: Location,   // move: where the target must still be, if `expects` (set field: see `other`)
 	expects:  bool,
 }
 
@@ -249,6 +250,21 @@ proposal_group_set_of_to :: proc(self: ^Proposal_Group, field: cstring, target: 
 	p       = proposal(.Set_Field, target)
 	p.name  = field
 	p.value = value
+	proposal_group_add_proposal(self, p)
+}
+
+
+/* A field set, if it still has the value it was read with: two who read
+ * it at once (two farmers sowing a row of one plot) can't both count on it;
+ * the second's group fails. */
+proposal_group_set_of_to_expecting :: proc(self: ^Proposal_Group, field: cstring, target: Ref, value: i64, was: i64) {
+	p: Proposal
+
+	p              = proposal(.Set_Field, target)
+	p.name         = field
+	p.value        = value
+	p.other.entity = Entity_ID(u64(was))
+	p.expects      = true
 	proposal_group_add_proposal(self, p)
 }
 

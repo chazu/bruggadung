@@ -765,6 +765,12 @@ committer_apply :: proc(self: ^Committer, p: ^Proposal, g: ^Proposal_Group, tall
 		if world_record(self.world, k, e) == nil {
 			return fmt.tprintf("%d has no %s component", e, world_kind_info(self.world, k).name)
 		}
+		if p.expects {
+			now: i64
+			if !world_get_field(self.world, p.name, e, &now) || now != i64(u64(p.other.entity)) {
+				return fmt.tprintf("%d's %s is no longer %d", e, p.name, i64(u64(p.other.entity)))
+			}
+		}
 		// a reference to something the group creates: its ID now
 		value = i64(proposal_group_id_for(g, Entity_ID(p.value))) if f.value == VALUE_REF && is_handle(Entity_ID(p.value)) else p.value
 		set: bool
