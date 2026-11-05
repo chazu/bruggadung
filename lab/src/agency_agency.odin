@@ -1148,6 +1148,17 @@ agency_match_supposing :: proc(self: ^Agency, c: ^Condition, b: [^]Slot_Binding,
 		}
 	}
 	strings.write_string(&expr, " }")
+	/* worked out before, for the same condition and description: the
+	 * condition named by its variants' patterns, the content's own nodes */
+	key := strings.builder_make(context.temp_allocator)
+	strings.write_string(&key, "supposing")
+	for v: uint = 0; v < c.nvariants; v += 1 do fmt.sbprintf(&key, "\x00%p", c.match[v])
+	fmt.sbprintf(&key, "\x00%s", strings.to_string(expr))
+	if m, ok := world_matched(self.world, strings.to_string(key)); ok {
+		strncpy(path, cstring(&m.result.failure.path[0]), 255)
+		path[255] = 0
+		return m.match
+	}
 	arena       := tri.arena_new()
 	description := tri.value(tc, ns_utf8(strings.to_string(expr)), arena, nil, 0)
 	best        := tri.Match.Incompatible
@@ -1162,6 +1173,10 @@ agency_match_supposing :: proc(self: ^Agency, c: ^Condition, b: [^]Slot_Binding,
 	}
 	path[255] = 0
 	tri.arena_free(arena)
+	kept: Matched
+	kept.match = best
+	strncpy(kept.result.failure.path[:], cstring(raw_data(path)), 255)
+	world_remember_match(self.world, strings.to_string(key), kept)
 	return best
 }
 

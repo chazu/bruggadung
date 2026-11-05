@@ -281,6 +281,17 @@ the next to measure; recognition was 2.7 s (decision 4).
    searches. The run's own output, and its hash, are unchanged. Each
    slice records them in lab/PLAN.md, as slice 10 of VILLAGE.md
    proposes.
+7. **What is a function of the content alone is worked out once**
+   (built). Three things were worked out from text again and again, each
+   the same for the same text: what kind an entity is seen as (its
+   blueprint and components; kept for each entity until it gains or loses
+   a component), a referent's features as recalled after so many steps of
+   fading (kept by kind, steps and features), and whether a description
+   matches a pattern (an action's roles, a condition's frame, two looks
+   unifying; kept by the text and the pattern). Each is kept on the world,
+   bounded and let go when full. None changes what happens: the scenario
+   hashes are the same. The market's village took 22 s, and 14 s after
+   (profiled with macOS's `sample` on a `-o:speed -debug` build).
 
 ## Open questions
 

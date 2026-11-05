@@ -4995,3 +4995,26 @@ Coins, stalls with price boards, and the sale in three acts.
   13 s): see VILLAGE.md's open question on the market's cost.
 
 136 tests, 4040 checks.
+
+### After the slice: the market's cost (PERFORMANCE.md decision 7)
+
+Profiled with macOS's `sample` on an `-o:speed -debug` build (the lab's
+own counters say which phase, not which function). Three things were
+worked out from text again and again, each a function of the content:
+
+- `kind_of_entity` (what an entity is seen as) looped over every seen
+  kind and every component kind each call, for each entity in sight at
+  each perception; the stalls and boards at the crossroads made it the
+  top of the profile. Kept per entity (`World.seenAs`), with its
+  blueprint, until it gains or loses a component.
+- `knowledge_store_recall` parsed and generalized a referent's features
+  for every description of it. Kept by kind, steps and features
+  (`World.recalled`, bounded).
+- `match_described`, `agency_match_supposing` and
+  `knowledge_looks_alike` built a description as text, parsed and matched
+  it. Kept by the text and the pattern (`World.matched`, bounded).
+
+The village: 14.0 s, from 22 s; perception 5.2 s (from 10.4), decision
+6.3 s (from 7.8). Every scenario's hash is unchanged. What's left is
+spread thin; `text_at` (printing content nodes) is the largest, and not
+all its nodes are the content's own.

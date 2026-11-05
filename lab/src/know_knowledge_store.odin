@@ -1823,8 +1823,18 @@ knowledge_store_recall :: proc(self: ^Knowledge_Store, r: ^Referent) -> string {
 	salience = r.salience if r.salience > BG_NOTICE else BG_NOTICE
 	steps = i32(i64(knowledge_store_steps_since(self, r.seen)) * 2 * BG_NOTICE / i64((1 + sightings) * salience))
 	if steps == 0 || len(known) == 0 || r.kind == nil do return known
-	return knowledge_store_generalize(self, known, r.kind, steps)
+	/* a function of the content alone: worked out once, and kept */
+	key := fmt.tprintf("%s\x00%d\x00%s", r.kind, steps, known)
+	if v, ok := self.world.recalled[key]; ok do return strings.clone(v, context.temp_allocator)
+	recalled := knowledge_store_generalize(self, known, r.kind, steps)
+	if len(self.world.recalled) >= BG_RECALLED do world_forget_recalled(self.world)
+	self.world.recalled[strings.clone(key)] = strings.clone(recalled)
+	return recalled
 }
+
+
+/* How many recalled descriptions are kept before they are let go. */
+BG_RECALLED :: 8192
 
 
 knowledge_store_generalize :: proc(self: ^Knowledge_Store, known: string, kind: cstring, steps: i32) -> string {

@@ -453,13 +453,12 @@ New, and entered in the glossary with this document:
 - **A buyer always pays.** Handed the goods, the buyer pays at once; one
   who walked off without paying would be a thief, a case for the law
   (INSTITUTIONS.md), not built.
-- **What the market costs.** The village takes 22 s (from 13 s): 43,000
-  boundaries, from 34,000, and perception 10 s, from 5. Most of it isn't
-  market day: without one the run still takes 38,000 boundaries and
-  8.7 s of perception. Not the boards' reading, the market's commitments
-  or the farmers' bigger store; not yet found (the first morning's walk
-  to the green shifts every day after it, and there are more things to
-  know). A profile is the next step.
+- **What the market costs.** Settled (PERFORMANCE.md decision 7): the
+  stalls and boards stand at the crossroads, which nearly every walk
+  passes, and working out what each entity seen is, and recalling and
+  matching descriptions, was done from text every time. Done once now,
+  the village takes 14 s, from 22 s (13 s before the market), with the
+  same hashes.
 - **How weakness is felt.** Strength and cognition fall with reserves, but
   does the agent know it is weak? The interoceptive belief is hunger's.
   Weakness might be felt as fatigue, or as a need of its own.

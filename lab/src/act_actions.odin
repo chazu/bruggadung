@@ -182,6 +182,16 @@ match_described :: proc(world: ^World, pattern: ^tri.Node, action: Action, descr
 		}
 	}
 	strings.write_string(&expr, " } }")
+	/* worked out before, for the same operation and description */
+	key := fmt.tprintf("described\x00%s\x00%s", action.operation, strings.to_string(expr))
+	if m, ok := world_matched(world, key); ok {
+		if result != nil do result^ = m.result
+		if m.match == .Incompatible && reason != nil {
+			failure := m.result.failure
+			reason^ = fmt.tprintf("%s is ruled out at %s", action.operation, cstring(&failure.path[0]))
+		}
+		return m.match
+	}
 	arena       = tri.arena_new()
 	description = tri.value(content, ns_utf8(strings.to_string(expr)), arena, &err[0], size_of(err))
 	if description == nil {
@@ -191,10 +201,13 @@ match_described :: proc(world: ^World, pattern: ^tri.Node, action: Action, descr
 		tri.arena_free(arena)
 		return .Incompatible
 	}
-	match = tri.match_instance(content, action.operation, description, result)
+	worked: tri.Match_Result
+	match = tri.match_instance(content, action.operation, description, &worked)
+	if result != nil do result^ = worked
 	if match == .Incompatible && reason != nil {
-		reason^ = fmt.tprintf("%s is ruled out at %s", action.operation, cstring(&result.failure.path[0]))
+		reason^ = fmt.tprintf("%s is ruled out at %s", action.operation, cstring(&worked.failure.path[0]))
 	}
+	world_remember_match(world, key, Matched{match, worked})
 	tri.arena_free(arena)
 	return match
 }

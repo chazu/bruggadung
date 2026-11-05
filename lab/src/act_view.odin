@@ -217,10 +217,21 @@ seen_kinds_load :: proc(content: ^tri.Content) -> [dynamic]Seen_Kind {
    the kind; more, their conjunction; none, #Thing. An inner state (a
    stomach) is no seen kind, so it doesn't show; a kind no list names shows
    as the seen kinds above it. What has no body (a claim, a bond) is its
-   type. "" for no entity. */
+   type. "" for no entity. Worked out once for each entity, and kept
+   (World.seenAs) until it gains or loses a component. */
 kind_of_entity :: proc(world: ^World, entity: Entity_ID) -> string {
 	info := world_info(world, entity)
 	if info == nil do return ""
+	if v, ok := world.seenAs[entity]; ok && v.blueprint == info.blueprint do return v.kind
+	kind := kind_of_entity_worked_out(world, entity, info)
+	world_forget_seen_as(world, entity)
+	world.seenAs[entity] = Seen_As{info.blueprint, strings.clone(kind)}
+	return kind
+}
+
+
+@(private = "file")
+kind_of_entity_worked_out :: proc(world: ^World, entity: Entity_ID, info: ^Entity_Info) -> string {
 	tc      := world_tri(world)
 	pattern := tri.pattern(tc, info.blueprint)
 	if pattern == nil do return "#Thing"

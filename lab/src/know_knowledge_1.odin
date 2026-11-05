@@ -1291,9 +1291,13 @@ knowledge_looks_alike :: proc(self: ^Knowledge, r: ^Referent, store: ^Knowledge_
 	expr: string
 
 	expr  = fmt.tprintf("%s & {{ %s }} & {{ %s }}", kind, know_lasting(knowledge_store_recall(store, r)), know_lasting(features))
+	/* whether they unify, worked out before for the same text */
+	key := fmt.tprintf("alike\x00%s", expr)
+	if m, ok := world_matched(self.world, key); ok do return m.match == .Entailed
 	arena = tri.arena_new()
 	both  = tri.value(world_tri(self.world), ns_utf8(expr), arena, nil, 0)
 	tri.arena_free(arena)
+	world_remember_match(self.world, key, Matched{match = .Entailed if both != nil else .Incompatible})
 	return both != nil
 }
 

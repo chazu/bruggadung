@@ -154,6 +154,9 @@ World :: struct {
 	weakness:         Weakness_Table,   /* hunger's curves, from content (domains_bodies.odin) */
 	looks:            Looks,            /* what things look like, from content (looks.odin) */
 	seen:             [dynamic]Seen_Kind, /* the kinds seen at a glance, from content (act_view.odin) */
+	seenAs:           map[Entity_ID]Seen_As, /* each entity's kind as seen, worked out once (act_view.odin) */
+	recalled:         map[string]string, /* features as recalled, by kind, steps and features (know_knowledge_store.odin) */
+	matched:          map[string]Matched, /* matches of described things, by what was matched (world_matched) */
 	settled:          ^Anchors_Kept,    /* the anchors as last settled, to tell what rose */
 	risen:            [^]Entity_ID,     /* what rose from frozen since it was last taken */
 	nrisen:           uint,
@@ -481,6 +484,12 @@ world_dealloc :: proc(self: ^World) {
 	reality_free(self.reality)
 	looks_free(&self.looks)
 	delete(self.seen)
+	for _, v in self.seenAs do delete(v.kind)
+	delete(self.seenAs)
+	world_forget_recalled(self)
+	delete(self.recalled)
+	world_forget_matched(self)
+	delete(self.matched)
 	free(self.settled)
 	free(self.risen)
 	delete(self.checkedOut)
@@ -861,6 +870,7 @@ file_record :: proc(self: ^World, kind: uint, entity: Entity_ID, add: bool) {
 
 
 world_set_record :: proc(self: ^World, record: rawptr, kind: uint, entity: Entity_ID) {
+	if store_record_for(self.kinds[kind], entity) == nil do world_forget_seen_as(self, entity)     /* a component it hadn't */
 	journal_record(self, self.kinds[kind], kind, entity)
 	file_record(self, kind, entity, false)
 	store_set_record(self.kinds[kind], record, entity)
@@ -872,10 +882,66 @@ world_remove_record :: proc(self: ^World, kind: uint, entity: Entity_ID) {
 	if store_record_for(self.kinds[kind], entity) == nil {
 		return
 	}
+	world_forget_seen_as(self, entity)
 	journal_record(self, self.kinds[kind], kind, entity)
 	file_record(self, kind, entity, false)
 	store_remove_record_for(self.kinds[kind], entity)
 	touch(self, entity)
+}
+
+
+/* An entity's kind as seen (act_view.odin's kind_of_entity), worked out
+ * from its blueprint and its components, which change only as it is made
+ * or ended: kept, with the blueprint it was worked out for. */
+Seen_As :: struct {
+	blueprint: cstring,
+	kind:      string,
+}
+
+
+/* A match worked out from text (a pattern and a description, PERFORMANCE.md
+ * decision 7): a function of the content alone, so kept, by the text and
+ * whatever names the pattern, up to BG_MATCHED of them, then let go. */
+Matched :: struct {
+	match:  tri.Match,
+	result: tri.Match_Result,
+}
+
+BG_MATCHED :: 4096
+
+
+world_matched :: proc(self: ^World, key: string) -> (Matched, bool) {
+	return self.matched[key]
+}
+
+
+world_remember_match :: proc(self: ^World, key: string, m: Matched) {
+	if len(self.matched) >= BG_MATCHED do world_forget_matched(self)
+	self.matched[strings.clone(key)] = m
+}
+
+
+world_forget_matched :: proc(self: ^World) {
+	for k in self.matched do delete(k)
+	clear(&self.matched)
+}
+
+
+/* Let go of what was recalled (a cache of a pure function of content). */
+world_forget_recalled :: proc(self: ^World) {
+	for k, v in self.recalled {
+		delete(k)
+		delete(v)
+	}
+	clear(&self.recalled)
+}
+
+
+world_forget_seen_as :: proc(self: ^World, entity: Entity_ID) {
+	if v, ok := self.seenAs[entity]; ok {
+		delete(v.kind)
+		delete_key(&self.seenAs, entity)
+	}
 }
 
 
