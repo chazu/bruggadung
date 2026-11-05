@@ -14,6 +14,8 @@
 // - code:     src/domains_thermal.odin (solids), domains_atmosphere.odin (fire, the
 //             gas's heat); effect_light.
 
+package heat
+
 // A stove's firebox: lit or not, its damper open to the flue or not, and how
 // fast it burns at most (mg of wood a second).
 #Combustor: {

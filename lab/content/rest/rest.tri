@@ -16,6 +16,8 @@
 //             leaves what the breather rests easy in (air/air.tri).
 // - code:     effect_rest (src/act_actions.odin).
 
+package rest
+
 // Tiredness raises resting: worth what the agent feels of it; done once a
 // rest has run its course.
 rest_when_tired: #Goal & {

@@ -286,7 +286,7 @@ size_t tri_component_header(TriContent *c, const char *prefix, char *buf, size_t
             TriNode *v = e ? node_arc(e, f) : NULL;
             const char *flags = field_flags(c, f);
             Buf fld = { 0 }, note = { 0 };
-            c_ident(&fld, c->feats.v[f].name, false);
+            c_ident(&fld, component_field_name(c, f), false);
             const TypeInfo *vt = v ? &c->types.v[v->type] : NULL;
             const char *ctype, *vkind, *kname;
             if (v && (v->flags & NF_DIM)) {
@@ -320,7 +320,7 @@ size_t tri_component_header(TriContent *c, const char *prefix, char *buf, size_t
                         if (vt->kind == TK_ANON) {
                             c_ident(&enums, ti->component, true);
                             buf_putc(&enums, '_');
-                            c_ident(&enums, c->feats.v[f].name, true);
+                            c_ident(&enums, component_field_name(c, f), true);
                         } else {
                             c_ident(&enums, vt->name, true);
                         }
@@ -340,7 +340,7 @@ size_t tri_component_header(TriContent *c, const char *prefix, char *buf, size_t
             }
             buf_printf(&b, "    %-15s %s;", ctype, fld.s);
             buf_printf(&b, "    /* %s%s%s */\n", note.s ? note.s : "", flags ? "; " : "", flags ? flags : "");
-            buf_printf(&reg, "    { \"%s\", offsetof(%s, %s), %s_VALUE_%s, ", c->feats.v[f].name, sname.s, fld.s, up.s, vkind);
+            buf_printf(&reg, "    { \"%s\", offsetof(%s, %s), %s_VALUE_%s, ", component_field_name(c, f), sname.s, fld.s, up.s, vkind);
             put_c_string(&reg, kname);
             buf_puts(&reg, ", ");
             put_c_string(&reg, flags ? flags : "");
@@ -434,7 +434,7 @@ size_t tri_component_odin(TriContent *c, const char *package, const char *triang
             TriNode *v = e ? node_arc(e, f) : NULL;
             const char *flags = field_flags(c, f);
             Buf fld = { 0 }, note = { 0 };
-            c_ident(&fld, c->feats.v[f].name, false);
+            c_ident(&fld, component_field_name(c, f), false);
             const TypeInfo *vt = v ? &c->types.v[v->type] : NULL;
             const char *otype, *vkind, *kname;
             if (v && (v->flags & NF_DIM)) {
@@ -467,7 +467,7 @@ size_t tri_component_odin(TriContent *c, const char *package, const char *triang
                         if (vt->kind == TK_ANON) {
                             c_ident(&enums, ti->component, true);
                             buf_putc(&enums, '_');
-                            c_ident(&enums, c->feats.v[f].name, true);
+                            c_ident(&enums, component_field_name(c, f), true);
                         } else {
                             c_ident(&enums, vt->name, true);
                         }
@@ -486,7 +486,7 @@ size_t tri_component_odin(TriContent *c, const char *package, const char *triang
                 buf_printf(&note, "%s: a structure", kname);
             }
             buf_printf(&b, "\t%s: %s,    // %s%s%s\n", fld.s, otype, note.s ? note.s : "", flags ? "; " : "", flags ? flags : "");
-            buf_printf(&reg, "\t{\"%s\", offset_of(%s, %s), VALUE_%s, ", c->feats.v[f].name, sname.s, fld.s, vkind);
+            buf_printf(&reg, "\t{\"%s\", offset_of(%s, %s), VALUE_%s, ", component_field_name(c, f), sname.s, fld.s, vkind);
             put_c_string(&reg, kname);
             buf_puts(&reg, ", ");
             put_c_string(&reg, flags ? flags : "");

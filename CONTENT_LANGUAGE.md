@@ -58,8 +58,9 @@ Out of scope here:
      and totally well-typed. It merges descriptions and matches patterns.
 4. **Types are nominal and closed.** The hierarchy is completed to a bounded
    complete partial order at load, with greatest-lower-bound (meet) types
-   generated where missing. Every feature is introduced by exactly one type.
-   Types marked `@component` group the features they introduce into a
+   generated where missing. Every feature is introduced by exactly one type
+   (in a package, decision 12). Types marked `@component` group the features
+   they introduce into a
    component kind, so the field registry is generated from content.
 5. **Names copy; references and tags share.** A reference to a top-level
    name (a type or an instance), or to a path into one (`wrench_19.size`),
@@ -98,13 +99,30 @@ Out of scope here:
     structure nodes are C structs in arenas, never the systems' objects. An
     optional TDL front end shares the internal tree, so the English Resource
     Grammar can serve as a large benchmark.
-12. **Packages scope names, not features.** A package (a file, or a
-    directory of them) scopes type, component, and blueprint names, and
-    prefixes the identifiers generated from them, so a component can't clash
-    with an engine type. Feature names stay global:
-    every feature is still introduced by exactly one type, so where two
-    meanings truly coincide they share a supertype. This revises "Not
-    adopted from CUE: ... packages" (§2).
+12. **Packages scope names and features.** A package (a file, or a
+    directory of them) scopes type, component, blueprint and feature names.
+    - A feature is the package's whose file introduces it, so two packages
+      may each have a `larder`; within one package (or the root), a feature
+      is still introduced by exactly one type.
+    - A plain name means the package's own, else the root's, else the one
+      package's that declares it. A plain label means the field of the type
+      it is written against (`#Cooking & { larder: … }`), else the
+      package's own, else the root's, else the only one. Where that leaves
+      two, it is an error, and the name is qualified: `cooking.#Food`,
+      `cooking.larder:`.
+    - A type the root declares is the root's everywhere: a package's file
+      that declares it adds to it. Another package's type is added to by its
+      qualified name (`hunger.#Food: { raw: … }`). The fields a file adds are
+      its package's.
+    - Names print plainly where that is unambiguous, qualified where not, so
+      what prints parses back; generated names follow (a component
+      `Gadget`, a field `cooking_cooks` only where its component has two).
+    - Names and features are ordered by their plain names first, so moving
+      declarations into packages renumbers nothing.
+    *Revised:* first features stayed global, and every cross-package name
+    was qualified; the lab's topics, each a package, then had to rename or
+    share a supertype for every field two topics both wanted (`larder`,
+    `wide`), and to qualify names that never clashed.
 
 ## Terms
 
@@ -115,7 +133,7 @@ Out of scope here:
 | Hierarchy | The partial order of types, completed so that any two compatible types have a unique meet |
 | Meet (GLB) | The most general type that is a subtype of both. Undefined (bottom) means the types are incompatible. |
 | Appropriateness | Which features a type has, and the most general type allowed for each feature's value |
-| Introducing type | The unique most general type that declares a feature |
+| Introducing type | The unique most general type that declares a feature, in its package |
 | Totally well-typed | Every node has every feature its type makes appropriate. A missing value is present as the most general allowed type, which means "nothing known". |
 | Unification | Combining two FSs into the most general FS more specific than both, or failing |
 | Subsumption | A ⊒ B: A is more general than B, so everything A says, B says too |
@@ -205,9 +223,9 @@ Three constructs look like CUE but mean something else:
 
 **Not adopted from CUE:** comprehensions that make declarations.
 Arithmetic is adopted, between tags and references (§5).
-Packages are adopted for names only (decision 12): a `package` scopes
-types, instances, and components, and features stay global; files are
-otherwise simply included.
+Packages are adopted (decision 12): a `package` scopes types, instances,
+components and features, and a name needs its package only where two
+packages have it; files are otherwise simply included.
 
 **Adopted later from CUE, for usability:** string escapes and raw strings
 (`#"..."#`), regex constraints (`=~`, `!~`, RE2 syntax), and string
@@ -297,10 +315,12 @@ are the point of a blueprint.
 - **Appropriateness is inferred**:
   - A feature belongs to the type that introduces it.
   - Subtypes inherit it and may narrow its value type.
-  - A feature introduced by two unrelated types is a load error, by
-    decision: generating a hidden common supertype would change what the
-    types mean without anyone seeing it. The message gives both locations,
-    and names a common supertype to declare it on, or suggests a new one.
+  - A feature introduced by two unrelated types of one package (or of the
+    root) is a load error, by decision: generating a hidden common
+    supertype would change what the types mean without anyone seeing it.
+    The message gives both locations, and names a common supertype to
+    declare it on, or suggests a new one. Two packages introducing one
+    label make two features (decision 12).
 - **Type constraints.** A type's definition body is a constraint every
   instance of the type satisfies. This is how universal constraints, like
   Troll's "every bird can fly", are written: there is no separate implication
@@ -1164,8 +1184,9 @@ listed under it.
    generates C structs for the component stores (§3), not Objective-C
    classes; since the lab moved to Odin, Odin structs (`tri-components
    -odin`). This also answers COMPONENTS.md open question 6.
-3. **Feature introduction friction.** Kept as an error, with both locations
-   and a suggested supertype (§3).
+3. **Feature introduction friction.** Kept as an error within a package,
+   with both locations and a suggested supertype (§3); across packages, two
+   introductions are two features (decision 12).
 4. **Default ties.** Both are dropped, with a warning; the field becomes
    variation (§6).
 5. **Variation distributions.** Path-keyed seeds, weights for alternatives,

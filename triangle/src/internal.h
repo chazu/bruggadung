@@ -140,7 +140,8 @@ struct X {
         Sym name;                                         /* NAME, ATOM, TAG */
         struct { int dim; int64_t q; } num;
         struct { int op; int dim; int64_t q; struct X *of; } bound;   /* of: a named value, until load reads it */
-        struct { XField *fields; int n; Attr *attrs; int nattrs; bool refs; } st;   /* refs: made for references */
+        struct { XField *fields; int n; Attr *attrs; int nattrs; bool refs; Sym pkg; } st;   /* refs: made for references;
+                                                                                             pkg: its file's package */
         struct { X **items; int n; bool open; X *tail; X *elem; } list;   /* elem: [...X] */
         struct { X *a, *b; } bin;
         X *sub;                                           /* DEFAULT */
@@ -296,13 +297,20 @@ typedef struct {
     DefVec    varies;                   /* @vary records, likewise */
     ArithVec  ariths;                   /* arithmetic constraints, own and inherited */
     Sym       component;                /* @component name, or NULL */
+    Sym       home;                     /* the package it is declared in, or NULL (the root) */
     bool      isdisj;                   /* its subtypes are alternatives (TK_ALT) */
     VEC(Attr *) field_attrs;            /* parallel to own introduced features */
     U32Vec field_feats;
 } TypeInfo;
 
+/* A feature is its introducing type's package's (CONTENT_LANGUAGE.md decision
+ * 12): two packages may each introduce one of a label. Features are numbered
+ * by label, then package (the root first), so packages don't reorder them. */
 typedef struct {
-    Sym      name;
+    Sym      name;       /* as it prints: the label, unless that is ambiguous */
+    Sym      label;      /* as written: larder */
+    Sym      pkg;        /* its package, or NULL (the root) */
+    Sym      full;       /* pkg.label, or the label */
     uint32_t intro;
 } FeatInfo;
 
@@ -408,7 +416,10 @@ struct TriContent {
     struct { uint64_t key; uint32_t val; } meetcache[4096];   /* direct-mapped, in front of meetmemo */
 
     VEC(FeatInfo) feats;
-    U64Map featidx;              /* Sym → feature id + 1 */
+    U64Map featidx;              /* Sym → feature id + 1: by full name, and by name */
+    U64Map labelidx;             /* label Sym → the first feature with it + 1 */
+    U64Map plainidx;             /* a packaged name, plain → its one qualified name; or
+                                    PLAIN_AMBIGUOUS where two packages declare it */
 
     VEC(InstInfo) insts;
     U64Map instidx;
@@ -473,6 +484,23 @@ bool     types_build(Content *c);
 bool     tdl_parse_top(Content *c, const char *path, int kind);
 uint32_t type_lookup(const Content *c, Sym name);         /* TRI_BOTTOM if none */
 uint32_t feat_lookup(const Content *c, Sym name);         /* TRI_BOTTOM if none */
+/* The feature a label written in content names: a qualified label's; else,
+ * of those with the label, the one appropriate to ctx (the type it is written
+ * against, or TRI_BOTTOM), the package's own, the root's, or the only one.
+ * TRI_BOTTOM if none; *ambiguous is set if that leaves several. */
+uint32_t feat_resolve(const Content *c, Sym label, uint32_t ctx, Sym pkg, bool *ambiguous);
+/* A component's field, as generated code names it: its label, unless its type
+ * has another field of that label (two packages added one): then pkg.label. */
+Sym      component_field_name(const Content *c, uint32_t f);
+/* Whether a label as written (plain or qualified) names feature f. */
+bool     label_names(const Content *c, Sym label, uint32_t f);
+/* The package a type was declared in, or NULL (the root, or a generated type);
+ * other packages may add to it. */
+Sym      type_pkg(const Content *c, uint32_t t);
+/* Names in order: the plain name first, then its package (the root first), so
+ * moving declarations into packages doesn't reorder them. */
+int      name_cmp(const char *a, const char *b);
+#define PLAIN_AMBIGUOUS ((uint64_t) 1)
 bool     is_subtype(const Content *c, uint32_t a, uint32_t b);
 uint32_t meet(Content *c, uint32_t a, uint32_t b);
 bool     approp(const Content *c, uint32_t t, uint32_t f);

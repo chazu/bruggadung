@@ -4805,3 +4805,36 @@ behaved differently.
   proposal, both by name, and restores them to the same save and state.
 - Every scenario's hashes change once, for the new hashing; the runs
   differ only in the trace's named types.
+
+### After the slice: topics are packages, and own their fields (CONTENT_LANGUAGE.md decision 12)
+
+A field's name was global: one type in all the content introduced it.
+Farming hit that four times in one slice. For `larder` it had to add a
+shared `#Keeping` frame to cooking/. For `wide`, `ground` and `tended` it
+had to rename. Each new topic would hit it again.
+
+- Triangle: a feature is the package's whose file introduces it.
+  - Two packages may each introduce a field of one name. Within one
+    package (or the root) it is one type's, as before.
+  - A plain label means the field of the type it is written against, else
+    the package's own, else the root's, else the only one.
+  - A plain name means the package's own, else the root's, else the only
+    package's.
+  - A name or label is qualified (`cooking.#Food`, `cooking.larder:`) only
+    where that leaves two.
+  - A type the root declares stays the root's. A package's file adds to it
+    by declaring it, and to another package's by its qualified name
+    (`hunger.#Food: { … }`). The fields a file adds are its package's.
+  - Names print plainly where unambiguous, generated names likewise.
+    Ordering is by plain name first, so packaging renumbers nothing.
+  - Triangle tests: test_packages (revised), test_package_features,
+    test_package_additions; 88 tests.
+- The lab: every topic directory is a package (`package <topic>` after
+  each file's header; content/README.md §6).
+  - cooking/ adds to `hunger.#Food`, and firewood/ to `sawing.#Log`.
+  - With nothing else changed, src/components.odin, every test and every
+    scenario's hashes came out as they were.
+  - Then cooking's `#Cooking` has its own `larder` again, and farming's
+    `#Farming` its own, without `#Keeping`. Tests and hashes as they were.
+
+128 tests, 3940 checks.

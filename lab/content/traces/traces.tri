@@ -15,6 +15,8 @@
 //             (#Sign, #Near, ...), in src/know_knowledge_*.odin; effect_tend,
 //             effect_analyse, effect_investigate.
 
+package traces
+
 // Traces (KNOWLEDGE.md §3): what committed effects leave on bodies and on
 // the floor. A trace is an informational entity, with no body and no
 // location: what it is, what bears it (or which tile), how strong it was

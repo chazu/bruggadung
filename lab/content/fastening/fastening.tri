@@ -13,6 +13,8 @@
 //              @widen, knowledge.tri's `size_blurs`).
 // - code:      effect_tighten, effect_look.
 
+package fastening
+
 // Something with a size that matters: a nut, a spanner's jaw. Seen from
 // afar, the size is known only roughly: it widens a millimetre a step.
 #Sized: {

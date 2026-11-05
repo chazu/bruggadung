@@ -11,6 +11,8 @@
 //             (machines/pump.tri).
 // - code:     src/domains_fluid_domain.odin; effect_open_tap, effect_fill.
 
+package water
+
 // Water, for DOMAIN_SIMULATION.md's third scenario, "Two draws on a
 // dwindling stock". Water is a stock: whole millilitres, held by entities
 // (WaterStore) and by tiles, and moved by the fluid domain while it flows.

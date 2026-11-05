@@ -11,6 +11,8 @@
 //              (institutions/law.tri).
 // - code:      effect_issue, effect_copy.
 
+package institutions
+
 // COMPONENTS.md §8, informational content and physical copies, and its
 // second scenario, "the forged permit".
 

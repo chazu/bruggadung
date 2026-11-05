@@ -25,6 +25,8 @@
 //            harm's wakes; src/know_knowledge_*.odin: interoception. Only
 //            what carries #Hungry gets hungry: people, here.
 
+package hunger
+
 // What gets hungry: a stomach, `satiety` 0 to 100, and `reserves` 0 to 100,
 // both as of `fedAt`; how long the stomach takes to empty from full, the
 // reserves to run out from full with the stomach empty, and to fill again

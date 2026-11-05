@@ -18,6 +18,8 @@
 //             (promises/promises.tri).
 // - code:     effect_hire.
 
+package work
+
 // What work adds to an agent: the job it offers, by name (AGENCY.md decision
 // 15), if any.
 #Agent: {

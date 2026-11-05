@@ -409,6 +409,7 @@ static X *xnew(Parser *p, XKind k, Loc loc)
     X *x = arena_alloc(p->c->load, sizeof(X));
     x->k = k;
     x->loc = loc;
+    if (k == X_STRUCT) x->u.st.pkg = p->pkg;     /* its labels are first the package's */
     return x;
 }
 
@@ -421,6 +422,14 @@ static Sym tok_sym(Parser *p, Tok *t)
 static bool qualified(Tok *t)
 {
     return memchr(t->s, '.', t->len) != NULL || memchr(t->s, '[', t->len) != NULL;
+}
+
+/* pkg.#Type: a package's type, and nothing past it. */
+static bool package_type(const Tok *t)
+{
+    const char *dot = memchr(t->s, '.', t->len);
+    return t->k == T_DEF && t->s[0] != '#' && dot && dot[1] == '#' &&
+           !memchr(dot + 1, '.', (size_t) (t->s + t->len - dot - 1)) && !memchr(t->s, '[', t->len);
 }
 
 static bool tok_is(const Tok *t, const char *word)
@@ -784,11 +793,17 @@ static X *finish_expr(Parser *p, X *x)
     return p->error ? NULL : x;
 }
 
-/* Features are global (CONTENT_LANGUAGE.md decision 12): a label takes no package. */
+/* A label is a feature's name, or its package's and its name, where two
+ * packages each have one (CONTENT_LANGUAGE.md decision 12): larder,
+ * cooking.larder. */
 static bool plain_label(Parser *p, Tok *t)
 {
     if (!qualified(t)) return true;
-    perr(p, t->loc, "a feature name takes no package: features are global");
+    const char *dot = memchr(t->s, '.', t->len);
+    if (dot && dot > t->s && dot + 1 < t->s + t->len && !memchr(dot + 1, '.', (size_t) (t->s + t->len - dot - 1)) &&
+        !memchr(t->s, '[', t->len))
+        return true;
+    perr(p, t->loc, "a field label is a name, or a package's and a name (cooking.larder)");
     return false;
 }
 
@@ -1608,7 +1623,9 @@ bool parse_source(Content *c, Sym file, const char *src, DeclVec *out)
             if (!parse_let(&p)) break;
             continue;
         }
-        if ((lab->k == T_IDENT || lab->k == T_DEF) && qualified(lab)) {
+        /* another package's type, pkg.#Type, may be added to; anything else
+         * qualified is declared in its own package's files */
+        if ((lab->k == T_IDENT || lab->k == T_DEF) && qualified(lab) && !package_type(lab)) {
             perr(&p, lab->loc, "a declaration's name is its own: declare it in its package's files, unqualified");
             break;
         }

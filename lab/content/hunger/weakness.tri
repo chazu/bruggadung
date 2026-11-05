@@ -17,6 +17,8 @@
 // - code:    src/domains_bodies.odin (weakness), read in act_actions.odin's
 //            work rate and grip, and know_knowledge_2.odin's perception.
 
+package hunger
+
 // What going without weakens, and how much at each level of reserves:
 // points by rising input, straight between them, level beyond the ends.
 #Weakness: { weakens: "attention" | "pace" | "perception" | "grip", lost: [...#Point] }

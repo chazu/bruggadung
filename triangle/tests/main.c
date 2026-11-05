@@ -45,7 +45,7 @@ int has_diag(const TriContent *c, const char *needle, int errors_only)
     X(test_fixed_and_int) X(test_runtime_is_strict) X(test_build_log_and_clash_hint) X(test_previously_untested) \
     X(test_arithmetic) X(test_clauses) \
     X(test_path_keyed_variation) X(test_arithmetic_exponents_and_backwards) X(test_clause_solutions_distinct) \
-    X(test_component_header) X(test_failure_recording_and_sizes) X(test_migration) X(test_packages) \
+    X(test_component_header) X(test_failure_recording_and_sizes) X(test_migration) X(test_packages) X(test_package_features) X(test_package_additions) \
     X(test_properties) X(test_properties_order) X(test_properties_construct) X(test_fuzz_sources) X(test_properties_arithmetic) \
     X(test_properties_clauses)
 

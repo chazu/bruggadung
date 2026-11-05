@@ -34,6 +34,8 @@
 //             (src/domains_farming.odin). Where a plot is seen and reached
 //             from is an area's (things.tri).
 
+package farming
+
 // A plot: tilled ground a household farms, an area of it, and its crop:
 // what it grows, how it stands (bare, sown, ripe), how many of its tiles
 // are sown so far (bare) or reaped (ripe), and when its last row was sown;
@@ -79,8 +81,9 @@ seed_grain:  #Stack & #Seed & { material: "food", unit: "seed grain", unitMass: 
 turnip_seed: #Stack & #Seed & { material: "food", unit: "turnip seed", unitMass: 5g, count: 300, sows: "turnip" }
 
 // Farming: the plot, the seed sown on it, what was harvested, and the
-// larder it goes to.
-#Farming: #Keeping & { plot: #Plot, seed: #Body, harvest: #Body }
+// larder it goes to (the household's, where cooking/ keeps its food too:
+// each frame its own `larder`).
+#Farming: #Frame & { plot: #Plot, seed: #Body, harvest: #Body, larder: #Body }
 
 // The day's work, for a farmer: a plot of its household's tended, kept
 // through its working hours (bound when undertaken: the plot, and the

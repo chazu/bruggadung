@@ -31,6 +31,8 @@
 // - code:     effect_fell, effect_split, effect_stoke, effect_put_down, and
 //             effect_saw's trunks (src/act_actions.odin).
 
+package firewood
+
 // A standing tree, and what it is felled into: a trunk's blueprint.
 #Tree: #Body & {
     @component(Tree)
@@ -53,7 +55,7 @@ trunk_seen: #Seen & { kindOf: "#Trunk" } @family(seen)
 
 // What a log is split into: a stack's blueprint (oak firewood, unless
 // it says otherwise).
-#Log: {
+sawing.#Log: {
     splitsInto: *"firewood_20" | text @field(content, saved, inspect)
 }
 

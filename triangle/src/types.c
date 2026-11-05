@@ -1,5 +1,6 @@
 #include "internal.h"
 
+#include <ctype.h>
 #include <time.h>
 
 static double trace_t0;
@@ -18,6 +19,7 @@ static void trace(const char *what, size_t a, size_t b)
  * deterministic IDs, codes for meets, and feature appropriateness. */
 
 static Loc noloc;
+static Loc field_decl_loc(Content *c, uint32_t t, Sym label);
 
 uint32_t type_lookup(const Content *c, Sym name)
 {
@@ -38,6 +40,16 @@ static uint32_t type_add(Content *c, Sym name, TypeKind kind)
     TypeInfo t = { 0 };
     t.name = name;
     t.kind = kind;
+    const char *pound = strstr(name, ".#");      /* tools.#Wrench is the tools package's */
+    if (pound && pound > name && (isalpha((unsigned char) name[0]) || name[0] == '_')) {
+        bool ident = true;
+        for (const char *p = name; p < pound && ident; p++) ident = isalnum((unsigned char) *p) || *p == '_';
+        if (ident) {
+            char *pkg = strndup(name, (size_t) (pound - name));
+            t.home = intern(c, pkg);
+            free(pkg);
+        }
+    }
     t.dim = -1;
     t.bit = -1;          /* no code until compute_codes runs */
     VEC_PUSH(c->types, t);
@@ -62,7 +74,124 @@ static void add_parent(Content *c, uint32_t child, uint32_t parent)
 
 static int cmp_sym(const void *a, const void *b)
 {
-    return strcmp(*(Sym const *) a, *(Sym const *) b);
+    return name_cmp(*(Sym const *) a, *(Sym const *) b);
+}
+
+/* A qualified name's package and plain name: tools.#Wrench, tools.wrench_250.
+ * Anything else is plain. */
+static const char *plain_part(const char *s, size_t *pkglen)
+{
+    *pkglen = 0;
+    if (!(isalpha((unsigned char) s[0]) || s[0] == '_')) return s;
+    const char *p = s;
+    while (isalnum((unsigned char) *p) || *p == '_') p++;
+    if (*p != '.' || !(p[1] == '#' || p[1] == '_' || isalpha((unsigned char) p[1]))) return s;
+    *pkglen = (size_t) (p - s);
+    return p + 1;
+}
+
+int name_cmp(const char *a, const char *b)
+{
+    size_t la, lb;
+    const char *pa = plain_part(a, &la), *pb = plain_part(b, &lb);
+    int r = strcmp(pa, pb);
+    if (r || (la == lb && !memcmp(a, b, la))) return r;
+    if (!la || !lb) return la ? 1 : -1;               /* the root's first */
+    r = memcmp(a, b, la < lb ? la : lb);
+    return r ? r : la < lb ? -1 : 1;
+}
+
+Sym type_pkg(const Content *c, uint32_t t)
+{
+    return c->types.v[t].home;
+}
+
+static Sym qualified_name(Content *c, Sym pkg, Sym name)
+{
+    Buf b = { 0 };
+    buf_printf(&b, "%s.%s", pkg, name);
+    Sym q = intern(c, b.s);
+    buf_free(&b);
+    return q;
+}
+
+typedef struct { Sym label; Sym pkg; uint32_t intro; } NewFeat;
+typedef struct { uint32_t type; uint32_t label; Sym pkg; } DeclPair;
+
+static int cmp_newfeat(const void *a, const void *b)
+{
+    const NewFeat *x = a, *y = b;
+    int r = strcmp(x->label, y->label);
+    if (r) return r;
+    if (!x->pkg || !y->pkg) return x->pkg ? 1 : y->pkg ? -1 : 0;
+    return strcmp(x->pkg, y->pkg);
+}
+
+uint32_t feat_resolve(const Content *c, Sym label, uint32_t ctx, Sym pkg, bool *ambiguous)
+{
+    if (ambiguous) *ambiguous = false;
+    if (!label) return TRI_BOTTOM;
+    if (strchr(label, '.')) return feat_lookup(c, label);      /* pkg.label: that package's */
+    uint64_t v;
+    if (!u64map_get(&c->labelidx, (uint64_t) (uintptr_t) label, &v)) return TRI_BOTTOM;
+    uint32_t first = (uint32_t) v - 1, end = first + 1;
+    while (end < c->feats.n && c->feats.v[end].label == label) end++;
+    if (end - first == 1) return first;
+    /* several: the one the type it is written against has */
+    if (ctx != TRI_BOTTOM && ctx < c->types.n) {
+        uint32_t found = TRI_BOTTOM, n = 0;
+        for (uint32_t f = first; f < end; f++)
+            if (is_subtype(c, ctx, c->feats.v[f].intro)) { found = f; n++; }
+        if (n == 1) return found;
+    }
+    /* else the package's own, else the root's */
+    for (uint32_t f = first; f < end; f++) if (pkg && c->feats.v[f].pkg == pkg) return f;
+    for (uint32_t f = first; f < end; f++) if (!c->feats.v[f].pkg) return f;
+    if (ambiguous) *ambiguous = true;
+    return TRI_BOTTOM;
+}
+
+Sym component_field_name(const Content *c, uint32_t f)
+{
+    const FeatInfo *fi = &c->feats.v[f];
+    uint64_t v;
+    if (!u64map_get(&c->labelidx, (uint64_t) (uintptr_t) fi->label, &v)) return fi->label;
+    for (uint32_t g = (uint32_t) v - 1; g < c->feats.n && c->feats.v[g].label == fi->label; g++)
+        if (g != f && c->feats.v[g].intro == fi->intro) return fi->full;
+    return fi->label;
+}
+
+bool label_names(const Content *c, Sym label, uint32_t f)
+{
+    return f < c->feats.n && (label == c->feats.v[f].label || label == c->feats.v[f].full);
+}
+
+/* Two unrelated types of one package (or of the root) introduce one label. */
+static void report_introducers(Content *c, Sym label, const U32Vec *minimal)
+{
+    Buf b = { 0 };
+    Loc first = noloc;
+    for (size_t i = 0; i < minimal->n; i++) {
+        Loc fl = field_decl_loc(c, minimal->v[i], label);
+        if (!i) first = fl;
+        buf_printf(&b, "%s%s (%s:%d)", i ? " and " : "", c->types.v[minimal->v[i]].name, fl.file ? fl.file : "?", fl.line);
+    }
+    /* the most specific named common supertype: IDs follow topological order */
+    uint32_t common = TRI_BOTTOM;
+    for (uint32_t u = 0; u < c->types.n; u++) {
+        if (c->types.v[u].kind != TK_DEF) continue;
+        bool all = true;
+        for (size_t i = 0; i < minimal->n && all; i++) all = is_subtype(c, minimal->v[i], u);
+        if (all) common = u;
+    }
+    Buf hint = { 0 };
+    if (common != TRI_BOTTOM) buf_printf(&hint, "on %s, which both inherit from", c->types.v[common].name);
+    else buf_printf(&hint, "on a new common supertype (say #Has%c%s)", (char) (label[0] >= 'a' && label[0] <= 'z' ? label[0] - 32 : label[0]),
+                    label + 1);
+    diag(c, true, first.file ? first : c->types.v[minimal->v[0]].decls.v[0]->loc,
+         "feature '%s' is introduced by both %s; declare it once %s, and inherit it", label, b.s, hint.s);
+    buf_free(&hint);
+    buf_free(&b);
 }
 
 /* --- codes ----------------------------------------------------------------------- */
@@ -454,7 +583,7 @@ static void renumber(Content *c)
     /* Kahn's algorithm with a ready set ordered by name. */
     uint32_t *heap = malloc(n * sizeof(uint32_t));
     size_t hn = 0;
-#define LESS(a, b) (strcmp(c->types.v[a].name, c->types.v[b].name) < 0)
+#define LESS(a, b) (name_cmp(c->types.v[a].name, c->types.v[b].name) < 0)
 #define PUSH(x) do { size_t i_ = hn++; heap[i_] = (x); \
         while (i_ && LESS(heap[i_], heap[(i_ - 1) / 2])) { \
             uint32_t t_ = heap[i_]; heap[i_] = heap[(i_ - 1) / 2]; heap[(i_ - 1) / 2] = t_; i_ = (i_ - 1) / 2; } } while (0)
@@ -1358,7 +1487,7 @@ bool types_build(Content *c)
     trace("renumbered", c->types.n, 0);
     /* features: introduced by the top-level fields of each type's own body */
     SymVec fnames = { 0 };
-    VEC(uint64_t) declpairs = { 0 };      /* (type << 32 | label index) */
+    VEC(DeclPair) declpairs = { 0 };      /* a type declaring a label, in a package's file */
     U64Map labidx = { 0 };                /* label Sym → index into fnames + 1 */
     U64Map altonly = { 0 };               /* labels only alternatives declare */
     /* named types first; then alternatives, where a field several alternatives
@@ -1377,6 +1506,7 @@ bool types_build(Content *c)
                     for (int f = 0; f < x->u.st.n; f++) {
                         Sym lab = x->u.st.fields[f].label;
                         uint64_t li;
+                        if (strchr(lab, '.')) continue;     /* pkg.label narrows that package's */
                         uint32_t declarer = t;
                         if (!u64map_get(&labidx, (uint64_t) (uintptr_t) lab, &li)) {
                             uint32_t d = ti->parents.v[0];
@@ -1389,7 +1519,8 @@ bool types_build(Content *c)
                                    alt_siblings_declaring(c, ti->parents.v[0], lab) >= 2) {
                             declarer = ti->parents.v[0];
                         }
-                        VEC_PUSH(declpairs, ((uint64_t) declarer << 32) | (li - 1));
+                        DeclPair dp = { declarer, (uint32_t) (li - 1), ti->decls.v[k]->pkg };
+                        VEC_PUSH(declpairs, dp);
                     }
                     continue;
                 }
@@ -1415,85 +1546,95 @@ bool types_build(Content *c)
                 for (int f = 0; f < x->u.st.n; f++) {
                     Sym lab = x->u.st.fields[f].label;
                     uint64_t li;
+                    if (strchr(lab, '.')) continue;         /* pkg.label narrows that package's */
                     if (!u64map_get(&labidx, (uint64_t) (uintptr_t) lab, &li)) {
                         VEC_PUSH(fnames, lab);
                         li = fnames.n;
                         u64map_put(&labidx, (uint64_t) (uintptr_t) lab, li);
                     }
-                    VEC_PUSH(declpairs, ((uint64_t) t << 32) | (li - 1));
+                    DeclPair dp = { t, (uint32_t) (li - 1), ti->decls.v[k]->pkg };
+                    VEC_PUSH(declpairs, dp);
                 }
             }
             VEC_FREE(cj);
         }
     }
-    SymVec unsorted = { 0 };
-    for (size_t i = 0; i < fnames.n; i++) VEC_PUSH(unsorted, fnames.v[i]);
-    qsort(fnames.v, fnames.n, sizeof(Sym), cmp_sym);
-    for (size_t i = 0; i < fnames.n; i++) {
-        FeatInfo fi = { fnames.v[i], TRI_BOTTOM };
-        VEC_PUSH(c->feats, fi);
-        u64map_put(&c->featidx, (uint64_t) (uintptr_t) fnames.v[i], i + 1);
-    }
-    U32Vec *declarers = calloc(c->feats.n ? c->feats.n : 1, sizeof(U32Vec));
+    /* each label's declarers, by type and the package of the file that
+     * declares it there; the most general of them in a package introduces
+     * the label's feature there (CONTENT_LANGUAGE.md decision 12) */
+    VEC(DeclPair) *declarers = calloc(fnames.n ? fnames.n : 1, sizeof *declarers);
     for (size_t i = 0; i < declpairs.n; i++) {
-        uint32_t t = (uint32_t) (declpairs.v[i] >> 32);
-        uint32_t f = feat_lookup(c, unsorted.v[(uint32_t) declpairs.v[i]]);
-        U32Vec *dv = &declarers[f];
+        DeclPair dp = declpairs.v[i];
         bool dup = false;
-        for (size_t q = 0; q < dv->n && !dup; q++) dup = dv->v[q] == t;
-        if (!dup) VEC_PUSH(*dv, t);
+        for (size_t q = 0; q < declarers[dp.label].n && !dup; q++)
+            dup = declarers[dp.label].v[q].type == dp.type && declarers[dp.label].v[q].pkg == dp.pkg;
+        if (!dup) VEC_PUSH(declarers[dp.label], dp);
     }
     VEC_FREE(declpairs);
-    VEC_FREE(unsorted);
     u64map_free(&labidx);
     u64map_free(&altonly);
-    for (uint32_t f = 0; f < c->feats.n; f++) {
-        U32Vec decl = declarers[f];
-        U32Vec minimal = { 0 };
-        for (size_t i = 0; i < decl.n; i++) {
-            bool m = true;
-            for (size_t j = 0; j < decl.n && m; j++)
-                if (i != j && is_subtype(c, decl.v[i], decl.v[j])) m = false;
-            if (m) VEC_PUSH(minimal, decl.v[i]);
+    VEC(NewFeat) made = { 0 };
+    for (size_t li = 0; li < fnames.n; li++) {
+        DeclPair *d = declarers[li].v;
+        size_t nd = declarers[li].n;
+        /* a declaration narrows the field when a supertype declares it, or
+         * the type's own package does where another package adds to it */
+        bool *narrows = calloc(nd ? nd : 1, sizeof(bool));
+        for (size_t i = 0; i < nd; i++)
+            for (size_t j = 0; j < nd && !narrows[i]; j++) {
+                if (i == j) continue;
+                if (d[j].type != d[i].type) narrows[i] = is_subtype(c, d[i].type, d[j].type);
+                else narrows[i] = d[j].pkg == type_pkg(c, d[i].type) && d[i].pkg != d[j].pkg;
+            }
+        /* by package: one introduces it there; two unrelated ones, an error */
+        bool *taken = calloc(nd ? nd : 1, sizeof(bool));
+        for (size_t i = 0; i < nd; i++) {
+            if (taken[i] || narrows[i]) continue;
+            Sym pkg = d[i].pkg;
+            U32Vec same = { 0 };
+            for (size_t j = i; j < nd; j++)
+                if (!taken[j] && !narrows[j] && d[j].pkg == pkg) {
+                    taken[j] = true;
+                    bool seen = false;
+                    for (size_t q = 0; q < same.n && !seen; q++) seen = same.v[q] == d[j].type;
+                    if (!seen) VEC_PUSH(same, d[j].type);
+                }
+            if (same.n == 1) {
+                NewFeat nf = { fnames.v[li], pkg, same.v[0] };
+                VEC_PUSH(made, nf);
+            } else
+                report_introducers(c, fnames.v[li], &same);
+            VEC_FREE(same);
         }
-        if (minimal.n == 1) {
-            c->feats.v[f].intro = minimal.v[0];
-        } else {
-            /* both declarations, and a supertype to declare it on */
-            Buf b = { 0 };
-            Loc first = noloc;
-            for (size_t i = 0; i < minimal.n; i++) {
-                Loc fl = field_decl_loc(c, minimal.v[i], c->feats.v[f].name);
-                if (!i) first = fl;
-                buf_printf(&b, "%s%s (%s:%d)", i ? " and " : "", c->types.v[minimal.v[i]].name, fl.file ? fl.file : "?",
-                           fl.line);
-            }
-            /* the most specific named common supertype: IDs follow topological order */
-            uint32_t common = TRI_BOTTOM;
-            for (uint32_t u = 0; u < c->types.n; u++) {
-                if (c->types.v[u].kind != TK_DEF) continue;
-                bool all = true;
-                for (size_t i = 0; i < minimal.n && all; i++) all = is_subtype(c, minimal.v[i], u);
-                if (all) common = u;
-            }
-            Buf hint = { 0 };
-            if (common != TRI_BOTTOM) buf_printf(&hint, "on %s, which both inherit from", c->types.v[common].name);
-            else {
-                const char *fn = c->feats.v[f].name;
-                buf_printf(&hint, "on a new common supertype (say #Has%c%s)", (char) (fn[0] >= 'a' && fn[0] <= 'z' ? fn[0] - 32 : fn[0]),
-                           fn + 1);
-            }
-            diag(c, true, first.file ? first : c->types.v[minimal.v[0]].decls.v[0]->loc,
-                 "feature '%s' is introduced by both %s; declare it once %s, and inherit it",
-                 c->feats.v[f].name, b.s, hint.s);
-            buf_free(&hint);
-            buf_free(&b);
-        }
-        VEC_FREE(decl);
-        VEC_FREE(minimal);
+        free(taken);
+        free(narrows);
+        VEC_FREE(declarers[li]);
     }
     free(declarers);
     VEC_FREE(fnames);
+    /* numbered by label, then package, the root's first */
+    qsort(made.v, made.n, sizeof(NewFeat), cmp_newfeat);
+    for (size_t i = 0; i < made.n; i++) {
+        FeatInfo fi = { 0 };
+        fi.label = made.v[i].label;
+        fi.pkg = made.v[i].pkg;
+        fi.intro = made.v[i].intro;
+        fi.full = fi.pkg ? qualified_name(c, fi.pkg, fi.label) : fi.label;
+        VEC_PUSH(c->feats, fi);
+        u64map_put(&c->featidx, (uint64_t) (uintptr_t) fi.full, i + 1);
+        if (!i || made.v[i - 1].label != fi.label) u64map_put(&c->labelidx, (uint64_t) (uintptr_t) fi.label, i + 1);
+    }
+    /* each prints as its label where the label alone finds it: the root's, or
+     * the only one */
+    for (size_t i = 0; i < c->feats.n; i++) {
+        FeatInfo *fi = &c->feats.v[i];
+        bool alone = (!i || c->feats.v[i - 1].label != fi->label) &&
+                     (i + 1 == c->feats.n || c->feats.v[i + 1].label != fi->label);
+        bool plain = alone || !fi->pkg;
+        fi->name = plain ? fi->label : fi->full;
+        if (plain) u64map_put(&c->featidx, (uint64_t) (uintptr_t) fi->label, i + 1);
+    }
+    VEC_FREE(made);
     if (c->nerrors > errors0) return false;
 
     for (uint32_t t = 0; t < c->types.n; t++)
@@ -1514,7 +1655,7 @@ bool types_build(Content *c)
                     XField *fl = &x->u.st.fields[f];
                     for (int a = 0; a < fl->nattrs; a++) {
                         if (strcmp(fl->attrs[a].name, "field") != 0) continue;
-                        VEC_PUSH(ti->field_feats, feat_lookup(c, fl->label));
+                        VEC_PUSH(ti->field_feats, feat_resolve(c, fl->label, t, type_pkg(c, t), NULL));
                         VEC_PUSH(ti->field_attrs, &fl->attrs[a]);
                     }
                 }

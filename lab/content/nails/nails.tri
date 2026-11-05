@@ -14,6 +14,8 @@
 // - code:     effect_drive (a nail split off the stack, driven in as a
 //             wedge); stacks split and merge in the components system.
 
+package nails
+
 #WithNails: #Frame & { nails: #Stack }
 
 // Wedging a lock: the lock, and the nail driven into it as a wedge.

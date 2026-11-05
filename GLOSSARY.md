@@ -747,8 +747,9 @@ REALITY.md, PRF = PERFORMANCE.md, TER = TERRAIN.md, TES = TESSERA.md, VIL = VILL
 - **Primary parent**: a type's first-listed supertype; generalising goes
   along it. (CL §3)
 - **Feature**: a named attribute, introduced by exactly one type (its
-  **introducing type**); feature names are global. Written in content as a
-  field. (CL d4)
+  **introducing type**) and belonging to that file's package; two packages
+  may each have one of a name (`cooking.larder`, `farming.larder`). Written
+  in content as a field. (CL d4, d12)
 - **Appropriateness**: which features a type has, and the most general
   value each allows. **Totally well-typed**: every node has every feature
   its type allows. **Closed**: no features beyond its type's. (CL §3)
@@ -806,9 +807,10 @@ REALITY.md, PRF = PERFORMANCE.md, TER = TERRAIN.md, TES = TESSERA.md, VIL = VILL
 - **Attribute**: `@name(...)`: `@component`, `@field`, `@family`,
   `@vary`, `@widen`, `@fn`, `@embed`, `@quickcheck`, `@variants`. (CL §1)
 - **Derived field**: a value computed by code named by `@fn`. (CL §5)
-- **Package**: a file or directory of content scoping names, not features.
-  Not a topic directory, and not Odin's unit of code (an **Odin package**,
-  such as the lab's `lab` in `lab/src`). (CL d12)
+- **Package**: a file or directory of content scoping its names and
+  features; a name is qualified (`cooking.#Food`) only where two packages
+  have it. Each topic directory is one, named for it. Not Odin's unit of
+  code (an **Odin package**, such as the lab's `lab` in `lab/src`). (CL d12)
 - **Topic**: one subject of the content that crosses systems (hunger: a
   body field, a felt need, a goal and its methods, eating), kept in one
   directory of content with what it does at every level of detail. Not a
@@ -911,7 +913,7 @@ Each row says which term to use for which sense.
 | loyalty | a bond's weight | (not a disposition) |
 | office | a position in an organization | **organization** (the body) |
 | subject | a claim's subject | **topic** (what a content directory is about) |
-| package | Triangle's: content scoping names | **Odin package** (a directory of Odin code) |
+| package | Triangle's: content scoping names and features | **Odin package** (a directory of Odin code) |
 | field | a component's field | **plot** (farmed ground) |
 | trade | a craft (`Agent.trade`) | **sale** (goods for coins) |
 | leg | the body's legs, a provider an activity uses | **leg of a journey** (reserved) |

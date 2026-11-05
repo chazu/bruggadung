@@ -15,6 +15,8 @@
 // - law:      taking another's purse is a theft (institutions/law.tri).
 // - code:     money is cloth (`material: "cloth"`) for now.
 
+package money
+
 // Getting money: the money, and a friend or someone to work for.
 #Getting: #Frame & { money: #Body, friend: #Agent, boss: #Agent }
 

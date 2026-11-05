@@ -18,6 +18,8 @@
 // - code:     effect_dismantle, effect_shut, effect_work;
 //             src/kinds_latent_kind.odin.
 
+package machines
+
 // The miller's pump: open once dismantled.
 #Pump: #Assembly & {
     @component(Pump)

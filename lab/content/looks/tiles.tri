@@ -1,6 +1,8 @@
 // Looks, the tiles theme: the watcher's window, glyph tiles in DejaVu Sans
 // Mono (see looks.tri for the cut points).
 
+package looks
+
 tiles_wall:     #Glyph & { theme: "tiles", look: "wall", char: "#", ink: [190, 186, 176], ground: [74, 72, 68] } @family(glyphs)
 tiles_floor:    #Glyph & { theme: "tiles", look: "floor", char: ".", ink: [110, 110, 100], ground: [28, 28, 26] } @family(glyphs)
 tiles_plank:    #Glyph & { theme: "tiles", look: "floor.plank", char: ".", ink: [140, 104, 60], ground: [42, 30, 18] } @family(glyphs)

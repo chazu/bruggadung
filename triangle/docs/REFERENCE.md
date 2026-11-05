@@ -157,7 +157,8 @@ parents.
 
 **Features.** A feature belongs to the type that introduces it: the most
 general type whose body declares it. Its subtypes inherit it and may narrow its
-value. A feature that two unrelated types introduce is an error. Structures
+value. A feature that two unrelated types of one package introduce is an
+error; two packages may each introduce one (see [Packages](#packages)). Structures
 are closed: a structure may only carry features its type has, and a struct
 literal's features must all belong to one type.
 
@@ -166,24 +167,41 @@ literal's features must all belong to one type.
 A file that begins `package name` puts its declarations in that package; a
 file without one is in the root. Many files may declare the same package.
 
-- **Types, instances (blueprints and patterns), and components are the
-  package's.** `#Wrench` declared in `package tools` is `tools.#Wrench`;
-  `wrench_250` is `tools.wrench_250`; `@component(Record)` is the component
-  `tools.Record`. Two packages may each declare the same name.
-- **Inside a package, a plain name is the package's own** if it declares
-  one, else the root's. Another package's names are always qualified:
-  `spare: tools.#Wrench & { … }`. The root sees only the root's names
-  plainly.
-- **Features and atoms stay global.** A feature is still introduced by
-  exactly one type, whatever its package; a qualified field label is an
-  error. Atoms (`"steel"`) are values, not names.
-- A declaration's own label is never qualified: a name is declared in its
-  package's files.
-- Qualified names print as written, and parse back: `tri_type_name` gives
-  `tools.#Wrench`, and `tri_spec(c, "tools.wrench_250")` finds the blueprint.
-- **Generated C names carry the package**: the component `tools.Record`
-  under the prefix `BG` is the struct `BGtools_Record`, and its registry
-  entry is named `"tools.Record"`. A root component's names are unchanged.
+- **Types, instances (blueprints and patterns), components and features
+  are the package's.** `#Wrench` declared in `package tools` is
+  `tools.#Wrench`; `wrench_250` is `tools.wrench_250`; `@component(Record)`
+  is the component `tools.Record`; a field its file introduces, `size`, is
+  `tools.size`. Two packages may each declare the same name, or introduce
+  a field of the same name; within one package (or the root) a feature is
+  still introduced by exactly one type.
+- **A plain name is the package's own** if it declares one, **else the
+  root's, else the one package's that declares it**, from inside a package
+  or from the root. Where two packages declare it and neither is the
+  package's own, it is qualified: `spare: tools.#Wrench & { … }`.
+- **A plain label is the field of the type it is written against** (`T &
+  { … }`, or the type whose body it is in), **else the package's own, else
+  the root's, else the only one.** Where that leaves two, write it
+  qualified: `cooking.larder: …`. A path at run time (`tri_at`) reads each
+  node's own field.
+- **A type the root declares is the root's everywhere.** A package's file
+  that declares it adds to it, and the fields it adds are the package's.
+  Another package's type is added to by its qualified name:
+  `hunger.#Food: { raw: bool }` in `package cooking`. Only a type may be
+  declared qualified so; anything else is declared in its own package's
+  files.
+- Atoms (`"steel"`) are values, not names, and stay global.
+- **Names print plainly where that is unambiguous**, and qualified where
+  not, so what prints parses back: `tri_type_name` gives `#Wrench` when
+  only one package declares it, `tools.#Wrench` when two do; either finds
+  it. A field prints likewise (`larder`, or `cooking.larder`).
+- **Generated C names follow**: a component only one package declares
+  keeps its plain name (`BGRecord`, registry entry `"Record"`); where two
+  packages declare one, the struct is `BGtools_Record` and the entry
+  `"tools.Record"`. A component's field is its label, unless two packages
+  added one of that label to it: `cooking_cooks`, entry `"cooking.cooks"`.
+- **Order doesn't depend on packages**: types, instances and features are
+  numbered by their plain names first, the root's before a package's, so
+  moving declarations into packages renumbers nothing.
 
 ## Expressions
 
@@ -783,7 +801,9 @@ location of the other declaration where there is one.
 | Message | Cause |
 | --- | --- |
 | `unknown name X`, `unknown feature 'f'`, `unknown atom X`, `unknown enum X` | A name no declaration defines. Features must be introduced by a type before content can use them. |
-| `feature 'f' is introduced by both #A (…) and #B (…); declare it once on …, and inherit it` | Two unrelated types introduce one feature. The message suggests an existing common supertype, or a new one. |
+| `feature 'f' is introduced by both #A (…) and #B (…); declare it once on …, and inherit it` | Two unrelated types of one package (or of the root) introduce one feature. The message suggests an existing common supertype, or a new one. |
+| `two packages have a field 'f': say which (a.f or b.f)` | A plain label that the type it is written against, its package and the root don't settle. |
+| `P.#T adds to a type its package doesn't declare` | An addition to another package's type that the package has no declaration of. |
 | `X is not a type that #T can inherit from` | A supertype that is unknown, or not a type. |
 | `supertypes of #T are already declared at file:line; additions may not add supertypes` | Parents listed in a second declaration. |
 | `type hierarchy has a cycle through #T` | A type is its own ancestor. |

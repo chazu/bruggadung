@@ -15,6 +15,8 @@
 // - code:     BGLawsBroken (whether an act breaks a law); effect_confiscate,
 //             effect_arrest, effect_flee; the #Taken and #Arrested findings.
 
+package institutions
+
 // Institutions (INSTITUTIONS.md): real organizations, made of people, that
 // act only through their members. An organization's rules are content it
 // issues: a law says what it forbids, what makes doing it wrong, and what

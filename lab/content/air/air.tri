@@ -14,6 +14,8 @@
 // - heat:     fire, and the heat of solids, are heat/heat.tri's.
 // - code:     src/domains_atmosphere.odin; effect_open_door, effect_pass.
 
+package air
+
 // Air, for DOMAIN_SIMULATION.md's first scenario, "The unattended stove".
 // Gas is a stock: whole millimoles of oxygen and carbon dioxide, and whole
 // joules of the heat the gas carries, held by a region of air (the room)

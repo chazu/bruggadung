@@ -13,6 +13,8 @@
 // - body:     injury is things.tri's (#Agent), felt as pain less adrenaline.
 // - code:     effect_hit; effect_flee, to get clear.
 
+package harm
+
 // Harmed: who struck.
 #Harming: #Frame & { attacker: #Agent }
 

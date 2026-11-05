@@ -28,6 +28,8 @@
 //             stands, the households' bonds and claims, the commitments,
 //             and the checks.
 
+package village
+
 // The village (VILLAGE.md, "The village"): 160 by 100, the woods north and
 // east, four houses on either side of the path east, a path north to the
 // woods and south to the two farming households' plots.

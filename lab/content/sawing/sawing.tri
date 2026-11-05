@@ -12,6 +12,8 @@
 // - code:    effect_saw (a trunk's lengths too); the partial effect and the
 //            grading in src/act_activities.odin.
 
+package sawing
+
 // For ACTIONS.md §5's partial effects: a log, how far it is sawn through
 // (percent), and a saw.
 #Log: #Body & {

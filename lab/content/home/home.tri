@@ -25,6 +25,8 @@
 //             claim (things.tri), which the owner knows when it sees the bed
 //             (a method can ask for its own: agency.tri's `own` order).
 
+package home
+
 // Something to sleep in. One bed is told from another just like it, an
 // agent's own from its neighbours', by where it is (KNOWLEDGE.md decision
 // 18), not its looks.

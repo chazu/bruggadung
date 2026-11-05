@@ -32,9 +32,11 @@
 //             larders and undertakes the morning's commitment
 //             (src/scenario_village.odin).
 
+package cooking
+
 // What cooking adds to food: raw, it wants cooking, which adds `cooking`
 // to its nourishment. Raw or not is seen.
-#Food: {
+hunger.#Food: {
     raw:     *false | true          @field(content, saved, proposable, inspect, perceive(sight))
     cooking: *0 | int & >=0 & <=100 @field(content, saved, inspect)
 }
@@ -48,11 +50,7 @@ grain:      #Body & #Food & raw_grain & { mass: 250g }
 grain_sack: #Stack & #Food & raw_grain & { unit: "grain", unitMass: 250g, count: 60 }
 
 // Cooking: the food, the stove it is cooked at, and where it is kept.
-#Cooking: #Supper & #Warming & #Keeping
-
-// Where a household keeps its food: its larder (farming/'s harvest goes
-// there too).
-#Keeping: #Frame & { larder: #Body }
+#Cooking: #Supper & #Warming & { larder: #Body }
 
 // A meal in hand: food the agent holds that isn't raw.
 have_a_meal: #Goal & {

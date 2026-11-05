@@ -1298,9 +1298,10 @@ void test_migration(void)
 
 
 /* Packages (CONTENT_LANGUAGE.md decision 12): a file's `package` scopes the
- * types, blueprints and components it declares; features stay global. Two
- * packages each declare a #Wrench and a `wrench`; inside a package a plain
- * name is its own, else the root's; across, it is qualified. */
+ * types, blueprints, components and features it declares. Two packages each
+ * declare a #Wrench and a `wrench`; inside a package a plain name is its own,
+ * else the root's, else the one package's that has it; where two have it,
+ * it is qualified. */
 static int diag_says(TriContent *c, const char *text)
 {
     for (size_t i = 0; i < tri_diag_count(c); i++)
@@ -1330,9 +1331,11 @@ void test_packages(void)
     /* a plain name inside a package is its own */
     CHECK(tri_spec(c, "tools.wrench") && tri_spec(c, "kitchen.wrench") && ! tri_spec(c, "wrench"));
     CHECK_STR(tri_type_name(c, tri_node_type(tri_spec(c, "kitchen.wrench"))), "kitchen.#Wrench");
-    /* across, qualified: the kitchen's spare is a tools wrench */
+    /* across, qualified: the kitchen's spare is a tools wrench; and the only
+     * spare is found and named plainly */
     const TriNode *spare = tri_spec(c, "kitchen.spare");
     CHECK(spare && !strcmp(tri_type_name(c, tri_node_type(spare)), "tools.#Wrench"));
+    CHECK(tri_spec(c, "spare") == spare);
     int64_t lo, hi;
     CHECK(tri_node_interval(tri_at(c, spare, "size"), &lo, &hi) && lo == 220);
     /* what prints parses back */
@@ -1341,19 +1344,19 @@ void test_packages(void)
     CHECK(tri_value(c, "tools.#Wrench & { size: 19mm }", a, err, sizeof err) != NULL);
     CHECK(!tri_value(c, "#Wrench & { size: 19mm }", a, err, sizeof err));
     tri_arena_free(a);
-    /* a packaged component's generated names carry its package */
+    /* the only Gadget's generated names are plain */
     char buf[8192];
     tri_component_header(c, "BG", buf, sizeof buf);
-    CHECK_CONTAINS(buf, "} BGkitchen_Gadget;");
-    CHECK_CONTAINS(buf, "{ \"kitchen.Gadget\", \"kitchen.#Wrench\", sizeof(BGkitchen_Gadget)");
+    CHECK_CONTAINS(buf, "} BGGadget;");
+    CHECK_CONTAINS(buf, "{ \"Gadget\", \"kitchen.#Wrench\", sizeof(BGGadget)");
     tri_content_free(c);
 
-    /* features take no package; a declaration is named in its own files; an
-     * unknown qualified name is unknown; the root sees no package's names */
+    /* an unknown qualified label is unknown; a declaration is named in its own
+     * files; an unknown qualified name is unknown */
     const char *bad1[] = { "package tools\n#Wrench: { tools.size: length }\n" };
     const char *n1[] = { "a.tri" };
     c = load(n1, bad1, 1);
-    CHECK(!tri_content_ok(c) && diag_says(c, "features are global"));
+    CHECK(!tri_content_ok(c) && diag_says(c, "unknown feature 'tools.size'"));
     tri_content_free(c);
     const char *bad2[] = { "tools.#Wrench: { size: length }\n" };
     c = load(n1, bad2, 1);
@@ -1364,8 +1367,150 @@ void test_packages(void)
     c = load(n3, bad3, 2);
     CHECK(!tri_content_ok(c));
     tri_content_free(c);
-    const char *bad4[] = { "package tools\n#Wrench: { size: length }\n", "x: #Wrench & {}\n" };
-    c = load(n3, bad4, 2);
-    CHECK(!tri_content_ok(c));
+    /* the root sees the only package's #Wrench plainly */
+    const char *good4[] = { "package tools\n#Wrench: { size: length }\n", "x: #Wrench & { size: 3mm }\n" };
+    c = load(n3, good4, 2);
+    CHECK(tri_content_ok(c));
+    if (!tri_content_ok(c)) dump_diags(c);
+    CHECK(tri_spec(c, "x") && !strcmp(tri_type_name(c, tri_node_type(tri_spec(c, "x"))), "#Wrench"));
+    tri_content_free(c);
+}
+
+/* A package adds to a type the root declares by declaring it, and to another
+ * package's by its qualified name (hunger.#Food); the fields it adds are its
+ * own: two packages adding `cooks` to #Agent add two. */
+void test_package_additions(void)
+{
+    const char *names[] = { "core.tri", "hunger.tri", "cooking.tri", "farming.tri" };
+    const char *srcs[] = {
+        "#Thing: { mass: mass }\n"
+        "#Agent: #Thing & { @component(Agent)\n hands: *2 | int @field(content) }\n",
+        "package hunger\n"
+        "#Food: #Thing & { @component(Food)\n nourishment: *1 | int @field(content) }\n",
+        "package cooking\n"
+        "hunger.#Food: { raw: *false | bool @field(content) }\n"
+        "#Agent: { cooks: *false | bool @field(content) }\n"
+        "cook: #Agent & { mass: 60kg, cooks: true }\n",
+        "package farming\n"
+        "#Agent: { cooks: *false | bool @field(content) }\n"
+        "farmer: #Agent & { mass: 70kg, cooks: true }\n"
+        "bread: #Food & { mass: 500g, raw: false, nourishment: 5 }\n",
+    };
+    TriContent *c = load(names, srcs, 4);
+    CHECK(tri_content_ok(c));
+    if (!tri_content_ok(c)) dump_diags(c);
+    /* one #Food and one #Agent, added to */
+    TriType food = tri_type_named(c, "#Food"), agent = tri_type_named(c, "#Agent");
+    CHECK(food != TRI_BOTTOM && food == tri_type_named(c, "hunger.#Food") && agent != TRI_BOTTOM);
+    CHECK(tri_node_type(tri_pattern(c, "bread")) == food && tri_node_type(tri_pattern(c, "cook")) == agent);
+    /* the Food component has cooking's field; an agent has each package's
+     * cooks, and neither is plainly `cooks` */
+    int raw = 0, cooks = 0, plain = 0;
+    for (size_t i = 0; i < tri_component_count(c); i++)
+        for (size_t j = 0; j < tri_component_field_count(c, i); j++) {
+            const char *f = tri_component_field(c, i, j, NULL);
+            if (!strcmp(tri_component_name(c, i), "Food") && !strcmp(f, "raw")) raw++;
+            if (!strcmp(tri_component_name(c, i), "Agent") && (!strcmp(f, "cooking.cooks") || !strcmp(f, "farming.cooks"))) cooks++;
+            if (!strcmp(f, "cooks")) plain++;
+        }
+    CHECK(raw == 1 && cooks == 2 && plain == 0);
+    /* generated, each package's is a field of its own */
+    char buf[16384];
+    tri_component_header(c, "BG", buf, sizeof buf);
+    CHECK_CONTAINS(buf, "cooking_cooks;");
+    CHECK_CONTAINS(buf, "farming_cooks;");
+    CHECK_CONTAINS(buf, "{ \"cooking.cooks\", offsetof(BGAgent, cooking_cooks)");
+    tri_content_free(c);
+
+    /* the root's agent who cooks: two packages have the field, so say which */
+    const char *bad1[] = { srcs[0], "package cooking\n#Agent: { cooks: bool }\n", "package farming\n#Agent: { cooks: bool }\n",
+                           "x: #Agent & { mass: 60kg, cooks: true }\n" };
+    const char *n1[] = { "a.tri", "b.tri", "c.tri", "d.tri" };
+    c = load(n1, bad1, 4);
+    CHECK(!tri_content_ok(c) && diag_says(c, "say which (cooking.cooks or farming.cooks)"));
+    tri_content_free(c);
+}
+
+/* Two packages may each introduce a field of one name (CONTENT_LANGUAGE.md
+ * decision 12): cooking's larder and farming's are two features. A label
+ * means the field of the type it is written against, else the package's own,
+ * else the root's, else the only one; where that leaves two, it is qualified
+ * (cooking.larder). A path into a node reads the node's own. */
+void test_package_features(void)
+{
+    const char *names[] = { "core.tri", "cooking.tri", "farming.tri", "village.tri" };
+    const char *srcs[] = {
+        "#Thing: { mass: mass }\n"
+        "#Door: #Thing & { wide: length }\n",
+        "package cooking\n"
+        "#Cooking: { larder: #Thing, pot: #Thing }\n"
+        "supper: #Cooking & { larder: { mass: 3kg } }\n",
+        "package farming\n"
+        "#Farming: { larder: #Thing, plot: #Area }\n"
+        "#Area: #Thing & { wide: length, crop: text }\n"
+        "harvest: { plot: { crop: \"grain\" }, larder: { mass: 5kg } }\n"   /* its own larder */
+        "gate: #Door & { wide: 2m }\n"                                        /* the door's */
+        "field: #Area & { wide: 30m }\n"                                      /* its own */
+        "loose: { wide: 4m }\n",                                              /* its own */
+        "dinner: cooking.#Cooking & { larder: { mass: 1kg }, pot: {} }\n"
+        "#Kitchen: cooking.#Cooking & farming.#Farming & {}\n"
+        "both: #Kitchen & { cooking.larder: { mass: 2kg }, farming.larder: { mass: 6kg } }\n"
+        "door: { wide: 1m }\n"                                                /* the root's */
+        "crop: { crop: \"turnip\" }\n",                                       /* the only one */
+    };
+    TriContent *c = load(names, srcs, 4);
+    CHECK(tri_content_ok(c));
+    if (!tri_content_ok(c)) dump_diags(c);
+    TriType cooking = tri_type_named(c, "#Cooking"), farming = tri_type_named(c, "#Farming");
+    TriType door = tri_type_named(c, "#Door"), area = tri_type_named(c, "#Area");
+    CHECK(cooking != TRI_BOTTOM && farming != TRI_BOTTOM && door != TRI_BOTTOM && area != TRI_BOTTOM);
+    CHECK(tri_node_type(tri_pattern(c, "supper")) == cooking && tri_node_type(tri_pattern(c, "dinner")) == cooking);
+    CHECK(tri_node_type(tri_pattern(c, "harvest")) == farming);
+    CHECK(tri_node_type(tri_pattern(c, "gate")) == door && tri_node_type(tri_pattern(c, "field")) == area);
+    CHECK(tri_node_type(tri_pattern(c, "loose")) == area && tri_node_type(tri_pattern(c, "door")) == door);
+    CHECK(tri_node_type(tri_pattern(c, "crop")) == area);
+    /* by path, each node's own larder */
+    int64_t lo, hi;
+    CHECK(tri_node_interval(tri_at(c, tri_pattern(c, "dinner"), "larder.mass"), &lo, &hi) && lo == 1000);
+    CHECK(tri_node_interval(tri_at(c, tri_pattern(c, "harvest"), "larder.mass"), &lo, &hi) && lo == 5000);
+    /* a kitchen has both: written qualified; read by path, neither */
+    const TriNode *both = tri_pattern(c, "both");
+    CHECK(both && tri_subtype(c, tri_node_type(both), cooking) && tri_subtype(c, tri_node_type(both), farming));
+    CHECK(both && tri_at(c, both, "larder") == NULL);
+    CHECK(both && tri_node_interval(tri_at(c, both, "pot"), &lo, &hi) == 0);
+    /* a field prints as its label where that alone finds it */
+    int qualified = 0, plain = 0;
+    for (size_t i = 0; i < tri_type_feature_count(c, cooking); i++) {
+        if (!strcmp(tri_type_feature(c, cooking, i), "cooking.larder")) qualified++;
+        if (!strcmp(tri_type_feature(c, cooking, i), "pot")) plain++;
+    }
+    CHECK(qualified == 1 && plain == 1);
+    /* at run time, written against a type */
+    TriArena *a = tri_arena_new();
+    char err[256];
+    const TriNode *v = tri_value(c, "#Farming & { larder: { mass: 9kg } }", a, err, sizeof err);
+    CHECK(v && tri_node_interval(tri_at(c, v, "larder.mass"), &lo, &hi) && lo == 9000);
+    CHECK(!tri_value(c, "{ larder: { mass: 9kg } }", a, err, sizeof err));
+    tri_arena_free(a);
+    tri_content_free(c);
+
+    /* the root's untyped larder: two packages have one, so say which */
+    const char *bad1[] = { "package cooking\n#Cooking: { larder: _ }\n", "package farming\n#Farming: { larder: _ }\n",
+                           "x: { larder: 1 }\n" };
+    const char *n1[] = { "a.tri", "b.tri", "c.tri" };
+    c = load(n1, bad1, 3);
+    CHECK(!tri_content_ok(c) && diag_says(c, "two packages have a field 'larder': say which (cooking.larder or farming.larder)"));
+    tri_content_free(c);
+    /* a kitchen's plain larder: it has two */
+    const char *bad3[] = { "package cooking\n#Cooking: { larder: _ }\n", "package farming\n#Farming: { larder: _ }\n",
+                           "#Kitchen: cooking.#Cooking & farming.#Farming & {}\nx: #Kitchen & { larder: 1 }\n" };
+    c = load(n1, bad3, 3);
+    CHECK(!tri_content_ok(c) && diag_says(c, "two packages have a field 'larder'"));
+    tri_content_free(c);
+    /* two unrelated types of one package may not both introduce one */
+    const char *bad2[] = { "package cooking\n#Cooking: { larder: _ }\n#Pantry: { larder: _ }\n" };
+    const char *n2[] = { "a.tri" };
+    c = load(n2, bad2, 1);
+    CHECK(!tri_content_ok(c) && diag_says(c, "feature 'larder' is introduced by both"));
     tri_content_free(c);
 }

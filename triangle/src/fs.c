@@ -729,13 +729,22 @@ static TriNode *node_at_lazy(Content *c, TriNode *n, const uint32_t *path, size_
     return n;
 }
 
+/* Each of the path's fields is the one the node it is read from has: where
+ * two packages have a field of one name, the node's type says which. */
 const TriNode *tri_at(const TriContent *cc, const TriNode *node, const char *path)
 {
     Content *c = (Content *) cc;
-    U32Vec p = { 0 };
-    TriNode *r = path_parse(c, path, &p) ? node_at_lazy(c, (TriNode *) node, p.v, p.n) : NULL;
-    VEC_FREE(p);
-    return r;
+    TriNode *n = (TriNode *) node;
+    for (const char *s = path; n && *s;) {
+        const char *e = strchr(s, '.');
+        size_t len = e ? (size_t) (e - s) : strlen(s);
+        uint32_t f = feat_resolve(c, sym_intern(&c->syms, s, len), n->type, NULL, NULL);
+        if (f == TRI_BOTTOM) return NULL;
+        n = node_at_lazy(c, n, &f, 1);
+        if (!e) break;
+        s = e + 1;
+    }
+    return n;
 }
 
 TriType tri_node_type(const TriNode *node) { return node->type; }

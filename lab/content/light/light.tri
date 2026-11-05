@@ -9,6 +9,8 @@
 //             it sees less precisely (knowledge.tri).
 // - code:     src/domains_light.odin; the knowledge system's light at a tile.
 
+package light
+
 // Light (KNOWLEDGE.md §5's conditions, authored): a lamp, shining, makes it
 // day within `reach` tiles of where it is, held or set down. With the light
 // domain (KNOWLEDGE.md decision 14), it burns its `oil` down while it

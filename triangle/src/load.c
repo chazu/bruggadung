@@ -39,7 +39,30 @@ typedef struct {
     size_t decl;     /* which of its declarations */
     bool runtime;    /* a runtime value: no defaults */
     ArithVec ariths; /* arithmetic met while building; tags resolved afterwards */
+    uint32_t ctx1;   /* the type a struct's labels are written against (T & { … }), + 1; 0: none */
 } Build;
+
+static void build_error(Build *b, Loc loc, const char *fmt, const char *arg);
+
+/* The feature a struct's field names, written against ctx (or TRI_BOTTOM);
+ * TRI_BOTTOM, reported, if none or several. */
+static uint32_t field_feat(Build *b, X *x, XField *f, uint32_t ctx)
+{
+    bool ambiguous;
+    uint32_t fid = feat_resolve(b->c, f->label, ctx, x->u.st.pkg, &ambiguous);
+    if (fid != TRI_BOTTOM) return fid;
+    if (!ambiguous) { build_error(b, f->loc, "unknown feature '%s'", f->label); return TRI_BOTTOM; }
+    Buf w = { 0 };
+    uint64_t v;
+    u64map_get(&b->c->labelidx, (uint64_t) (uintptr_t) f->label, &v);
+    for (uint32_t g = (uint32_t) v - 1; g < b->c->feats.n && b->c->feats.v[g].label == f->label; g++)
+        buf_printf(&w, "%s%s", w.len ? " or " : "", b->c->feats.v[g].full);
+    char msg[512];
+    snprintf(msg, sizeof msg, "two packages have a field '%s': say which (%s)", f->label, w.s);
+    build_error(b, f->loc, "%s", msg);
+    buf_free(&w);
+    return TRI_BOTTOM;
+}
 
 static const char *interp_eval(Content *c, const X *x, void *lookup, Buf *out);
 static TriNode *string_node(Content *c, TriArena *a, const char *bytes, size_t n);
@@ -89,7 +112,7 @@ static bool find_field_loc(Content *c, X *x, const uint32_t *path, size_t n, Loc
     if (x->k != X_STRUCT) return false;
     for (int i = 0; i < x->u.st.n; i++) {
         XField *f = &x->u.st.fields[i];
-        if (f->label != c->feats.v[path[0]].name) continue;
+        if (!label_names(c, f->label, path[0])) continue;
         if (n == 1 || find_field_loc(c, f->value, path + 1, n - 1, out)) {
             if (n == 1) *out = f->loc;
             return true;
@@ -252,7 +275,7 @@ static TriNode *name_path(Build *b, X *x)
                 while (*e && *e != '.' && *e != '[') e++;
                 snprintf(seg, sizeof seg, "%.*s", (int) (e - p), p);
                 p = e;
-                uint32_t f = feat_lookup(c, intern(c, seg));
+                uint32_t f = feat_resolve(c, intern(c, seg), deref(c, node)->type, NULL, NULL);
                 TriNode *next = f == TRI_BOTTOM ? NULL : node_arc(deref(c, node), f);
                 if (!next) {
                     char msg[600];
@@ -285,14 +308,20 @@ static TriNode *name_path(Build *b, X *x)
 static TriNode *build_struct_into(Build *b, TriNode *r, X *x)
 {
     Content *c = b->c;
+    /* written against: what the struct is conjoined with, else what it is
+     * built into (a type's body, its own type) */
+    uint32_t ctx = b->ctx1 ? b->ctx1 - 1 : deref(c, r)->type;
+    uint32_t ctx1 = b->ctx1;
     for (int i = 0; i < x->u.st.n && b->ok; i++) {
         XField *f = &x->u.st.fields[i];
-        uint32_t fid = feat_lookup(c, f->label);
-        if (fid == TRI_BOTTOM) { build_error(b, f->loc, "unknown feature '%s'", f->label); break; }
+        uint32_t fid = field_feat(b, x, f, ctx);
+        if (fid == TRI_BOTTOM) break;
         VEC_PUSH(b->path, fid);
         const char *vary = attr_args(f->attrs, f->nattrs, "vary");
         if (vary) record_vary(b, f->value, vary, f->loc);
+        b->ctx1 = 0;                       /* a field's value is written against nothing yet */
         TriNode *child = build_raw(b, f->value);
+        b->ctx1 = ctx1;
         b->path.n--;
         if (!child) break;
         TriNode *rd = deref(c, r);
@@ -414,8 +443,8 @@ static TriNode *build_raw(Build *b, X *x)
     case X_STRUCT: {
         uint32_t t = c->top;
         for (int i = 0; i < x->u.st.n; i++) {
-            uint32_t f = feat_lookup(c, x->u.st.fields[i].label);
-            if (f == TRI_BOTTOM) { build_error(b, x->u.st.fields[i].loc, "unknown feature '%s'", x->u.st.fields[i].label); return NULL; }
+            uint32_t f = field_feat(b, x, &x->u.st.fields[i], b->ctx1 ? b->ctx1 - 1 : TRI_BOTTOM);
+            if (f == TRI_BOTTOM) return NULL;
             uint32_t m = meet(c, t, c->feats.v[f].intro);
             if (m == TRI_BOTTOM) {
                 build_error(b, x->u.st.fields[i].loc, "no type has all of these features (at '%s')", x->u.st.fields[i].label);
@@ -443,7 +472,13 @@ static TriNode *build_raw(Build *b, X *x)
     }
     case X_AND: {
         TriNode *l = build_raw(b, x->u.bin.a);
-        TriNode *r = l ? build_raw(b, x->u.bin.b) : NULL;
+        if (!l) return NULL;
+        /* the right is written against the left: T & { … } */
+        uint32_t ctx1 = b->ctx1, lt = deref(c, l)->type;
+        uint32_t both = ctx1 ? meet(c, ctx1 - 1, lt) : lt;
+        b->ctx1 = 1 + (both != TRI_BOTTOM ? both : lt);
+        TriNode *r = build_raw(b, x->u.bin.b);
+        b->ctx1 = ctx1;
         if (!r) return NULL;
         X *rb = x->u.bin.b;
         if (rb->k == X_STRUCT && rb->u.st.refs) {      /* a reference's place: name the reference */
@@ -2550,7 +2585,7 @@ static bool x_sets_path(Content *c, X *x, const uint32_t *path, size_t n)
     if (x->k == X_STRUCT && n) {
         for (int i = 0; i < x->u.st.n; i++) {
             XField *f = &x->u.st.fields[i];
-            if (f->label != c->feats.v[path[0]].name) continue;
+            if (!label_names(c, f->label, path[0])) continue;
             if (n == 1 || x_sets_path(c, f->value, path + 1, n - 1)) return true;
         }
         return false;
@@ -3126,7 +3161,6 @@ static TriNode *gen_copy(Content *c, TriArena *a, TriNode *n, const GenTarget *g
  * primary parents: the nearest declaration that has it. */
 const char *field_attr(Content *c, uint32_t t, uint32_t f, const char *name)
 {
-    Sym label = c->feats.v[f].name;
     for (uint32_t u = t; u != TRI_BOTTOM; u = c->types.v[u].parents.n ? c->types.v[u].parents.v[0] : TRI_BOTTOM) {
         TypeInfo *ui = &c->types.v[u];
         for (size_t k = 0; k < ui->decls.n; k++) {
@@ -3136,7 +3170,7 @@ const char *field_attr(Content *c, uint32_t t, uint32_t f, const char *name)
             for (size_t j = 0; j < cj.n && !r; j++) {
                 if (cj.v[j]->k != X_STRUCT) continue;
                 for (int q = 0; q < cj.v[j]->u.st.n && !r; q++)
-                    if (cj.v[j]->u.st.fields[q].label == label)
+                    if (label_names(c, cj.v[j]->u.st.fields[q].label, f))
                         r = attr_args(cj.v[j]->u.st.fields[q].attrs, cj.v[j]->u.st.fields[q].nattrs, name);
             }
             VEC_FREE(cj);
@@ -3371,7 +3405,7 @@ static void check_fields_set(Content *c, InstInfo *in, X *x)
     case X_STRUCT:
         for (int k = 0; k < x->u.st.n; k++) {
             XField *fl = &x->u.st.fields[k];
-            uint32_t f = feat_lookup(c, fl->label);
+            uint32_t f = feat_resolve(c, fl->label, TRI_BOTTOM, x->u.st.pkg, NULL);
             const char *flags = f == TRI_BOTTOM ? NULL : field_flags(c, f);
             if (flags && !has_flag(flags, "content"))
                 diag(c, true, fl->loc, "%s: %s is not a content field (@field(%s)), so content may not set it",
@@ -3414,23 +3448,36 @@ static Sym qualify(Content *c, Sym pkg, Sym name)
     return q;
 }
 
-/* Within a package, a plain name is the package's own if it declares one,
- * else the root's. Qualified names are taken as written. */
-static void resolve_names(Content *c, X *x, Sym pkg, const U64Map *declared)
+/* A plain name means the package's own if it declares one, else the root's,
+ * else the one package's that declares it (CONTENT_LANGUAGE.md decision 12);
+ * where two do and neither is the package's or the root's, it stays plain,
+ * and is unknown. */
+static Sym resolve_plain(Content *c, Sym name, Sym pkg, const U64Map *declared, const U64Map *root)
+{
+    if (pkg) {
+        Sym q = qualify(c, pkg, name);
+        if (u64map_get(declared, (uint64_t) (uintptr_t) q, NULL)) return q;
+    }
+    if (u64map_get(root, (uint64_t) (uintptr_t) name, NULL)) return name;
+    uint64_t v;
+    if (u64map_get(&c->plainidx, (uint64_t) (uintptr_t) name, &v) && v != PLAIN_AMBIGUOUS) return (Sym) (uintptr_t) v;
+    return name;
+}
+
+/* Qualified names are taken as written; plain ones, as resolve_plain says. */
+static void resolve_names(Content *c, X *x, Sym pkg, const U64Map *declared, const U64Map *root)
 {
     if (!x) return;
     switch (x->k) {
     case X_NAME: {
-        if (!pkg) break;
         const char *s = x->u.name;
         size_t first = strcspn(s, ".[");
         if (!s[first]) {
-            Sym q = qualify(c, pkg, s);
-            if (u64map_get(declared, (uint64_t) (uintptr_t) q, NULL)) x->u.name = q;
+            x->u.name = resolve_plain(c, x->u.name, pkg, declared, root);
             break;
         }
-        /* a path, wrench_19.size: the package's own wrench_19 if it has one,
-         * unless the name already starts with another package's name */
+        /* a path, wrench_19.size: its first name resolved, unless the name
+         * already starts with a package's */
         if (s[first] == '.' && s[first + 1] == '#') break;
         for (size_t end = strlen(s); end > first; end--) {
             if (s[end] && s[end] != '.' && s[end] != '[') continue;
@@ -3444,53 +3491,59 @@ static void resolve_names(Content *c, X *x, Sym pkg, const U64Map *declared)
         char *head = malloc(first + 1);
         memcpy(head, s, first);
         head[first] = 0;
-        Sym q = qualify(c, pkg, intern(c, head));
+        Sym h = intern(c, head);
         free(head);
-        if (u64map_get(declared, (uint64_t) (uintptr_t) q, NULL)) x->u.name = qualify(c, pkg, s);
+        Sym r = resolve_plain(c, h, pkg, declared, root);
+        if (r != h) {
+            Buf b = { 0 };
+            buf_printf(&b, "%s%s", r, s + first);
+            x->u.name = intern(c, b.s);
+            buf_free(&b);
+        }
         break;
     }
     case X_STRUCT:
         for (int i = 0; i < x->u.st.n; i++) {
-            resolve_names(c, x->u.st.fields[i].value, pkg, declared);
-            resolve_names(c, x->u.st.fields[i].dlabel, pkg, declared);
+            resolve_names(c, x->u.st.fields[i].value, pkg, declared, root);
+            resolve_names(c, x->u.st.fields[i].dlabel, pkg, declared, root);
         }
         break;
     case X_COMP:
-        for (int i = 0; i < x->u.comp.n; i++) resolve_names(c, x->u.comp.clauses[i].expr, pkg, declared);
-        resolve_names(c, x->u.comp.body, pkg, declared);
+        for (int i = 0; i < x->u.comp.n; i++) resolve_names(c, x->u.comp.clauses[i].expr, pkg, declared, root);
+        resolve_names(c, x->u.comp.body, pkg, declared, root);
         break;
     case X_CMP: case X_LOGIC:
-        resolve_names(c, x->u.ar.a, pkg, declared);
-        resolve_names(c, x->u.ar.b, pkg, declared);
+        resolve_names(c, x->u.ar.a, pkg, declared, root);
+        resolve_names(c, x->u.ar.b, pkg, declared, root);
         break;
     case X_NOT:
-        resolve_names(c, x->u.sub, pkg, declared);
+        resolve_names(c, x->u.sub, pkg, declared, root);
         break;
     case X_CALL:
-        for (int i = 0; i < x->u.call.n; i++) resolve_names(c, x->u.call.args[i], pkg, declared);
+        for (int i = 0; i < x->u.call.n; i++) resolve_names(c, x->u.call.args[i], pkg, declared, root);
         break;
     case X_BOUND:
-        resolve_names(c, x->u.bound.of, pkg, declared);
+        resolve_names(c, x->u.bound.of, pkg, declared, root);
         break;
     case X_LIST:
-        for (int i = 0; i < x->u.list.n; i++) resolve_names(c, x->u.list.items[i], pkg, declared);
-        resolve_names(c, x->u.list.tail, pkg, declared);
-        resolve_names(c, x->u.list.elem, pkg, declared);
+        for (int i = 0; i < x->u.list.n; i++) resolve_names(c, x->u.list.items[i], pkg, declared, root);
+        resolve_names(c, x->u.list.tail, pkg, declared, root);
+        resolve_names(c, x->u.list.elem, pkg, declared, root);
         break;
     case X_AND:
     case X_OR:
-        resolve_names(c, x->u.bin.a, pkg, declared);
-        resolve_names(c, x->u.bin.b, pkg, declared);
+        resolve_names(c, x->u.bin.a, pkg, declared, root);
+        resolve_names(c, x->u.bin.b, pkg, declared, root);
         break;
     case X_DEFAULT:
-        resolve_names(c, x->u.sub, pkg, declared);
+        resolve_names(c, x->u.sub, pkg, declared, root);
         break;
     case X_ARITH:
-        resolve_names(c, x->u.ar.a, pkg, declared);
-        resolve_names(c, x->u.ar.b, pkg, declared);
+        resolve_names(c, x->u.ar.a, pkg, declared, root);
+        resolve_names(c, x->u.ar.b, pkg, declared, root);
         break;
     case X_INTERP:
-        for (int i = 0; i < x->u.in.n; i++) resolve_names(c, x->u.in.parts[i], pkg, declared);
+        for (int i = 0; i < x->u.in.n; i++) resolve_names(c, x->u.in.parts[i], pkg, declared, root);
         break;
     default:
         break;
@@ -3521,21 +3574,89 @@ static bool check_lets(Content *c)
 }
 
 /* Types and blueprints declared in a package take its name; references to
- * them inside it are resolved. Atoms and features stay global. */
+ * them are resolved, in the root too. Atoms stay global; features are
+ * resolved once there are features (feat_resolve). */
 static void resolve_packages(Content *c)
 {
-    U64Map declared = { 0 };
+    U64Map declared = { 0 }, root = { 0 };
     bool any = false;
     for (size_t i = 0; i < c->decls.n; i++) {
         Decl *d = &c->decls.v[i];
-        if (!d->pkg || d->kind == L_ATOM) continue;
+        if (d->kind != L_ATOM && !d->pkg && !strchr(d->label, '.')) u64map_put(&root, (uint64_t) (uintptr_t) d->label, 1);
+    }
+    for (size_t i = 0; i < c->decls.n; i++) {
+        Decl *d = &c->decls.v[i];
+        if (d->kind == L_ATOM || strchr(d->label, '.')) {
+            any |= d->kind != L_ATOM;
+            continue;
+        }
+        /* a type the root declares is the root's: a package's file that
+         * declares it adds to it; the fields the file declares are its
+         * package's */
+        if (!d->pkg || (d->kind == L_DEF && u64map_get(&root, (uint64_t) (uintptr_t) d->label, NULL))) continue;
+        Sym plain = d->label;
         d->label = qualify(c, d->pkg, d->label);
         u64map_put(&declared, (uint64_t) (uintptr_t) d->label, 1);
+        uint64_t v;
+        if (!u64map_get(&c->plainidx, (uint64_t) (uintptr_t) plain, &v))
+            u64map_put(&c->plainidx, (uint64_t) (uintptr_t) plain, (uint64_t) (uintptr_t) d->label);
+        else if (v != (uint64_t) (uintptr_t) d->label)
+            u64map_put(&c->plainidx, (uint64_t) (uintptr_t) plain, PLAIN_AMBIGUOUS);
         any = true;
     }
+    /* adding to another package's type, written pkg.#Type: it must have one */
+    for (size_t i = 0; i < c->decls.n; i++) {
+        Decl *d = &c->decls.v[i];
+        if (d->kind == L_ATOM || !strchr(d->label, '.') || u64map_get(&declared, (uint64_t) (uintptr_t) d->label, NULL)) continue;
+        diag(c, true, d->loc, "%s adds to a type its package doesn't declare: declare it in its package's files", d->label);
+    }
     for (size_t i = 0; any && i < c->decls.n; i++)
-        if (c->decls.v[i].pkg) resolve_names(c, c->decls.v[i].value, c->decls.v[i].pkg, &declared);
+        resolve_names(c, c->decls.v[i].value, c->decls.v[i].pkg, &declared, &root);
     u64map_free(&declared);
+    u64map_free(&root);
+}
+
+/* The plain name of a qualified one, tools.#Wrench or tools.wrench: past the
+ * package's dot. */
+static const char *past_package(const char *s)
+{
+    const char *d = strchr(s, '.');
+    return d ? d + 1 : s;
+}
+
+/* What a packaged type, instance or component is called where only one is
+ * so named, and the root has none: its plain name, which also finds it. */
+static void name_plainly(Content *c)
+{
+    for (uint32_t t = 0; t < c->types.n; t++) {
+        TypeInfo *ti = &c->types.v[t];
+        if (ti->kind != TK_DEF || !type_pkg(c, t)) continue;
+        Sym plain = intern(c, past_package(ti->name));
+        uint64_t v;
+        if (!u64map_get(&c->plainidx, (uint64_t) (uintptr_t) plain, &v) || v != (uint64_t) (uintptr_t) ti->name) continue;
+        if (u64map_get(&c->typeidx, (uint64_t) (uintptr_t) plain, NULL)) continue;
+        u64map_put(&c->typeidx, (uint64_t) (uintptr_t) plain, t + 1);
+        ti->name = plain;
+    }
+    for (uint32_t i = 0; i < c->insts.n; i++) {
+        InstInfo *in = &c->insts.v[i];
+        if (!in->decls.n || !in->decls.v[0]->pkg) continue;
+        Sym plain = intern(c, past_package(in->name));
+        uint64_t v;
+        if (!u64map_get(&c->plainidx, (uint64_t) (uintptr_t) plain, &v) || v != (uint64_t) (uintptr_t) in->name) continue;
+        if (u64map_get(&c->instidx, (uint64_t) (uintptr_t) plain, NULL)) continue;
+        u64map_put(&c->instidx, (uint64_t) (uintptr_t) plain, i + 1);
+        in->name = plain;
+    }
+    for (uint32_t t = 0; t < c->types.n; t++) {
+        TypeInfo *ti = &c->types.v[t];
+        if (!ti->component || !strchr(ti->component, '.')) continue;
+        const char *plain = past_package(ti->component);
+        size_t n = 0;
+        for (uint32_t u = 0; u < c->types.n; u++)
+            if (c->types.v[u].component && !strcmp(past_package(c->types.v[u].component), plain)) n++;
+        if (n == 1) ti->component = intern(c, plain);
+    }
 }
 
 
@@ -4105,6 +4226,7 @@ static void finish_load(Content *c, bool ok, double t0)
         resolve_packages(c);
     if (ok && !c->tdl) ok = expand_all(c);
     if (ok && types_build(c) && check_lets(c)) {
+        if (!c->tdl) name_plainly(c);
         double t2 = now_ms();
         c->stats.hierarchy_ms = t2 - t1;
         for (uint32_t t = 0; t < c->types.n; t++) type_expansion(c, t);
@@ -4248,6 +4370,8 @@ void tri_content_free(TriContent *c)
     u64map_free(&c->codeidx);
     u64map_free(&c->meetmemo);
     u64map_free(&c->featidx);
+    u64map_free(&c->labelidx);
+    u64map_free(&c->plainidx);
     u64map_free(&c->instidx);
     free(c->bittype);
     tri_arena_free(c->load);
@@ -4407,7 +4531,7 @@ const char *tri_component_field(const TriContent *c, size_t i, size_t j, const c
             for (size_t a = 0; a < ti->field_feats.n; a++)
                 if (ti->field_feats.v[a] == f) *flags = ti->field_attrs.v[a]->args;
         }
-        return c->feats.v[f].name;
+        return component_field_name(c, f);
     }
     return NULL;
 }

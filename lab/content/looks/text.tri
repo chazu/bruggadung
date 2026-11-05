@@ -1,6 +1,8 @@
 // Looks, the text theme: `lab play`'s map, a character to a tile (see
 // looks.tri for the cut points).
 
+package looks
+
 text_wall:        #Glyph & { theme: "text", look: "wall", char: "#" } @family(glyphs)
 text_floor:       #Glyph & { theme: "text", look: "floor", char: "." } @family(glyphs)
 text_doorway:     #Glyph & { theme: "text", look: "doorway", char: "." } @family(glyphs)

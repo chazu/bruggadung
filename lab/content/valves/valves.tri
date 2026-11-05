@@ -9,6 +9,8 @@
 //            src/kinds_valve_kind.odin reacts (breaking free, a lever
 //            bending); effect_strike.
 
+package valves
+
 // What valves add to an agent: what its hands can put into a turn
 // (ACTIONS.md Scenario 1).
 #Agent: {

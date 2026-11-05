@@ -12,6 +12,8 @@
 // - work:     a job's task is `deliver` (work/work.tri).
 // - code:     commitments, urgency and windows, in src/agency_agency.odin.
 
+package promises
+
 // Delivering: the goods, and where they are to go.
 #Delivering: #Frame & { goods: #Body, dest: #Container }
 

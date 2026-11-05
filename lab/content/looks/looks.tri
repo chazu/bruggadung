@@ -14,6 +14,8 @@
 //            as its first letter). The view's own signs aren't looks: `@`
 //            for oneself in `lab play`, water drawn over a tile.
 
+package looks
+
 // What a theme draws for a look, or a family of looks (the part of a look
 // before its first dot): a glyph (`char`), in `ink`, on `ground` if it
 // fills its tile (terrain), as red, green and blue, 0 to 255.

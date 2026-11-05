@@ -13,6 +13,8 @@
 //             effect_reveal, effect_replace, effect_service, effect_install,
 //             effect_cut, effect_shape.
 
+package machines
+
 // Latent physical assembly (COMPONENTS.md §7, DOMAIN_SIMULATION.md Scenario
 // 2, LATENT_ASSEMBLY.md).
 //

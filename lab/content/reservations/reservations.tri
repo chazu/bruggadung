@@ -12,6 +12,8 @@
 //             weighs it; the #Reserved finding comes from what the agent is
 //             told or reads.
 
+package reservations
+
 // Fetching: a part.
 #Fetching: #Frame & { part: #Body }
 

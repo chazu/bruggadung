@@ -8,6 +8,8 @@
 // - code:    src/core_terrain.odin; a map's levels are files in maps/,
 //            brought in by @embed (a path from this directory).
 
+package terrain
+
 // Terrain (TERRAIN.md): what each tile at each level is. A wall fills its
 // tile; a cell is a kind's index, not an entity, until something tells it
 // apart.

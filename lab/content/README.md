@@ -54,11 +54,21 @@ with. It applies to all content, and to every agent and person adding to it.
    header (`hunger/body.tri`, `hunger/eating.tri`), not into
    subdirectories. The tools find the **content root** as the directory
    above a topic's directory, and the root holds `.tri` files of its own.
-6. **Topic directories are not packages.** They declare no `package`, so
-   names stay global (CONTENT_LANGUAGE.md decision 12), and declaration
-   order never matters (§3): moving a declaration between files changes
-   nothing it means, and the content hash stays the same. A `let` is the
-   file's own, so a file that uses one (`person`) declares it.
+6. **Each topic directory is a package** named for it: every file in it
+   begins, after its header, `package <topic>` (CONTENT_LANGUAGE.md decision
+   12). So a topic owns its fields: farming's `larder` and cooking's are
+   two, and neither topic edits the other's to have one. A name or label
+   is written plainly; it is qualified (`cooking.#Food`, `cooking.larder:`)
+   only where two packages have it and the type it is written against
+   doesn't say which.
+   - Adding to a root type is declaring it in the topic's file, as §4 says
+     (`#Agent: { hires: ... }` in work/); adding to another topic's type
+     names it qualified (`hunger.#Food: { raw: ... }` in cooking/). Either
+     way the fields added are the topic's.
+   - The root's files declare no package: they are the vocabulary.
+   - Declaration order still never matters (§3), and moving a declaration
+     into a package renumbers nothing. A `let` is the file's own, so a file
+     that uses one (`person`) declares it.
 
 ## The header
 

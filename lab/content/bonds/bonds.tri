@@ -11,6 +11,8 @@
 // - code:     bonds are made from these blueprints (hiring makes a
 //             `work_bond`: effect_hire).
 
+package bonds
+
 // Loyalty (AGENCY.md decision 12): a weighted relation from an agent to
 // another. It is the agent's own, as its dispositions are, formed by
 // kinship, friendship, employment, or authored. Like a claim, it is reified: a bond,
