@@ -10,7 +10,8 @@ village` checks it, as the other scenarios are checked.
 This document is a proposal, built a slice at a time: slices 1 (hunger
 over weeks), 2 (looks in content), 3 (the village and its homes), 4
 (cooking and the larder), 5 (firewood), 6 (farming), 7 (hunting), 8
-(perishing) and 9 (the market) are built. Each slice below is a ticket: slice n is GitHub issue #n
+(perishing), 9 (the market) and 10 (a week in the village) are built, and
+carrying (decision 11). Each slice below is a ticket: slice n is GitHub issue #n
 (label `village`). A slice moves into `lab/PLAN.md` when it is built.
 
 It is the first scenario that runs for weeks, not minutes. That forces two
@@ -377,6 +378,22 @@ What content can't say yet:
 Each slice brings its own tests too, as the lab's do. The `watcher` test
 already proves that watching changes nothing.
 
+Built (slice 10): `lab run village` runs seven days and checks them as it
+goes, 79 checks in all: the design's above, each night (everyone fed that
+day, reserves at 50 or more, stoves fuelled, packs back), each market day,
+and at the end. No meat can be eaten spoiled (spoiled food isn't food); the
+check is that nothing past its time is food still (three things spoiled in
+the week). Its hashes are in `ci/scenario-hashes.txt`, the same on macOS
+and on Linux (run in the CI image on arm64 as well as CI's x86-64).
+
+What it costs, on an M-series Mac at `-o:speed`: 34 s for the week, 4.9 s
+a world day; 75,120 boundaries, 157,347 perceptions (12.9 s), 168,715
+decisions (16.1 s), the domains 0.1 s. `make check` runs it three times
+(the village test, and the scenario's run and save) and takes 128 s in
+all, the village 103 s of it. Not cut: if CI needs it faster, the save's
+hash could come from the same run as the run's, and the test could run
+three days, a week's cost once.
+
 ## The plan, in slices
 
 Each slice is one ticket, the issue of its number, and each can be watched
@@ -394,7 +411,7 @@ when it is built:
 8. **Perishing**: food that spoils (built).
 9. **The market**: coins, stalls, posted prices, sales (built).
 10. **A week in the village**: the scenario's checks and hashes in CI, and
-    how fast it runs.
+    how fast it runs (built).
 11. **The knowledge view in the watcher**: one agent's village as it
     remembers it (TESSERA.md slice 2's knowledge scenes).
 12. **Carrying**: backpacks and baskets, loads, a burdened walk (built;
@@ -507,6 +524,11 @@ New, and entered in the glossary with this document:
   and left a mind deciding only where a walk ends (PERFORMANCE.md).
   A boundary a step remains; carrying more at a time, or movement in
   closed form (PERFORMANCE.md, open questions), would cut it further.
+- **The week's balance.** The woodcutters stock their three tonnes by the
+  sixth day and stop, and sell thirty pieces a market; the Hunts may have
+  nothing to sell on a market day (the seventh, in the checked run). What
+  a household makes and what the others buy aren't matched yet: prices
+  don't move with plenty, and nobody works more for want of coins.
 - **Three weeks of the village.** A plot sown the first day ripens in a
   fortnight, so the village's own checks see sowing, not harvest; a plot
   of its own (src/test_farming.odin) is checked for three weeks. Run for

@@ -26,17 +26,27 @@ package lab
  * roam there and run from people they see; the herds are kept up from the
  * east edge, six deer and four hares at most (the game domain).
  *
+ * Each household keeps coins in a coffer, a stall on the green, and a
+ * backpack and a basket by its door (content/market/, content/carrying/):
+ * on market day (the third, then every fourth) its first keeps the stall
+ * and its second buys what it doesn't make; woodcutters and hunters carry
+ * their day's work home in the backpack.
+ *
  * The run goes boundary by boundary up to each check's time, putting none
  * in of its own (as the watcher runs it), so `lab run village` and a
- * watched village are the same run. The checks, for three days and nights:
- * everyone taking a meal to work at 07:30, at work at 11:00 (about its
- * worksite, or about its work: a woodcutter in the woods, or on its way
- * home with firewood; a hunter on the hunt), the meal
- * eaten there by 14:30, every plot sown by 15:00 the first day, home by
- * 21:00, asleep in their own bed at 02:00, and the game bedded down;
- * and at the end, each household's larder emptied by what it ate, meat in
- * the hunters' larder, the herds alive and within their bounds, no food
- * past its time still food, and nobody's reserves fallen.
+ * watched village are the same run. The checks, for a week of days and
+ * nights (VILLAGE.md's Testing): everyone taking a meal to work at 07:30,
+ * at work at 11:00 (about its worksite, or about its work: a woodcutter in
+ * the woods, or on its way home with firewood; a hunter on the hunt; on
+ * market day, the market), the meal eaten there by 14:30, the woodpile
+ * rising (or stocked), every plot sown by 15:00 the first day, home by
+ * 21:00; at 02:00 asleep in their own bed, everyone fed that day and no
+ * reserves below 50, every stove with fuel, every pack back by its larder,
+ * and the game bedded down; on each market day, sales by every household
+ * with goods to sell, and the takings home with no coin made or lost; and
+ * at the end, each household's larder emptied by what it ate, meat and a
+ * hide in the hunters' larder, the herds alive and within their bounds, no
+ * food past its time still food, and every plot growing or harvested.
  */
 
 import "core:fmt"
@@ -46,10 +56,11 @@ import tri "../../triangle/odin/triangle"
 
 VILLAGE_DAY :: i64(86400000)
 VILLAGE_HOUR :: i64(3600000)
-VILLAGE_DAYS :: 3
+VILLAGE_DAYS :: 7
 VILLAGE_GRAIN :: i64(60)               // portions in each larder's sack (village.tri's grain_sack)
 VILLAGE_FARM_GRAIN :: i64(200)         // a farming household's harvest in store (village.tri's farm_grain)
 VILLAGE_COINS :: i64(100)              // coins in each household's coffer (money/coins.tri's coins_100)
+VILLAGE_STOCKED :: i64(3000)          // pieces on a stocked woodpile (firewood.tri's woodpile_stocked, three tonnes)
 VILLAGE_MARKET :: i64(2)               // the first market day's index (day 3); then every fourth
 
 /* What each household buys at the market (content/market/): the goals,
@@ -539,7 +550,7 @@ village_step_until :: proc(self: ^Village, t: i64) {
 }
 
 
-/* Three days and nights, checked as they go. */
+/* A week of days and nights (VILLAGE_DAYS), checked as they go. */
 village_run :: proc(self: ^Village) {
 	if self.error != "" {
 		village_check(self, false, "set up", self.error)
@@ -567,7 +578,8 @@ village_run :: proc(self: ^Village) {
 		now := village_firewood_in(self.world, self.woodpiles[woodcutters])
 		/* on market day they sell it, and work less */
 		if !market {
-			village_check(self, now > stocked, fmt.tprintf("day %d, 15:00: the woodcutters' woodpile rose with their work", d + 1),
+			village_check(self, now > stocked || now >= VILLAGE_STOCKED,
+			              fmt.tprintf("day %d, 15:00: the woodcutters' woodpile rose with their work, or is stocked", d + 1),
 			              fmt.tprintf("%d pieces, %d before", now, stocked))
 		}
 		stocked = now
@@ -586,6 +598,7 @@ village_run :: proc(self: ^Village) {
 		village_check_each(self, fmt.tprintf("day %d, 21:00: everyone home", d + 1), .Home)
 		village_step_until(self, (d + 1) * VILLAGE_DAY + 2 * VILLAGE_HOUR)
 		village_check_each(self, fmt.tprintf("night %d, 02:00: everyone asleep in their own bed", d + 1), .Asleep)
+		village_check_fed(self, d)
 		cold := make([dynamic]string, context.temp_allocator)
 		for e, k in self.stoves {
 			fuel: i64
@@ -643,12 +656,39 @@ village_run :: proc(self: ^Village) {
 	}
 	village_check(self, len(stale) == 0, fmt.tprintf("no food past its time is food still (%d spoiled)", spoiled),
 	              fmt.tprintf("not: %s", strings.join(stale[:], ", ", context.temp_allocator)))
-	hungry := make([dynamic]string, context.temp_allocator)
-	for v in self.people {
-		if reserves(hungry_of(self.world, v.id), world_time(self.world).ms) < 100 do append(&hungry, fmt.tprintf("%d", v.id))
+	/* the crops (farming/): each plot still growing, or harvested once ripe
+	 * (ripe a day and more, unharvested, is let go to waste) */
+	wasted := make([dynamic]string, context.temp_allocator)
+	for list, k in self.plots {
+		for plot in list {
+			p := plot_of(self.world, plot)
+			if p != nil && p.stands == plot_stands(self.world, "ripe") && p.sownAt + p.ripensIn < world_time(self.world).ms - VILLAGE_DAY {
+				append(&wasted, fmt.tprintf("%s' at %d", households[k].name, world_location_of(self.world, plot).x))
+			}
+		}
 	}
-	village_check(self, len(hungry) == 0, "nobody went without: everyone's reserves are full",
-	              fmt.tprintf("not: %s", strings.join(hungry[:], ", ", context.temp_allocator)))
+	village_check(self, len(wasted) == 0, "every plot still growing, or harvested once ripe",
+	              fmt.tprintf("not: %s", strings.join(wasted[:], ", ", context.temp_allocator)))
+}
+
+
+/* Night d, 02:00 (VILLAGE.md's Testing): everyone ate on day d (fed since
+ * its morning), and nobody's reserves have fallen below 50. */
+@(private = "file")
+village_check_fed :: proc(self: ^Village, d: i64) {
+	unfed := make([dynamic]string, context.temp_allocator)
+	low   := make([dynamic]string, context.temp_allocator)
+	now   := world_time(self.world).ms
+	for v in self.people {
+		h := hungry_of(self.world, v.id)
+		if h == nil do continue
+		if h.fedAt < d * VILLAGE_DAY do append(&unfed, fmt.tprintf("%d", v.id))
+		if reserves(h, now) < 50 do append(&low, fmt.tprintf("%d (%d)", v.id, reserves(h, now)))
+	}
+	village_check(self, len(unfed) == 0 && len(low) == 0,
+	              fmt.tprintf("night %d, 02:00: everyone ate today, and nobody's reserves are below 50", d + 1),
+	              fmt.tprintf("unfed: %s; low: %s", strings.join(unfed[:], ", ", context.temp_allocator),
+	                          strings.join(low[:], ", ", context.temp_allocator)))
 }
 
 

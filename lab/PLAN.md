@@ -5062,3 +5062,28 @@ A backpack and a basket for each household, loads, and a burdened walk.
   village's hashes change.
 
 137 tests, 4069 checks.
+
+### After the slice: a week in the village (VILLAGE.md slice 10, issue #10)
+
+`lab run village` runs seven days (`VILLAGE_DAYS`), 79 checks.
+
+- **New checks** (VILLAGE.md's Testing): each night, everyone fed that
+  day (`Hungry.fedAt` since the day's start) and nobody's reserves below
+  50, in place of the end's "reserves full"; at the end, every plot still
+  growing or harvested once ripe. The woodpile's daily check accepts a
+  stocked woodpile: the woodcutters reach their three tonnes on the sixth
+  day and stop.
+- **The week**: two market days (the third and the seventh), every
+  household with goods to sell sells, the takings home, 400 coins; three
+  things spoiled; packs back every night; a hide home.
+- **Determinism across platforms**: every scenario's hashes, the week's
+  included, are the same on macOS (arm64) and on Linux in the CI image
+  (arm64, under Docker), built from a copy of the tree so the two
+  platforms' Triangle objects don't mix. CI checks Linux on x86-64.
+- **Cost**: 34 s a week at `-o:speed`, 4.9 s a world day: 75,120
+  boundaries, 157,347 perceptions (12.9 s), 168,715 decisions (16.1 s),
+  domains 0.1 s. `make check` takes 128 s, the village 103 s of it (run
+  three times: the test, the scenario's run, its save). Not cut; how to,
+  if CI wants it: VILLAGE.md's Testing.
+
+137 tests, 4069 checks.

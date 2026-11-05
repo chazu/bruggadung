@@ -5,4 +5,4 @@ cistern        run b11691336de1c4d0 save b11691336de1c4d0
 cistern-b      run 542ea94140c92e52 save 542ea94140c92e52 
 cistern-d      run b11691336de1c4d0 save b11691336de1c4d0 
 cistern-e      run 5ad8faf6e9fcea46 save 5ad8faf6e9fcea46 
-village        run a2d2dea472f060ff save 348350bc553677ea state hash 7f4805d99d7871e0
+village        run 838aee74dd6e2e6b save fa13a969493a9af4 state hash 3fa83eab8d6356a7
