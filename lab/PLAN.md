@@ -4922,3 +4922,35 @@ hunt in the village.
 - Not done: tiredness from hours awake (AGENCY.md open question 10).
 
 134 tests, 3994 checks.
+
+### After the slice: perishing (VILLAGE.md slice 8, issue #8)
+
+Food that spoils, in closed form.
+
+- **Perishable food** (content/perishing/): perishing adds to hunger's
+  `#Food` how long it keeps once made (`keepsFor`: 0, it keeps; meat,
+  three days), when it spoils (`spoilsAt`), how long a meal made of it
+  keeps (`mealKeepsFor`, two days), and what it is spoiled (`spoiled`).
+  A component can't be added to a thing by setting a field, so every
+  food carries them, and grain's say it keeps.
+- **The perishing domain** (src/domains_perishing.odin): every domain
+  advances at every boundary from the last commit's time, so food made
+  then is stamped exactly, `t0 + keepsFor`; cooking sets a meal's
+  (effect_cook). Its horizon is the next food to spoil, so a larder's
+  meat across ten days is two boundaries.
+- **Spoiling is becoming**: `become` (act_actions.odin), which death now
+  uses too, makes the new thing where the old was, as heavy, its mass
+  carved from it, and ends the old. Spoiled food is made of a new
+  material, "rot": `eat` and the food valuing take anything made of
+  "food" (the farmers' seed grain too), so spoiled food made of food
+  would have been edible.
+- **Merging**: the Body kind's merge into a larder's stack also gives it
+  the earlier of the two times.
+- test_perishing: meat spoils exactly three days on, across ten days of
+  nothing, in four boundaries; grain keeps; spoiled meat can't be eaten;
+  older meat put with fresher takes the older's time; a cooked meal
+  spoils two days on. The village has the domain and a check that no
+  food past its time is food still: nothing spoils in its three days.
+  Only the village's hashes change (food's new fields).
+
+135 tests, 4013 checks.

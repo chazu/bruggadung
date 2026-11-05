@@ -8,7 +8,9 @@
 //             and the rest is waste.
 // - reduced:  the same; butchering runs its time.
 // - abstract: as reduced.
-// - frozen:   nothing is butchered; a carcass keeps (perishing is slice 8).
+// - frozen:   nothing is butchered; a carcass keeps.
+// - perishing: meat keeps three days from when it is butchered, then
+//             spoils (perishing/). A carcass keeps (left out).
 // - harm:     a carcass is what harm/'s death makes of an animal: as heavy
 //             as it was.
 // - cooking:  meat is raw food; in a larder it merges with meat already
@@ -32,9 +34,10 @@ carcass_look: #Look & { kindOf: "#Carcass", look: "carcass" } @family(looks)
 deer_carcass: #Carcass & { material: "flesh", mass: 60kg, yields: "venison", cuts: 40, hide: "deer_hide" }
 hare_carcass: #Carcass & { material: "flesh", mass: 3kg, yields: "hare_meat", cuts: 3, hide: "hare_pelt" }
 
-// Meat, raw: a cut is a portion, as grain's is (cooking/).
-venison:   #Stack & #Food & { material: "food", raw: true, nourishment: 20, cooking: 40, unit: "venison", unitMass: 500g, count: 1 }
-hare_meat: #Stack & #Food & { material: "food", raw: true, nourishment: 20, cooking: 30, unit: "hare meat", unitMass: 500g, count: 1 }
+// Meat, raw: a cut is a portion, as grain's is (cooking/). It keeps three
+// days in a cool larder, then spoils (perishing/).
+venison:   #Stack & #Food & { material: "food", raw: true, nourishment: 20, cooking: 40, keepsFor: 3d, unit: "venison", unitMass: 500g, count: 1 }
+hare_meat: #Stack & #Food & { material: "food", raw: true, nourishment: 20, cooking: 30, keepsFor: 3d, unit: "hare meat", unitMass: 500g, count: 1 }
 
 // Hides: leather to be, when there is someone to dress them.
 deer_hide: #Body & { material: "leather", mass: 4kg }

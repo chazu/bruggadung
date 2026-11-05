@@ -9,7 +9,8 @@ village` checks it, as the other scenarios are checked.
 
 This document is a proposal, built a slice at a time: slices 1 (hunger
 over weeks), 2 (looks in content), 3 (the village and its homes), 4
-(cooking and the larder), 5 (firewood), 6 (farming) and 7 (hunting) are built. Each slice below is a ticket: slice n is GitHub issue #n
+(cooking and the larder), 5 (firewood), 6 (farming), 7 (hunting) and 8
+(perishing) are built. Each slice below is a ticket: slice n is GitHub issue #n
 (label `village`). A slice moves into `lab/PLAN.md` when it is built.
 
 It is the first scenario that runs for weeks, not minutes. That forces two
@@ -173,6 +174,23 @@ things the lab put off:
    **perishable**: made at a time, good for so long, then spoiled. A
    spoiled thing still exists, but it isn't food any more. Salting and
    smoking are left out.
+   - Built (content/perishing/). Food that keeps for some time (meat,
+     three days) spoils at `spoilsAt`, set as it is made; a meal keeps two
+     days from when it is cooked, whatever it was made of; grain and
+     turnips keep. The time is all there is: nothing steps it. The
+     perishing domain stamps food made at the last boundary (it was made
+     at t0), and its horizon is the next food to spoil, its one wake.
+   - Spoiled, food **becomes spoiled food**, as death makes remains: a
+     new thing, as heavy, where it was, its mass carved from the food,
+     which ends. It is made of **rot**, not food, so no method finds it to
+     eat, `eat` can't take it, and nobody values it as food. Whoever sees
+     the larder sees the meat gone and spoiled food there.
+   - A stack spoils whole. Put with a stack of its unit and merged, the
+     two spoil when the older would have: fresh meat put in with old
+     spoils with the old.
+   - In the village's three days nothing spoils yet (the first venison is
+     three days old the morning after the run ends); the check that no
+     food past its time is food still is there for the week (slice 10).
 9. **Selling at the market is a deal, struck at a stall** (slice 9).
    - Money becomes coins: a stack of a `coin` unit (money is cloth today).
    - On market days a seller sets out a **stall** on the green, with a
@@ -250,7 +268,7 @@ its cut points. The new and changed ones:
 | --- | --- | --- |
 | `hunger/` | satiety and reserves (`body.tri`), the effect curves, eating, food's `nourishment` | changed (slice 1) |
 | `cooking/` | the larder, cooking at a lit stove (raw food into a meal), meals | new (slice 4) |
-| `perishing/` | perishable things: made at, keeps for, spoiled | new (slice 8) |
+| `perishing/` | perishable food: how long it keeps, when it spoils, spoiled food | new (slice 8) |
 | `farming/` | plots, crops, sowing, ripening, harvesting, seed grain | new (slice 6) |
 | `firewood/` | trees, felling, splitting, the woodpile, stoking | new (slice 5), with `sawing/` and `heat/` |
 | `hunting/` | animals and their goals, stalking, dying, carcasses, butchering, hides | new (slice 7), with `harm/` |
@@ -317,7 +335,7 @@ when it is built:
 5. **Firewood**: trees, felling, splitting, the woodpile, stoking (built).
 6. **Farming**: plots, sowing, ripening, harvesting (built).
 7. **Hunting**: animals, death, butchering (built).
-8. **Perishing**: food that spoils.
+8. **Perishing**: food that spoils (built).
 9. **The market**: coins, stalls, posted prices, sales.
 10. **A week in the village**: the scenario's checks and hashes in CI, and
     how fast it runs.
@@ -340,7 +358,8 @@ New, and entered in the glossary with this document:
 | Nourishment | What a food gives satiety when eaten (`nourish by N`). (Built.) |
 | Plot | Tilled ground a household farms: an area, known as a whole. *Avoid:* field, which is a component's field. (Built.) |
 | Crop | What a plot grows: sown a row at a time, growing from its last row, ripe after its growth. (Built, as the plot's state.) |
-| Perishable | Good for so long after it was made, then spoiled. |
+| Perishable | Good for so long after it was made, then spoiled. (Built.) |
+| Spoiled food | What perishable food is once its time has come: as heavy, made of rot, not food. (Built.) |
 | Carcass | What an animal's body is once it dies: something to butcher. |
 | Stall | Where a seller sets out goods on market day, with its posted prices. |
 | Posted price | A seller's written price for a kind of goods, read by buyers. |
@@ -370,6 +389,20 @@ New, and entered in the glossary with this document:
   scent, or a wounded animal that runs further and heals would make it
   harder still. And a hunter that has shot goes on uncrouched for up to
   twenty minutes (`hidden` is having crouched lately, not hiding now).
+- **What becomes of spoiled food.** It stays where it spoiled: in a
+  larder, beside the food, for good. Nobody throws it out, and nothing
+  rots it away. Clearing out the larder is a chore with no goal yet;
+  spoiled food that rots to nothing over weeks would be a second closed
+  form, after the first.
+- **Meat merged spoils with the oldest.** A larder's venison is one
+  stack, and a stack spoils whole, so a fresh deer's meat put in with
+  three-day-old meat spoils the next day. Keeping each day's meat apart
+  (stacks that merge only when made the same day) would be truer, but
+  then a condition on "forty kilograms of venison" reads one stack, and
+  the hunters' would never hold. Eating the oldest first is the
+  household's answer, and it isn't modelled.
+- **Carcasses keep.** A carcass left unbutchered never spoils; only its
+  meat does. A carcass that spoils is perishing on a body, not food.
 - **What a stack is seen as.** A stack's count isn't perceived, only its
   mass, so a condition on a count never holds of what an agent knows.
   The woodcutters' "past three thousand pieces" was one, never done; it

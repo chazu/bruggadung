@@ -1,10 +1,10 @@
-// Generated from Triangle content e2f34a9e01e8e0c6: do not edit. Type IDs are valid
+// Generated from Triangle content 34a4869e235b6788: do not edit. Type IDs are valid
 // only for this content; regenerate when it changes.
 package lab
 
 import tri "../../triangle/odin/triangle"
 
-CONTENT_HASH :: 0xe2f34a9e01e8e0c6
+CONTENT_HASH :: 0x34a4869e235b6788
 
 // Combustor, from #Combustor
 Combustor :: struct {
@@ -16,8 +16,12 @@ Combustor :: struct {
 // Food, from #Food
 Food :: struct {
 	cooking: i64,    // int, in quanta of 1; content, saved, inspect
+	keepsFor: i64,    // time, in quanta of 1ms; content, saved, inspect
+	mealKeepsFor: i64,    // time, in quanta of 1ms; content, saved, inspect
 	nourishment: i64,    // int, in quanta of 1; content, saved, proposable, inspect
 	raw: bool,    // bool; content, saved, proposable, inspect, perceive(sight)
+	spoiled: cstring,    // text; content, saved, inspect
+	spoilsAt: i64,    // time, in quanta of 1ms; saved, proposable, inspect
 }
 
 // FuelContainer, from #FuelContainer
@@ -389,78 +393,79 @@ Fastener :: struct {
 }
 
 // #ActivityStatus
-ACTIVITYSTATUS_ABORTED :: 723
-ACTIVITYSTATUS_COMPLETED :: 724
-ACTIVITYSTATUS_EXHAUSTED :: 725
-ACTIVITYSTATUS_FAILED :: 726
-ACTIVITYSTATUS_RUNNING :: 727
-ACTIVITYSTATUS_SUSPENDED :: 728
+ACTIVITYSTATUS_ABORTED :: 727
+ACTIVITYSTATUS_COMPLETED :: 728
+ACTIVITYSTATUS_EXHAUSTED :: 729
+ACTIVITYSTATUS_FAILED :: 730
+ACTIVITYSTATUS_RUNNING :: 731
+ACTIVITYSTATUS_SUSPENDED :: 732
 
 // #Tie
-TIE_EMPLOY :: 831
-TIE_FRIEND :: 832
-TIE_KIN :: 833
-TIE_SWORN :: 834
+TIE_EMPLOY :: 836
+TIE_FRIEND :: 837
+TIE_KIN :: 838
+TIE_SWORN :: 839
 
 // #ClaimKind
-CLAIMKIND_CUSTODY :: 730
-CLAIMKIND_OWNERSHIP :: 731
-CLAIMKIND_RESERVATION :: 732
+CLAIMKIND_CUSTODY :: 734
+CLAIMKIND_OWNERSHIP :: 735
+CLAIMKIND_RESERVATION :: 736
 
 // #Penalty
-PENALTY_FINE :: 817
-PENALTY_ARREST :: 850
-PENALTY_CONFISCATE :: 851
+PENALTY_FINE :: 822
+PENALTY_ARREST :: 855
+PENALTY_CONFISCATE :: 856
 
 // #Wrong
-WRONG_ANOTHERS :: 842
-WRONG_UNAUTHORIZED :: 843
+WRONG_ANOTHERS :: 847
+WRONG_UNAUTHORIZED :: 848
 
 // #Material
-MATERIAL_CLOTH :: 799
-MATERIAL_EARTH :: 800
-MATERIAL_FOOD :: 801
-MATERIAL_LEATHER :: 802
-MATERIAL_GRAIN :: 804
-MATERIAL_RUBBER :: 805
-MATERIAL_STONE :: 806
-MATERIAL_TURNIP :: 807
-MATERIAL_FLESH :: 853
-MATERIAL_BRASS :: 855
-MATERIAL_IRON :: 856
-MATERIAL_PAPER :: 857
-MATERIAL_STEEL :: 858
-MATERIAL_BIRCH :: 860
-MATERIAL_OAK :: 861
+MATERIAL_CLOTH :: 803
+MATERIAL_EARTH :: 804
+MATERIAL_FOOD :: 805
+MATERIAL_LEATHER :: 806
+MATERIAL_GRAIN :: 808
+MATERIAL_ROT :: 809
+MATERIAL_RUBBER :: 810
+MATERIAL_STONE :: 811
+MATERIAL_TURNIP :: 812
+MATERIAL_FLESH :: 858
+MATERIAL_BRASS :: 860
+MATERIAL_IRON :: 861
+MATERIAL_PAPER :: 862
+MATERIAL_STEEL :: 863
+MATERIAL_BIRCH :: 865
+MATERIAL_OAK :: 866
 
 // "flesh" | "metal" | "natural" | "paper" | "wood"
-BODY_SURFACE_NATURAL :: 546
-BODY_SURFACE_FLESH :: 853
-BODY_SURFACE_BRASS :: 855
-BODY_SURFACE_IRON :: 856
-BODY_SURFACE_PAPER :: 857
-BODY_SURFACE_STEEL :: 858
-BODY_SURFACE_BIRCH :: 860
-BODY_SURFACE_OAK :: 861
+BODY_SURFACE_NATURAL :: 549
+BODY_SURFACE_FLESH :: 858
+BODY_SURFACE_BRASS :: 860
+BODY_SURFACE_IRON :: 861
+BODY_SURFACE_PAPER :: 862
+BODY_SURFACE_STEEL :: 863
+BODY_SURFACE_BIRCH :: 865
+BODY_SURFACE_OAK :: 866
 
 // #Colour
-COLOUR_BLUE :: 735
-COLOUR_BLACK :: 737
-COLOUR_BROWN :: 738
-COLOUR_GREEN :: 739
-COLOUR_GREY :: 740
-COLOUR_NAVY :: 741
-COLOUR_ORANGE :: 742
-COLOUR_PURPLE :: 743
-COLOUR_RED :: 744
-COLOUR_YELLOW :: 745
-COLOUR_BEIGE :: 767
-COLOUR_WHITE :: 795
+COLOUR_BLUE :: 739
+COLOUR_BLACK :: 741
+COLOUR_BROWN :: 742
+COLOUR_GREEN :: 743
+COLOUR_GREY :: 744
+COLOUR_NAVY :: 745
+COLOUR_ORANGE :: 746
+COLOUR_PURPLE :: 747
+COLOUR_RED :: 748
+COLOUR_YELLOW :: 749
+COLOUR_BEIGE :: 771
+COLOUR_WHITE :: 799
 
 // "bare" | "ripe" | "sown"
-PLOT_STANDS_BARE :: 372
-PLOT_STANDS_RIPE :: 596
-PLOT_STANDS_SOWN :: 624
+PLOT_STANDS_BARE :: 374
+PLOT_STANDS_RIPE :: 599
+PLOT_STANDS_SOWN :: 627
 
 // The field registry: what code needs to read and write any component
 // generically.
@@ -497,8 +502,12 @@ COMPONENT_COUNT :: 47
 }
 @(rodata) Food_fields := [?]Field_Info{
 	{"cooking", offset_of(Food, cooking), VALUE_QUANTITY, "int", "content, saved, inspect"},
+	{"keepsFor", offset_of(Food, keepsFor), VALUE_QUANTITY, "time", "content, saved, inspect"},
+	{"mealKeepsFor", offset_of(Food, mealKeepsFor), VALUE_QUANTITY, "time", "content, saved, inspect"},
 	{"nourishment", offset_of(Food, nourishment), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
 	{"raw", offset_of(Food, raw), VALUE_BOOL, "bool", "content, saved, proposable, inspect, perceive(sight)"},
+	{"spoiled", offset_of(Food, spoiled), VALUE_TEXT, "text", "content, saved, inspect"},
+	{"spoilsAt", offset_of(Food, spoilsAt), VALUE_QUANTITY, "time", "saved, proposable, inspect"},
 }
 @(rodata) Fuel_Container_fields := [?]Field_Info{
 	{"fuel", offset_of(Fuel_Container, fuel), VALUE_QUANTITY, "mass", "content, saved, proposable, inspect, perceive(sight)"},
@@ -781,7 +790,7 @@ COMPONENT_COUNT :: 47
 
 COMPONENTS := [COMPONENT_COUNT + 1]Component_Info{
 	{"Combustor", "#Combustor", size_of(Combustor), 3, &Combustor_fields[0]},
-	{"Food", "#Food", size_of(Food), 3, &Food_fields[0]},
+	{"Food", "#Food", size_of(Food), 7, &Food_fields[0]},
 	{"FuelContainer", "#FuelContainer", size_of(Fuel_Container), 1, &Fuel_Container_fields[0]},
 	{"GasStore", "#GasStore", size_of(Gas_Store), 8, &Gas_Store_fields[0]},
 	{"Hungry", "#Hungry", size_of(Hungry), 7, &Hungry_fields[0]},

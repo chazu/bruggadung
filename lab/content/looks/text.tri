@@ -22,6 +22,7 @@ text_tap:         #Glyph & { theme: "text", look: "tap", char: "u" } @family(gly
 text_stack:       #Glyph & { theme: "text", look: "stack", char: "*" } @family(glyphs)
 text_water_store: #Glyph & { theme: "text", look: "water.store", char: "w" } @family(glyphs)
 text_food:        #Glyph & { theme: "text", look: "food", char: "%" } @family(glyphs)
+text_spoiled:     #Glyph & { theme: "text", look: "food.spoiled", char: "~" } @family(glyphs)
 text_tree:        #Glyph & { theme: "text", look: "tree", char: "T" } @family(glyphs)
 text_log:         #Glyph & { theme: "text", look: "log", char: "-" } @family(glyphs)
 text_tool:        #Glyph & { theme: "text", look: "tool", char: "/" } @family(glyphs)

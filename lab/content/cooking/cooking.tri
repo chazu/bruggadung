@@ -28,6 +28,8 @@
 //             household's people its owner) its owners know when they see
 //             it, and take from their own first, then what they are used to
 //             (habit, AGENCY.md §8), then the nearest.
+// - perishing: a meal keeps two days from when it is cooked, whatever it
+//             was made of, then spoils (perishing/); raw grain keeps.
 // - code:     effect_cook (src/act_actions.odin); the scenario stocks the
 //             larders and undertakes the morning's commitment
 //             (src/scenario_village.odin).

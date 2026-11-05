@@ -892,7 +892,8 @@ effect_eat :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) ->
 
 
 /* Cooking (content/cooking/): at a lit stove, the food is no longer raw,
- * and nourishes by what cooking adds to it, to 100 at most. */
+ * and nourishes by what cooking adds to it, to 100 at most; a meal now, it
+ * spoils its `mealKeepsFor` from now (content/perishing/). */
 @(private = "file")
 effect_cook :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
 	lit, raw, nourishment, cooking: i64
@@ -907,6 +908,10 @@ effect_cook :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -
 	world_get_field(world, "Food.cooking", a.roles[.Item], &cooking)
 	proposal_group_set_of_to(g, "Food.raw", whole(a.roles[.Item]), 0)
 	proposal_group_set_of_to(g, "Food.nourishment", whole(a.roles[.Item]), min(nourishment + cooking, 100))
+	/* a meal keeps so long from now, whatever it was made of (perishing/) */
+	if keeps: i64; world_get_field(world, "Food.mealKeepsFor", a.roles[.Item], &keeps) && keeps > 0 {
+		proposal_group_set_of_to(g, "Food.spoilsAt", whole(a.roles[.Item]), world_time(world).ms + keeps)
+	}
 	return ""
 }
 
@@ -2640,13 +2645,21 @@ die :: proc(world: ^World, g: ^Proposal_Group, body: Entity_ID) {
 	for e in held[:world_entities_at(world, body, .Held_By, raw_data(held[:]), len(held))] {
 		proposal_group_move_to(g, whole(e), at)
 	}
-	/* the body's mass is its remains': carved from it, none made or lost */
 	blueprint := world_text_field(world, "Agent.remains", body)
-	remains := proposal_group_create(g, blueprint if blueprint != nil && blueprint != "" else "corpse", "remains", at)
-	proposal_group_relate(g, .Split_From, whole(remains), whole(body))
-	proposal_group_set_of_to(g, "Body.mass", whole(remains), world_mass_of(world, body))
-	proposal_group_set_of_to(g, "Body.mass", whole(body), 0)
-	proposal_group_destroy(g, whole(body), "died")
+	become(world, g, body, blueprint if blueprint != nil && blueprint != "" else "corpse", "died")
+}
+
+
+/* A thing that becomes another (a body its remains, food spoiled food): the
+ * other made where it was, as heavy, its mass carved from it, none made or
+ * lost; the thing ended, `why`. The new one's handle. */
+become :: proc(world: ^World, g: ^Proposal_Group, e: Entity_ID, blueprint: cstring, why: cstring) -> Entity_ID {
+	after := proposal_group_create(g, blueprint, why, world_location_of(world, e))
+	proposal_group_relate(g, .Split_From, whole(after), whole(e))
+	proposal_group_set_of_to(g, "Body.mass", whole(after), world_mass_of(world, e))
+	proposal_group_set_of_to(g, "Body.mass", whole(e), 0)
+	proposal_group_destroy(g, whole(e), why)
+	return after
 }
 
 

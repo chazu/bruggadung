@@ -35,8 +35,8 @@ package lab
  * eaten there by 14:30, every plot sown by 15:00 the first day, home by
  * 21:00, asleep in their own bed at 02:00, and the game bedded down;
  * and at the end, each household's larder emptied by what it ate, meat in
- * the hunters' larder, the herds alive and within their bounds, and
- * nobody's reserves fallen.
+ * the hunters' larder, the herds alive and within their bounds, no food
+ * past its time still food, and nobody's reserves fallen.
  */
 
 import "core:fmt"
@@ -131,6 +131,7 @@ Village :: struct {
 	air:          ^Atmosphere,       // burns what is in the stoves
 	farming:      ^Farming,          // ripens the crops
 	game:         ^Game,             // keeps the herds up
+	perishing:    ^Perishing,        // spoils meat and meals
 	people:       [dynamic]Villager,
 	larders:      [4]Entity_ID,      // each household's, by its index
 	stoves:       [4]Entity_ID,
@@ -163,6 +164,7 @@ village_init_with_world :: proc(world: ^World, committer: ^Committer) -> ^Villag
 	self.air        = atmosphere_init_with_world(world)
 	self.farming    = farming_init_with_world(world)
 	self.game       = game_init_with_world(world)
+	self.perishing  = perishing_init_with_world(world)
 	self.scheduler  = scheduler_init_with_world(world, committer)
 	/* a diagnostic event is kept a day, then counted (KNOWLEDGE.md decision 21) */
 	world_set_history_window(world, 86400000)
@@ -171,6 +173,7 @@ village_init_with_world :: proc(world: ^World, committer: ^Committer) -> ^Villag
 	scheduler_add_domain(self.scheduler, atmosphere_as_domain(self.air))
 	scheduler_add_domain(self.scheduler, farming_as_domain(self.farming))
 	scheduler_add_domain(self.scheduler, game_as_domain(self.game))
+	scheduler_add_domain(self.scheduler, perishing_as_domain(self.perishing))
 	/* the herds of the eastern woods, kept up from the east edge (VILLAGE.md
 	 * decision 7): six deer at most, four hares, one a quarter-day */
 	edge := [][2]i32{{159, 20}, {159, 45}, {159, 70}, {159, 90}}
@@ -195,6 +198,7 @@ village_dealloc :: proc(self: ^Village) {
 	release(self.air)
 	release(self.farming)
 	release(self.game)
+	release(self.perishing)
 	delete(self.people)
 	for list in self.plots do delete(list)
 	for r in self.results do delete(r)
@@ -509,6 +513,22 @@ village_run :: proc(self: ^Village) {
 	deer, hares := game_count(self.world, "deer"), game_count(self.world, "hare")
 	village_check(self, deer >= 1 && deer <= 6 && hares >= 1 && hares <= 4, "the herds neither vanished nor outgrew the woods",
 	              fmt.tprintf("%d deer, %d hares", deer, hares))
+	/* food past its time is spoiled, never food still (VILLAGE.md decision 8) */
+	stale := make([dynamic]string, context.temp_allocator)
+	spoiled := 0
+	foods := world_store_for_kind(self.world, world_kind_named(self.world, "Food"))
+	for i: uint = 0; i < store_count(foods); i += 1 {
+		food := (^Food)(store_record_at_index(foods, i))
+		if at := perishing_spoils_at(food, world_time(self.world).ms); at > 0 && at <= world_time(self.world).ms {
+			append(&stale, fmt.tprintf("%d", store_entity_at_index(foods, i)))
+		}
+	}
+	bodies := world_store_for_kind(self.world, world_kind_named(self.world, "Body"))
+	for i: uint = 0; i < store_count(bodies); i += 1 {
+		if info := world_info(self.world, store_entity_at_index(bodies, i)); info != nil && info.blueprint == "spoiled_food" do spoiled += 1
+	}
+	village_check(self, len(stale) == 0, fmt.tprintf("no food past its time is food still (%d spoiled)", spoiled),
+	              fmt.tprintf("not: %s", strings.join(stale[:], ", ", context.temp_allocator)))
 	hungry := make([dynamic]string, context.temp_allocator)
 	for v in self.people {
 		if reserves(hungry_of(self.world, v.id), world_time(self.world).ms) < 100 do append(&hungry, fmt.tprintf("%d", v.id))

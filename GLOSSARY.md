@@ -866,8 +866,14 @@ REALITY.md, PRF = PERFORMANCE.md, TER = TERRAIN.md, TES = TESSERA.md, VIL = VILL
 - **Seed to sow**: `#Seed`, a stack of what sows a crop (seed grain,
   turnip seed), a unit to a tile, **kept back** in a larder. See *Words
   with more than one sense*. (VIL d5)
-- **Perishable**: good for so long after it was made, then spoiled. (VIL
-  d8)
+- **Perishable**: good for so long after it was made, then spoiled. Food
+  is perishable when it keeps for some time (`keepsFor`: meat, three
+  days); a meal keeps its own (`mealKeepsFor`, two days) from when it is
+  cooked. Grain and turnips keep. (VIL d8)
+- **Spoiled food**: what perishable food is once its time has come: a
+  thing as heavy, where it was, made of **rot**, not food, so nobody eats
+  it. A stack spoils whole; two merged spoil when the older would have.
+  (VIL d8)
 - **Carcass**: what an animal's body is once it has died, to butcher
   into meat (its `yields`, so many cuts) and a hide. (VIL d7)
 - **Remains**: what any body is once its injury reaches 100 and it dies,
