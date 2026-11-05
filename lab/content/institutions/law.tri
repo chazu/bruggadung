@@ -87,7 +87,7 @@ arrest: #Operation & {
 // Flee: run from someone up to four tiles off, straight away from them,
 // four tiles in four seconds (INSTITUTIONS.md decision 7: the arrested
 // complies, resists, or flees, as its own agency decides; hunting/'s
-// animals run from people). If they are gone meanwhile, further than that,
+// animals bolt further, faster). If they are gone meanwhile, further than that,
 // there is nothing left to flee: it fails, not to be resumed.
 flee: #Operation & {
     effect:   "flee"

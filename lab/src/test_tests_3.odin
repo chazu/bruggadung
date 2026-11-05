@@ -3769,6 +3769,7 @@ ALL_TESTS := [?]Test_Case{
 	{"death",                         test_death},
 	{"animals",                       test_animals},
 	{"bow",                           test_bow},
+	{"aim",                           test_aim},
 	{"butcher",                       test_butcher},
 	{"hunting_week",                  test_hunting_week},
 }

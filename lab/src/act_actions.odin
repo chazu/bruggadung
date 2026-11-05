@@ -2497,7 +2497,9 @@ effect_arrest :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group)
 }
 
 
-/* Fleeing: four tiles straight away from the one fled, on the map. */
+/* Fleeing: straight away from the one fled, as far as the operation runs
+ * (`run`, four tiles if it says none), on the map, and along its edge where
+ * straight away is off it. */
 @(private = "file")
 effect_flee :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
 	at: Location
@@ -2516,9 +2518,20 @@ effect_flee :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -
 	if dx == 0 && dy == 0 {
 		dx = 1
 	}
-	for k = 0; k < 4 && world_is_tile_x(world, at.x + dx, at.y + dy, at.level); k += 1 {
-		at.x += dx
-		at.y += dy
+	/* along an edge, when the way straight off is off the map */
+	run := operation_run(world, a.operation)
+	for k = 0; k < int(run); k += 1 {
+		switch {
+		case world_is_tile_x(world, at.x + dx, at.y + dy, at.level):
+			at.x += dx
+			at.y += dy
+		case dx != 0 && world_is_tile_x(world, at.x + dx, at.y, at.level):
+			at.x += dx
+		case dy != 0 && world_is_tile_x(world, at.x, at.y + dy, at.level):
+			at.y += dy
+		case:
+			k = int(run)
+		}
 	}
 	proposal_group_move_to(g, whole(a.roles[.Actor]), at)
 	tread(world, at, g)
@@ -2547,15 +2560,31 @@ effect_crouch :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group)
 }
 
 
-/* A shot (content/hunting/): the game within range is wounded as the bow
- * wounds, and knows who shot; the shot gives the hunter away. */
+/* A shot (content/hunting/): it strikes by a seeded draw, as the bow aims
+ * at that many tiles and the hunter's stalking; struck, the game is
+ * wounded as the bow wounds, and knows who shot. Struck or missed, the
+ * shot gives the hunter away. */
 @(private = "file")
 effect_shoot :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
-	wounds: i64
+	wounds, aim, spread, stalking: i64
+	here, there: Location
 	game := a.roles[.Destination]
 	if game == a.roles[.Actor] do return "one cannot shoot oneself"
 	if !world_get_field(world, "Bow.wounds", a.roles[.Item], &wounds) do return "it shoots with no bow"
+	world_get_field(world, "Bow.aim", a.roles[.Item], &aim)
+	world_get_field(world, "Bow.spread", a.roles[.Item], &spread)
+	world_get_field(world, "Agent.stalking", a.roles[.Actor], &stalking)
+	if !know_ground_tile(world, a.roles[.Actor], &here) || !know_ground_tile(world, game, &there) do return "it has nothing to shoot at"
 	proposal_group_set_of_to(g, "Agent.hiding", whole(a.roles[.Actor]), 0)
+	/* the chance in a hundred: the bow's aim, less its spread each tile
+	 * beyond the first, in the hunter's hands; drawn, seeded by the shot */
+	tiles  := i64(max(abs(here.x - there.x), abs(here.y - there.y), 1))
+	chance := max(aim - spread * (tiles - 1), 0) * stalking / 100
+	state  := mix(world_seed(world) ~ mix(world_boundary(world) * 0x100 + u64(a.roles[.Actor])) ~ mix(u64(game)) ~ 0x73686f74)
+	if i64(next(&state) % 100) >= chance {
+		proposal_group_emit_subject_other_detail(g, "missed", whole(game), whole(a.roles[.Actor]), nil)
+		return ""
+	}
 	injure(world, g, game, a.roles[.Actor], wounds)
 	return ""
 }
@@ -2949,6 +2978,15 @@ effects := [?]Named_Effect{
 	{"crouch",    effect_crouch},
 	{"shoot",     effect_shoot},
 	{"butcher",   effect_butcher},
+}
+
+
+/* How far a flight carries, in tiles (content/actions.tri's `run`). */
+operation_run :: proc(world: ^World, op: cstring) -> i64 {
+	lo, hi: i64
+	tc := world_tri(world)
+	v  := tri.at(tc, tri.pattern(tc, op), "run")
+	return lo if v != nil && tri.node_interval(v, &lo, &hi) != 0 && lo == hi && lo >= 1 else 4
 }
 
 

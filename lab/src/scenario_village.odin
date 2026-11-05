@@ -33,7 +33,7 @@ package lab
  * worksite, or about its work: a woodcutter in the woods, or on its way
  * home with firewood; a hunter on the hunt), the meal
  * eaten there by 14:30, every plot sown by 15:00 the first day, home by
- * 21:00, asleep in their own bed at 02:00;
+ * 21:00, asleep in their own bed at 02:00, and the game bedded down;
  * and at the end, each household's larder emptied by what it ate, meat in
  * the hunters' larder, the herds alive and within their bounds, and
  * nobody's reserves fallen.
@@ -493,6 +493,9 @@ village_run :: proc(self: ^Village) {
 		}
 		village_check(self, len(cold) == 0, fmt.tprintf("night %d, 02:00: every stove has fuel in it", d + 1),
 		              fmt.tprintf("not: %s", strings.join(cold[:], ", ", context.temp_allocator)))
+		awake := village_game_awake(self)
+		village_check(self, len(awake) == 0, fmt.tprintf("night %d, 02:00: the game bedded down", d + 1),
+		              fmt.tprintf("not: %s", strings.join(awake[:], ", ", context.temp_allocator)))
 	}
 	village_check_larders(self)
 	/* the hunters' work: meat brought home; the game kept up (VILLAGE.md
@@ -512,6 +515,30 @@ village_run :: proc(self: ^Village) {
 	}
 	village_check(self, len(hungry) == 0, "nobody went without: everyone's reserves are full",
 	              fmt.tprintf("not: %s", strings.join(hungry[:], ", ", context.temp_allocator)))
+}
+
+
+/* The deer and hares not lying up (content/hunting/animals.tri's bed_down
+ * under way), by ID. */
+@(private = "file")
+village_game_awake :: proc(self: ^Village) -> [dynamic]string {
+	awake := make([dynamic]string, context.temp_allocator)
+	lying := make(map[Entity_ID]bool, context.temp_allocator)
+	running := u32(tri.type_named(world_tri(self.world), "\"running\""))
+	activities := world_store_for_kind(self.world, world_kind_named(self.world, "Activity"))
+	for i: uint = 0; i < store_count(activities); i += 1 {
+		a := (^Activity)(store_record_at_index(activities, i))
+		op := world_text_field(self.world, "Activity.operation", store_entity_at_index(activities, i))
+		if a.status == running && op != nil && op == "bed_down" do lying[Entity_ID(a.actorRef)] = true
+	}
+	agents := world_store_for_kind(self.world, world_kind_named(self.world, "Agent"))
+	for i: uint = 0; i < store_count(agents); i += 1 {
+		e := store_entity_at_index(agents, i)
+		info := world_info(self.world, e)
+		if info == nil || (info.blueprint != "deer" && info.blueprint != "hare") || e in lying do continue
+		append(&awake, fmt.tprintf("%d", e))
+	}
+	return awake
 }
 
 

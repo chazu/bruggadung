@@ -3183,15 +3183,28 @@ mind_due_now :: proc(context_: rawptr, agent: Entity_ID) -> i64 {
 
 
 /* An animal's mind (content/hunting/): made as it first perceives, its
- * instinct (`Agent.instinct`, a goal) undertaken all day, every day. nil
- * for an agent with none: a person's days are its commitments. */
+ * instinct (`Agent.instinct`, an #Instinct) undertaken: each goal it keeps
+ * over its hours, every day. Each window is undertaken a day early, so the
+ * one under way now (a night begun yesterday) is kept, and the rest open
+ * as their hours come. nil for an agent with none: a person's days are its
+ * commitments. */
 @(private = "file")
 agency_take_on_instinct :: proc(self: ^Agency, agent: Entity_ID) -> ^Motivation {
 	DAY :: i64(86400000)
-	goal := world_text_field(self.world, "Agent.instinct", agent)
-	if goal == nil || len(goal) == 0 || !world_is_live(self.world, agent) do return nil
-	if !agency_undertake_every_with(self, agent, goal, 0, DAY, "instinct", DAY, {}) do return nil
-	return agency_existing_mind_of(self, agent)
+	goal: [64]u8
+	name := world_text_field(self.world, "Agent.instinct", agent)
+	if name == nil || len(name) == 0 || !world_is_live(self.world, agent) do return nil
+	tc := world_tri(self.world)
+	took := false
+	for keeps := tri.at(tc, tri.pattern(tc, name), "keeps"); keeps != nil; keeps = tri.at(tc, keeps, "rest") {
+		kept := tri.at(tc, keeps, "first")
+		if kept == nil || !text_at(tc, kept, "goal", goal[:]) do break
+		from  := int_at(tc, kept, "from", 0)
+		until := int_at(tc, kept, "until", DAY)
+		if !agency_undertake_every_with(self, agent, cstr(goal[:]), from - DAY, until - DAY, "instinct", DAY, {}) do return nil
+		took = true
+	}
+	return agency_existing_mind_of(self, agent) if took else nil
 }
 
 

@@ -873,14 +873,23 @@ REALITY.md, PRF = PERFORMANCE.md, TER = TERRAIN.md, TES = TESSERA.md, VIL = VILL
 - **Remains**: what any body is once its injury reaches 100 and it dies,
   as heavy as it was: its blueprint's `remains`, a carcass for an animal,
   a **corpse** for a person. (VIL d7)
-- **Instinct**: the goal an animal keeps all day, every day, taken on as
-  it first perceives (a deer's: to roam). A person has none. (AG d21)
+- **Instinct**: the goals an animal keeps every day, each over its hours,
+  taken on as it first perceives (a grazer's: to roam from dawn to dusk,
+  bedded down the night). A person has none. (AG d21)
+- **Bolt**: an animal's flight from a person in sight: a dozen tiles in
+  three seconds, out of its sight, faster than anyone runs after it. How
+  far a flight carries is its operation's `run`. (VIL d7)
 - **Herd**: the game of a kind the woods hold, kept up to so many by
   animals coming in at the woods' edge (a scenario's input). (VIL d7)
 - **Range**: how far an operation's other roles may be from its actor, in
   tiles: 1, beside it; a shot's 3. (AG d21)
 - **Lie in wait**: a hunter's way of looking for game: crouched, bow in
   hand, a quarter-hour in one place, between short walks. (VIL d7)
+- **Aim**: the chance in a hundred that a bow's shot from beside its mark
+  strikes, in a master's hands; less its **spread** for each tile
+  further, and a hundredth of it for each point of the hunter's
+  `stalking`. A shot that misses gives the hunter away all the same.
+  (VIL d7)
 - **Stall**: where a seller sets out goods on **market day** (every fourth
   day, on the green), with its **posted prices**: written records of what
   it asks. (VIL d9)

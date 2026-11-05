@@ -4,10 +4,12 @@
 // Cut points:
 // - full:     a hunter crouches, hiding (things.tri's `hiding`: seen only
 //             from beside it), and so stalks game it knows of to within
-//             three tiles, and shoots: a wound of the bow's `wounds` to it,
-//             and the shot gives the hunter away. Struck, the animal gets
-//             clear (harm/), and runs from the hunter it now sees
-//             (animals.tri).
+//             three tiles, and shoots. The shot strikes by a seeded draw:
+//             the bow's `aim` from beside, less its `spread` for each tile
+//             further, in the hunter's `stalking` (a hundredth of it each).
+//             Struck, the animal takes a wound of the bow's `wounds`, gets
+//             clear (harm/), and runs from the hunter, whom the shot,
+//             struck or missed, gives away (animals.tri).
 // - reduced:  the same, decided on the cadence's beat; a shot is instant.
 // - abstract: as reduced. Game taken as a yield of the woods, below
 //             reduced, is open (VILLAGE.md decision 3).
@@ -20,8 +22,9 @@
 
 package hunting
 
-// A hunter's skill: as a rule's, how keenly it reads game in sight (a
-// non-hunter's is 0).
+// A hunter's skill: as a rule's, how keenly it reads game in sight; and
+// how surely it shoots, a hundredth of the bow's aim each (a non-hunter's
+// is 0: it never strikes).
 #Agent: {
     stalking: *0 | int & >=0 & <=100 @field(content, saved, inspect)
 }
@@ -29,16 +32,23 @@ package hunting
 // The tests' hunter (src/test_hunting.odin), who needn't eat.
 huntsman: #Agent & { material: "flesh", mass: 70kg, hands: 2, coat: "grey", trade: "hunter", stalking: 100 }
 
-// A bow: what a shot from it wounds.
+// A bow: what a shot from it wounds; the chance in a hundred that a shot
+// from beside strikes, in a master's hands (`aim`), and how much less for
+// each tile further (`spread`).
 #Bow: #Body & {
     @component(Bow)
     wounds: *40 | int & >=1 & <=100 @field(content, saved, inspect)
+    aim:    *80 | int & >=0 & <=100 @field(content, saved, inspect)
+    spread: *25 | int & >=0 & <=100 @field(content, saved, inspect)
 }
 
 bow_seen: #Seen & { kindOf: "#Bow" } @family(seen)
 bow_look: #Look & { kindOf: "#Bow", look: "tool.bow" } @family(looks)
 
 bow: #Bow & { material: "oak", mass: 1kg }
+
+// The tests' bow that never misses.
+sure_bow: #Bow & { material: "oak", mass: 1kg, aim: 100, spread: 0 }
 
 // Crouch, bow in hand, to stalk: from now on, hiding, until a shot gives it
 // away. A second.

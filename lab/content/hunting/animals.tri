@@ -1,14 +1,17 @@
-// Hunting, the animals: deer and hares, agents with no hands and two goals,
-// to roam their range and keep away from people (VILLAGE.md decision 7,
-// slice 7).
+// Hunting, the animals: deer and hares, agents with no hands and few
+// goals: to roam their range by day, bed down by night, and keep away from
+// people (VILLAGE.md decision 7, slice 7).
 //
 // Cut points:
-// - full:     an animal roams: it wanders to a spot of woodland within ten
-//             tiles and grazes there an hour, again and again, all day (a
-//             kept goal, undertaken for it as it comes into the world).
-//             One that sees a person (an #Agent that is no animal) in sight
-//             now holds it a #Danger, and runs off from it, out of sight;
-//             seen again, it runs again. A hunter hiding is seen only from
+// - full:     an animal keeps its instinct's goals, each over its hours,
+//             every day (undertaken for it as it comes into the world). By
+//             day it roams: it wanders to a spot of woodland within ten
+//             tiles and grazes there an hour, again and again (a kept
+//             goal). By night it beds down where it is, two hours at a
+//             time (kept too). One that sees a person (an #Agent that is
+//             no animal) in sight now holds it a #Danger, and bolts from
+//             it, a dozen tiles in three seconds, out of sight; seen
+//             again, it bolts again. A hunter hiding is seen only from
 //             beside it (things.tri's `hiding`). Struck, it gets clear
 //             (harm/).
 // - reduced:  the same, decided on the cadence's beat.
@@ -20,23 +23,37 @@
 // - knowledge: the #Danger is drawn only by an agent with the skill `wary`
 //             (an animal's; a person's is 0), from a #Sighted premise
 //             (knowledge.tri), weighed at every perception.
-// - code:     the #Wander step (src/agency_agency.odin); the #Sighted
-//             premise (src/know_knowledge_1.odin); the herd kept up by
-//             animals coming in at the woods' edge (src/domains_hunting.odin).
+// - code:     an instinct taken on, and the #Wander step
+//             (src/agency_agency.odin); the #Sighted premise
+//             (src/know_knowledge_1.odin); a bolt is effect_flee, carried
+//             as far as its `run` (src/act_actions.odin); the herd kept up
+//             by animals coming in at the woods' edge
+//             (src/domains_hunting.odin).
 
 package hunting
 
 // An animal's instincts: as a rule's skill, how keenly it reads people as
-// danger (a person's is 0); and the goal it keeps all day, every day,
-// which agency takes on for it when it first perceives (a person's is
-// none: its days are its commitments).
+// danger (a person's is 0); and its days, an #Instinct, which agency takes
+// on for it when it first perceives (a person's is none: its days are its
+// commitments).
 #Agent: {
     wary:     *0 | int & >=0 & <=100 @field(content, saved, inspect)
     instinct: *"" | text             @field(content, saved, inspect)
 }
 
-// An animal: wary, roaming, and no hands.
-#Animal: #Agent & { hands: 0, wary: *100 | int, instinct: *"roam" | text }
+// An instinct: the goals an animal keeps, each from `from` until `until`
+// (past midnight, more than a day), every day.
+#Keeps:    { goal: text, from: time & >=0ms & <=1d, until: time & >=0ms & <=2d }
+#Instinct: { keeps: [...#Keeps] }
+
+// A grazer's day: roaming from dawn to dusk, bedded down the night.
+grazing: #Instinct & {
+    keeps: [{ goal: "roam", from: 5h, until: 21h },
+            { goal: "bedded_down", from: 21h, until: 29h }]
+} @family(instincts)
+
+// An animal: wary, grazing, and no hands.
+#Animal: #Agent & { hands: 0, wary: *100 | int, instinct: *"grazing" | text }
 #Deer:   #Animal & {}
 #Hare:   #Animal & {}
 
@@ -69,7 +86,7 @@ wary_of_people: #Rule & {
 
 keep_away: #Goal & {
     title:  "keep away"
-    done:   #Did & { did: "flee" }
+    done:   #Did & { did: "bolt" }
     arises: { finding: "#Danger", slot: "danger", lapse: 1h, of: #Agent }
     worth:  [#Flat & { value: 60 }]
 } @family(goals)
@@ -79,10 +96,26 @@ run_off: #Method & {
     goal:  "keep_away"
     rank:  1
     pre:   { find: ["danger"], match: #Wariness & { danger: #Agent } }
-    steps: [#Do & { op: "flee", object: "danger" }]
+    steps: [#Do & { op: "bolt", object: "danger" }]
 } @family(methods)
 
-// Roaming: through the day, somewhere in the woods, then grazing there.
+// Bolting: a flight from one within sight, a dozen tiles in three seconds,
+// as fast as no person runs, and out of its sight.
+bolt: #Operation & {
+    effect:   "flee"
+    duration: 3s
+    hard:     "fail"
+    range:    4
+    run:      12
+    uses:     ["legs"]
+    roles: {
+        actor: #Animal & { place: #OnTile }
+        item:  #Agent
+    }
+} @family(operations)
+
+// Roaming: through the day, somewhere in the woods, then grazing there;
+// and the night, bedded down.
 #Roaming: #Frame & {}
 
 roam: #Goal & {
@@ -99,6 +132,32 @@ wander_and_graze: #Method & {
     sequence: true
     steps:    [#Wander & { radius: 10, over: "woodland" }, #Do & { op: "graze" }]
 } @family(methods)
+
+// The night: bedded down where it is, two hours at a time, as anyone
+// rests, till the night is over (kept, as roaming is by day). A person in
+// sight, or a blow, wakes it: it bolts, and beds down again.
+bedded_down: #Goal & {
+    title: "bed down"
+    done:  #Did & { did: "bed_down", lately: 121min }
+    kept:  true
+} @family(goals)
+
+lie_up: #Method & {
+    title: "lie up"
+    goal:  "bedded_down"
+    rank:  1
+    pre:   { find: [], match: #Roaming & {} }
+    steps: [#Do & { op: "bed_down" }]
+} @family(methods)
+
+bed_down: #Operation & {
+    effect:   "rest"
+    duration: 2h
+    uses:     ["legs"]
+    roles: {
+        actor: #Animal & { place: #OnTile }
+    }
+} @family(operations)
 
 // Grazing: an hour in one spot, resting.
 graze: #Operation & {

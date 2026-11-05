@@ -4895,3 +4895,30 @@ hunt in the village.
   only in those.
 
 133 tests, 3986 checks.
+
+### After the slice: a harder hunt, and animals that sleep
+
+- **A shot can miss** (hunting/hunting.tri): it strikes by a seeded draw,
+  the bow's `aim` from beside (80) less its `spread` (25) for each tile
+  further, in the hunter's `stalking`. A farmhand, with none, never
+  strikes. Struck or missed, the shot gives the hunter away. test_aim:
+  a hundred shots from each distance; test_bow shoots a `sure_bow`.
+- **Animals bolt**: their own `bolt` (a flight a dozen tiles in three
+  seconds; an operation's new `run`, actions.tri, how far a flight
+  carries), where they fled four tiles at a walk, still in sight, and the
+  hunter walked up and shot again, seven times in a minute. A flight
+  straight into the map's edge stayed put; it slides along it now.
+- **Animals sleep**: an `instinct` names an `#Instinct`, the goals an
+  animal keeps each over its hours (AGENCY.md decision 21). A grazer's:
+  roam 05:00 to 21:00, bedded down 21:00 to 05:00, two hours at a time
+  (kept, so it lies up again after a bolt, and stops near dawn). Each
+  window is taken on a day early, so a night under way is kept.
+  test_animals checks a night, a day, and the next night; the village
+  checks the game bedded down at 02:00 each night.
+- test_hunting_week: two deer home, from 33 shots, 236 bolts; the herd
+  between 3 and 4 of its 4. The village: 29 checks, 13.1 s at
+  `-o:speed` (from 11.7 s): 34,170 boundaries, the bolts and the night's
+  lying up. Only the village's hashes change.
+- Not done: tiredness from hours awake (AGENCY.md open question 10).
+
+134 tests, 3994 checks.

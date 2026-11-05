@@ -86,6 +86,9 @@
     // how far its other roles may be from the actor, in tiles: 1, beside it
     // (a shot, further: hunting/)
     range:            *1 | int & >=1 & <=8
+    // how far a flight carries, in tiles (flee, law/; an animal's bolt,
+    // hunting/)
+    run:              *4 | int & >=1 & <=16
     stages:           [...#Stage]
     uses:             [...#Provider]
     attention:        *0 | int & >=0 & <=100

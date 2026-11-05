@@ -123,16 +123,24 @@ Out of scope here, except where they touch agency:
     A walk is not a journey: that word is kept for travel by any means,
     in legs, which isn't built (GLOSSARY.md).
 21. **Animals are agents with an instinct, and the dead have no mind**
-    (VILLAGE.md decision 7). An agent whose `instinct` names a goal (an
-    animal's: hunting/'s `roam`) takes it on, all day every day, as it
-    first perceives; a person has none, its days being its commitments.
-    Roaming is a kept goal done "lately" (`#Did`'s `lately`: an activity
-    begun no longer ago than that), so done, it is due again once that
-    lapses, and the agent is woken then. A `#Wander` step walks to a
+    (VILLAGE.md decision 7). An agent whose `instinct` names an
+    `#Instinct` (an animal's: hunting/'s `grazing`) takes on its goals,
+    each over its hours every day, as it first perceives: commitments, as
+    a person's are, but its kind's, not undertaken for it by a scenario. A
+    person has none, its days being its commitments. A grazer roams from
+    05:00 to 21:00 and is bedded down from 21:00 to 05:00. Each window is
+    taken on a day early, so the one under way (a night begun yesterday)
+    is kept. Roaming and bedding down are kept goals done "lately"
+    (`#Did`'s `lately`: an activity begun no longer ago than that), so
+    done, each is due again once that lapses, and the agent is woken
+    then: an hour's grazing, two hours lying up, so neither runs far past
+    its window's end. A `#Wander` step walks to a
     tile of a kind of ground within a radius, chosen from the agent and
     the time, the walk not given up for having seen it. An operation's
     `range` (actions.tri; a shot's 3, fleeing's 4) is how far its other
-    roles may be: the agent walks only until within it. A mind whose
+    roles may be: the agent walks only until within it. Its `run` is how
+    far a flight carries (fleeing's 4; an animal's bolt, 12), along the
+    map's edge where straight away is off it. A mind whose
     agent is dead is let go at the next boundary.
 
 ## Terms
@@ -727,3 +735,12 @@ a body need, and consequences flowing through knowledge.
    thresholds.
 9. **Pressure generators.** A storyteller for pacing is outside agency, but
    we need to design one eventually.
+10. **Tiredness from being awake.** Fatigue (§6) rises only with effort
+    (an operation's `exertion`) and with freezing or smothering, and a
+    rest clears it. Nothing tires an agent for having been awake, so
+    nobody sleeps because it is tired: villagers sleep because of their
+    nightly commitment, animals because of their instinct's hours. A
+    drive that rises with hours awake, felt as the `tired` need and
+    weighed against commitments, would let a villager who worked through
+    the night sleep into the morning, and a commitment to sleep could
+    give way to it. Until then, a sleep's length and hour are content.

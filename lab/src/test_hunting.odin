@@ -58,10 +58,12 @@ test_death :: proc() {
 }
 
 
-/* The animals (VILLAGE.md decision 7): a deer roams, wandering the woods and
- * grazing; one that sees a person runs off out of sight, and runs again
- * when it sees it again. A person draws no danger from anyone. */
+/* The animals (VILLAGE.md decision 7): a deer beds down the night, and by
+ * day roams, wandering the woods and grazing; one that sees a person bolts
+ * out of sight, and bolts again when it sees it again. A person draws no
+ * danger from anyone. */
 test_animals :: proc() {
+	HOUR :: i64(3600 * 1000)
 	w := test_world(109)
 	why: string
 	bg_check(world_set_terrain_map(w, "woods_map", &why))
@@ -78,20 +80,25 @@ test_animals :: proc() {
 	done := Test_Done{}
 	defer test_done_free(&done)
 
-	g := proposal_group_group_with_phase(.System, "setup: a deer in the woods")
+	g := proposal_group_group_with_phase(.System, "setup: a deer in the woods, at midnight")
 	deer := proposal_group_create(g, "deer", "a deer", on_tile(20, 12, 0))
 	committer_submit(c, g)
 	scheduler_run_until(s, time_make(1))
 	deer = proposal_group_id_for(g, deer)
-	bg_check(agency_has_mind(agency, deer))          /* its instinct: it roams */
+	bg_check(agency_has_mind(agency, deer))          /* its instinct: its days */
+
+	/* the night: bedded down where it is, two hours at a time, till five */
+	test_run_counting(s, w, &done, 5 * HOUR)
+	at := world_location_of(w, deer)
+	bg_check(at.x == 20 && at.y == 12 && done.counts["bed_down"] >= 2 && done.counts["graze"] == 0)
 
 	/* six hours of roaming: it moves, on woodland, and grazes an hour at a
 	 * time */
 	moved, off := 0, 0
 	last := world_location_of(w, deer)
-	for scheduler_step_until(s, time_make(6 * 3600 * 1000)) {
+	for scheduler_step_until(s, time_make(11 * HOUR)) {
 		test_count_done(w, &done)
-		at := world_location_of(w, deer)
+		at = world_location_of(w, deer)
 		if at.x != last.x || at.y != last.y do moved += 1
 		if terrain_kind_info(world_terrain(w), terrain_at(world_terrain(w), at.x, at.y, 0)).name != "woodland" do off += 1
 		last = at
@@ -100,8 +107,8 @@ test_animals :: proc() {
 	bg_check(moved > 10 && off == 0)
 	bg_check(done.counts["graze"] >= 4 && done.counts["graze"] <= 6)
 
-	/* a person three tiles off: it runs, out of sight */
-	at := world_location_of(w, deer)
+	/* a person three tiles off: it bolts, out of sight */
+	at = world_location_of(w, deer)
 	px := at.x - 3 if at.x > 8 else at.x + 3
 	g = proposal_group_group_with_phase(.System, "setup: a person comes near")
 	person := proposal_group_create(g, "farmhand", "a person", on_tile(px, at.y, 0))
@@ -109,21 +116,32 @@ test_animals :: proc() {
 	scheduler_run_until(s, time_make(world_time(w).ms + 1))
 	person = proposal_group_id_for(g, person)
 	test_run_counting(s, w, &done, world_time(w).ms + 30 * 1000)
-	bg_check(done.counts["flee"] >= 1)
+	bg_check(done.counts["bolt"] >= 1)
 	bg_check(!test_within(w, deer, person, 4))
 
-	/* it comes near again: it runs again */
+	/* it comes near again: it bolts again */
 	at = world_location_of(w, deer)
 	g = proposal_group_group_with_phase(.System, "setup: the person, near again")
 	proposal_group_move_to(g, whole(person), on_tile(at.x - 2 if at.x > 7 else at.x + 2, at.y, 0))
 	committer_submit(c, g)
 	test_run_counting(s, w, &done, world_time(w).ms + 30 * 1000)
-	bg_check(done.counts["flee"] >= 2)
+	bg_check(done.counts["bolt"] >= 2)
 	bg_check(!test_within(w, deer, person, 4))
 
 	/* the person, who has seen the deer, holds no danger of it */
 	store := knowledge_store_of(knowledge, person)
 	bg_check(store != nil && knowledge_store_finding_count(store) == 0)
+
+	/* the person gone, the next night: from ten, it lies where it is */
+	g = proposal_group_group_with_phase(.System, "setup: the person, gone")
+	proposal_group_destroy(g, whole(person), "gone")
+	committer_submit(c, g)
+	test_run_counting(s, w, &done, 22 * HOUR)
+	at = world_location_of(w, deer)
+	beds := done.counts["bed_down"]
+	test_run_counting(s, w, &done, 26 * HOUR)
+	last = world_location_of(w, deer)
+	bg_check(at.x == last.x && at.y == last.y && done.counts["bed_down"] >= beds + 1 && world_is_live(w, deer))
 }
 
 
@@ -172,9 +190,10 @@ test_within :: proc(w: ^World, a: Entity_ID, b: Entity_ID, tiles: i32) -> bool {
 
 
 /* The bow (VILLAGE.md decision 7): a hunter crouched three tiles from a
- * deer is unseen; from four it can't shoot; from three, the deer is wounded
- * by the bow's 40, the shot gives the hunter away, and the deer runs. Shot
- * at 70 injury, it dies: a carcass where it was, as heavy. */
+ * deer is unseen; from four it can't shoot; from three, with a sure bow
+ * (one that never misses), the deer is wounded by the bow's 40, the shot
+ * gives the hunter away, and the deer bolts. Shot at 70 injury, it dies: a
+ * carcass where it was, as heavy. */
 test_bow :: proc() {
 	error: string
 
@@ -196,8 +215,8 @@ test_bow :: proc() {
 
 	g := proposal_group_group_with_phase(.System, "setup: a deer, and a hunter with a bow out of its sight")
 	deer   := proposal_group_create(g, "standing_deer", "a deer", on_tile(20, 12, 0))
-	hunter := proposal_group_create(g, "farmhand", "a hunter", on_tile(12, 12, 0))
-	bow    := proposal_group_create(g, "bow", "a bow", held_by(hunter, 0))
+	hunter := proposal_group_create(g, "huntsman", "a hunter", on_tile(12, 12, 0))
+	bow    := proposal_group_create(g, "sure_bow", "a bow", held_by(hunter, 0))
 	committer_submit(c, g)
 	scheduler_run_until(s, time_make(1))
 	deer, hunter, bow = proposal_group_id_for(g, deer), proposal_group_id_for(g, hunter), proposal_group_id_for(g, bow)
@@ -217,14 +236,14 @@ test_bow :: proc() {
 	ds := knowledge_store_of(knowledge, deer)
 	bg_check(ds == nil || knowledge_store_finding_count(ds) == 0)
 
-	/* the shot: wounded, the hunter seen, and the deer runs */
+	/* the shot: wounded, the hunter seen, and the deer bolts */
 	error = ""
 	if perform(w, c, action_make("shoot", hunter, bow, deer), 0, &error) == nil do fmt.printf("    shoot: %s\n", error)
 	test_run_counting(s, w, &done, 20000)
 	injury: i64
 	bg_check(world_get_field(w, "Agent.injury", deer, &injury) && injury == 40)
 	bg_check(world_get_field(w, "Agent.hiding", hunter, &hiding) && hiding == 0)
-	bg_check(done.counts["flee"] >= 1 && !test_within(w, deer, hunter, 3))
+	bg_check(done.counts["bolt"] >= 1 && !test_within(w, deer, hunter, 3))
 
 	/* hurt to 70, and shot again: it dies, a carcass as heavy */
 	at := world_location_of(w, deer)
@@ -245,6 +264,63 @@ test_bow :: proc() {
 		if world_info(w, e) != nil && world_info(w, e).blueprint == "deer_carcass" do carcass = e
 	}
 	bg_check(carcass != NO_ENTITY && world_mass_of(w, carcass) == mass)
+}
+
+
+/* Aim (VILLAGE.md decision 7): a shot strikes by a seeded draw, the bow's
+ * aim from beside (80 in a hundred), less its spread (25) each tile
+ * further, in the hunter's stalking; a farmhand, who has none, never
+ * strikes. A hundred shots at a deer that stands, from each distance. */
+test_aim :: proc() {
+	error: string
+
+	w := test_world(113)
+	why: string
+	bg_check(world_set_terrain_map(w, "woods_map", &why))
+	c := test_committer(w)
+	committer_set_tracing(c, false)
+	activities := activities_with_world(w, c)
+	s          := autorelease(scheduler_init_with_world(w, c))
+	scheduler_set_activities(s, activities_as_activity_clock(activities))
+
+	g := proposal_group_group_with_phase(.System, "setup: a deer that stands; a hunter, and a farmhand, each with a bow")
+	deer     := proposal_group_create(g, "standing_deer", "a deer", on_tile(20, 12, 0))
+	hunter   := proposal_group_create(g, "huntsman", "a hunter", on_tile(19, 12, 0))
+	bow      := proposal_group_create(g, "bow", "a bow", held_by(hunter, 0))
+	farmhand := proposal_group_create(g, "farmhand", "a farmhand", on_tile(21, 12, 0))
+	other    := proposal_group_create(g, "bow", "a bow", held_by(farmhand, 0))
+	committer_submit(c, g)
+	scheduler_run_until(s, time_make(1))
+	deer, hunter, bow = proposal_group_id_for(g, deer), proposal_group_id_for(g, hunter), proposal_group_id_for(g, bow)
+	farmhand, other = proposal_group_id_for(g, farmhand), proposal_group_id_for(g, other)
+
+	struck := [4]int{}
+	for tiles in 1 ..= 3 {
+		test_move(c, hunter, 20 - i32(tiles), 12)
+		for _ in 0 ..< 100 {
+			if perform(w, c, action_make("shoot", hunter, bow, deer), 0, &error) == nil do fmt.printf("    shoot: %s\n", error)
+			scheduler_run_until(s, time_make(world_time(w).ms + 2001))
+			injury: i64
+			world_get_field(w, "Agent.injury", deer, &injury)
+			if injury > 0 do struck[tiles] += 1
+			g = proposal_group_group_with_phase(.System, "setup: the deer, whole again")
+			proposal_group_set_of_to(g, "Agent.injury", whole(deer), 0)
+			committer_submit(c, g)
+		}
+	}
+	for _ in 0 ..< 20 {
+		if perform(w, c, action_make("shoot", farmhand, other, deer), 0, &error) == nil do fmt.printf("    shoot: %s\n", error)
+		scheduler_run_until(s, time_make(world_time(w).ms + 2001))
+	}
+	injury: i64
+	world_get_field(w, "Agent.injury", deer, &injury)
+	if !(struck[1] >= 68 && struck[1] <= 92 && struck[2] >= 42 && struck[2] <= 68 && struck[3] >= 18 && struck[3] <= 42) {
+		fmt.printf("    struck %d, %d, %d in a hundred\n", struck[1], struck[2], struck[3])
+	}
+	bg_check(struck[1] >= 68 && struck[1] <= 92)
+	bg_check(struck[2] >= 42 && struck[2] <= 68)
+	bg_check(struck[3] >= 18 && struck[3] <= 42)
+	bg_check(injury == 0 && world_is_live(w, deer))
 }
 
 
@@ -304,8 +380,9 @@ test_butcher :: proc() {
 /* A week of hunting (issue #7's done-when): a hunter with a bow, bound to
  * its larder at the woods' edge through its working hours; deer in the
  * woods, kept up to four by the herd coming in from the east edge. Over
- * seven days the hunter brings meat home, the deer run from it when they
- * see it, and the herd never vanishes nor outgrows its four. */
+ * seven days the hunter brings meat home, missing some shots, the deer
+ * bolt from it when they see it, and the herd never vanishes nor outgrows
+ * its four. */
 test_hunting_week :: proc() {
 	w := test_world(112)
 	why: string
@@ -359,10 +436,11 @@ test_hunting_week :: proc() {
 		u := world_unit_of(w, e)
 		if u != nil && u == "venison" do venison += int(world_units_of(w, e))
 	}
-	fmt.printf("    a week: %d venison home, %d shots, %d butchered, %d flights, deer %d to %d\n", venison,
-	           done.counts["shoot"], done.counts["butcher"], done.counts["flee"], fewest, most)
+	fmt.printf("    a week: %d venison home, %d shots, %d butchered, %d bolts, deer %d to %d\n", venison,
+	           done.counts["shoot"], done.counts["butcher"], done.counts["bolt"], fewest, most)
 	bg_check(venison >= 40)
-	bg_check(done.counts["flee"] > 0)
+	bg_check(done.counts["bolt"] > 0)
+	bg_check(done.counts["shoot"] > 3 * done.counts["butcher"])     /* three strike a deer down: some missed */
 	bg_check(fewest >= 1 && most <= 4)
 }
 

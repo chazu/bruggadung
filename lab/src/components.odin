@@ -1,10 +1,10 @@
-// Generated from Triangle content a707272fa2d681a9: do not edit. Type IDs are valid
+// Generated from Triangle content e2f34a9e01e8e0c6: do not edit. Type IDs are valid
 // only for this content; regenerate when it changes.
 package lab
 
 import tri "../../triangle/odin/triangle"
 
-CONTENT_HASH :: 0xa707272fa2d681a9
+CONTENT_HASH :: 0xe2f34a9e01e8e0c6
 
 // Combustor, from #Combustor
 Combustor :: struct {
@@ -215,6 +215,8 @@ Assembly :: struct {
 
 // Bow, from #Bow
 Bow :: struct {
+	aim: i64,    // int, in quanta of 1; content, saved, inspect
+	spread: i64,    // int, in quanta of 1; content, saved, inspect
 	wounds: i64,    // int, in quanta of 1; content, saved, inspect
 }
 
@@ -387,78 +389,78 @@ Fastener :: struct {
 }
 
 // #ActivityStatus
-ACTIVITYSTATUS_ABORTED :: 713
-ACTIVITYSTATUS_COMPLETED :: 714
-ACTIVITYSTATUS_EXHAUSTED :: 715
-ACTIVITYSTATUS_FAILED :: 716
-ACTIVITYSTATUS_RUNNING :: 717
-ACTIVITYSTATUS_SUSPENDED :: 718
+ACTIVITYSTATUS_ABORTED :: 723
+ACTIVITYSTATUS_COMPLETED :: 724
+ACTIVITYSTATUS_EXHAUSTED :: 725
+ACTIVITYSTATUS_FAILED :: 726
+ACTIVITYSTATUS_RUNNING :: 727
+ACTIVITYSTATUS_SUSPENDED :: 728
 
 // #Tie
-TIE_EMPLOY :: 821
-TIE_FRIEND :: 822
-TIE_KIN :: 823
-TIE_SWORN :: 824
+TIE_EMPLOY :: 831
+TIE_FRIEND :: 832
+TIE_KIN :: 833
+TIE_SWORN :: 834
 
 // #ClaimKind
-CLAIMKIND_CUSTODY :: 720
-CLAIMKIND_OWNERSHIP :: 721
-CLAIMKIND_RESERVATION :: 722
+CLAIMKIND_CUSTODY :: 730
+CLAIMKIND_OWNERSHIP :: 731
+CLAIMKIND_RESERVATION :: 732
 
 // #Penalty
-PENALTY_FINE :: 807
-PENALTY_ARREST :: 840
-PENALTY_CONFISCATE :: 841
+PENALTY_FINE :: 817
+PENALTY_ARREST :: 850
+PENALTY_CONFISCATE :: 851
 
 // #Wrong
-WRONG_ANOTHERS :: 832
-WRONG_UNAUTHORIZED :: 833
+WRONG_ANOTHERS :: 842
+WRONG_UNAUTHORIZED :: 843
 
 // #Material
-MATERIAL_CLOTH :: 789
-MATERIAL_EARTH :: 790
-MATERIAL_FOOD :: 791
-MATERIAL_LEATHER :: 792
-MATERIAL_GRAIN :: 794
-MATERIAL_RUBBER :: 795
-MATERIAL_STONE :: 796
-MATERIAL_TURNIP :: 797
-MATERIAL_FLESH :: 843
-MATERIAL_BRASS :: 845
-MATERIAL_IRON :: 846
-MATERIAL_PAPER :: 847
-MATERIAL_STEEL :: 848
-MATERIAL_BIRCH :: 850
-MATERIAL_OAK :: 851
+MATERIAL_CLOTH :: 799
+MATERIAL_EARTH :: 800
+MATERIAL_FOOD :: 801
+MATERIAL_LEATHER :: 802
+MATERIAL_GRAIN :: 804
+MATERIAL_RUBBER :: 805
+MATERIAL_STONE :: 806
+MATERIAL_TURNIP :: 807
+MATERIAL_FLESH :: 853
+MATERIAL_BRASS :: 855
+MATERIAL_IRON :: 856
+MATERIAL_PAPER :: 857
+MATERIAL_STEEL :: 858
+MATERIAL_BIRCH :: 860
+MATERIAL_OAK :: 861
 
 // "flesh" | "metal" | "natural" | "paper" | "wood"
-BODY_SURFACE_NATURAL :: 536
-BODY_SURFACE_FLESH :: 843
-BODY_SURFACE_BRASS :: 845
-BODY_SURFACE_IRON :: 846
-BODY_SURFACE_PAPER :: 847
-BODY_SURFACE_STEEL :: 848
-BODY_SURFACE_BIRCH :: 850
-BODY_SURFACE_OAK :: 851
+BODY_SURFACE_NATURAL :: 546
+BODY_SURFACE_FLESH :: 853
+BODY_SURFACE_BRASS :: 855
+BODY_SURFACE_IRON :: 856
+BODY_SURFACE_PAPER :: 857
+BODY_SURFACE_STEEL :: 858
+BODY_SURFACE_BIRCH :: 860
+BODY_SURFACE_OAK :: 861
 
 // #Colour
-COLOUR_BLUE :: 725
-COLOUR_BLACK :: 727
-COLOUR_BROWN :: 728
-COLOUR_GREEN :: 729
-COLOUR_GREY :: 730
-COLOUR_NAVY :: 731
-COLOUR_ORANGE :: 732
-COLOUR_PURPLE :: 733
-COLOUR_RED :: 734
-COLOUR_YELLOW :: 735
-COLOUR_BEIGE :: 757
-COLOUR_WHITE :: 785
+COLOUR_BLUE :: 735
+COLOUR_BLACK :: 737
+COLOUR_BROWN :: 738
+COLOUR_GREEN :: 739
+COLOUR_GREY :: 740
+COLOUR_NAVY :: 741
+COLOUR_ORANGE :: 742
+COLOUR_PURPLE :: 743
+COLOUR_RED :: 744
+COLOUR_YELLOW :: 745
+COLOUR_BEIGE :: 767
+COLOUR_WHITE :: 795
 
 // "bare" | "ripe" | "sown"
-PLOT_STANDS_BARE :: 368
-PLOT_STANDS_RIPE :: 586
-PLOT_STANDS_SOWN :: 614
+PLOT_STANDS_BARE :: 372
+PLOT_STANDS_RIPE :: 596
+PLOT_STANDS_SOWN :: 624
 
 // The field registry: what code needs to read and write any component
 // generically.
@@ -650,6 +652,8 @@ COMPONENT_COUNT :: 47
 	{"slots", offset_of(Assembly, slots), VALUE_QUANTITY, "int", "content, saved, inspect, perceive(sight)"},
 }
 @(rodata) Bow_fields := [?]Field_Info{
+	{"aim", offset_of(Bow, aim), VALUE_QUANTITY, "int", "content, saved, inspect"},
+	{"spread", offset_of(Bow, spread), VALUE_QUANTITY, "int", "content, saved, inspect"},
 	{"wounds", offset_of(Bow, wounds), VALUE_QUANTITY, "int", "content, saved, inspect"},
 }
 @(rodata) Carcass_fields := [?]Field_Info{
@@ -799,7 +803,7 @@ COMPONENTS := [COMPONENT_COUNT + 1]Component_Info{
 	{"Agent", "#Agent", size_of(Agent), 28, &Agent_fields[0]},
 	{"Area", "#Area", size_of(Area), 2, &Area_fields[0]},
 	{"Assembly", "#Assembly", size_of(Assembly), 1, &Assembly_fields[0]},
-	{"Bow", "#Bow", size_of(Bow), 1, &Bow_fields[0]},
+	{"Bow", "#Bow", size_of(Bow), 3, &Bow_fields[0]},
 	{"Carcass", "#Carcass", size_of(Carcass), 3, &Carcass_fields[0]},
 	{"Cock", "#Cock", size_of(Cock), 2, &Cock_fields[0]},
 	{"Container", "#Container", size_of(Container), 1, &Container_fields[0]},

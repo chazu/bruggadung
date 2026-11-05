@@ -142,13 +142,23 @@ things the lab put off:
      person's corpse) made where it was and as heavy, what it held
      dropped, its mind let go (AGENCY.md decision 21). Nothing in the
      village hurts a person, so only animals die.
-   - An animal keeps its **instinct**, to roam, all day: it wanders to a
-     spot of woodland within ten tiles and grazes there an hour. One that
-     sees a person in sight now holds it a #Danger (KNOWLEDGE.md decision
-     23) and runs out of sight; seen again, it runs again.
+   - An animal keeps its **instinct**'s goals, each over its hours: from
+     05:00 to 21:00 it roams, wandering to a spot of woodland within ten
+     tiles and grazing there an hour; from 21:00 it is bedded down where
+     it is, two hours at a time, till 05:00. One that sees a person in
+     sight now holds it a #Danger (KNOWLEDGE.md decision 23) and
+     **bolts**, a dozen tiles in three seconds, out of sight; seen again,
+     it bolts again.
+   - Built after the slice: an animal bolts, where it ran off at a walk
+     four tiles, still in sight, and a hunter walked up and shot again,
+     seven times in a minute. At the map's edge a flight ran straight into
+     it and stayed: it slides along the edge now.
    - **The hunt is a bow, while stalking.** A hunter crouches, hiding
      (seen only from beside it), and shoots game within three tiles (an
-     operation's `range`): a wound of 40, and the shot gives it away. Its
+     operation's `range`). A shot strikes by a seeded draw, the bow's
+     **aim** (80 in a hundred from beside) less its spread (25 a tile
+     further), in the hunter's `stalking`: a wound of 40, three to bring
+     a deer down; struck or missed, the shot gives the hunter away. Its
      day is a kept goal, the larder holding two deer's worth of venison:
      it takes home meat it holds, butchers a carcass it knows of, stalks
      game it sees, and otherwise **lies in wait** a quarter-hour at a
@@ -352,10 +362,14 @@ New, and entered in the glossary with this document:
 - **Hides.** A carcass's hide is left where it was butchered: the hunter's
   hands hold its bow and the meat. Carrying hides home, and dressing them
   (the Hunts' other trade), wait for the market, which is where they go.
-- **The hunt is easy.** A shot always strikes, and a hunter lying in wait
-  sees most of what passes. Over a week, one hunter in a small wood fills
-  its larder in a day or two, then stops. A miss, game that learns where
-  hunters wait, or wind that carries scent would make it harder.
+- **The hunt is fair, but the game never learns.** A shot can miss, and a
+  deer bolts out of sight from a shot that gives the hunter away. Over a
+  week, one hunter in a small wood brings home its two deer from 33
+  shots, where before every shot struck and it filled its larder in a
+  day or two. Game that learns where hunters wait, wind that carries
+  scent, or a wounded animal that runs further and heals would make it
+  harder still. And a hunter that has shot goes on uncrouched for up to
+  twenty minutes (`hidden` is having crouched lately, not hiding now).
 - **What a stack is seen as.** A stack's count isn't perceived, only its
   mass, so a condition on a count never holds of what an agent knows.
   The woodcutters' "past three thousand pieces" was one, never done; it
