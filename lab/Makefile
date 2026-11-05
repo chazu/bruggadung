@@ -73,7 +73,8 @@ asan: triangle
 gen:
 	$(MAKE) -C $(TRIANGLE) build/tri-components
 	$(TRIANGLE)/build/tri-components -odin lab ../../triangle/odin/triangle \
-	    $$(find content -name '*.tri' -not -path '*/.*' | sort) > src/components.odin
+	    $$(find content -name '*.tri' -not -path '*/.*' | sort) > src/components.odin.new
+	mv src/components.odin.new src/components.odin
 
 clean:
 	rm -rf $(BUILD)

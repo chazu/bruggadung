@@ -189,7 +189,8 @@ Question :: struct {
  * when it no longer makes sense. */
 Walk_Purpose :: struct {
 	set:    bool,
-	toward: u32,             /* the referent it goes to; 0, exploring */
+	toward: u32,             /* the referent it goes to; 0, exploring, or wandering */
+	wander: bool,            /* to a tile it chose (#Wander): seeing it is no reason to stop */
 	x:      i32,             /* where that was believed to be; exploring, the unseen tile */
 	y:      i32,
 	level:  i32,
@@ -720,6 +721,13 @@ agency_log_of :: proc(self: ^Agency, agent: Entity_ID) -> []string {
 }
 
 
+/* Whether the agent has a mind (for checks; it makes none). */
+agency_has_mind :: proc(self: ^Agency, agent: Entity_ID) -> bool {
+	for m in self.minds do if m.agent == agent do return true
+	return false
+}
+
+
 /* Whether the agent has the goal among its intentions now (for checks and
  * the developer; it makes no mind). */
 agency_intends :: proc(self: ^Agency, agent: Entity_ID, goal: string) -> bool {
@@ -957,6 +965,49 @@ agency_explore :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Store, o
 	if !r.found || r.step == .None do return false
 	agency_set_out(self, m, way[:], 0, r.x, r.y, me.level, "exploring", fmt.tprintf("toward (%d, %d)", r.x, r.y))
 	return true
+}
+
+
+/* Wandering (#Wander, hunting/'s animals): to a tile no more than `within`
+ * away, on ground of the kind `on` as it believes it (0, any), walkable; of
+ * those, one chosen from the agent and the time, so each wanders its own
+ * way, the same in every run. true when it set out. */
+agency_wander :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Store, within: i32, on: Terrain_Kind) -> bool {
+	c: Walk_Context
+	q: Path_Query
+
+	me := knowledge_store_referent(store, knowledge_store_self_referent(store))
+	if me == nil || within < 1 do return false
+	c.world = self.world
+	c.store = store
+	c.level = me.level
+	h := mix(u64(m.agent) ~ u64(world_time(self.world).ms) * 0x9e3779b97f4a7c15)
+	span := u64(2 * within + 1)
+	for try := 0; try < 24; try += 1 {
+		h = mix(h + u64(try))
+		x := me.x + i32(h % span) - within
+		y := me.y + i32((h / span) % span) - within
+		if x == me.x && y == me.y do continue
+		if !walkable(&c, x, y) do continue
+		if on != 0 && knowledge_store_believed_terrain_at_x(store, x, y, me.level) != on do continue
+		way := make([dynamic]Step, context.temp_allocator)
+		q          = {}
+		q.x        = me.x
+		q.y        = me.y
+		q.targeted = true
+		q.tx       = x
+		q.ty       = y
+		q.context_ = &c
+		q.passable = walkable
+		q.way      = &way
+		self.pathSearches += 1
+		r := path_find(&q)
+		if !r.found || r.step == .None do continue
+		agency_set_out(self, m, way[:], 0, x, y, me.level, "wandering", fmt.tprintf("toward (%d, %d)", x, y))
+		m.walking.wander = true
+		return true
+	}
+	return false
 }
 
 
@@ -1286,7 +1337,11 @@ agency_holds :: proc(self: ^Agency, instance: cstring, path: cstring, since: i64
 		                knowledge_store_referent(store, bound(b, n^, str(text[:]))))
 	}
 	if done != nil && text_at(tc, done, "did", text[:]) {
-		return agency_activity(self, cstr(text[:]), knowledge_store_agent(store), "completed", since) != NO_ENTITY
+		/* lately: one begun no longer ago than that (a kept goal, done
+		 * again and again) */
+		lately := int_at(tc, done, "lately", 0)
+		after  := max(since, world_time(self.world).ms - lately) if lately > 0 else since
+		return agency_activity(self, cstr(text[:]), knowledge_store_agent(store), "completed", after) != NO_ENTITY
 	}
 
 	if !agency_load(self, &c, instance, path, store) do return false
@@ -1482,7 +1537,7 @@ agency_walk_stale :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Store
 		r := knowledge_store_referent(store, j.toward)
 		if r == nil || !r.present do return fmt.tprintf("R%d is gone from where it was", j.toward)
 		if r.x != j.x || r.y != j.y || r.level != j.level do return fmt.tprintf("R%d has moved", j.toward)
-	} else if knowledge_store_has_seen_x(store, j.x, j.y, j.level) {
+	} else if !j.wander && knowledge_store_has_seen_x(store, j.x, j.y, j.level) {
 		return "it has seen where it was going"
 	}
 	record := (^Activity)(world_record(self.world, world_kind_named(self.world, "Activity"), a))
@@ -1522,7 +1577,7 @@ agency_put_aside :: proc(self: ^Agency, a: Entity_ID, why: string, error: ^strin
  * came. */
 @(private = "file")
 agency_walk :: proc(self: ^Agency, m: ^Motivation, why: string, me: ^Referent, target: ^Referent,
-                    store: ^Knowledge_Store) {
+                    store: ^Knowledge_Store, range: i32 = 1) {
 	c:   Walk_Context
 	q:   Path_Query
 	way: [dynamic]Step
@@ -1549,6 +1604,23 @@ agency_walk :: proc(self: ^Agency, m: ^Motivation, why: string, me: ^Referent, t
 	if r.step == .None {
 		agency_note(self, m, fmt.tprintf("%s: no way toward R%d at (%d, %d)", why, target.id, target.x, target.y))
 		return
+	}
+	/* for something done from further off (a shot), only as far as that */
+	if range > 1 {
+		x, y := me.x, me.y
+		for step, i in way {
+			if abs(near.x - x) <= range && abs(near.y - y) <= range {
+				resize(&way, i)
+				break
+			}
+			switch step {
+			case .North: y -= 1
+			case .South: y += 1
+			case .East:  x += 1
+			case .West:  x -= 1
+			case .None:
+			}
+		}
 	}
 	agency_set_out(self, m, way[:], target.id, target.x, target.y, target.level, why,
 	               fmt.tprintf("toward R%d at (%d, %d)", target.id, target.x, target.y))
@@ -1733,6 +1805,21 @@ agency_follow :: proc(self: ^Agency, m: ^Motivation, method: cstring, index: i32
 			agency_fail(self, m, index, fmt.tprintf("%s: nowhere left to look", str(title[:])))
 			return false
 		}
+		/* wandering: to a tile of the kind of ground, near (#Wander); in a
+		 * sequence, done once it sets out */
+		if tri.node_type(step) == tri.type_named(tc, "#Wander") {
+			if sequence && k < 32 && (m.intentions[m.nintentions - 1].stepsDone & (u32(1) << u32(k))) != 0 do continue
+			on: Terrain_Kind
+			if text_at(tc, step, "over", slot[:]) && world_terrain(self.world) != nil {
+				on = terrain_kind_named(world_terrain(self.world), cstr(slot[:]))
+			}
+			if agency_wander(self, m, store, i32(int_at(tc, step, "radius", 8)), on) {
+				if sequence && k < 32 do m.intentions[m.nintentions - 1].stepsDone |= u32(1) << u32(k)
+				return true
+			}
+			agency_fail(self, m, index, fmt.tprintf("%s: nowhere to wander", str(title[:])))
+			return false
+		}
 		/* the operation, within reach of what it names */
 		if !text_at(tc, step, "op", op[:]) do continue
 		/* an activity of it the agent suspended: resumed, not begun again;
@@ -1773,8 +1860,8 @@ agency_follow :: proc(self: ^Agency, m: ^Motivation, method: cstring, index: i32
 		for q := 0; q < 2; q += 1 {
 			if roles[q] == 0 do continue
 			r = knowledge_store_referent(store, roles[q])
-			if !in_reach(me, r) && r != nil && r.present {
-				agency_walk(self, m, str(title[:]), me, r, store)
+			if !referent_in_reach(me, r, operation_range(self.world, cstr(op[:]))) && r != nil && r.present {
+				agency_walk(self, m, str(title[:]), me, r, store, operation_range(self.world, cstr(op[:])))
 				return true
 			}
 		}
@@ -2572,6 +2659,17 @@ agency_settle :: proc(self: ^Agency, m: ^Motivation, intention: ^Intention, done
 			c.settled = true
 		} else if !done {
 			c.resume = world_time(self.world).ms + BG_KEPT_RETRY
+		} else {
+			/* done lately (#Did's `lately`): due again once it no longer is */
+			tc   := world_tri(self.world)
+			cond := tri.at(tc, tri.pattern(tc, intention.goal), "done")
+			text: [64]u8
+			if lately := int_at(tc, cond, "lately", 0); lately > 0 && text_at(tc, cond, "did", text[:]) {
+				a := agency_activity(self, cstr(text[:]), m.agent, "completed", intention.adopted)
+				if record := (^Activity)(world_record(self.world, world_kind_named(self.world, "Activity"), a)); record != nil {
+					c.resume = record.started + lately + 1
+				}
+			}
 		}
 	}
 	if intention.pressed != 0 {
@@ -3084,6 +3182,19 @@ mind_due_now :: proc(context_: rawptr, agent: Entity_ID) -> i64 {
 }
 
 
+/* An animal's mind (content/hunting/): made as it first perceives, its
+ * instinct (`Agent.instinct`, a goal) undertaken all day, every day. nil
+ * for an agent with none: a person's days are its commitments. */
+@(private = "file")
+agency_take_on_instinct :: proc(self: ^Agency, agent: Entity_ID) -> ^Motivation {
+	DAY :: i64(86400000)
+	goal := world_text_field(self.world, "Agent.instinct", agent)
+	if goal == nil || len(goal) == 0 || !world_is_live(self.world, agent) do return nil
+	if !agency_undertake_every_with(self, agent, goal, 0, DAY, "instinct", DAY, {}) do return nil
+	return agency_existing_mind_of(self, agent)
+}
+
+
 /* The mind of an agent, if it has one; none is made, nothing nudged. */
 @(private = "file")
 agency_existing_mind_of :: proc(self: ^Agency, agent: Entity_ID) -> ^Motivation {
@@ -3127,6 +3238,10 @@ agency_decide_boundary :: proc(self: ^Agency, boundary: u64) {
 	nperceived: uint
 	nwoken:     uint
 
+	/* the dead's minds go with them (VILLAGE.md decision 7) */
+	for i := len(self.minds); i > 0; i -= 1 {
+		if !world_is_live(self.world, self.minds[i - 1].agent) do agency_retire_mind_at(self, uint(i - 1))
+	}
 	/* which minds: those whose agents perceived; those due of themselves;
 	 * those looked up since the last boundary. Else they rest, unread */
 	agency_wake_minds(self)
@@ -3148,6 +3263,7 @@ agency_decide_boundary :: proc(self: ^Agency, boundary: u64) {
 	for i: uint = 0; i < ndue; i += 1 {
 		if i != 0 && due[i] == due[i - 1] do continue
 		m := agency_existing_mind_of(self, due[i])
+		if m == nil do m = agency_take_on_instinct(self, due[i])
 		if m == nil do continue
 		if agency_is_due(self, m) {
 			for k := 0; k < 2 * BG_MAX_INTENTIONS && !agency_decide(self, m); k += 1 {}

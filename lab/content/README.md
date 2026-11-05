@@ -105,6 +105,7 @@ cut: the levels of detail first, then other topics, then code.
 | `hunger/` | satiety and reserves (`body.tri`); what going without weakens (`weakness.tri`); eating and food's nourishment (`eating.tri`) |
 | `cooking/` | raw food and meals, the larder, cooking at a lit stove, and the ways from a larder to a meal (`cooking.tri`) |
 | `farming/` | plots (areas) and their crops, seed kept back, sowing and harvesting a row at a time, ripening in closed form (`farming.tri`) |
+| `hunting/` | deer and hares, their instincts and their wariness (`animals.tri`); the hunter, the bow, lying in wait and the shot (`hunting.tri`); carcasses and butchering (`butchering.tri`) |
 | `firewood/` | trees, felling, bucking and splitting with an axe, the woodpile, stoking a stove (`firewood.tri`) |
 | `institutions/` | laws and the watch (`law.tri`); content, copies, seals and permits (`permits.tri`) |
 | `light/` | daylight and lamps |

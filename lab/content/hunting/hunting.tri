@@ -1,0 +1,212 @@
+// Hunting, the hunter: a bow, stalking, the shot (VILLAGE.md decision 7,
+// slice 7).
+//
+// Cut points:
+// - full:     a hunter crouches, hiding (things.tri's `hiding`: seen only
+//             from beside it), and so stalks game it knows of to within
+//             three tiles, and shoots: a wound of the bow's `wounds` to it,
+//             and the shot gives the hunter away. Struck, the animal gets
+//             clear (harm/), and runs from the hunter it now sees
+//             (animals.tri).
+// - reduced:  the same, decided on the cadence's beat; a shot is instant.
+// - abstract: as reduced. Game taken as a yield of the woods, below
+//             reduced, is open (VILLAGE.md decision 3).
+// - frozen:   it doesn't decide; what is under way waits.
+// - harm:     the wound is an injury (harm/'s injure): at 100 the animal
+//             dies, its carcass where it fell (butchering.tri).
+// - code:     effect_crouch, effect_shoot (src/act_actions.odin); an
+//             operation's `range` (actions.tri), which agency walks to
+//             within and no further.
+
+package hunting
+
+// A hunter's skill: as a rule's, how keenly it reads game in sight (a
+// non-hunter's is 0).
+#Agent: {
+    stalking: *0 | int & >=0 & <=100 @field(content, saved, inspect)
+}
+
+// The tests' hunter (src/test_hunting.odin), who needn't eat.
+huntsman: #Agent & { material: "flesh", mass: 70kg, hands: 2, coat: "grey", trade: "hunter", stalking: 100 }
+
+// A bow: what a shot from it wounds.
+#Bow: #Body & {
+    @component(Bow)
+    wounds: *40 | int & >=1 & <=100 @field(content, saved, inspect)
+}
+
+bow_seen: #Seen & { kindOf: "#Bow" } @family(seen)
+bow_look: #Look & { kindOf: "#Bow", look: "tool.bow" } @family(looks)
+
+bow: #Bow & { material: "oak", mass: 1kg }
+
+// Crouch, bow in hand, to stalk: from now on, hiding, until a shot gives it
+// away. A second.
+crouch: #Operation & {
+    effect:   "crouch"
+    duration: 1s
+    roles: {
+        actor: #Agent & { id: $a, place: #OnTile }
+        item:  #Bow & { place: #Held & { by: $a } }
+    }
+} @family(operations)
+
+// Shoot game within three tiles, the bow in hand: two seconds, with the
+// hands.
+shoot: #Operation & {
+    effect:   "shoot"
+    duration: 2s
+    range:    3
+    uses:     ["hands"]
+    roles: {
+        actor:       #Agent & { id: $a, place: #OnTile }
+        item:        #Bow & { place: #Held & { by: $a } }
+        destination: #Animal
+    }
+} @family(operations)
+
+// Hunting: the game, its carcass, the meat from it, the bow, and the larder
+// the meat goes to.
+#Hunting: #Frame & { game: #Animal, carcass: #Carcass, meat: #Body, bow: #Body, larder: #Body }
+
+// The day's work, for a hunter: its household's larder stocked with meat,
+// kept through its working hours (bound when undertaken: the larder). Done
+// past forty kilograms of venison, eighty cuts, two deer: more than the
+// household eats in a week, the rest to sell (the market, VILLAGE.md slice
+// 9). A stack is seen by its mass, its count unseen.
+game_hunted: #Goal & {
+    title: "hunt"
+    done: {
+        find:  ["larder", "meat"]
+        match: #Hunting & { larder: #Container & { id: $l },
+                            meat: #Food & #Stack & { unit: "venison", mass: >=40kg, place: #Inside & { container: $l } } }
+    }
+    kept: true
+} @family(goals)
+
+// Meat in hand: home with it, to the larder.
+bring_home_the_meat: #Method & {
+    title: "bring home the meat"
+    goal:  "game_hunted"
+    rank:  1
+    pre: {
+        find:  ["meat", "larder"]
+        match: #Hunting & { me: #Agent & { id: $me },
+                            meat: #Food & #Stack & { raw: true, place: #Held & { by: $me } },
+                            larder: #Container }
+    }
+    order: ["own", "habit", "near"]
+    steps: [#Do & { op: "put_in", object: "meat", target: "larder" }]
+} @family(methods)
+
+// Game down: butcher it where it lies.
+butcher_it: #Method & {
+    title: "butcher it"
+    goal:  "game_hunted"
+    rank:  2
+    pre:   { find: ["carcass"], match: #Hunting & { me: #Agent & { freeHands: >=1 }, carcass: #Carcass } }
+    order: ["near"]
+    steps: [#Do & { op: "butcher", object: "carcass" }]
+} @family(methods)
+
+// Game seen: stalk it, crouched, and shoot.
+shoot_it: #Method & {
+    title: "stalk and shoot"
+    goal:  "game_hunted"
+    rank:  3
+    pre: {
+        find:  ["bow", "game"]
+        match: #Hunting & { me: #Agent & { id: $me }, bow: #Bow & { place: #Held & { by: $me } }, game: #Animal }
+    }
+    order: ["near"]
+    steps: [#Achieve & { subgoal: "hidden" }, #Do & { op: "shoot", object: "bow", target: "game" }]
+} @family(methods)
+
+// None seen: through the woods, crouched (to see game before it sees the
+// hunter), lying in wait a while, then on a way, and in wait again.
+look_for_game: #Method & {
+    title: "look for game"
+    goal:  "game_hunted"
+    rank:  4
+    pre:   { find: [], match: #Hunting & {} }
+    steps: [#Achieve & { subgoal: "hidden" }, #Achieve & { subgoal: "watched" }, #Wander & { radius: 12, over: "woodland" }]
+} @family(methods)
+
+// Lain in wait lately: the last wait just ended (five seconds since), so
+// one way is walked, and no more.
+watched: #Goal & {
+    title: "lie in wait"
+    done:  #Did & { did: "lie_in_wait", lately: 905s }
+} @family(goals)
+
+lie_low: #Method & {
+    title: "lie low"
+    goal:  "watched"
+    rank:  1
+    pre:   { find: ["bow"], match: #Hunting & { me: #Agent & { id: $me }, bow: #Bow & { place: #Held & { by: $me } } } }
+    steps: [#Do & { op: "lie_in_wait", object: "bow" }]
+} @family(methods)
+
+// Lie in wait, bow in hand, crouched: a quarter of an hour, watching. Game
+// coming into sight is taken a shot at (take_the_shot), whatever else.
+lie_in_wait: #Operation & {
+    effect:   "rest"
+    duration: 15min
+    roles: {
+        actor: #Agent & { id: $a, place: #OnTile }
+        item:  #Bow & { place: #Held & { by: $a } }
+    }
+} @family(operations)
+
+// Game in sight, to a hunter: a shot to take.
+#Game: #Finding & {}
+
+game_in_sight: #Rule & {
+    premises:  [#Sighted & { sighted: "#Deer" }]
+    skill:     "stalking"
+    mastery:   1
+    concludes: "#Game"
+    weight:    20
+} @family(rules)
+
+hare_in_sight: #Rule & {
+    premises:  [#Sighted & { sighted: "#Hare" }]
+    skill:     "stalking"
+    mastery:   1
+    concludes: "#Game"
+    weight:    20
+} @family(rules)
+
+// Game seen, the hunter at work or lying in wait: the shot, from cover.
+take_the_shot: #Goal & {
+    title:  "take the shot"
+    done:   #Did & { did: "shoot" }
+    arises: { finding: "#Game", slot: "game", lapse: 10min, of: #Animal }
+    worth:  [#Flat & { value: 60 }]
+} @family(goals)
+
+shoot_from_cover: #Method & {
+    title: "shoot from cover"
+    goal:  "take_the_shot"
+    rank:  1
+    pre: {
+        find:  ["bow", "game"]
+        match: #Hunting & { me: #Agent & { id: $me }, bow: #Bow & { place: #Held & { by: $me } }, game: #Animal }
+    }
+    steps: [#Achieve & { subgoal: "hidden" }, #Do & { op: "shoot", object: "bow", target: "game" }]
+} @family(methods)
+
+// Hidden, to stalk: crouched lately (a shot gives it away, and once twenty
+// minutes have passed it crouches again).
+hidden: #Goal & {
+    title: "keep hidden"
+    done:  #Did & { did: "crouch", lately: 20min }
+} @family(goals)
+
+crouch_down: #Method & {
+    title: "crouch"
+    goal:  "hidden"
+    rank:  1
+    pre:   { find: ["bow"], match: #Hunting & { me: #Agent & { id: $me }, bow: #Bow & { place: #Held & { by: $me } } } }
+    steps: [#Do & { op: "crouch", object: "bow" }]
+} @family(methods)

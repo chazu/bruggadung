@@ -214,6 +214,15 @@ These were made while writing this document and have not yet been reviewed.
     - Left out: many like things seen as one (a stand of trees, a herd),
       which would be grouping in perception; an area's light and distance
       for how precisely it is seen are its placed tile's.
+23. **What is in sight now is a premise** (VILLAGE.md decision 7). A
+    `#Sighted` premise holds of a referent seen at this perception as a
+    kind (`"#Agent"`, a person; `"#Deer"`). Its rule is weighed at every
+    perception, unlike a rule over looks, and its finding is drawn afresh
+    while it holds and retracted when it doesn't: a deer still in sight
+    of a person after running from it runs again, and once out of sight
+    its #Danger is gone. Such rules need a skill (`wary`, an animal's;
+    `stalking`, a hunter's), so a person draws no danger from every
+    passer-by, and costs nothing for those without it.
 
 ## Terms
 

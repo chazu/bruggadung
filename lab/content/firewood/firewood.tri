@@ -90,14 +90,15 @@ axe: #Axe & { material: "iron", mass: 2kg }
 
 // The day's work, for a woodcutter: its household's woodpile stocked, kept
 // through its working hours (bound when undertaken: the household's
-// woodpile). Done past three thousand pieces: more than a day's work, the
-// surplus a woodcutter's to sell (the market, VILLAGE.md slice 9).
+// woodpile). Done past three thousand pieces (three tonnes: a stack is seen
+// by its mass, its count unseen): more than a day's work, the surplus a
+// woodcutter's to sell (the market, VILLAGE.md slice 9).
 woodpile_stocked: #Goal & {
     title: "stock the woodpile"
     done: {
-        find:  ["wood"]
+        find:  ["woodpile", "wood"]
         match: #Felling & { woodpile: #Container & { id: $w },
-                            wood: #Stack & { unit: "firewood", count: >=3000, place: #Inside & { container: $w } } }
+                            wood: #Stack & { unit: "firewood", mass: >=3000kg, place: #Inside & { container: $w } } }
     }
     kept: true
 } @family(goals)

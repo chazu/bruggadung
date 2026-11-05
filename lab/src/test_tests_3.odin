@@ -3766,4 +3766,9 @@ ALL_TESTS := [?]Test_Case{
 	{"firewood",                      test_firewood},
 	{"farming",                       test_farming},
 	{"farming_weeks",                 test_farming_weeks},
+	{"death",                         test_death},
+	{"animals",                       test_animals},
+	{"bow",                           test_bow},
+	{"butcher",                       test_butcher},
+	{"hunting_week",                  test_hunting_week},
 }

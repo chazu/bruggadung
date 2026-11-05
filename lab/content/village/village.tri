@@ -10,8 +10,8 @@
 // - hunger:   the villagers get hungry (hunger/body.tri) and eat from
 //             their larders (cooking/cooking.tri): a sack of grain each, so
 //             a larder empties as its household eats, until a harvest
-//             (farming/) fills the farmers' again, a fortnight on (hunting
-//             is a slice to come).
+//             (farming/) fills the farmers' again, a fortnight on, and the
+//             hunters bring venison home (hunting/).
 // - farming:  the map's tilled ground is the two farming households'
 //             plots, each household's block two of them, its scarecrow in
 //             one; their seed is in their larders, and their work is to
@@ -23,6 +23,10 @@
 //             woodcutters' a little, the others' what they had of them;
 //             the woodcutters' wood of oaks and birches north of their
 //             block, and an axe each by it, are the scenario's.
+// - hunting:  the hunters (`stalking`, a hunter's skill) hunt the eastern
+//             woods with bows, for their larder (hunting/hunting.tri); the
+//             game there at the start, the herds' bounds and where they
+//             come in, and a bow each, are the scenario's.
 // - terrain:  the map's kinds are terrain/terrain.tri's.
 // - code:     src/scenario_village.odin: where everyone and everything
 //             stands, the households' bonds and claims, the commitments,
@@ -53,7 +57,7 @@ let person = #Hungry & { material: "flesh", hands: 2, emptiesIn: 12h }
 // The villagers, by their work.
 farmer:     #Agent & person & { mass: 75kg, coat: "green", trade: "farmer" }
 woodcutter: #Agent & person & { mass: 85kg, coat: "brown", trade: "woodcutter" }
-hunter:     #Agent & person & { mass: 70kg, coat: "grey", trade: "hunter" }
+hunter:     #Agent & person & { mass: 70kg, coat: "grey", trade: "hunter", stalking: 100 }
 
 farmer_look:     #Look & { kindOf: "farmer", look: "agent.farmer" } @family(looks)
 woodcutter_look: #Look & { kindOf: "woodcutter", look: "agent.woodcutter" } @family(looks)

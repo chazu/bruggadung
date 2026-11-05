@@ -260,7 +260,7 @@ match_believed_supposing :: proc(world: ^World, store: ^Knowledge_Store, action:
 		ref = knowledge_store_referent(store, u32(action.roles[r]))
 		/* formulate, from the store: the actor is itself; the rest are believed there, in reach */
 		if ref == nil || me == nil || (r == .Actor) != (ref.id == me.id) || !ref.present ||
-		   (ref.id != me.id && !referent_in_reach(me, ref)) {
+		   (ref.id != me.id && !referent_in_reach(me, ref, operation_range(world, action.operation))) {
 			if reason != nil {
 				reason^ = fmt.tprintf("you don't know of a %s in reach", ROLE_NAMES[r])
 			}
@@ -348,7 +348,7 @@ match_action :: proc(world: ^World, action: Action, result: ^tri.Match_Result, r
 			continue
 		}
 		/* formulate: the actor can bind only what it can reach, and not itself to another role */
-		if action.roles[r] == 0 || !view_can_reach(view, action.roles[r]) ||
+		if action.roles[r] == 0 || !view_can_reach(view, action.roles[r], 1 if r == .Actor else operation_range(world, action.operation)) ||
 		   (r != .Actor && action.roles[r] == action.roles[.Actor]) {
 			if reason != nil {
 				reason^ = fmt.tprintf("the %s is not in the actor's reach", ROLE_NAMES[r])
@@ -2530,16 +2530,94 @@ effect_flee :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -
  * knows who dealt. Hitting oneself does nothing. */
 @(private = "file")
 effect_hit :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
-	injury: i64
-
 	if a.roles[.Item] == a.roles[.Actor] {
 		return "one cannot hit oneself"
 	}
-	injury = 0
-	world_get_field(world, "Agent.injury", a.roles[.Item], &injury)
-	proposal_group_set_of_to(g, "Agent.injury", whole(a.roles[.Item]), 100 if injury + 15 > 100 else injury + 15)
-	proposal_group_emit_subject_other_detail(g, "struck", whole(a.roles[.Item]), whole(a.roles[.Actor]), nil)
+	injure(world, g, a.roles[.Item], a.roles[.Actor], 15)
 	return ""
+}
+
+
+/* Crouching (content/hunting/): hiding, seen only from beside it, until a
+ * shot gives it away. */
+@(private = "file")
+effect_crouch :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
+	proposal_group_set_of_to(g, "Agent.hiding", whole(a.roles[.Actor]), 1)
+	return ""
+}
+
+
+/* A shot (content/hunting/): the game within range is wounded as the bow
+ * wounds, and knows who shot; the shot gives the hunter away. */
+@(private = "file")
+effect_shoot :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
+	wounds: i64
+	game := a.roles[.Destination]
+	if game == a.roles[.Actor] do return "one cannot shoot oneself"
+	if !world_get_field(world, "Bow.wounds", a.roles[.Item], &wounds) do return "it shoots with no bow"
+	proposal_group_set_of_to(g, "Agent.hiding", whole(a.roles[.Actor]), 0)
+	injure(world, g, game, a.roles[.Actor], wounds)
+	return ""
+}
+
+
+/* Butchering a carcass (content/hunting/butchering.tri): its meat, a stack
+ * of so many cuts, in the butcher's free hand; its hide lying where it lay;
+ * the rest is waste. */
+@(private = "file")
+effect_butcher :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
+	cuts: i64
+	carcass := a.roles[.Item]
+	meat := world_text_field(world, "Carcass.yields", carcass)
+	hide := world_text_field(world, "Carcass.hide", carcass)
+	if meat == nil || len(meat) == 0 || !world_get_field(world, "Carcass.cuts", carcass, &cuts) do return "it is no carcass"
+	hand := free_hand(world, a.roles[.Actor])
+	if hand < 0 do return "no hand is free"
+	at := world_location_of(world, carcass)
+	/* a cut each, gathered into one stack: each made as its blueprint is,
+	 * so the count and the mass are declared */
+	into := NO_ENTITY
+	for _ in 0 ..< cuts {
+		cut := proposal_group_create(g, meat, "meat", held_by(a.roles[.Actor], hand))
+		if into == NO_ENTITY do into = cut
+		else do proposal_group_merge(g, whole(cut), whole(into))
+	}
+	if hide != nil && len(hide) > 0 do proposal_group_create(g, hide, "a hide", at)
+	proposal_group_destroy(g, whole(carcass), "butchered")
+	return ""
+}
+
+
+/* An injury to a body (things.tri's #Agent), which it feels, and knows who
+ * dealt (a "struck" event, a #Struck finding); at 100 it dies. */
+injure :: proc(world: ^World, g: ^Proposal_Group, victim: Entity_ID, by: Entity_ID, amount: i64) {
+	injury: i64
+	world_get_field(world, "Agent.injury", victim, &injury)
+	after := min(injury + amount, 100)
+	proposal_group_set_of_to(g, "Agent.injury", whole(victim), after)
+	proposal_group_emit_subject_other_detail(g, "struck", whole(victim), whole(by), nil)
+	if after >= 100 do die(world, g, victim)
+}
+
+
+/* Death (VILLAGE.md decision 7, content/harm/): a body whose injury reaches
+ * 100 is its remains (its `remains`, a blueprint: a deer's carcass, a
+ * person's corpse), as heavy as it was, where it was; what it held falls
+ * there. Its mind goes with it (agency), and its activities end, their
+ * actor gone. */
+die :: proc(world: ^World, g: ^Proposal_Group, body: Entity_ID) {
+	held: [8]Entity_ID
+	at := world_location_of(world, body)
+	for e in held[:world_entities_at(world, body, .Held_By, raw_data(held[:]), len(held))] {
+		proposal_group_move_to(g, whole(e), at)
+	}
+	/* the body's mass is its remains': carved from it, none made or lost */
+	blueprint := world_text_field(world, "Agent.remains", body)
+	remains := proposal_group_create(g, blueprint if blueprint != nil && blueprint != "" else "corpse", "remains", at)
+	proposal_group_relate(g, .Split_From, whole(remains), whole(body))
+	proposal_group_set_of_to(g, "Body.mass", whole(remains), world_mass_of(world, body))
+	proposal_group_set_of_to(g, "Body.mass", whole(body), 0)
+	proposal_group_destroy(g, whole(body), "died")
 }
 
 
@@ -2868,6 +2946,19 @@ effects := [?]Named_Effect{
 	{"issue",     effect_issue},
 	{"rest",      effect_rest},
 	{"strike",    effect_strike},
+	{"crouch",    effect_crouch},
+	{"shoot",     effect_shoot},
+	{"butcher",   effect_butcher},
+}
+
+
+/* How far the operation's other roles may be from its actor, in tiles
+ * (content/actions.tri's `range`): 1, beside it. */
+operation_range :: proc(world: ^World, operation: cstring) -> i32 {
+	lo, hi: i64
+	pattern := tri.pattern(world_tri(world), operation) if operation != nil else nil
+	v := tri.at(world_tri(world), pattern, "range") if pattern != nil else nil
+	return i32(lo) if v != nil && tri.node_interval(v, &lo, &hi) != 0 && lo == hi && lo >= 1 else 1
 }
 
 

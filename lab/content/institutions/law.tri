@@ -84,14 +84,16 @@ arrest: #Operation & {
     }
 } @family(operations)
 
-// Flee: run from someone, straight away from them, four tiles in four
-// seconds (INSTITUTIONS.md decision 7: the arrested complies, resists, or
-// flees, as its own agency decides). If they are gone meanwhile, out of
-// reach, there is nothing left to flee: it fails, not to be resumed.
+// Flee: run from someone up to four tiles off, straight away from them,
+// four tiles in four seconds (INSTITUTIONS.md decision 7: the arrested
+// complies, resists, or flees, as its own agency decides; hunting/'s
+// animals run from people). If they are gone meanwhile, further than that,
+// there is nothing left to flee: it fails, not to be resumed.
 flee: #Operation & {
     effect:   "flee"
     duration: 4s
     hard:     "fail"
+    range:    4
     uses:     ["legs"]
     roles: {
         actor: #Agent & { place: #OnTile }

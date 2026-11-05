@@ -1,0 +1,52 @@
+// Hunting, butchering: what an animal's carcass yields (VILLAGE.md decision
+// 7, slice 7).
+//
+// Cut points:
+// - full:     a carcass is butchered where it lies, a hand free: half an
+//             hour, and its meat (a stack of raw food, cooked as any is:
+//             cooking/) is in the free hand; its hide is left lying there,
+//             and the rest is waste.
+// - reduced:  the same; butchering runs its time.
+// - abstract: as reduced.
+// - frozen:   nothing is butchered; a carcass keeps (perishing is slice 8).
+// - harm:     a carcass is what harm/'s death makes of an animal: as heavy
+//             as it was.
+// - cooking:  meat is raw food; in a larder it merges with meat already
+//             there, as grain does.
+// - code:     effect_butcher (src/act_actions.odin).
+
+package hunting
+
+// A carcass: what it yields, butchered: so many cuts of meat (`yields`, a
+// stack's blueprint, a unit to a cut), and a hide.
+#Carcass: #Body & {
+    @component(Carcass)
+    yields: text @field(content, saved, inspect)
+    cuts:   int & >=0 & <=200 @field(content, saved, inspect)
+    hide:   text @field(content, saved, inspect)
+}
+
+carcass_seen: #Seen & { kindOf: "#Carcass" } @family(seen)
+carcass_look: #Look & { kindOf: "#Carcass", look: "carcass" } @family(looks)
+
+deer_carcass: #Carcass & { material: "flesh", mass: 60kg, yields: "venison", cuts: 40, hide: "deer_hide" }
+hare_carcass: #Carcass & { material: "flesh", mass: 3kg, yields: "hare_meat", cuts: 3, hide: "hare_pelt" }
+
+// Meat, raw: a cut is a portion, as grain's is (cooking/).
+venison:   #Stack & #Food & { material: "food", raw: true, nourishment: 20, cooking: 40, unit: "venison", unitMass: 500g, count: 1 }
+hare_meat: #Stack & #Food & { material: "food", raw: true, nourishment: 20, cooking: 30, unit: "hare meat", unitMass: 500g, count: 1 }
+
+// Hides: leather to be, when there is someone to dress them.
+deer_hide: #Body & { material: "leather", mass: 4kg }
+hare_pelt: #Body & { material: "leather", mass: 300g }
+
+// Butcher a carcass in reach, a hand free: half an hour, with the hands.
+butcher: #Operation & {
+    effect:   "butcher"
+    duration: 30min
+    uses:     ["hands"]
+    roles: {
+        actor: #Agent & { freeHands: >=1 }
+        item:  #Carcass
+    }
+} @family(operations)

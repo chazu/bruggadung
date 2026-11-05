@@ -868,8 +868,19 @@ REALITY.md, PRF = PERFORMANCE.md, TER = TERRAIN.md, TES = TESSERA.md, VIL = VILL
   with more than one sense*. (VIL d5)
 - **Perishable**: good for so long after it was made, then spoiled. (VIL
   d8)
-- **Carcass**: what an animal's body is once it has died, to butcher.
-  (VIL d7)
+- **Carcass**: what an animal's body is once it has died, to butcher
+  into meat (its `yields`, so many cuts) and a hide. (VIL d7)
+- **Remains**: what any body is once its injury reaches 100 and it dies,
+  as heavy as it was: its blueprint's `remains`, a carcass for an animal,
+  a **corpse** for a person. (VIL d7)
+- **Instinct**: the goal an animal keeps all day, every day, taken on as
+  it first perceives (a deer's: to roam). A person has none. (AG d21)
+- **Herd**: the game of a kind the woods hold, kept up to so many by
+  animals coming in at the woods' edge (a scenario's input). (VIL d7)
+- **Range**: how far an operation's other roles may be from its actor, in
+  tiles: 1, beside it; a shot's 3. (AG d21)
+- **Lie in wait**: a hunter's way of looking for game: crouched, bow in
+  hand, a quarter-hour in one place, between short walks. (VIL d7)
 - **Stall**: where a seller sets out goods on **market day** (every fourth
   day, on the green), with its **posted prices**: written records of what
   it asks. (VIL d9)

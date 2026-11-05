@@ -4838,3 +4838,60 @@ had to rename. Each new topic would hit it again.
     `#Farming` its own, without `#Keeping`. Tests and hashes as they were.
 
 128 tests, 3940 checks.
+
+### After the slice: hunting (VILLAGE.md slice 7, issue #7)
+
+Animals, death, the bow, butchering, and the herds kept up; the Hunts
+hunt in the village.
+
+- **Death** is any body's (VILLAGE.md decision 7): `injure` sets the
+  injury and, at 100, `die` makes the body's `remains` (harm/'s field: a
+  carcass, a corpse) where it was, carved from it so its mass is the
+  same, drops what it held, and destroys it. Agency lets a dead agent's
+  mind go at the next boundary. test_death.
+- **Animals** (hunting/animals.tri): deer and hares, `#Animal`s with no
+  hands, `wary` 100, and an `instinct` to roam, which agency takes on for
+  any agent that has one as it first perceives (AGENCY.md decision 21).
+  Roaming is a kept goal done "lately" (`#Did`'s new `lately`): wander
+  (`#Wander`, a new step: a tile of woodland within ten, chosen from the
+  agent and the time) and graze an hour; a kept goal so done is woken
+  again when it lapses. A `#Sighted` premise (KNOWLEDGE.md decision 23)
+  over a person in sight now draws a #Danger, weighed at every perception
+  and drawn afresh while it holds, and `keep_away` runs from it. An
+  operation's new `range` (actions.tri) lets fleeing start from four
+  tiles off, and agency walks only within range. test_animals.
+- **The bow** (hunting/hunting.tri): crouch (hiding, bow in hand), and
+  shoot within three tiles, a wound of the bow's 40; the shot gives the
+  hunter away. test_bow.
+- **Butchering** (hunting/butchering.tri): a carcass, a hand free, is so
+  many cuts of raw meat in that hand (made a cut at a time and merged, so
+  count and mass are declared), its hide lying where it was, the rest
+  waste. test_butcher.
+- **The hunter's day**: `game_hunted`, kept through working hours, done at
+  40 kg of venison in the larder; meat home, butcher, stalk and shoot,
+  else lie in wait a quarter-hour between short walks. A `stalking` skill
+  draws #Game from deer and hares in sight, and `take_the_shot`
+  interrupts the wait. The game domain (src/domains_hunting.odin) brings
+  one in at the woods' edge every so often while there are fewer than so
+  many. test_hunting_week: a week, 120 cuts home, the deer running when
+  they see the hunter, the herd between 2 and 4 of its 4.
+- **The village**: the Hunts hold bows and hunt the eastern woods; seven
+  head of game to start, up to six deer and four hares, coming in from
+  the east edge. Two new checks: meat in the Hunts' larder (80 cuts of
+  venison and a hare by the third night), and the herds alive and within
+  bounds. 11.7 s at `-o:speed` (from 8.8 s): 25,803 boundaries, 54,038
+  perceptions, 57,850 decisions. Hunters walking all day doubled the
+  boundaries until they lay in wait; animals grazing an hour, not twenty
+  minutes, cut them again.
+- **Found on the way**: a stack's count isn't perceived, so a condition
+  on it never held of what an agent knows: the woodcutters' woodpile was
+  never "stocked". It reads mass now (three tonnes), and names the bound
+  woodpile in its `find`. Fleeing walked up to whom it fled, before
+  `range`. `test_farming_weeks` released its activities twice
+  (`activities_with_world` already autoreleases), which an Odin
+  `-sanitize:address` build found once more tests ran after it.
+- Every scenario's hashes change: agents have four new fields (`remains`,
+  `wary`, `instinct`, `stalking`); the cistern and marked-nail runs differ
+  only in those.
+
+133 tests, 3986 checks.

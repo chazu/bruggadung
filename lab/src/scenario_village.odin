@@ -20,15 +20,22 @@ package lab
  * block two of them, a farmer to one, with seed kept back in the larder: all
  * sown the first day, ripe a fortnight on.
  *
+ * The hunters hunt the eastern woods (content/hunting/), bows in hand: lying
+ * in wait, stalking what they see, butchering what they shoot, and bringing
+ * the meat home, until the larder holds two deer's worth. Deer and hares
+ * roam there and run from people they see; the herds are kept up from the
+ * east edge, six deer and four hares at most (the game domain).
+ *
  * The run goes boundary by boundary up to each check's time, putting none
  * in of its own (as the watcher runs it), so `lab run village` and a
  * watched village are the same run. The checks, for three days and nights:
  * everyone taking a meal to work at 07:30, at work at 11:00 (about its
  * worksite, or about its work: a woodcutter in the woods, or on its way
- * home with firewood), the meal
+ * home with firewood; a hunter on the hunt), the meal
  * eaten there by 14:30, every plot sown by 15:00 the first day, home by
  * 21:00, asleep in their own bed at 02:00;
- * and at the end, each household's larder emptied by what it ate, and
+ * and at the end, each household's larder emptied by what it ate, meat in
+ * the hunters' larder, the herds alive and within their bounds, and
  * nobody's reserves fallen.
  */
 
@@ -82,6 +89,20 @@ village_plots := [4]Village_Plot {
 	{1, "turnip_plot", {79, 76}, 18, 17},
 }
 
+/* The game in the eastern woods at the start (content/hunting/): deer and
+ * hares about the Hunts' blind. */
+@(private = "file")
+Village_Game :: struct {
+	blueprint: cstring,
+	at:        [2]i32,
+}
+
+@(private = "file", rodata)
+village_game := [7]Village_Game {
+	{"deer", {142, 35}}, {"deer", {150, 52}}, {"deer", {140, 68}}, {"deer", {153, 80}},
+	{"hare", {146, 42}}, {"hare", {138, 58}}, {"hare", {151, 64}},
+}
+
 /* The seed each household keeps back, by blueprint (village.tri). */
 @(private = "file", rodata)
 village_seed := [4][2]cstring {
@@ -109,6 +130,7 @@ Village :: struct {
 	bodies:       ^Bodies,
 	air:          ^Atmosphere,       // burns what is in the stoves
 	farming:      ^Farming,          // ripens the crops
+	game:         ^Game,             // keeps the herds up
 	people:       [dynamic]Villager,
 	larders:      [4]Entity_ID,      // each household's, by its index
 	stoves:       [4]Entity_ID,
@@ -140,6 +162,7 @@ village_init_with_world :: proc(world: ^World, committer: ^Committer) -> ^Villag
 	self.bodies     = bodies_init_with_world(world)
 	self.air        = atmosphere_init_with_world(world)
 	self.farming    = farming_init_with_world(world)
+	self.game       = game_init_with_world(world)
 	self.scheduler  = scheduler_init_with_world(world, committer)
 	/* a diagnostic event is kept a day, then counted (KNOWLEDGE.md decision 21) */
 	world_set_history_window(world, 86400000)
@@ -147,6 +170,12 @@ village_init_with_world :: proc(world: ^World, committer: ^Committer) -> ^Villag
 	scheduler_add_domain(self.scheduler, bodies_as_domain(self.bodies))
 	scheduler_add_domain(self.scheduler, atmosphere_as_domain(self.air))
 	scheduler_add_domain(self.scheduler, farming_as_domain(self.farming))
+	scheduler_add_domain(self.scheduler, game_as_domain(self.game))
+	/* the herds of the eastern woods, kept up from the east edge (VILLAGE.md
+	 * decision 7): six deer at most, four hares, one a quarter-day */
+	edge := [][2]i32{{159, 20}, {159, 45}, {159, 70}, {159, 90}}
+	game_add_herd(self.game, "deer", 6, 6 * VILLAGE_HOUR, 6 * VILLAGE_HOUR, edge)
+	game_add_herd(self.game, "hare", 4, 6 * VILLAGE_HOUR, 6 * VILLAGE_HOUR, edge)
 	scheduler_set_activities(self.scheduler, activities_as_activity_clock(self.activities))
 	scheduler_set_perception(self.scheduler, knowledge_as_perception_phase(self.knowledge))
 	scheduler_set_decision(self.scheduler, agency_as_decision_phase(self.agency))
@@ -165,6 +194,7 @@ village_dealloc :: proc(self: ^Village) {
 	release(self.bodies)
 	release(self.air)
 	release(self.farming)
+	release(self.game)
 	delete(self.people)
 	for list in self.plots do delete(list)
 	for r in self.results do delete(r)
@@ -220,6 +250,8 @@ village_setup :: proc(self: ^Village) {
 			                                on_tile(h.works.x - 1 + i32(i), h.works.y + 1, 0))
 			append(&handles, Villager{person, k, bed, works[k]})
 			village_own(g, person, bed, "a bed of one's own")
+			/* a hunter's bow, in hand */
+			if h.worksite == "hunting_blind" do proposal_group_create(g, "bow", "a bow", held_by(person, 0))
 		}
 		/* the household's things, each of its people's */
 		for v in handles[first:] {
@@ -244,6 +276,10 @@ village_setup :: proc(self: ^Village) {
 			}
 			proposal_group_create(g, "axe", "an axe", on_tile(h.works.x - 1, h.works.y, 0))
 			proposal_group_create(g, "axe", "an axe", on_tile(h.works.x + 1, h.works.y, 0))
+		}
+		/* about the hunting blind, the eastern woods' game */
+		if h.worksite == "hunting_blind" {
+			for at in village_game do proposal_group_create(g, at.blueprint, at.blueprint, on_tile(at.at.x, at.at.y, 0))
 		}
 	}
 	committer_submit(c, g)
@@ -323,7 +359,10 @@ village_setup :: proc(self: ^Village) {
 		                                  VILLAGE_DAY, {{"stove", stove}}) &&
 		      (households[v.household].worksite != "chopping_block" ||
 		       agency_undertake_every_with(self.agency, v.id, "woodpile_stocked", 7 * VILLAGE_HOUR, 15 * VILLAGE_HOUR, "work",
-		                                   VILLAGE_DAY, {{"woodpile", pile}}))
+		                                   VILLAGE_DAY, {{"woodpile", pile}})) &&
+		      (households[v.household].worksite != "hunting_blind" ||
+		       agency_undertake_every_with(self.agency, v.id, "game_hunted", 7 * VILLAGE_HOUR, 15 * VILLAGE_HOUR, "work",
+		                                   VILLAGE_DAY, {{"larder", larder}}))
 		/* a farmer's plot: one of its household's, by turns (the Ashes' three
 		 * over their two, two Brooks to each of theirs), so it carries one
 		 * kind of seed; bound to the plot as it knows it, and the household's
@@ -416,8 +455,9 @@ village_run :: proc(self: ^Village) {
 		village_check(self, false, "set up", self.error)
 		return
 	}
-	woodcutters := -1
+	woodcutters, hunters := -1, -1
 	for h, k in households do if h.worksite == "chopping_block" do woodcutters = k
+	for h, k in households do if h.worksite == "hunting_blind" do hunters = k
 	stocked := village_firewood_in(self.world, self.woodpiles[woodcutters])
 	for d in 0 ..< i64(VILLAGE_DAYS) {
 		village_step_until(self, d * VILLAGE_DAY + 7 * VILLAGE_HOUR + VILLAGE_HOUR / 2)
@@ -455,6 +495,17 @@ village_run :: proc(self: ^Village) {
 		              fmt.tprintf("not: %s", strings.join(cold[:], ", ", context.temp_allocator)))
 	}
 	village_check_larders(self)
+	/* the hunters' work: meat brought home; the game kept up (VILLAGE.md
+	 * decision 7) */
+	meat: i64
+	inside: [16]Entity_ID
+	for e in inside[:world_entities_at(self.world, self.larders[hunters], .In, raw_data(inside[:]), 16)] {
+		if u := world_unit_of(self.world, e); u != nil && (u == "venison" || u == "hare meat") do meat += world_units_of(self.world, e)
+	}
+	village_check(self, meat > 0, "the hunters brought meat home", "none in their larder")
+	deer, hares := game_count(self.world, "deer"), game_count(self.world, "hare")
+	village_check(self, deer >= 1 && deer <= 6 && hares >= 1 && hares <= 4, "the herds neither vanished nor outgrew the woods",
+	              fmt.tprintf("%d deer, %d hares", deer, hares))
 	hungry := make([dynamic]string, context.temp_allocator)
 	for v in self.people {
 		if reserves(hungry_of(self.world, v.id), world_time(self.world).ms) < 100 do append(&hungry, fmt.tprintf("%d", v.id))
@@ -542,7 +593,8 @@ village_at_work :: proc(self: ^Village, v: Villager) -> bool {
 	if la.form == .On_Tile && lw.form == .On_Tile && la.level == lw.level && abs(la.x - lw.x) <= 6 && abs(la.y - lw.y) <= 6 {
 		return true
 	}
-	return agency_intends(self.agency, v.id, "woodpile_stocked") || agency_intends(self.agency, v.id, "plot_tended")
+	return agency_intends(self.agency, v.id, "woodpile_stocked") || agency_intends(self.agency, v.id, "plot_tended") ||
+	       agency_intends(self.agency, v.id, "game_hunted")
 }
 
 

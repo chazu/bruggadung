@@ -78,8 +78,13 @@
 // it is seen worn at least this much (a part's `wear`); weighed again as
 // it is seen, so a part serviced stops being so
 #Wearing:    #Premise & { wearing: int }
+// it is in sight now, seen as this kind ("#Agent": a person); weighed at
+// every perception, so it stops holding once it is out of sight
+#Sighted:    #Premise & { sighted: text }
 
-#Skill: "painting"
+// What a rule may need of the agent: a skill, an #Agent field of its name
+// (`wary`, an animal's; `stalking`, a hunter's: hunting/).
+#Skill: "painting" | "wary" | "stalking"
 
 // `concludes` is a #Finding type; `weight` the credence it lends, in dB. A
 // `deliberate` rule takes thought: it is drawn only when the agent

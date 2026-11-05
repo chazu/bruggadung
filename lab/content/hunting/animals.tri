@@ -1,0 +1,121 @@
+// Hunting, the animals: deer and hares, agents with no hands and two goals,
+// to roam their range and keep away from people (VILLAGE.md decision 7,
+// slice 7).
+//
+// Cut points:
+// - full:     an animal roams: it wanders to a spot of woodland within ten
+//             tiles and grazes there an hour, again and again, all day (a
+//             kept goal, undertaken for it as it comes into the world).
+//             One that sees a person (an #Agent that is no animal) in sight
+//             now holds it a #Danger, and runs off from it, out of sight;
+//             seen again, it runs again. A hunter hiding is seen only from
+//             beside it (things.tri's `hiding`). Struck, it gets clear
+//             (harm/).
+// - reduced:  the same, decided on the cadence's beat.
+// - abstract: as reduced. A herd as a count at a place, below reduced, is
+//             open (VILLAGE.md decision 3).
+// - frozen:   it doesn't decide; what is under way waits.
+// - body:     its injury is things.tri's; at 100 it dies, its remains a
+//             carcass (harm/, butchering.tri).
+// - knowledge: the #Danger is drawn only by an agent with the skill `wary`
+//             (an animal's; a person's is 0), from a #Sighted premise
+//             (knowledge.tri), weighed at every perception.
+// - code:     the #Wander step (src/agency_agency.odin); the #Sighted
+//             premise (src/know_knowledge_1.odin); the herd kept up by
+//             animals coming in at the woods' edge (src/domains_hunting.odin).
+
+package hunting
+
+// An animal's instincts: as a rule's skill, how keenly it reads people as
+// danger (a person's is 0); and the goal it keeps all day, every day,
+// which agency takes on for it when it first perceives (a person's is
+// none: its days are its commitments).
+#Agent: {
+    wary:     *0 | int & >=0 & <=100 @field(content, saved, inspect)
+    instinct: *"" | text             @field(content, saved, inspect)
+}
+
+// An animal: wary, roaming, and no hands.
+#Animal: #Agent & { hands: 0, wary: *100 | int, instinct: *"roam" | text }
+#Deer:   #Animal & {}
+#Hare:   #Animal & {}
+
+deer_seen: #Seen & { kindOf: "#Deer" } @family(seen)
+hare_seen: #Seen & { kindOf: "#Hare" } @family(seen)
+
+deer_look: #Look & { kindOf: "#Deer", look: "animal.deer" } @family(looks)
+hare_look: #Look & { kindOf: "#Hare", look: "animal.hare" } @family(looks)
+
+// A deer, and a hare; each dies into a carcass of its own (butchering.tri).
+deer: #Deer & { material: "flesh", mass: 60kg, coat: "brown", remains: "deer_carcass" }
+hare: #Hare & { material: "flesh", mass: 3kg, coat: "grey", remains: "hare_carcass" }
+
+// The tests' deer that stands where it is put, roaming nowhere.
+standing_deer: #Deer & { material: "flesh", mass: 60kg, coat: "brown", remains: "deer_carcass", instinct: "" }
+
+// A person in sight, to an animal: danger.
+#Danger: #Finding & {}
+
+wary_of_people: #Rule & {
+    premises:  [#Sighted & { sighted: "#Agent" }]
+    skill:     "wary"
+    mastery:   1
+    concludes: "#Danger"
+    weight:    20
+} @family(rules)
+
+// Keeping away: from the one it sees.
+#Wariness: #Frame & { danger: #Agent }
+
+keep_away: #Goal & {
+    title:  "keep away"
+    done:   #Did & { did: "flee" }
+    arises: { finding: "#Danger", slot: "danger", lapse: 1h, of: #Agent }
+    worth:  [#Flat & { value: 60 }]
+} @family(goals)
+
+run_off: #Method & {
+    title: "run off"
+    goal:  "keep_away"
+    rank:  1
+    pre:   { find: ["danger"], match: #Wariness & { danger: #Agent } }
+    steps: [#Do & { op: "flee", object: "danger" }]
+} @family(methods)
+
+// Roaming: through the day, somewhere in the woods, then grazing there.
+#Roaming: #Frame & {}
+
+roam: #Goal & {
+    title: "roam"
+    done:  #Did & { did: "graze", lately: 61min }
+    kept:  true
+} @family(goals)
+
+wander_and_graze: #Method & {
+    title:    "wander and graze"
+    goal:     "roam"
+    rank:     1
+    pre:      { find: [], match: #Roaming & {} }
+    sequence: true
+    steps:    [#Wander & { radius: 10, over: "woodland" }, #Do & { op: "graze" }]
+} @family(methods)
+
+// Grazing: an hour in one spot, resting.
+graze: #Operation & {
+    effect:   "rest"
+    duration: 1h
+    uses:     ["legs"]
+    roles: {
+        actor: #Animal & { place: #OnTile }
+    }
+} @family(operations)
+
+
+// The hunting tests' woods (src/test_hunting.odin): woodland of 35 by 24,
+// with a strip of grass along its west edge.
+woods_map: #Map & {
+    legend: [{ glyph: ",", terrain: "grass" },
+             { glyph: ";", terrain: "woodland" }]
+    levels: [{ z: 0, rows: _ @embed(file="maps/woods.0.map", type=text) }]
+    fill:   "woodland"
+}

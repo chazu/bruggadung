@@ -9,7 +9,7 @@ village` checks it, as the other scenarios are checked.
 
 This document is a proposal, built a slice at a time: slices 1 (hunger
 over weeks), 2 (looks in content), 3 (the village and its homes), 4
-(cooking and the larder), 5 (firewood) and 6 (farming) are built. Each slice below is a ticket: slice n is GitHub issue #n
+(cooking and the larder), 5 (firewood), 6 (farming) and 7 (hunting) are built. Each slice below is a ticket: slice n is GitHub issue #n
 (label `village`). A slice moves into `lab/PLAN.md` when it is built.
 
 It is the first scenario that runs for weeks, not minutes. That forces two
@@ -136,8 +136,29 @@ things the lab put off:
    stalking, then a blow or a shot (harm.tri). An animal whose injury
    reaches 100 dies: its entity becomes a **carcass**, a body to butcher
    into meat and a hide. Death was left for a scenario of its own (AGENCY.md
-   d17); this is the scenario, for animals. Whether people can die too is
-   an open question.
+   d17); this is the scenario, for animals.
+   - Built (content/hunting/). **Death is any body's**: whoever's injury
+     reaches 100 dies, its **remains** (its blueprint's: a carcass, or a
+     person's corpse) made where it was and as heavy, what it held
+     dropped, its mind let go (AGENCY.md decision 21). Nothing in the
+     village hurts a person, so only animals die.
+   - An animal keeps its **instinct**, to roam, all day: it wanders to a
+     spot of woodland within ten tiles and grazes there an hour. One that
+     sees a person in sight now holds it a #Danger (KNOWLEDGE.md decision
+     23) and runs out of sight; seen again, it runs again.
+   - **The hunt is a bow, while stalking.** A hunter crouches, hiding
+     (seen only from beside it), and shoots game within three tiles (an
+     operation's `range`): a wound of 40, and the shot gives it away. Its
+     day is a kept goal, the larder holding two deer's worth of venison:
+     it takes home meat it holds, butchers a carcass it knows of, stalks
+     game it sees, and otherwise **lies in wait** a quarter-hour at a
+     time between short walks. Game coming into sight while it waits is a
+     #Game finding (its `stalking` skill), and taking the shot interrupts.
+   - A carcass is butchered where it lies, a hand free: its meat (a deer,
+     forty cuts of raw venison, 20 kg) in hand, its hide left lying.
+   - **Game comes in at the woods' edge** (the game domain, a scenario
+     input): while fewer than six deer or four hares live, one walks in
+     from the east edge every quarter-day.
 8. **Food spoils, in closed form** (slice 8). Meat and cooked food are
    **perishable**: made at a time, good for so long, then spoiled. A
    spoiled thing still exists, but it isn't food any more. Salting and
@@ -285,7 +306,7 @@ when it is built:
 4. **Cooking and the larder**: meals, eating at home (built).
 5. **Firewood**: trees, felling, splitting, the woodpile, stoking (built).
 6. **Farming**: plots, sowing, ripening, harvesting (built).
-7. **Hunting**: animals, death, butchering.
+7. **Hunting**: animals, death, butchering (built).
 8. **Perishing**: food that spoils.
 9. **The market**: coins, stalls, posted prices, sales.
 10. **A week in the village**: the scenario's checks and hashes in CI, and
@@ -323,14 +344,22 @@ New, and entered in the glossary with this document:
 
 ## Open questions
 
-- **Can people die?** Animals must (decision 7). With hunger over weeks
-  and nothing violent among villagers, a person in the village shouldn't
-  come close. The question is whether death is general from the start, or
-  for animals only until a scenario needs it for people.
-- **Where game comes from.** A few hunters over weeks would empty a fixed
-  herd. Animals might come in from the woods' edge while there are fewer
-  than so many, or the herd might breed. The first is a scenario input and
-  simple. The second is a topic of its own.
+- **Can people die?** Settled (decision 7): any body whose injury reaches
+  100 dies, a person into a corpse. Nothing in the village comes close.
+- **Where game comes from.** Settled (decision 7): it comes in at the
+  woods' edge while there are fewer than so many, a scenario input. A herd
+  that breeds is a topic of its own.
+- **Hides.** A carcass's hide is left where it was butchered: the hunter's
+  hands hold its bow and the meat. Carrying hides home, and dressing them
+  (the Hunts' other trade), wait for the market, which is where they go.
+- **The hunt is easy.** A shot always strikes, and a hunter lying in wait
+  sees most of what passes. Over a week, one hunter in a small wood fills
+  its larder in a day or two, then stops. A miss, game that learns where
+  hunters wait, or wind that carries scent would make it harder.
+- **What a stack is seen as.** A stack's count isn't perceived, only its
+  mass, so a condition on a count never holds of what an agent knows.
+  The woodcutters' "past three thousand pieces" was one, never done; it
+  is three tonnes now, and the hunters' two deer forty kilograms.
 - **Prices.** A posted price from the seller's values alone ignores what
   others ask. Whether sellers should read each other's stalls and follow is
   for after the first market works.
@@ -367,7 +396,7 @@ New, and entered in the glossary with this document:
   harvest as seed is a method of its own.
 - **Grouped perception.** A plot is one entity, so it is one referent. Many
   like things seen as one (a stand of trees, a herd) would be knowledge's
-  to group, a larger change (KNOWLEDGE.md); the herds of slice 7 may want
-  it.
+  to group, a larger change (KNOWLEDGE.md). The herds of slice 7 didn't
+  need it: ten animals at most, each its own agent and referent.
 - **Children.** The households are all adults. Children who eat but don't
   work would test the market harder.

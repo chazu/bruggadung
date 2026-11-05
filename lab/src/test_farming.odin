@@ -139,7 +139,7 @@ test_farming_weeks :: proc() {
 	bg_check(world_set_terrain_map(w, "farm_map", &why))
 	c := test_committer(w)
 	committer_set_tracing(c, false)
-	activities := autorelease(activities_with_world(w, c))
+	activities := activities_with_world(w, c)
 	knowledge  := autorelease(knowledge_init_with_world(w))
 	agency     := autorelease(agency_init_with_world(w, c, knowledge))
 	farming    := autorelease(farming_init_with_world(w))

@@ -11,9 +11,21 @@
 // - abstract: as reduced.
 // - frozen:   it neither perceives nor decides; contact raises it.
 // - body:     injury is things.tri's (#Agent), felt as pain less adrenaline.
-// - code:     effect_hit; effect_flee, to get clear.
+//             At 100 it dies, whoever it is (VILLAGE.md decision 7): it is
+//             its `remains`, a blueprint (a carcass, hunting/; else a
+//             corpse), as heavy as it was.
+// - code:     effect_hit; effect_flee, to get clear; injure and die
+//             (src/act_actions.odin), and agency forgetting the dead's mind.
 
 package harm
+
+// What a body is once it dies: a blueprint, made where it was and as heavy.
+#Agent: {
+    remains: *"corpse" | text @field(content, saved, inspect)
+}
+
+// What a person is once dead: nothing to butcher.
+corpse: #Body & { material: "flesh", mass: 1kg }
 
 // Harmed: who struck.
 #Harming: #Frame & { attacker: #Agent }

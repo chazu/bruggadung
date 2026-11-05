@@ -104,7 +104,7 @@ ground_tile :: proc(world: ^World, e: Entity_ID, tile: ^Location) -> bool {
 }
 
 
-view_can_reach :: proc(self: ^View, entity: Entity_ID) -> bool {
+view_can_reach :: proc(self: ^View, entity: Entity_ID, range: i32 = 1) -> bool {
 	here:  Location
 	there: Location
 
@@ -115,7 +115,7 @@ view_can_reach :: proc(self: ^View, entity: Entity_ID) -> bool {
 		east, south := world_area_extent(self.world, entity)
 		there = area_nearest(there, east, south, here)
 	}
-	return here.level == there.level && abs(here.x - there.x) <= 1 && abs(here.y - there.y) <= 1
+	return here.level == there.level && abs(here.x - there.x) <= range && abs(here.y - there.y) <= range
 }
 
 

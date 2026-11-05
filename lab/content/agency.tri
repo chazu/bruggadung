@@ -83,9 +83,10 @@
 
 // Conditions of what the agent did, not of how things are: it has looked
 // into the slot's referent since adopting the goal; an activity of the
-// operation it started since has completed.
+// operation it started since has completed (with `lately`, started no
+// longer ago than that, too: a kept goal done again and again).
 #Looked:  #Condition & { looked: text }
-#Did:     #Condition & { did: text }
+#Did:     #Condition & { did: text, lately: time }
 // ... it is within reach of the slot's referent.
 #Reached: #Condition & { reached: text }
 
@@ -111,6 +112,9 @@
 // seen, beside ground of the terrain kind `beside` that it has (the woods.
 // edge, to find trees).
 #Explore:    #MethodStep & { beside: text }
+// Wandering: a step to a tile no more than `radius` away, on ground of the
+// terrain kind `over`, chosen afresh each time (hunting/'s animals).
+#Wander:     #MethodStep & { radius: int, over: text }
 #Do:         #MethodStep & { op: text, object: text, target: text, units: int, says: #Utterance, regarding: text }
 
 // A way to achieve a goal. Its alternatives are tried by `rank`, lowest first,

@@ -1,10 +1,10 @@
-// Generated from Triangle content 4e732f974e168c44: do not edit. Type IDs are valid
+// Generated from Triangle content a707272fa2d681a9: do not edit. Type IDs are valid
 // only for this content; regenerate when it changes.
 package lab
 
 import tri "../../triangle/odin/triangle"
 
-CONTENT_HASH :: 0x4e732f974e168c44
+CONTENT_HASH :: 0xa707272fa2d681a9
 
 // Combustor, from #Combustor
 Combustor :: struct {
@@ -186,16 +186,20 @@ Agent :: struct {
 	hires: cstring,    // text; content, saved, proposable, inspect
 	honesty: i64,    // int, in quanta of 1; content, saved, proposable, inspect
 	injury: i64,    // int, in quanta of 1; content, saved, proposable, inspect
+	instinct: cstring,    // text; content, saved, inspect
 	memory: i64,    // int, in quanta of 1; content, saved, inspect
 	numbness: i64,    // int, in quanta of 1; content, saved, proposable, inspect
 	painting: i64,    // int, in quanta of 1; content, saved, inspect
 	quickness: i64,    // int, in quanta of 1; content, saved, proposable, inspect
+	remains: cstring,    // text; content, saved, inspect
 	respectful: i64,    // int, in quanta of 1; content, saved, proposable, inspect
 	riskTolerance: i64,    // int, in quanta of 1; content, saved, proposable, inspect
 	scruples: i64,    // int, in quanta of 1; content, saved, proposable, inspect
+	stalking: i64,    // int, in quanta of 1; content, saved, inspect
 	temper: i64,    // int, in quanta of 1; content, saved, proposable, inspect
 	trade: cstring,    // text; content, saved, proposable, inspect
 	trusting: i64,    // int, in quanta of 1; content, saved, proposable, inspect
+	wary: i64,    // int, in quanta of 1; content, saved, inspect
 }
 
 // Area, from #Area
@@ -207,6 +211,18 @@ Area :: struct {
 // Assembly, from #Assembly
 Assembly :: struct {
 	slots: i64,    // int, in quanta of 1; content, saved, inspect, perceive(sight)
+}
+
+// Bow, from #Bow
+Bow :: struct {
+	wounds: i64,    // int, in quanta of 1; content, saved, inspect
+}
+
+// Carcass, from #Carcass
+Carcass :: struct {
+	cuts: i64,    // int, in quanta of 1; content, saved, inspect
+	hide: cstring,    // text; content, saved, inspect
+	yields: cstring,    // text; content, saved, inspect
 }
 
 // Cock, from #Cock
@@ -371,78 +387,78 @@ Fastener :: struct {
 }
 
 // #ActivityStatus
-ACTIVITYSTATUS_ABORTED :: 654
-ACTIVITYSTATUS_COMPLETED :: 655
-ACTIVITYSTATUS_EXHAUSTED :: 656
-ACTIVITYSTATUS_FAILED :: 657
-ACTIVITYSTATUS_RUNNING :: 658
-ACTIVITYSTATUS_SUSPENDED :: 659
+ACTIVITYSTATUS_ABORTED :: 713
+ACTIVITYSTATUS_COMPLETED :: 714
+ACTIVITYSTATUS_EXHAUSTED :: 715
+ACTIVITYSTATUS_FAILED :: 716
+ACTIVITYSTATUS_RUNNING :: 717
+ACTIVITYSTATUS_SUSPENDED :: 718
 
 // #Tie
-TIE_EMPLOY :: 757
-TIE_FRIEND :: 758
-TIE_KIN :: 759
-TIE_SWORN :: 760
+TIE_EMPLOY :: 821
+TIE_FRIEND :: 822
+TIE_KIN :: 823
+TIE_SWORN :: 824
 
 // #ClaimKind
-CLAIMKIND_CUSTODY :: 661
-CLAIMKIND_OWNERSHIP :: 662
-CLAIMKIND_RESERVATION :: 663
+CLAIMKIND_CUSTODY :: 720
+CLAIMKIND_OWNERSHIP :: 721
+CLAIMKIND_RESERVATION :: 722
 
 // #Penalty
-PENALTY_FINE :: 745
-PENALTY_ARREST :: 776
-PENALTY_CONFISCATE :: 777
+PENALTY_FINE :: 807
+PENALTY_ARREST :: 840
+PENALTY_CONFISCATE :: 841
 
 // #Wrong
-WRONG_ANOTHERS :: 768
-WRONG_UNAUTHORIZED :: 769
+WRONG_ANOTHERS :: 832
+WRONG_UNAUTHORIZED :: 833
 
 // #Material
-MATERIAL_CLOTH :: 727
-MATERIAL_EARTH :: 728
-MATERIAL_FOOD :: 729
-MATERIAL_LEATHER :: 730
-MATERIAL_GRAIN :: 732
-MATERIAL_RUBBER :: 733
-MATERIAL_STONE :: 734
-MATERIAL_TURNIP :: 735
-MATERIAL_FLESH :: 779
-MATERIAL_BRASS :: 781
-MATERIAL_IRON :: 782
-MATERIAL_PAPER :: 783
-MATERIAL_STEEL :: 784
-MATERIAL_BIRCH :: 786
-MATERIAL_OAK :: 787
+MATERIAL_CLOTH :: 789
+MATERIAL_EARTH :: 790
+MATERIAL_FOOD :: 791
+MATERIAL_LEATHER :: 792
+MATERIAL_GRAIN :: 794
+MATERIAL_RUBBER :: 795
+MATERIAL_STONE :: 796
+MATERIAL_TURNIP :: 797
+MATERIAL_FLESH :: 843
+MATERIAL_BRASS :: 845
+MATERIAL_IRON :: 846
+MATERIAL_PAPER :: 847
+MATERIAL_STEEL :: 848
+MATERIAL_BIRCH :: 850
+MATERIAL_OAK :: 851
 
 // "flesh" | "metal" | "natural" | "paper" | "wood"
-BODY_SURFACE_NATURAL :: 487
-BODY_SURFACE_FLESH :: 779
-BODY_SURFACE_BRASS :: 781
-BODY_SURFACE_IRON :: 782
-BODY_SURFACE_PAPER :: 783
-BODY_SURFACE_STEEL :: 784
-BODY_SURFACE_BIRCH :: 786
-BODY_SURFACE_OAK :: 787
+BODY_SURFACE_NATURAL :: 536
+BODY_SURFACE_FLESH :: 843
+BODY_SURFACE_BRASS :: 845
+BODY_SURFACE_IRON :: 846
+BODY_SURFACE_PAPER :: 847
+BODY_SURFACE_STEEL :: 848
+BODY_SURFACE_BIRCH :: 850
+BODY_SURFACE_OAK :: 851
 
 // #Colour
-COLOUR_BLUE :: 666
-COLOUR_BLACK :: 668
-COLOUR_BROWN :: 669
-COLOUR_GREEN :: 670
-COLOUR_GREY :: 671
-COLOUR_NAVY :: 672
-COLOUR_ORANGE :: 673
-COLOUR_PURPLE :: 674
-COLOUR_RED :: 675
-COLOUR_YELLOW :: 676
-COLOUR_BEIGE :: 696
-COLOUR_WHITE :: 723
+COLOUR_BLUE :: 725
+COLOUR_BLACK :: 727
+COLOUR_BROWN :: 728
+COLOUR_GREEN :: 729
+COLOUR_GREY :: 730
+COLOUR_NAVY :: 731
+COLOUR_ORANGE :: 732
+COLOUR_PURPLE :: 733
+COLOUR_RED :: 734
+COLOUR_YELLOW :: 735
+COLOUR_BEIGE :: 757
+COLOUR_WHITE :: 785
 
 // "bare" | "ripe" | "sown"
-PLOT_STANDS_BARE :: 346
-PLOT_STANDS_RIPE :: 537
-PLOT_STANDS_SOWN :: 563
+PLOT_STANDS_BARE :: 368
+PLOT_STANDS_RIPE :: 586
+PLOT_STANDS_SOWN :: 614
 
 // The field registry: what code needs to read and write any component
 // generically.
@@ -470,7 +486,7 @@ Component_Info :: struct {
 	fields:  [^]Field_Info,
 }
 
-COMPONENT_COUNT :: 45
+COMPONENT_COUNT :: 47
 
 @(rodata) Combustor_fields := [?]Field_Info{
 	{"burnRate", offset_of(Combustor, burnRate), VALUE_QUANTITY, "int", "content, saved, inspect"},
@@ -611,16 +627,20 @@ COMPONENT_COUNT :: 45
 	{"hires", offset_of(Agent, hires), VALUE_TEXT, "text", "content, saved, proposable, inspect"},
 	{"honesty", offset_of(Agent, honesty), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
 	{"injury", offset_of(Agent, injury), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
+	{"instinct", offset_of(Agent, instinct), VALUE_TEXT, "text", "content, saved, inspect"},
 	{"memory", offset_of(Agent, memory), VALUE_QUANTITY, "int", "content, saved, inspect"},
 	{"numbness", offset_of(Agent, numbness), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
 	{"painting", offset_of(Agent, painting), VALUE_QUANTITY, "int", "content, saved, inspect"},
 	{"quickness", offset_of(Agent, quickness), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
+	{"remains", offset_of(Agent, remains), VALUE_TEXT, "text", "content, saved, inspect"},
 	{"respectful", offset_of(Agent, respectful), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
 	{"riskTolerance", offset_of(Agent, riskTolerance), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
 	{"scruples", offset_of(Agent, scruples), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
+	{"stalking", offset_of(Agent, stalking), VALUE_QUANTITY, "int", "content, saved, inspect"},
 	{"temper", offset_of(Agent, temper), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
 	{"trade", offset_of(Agent, trade), VALUE_TEXT, "text", "content, saved, proposable, inspect"},
 	{"trusting", offset_of(Agent, trusting), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
+	{"wary", offset_of(Agent, wary), VALUE_QUANTITY, "int", "content, saved, inspect"},
 }
 @(rodata) Area_fields := [?]Field_Info{
 	{"east", offset_of(Area, east), VALUE_QUANTITY, "int", "content, saved, proposable, inspect, perceive(sight)"},
@@ -628,6 +648,14 @@ COMPONENT_COUNT :: 45
 }
 @(rodata) Assembly_fields := [?]Field_Info{
 	{"slots", offset_of(Assembly, slots), VALUE_QUANTITY, "int", "content, saved, inspect, perceive(sight)"},
+}
+@(rodata) Bow_fields := [?]Field_Info{
+	{"wounds", offset_of(Bow, wounds), VALUE_QUANTITY, "int", "content, saved, inspect"},
+}
+@(rodata) Carcass_fields := [?]Field_Info{
+	{"cuts", offset_of(Carcass, cuts), VALUE_QUANTITY, "int", "content, saved, inspect"},
+	{"hide", offset_of(Carcass, hide), VALUE_TEXT, "text", "content, saved, inspect"},
+	{"yields", offset_of(Carcass, yields), VALUE_TEXT, "text", "content, saved, inspect"},
 }
 @(rodata) Cock_fields := [?]Field_Info{
 	{"serves", offset_of(Cock, serves), VALUE_TEXT, "text", "content, saved, inspect"},
@@ -768,9 +796,11 @@ COMPONENTS := [COMPONENT_COUNT + 1]Component_Info{
 	{"Law", "#Law", size_of(Law), 6, &Law_fields[0]},
 	{"Organization", "#Organization", size_of(Organization), 1, &Organization_fields[0]},
 	{"Body", "#Body", size_of(Body), 5, &Body_fields[0]},
-	{"Agent", "#Agent", size_of(Agent), 24, &Agent_fields[0]},
+	{"Agent", "#Agent", size_of(Agent), 28, &Agent_fields[0]},
 	{"Area", "#Area", size_of(Area), 2, &Area_fields[0]},
 	{"Assembly", "#Assembly", size_of(Assembly), 1, &Assembly_fields[0]},
+	{"Bow", "#Bow", size_of(Bow), 1, &Bow_fields[0]},
+	{"Carcass", "#Carcass", size_of(Carcass), 3, &Carcass_fields[0]},
 	{"Cock", "#Cock", size_of(Cock), 2, &Cock_fields[0]},
 	{"Container", "#Container", size_of(Container), 1, &Container_fields[0]},
 	{"Inscription", "#Copy", size_of(Inscription), 6, &Inscription_fields[0]},

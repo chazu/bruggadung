@@ -228,10 +228,10 @@ referent_extent :: proc(r: ^Referent) -> (east: i32, south: i32) {
 
 /* Whether `me` is believed within reach of a referent: on its tile or
  * beside it, or an area's, any of them. */
-referent_in_reach :: proc(me: ^Referent, r: ^Referent) -> bool {
+referent_in_reach :: proc(me: ^Referent, r: ^Referent, range: i32 = 1) -> bool {
 	if r == nil || me == nil || me.level != r.level do return false
 	east, south := referent_extent(r)
-	return me.x >= r.x - 1 && me.x <= r.x + east && me.y >= r.y - 1 && me.y <= r.y + south
+	return me.x >= r.x - range && me.x <= r.x + east - 1 + range && me.y >= r.y - range && me.y <= r.y + south - 1 + range
 }
 
 

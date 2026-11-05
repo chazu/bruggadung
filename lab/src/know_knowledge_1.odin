@@ -1858,6 +1858,7 @@ Premise_Kind :: enum u8 {
 	Repeated,           /* `n` times put in the same place: the usual place */
 	Wearing,            /* wear seen at least `n` */
 	Near,               /* a trace of the kind on the floor at it or beside it */
+	Sighted,            /* in sight now, seen as the kind */
 }
 
 Read_Premise :: struct {
@@ -1877,6 +1878,7 @@ Read_Rule :: struct {
 	mastery:    i64,
 	weight:     i32,
 	repeated:   bool,               /* weighed again as what it watches changes */
+	sighted:    bool,               /* over what is in sight now: weighed at every perception */
 	premises:   []Read_Premise,
 	/* what its premises read beyond the referent's own looks and evidence
 	 * (PERFORMANCE.md decision 2) */
@@ -1945,14 +1947,17 @@ know_rules :: proc(self: ^Knowledge) -> []Read_Rule {
 				p.n    = lo
 			} else if v = tri.at(tc, premise, "near"); v != nil && tri.print(tc, v, &text[0], size_of(text)) > 2 {
 				p.kind = .Near
+			} else if v = tri.at(tc, premise, "sighted"); v != nil && tri.print(tc, v, &text[0], size_of(text)) > 2 {
+				p.kind = .Sighted
 			}
-			if p.kind == .Sign || p.kind == .Formerly || p.kind == .Unworn || p.kind == .Near {
+			if p.kind == .Sign || p.kind == .Formerly || p.kind == .Unworn || p.kind == .Near || p.kind == .Sighted {
 				text[len(k1_buf(text[:])) - 1] = 0
 				p.text = world_intern(self.world, cstring(&text[1]))
 			}
 			rule.misprint ||= p.kind == .Misprinted
 			rule.nearby   ||= p.kind == .Near
 			rule.usual    ||= p.kind == .Repeated
+			rule.sighted  ||= p.kind == .Sighted
 			append(&premises, p)
 		}
 		shrink(&premises)
@@ -1966,7 +1971,7 @@ know_rules :: proc(self: ^Knowledge) -> []Read_Rule {
 /* Whether the rule's premises hold of the referent, and what the last one
  * that chooses chose (a usual place). */
 @(private)
-know_premises_hold :: proc(store: ^Knowledge_Store, rule: ^Read_Rule, r: ^Referent) -> (holds: bool, choice: u32) {
+know_premises_hold :: proc(store: ^Knowledge_Store, rule: ^Read_Rule, r: ^Referent, now: i64) -> (holds: bool, choice: u32) {
 	holds = true
 	for &p in rule.premises {
 		if !holds do break
@@ -1983,6 +1988,7 @@ know_premises_hold :: proc(store: ^Knowledge_Store, rule: ^Read_Rule, r: ^Refere
 
 			holds = r.features != nil && know_int_feature(r.features, "wear", &worn) && worn >= p.n
 		case .Near:       holds = r.present && know_near(store, r, p.text)
+		case .Sighted:    holds = r.present && r.seen == now && r.kind != nil && string(r.kind) == string(p.text)
 		case .Unreadable: holds = false      /* a premise it can't read never holds */
 		}
 	}
@@ -2065,7 +2071,7 @@ knowledge_interpret :: proc(self: ^Knowledge, store: ^Knowledge_Store, deliberat
 				continue
 			}
 		}
-		all := deliberately || !store.eligible[ri] || rule.misprint || (rule.nearby && floorChanged) ||
+		all := deliberately || !store.eligible[ri] || rule.misprint || rule.sighted || (rule.nearby && floorChanged) ||
 		       (rule.usual && kindsChanged)
 		store.eligible[ri] = true
 		/* a rule over repetition is weighed again as what it is seen to do
@@ -2090,10 +2096,15 @@ knowledge_interpret :: proc(self: ^Knowledge, store: ^Knowledge_Store, deliberat
 				knowledge_store_retract_finding(store, rule.concludes, r.id)
 				continue
 			}
-			if existing != nil && !rule.repeated do continue
-			holds, choice = know_premises_hold(store, &rule, r)
+			if existing != nil && !rule.repeated && !rule.sighted do continue
+			holds, choice = know_premises_hold(store, &rule, r, world_time(self.world).ms)
 			if existing != nil {
-				if holds && choice == existing.choice do continue
+				/* what is in sight now is drawn afresh while it is (a danger
+				 * still there after running from it raises running again) */
+				if holds && choice == existing.choice {
+					if rule.sighted do existing.time = world_time(self.world).ms
+					continue
+				}
 				/* its premise no longer holds as it did: retracted (KNOWLEDGE.md §9) */
 				k1_say(news, fmt.tprintf("R%d: no longer %s (R%d), by %s", r.id, existing.kind,
 				                         existing.choice, existing.rule))
@@ -2134,7 +2145,7 @@ knowledge_interpret :: proc(self: ^Knowledge, store: ^Knowledge_Store, deliberat
 know_verify_skipped :: proc(self: ^Knowledge, store: ^Knowledge_Store, rule: ^Read_Rule, r: ^Referent) {
 	existing := knowledge_store_finding(store, rule.concludes, r.id)
 	if existing != nil && !rule.repeated do return
-	holds, choice := know_premises_hold(store, rule, r)
+	holds, choice := know_premises_hold(store, rule, r, world_time(self.world).ms)
 	if existing == nil && !holds do return
 	if existing != nil && holds && choice == existing.choice do return
 	self.interpretationMisses += 1

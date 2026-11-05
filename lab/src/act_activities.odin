@@ -616,7 +616,9 @@ activities_obstacle_to :: proc(self: ^Activities, a: Entity_ID, record: ^Activit
 	for i = 1; i < 3; i += 1 {
 		if bound[i] == NO_ENTITY do continue
 		if !world_is_live(self.world, bound[i]) do return fmt.tprintf("%d is gone", bound[i])
-		if !view_can_reach(view, bound[i]) do return fmt.tprintf("%d is out of reach", bound[i])
+		if !view_can_reach(view, bound[i], operation_range(self.world, world_text_field(self.world, "Activity.operation", a))) {
+			return fmt.tprintf("%d is out of reach", bound[i])
+		}
 	}
 	return ""
 }

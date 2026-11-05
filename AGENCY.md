@@ -122,6 +122,18 @@ Out of scope here, except where they touch agency:
     walk is given up, not suspended: there is only a way to find again.
     A walk is not a journey: that word is kept for travel by any means,
     in legs, which isn't built (GLOSSARY.md).
+21. **Animals are agents with an instinct, and the dead have no mind**
+    (VILLAGE.md decision 7). An agent whose `instinct` names a goal (an
+    animal's: hunting/'s `roam`) takes it on, all day every day, as it
+    first perceives; a person has none, its days being its commitments.
+    Roaming is a kept goal done "lately" (`#Did`'s `lately`: an activity
+    begun no longer ago than that), so done, it is due again once that
+    lapses, and the agent is woken then. A `#Wander` step walks to a
+    tile of a kind of ground within a radius, chosen from the agent and
+    the time, the walk not given up for having seen it. An operation's
+    `range` (actions.tri; a shot's 3, fleeing's 4) is how far its other
+    roles may be: the agent walks only until within it. A mind whose
+    agent is dead is let go at the next boundary.
 
 ## Terms
 

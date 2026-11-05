@@ -14,7 +14,7 @@ test_village :: proc() {
 	village := autorelease(village_init_with_world(w, test_committer(w)))
 	bg_check(village_error(village) == "")
 	village_run(village)
-	bg_check(len(village_results(village)) == 24 && village_failure_count(village) == 0)
+	bg_check(len(village_results(village)) == 26 && village_failure_count(village) == 0)
 	/* asleep at 02:00 on the third night: everyone's sleep is of its own bed */
 	for v in village.people {
 		bed := world_location_of(w, v.bed)
