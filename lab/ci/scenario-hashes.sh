@@ -14,6 +14,11 @@ else
     SHA="shasum -a 256"
 fi
 
+# A save's `content` line names the content it was made with, which any
+# change to the content changes; loading skips it, and so does the hash.
+# Everything else is by name, so content that only adds types leaves the
+# hashes as they were.
+#
 # Windows prints \r\n: the hashes are of the text, not its line endings
 hash() {
     tr -d '\r' | $SHA | cut -c1-16
@@ -23,6 +28,6 @@ for s in marked-nail marked-nail-a marked-nail-b cistern cistern-b cistern-d cis
     run=$("$LAB" run "$s" 2>&1 | tr -d '\r')
     printf '%-14s run %s save %s %s\n' "$s" \
         "$(printf '%s\n' "$run" | hash)" \
-        "$("$LAB" save "$s" 2>&1 | hash)" \
+        "$("$LAB" save "$s" 2>&1 | grep -v '^content ' | hash)" \
         "$(printf '%s\n' "$run" | grep -o 'state hash [0-9a-f]*' | tail -1)"
 done

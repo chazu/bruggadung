@@ -35,9 +35,12 @@ import tri "../../triangle/odin/triangle"
  *   edge <kind> <from> <to>
  *   tombstone <id> "<blueprint>" <successor> <cause> "<reason>"
  *   event <index> <boundary> <round> "<kind>" <subject> <other> <amount> <detail> <cause> <group> <location> <actor>
+ *                                        a type a field was set to is "<type name>"
  *   tile <x> <y> <level> water <mL>
  *   group <phase> <cause> <handles> "<source>" <actor>
- *   proposal <kind> <target> <unit> <other> <unit> <value> <edge> <name> <key> <handle> <location>
+ *   proposal <kind> <target> <unit> <other> <unit> <value> <edge> <name> <key> <handle> <location> <expects> <location>
+ *                                        a field set to a type: its value, and what it
+ *                                        expected, are "<type name>"
  *   domain <name> <what the domain keeps>
  *   end
  *
@@ -245,7 +248,13 @@ save :: proc(world: ^World, committer: ^Committer, domains: []Saved_System) -> s
 		ev = &kept
 		fmt.sbprintf(&out, "event %d %d %d", ev.index, ev.boundary, ev.round)
 		put_string(&out, ev.kind)
-		fmt.sbprintf(&out, " %d %d %d", ev.subject, ev.other, ev.amount)
+		/* a type a field was set to, by its name (other content can read it) */
+		if name := world_event_type_name(world, ev); name != nil {
+			fmt.sbprintf(&out, " %d %d", ev.subject, ev.other)
+			put_string(&out, name)
+		} else {
+			fmt.sbprintf(&out, " %d %d %d", ev.subject, ev.other, ev.amount)
+		}
 		put_string(&out, ev.detail)
 		fmt.sbprintf(&out, " %d %d", ev.cause, ev.group)
 		put_location(&out, ev.location)
@@ -274,10 +283,24 @@ save :: proc(world: ^World, committer: ^Committer, domains: []Saved_System) -> s
 		             1 if proposal_group_diagnostic(group) else 0)
 		for j: uint = 0; j < proposal_group_count(group); j += 1 {
 			p = &proposal_group_proposals(group)[j]
-			fmt.sbprintf(&out, "proposal %d %d %d %d %d %d %d", i32(p.kind),
-			             p.target.entity, p.target.unit,
-			             p.other.entity, p.other.unit,
-			             p.value, i32(p.edge))
+			/* a field set to a type, by the type's name, and what it was
+			 * expected to be too (other content can read it) */
+			if p.kind == .Set_Field && world_field_holds_type(world, p.name) {
+				fmt.sbprintf(&out, "proposal %d %d %d", i32(p.kind), p.target.entity, p.target.unit)
+				if p.expects {
+					put_string(&out, tri.type_name(world_tri(world), tri.Type(p.other.entity)))
+				} else {
+					fmt.sbprintf(&out, " %d", p.other.entity)
+				}
+				fmt.sbprintf(&out, " %d", p.other.unit)
+				put_string(&out, tri.type_name(world_tri(world), tri.Type(p.value)))
+				fmt.sbprintf(&out, " %d", i32(p.edge))
+			} else {
+				fmt.sbprintf(&out, "proposal %d %d %d %d %d %d %d", i32(p.kind),
+				             p.target.entity, p.target.unit,
+				             p.other.entity, p.other.unit,
+				             p.value, i32(p.edge))
+			}
 			put_string(&out, p.name)
 			put_string(&out, p.key)
 			fmt.sbprintf(&out, " %d", p.handle)
@@ -373,6 +396,16 @@ token_string :: proc(line: ^BG_Line, i: i32) -> cstring {
 	if i >= line.n do return nil
 	if !line.quoted[i] && string(line.tokens[i]) == "-" do return nil
 	return line.tokens[i]
+}
+
+
+// A type, by its name ("exhausted"); a problem if the content has none.
+@(private = "file")
+token_type :: proc(world: ^World, line: ^BG_Line, i: i32, problem: ^string) -> tri.Type {
+	if i >= line.n do return tri.BOTTOM
+	type := tri.type_named(world_tri(world), line.tokens[i])
+	if type == tri.BOTTOM do problem^ = fmt.tprintf("the content has no type %s", line.tokens[i])
+	return type
 }
 
 
@@ -600,6 +633,7 @@ restore :: proc(text: string, content: ^tri.Content, deferred: ^[]^Proposal_Grou
 			ev.subject  = token_u64(&line, 5)
 			ev.other    = token_u64(&line, 6)
 			ev.amount   = token_i64(&line, 7)
+			if line.n > 7 && line.quoted[7] do ev.amount = i64(token_type(world, &line, 7, &problem))
 			ev.detail   = world_intern(world, token_string(&line, 8)) if token_string(&line, 8) != nil else nil
 			ev.cause    = token_u64(&line, 9)
 			ev.group    = token_u64(&line, 10)
@@ -684,6 +718,8 @@ restore :: proc(text: string, content: ^tri.Content, deferred: ^[]^Proposal_Grou
 			p.location      = token_location(&line, 11)
 			p.expects       = token_i64(&line, 18) != 0
 			p.expected      = token_location(&line, 19)
+			if line.n > 4 && line.quoted[4] do p.other.entity = u64(token_type(world, &line, 4, &problem))
+			if line.n > 6 && line.quoted[6] do p.value = i64(token_type(world, &line, 6, &problem))
 			proposal_group_add_proposal(group, p)
 		} else if s == "domain" {
 			/* the domain's own: saved_domain_state */

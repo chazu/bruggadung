@@ -1089,11 +1089,17 @@ committer_describe_event :: proc(self: ^Committer, ev: ^Event) -> string {
 	where_: string
 
 	where_ = location_format(ev.location)
+	amount := ""
+	if name := world_event_type_name(self.world, ev); name != nil {
+		amount = fmt.tprintf(", %s", name)
+	} else if ev.amount != 0 {
+		amount = fmt.tprintf(", %d", ev.amount)
+	}
 	return fmt.tprintf("    event %d %s: %d%s%s%s%s%s%s",
 	                   ev.index, ev.kind, ev.subject,
 	                   ", other " if ev.other != NO_ENTITY else "",
 	                   fmt.tprintf("%d", ev.other) if ev.other != NO_ENTITY else "",
-	                   fmt.tprintf(", %d", ev.amount) if ev.amount != 0 else "",
+	                   amount,
 	                   fmt.tprintf(", %s", ev.detail) if ev.detail != nil else "",
 	                   ", to " if ev.location.form != .None else "",
 	                   where_ if ev.location.form != .None else "")

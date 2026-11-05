@@ -107,6 +107,20 @@ test_farming :: proc() {
 	scheduler_run_until(s, time_make(world_time(w).ms + 1200 * 1000))
 	bg_check(plot_of(w, plot).sown == 8)
 	bg_check(world_units_of(w, seed) + world_units_of(w, other_seed) == 468 + 500 - 8)
+
+	/* saved, how the plot stood (its events) and a change still to commit
+	 * (expecting it bare) are by name, not by type ID, which content
+	 * renumbers; restored, the same save again, and the same state */
+	g = proposal_group_group_with_phase(.System, "waiting: the plot sown")
+	proposal_group_set_of_to_expecting(g, "Plot.stands", whole(plot), i64(plot_stands(w, "sown")),
+	                                   i64(plot_stands(w, "bare")))
+	committer_submit(c, g)
+	text := save(w, c, nil)
+	bg_check(ns_contains(text, "\"\\\"ripe\\\"\" \"Plot.stands\""))
+	bg_check(ns_contains(text, "\"\\\"bare\\\"\" 0 \"\\\"sown\\\"\""))
+	c2: ^Committer
+	w2 := test_restore(text, world_content_build(w), &c2, &error)
+	bg_check(w2 != nil && save(w2, c2, nil) == text && world_state_hash(w2) == world_state_hash(w))
 }
 
 

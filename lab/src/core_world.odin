@@ -906,6 +906,24 @@ world_lookup_field :: proc(self: ^World, path: cstring, kind: ^uint, field: ^^Fi
 }
 
 
+// What a "changed" event set a field that holds a type to ("Activity.status"),
+// that type's name; nil for any other event. Traces, saves and the state
+// hash write it so: content renumbers type IDs.
+world_event_type_name :: proc(self: ^World, ev: ^Event) -> cstring {
+	if ev.kind != "changed" || ev.amount == 0 || !world_field_holds_type(self, ev.detail) do return nil
+	return tri.type_name(world_tri(self), tri.Type(ev.amount))
+}
+
+
+// Whether a field ("Plot.stands") holds a type: a union of strings, say.
+world_field_holds_type :: proc(self: ^World, path: cstring) -> bool {
+	kind: uint
+	f:    ^Field_Info
+
+	return path != nil && world_lookup_field(self, path, &kind, &f) && f.value == VALUE_TYPE
+}
+
+
 @(private = "file")
 field_get :: proc(f: ^Field_Info, record: rawptr) -> i64 {
 	p := rawptr(uintptr(record) + f.offset)
@@ -2553,14 +2571,17 @@ world_intern :: proc(self: ^World, string_: cstring) -> cstring {
 }
 
 
+// A record's fields, a type by its name: content renumbers type IDs.
 @(private = "file")
-hash_record :: proc(h: u64, info: ^Component_Info, record: rawptr) -> u64 {
+hash_record :: proc(self: ^World, h: u64, info: ^Component_Info, record: rawptr) -> u64 {
 	h := h
 	for i: uint = 0; i < info.nfields; i += 1 {
 		f := &info.fields[i]
 		if f.value == VALUE_TEXT {
 			text := (^cstring)(uintptr(record) + f.offset)^
 			h = mix_string(h, text if text != nil else "")
+		} else if f.value == VALUE_TYPE {
+			h = mix_string(h, tri.type_name(world_tri(self), tri.Type(field_get(f, record))))
 		} else {
 			h = mix(h ~ u64(field_get(f, record)))
 		}
@@ -2578,11 +2599,17 @@ world_state_hash :: proc(self: ^World) -> u64 {
 		h = mix_string(h, info.blueprint)
 		h = mix(h ~ info.seed)
 	}
-	for k: uint = 0; k < self.nkinds; k += 1 {
-		h = mix(h ~ u64(k))
+	/* the components by name, those no entity has passed over: content
+	 * renumbers them, and adds some */
+	kinds := make([]uint, self.nkinds, context.temp_allocator)
+	for k: uint = 0; k < self.nkinds; k += 1 do kinds[k] = k
+	slice.sort_by(kinds, proc(a, b: uint) -> bool {return string(COMPONENTS[a].name) < string(COMPONENTS[b].name)})
+	for k in kinds {
+		if store_count(self.kinds[k]) == 0 do continue
+		h = mix_string(h, COMPONENTS[k].name)
 		for i: uint = 0; i < store_count(self.kinds[k]); i += 1 {
 			h = mix(h ~ store_entity_at_index(self.kinds[k], i))
-			h = hash_record(h, &COMPONENTS[k], store_record_at_index(self.kinds[k], i))
+			h = hash_record(self, h, &COMPONENTS[k], store_record_at_index(self.kinds[k], i))
 		}
 	}
 	for i: uint = 0; i < store_count(self.locations); i += 1 {
@@ -2622,7 +2649,11 @@ world_state_hash :: proc(self: ^World) -> u64 {
 		ev := &self.events[i]
 		h = mix_string(h, ev.kind)
 		h = mix_string(h, ev.detail if ev.detail != nil else "")
-		h = mix(h ~ ev.subject ~ (ev.other << 24) ~ (u64(ev.amount) << 48))
+		amount := ev.amount
+		if name := world_event_type_name(self, ev); name != nil {
+			h, amount = mix_string(h, name), 0
+		}
+		h = mix(h ~ ev.subject ~ (ev.other << 24) ~ (u64(amount) << 48))
 		h = mix(h ~ ev.cause ~ (ev.group << 32) ~ ev.boundary)
 		h = mix(h ~ ev.actor)
 	}

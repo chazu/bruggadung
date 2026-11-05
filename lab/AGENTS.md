@@ -81,6 +81,11 @@ scenarios > ci/scenario-hashes.txt`) and says so in the commit.
   could reach output or state.
 - Integer arithmetic only, where the simulation is concerned: the same
   widths and truncating division the C had.
+- What reaches a hash names content, never numbers it: a type by its name
+  (`tri.type_name`), a component by its name, a terrain kind by its name.
+  Content renumbers all three whenever anything is added, so content that
+  only adds leaves every scenario's hashes as they were. A save's
+  `content` line is the one exception, and the hashes skip it.
 
 ## Content
 

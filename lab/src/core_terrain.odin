@@ -447,6 +447,12 @@ terrain_kind_info :: proc(t: ^Terrain, k: Terrain_Kind) -> ^Terrain_Info {
 	return &t.kinds[k] if k != 0 && uint(k) <= t.nkinds else nil
 }
 
+/* nil for 0 or none */
+terrain_kind_name :: proc(t: ^Terrain, k: Terrain_Kind) -> cstring {
+	info := terrain_kind_info(t, k)
+	return info.name if info != nil else nil
+}
+
 /* --- cells ------------------------------------------------------------------------------ */
 
 @(private = "file")
@@ -644,7 +650,9 @@ terrain_hash :: proc(t: ^Terrain) -> u64 {
 	k: uint
 
 	h = mix_string(0x7465727261696e, t.map_ if t.map_ != nil else "")
-	h = mix(h ~ u64(t.wide) ~ (u64(t.high) << 20) ~ (u64(t.levels) << 40) ~ (u64(t.fill) << 50))
+	/* kinds by name: content renumbers them */
+	h = mix(h ~ u64(t.wide) ~ (u64(t.high) << 20) ~ (u64(t.levels) << 40))
+	h = mix_string(h, terrain_kind_name(t, t.fill))
 	n = terrain_changed(t, nil, 0)
 	if n == 0 do return h
 	corners = make([^][3]i32, n)
@@ -655,7 +663,7 @@ terrain_hash :: proc(t: ^Terrain) -> u64 {
 		for k = 0; k < BG_CHUNK * BG_CHUNK; k += 1 {
 			if cells[k] != terrain_source(t, corners[i][0] + i32(k % BG_CHUNK), corners[i][1] + i32(k / BG_CHUNK),
 			                              corners[i][2]) {
-				h = mix(h ~ u64(k) ~ (u64(cells[k]) << 16))
+				h = mix_string(mix(h ~ u64(k)), terrain_kind_name(t, cells[k]))
 			}
 		}
 	}

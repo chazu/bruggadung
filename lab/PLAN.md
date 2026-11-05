@@ -4780,3 +4780,28 @@ checks fewer, as one walk is kept, not a one-tile walk each way.
   traced); only the village behaves differently.
 
 128 tests, 3937 checks.
+
+
+### After the slice: hashes by name
+
+Every content change used to change every scenario's hashes: content
+renumbers its types, components and terrain kinds whenever anything is
+added, and the hashes read those numbers. Farming changed them all, and
+only a by-hand diff against the last commit showed that only the village
+behaved differently.
+
+- The state hash reads a field that holds a type by the type's name, the
+  components in order of their names (those no entity has passed over),
+  and terrain kinds by name. A "changed" event that set a field to a
+  type is hashed, traced (`changed: 10, "exhausted", Activity.status`)
+  and saved by the type's name; so is a deferred proposal that sets one,
+  and what it expected. Saves were meant to load under other content
+  ("by name"), and these events and proposals didn't: now they do.
+- `ci/scenario-hashes.sh` hashes a save without its `content` line,
+  which any content change changes and loading skips.
+- Checked by hand: content adding a component, a terrain kind, and types
+  sorted ahead of all others (a topic `aaa/`) leaves every scenario's
+  hashes as they were. test_farming saves a plot's events and a waiting
+  proposal, both by name, and restores them to the same save and state.
+- Every scenario's hashes change once, for the new hashing; the runs
+  differ only in the trace's named types.
