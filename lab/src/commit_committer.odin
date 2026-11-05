@@ -969,7 +969,13 @@ committer_place_obstacle :: proc(self: ^Committer, e: Entity_ID, loc: Location) 
 	case .Held_By:
 		agent = (^Agent)(world_record(self.world, world_kind_named(self.world, "Agent"), loc.place))
 		if agent == nil do return fmt.tprintf("%d has no hands", loc.place)
-		if loc.slot < 0 || i64(loc.slot) >= agent.hands do return fmt.tprintf("%d has no hand %d", loc.place, loc.slot)
+		/* the back carries a worn pack (content/carrying/), and only that */
+		if loc.slot == BG_BACK {
+			worn: i64
+			if !world_get_field(self.world, "Pack.worn", e, &worn) || worn == 0 do return fmt.tprintf("%d isn't worn on the back", e)
+		} else if loc.slot < 0 || i64(loc.slot) >= agent.hands {
+			return fmt.tprintf("%d has no hand %d", loc.place, loc.slot)
+		}
 		for i: uint = 0; i < n && i < 256; i += 1 {
 			other = world_location_of(self.world, others[i])
 			if others[i] != e && other.slot == loc.slot {
@@ -982,6 +988,12 @@ committer_place_obstacle :: proc(self: ^Committer, e: Entity_ID, loc: Location) 
 		container = (^Container)(world_record(self.world, world_kind_named(self.world, "Container"), loc.place))
 		if container == nil do return fmt.tprintf("%d is not a container", loc.place)
 		if i64(n) > container.capacity do return fmt.tprintf("%d is full (%d)", loc.place, container.capacity)
+		/* a pack bears no more than its load (content/carrying/) */
+		if load: i64; world_get_field(self.world, "Pack.load", loc.place, &load) {
+			bears: i64
+			for i: uint = 0; i < n && i < 256; i += 1 do bears += world_mass_of(self.world, others[i])      /* it among them */
+			if bears > load do return fmt.tprintf("%d would bear %dg, more than its %dg", loc.place, bears, load)
+		}
 		return ""
 
 	case .Part_Of:

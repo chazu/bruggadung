@@ -87,7 +87,9 @@
 // longer ago than that, too: a kept goal done again and again).
 #Looked:  #Condition & { looked: text }
 #Did:     #Condition & { did: text, lately: time }
-// ... it is within reach of the slot's referent.
+// ... it is within reach of the slot's referent. As a method's
+// precondition, its `find` and `match` must hold too: within reach of the
+// larder, with meat in the pack.
 #Reached: #Condition & { reached: text }
 
 // How a candidate's referents are ordered, for each slot as it is found:

@@ -3774,4 +3774,5 @@ ALL_TESTS := [?]Test_Case{
 	{"hunting_week",                  test_hunting_week},
 	{"perishing",                     test_perishing},
 	{"market",                        test_market},
+	{"carrying",                      test_carrying},
 }

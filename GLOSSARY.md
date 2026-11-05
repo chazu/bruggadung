@@ -517,8 +517,10 @@ REALITY.md, PRF = PERFORMANCE.md, TER = TERRAIN.md, TES = TESSERA.md, VIL = VILL
 - **Meal**: food that isn't **raw**: cooked (at a lit stove, adding its
   `cooking` to its nourishment) or never raw (a supper). *Avoid:* dish.
   (VIL slice 4, lab/content/cooking/cooking.tri)
-- **Larder**: a household's container of food, a plain container, known
-  from its neighbours' by where it is. (VIL d3, lab/content/cooking/)
+- **Larder**: a household's container of food (`#Larder`), told from its
+  other containers (its coffer, its packs) at a glance, and from its
+  neighbours' larders by where it is. Likewise a **woodpile**
+  (`#Woodpile`). (VIL d3, lab/content/cooking/)
 - **Firewood**: split wood by the piece (a kilogram), a stack; stoked into
   a stove, its fuel. A tree is **felled** into a **trunk**, **bucked** a
   length at a time into **logs**, and a log **split** into firewood.
@@ -909,6 +911,19 @@ REALITY.md, PRF = PERFORMANCE.md, TER = TERRAIN.md, TES = TESSERA.md, VIL = VILL
   **coffer**. What a buyer carries to market is its **purse**; what a
   stall was paid, its **takings**. The tempting purse of AGENCY.md's
   scenario is cloth, a purse in the other sense. (VIL d9)
+- **Pack**: a container carried, going where its carrier goes: a
+  **backpack** worn on the back (held, but by no hand), or a **basket** in
+  a hand. It bears no more than its **load**, in kilograms; what is in a
+  pack its carrier carries it knows. A household's are kept by its door,
+  taken by whoever needs one, and put back emptied. (VIL d11)
+- **Burden**: what an agent carries, in its hands and on its back, with
+  what is in that. Past the light amount (15 kg) it slows a walk: half
+  pace at 55 kg. (VIL d11)
+- **Stow**: what an operation that stows takes, or is handed (gathering,
+  picking up, butchering, a purchase), goes into a pack its taker carries
+  if it fits, else into a free hand. (VIL d11)
+- **Hide**: what is left of a carcass besides its meat (`#Hide`): leather
+  to be, carried home in a pack, else left lying. (VIL d7)
 - **Pricing**: what a unit of goods is worth to an agent in coins
   (`#Pricing`): its kind's, raised by a need the goods serve. A seller
   prices its spare goods without the raise; a buyer buys at a posted

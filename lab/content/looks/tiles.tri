@@ -31,6 +31,8 @@ tiles_coffer:    #Glyph & { theme: "tiles", look: "container.coffer", char: "▪
 tiles_stall:     #Glyph & { theme: "tiles", look: "stall", char: "π", ink: [190, 150, 90] } @family(glyphs)
 tiles_coins:     #Glyph & { theme: "tiles", look: "coins", char: "$", ink: [220, 200, 80] } @family(glyphs)
 tiles_board:     #Glyph & { theme: "tiles", look: "board", char: "¶", ink: [200, 170, 120] } @family(glyphs)
+tiles_backpack:  #Glyph & { theme: "tiles", look: "pack.back", char: "ᐃ", ink: [150, 110, 70] } @family(glyphs)
+tiles_basket:    #Glyph & { theme: "tiles", look: "pack.basket", char: "ᑌ", ink: [190, 160, 90] } @family(glyphs)
 tiles_assembly:  #Glyph & { theme: "tiles", look: "assembly", char: "m", ink: [200, 170, 90] } @family(glyphs)
 tiles_tap:       #Glyph & { theme: "tiles", look: "tap", char: "τ", ink: [200, 170, 90] } @family(glyphs)
 tiles_store:     #Glyph & { theme: "tiles", look: "water.store", char: "w", ink: [120, 170, 255] } @family(glyphs)

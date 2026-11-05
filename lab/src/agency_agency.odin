@@ -1007,6 +1007,38 @@ agency_wander :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Store, wi
 		m.walking.wander = true
 		return true
 	}
+	/* none of that ground near (a hunter in the village): toward the
+	 * nearest it knows of, ring by ring, up to eight times as far */
+	for d := within + 1; on != 0 && d <= 8 * within; d += 1 {
+		for k := -d; k <= d; k += 1 {
+			for side in 0 ..< 4 {
+				x, y: i32
+				switch side {
+				case 0: x, y = me.x + k, me.y - d
+				case 1: x, y = me.x + k, me.y + d
+				case 2: x, y = me.x - d, me.y + k
+				case 3: x, y = me.x + d, me.y + k
+				}
+				if !walkable(&c, x, y) || knowledge_store_believed_terrain_at_x(store, x, y, me.level) != on do continue
+				way := make([dynamic]Step, context.temp_allocator)
+				q          = {}
+				q.x        = me.x
+				q.y        = me.y
+				q.targeted = true
+				q.tx       = x
+				q.ty       = y
+				q.context_ = &c
+				q.passable = walkable
+				q.way      = &way
+				self.pathSearches += 1
+				r := path_find(&q)
+				if !r.found || r.step == .None do continue
+				agency_set_out(self, m, way[:], 0, x, y, me.level, "wandering", fmt.tprintf("toward (%d, %d), the nearest", x, y))
+				m.walking.wander = true
+				return true
+			}
+		}
+	}
 	return false
 }
 
@@ -1357,6 +1389,17 @@ agency_holds :: proc(self: ^Agency, instance: cstring, path: cstring, since: i64
 		lately := int_at(tc, done, "lately", 0)
 		after  := max(since, world_time(self.world).ms - lately) if lately > 0 else since
 		return agency_activity(self, cstr(text[:]), knowledge_store_agent(store), "completed", after) != NO_ENTITY
+	}
+
+	/* a precondition within reach of a slot's referent (unpacking at the
+	 * larder, not in the woods): that, and its slots found as any are */
+	pre := tri.at(tc, tri.pattern(tc, instance), "pre") if string(path) == "pre" else nil
+	if pre != nil && text_at(tc, pre, "reached", text[:]) {
+		if bound(b, n^, str(text[:])) == 0 ||
+		   !in_reach(knowledge_store_referent(store, knowledge_store_self_referent(store)),
+		             knowledge_store_referent(store, bound(b, n^, str(text[:])))) {
+			return false
+		}
 	}
 
 	if !agency_load(self, &c, instance, path, store) do return false
@@ -1837,7 +1880,7 @@ agency_follow :: proc(self: ^Agency, m: ^Motivation, method: cstring, index: i32
 		}
 		/* buying a lot (content/market/'s #Purchase): asked, or on the way */
 		if tri.type_named(tc, "#Purchase") != 0 && tri.node_type(step) == tri.type_named(tc, "#Purchase") {
-			why := agency_purchase(self, m, store, me, step, str(title[:]))
+			why := agency_purchase(self, m, store, me, step, str(title[:]), b, n)
 			if why == "" do return true
 			agency_fail(self, m, index, fmt.tprintf("%s: %s", str(title[:]), why))
 			return false
@@ -2274,14 +2317,23 @@ agency_price_writing :: proc(self: ^Agency, store: ^Knowledge_Store, goods: u32,
  * to first. "" once it asks, or sets out; else why it can't. */
 @(private = "file")
 agency_purchase :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Store, me: ^Referent, step: ^tri.Node,
-                        title: string) -> string {
+                        title: string, b: [^]Slot_Binding, n: i32) -> string {
 	unit: [64]u8
+	slot: [32]u8
 
 	tc   := world_tri(self.world)
 	what := tri.at(tc, step, "what")
 	if what == nil || !text_at(tc, what, "unit", unit[:]) do return "buy what?"
 	u     := world_intern(self.world, cstr(unit[:]))
 	units := int_at(tc, step, "units", 1)
+	/* no more than the supply lacks, with what it has in hand and pack */
+	if level := int_at(tc, step, "level", 0); level > 0 && text_at(tc, step, "stocking", slot[:]) {
+		have := agency_mass_toward(self, what, bound(b, n, str(slot[:])), store)
+		each := int_at(tc, tri.pattern(tc, u), "unitMass", 0)
+		if each <= 0 do each = int_at(tc, tri.pattern(tc, u), "mass", 1)
+		if have >= level do return fmt.tprintf("it has enough %s coming", u)
+		units = min(units, (level - have + each - 1) / each)
+	}
 	/* the cheapest; of those, the nearest; then the lowest */
 	best  := -1
 	bestAt: i32
@@ -2305,6 +2357,11 @@ agency_purchase :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Store, 
 	have := agency_units_of(self, purse, store) if purse != 0 else 0
 	if price.coins > 0 && units * i64(price.coins) > have do units = have / i64(price.coins)
 	if units < 1 do return "it hasn't the coins"
+	/* somewhere to take the lot: a free hand, or room in its pack (its own
+	 * hands and pack, as it feels them) */
+	each := int_at(tc, tri.pattern(tc, u), "unitMass", 0)
+	if each <= 0 do each = int_at(tc, tri.pattern(tc, u), "mass", 0)
+	if _, ok := receiving(self.world, m.agent, each * units, true); !ok do return "it has no hand free for it, nor room in its pack"
 	stall  := knowledge_store_referent(store, price.board)      /* the board stands on it */
 	seller := agency_minding(self, stall, store)
 	if seller == nil {
@@ -2324,6 +2381,34 @@ agency_purchase :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Store, 
 	m.awaitSince = world_time(self.world).ms
 	m.awaitUntil = m.awaitSince + BG_REPLY_WAIT
 	return ""
+}
+
+
+/* What it knows of things like `what` in the supply, in its hands, or in a
+ * pack it carries, in grams: what stocks the supply, or is on its way. */
+@(private = "file")
+agency_mass_toward :: proc(self: ^Agency, what: ^tri.Node, supply: u32, store: ^Knowledge_Store) -> i64 {
+	result: tri.Match_Result
+
+	tc    := world_tri(self.world)
+	me    := knowledge_store_self_referent(store)
+	arena := tri.arena_new()
+	defer tri.arena_free(arena)
+	total: i64
+	for i: uint = 0; i < knowledge_store_count(store); i += 1 {
+		r := knowledge_store_referent_at(store, i)
+		if !r.present do continue
+		toward := (r.form == .In && r.container == supply && supply != 0) || (r.form == .Held_By && r.container == me)
+		if !toward && r.form == .In {
+			c := knowledge_store_referent(store, r.container)
+			toward = c != nil && c.form == .Held_By && c.container == me
+		}
+		if !toward do continue
+		d := tri.value(tc, ns_utf8(knowledge_store_describe_referent(store, r.id)), arena, nil, 0)
+		if d == nil || tri.match(tc, what, d, &result) != .Entailed do continue
+		total += int_at(tc, d, "mass", 0)
+	}
+	return total
 }
 
 

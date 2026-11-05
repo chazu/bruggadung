@@ -157,6 +157,14 @@ Out of scope here, except where they touch agency:
     Worth is in dB, a thing's kind's, and can't price quantities, so
     pricing is in coins, a unit's. A mind now holds up to sixteen
     commitments (a villager's day, and market day's on top).
+23. **A method can ask to be within reach** (VILLAGE.md decision 11). A
+    precondition that is a `#Reached` holds only within reach of its
+    slot's referent, and its `find` and `match` must hold too: unpack the
+    pack by the larder, not in the woods. A step may also stow
+    (actions.tri's `stow`): what is taken goes into a pack the agent
+    carries if it fits. A `#Purchase` buys no more than its supply lacks,
+    counting what is in hand and in the pack; and only if there is a hand
+    free or room in the pack for the lot.
 
 ## Terms
 

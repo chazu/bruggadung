@@ -180,7 +180,10 @@ knowledge_perceive :: proc(self: ^Knowledge, store: ^Knowledge_Store, first: uin
 		}
 		if !knowledge_sees(self, sight, here) do continue
 		at = world_location_of(self.world, e)
-		if at.form == .In && !self.omniscient && !know_contains(raw_data(lookedIn[:]), nlooked, at.place) &&
+		/* what is in a pack it carries itself it knows (content/carrying/) */
+		carriedIn := at.form == .In && world_location_of(self.world, at.place).form == .Held_By &&
+		             world_location_of(self.world, at.place).place == agent
+		if at.form == .In && !self.omniscient && !carriedIn && !know_contains(raw_data(lookedIn[:]), nlooked, at.place) &&
 		   !know_contains(raw_data(glimpsed[:]), nglimpsed, e) {
 			continue          /* inside, unseen */
 		}

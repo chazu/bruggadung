@@ -28,6 +28,9 @@
 //             woods with bows, for their larder (hunting/hunting.tri); the
 //             game there at the start, the herds' bounds and where they
 //             come in, and a bow each, are the scenario's.
+// - carrying: each household has a backpack and a basket, kept by its
+//             coffer (carrying/); who takes which, and when, the
+//             scenario's.
 // - market:   each household has a coffer of coins by its larder, and a
 //             stall with its board on the green (market/, money/coins.tri);
 //             market days, who keeps the stall and who buys what, are the
@@ -73,8 +76,8 @@ hunter_look:     #Look & { kindOf: "hunter", look: "agent.hunter" } @family(look
 // woodpile. (Its stove is
 // heat/heat.tri's.)
 bed:      #Bed & { material: "oak", mass: 40kg }
-larder:   #Container & { material: "oak", mass: 30kg, capacity: 50 }
-woodpile: #Container & { material: "oak", mass: 5kg, capacity: 100 }
+larder:   #Larder & { material: "oak", mass: 30kg, capacity: 50 }
+woodpile: #Woodpile & { material: "oak", mass: 5kg, capacity: 100 }
 
 // A farming household's grain at first: last year's harvest, two hundred
 // portions, its own to eat and to sell (market/).

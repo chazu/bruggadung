@@ -193,7 +193,7 @@ look_for_seed: #Method & {
     title:  "look for seed"
     goal:   "seed_in_hand"
     rank:   2
-    pre:    { find: ["larder"], match: #Farming & { larder: #Container } }
+    pre:    { find: ["larder"], match: #Farming & { larder: #Larder } }
     order:  ["own", "habit", "likely", "near"]
     seeks:  #Seed & #Stack
     search: "larder"

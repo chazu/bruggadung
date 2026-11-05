@@ -36,7 +36,27 @@ free_hands :: proc(world: ^World, agent: Entity_ID) -> i32 {
 	a = (^Agent)(world_record(world, world_kind_named(world, "Agent"), agent))
 	if a == nil do return 0
 	n = world_entities_at(world, agent, .Held_By, raw_data(held[:]), 8)
-	return i32(a.hands) - i32(n)
+	used: i32
+	for e in held[:min(n, 8)] do if world_location_of(world, e).slot != BG_BACK do used += 1      /* the back is no hand */
+	return i32(a.hands) - used
+}
+
+
+/* Where a worn pack is carried (content/carrying/): held, by no hand. */
+BG_BACK :: i32(8)
+
+
+/* All an agent carries, in grams: what it holds, in its hands and on its
+ * back, and what is in that. */
+carried_mass :: proc(world: ^World, agent: Entity_ID) -> i64 {
+	held:   [8]Entity_ID
+	inside: [16]Entity_ID
+	total:  i64
+	for e in held[:min(world_entities_at(world, agent, .Held_By, raw_data(held[:]), 8), 8)] {
+		total += world_mass_of(world, e)
+		for c in inside[:min(world_entities_at(world, e, .In, raw_data(inside[:]), 16), 16)] do total += world_mass_of(world, c)
+	}
+	return total
 }
 
 

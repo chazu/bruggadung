@@ -113,6 +113,7 @@ cut: the levels of detail first, then other topics, then code.
 | `looks/` | themes: what `lab play`'s map (`text.tri`) and the watcher (`tiles.tri`) draw for each look |
 | `machines/` | latent assembly, wear and servicing (`latent.tri`); the pump and its repair (`pump.tri`) |
 | `money/` | getting money: borrowing, taking; a loan repaid (`money.tri`); coins, the coffer, and what goods are worth in coins (`coins.tri`) |
+| `carrying/` | packs (a backpack worn, a basket held), their loads, the burden that slows a walk, stowing, and taking and returning a household's pack (`carrying.tri`) |
 | `market/` | stalls and their price boards, keeping a stall, buying to stock a household, the sale (`market.tri`) |
 | `nails/` | nail stacks, wedging a lock, finding nails, putting them away |
 | `promises/` | delivering: what a promise commits to |

@@ -232,6 +232,36 @@ things the lab put off:
     type hierarchy, and the watcher's theme gives each look a glyph and
     colours. A village has too many kinds of thing for the stopgap
     (blueprint names, first letters) to read well.
+11. **What is carried is carried in a pack, and weighs on a walk**
+    (asked for after slice 9). A household keeps a **backpack** and a
+    **basket** by its door. A backpack is worn on the back, held by no hand,
+    so both stay free; a basket is held in a hand. Each bears no more than
+    its **load** (25 kg; 8 kg). What an agent carries in all slows its walk
+    past a light amount (15 kg): half pace at 55 kg.
+    - Built (content/carrying/). A woodcutter or a hunter takes the
+      backpack as it leaves home in the morning, the first of the household
+      to want it; whoever finds it gone does without, with its hands. On
+      market day the seller takes a pack, and then the buyer, the backpack
+      or else the basket.
+    - Operations that **stow** put what is taken, or handed over, into a
+      pack the agent carries if it fits, else a free hand: a woodcutter's
+      gathering (forty pieces home at a time, not twenty), butchering (the
+      meat, the bow still in hand), picking up a hide, a purchase (lots
+      bought until the supply's need is met, then carried home once), the
+      seller's unsold goods.
+    - By the supply (a precondition can be within reach of a slot, AGENCY.md
+      decision 23), what is in the pack is taken out and put away. At
+      15:00 every pack is emptied (food and hides into the larder, firewood
+      onto the woodpile) and put back by the larder.
+    - What is in a pack its carrier carries, the carrier knows (KNOWLEDGE.md
+      decision 25).
+    - Built on the way: larders and woodpiles are kinds of their own, seen
+      as such, so looking for food doesn't look in the coffer and the pack
+      by the larder first; a hide is `#Hide` (a leather pack was "brought
+      home" into the larder); a seller looks in its stall for takings
+      paid in unseen; a buyer frees a hand, or checks its pack has room,
+      before asking; with no woodland near, a wanderer heads for the
+      nearest.
 
 ## The village
 
@@ -367,6 +397,8 @@ when it is built:
     how fast it runs.
 11. **The knowledge view in the watcher**: one agent's village as it
     remembers it (TESSERA.md slice 2's knowledge scenes).
+12. **Carrying**: backpacks and baskets, loads, a burdened walk (built;
+    decision 11).
 
 Slice 1 comes first: everything after it depends on hunger working over
 weeks. Slices 2 and 3 can be done alongside it. Slices 4 to 9 depend on
@@ -394,7 +426,8 @@ New, and entered in the glossary with this document:
 | Household | The people of a home: kin bonds. Not a **place** (DETAIL_REGIMES.md's entity), until abstract detail needs one. |
 | Worksite | What a household's day's work is done at: a scarecrow in a plot, a chopping block, a hunting blind. *Avoid:* workplace. (Built.) |
 | Meal | Food that isn't raw: cooked, or never raw. (Built.) |
-| Larder | A household's container of food, known from its neighbours' by where it is. (Built.) |
+| Larder | A household's container of food, a kind of its own, known from its neighbours' by where it is. (Built.) |
+| Pack | A container carried: a backpack on the back, a basket in a hand, bearing so much. (Built.) |
 | Kept goal | An ongoing condition: a commitment to it arises again whenever it no longer holds, through its window. (Built.) |
 
 ## Open questions
@@ -404,9 +437,9 @@ New, and entered in the glossary with this document:
 - **Where game comes from.** Settled (decision 7): it comes in at the
   woods' edge while there are fewer than so many, a scenario input. A herd
   that breeds is a topic of its own.
-- **Hides.** A carcass's hide is left where it was butchered: the hunter's
-  hands hold its bow and the meat. Carrying hides home, and dressing them
-  (the Hunts' other trade), wait for the market, which is where they go.
+- **Hides.** A hunter with the backpack carries the hide home to the
+  larder (decision 11). Dressing them (the Hunts' other trade), and
+  selling them, wait: nobody buys hides yet.
 - **The hunt is fair, but the game never learns.** A shot can miss, and a
   deer bolts out of sight from a shot that gives the hunter away. Over a
   week, one hunter in a small wood brings home its two deer from 33
@@ -438,15 +471,13 @@ New, and entered in the glossary with this document:
   for after the first market works. Today it is the kind's price, the
   same at every stall: a seller prices spare goods without its need's
   raise, and only a buyer's pricing moves (with its hunger).
-- **Carrying.** Everything is carried in two hands. A buyer carries its
-  coins in one and what it bought in the other, so it buys a lot, walks
-  it home, and comes back; a woodcutter must put down its axe to fetch
-  coins, a hunter its bow. A bag, a basket, a backpack or a barrow (a
-  container carried, its contents carried with it) would carry coins and
-  goods together, and the firewood home by the armful. The user asked
-  for it (2026-11-05); it wants its own design: what a carried container
-  holds, how its contents are seen, and taking from it and putting in it
-  while held.
+- **Carrying.** Settled (decision 11): a backpack and a basket. A barrow
+  (a big load pushed with both hands, on open ground) is left for later.
+  The basket is little used: a buyer with the basket in one hand and its
+  coins in the other has no hand for the goods but the basket.
+- **One pack to a household.** Three hunters share one backpack: the first
+  out takes it, and the others hunt with their hands, leaving hides. A
+  pack each, or a peg for each, is a question of what a household owns.
 - **Unsold goods stay on the stall.** What wasn't sold stays set out on
   the green till the next market, perishable meat spoiling there. Taking
   it home after is a goal of its own.

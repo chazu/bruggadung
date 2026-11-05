@@ -247,6 +247,9 @@ village_setup :: proc(self: ^Village) {
 		coffer := proposal_group_create(g, "coffer", ns_utf8(fmt.tprintf("%s' coffer", h.name)), on_tile(h.coffer.x, h.coffer.y, 0))
 		coffers[k] = coffer
 		coins := proposal_group_create(g, "coins_100", ns_utf8(fmt.tprintf("%s' coins", h.name)), in_(coffer))
+		/* its backpack and basket, by the coffer (content/carrying/) */
+		pack   := proposal_group_create(g, "backpack", ns_utf8(fmt.tprintf("%s' backpack", h.name)), on_tile(h.coffer.x, h.coffer.y, 0))
+		basket := proposal_group_create(g, "basket", ns_utf8(fmt.tprintf("%s' basket", h.name)), on_tile(h.coffer.x, h.coffer.y, 0))
 		stalls[k] = proposal_group_create(g, "stall", ns_utf8(fmt.tprintf("%s' stall", h.name)), on_tile(h.stall.x, h.stall.y, 0))
 		boards[k] = proposal_group_create(g, "price_board", ns_utf8(fmt.tprintf("%s' board", h.name)), on_tile(h.stall.x, h.stall.y, 0))
 		/* the farmers' plots, their tilled block halved, and the seed kept
@@ -292,6 +295,8 @@ village_setup :: proc(self: ^Village) {
 			village_own(g, v.id, coffer, "the household's coffer")
 			village_own(g, v.id, coins, "the household's coins")
 			village_own(g, v.id, stalls[k], "the household's stall")
+			village_own(g, v.id, pack, "the household's backpack")
+			village_own(g, v.id, basket, "the household's basket")
 			village_own(g, v.id, wood, "the household's firewood")
 			for seed in seeds do village_own(g, v.id, seed, "the household's seed")
 			for plot in plots do village_own(g, v.id, plot, "the household's plot")
@@ -400,7 +405,14 @@ village_setup :: proc(self: ^Village) {
 		                                   VILLAGE_DAY, {{"woodpile", pile}})) &&
 		      (households[v.household].worksite != "hunting_blind" ||
 		       agency_undertake_every_with(self.agency, v.id, "game_hunted", 7 * VILLAGE_HOUR, 15 * VILLAGE_HOUR, "work",
-		                                   VILLAGE_DAY, {{"larder", larder}}))
+		                                   VILLAGE_DAY, {{"larder", larder}})) &&
+		      /* the backpack, for a woodcutter's or a hunter's day; put back by
+		       * the larder after (content/carrying/) */
+		      (households[v.household].worksite == "scarecrow" ||
+		       agency_undertake_every_with(self.agency, v.id, "pack_worn", 6 * VILLAGE_HOUR, 7 * VILLAGE_HOUR,
+		                                   "work", VILLAGE_DAY, {})) &&
+		      agency_undertake_every_with(self.agency, v.id, "pack_returned", 15 * VILLAGE_HOUR, 16 * VILLAGE_HOUR, "home",
+		                                  VILLAGE_DAY, {{"home", larder}, {"woodpile", pile}})
 		/* a farmer's plot: one of its household's, by turns (the Ashes' three
 		 * over their two, two Brooks to each of theirs), so it carries one
 		 * kind of seed; bound to the plot as it knows it, and the household's
@@ -432,11 +444,17 @@ village_setup :: proc(self: ^Village) {
 		}
 		if ok && which == 0 {
 			supply := pile if households[v.household].worksite == "chopping_block" else larder
-			ok = agency_undertake_every_with(self.agency, v.id, "stall_kept", day + 9 * VILLAGE_HOUR, day + 12 * VILLAGE_HOUR, "market",
+			ok = agency_undertake_every_with(self.agency, v.id, "pack_carried", day + 9 * VILLAGE_HOUR, day + 9 * VILLAGE_HOUR + VILLAGE_HOUR / 2,
+			                                 "market", 4 * VILLAGE_DAY, {}) &&
+			     agency_undertake_every_with(self.agency, v.id, "stall_kept", day + 9 * VILLAGE_HOUR, day + 12 * VILLAGE_HOUR, "market",
 			                                 4 * VILLAGE_DAY, {{"stall", stall}, {"board", board}, {"supply", supply}}) &&
+			     agency_undertake_every_with(self.agency, v.id, "unsold_home", day + 12 * VILLAGE_HOUR, day + 13 * VILLAGE_HOUR,
+			                                 "market", 4 * VILLAGE_DAY, {{"stall", stall}, {"supply", supply}}) &&
 			     agency_undertake_every_with(self.agency, v.id, "takings_home", day + 12 * VILLAGE_HOUR, day + 13 * VILLAGE_HOUR,
 			                                 "market", 4 * VILLAGE_DAY, {{"stall", stall}, {"coffer", coffer}})
 		} else if ok && which == 1 {
+			ok = agency_undertake_every_with(self.agency, v.id, "pack_carried", day + 9 * VILLAGE_HOUR + VILLAGE_HOUR / 2,
+			                                 day + 10 * VILLAGE_HOUR, "market", 4 * VILLAGE_DAY, {})
 			for goal in village_buys[v.household] {
 				supply := pile if goal == "firewood_stocked" else larder
 				ok = ok && agency_undertake_every_with(self.agency, v.id, goal, day + 9 * VILLAGE_HOUR + VILLAGE_HOUR / 2,
@@ -575,6 +593,18 @@ village_run :: proc(self: ^Village) {
 		}
 		village_check(self, len(cold) == 0, fmt.tprintf("night %d, 02:00: every stove has fuel in it", d + 1),
 		              fmt.tprintf("not: %s", strings.join(cold[:], ", ", context.temp_allocator)))
+		/* the packs (content/carrying/): each by its larder, emptied */
+		astray := make([dynamic]string, context.temp_allocator)
+		packs := world_store_for_kind(self.world, world_kind_named(self.world, "Pack"))
+		for i: uint = 0; i < store_count(packs); i += 1 {
+			e := store_entity_at_index(packs, i)
+			inside: [4]Entity_ID
+			by := false
+			for l in self.larders do if village_within_reach(self.world, e, l) do by = true
+			if !by || world_entities_at(self.world, e, .In, raw_data(inside[:]), 4) > 0 do append(&astray, fmt.tprintf("%d", e))
+		}
+		village_check(self, len(astray) == 0, fmt.tprintf("night %d, 02:00: every pack back by its larder, empty", d + 1),
+		              fmt.tprintf("not: %s", strings.join(astray[:], ", ", context.temp_allocator)))
 		awake := village_game_awake(self)
 		village_check(self, len(awake) == 0, fmt.tprintf("night %d, 02:00: the game bedded down", d + 1),
 		              fmt.tprintf("not: %s", strings.join(awake[:], ", ", context.temp_allocator)))
@@ -588,6 +618,12 @@ village_run :: proc(self: ^Village) {
 		if u := world_unit_of(self.world, e); u != nil && (u == "venison" || u == "hare meat") do meat += world_units_of(self.world, e)
 	}
 	village_check(self, meat > 0, "the hunters brought meat home", "none in their larder")
+	/* and a hide, carried home in the pack (content/carrying/), not left lying */
+	hides := 0
+	for e in inside[:world_entities_at(self.world, self.larders[hunters], .In, raw_data(inside[:]), 16)] {
+		if world_record(self.world, world_kind_named(self.world, "Body"), e) != nil && village_is_hide(self.world, e) do hides += 1
+	}
+	village_check(self, hides > 0, "the hunters brought a hide home", "none in their larder")
 	deer, hares := game_count(self.world, "deer"), game_count(self.world, "hare")
 	village_check(self, deer >= 1 && deer <= 6 && hares >= 1 && hares <= 4, "the herds neither vanished nor outgrew the woods",
 	              fmt.tprintf("%d deer, %d hares", deer, hares))
@@ -672,18 +708,29 @@ village_grain :: proc(k: int) -> i64 {
 
 
 /* Market day (VILLAGE.md decision 9, content/market/), from 11:00: by
- * noon every household has sold some of its goods (its stall holds coins);
+ * noon every household that had goods to sell has sold some (its stall
+ * holds coins; a hunt that brought nothing home leaves nothing to sell);
  * by 13:00 the takings are home and no coin was made or lost. What each
  * larder's grain changed by across the market, 09:00 (`before`) to 13:00,
  * is the market's, not eaten (nobody cooks from it then). */
 @(private = "file")
 village_check_market :: proc(self: ^Village, d: i64, before: [4]i64) {
 	village_step_until(self, d * VILLAGE_DAY + 12 * VILLAGE_HOUR)
+	/* what it had to sell (a hunt that brought nothing home has nothing): its
+	 * stall set out, or paid for it */
 	unsold := make([dynamic]string, context.temp_allocator)
+	none   := make([dynamic]string, context.temp_allocator)
 	for st, k in self.stalls {
-		if village_units_in(self.world, st, "coin") == 0 do append(&unsold, households[k].name)
+		inside: [8]Entity_ID
+		goods := false
+		for e in inside[:world_entities_at(self.world, st, .In, raw_data(inside[:]), 8)] do if u := world_unit_of(self.world, e); u != nil && u != "coin" do goods = true
+		paid := village_units_in(self.world, st, "coin") > 0
+		if !goods && !paid do append(&none, households[k].name)
+		else if !paid do append(&unsold, households[k].name)
 	}
-	village_check(self, len(unsold) == 0, fmt.tprintf("day %d, 12:00: every household sold at the market", d + 1),
+	village_check(self, len(unsold) == 0 && len(none) < len(self.stalls),
+	              fmt.tprintf("day %d, 12:00: every household with goods to sell sold some%s", d + 1,
+	                          fmt.tprintf(" (%s had none)", strings.join(none[:], ", ", context.temp_allocator)) if len(none) > 0 else ""),
 	              fmt.tprintf("not: %s", strings.join(unsold[:], ", ", context.temp_allocator)))
 	village_step_until(self, d * VILLAGE_DAY + 13 * VILLAGE_HOUR)
 	coins, left: i64
@@ -697,6 +744,16 @@ village_check_market :: proc(self: ^Village, d: i64, before: [4]i64) {
 	              fmt.tprintf("day %d, 13:00: the takings home, and no coin made or lost", d + 1),
 	              fmt.tprintf("%d coins, %d of them still on the stalls", coins, left))
 	for l, k in self.larders do self.marketed[k] += village_portions_in(self.world, l) - before[k]
+}
+
+
+/* Whether a thing is a hide (content/hunting/butchering.tri's #Hide). */
+@(private = "file")
+village_is_hide :: proc(world: ^World, e: Entity_ID) -> bool {
+	info := world_info(world, e)
+	tc   := world_tri(world)
+	return info != nil && tri.pattern(tc, info.blueprint) != nil && tri.type_named(tc, "#Hide") != 0 &&
+	       tri.subtype(tc, tri.node_type(tri.pattern(tc, info.blueprint)), tri.type_named(tc, "#Hide")) != 0
 }
 
 
@@ -773,11 +830,17 @@ village_at_work :: proc(self: ^Village, v: Villager) -> bool {
 	   agency_intends(self.agency, v.id, "game_hunted") {
 		return true
 	}
-	/* or about the market, on market day: its stall, its buying, the coins home */
-	for goal in ([?]string{"stall_kept", "grain_stocked", "meat_stocked", "firewood_stocked", "takings_home", "coins_home"}) {
+	/* or about the market, on market day: its stall, its buying, the coins
+	 * home; or at the green, where the stalls are, between one and the next */
+	for goal in ([?]string{"stall_kept", "grain_stocked", "meat_stocked", "firewood_stocked", "takings_home", "coins_home",
+	                       "unsold_home", "pack_carried"}) {
 		if agency_intends(self.agency, v.id, goal) do return true
 	}
-	return false
+	day := world_time(self.world).ms / VILLAGE_DAY
+	green := self.stalls[0]
+	return day >= VILLAGE_MARKET && (day - VILLAGE_MARKET) % 4 == 0 && green != NO_ENTITY &&
+	       la.form == .On_Tile && abs(la.x - world_location_of(self.world, green).x) <= 8 &&
+	       abs(la.y - world_location_of(self.world, green).y) <= 8
 }
 
 

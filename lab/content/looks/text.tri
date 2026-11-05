@@ -26,6 +26,8 @@ text_spoiled:     #Glyph & { theme: "text", look: "food.spoiled", char: "~" } @f
 text_stall:       #Glyph & { theme: "text", look: "stall", char: "T" } @family(glyphs)
 text_coins:       #Glyph & { theme: "text", look: "coins", char: "$" } @family(glyphs)
 text_board:       #Glyph & { theme: "text", look: "board", char: "|" } @family(glyphs)
+text_backpack:    #Glyph & { theme: "text", look: "pack.back", char: "b" } @family(glyphs)
+text_basket:      #Glyph & { theme: "text", look: "pack.basket", char: "u" } @family(glyphs)
 text_tree:        #Glyph & { theme: "text", look: "tree", char: "T" } @family(glyphs)
 text_log:         #Glyph & { theme: "text", look: "log", char: "-" } @family(glyphs)
 text_tool:        #Glyph & { theme: "text", look: "tool", char: "/" } @family(glyphs)

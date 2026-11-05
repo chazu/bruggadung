@@ -659,34 +659,31 @@ Effect :: #type proc(world: ^World, action: Action, amount: i64, group: ^Proposa
 
 @(private = "file")
 effect_take :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
-	hand: i32
-
-	hand = free_hand(world, a.roles[.Actor])
-	if hand < 0 {
+	into, ok := receiving(world, a.roles[.Actor], world_mass_of(world, a.roles[.Item]), operation_stows(world, a.operation))
+	if !ok {
 		return "no hand is free"
 	}
 	/* from where it is now: if someone else gets it first, this fails */
-	proposal_group_move_to_expecting(g, whole(a.roles[.Item]), held_by(a.roles[.Actor], hand),
-	                                 world_location_of(world, a.roles[.Item]))
+	proposal_group_move_to_expecting(g, whole(a.roles[.Item]), into, world_location_of(world, a.roles[.Item]))
 	return ""
 }
 
 
 @(private = "file")
 effect_take_some :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
-	hand: i32
-
 	if amount < 1 {
 		return "take how many?"
 	}
-	hand = free_hand(world, a.roles[.Actor])
-	if hand < 0 {
+	units := world_units_of(world, a.roles[.Item])
+	mass  := world_mass_of(world, a.roles[.Item]) * min(amount, units) / max(units, 1)
+	into, ok := receiving(world, a.roles[.Actor], mass, operation_stows(world, a.operation))
+	if !ok {
 		return "no hand is free"
 	}
-	if amount >= world_units_of(world, a.roles[.Item]) {
-		proposal_group_move_to(g, whole(a.roles[.Item]), held_by(a.roles[.Actor], hand))
+	if amount >= units {
+		proposal_group_move_to(g, whole(a.roles[.Item]), into)
 	} else {
-		proposal_group_split(g, whole(a.roles[.Item]), amount, held_by(a.roles[.Actor], hand))
+		proposal_group_split(g, whole(a.roles[.Item]), amount, into)
 	}
 	return ""
 }
@@ -1099,18 +1096,80 @@ turning_chain :: proc(world: ^World, actor: Entity_ID, chain: ^[2]Entity_ID, cos
  * effort (its `exertion`); fatigue and injury slow it, 200 / (200 +
  * fatigue + injury): half again as long at 100 of them together; and going
  * without, by the pace it has lost (hunger/weakness.tri). Resting, waiting,
- * talking go at their pace. */
+ * talking go at their pace. A walk goes at the pace its burden allows
+ * (burdened_rate). */
 work_rate :: proc(world: ^World, actor: Entity_ID, operation: cstring, index: i64) -> i64 {
 	agent: ^Agent
 	worn: i64
 
 	agent = (^Agent)(world_record(world, world_kind_named(world, "Agent"), actor))
+	if agent != nil && operation_effect_is(world, operation, "walk") do return burdened_rate(world, actor)
 	if agent == nil || operation_exertion(world, operation, index) <= 0 {
 		return 100
 	}
 	worn = agent.fatigue + agent.injury
 	/* and going without takes its share of what is left (hunger/weakness.tri) */
 	return 100 * 200 / (200 + (worn if worn > 0 else 0)) * (100 - weakness(world, actor, .Pace, world_time(world).ms)) / 100
+}
+
+
+/* How fast a walker goes, in percent, under what it carries
+ * (content/carrying/'s burden): at full pace up to `light`, half at `light`
+ * and `slows` more, a third at twice that. */
+burdened_rate :: proc(world: ^World, actor: Entity_ID) -> i64 {
+	tc      := world_tri(world)
+	burden  := tri.pattern(tc, "burden")
+	light   := int_feature(tc, burden, "light", 0)
+	slows   := int_feature(tc, burden, "slows", 0)
+	over    := carried_mass(world, actor) - light
+	if burden == nil || slows <= 0 || over <= 0 do return 100
+	return 100 * slows / (slows + over)
+}
+
+
+/* Whether the operation stows (content/actions.tri's `stow`). */
+operation_stows :: proc(world: ^World, operation: cstring) -> bool {
+	tc := world_tri(world)
+	v  := tri.at(tc, tri.pattern(tc, operation), "stow") if operation != nil else nil
+	return v != nil && tri.node_type(v) == tri.type_named(tc, "true")
+}
+
+
+/* Where something of `mass` grams an agent takes, or is handed, goes: for
+ * an operation that stows, into a pack it carries (its back's first) that
+ * has room for it, by count and by load; else a free hand. ok false if
+ * neither. */
+receiving :: proc(world: ^World, agent: Entity_ID, mass: i64, stows: bool) -> (Location, bool) {
+	held:   [8]Entity_ID
+	inside: [16]Entity_ID
+	if stows {
+		n := min(world_entities_at(world, agent, .Held_By, raw_data(held[:]), 8), 8)
+		for pass in 0 ..< 2 {
+			for e in held[:n] {
+				load, capacity: i64
+				if (world_location_of(world, e).slot == BG_BACK) != (pass == 0) do continue
+				if !world_get_field(world, "Pack.load", e, &load) || !world_get_field(world, "Container.capacity", e, &capacity) do continue
+				m := min(world_entities_at(world, e, .In, raw_data(inside[:]), 16), 16)
+				bears := mass
+				for c in inside[:m] do bears += world_mass_of(world, c)
+				if bears <= load && i64(m) < capacity do return in_(e), true
+			}
+		}
+	}
+	hand := free_hand(world, agent)
+	if hand < 0 do return {}, false
+	return held_by(agent, hand), true
+}
+
+
+/* Whether an operation's effect is the one named. */
+operation_effect_is :: proc(world: ^World, operation: cstring, effect: string) -> bool {
+	e: [32]u8
+	tc := world_tri(world)
+	v  := tri.at(tc, tri.pattern(tc, operation), "effect")
+	if v == nil do return false
+	n := tri.print(tc, v, raw_data(e[:]), size_of(e))
+	return n == uint(len(effect) + 2) && string(e[1:n - 1]) == effect
 }
 
 
@@ -2609,8 +2668,8 @@ effect_shoot :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) 
 
 
 /* Butchering a carcass (content/hunting/butchering.tri): its meat, a stack
- * of so many cuts, in the butcher's free hand; its hide lying where it lay;
- * the rest is waste. */
+ * of so many cuts, in the butcher's free hand, or, stowing, a pack it
+ * carries; its hide lying where it lay; the rest is waste. */
 @(private = "file")
 effect_butcher :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
 	cuts: i64
@@ -2618,14 +2677,15 @@ effect_butcher :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group
 	meat := world_text_field(world, "Carcass.yields", carcass)
 	hide := world_text_field(world, "Carcass.hide", carcass)
 	if meat == nil || len(meat) == 0 || !world_get_field(world, "Carcass.cuts", carcass, &cuts) do return "it is no carcass"
-	hand := free_hand(world, a.roles[.Actor])
-	if hand < 0 do return "no hand is free"
+	each := int_feature(world_tri(world), tri.pattern(world_tri(world), meat), "unitMass", 0)
+	place, ok := receiving(world, a.roles[.Actor], each * cuts, operation_stows(world, a.operation))
+	if !ok do return "no hand is free"
 	at := world_location_of(world, carcass)
 	/* a cut each, gathered into one stack: each made as its blueprint is,
 	 * so the count and the mass are declared */
 	into := NO_ENTITY
 	for _ in 0 ..< cuts {
-		cut := proposal_group_create(g, meat, "meat", held_by(a.roles[.Actor], hand))
+		cut := proposal_group_create(g, meat, "meat", place)
 		if into == NO_ENTITY do into = cut
 		else do proposal_group_merge(g, whole(cut), whole(into))
 	}
@@ -2662,16 +2722,19 @@ effect_post :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -
 
 
 /* Handing over (content/market/): `amount` units of the stack, or all of it
- * if no more, into a free hand of the one it is handed to. */
+ * if no more, into a free hand of the one it is handed to, or, stowing, a
+ * pack it carries. */
 @(private = "file")
 effect_hand_over :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
 	if amount < 1 do return "hand over how many?"
-	hand := free_hand(world, a.roles[.Destination])
-	if hand < 0 do return "no hand of theirs is free"
-	if amount >= world_units_of(world, a.roles[.Item]) {
-		proposal_group_move_to(g, whole(a.roles[.Item]), held_by(a.roles[.Destination], hand))
+	units := world_units_of(world, a.roles[.Item])
+	mass  := world_mass_of(world, a.roles[.Item]) * min(amount, units) / max(units, 1)
+	into, ok := receiving(world, a.roles[.Destination], mass, operation_stows(world, a.operation))
+	if !ok do return "no hand of theirs is free"
+	if amount >= units {
+		proposal_group_move_to(g, whole(a.roles[.Item]), into)
 	} else {
-		proposal_group_split(g, whole(a.roles[.Item]), amount, held_by(a.roles[.Destination], hand))
+		proposal_group_split(g, whole(a.roles[.Item]), amount, into)
 	}
 	return ""
 }
@@ -2688,6 +2751,30 @@ effect_put_some :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Grou
 	} else {
 		proposal_group_split(g, whole(a.roles[.Item]), amount, in_(a.roles[.Destination]))
 	}
+	return ""
+}
+
+
+/* Shouldering a backpack (content/carrying/): onto the back, which is no
+ * hand, if nothing is there already. */
+@(private = "file")
+effect_shoulder :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
+	held: [8]Entity_ID
+	for e in held[:min(world_entities_at(world, a.roles[.Actor], .Held_By, raw_data(held[:]), 8), 8)] {
+		if world_location_of(world, e).slot == BG_BACK do return "something is on its back already"
+	}
+	proposal_group_move_to(g, whole(a.roles[.Item]), held_by(a.roles[.Actor], BG_BACK))
+	return ""
+}
+
+
+/* Putting a pack back (content/carrying/): down on the ground, beside what
+ * it is kept by. */
+@(private = "file")
+effect_put_back :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
+	tile: Location
+	if !know_ground_tile(world, a.roles[.Destination], &tile) do return "it is nowhere to put it by"
+	proposal_group_move_to(g, whole(a.roles[.Item]), on_tile(tile.x, tile.y, tile.level))
 	return ""
 }
 
@@ -3052,6 +3139,8 @@ effects := [?]Named_Effect{
 	{"post",      effect_post},
 	{"hand_over", effect_hand_over},
 	{"put_some",  effect_put_some},
+	{"shoulder",  effect_shoulder},
+	{"put_back",  effect_put_back},
 }
 
 

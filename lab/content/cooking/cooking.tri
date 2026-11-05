@@ -30,6 +30,9 @@
 //             (habit, AGENCY.md §8), then the nearest.
 // - perishing: a meal keeps two days from when it is cooked, whatever it
 //             was made of, then spoils (perishing/); raw grain keeps.
+// - carrying: a larder is a kind of its own (#Larder), so looking for food
+//             doesn't look into the coffer or the packs beside it first
+//             (carrying/, money/coins.tri).
 // - code:     effect_cook (src/act_actions.odin); the scenario stocks the
 //             larders and undertakes the morning's commitment
 //             (src/scenario_village.odin).
@@ -50,6 +53,12 @@ food_look: #Look & { kindOf: "#Food", look: "food", prevails: 1 } @family(looks)
 let raw_grain = { material: "food", raw: true, nourishment: 15, cooking: 35 }
 grain:      #Body & #Food & raw_grain & { mass: 250g }
 grain_sack: #Stack & #Food & raw_grain & { unit: "grain", unitMass: 250g, count: 60 }
+
+// A larder: what a household keeps its food in, told from its other
+// containers (its coffer, its packs: carrying/) at a glance.
+#Larder: #Container & {}
+
+larder_seen: #Seen & { kindOf: "#Larder" } @family(seen)
 
 // Cooking: the food, the stove it is cooked at, and where it is kept.
 #Cooking: #Supper & #Warming & { larder: #Body }
@@ -168,7 +177,7 @@ look_for_food: #Method & {
     title:  "look for food"
     goal:   "have_a_meal"
     rank:   3
-    pre:    { find: ["larder", "stove"], match: #Cooking & { larder: #Container, stove: #Combustor & #Body } }
+    pre:    { find: ["larder", "stove"], match: #Cooking & { larder: #Larder, stove: #Combustor & #Body } }
     order:  ["own", "habit", "likely", "near"]
     seeks:  #Food & #Body
     search: "larder"

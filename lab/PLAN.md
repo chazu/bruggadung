@@ -5018,3 +5018,47 @@ The village: 14.0 s, from 22 s; perception 5.2 s (from 10.4), decision
 6.3 s (from 7.8). Every scenario's hash is unchanged. What's left is
 spread thin; `text_at` (printing content nodes) is the largest, and not
 all its nodes are the content's own.
+
+### After the slice: carrying (VILLAGE.md decision 11)
+
+A backpack and a basket for each household, loads, and a burdened walk.
+
+- **Packs** (content/carrying/): `#Pack`, a container with a `load`
+  (kg), `worn` or not. A worn pack is held on the back: a hand slot past
+  the hands (`BG_BACK`), which the committer allows only for a worn pack,
+  and which `free_hands` doesn't count. The committer keeps the load (a
+  placement obstacle, like capacity). `shoulder` and `put_back` are new
+  effects.
+- **The burden**: `burdened_rate` (work_rate, for a walk) slows a walk by
+  what the walker carries (hands, back, and what is in them) past the
+  burden's `light`, half pace at `light + slows` (15 kg; 55 kg). A first
+  curve (10; 30) made a woodcutter with a full pack and a lot in hand walk
+  at 38%: carrying more would have been slower.
+- **Stowing**: an operation's `stow` sends what it takes or is handed to
+  a pack its taker carries, if it fits by count and load, else a free hand
+  (`receiving`). `hand_over` and `butcher` stow; `gather` and `pick_up`
+  (family `stowing`, out of the menus) are stowing take_some and take.
+- **Agency**: a `#Reached` precondition with a find (AGENCY.md decision
+  23), so a pack is unpacked by the supply; `#Purchase` buys only the
+  supply's shortfall (counting hand and pack), and only with somewhere to
+  put the lot. A carried pack's contents are perceived by its carrier
+  (KNOWLEDGE.md decision 25): otherwise a seller believed its unsold
+  goods still at the stall and walked between stall and larder to unpack
+  them.
+- **Content**: `pack_worn`, `pack_carried`, `pack_returned` (emptied into
+  larder and woodpile, then put back); the market's buyers and sellers,
+  the hunters (meat and hide home), the woodcutters (a packful and a
+  handful a trip) use them. `#Larder`, `#Woodpile` and `#Hide` are kinds:
+  the coffer and packs by the larder had food searches looking in them
+  first, and the leather backpack was "brought home" as a hide.
+- **Found on the way**: payments split into a stall go unseen by its
+  seller (it looks in, now); a buyer with its axe in hand and its pack full
+  of firewood was refused, and forgot the price; a hunter left in the
+  village after the market had no woodland near to wander (it now heads
+  for the nearest); the market check counts the households that had goods
+  to sell (the Hunts may bring nothing home in two days).
+- test_carrying; the village: 35 checks (packs back by their larders,
+  empty, each night; a hide home), 15.5 s, 37,319 boundaries. Only the
+  village's hashes change.
+
+137 tests, 4069 checks.

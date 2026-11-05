@@ -25,7 +25,7 @@
 //            (src/act_activities.odin); they are compacted into digests
 //            after the world's history window (src/core_world.odin).
 
-#Effect: "take" | "take_some" | "put_in" | "drive" | "open_tap" | "fill" | "walk" | "loosen" | "look" | "say" | "tend" | "analyse" | "write" | "read" | "eat" | "give" | "investigate" | "tighten" | "rotate" | "strike" | "shut" | "dismantle" | "light" | "rest" | "open_door" | "saw" | "pass" | "copy" | "reveal" | "replace" | "cut" | "shape" | "install" | "issue" | "confiscate" | "arrest" | "flee" | "hit" | "hire" | "work" | "service" | "cook" | "fell" | "split" | "stoke" | "put_down" | "sow" | "harvest" | "crouch" | "shoot" | "butcher" | "post" | "hand_over" | "put_some"
+#Effect: "take" | "take_some" | "put_in" | "drive" | "open_tap" | "fill" | "walk" | "loosen" | "look" | "say" | "tend" | "analyse" | "write" | "read" | "eat" | "give" | "investigate" | "tighten" | "rotate" | "strike" | "shut" | "dismantle" | "light" | "rest" | "open_door" | "saw" | "pass" | "copy" | "reveal" | "replace" | "cut" | "shape" | "install" | "issue" | "confiscate" | "arrest" | "flee" | "hit" | "hire" | "work" | "service" | "cook" | "fell" | "split" | "stoke" | "put_down" | "sow" | "harvest" | "crouch" | "shoot" | "butcher" | "post" | "hand_over" | "put_some" | "shoulder" | "put_back"
 
 // Which roles an operation has is its roles' type: a structure's type is the
 // most general one with all its features.
@@ -89,6 +89,9 @@
     // how far a flight carries, in tiles (flee, law/; an animal's bolt,
     // hunting/)
     run:              *4 | int & >=1 & <=16
+    // what it takes, or is handed, goes into a pack its taker carries if it
+    // fits, else into a free hand (carrying/)
+    stow:             *false | true
     stages:           [...#Stage]
     uses:             [...#Provider]
     attention:        *0 | int & >=0 & <=100

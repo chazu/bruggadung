@@ -230,6 +230,11 @@ These were made while writing this document and have not yet been reviewed.
     alike are told apart by their stalls. A label is read on sighting it,
     or on coming within its `legible` distance from further off, so one
     first sighted from too far is read as the reader comes up to it.
+25. **What is in a pack its carrier carries, the carrier knows**
+    (VILLAGE.md decision 11). Inside a container is seen only by looking
+    in (or putting in, or taking out). A pack carried on the back or in a
+    hand is the exception for its carrier: what is in it is perceived with
+    the carrier, where the carrier is, so unpacking it walks nowhere.
 
 ## Terms
 

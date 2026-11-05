@@ -25,6 +25,10 @@
 //             one cut through.
 // - cooking:  a stove lit to cook is stoked first if empty
 //             (cooking/cooking.tri's `stove_lit`).
+// - carrying: a woodcutter with the household's backpack gathers into it
+//             (carrying/'s `gather`) and the next lot into its hand, stacks
+//             what it holds, and by the woodpile takes the rest out of the
+//             pack to stack.
 // - village:  the trees, the tools at the chopping block, the woodpiles
 //             and who stocks which are the scenario's
 //             (src/scenario_village.odin).
@@ -32,6 +36,12 @@
 //             effect_saw's trunks (src/act_actions.odin).
 
 package firewood
+
+// A woodpile: where a household's firewood is stacked, told from its other
+// containers at a glance.
+#Woodpile: #Container & {}
+
+woodpile_seen: #Seen & { kindOf: "#Woodpile" } @family(seen)
 
 // A standing tree, and what it is felled into: a trunk's blueprint.
 #Tree: #Body & {
@@ -86,7 +96,7 @@ birch_firewood_20: #Stack & { material: "birch", unit: "firewood", unitMass: 1kg
 axe: #Axe & { material: "iron", mass: 2kg }
 
 // Felling: a tree, the woodpile it goes to, the axe.
-#Felling: #Frame & { tree: #Body, trunk: #Body, log: #Body, wood: #Body, woodpile: #Body, axe: #Body }
+#Felling: #Frame & { tree: #Body, trunk: #Body, log: #Body, wood: #Body, woodpile: #Body, axe: #Body, pack: #Body, packed: #Body }
 
 // The day's work, for a woodcutter: its household's woodpile stocked, kept
 // through its working hours (bound when undertaken: the household's
@@ -114,22 +124,37 @@ stack_it: #Method & {
     steps: [#Do & { op: "put_in", object: "wood", target: "woodpile" }]
 } @family(methods)
 
+// Home with a pack (carrying/): the firewood in it taken out, by the
+// woodpile, to stack.
+unpack_the_wood: #Method & {
+    title: "unpack it"
+    goal:  "woodpile_stocked"
+    rank:  2
+    pre:   #Reached & {
+        reached: "woodpile"
+        find:    ["pack", "packed"]
+        match:   #Felling & { me: #Agent & { id: $me, freeHands: >=1 }, pack: #Pack & { id: $p, place: #Held & { by: $me } },
+                              packed: #Stack & { unit: "firewood", place: #Inside & { container: $p } } }
+    }
+    steps: [#Do & { op: "take", object: "packed" }]
+} @family(methods)
+
 gather_it: #Method & {
     title: "gather it"
     goal:  "woodpile_stocked"
-    rank:  2
+    rank:  3
     pre: {
         find:  ["wood"]
         match: #Felling & { me: #Agent & { freeHands: >=1 }, wood: #Stack & { unit: "firewood", place: #OnTile } }
     }
     order: ["near"]
-    steps: [#Do & { op: "take_some", object: "wood", units: 20 }]
+    steps: [#Do & { op: "gather", object: "wood", units: 20 }]
 } @family(methods)
 
 split_a_log: #Method & {
     title: "split a log"
     goal:  "woodpile_stocked"
-    rank:  3
+    rank:  4
     pre: {
         find:  ["log", "axe"]
         match: #Felling & {
@@ -145,7 +170,7 @@ split_a_log: #Method & {
 cut_a_trunk: #Method & {
     title: "cut a length off"
     goal:  "woodpile_stocked"
-    rank:  4
+    rank:  5
     pre: {
         find:  ["trunk", "axe"]
         match: #Felling & {
@@ -161,7 +186,7 @@ cut_a_trunk: #Method & {
 fell_a_tree: #Method & {
     title: "fell a tree"
     goal:  "woodpile_stocked"
-    rank:  5
+    rank:  6
     pre: {
         find:  ["tree", "axe"]
         match: #Felling & {
@@ -177,7 +202,7 @@ fell_a_tree: #Method & {
 take_up_the_axe: #Method & {
     title: "take up the axe"
     goal:  "woodpile_stocked"
-    rank:  6
+    rank:  7
     pre: {
         find:  ["axe"]
         match: #Felling & { me: #Agent & { freeHands: >=1 }, axe: #Axe & { place: #OnTile } }
@@ -190,9 +215,22 @@ take_up_the_axe: #Method & {
 look_for_trees: #Method & {
     title: "look for trees"
     goal:  "woodpile_stocked"
-    rank:  7
+    rank:  8
     pre:   { find: [], match: #Felling }
     steps: [#Explore & { beside: "woodland" }]
+} @family(methods)
+
+// Nothing left to gather or cut, the pack not empty: home with it.
+carry_the_wood_home: #Method & {
+    title: "carry it home"
+    goal:  "woodpile_stocked"
+    rank:  9
+    pre: {
+        find:  ["woodpile", "pack", "packed"]
+        match: #Felling & { me: #Agent & { id: $me }, woodpile: #Container, pack: #Pack & { id: $p, place: #Held & { by: $me } },
+                            packed: #Stack & { unit: "firewood", place: #Inside & { container: $p } } }
+    }
+    steps: [#Do & { op: "look_in", object: "woodpile" }]
 } @family(methods)
 
 // The night's: the household's stove stoked, six kilograms in it at the
@@ -230,7 +268,7 @@ look_in_the_woodpile: #Method & {
     title:  "look in the woodpile"
     goal:   "stove_stoked"
     rank:   3
-    pre:    { find: ["woodpile"], match: #Felling & { woodpile: #Container } }
+    pre:    { find: ["woodpile"], match: #Felling & { woodpile: #Woodpile } }
     order:  ["own", "habit", "likely", "near"]
     seeks:  #Stack & { unit: "firewood" }
     search: "woodpile"
