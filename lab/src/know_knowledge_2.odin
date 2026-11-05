@@ -116,6 +116,11 @@ knowledge_perceive :: proc(self: ^Knowledge, store: ^Knowledge_Store, first: uin
 	clear(news)
 	if !world_is_live(self.world, agent) || !know_ground_tile(self.world, agent, &here) do return
 	now = world_time(self.world).ms
+	/* where it was when it last perceived: a label it has just come close
+	 * enough to read is read, sighted or not */
+	was := knowledge_store_referent(store, knowledge_store_self_referent(store))
+	wasAt := Location{form = .On_Tile, x = was.x, y = was.y, level = was.level} if was != nil && was.seen > 0 else here
+	klabel := world_kind_named(self.world, "Label")
 
 	/* what the agent looked into this boundary: where it put something, or reached */
 	nlooked = 0
@@ -379,10 +384,12 @@ knowledge_perceive :: proc(self: ^Knowledge, store: ^Knowledge_Store, first: uin
 			r.slot      = at.slot
 			r.role      = at.role
 			/* a sighting (not seen for a minute before): remembered longer for
-			 * each; a label, on sighting it, is read below */
-			if r.seen == 0 || now - r.seen > 60000 {
-				r.sightings += 1
-				if nglance < 64 && world_record(self.world, world_kind_named(self.world, "Label"), seen[i].entity) != nil {
+			 * each; a label, on sighting it, or on coming close enough to read
+			 * it from further, is read below */
+			sighted := r.seen == 0 || now - r.seen > 60000
+			if sighted do r.sightings += 1
+			if label := (^Label)(world_record(self.world, klabel, seen[i].entity)) if klabel != 0 else nil; label != nil && nglance < 64 {
+				if sighted || wasAt.level != tile.level || i64(max(abs(wasAt.x - tile.x), abs(wasAt.y - tile.y))) > label.legible {
 					glance[nglance] = i
 					nglance += 1
 				}
@@ -1807,6 +1814,10 @@ knowledge_saved_state :: proc(self: ^Knowledge) -> []string {
 			append(&lines, fmt.tprintf("finding %d %d %d %d %s %s %d", knowledge_store_agent(store),
 			                           f.about, f.credence, f.time, f.kind, f.rule, f.choice))
 		}
+		for p in store.prices {
+			append(&lines, fmt.tprintf("price %d %d %d %d %d %s", knowledge_store_agent(store),
+			                           p.seller, p.board, p.coins, p.time, encode_word(p.unit)))
+		}
 		for j = 0; j < knowledge_store_testimony_count(store); j += 1 {
 			t = knowledge_store_testimony_at(store, j)
 			append(&lines, fmt.tprintf("told %d %d %d %d %d %d %d %d %d %d %d %d",
@@ -2009,6 +2020,11 @@ knowledge_restore_saved_state :: proc(self: ^Knowledge, lines: []string) {
 			knowledge_store_feel_hunger(knowledge_store_of(self, Entity_ID(agent)), trust, seen)
 			knowledge_store_feel_cold(knowledge_store_of(self, Entity_ID(agent)), cold)
 			knowledge_store_feel_stuffy(knowledge_store_of(self, Entity_ID(agent)), stuffy)
+		} else if libc.sscanf(text, "price %llu %u %u %d %lld %63s", &agent, &id, &next_, &trust, &seen, &role[0]) == 6 {
+			unit := decode_word(cstring(&role[0]))
+			knowledge_store_learn_price(knowledge_store_of(self, Entity_ID(agent)),
+			                            Known_Price{id, next_, world_intern(self.world, unit), trust, seen})
+			delete(unit)
 		} else if libc.sscanf(text, "finding %llu %u %d %lld %63s %511s %u", &agent, &id, &trust, &seen, &role[0], &kind[0], &next_) == 7 {
 			f: Finding
 

@@ -16,6 +16,8 @@
 // - frozen:   it doesn't decide; what is under way waits.
 // - harm:     the wound is an injury (harm/'s injure): at 100 the animal
 //             dies, its carcass where it fell (butchering.tri).
+// - market:   a hunter that put its bow down (both hands wanted, to buy:
+//             market/) takes it up again to hunt.
 // - code:     effect_crouch, effect_shoot (src/act_actions.odin); an
 //             operation's `range` (actions.tri), which agency walks to
 //             within and no further.
@@ -140,6 +142,17 @@ look_for_game: #Method & {
     rank:  4
     pre:   { find: [], match: #Hunting & {} }
     steps: [#Achieve & { subgoal: "hidden" }, #Achieve & { subgoal: "watched" }, #Wander & { radius: 12, over: "woodland" }]
+} @family(methods)
+
+// No bow in hand (put down at home, to buy at the market): take it up
+// again, when nothing else will do.
+take_up_the_bow: #Method & {
+    title: "take up the bow"
+    goal:  "game_hunted"
+    rank:  5
+    pre:   { find: ["bow"], match: #Hunting & { me: #Agent & { freeHands: >=1 }, bow: #Bow & { place: #OnTile | #Inside } } }
+    order: ["near"]
+    steps: [#Do & { op: "take", object: "bow" }]
 } @family(methods)
 
 // Lain in wait lately: the last wait just ended (five seconds since), so

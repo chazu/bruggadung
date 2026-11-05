@@ -48,6 +48,19 @@ VILLAGE_DAY :: i64(86400000)
 VILLAGE_HOUR :: i64(3600000)
 VILLAGE_DAYS :: 3
 VILLAGE_GRAIN :: i64(60)               // portions in each larder's sack (village.tri's grain_sack)
+VILLAGE_FARM_GRAIN :: i64(200)         // a farming household's harvest in store (village.tri's farm_grain)
+VILLAGE_COINS :: i64(100)              // coins in each household's coffer (money/coins.tri's coins_100)
+VILLAGE_MARKET :: i64(2)               // the first market day's index (day 3); then every fourth
+
+/* What each household buys at the market (content/market/): the goals,
+ * each stocking its larder (or woodpile) with what it doesn't make. */
+@(private = "file", rodata)
+village_buys := [4][2]cstring {
+	{"meat_stocked", "firewood_stocked"},
+	{"meat_stocked", "firewood_stocked"},
+	{"grain_stocked", "meat_stocked"},
+	{"grain_stocked", "firewood_stocked"},
+}
 
 Village_Household :: struct {
 	name:      string,
@@ -59,14 +72,16 @@ Village_Household :: struct {
 	woodpile:  [2]i32,               // outside, by the door
 	worksite: cstring,              // its blueprint
 	works:     [2]i32,               // where it stands
+	coffer:    [2]i32,               // beside the larder
+	stall:     [2]i32,               // on the green
 }
 
 @(private = "file", rodata)
 households := [4]Village_Household {
-	{"the Ashes", "farmer", 3, {{39, 39}, {41, 39}, {43, 39}, {}}, {46, 43}, {39, 44}, {44, 46}, "scarecrow", {36, 84}},
-	{"the Brooks", "farmer", 4, {{69, 38}, {71, 38}, {73, 38}, {75, 38}}, {78, 43}, {69, 44}, {74, 46}, "scarecrow", {79, 84}},
-	{"the Fells", "woodcutter", 2, {{41, 60}, {43, 60}, {}, {}}, {46, 57}, {41, 57}, {44, 54}, "chopping_block", {61, 22}},
-	{"the Hunts", "hunter", 3, {{71, 61}, {73, 61}, {75, 61}, {}}, {77, 57}, {71, 57}, {75, 54}, "hunting_blind", {135, 50}},
+	{"the Ashes", "farmer", 3, {{39, 39}, {41, 39}, {43, 39}, {}}, {46, 43}, {39, 44}, {44, 46}, "scarecrow", {36, 84}, {40, 44}, {57, 48}},
+	{"the Brooks", "farmer", 4, {{69, 38}, {71, 38}, {73, 38}, {75, 38}}, {78, 43}, {69, 44}, {74, 46}, "scarecrow", {79, 84}, {70, 44}, {63, 48}},
+	{"the Fells", "woodcutter", 2, {{41, 60}, {43, 60}, {}, {}}, {46, 57}, {41, 57}, {44, 54}, "chopping_block", {61, 22}, {42, 57}, {57, 52}},
+	{"the Hunts", "hunter", 3, {{71, 61}, {73, 61}, {75, 61}, {}}, {77, 57}, {71, 57}, {75, 54}, "hunting_blind", {135, 50}, {72, 57}, {63, 52}},
 }
 
 /* The farmers' plots (VILLAGE.md: the Ashes two of grain, the Brooks
@@ -136,7 +151,11 @@ Village :: struct {
 	larders:      [4]Entity_ID,      // each household's, by its index
 	stoves:       [4]Entity_ID,
 	woodpiles:    [4]Entity_ID,
+	coffers:      [4]Entity_ID,
+	stalls:       [4]Entity_ID,
+	boards:       [4]Entity_ID,      // each stall's price board, standing on it
 	plots:        [4][dynamic]Entity_ID,  // each farming household's
+	marketed:     [4]i64,            // grain each larder gained at the market (sold, less)
 	results:      [dynamic]string,   // each cloned
 	error:        string,            // cloned; "" if it was set up
 }
@@ -212,7 +231,7 @@ village_setup :: proc(self: ^Village) {
 	c := self.committer
 	g := proposal_group_group_with_phase(.System, "setup: the village")
 	handles := make([dynamic]Villager, context.temp_allocator)
-	works, larders, stoves, woodpiles: [4]Entity_ID
+	works, larders, stoves, woodpiles, coffers, stalls, boards: [4]Entity_ID
 	self_plots: [4][dynamic]Entity_ID
 	for &h, k in households {
 		works[k] = proposal_group_create(g, h.worksite, ns_utf8(fmt.tprintf("%s' worksite", h.name)),
@@ -222,7 +241,14 @@ village_setup :: proc(self: ^Village) {
 		larder := proposal_group_create(g, "larder", ns_utf8(fmt.tprintf("%s' larder", h.name)),
 		                                on_tile(h.larder.x, h.larder.y, 0))
 		larders[k] = larder
-		sack := proposal_group_create(g, "grain_sack", ns_utf8(fmt.tprintf("%s' grain", h.name)), in_(larder))
+		sack := proposal_group_create(g, "farm_grain" if h.worksite == "scarecrow" else "grain_sack",
+		                              ns_utf8(fmt.tprintf("%s' grain", h.name)), in_(larder))
+		/* its coins, in a coffer by the larder; its stall on the green */
+		coffer := proposal_group_create(g, "coffer", ns_utf8(fmt.tprintf("%s' coffer", h.name)), on_tile(h.coffer.x, h.coffer.y, 0))
+		coffers[k] = coffer
+		coins := proposal_group_create(g, "coins_100", ns_utf8(fmt.tprintf("%s' coins", h.name)), in_(coffer))
+		stalls[k] = proposal_group_create(g, "stall", ns_utf8(fmt.tprintf("%s' stall", h.name)), on_tile(h.stall.x, h.stall.y, 0))
+		boards[k] = proposal_group_create(g, "price_board", ns_utf8(fmt.tprintf("%s' board", h.name)), on_tile(h.stall.x, h.stall.y, 0))
 		/* the farmers' plots, their tilled block halved, and the seed kept
 		 * back for them (village.tri) */
 		seeds := make([dynamic]Entity_ID, context.temp_allocator)
@@ -263,6 +289,9 @@ village_setup :: proc(self: ^Village) {
 			village_own(g, v.id, larder, "the household's larder")
 			village_own(g, v.id, sack, "the household's grain")
 			village_own(g, v.id, woodpile, "the household's woodpile")
+			village_own(g, v.id, coffer, "the household's coffer")
+			village_own(g, v.id, coins, "the household's coins")
+			village_own(g, v.id, stalls[k], "the household's stall")
 			village_own(g, v.id, wood, "the household's firewood")
 			for seed in seeds do village_own(g, v.id, seed, "the household's seed")
 			for plot in plots do village_own(g, v.id, plot, "the household's plot")
@@ -291,6 +320,9 @@ village_setup :: proc(self: ^Village) {
 	for l, k in larders do self.larders[k] = proposal_group_id_for(g, l)
 	for e, k in stoves do self.stoves[k] = proposal_group_id_for(g, e)
 	for e, k in woodpiles do self.woodpiles[k] = proposal_group_id_for(g, e)
+	for e, k in coffers do self.coffers[k] = proposal_group_id_for(g, e)
+	for e, k in stalls do self.stalls[k] = proposal_group_id_for(g, e)
+	for e, k in boards do self.boards[k] = proposal_group_id_for(g, e)
 	for &list, k in self_plots {
 		for e in list do append(&self.plots[k], proposal_group_id_for(g, e))
 		delete(list)
@@ -302,7 +334,7 @@ village_setup :: proc(self: ^Village) {
 
 	/* then round its house: beside the larder (against the west wall), then
 	 * the stove (the east), two to a tile's breadth */
-	for stop, k in ([3]string{"woodpile", "larder", "stove"}) {
+	for stop, k in ([4]string{"woodpile", "larder", "stove", "green"}) {
 		tour := proposal_group_group_with_phase(.System, fmt.tprintf("setup: by the %s", stop))
 		for v, i in self.people {
 			h := households[v.household]
@@ -313,6 +345,8 @@ village_setup :: proc(self: ^Village) {
 				proposal_group_move_to(tour, whole(v.id), on_tile(h.woodpile.x - 1 + i32(i % 2), y, 0))
 			case 1: proposal_group_move_to(tour, whole(v.id), on_tile(h.larder.x + 1, h.larder.y - 1 + i32(i % 2), 0))
 			case 2: proposal_group_move_to(tour, whole(v.id), on_tile(h.stove.x - 1, h.stove.y - 1 + i32(i % 2), 0))
+			/* the green, where the paths cross, in sight of every stall */
+			case 3: proposal_group_move_to(tour, whole(v.id), on_tile(59 + i32(i % 3), 49 + i32(i / 3 % 3), 0))
 			}
 		}
 		committer_submit(c, tour)
@@ -333,7 +367,7 @@ village_setup :: proc(self: ^Village) {
 		}
 	}
 	committer_submit(c, home)
-	scheduler_run_until(self.scheduler, time_make(5))     /* and sees its bed */
+	scheduler_run_until(self.scheduler, time_make(6))     /* and sees its bed */
 
 	/* the day's commitments, every day, bound to its own bed and its work */
 	farmer_index: [4]int
@@ -377,6 +411,40 @@ village_setup :: proc(self: ^Village) {
 			ok = ok && known != 0 &&
 			     agency_undertake_every_with(self.agency, v.id, "plot_tended", 7 * VILLAGE_HOUR, 15 * VILLAGE_HOUR, "work",
 			                                 VILLAGE_DAY, {{"plot", known}, {"larder", larder}})
+		}
+		/* market days (content/market/): the household's first keeps its
+		 * stall, from where its goods are kept; its second buys what it
+		 * doesn't make; each takes the coins home after */
+		stall  := village_referent_of(store, self.stalls[v.household])
+		coffer := village_referent_of(store, self.coffers[v.household])
+		board  := village_referent_of(store, self.boards[v.household])
+		first  := 0
+		for w, i in self.people do if w.household == v.household {
+			first = i
+			break
+		}
+		which  := 0
+		for w, i in self.people do if w.id == v.id do which = i - first
+		day    := VILLAGE_MARKET * VILLAGE_DAY
+		if ok && (stall == 0 || coffer == 0 || board == 0) {
+			self.error = fmt.aprintf("%d hasn't seen its household's %s", v.id, "stall" if stall == 0 else ("coffer" if coffer == 0 else "board"))
+			return
+		}
+		if ok && which == 0 {
+			supply := pile if households[v.household].worksite == "chopping_block" else larder
+			ok = agency_undertake_every_with(self.agency, v.id, "stall_kept", day + 9 * VILLAGE_HOUR, day + 12 * VILLAGE_HOUR, "market",
+			                                 4 * VILLAGE_DAY, {{"stall", stall}, {"board", board}, {"supply", supply}}) &&
+			     agency_undertake_every_with(self.agency, v.id, "takings_home", day + 12 * VILLAGE_HOUR, day + 13 * VILLAGE_HOUR,
+			                                 "market", 4 * VILLAGE_DAY, {{"stall", stall}, {"coffer", coffer}})
+		} else if ok && which == 1 {
+			for goal in village_buys[v.household] {
+				supply := pile if goal == "firewood_stocked" else larder
+				ok = ok && agency_undertake_every_with(self.agency, v.id, goal, day + 9 * VILLAGE_HOUR + VILLAGE_HOUR / 2,
+				                                       day + 12 * VILLAGE_HOUR, "market", 4 * VILLAGE_DAY,
+				                                       {{"supply", supply}, {"coffer", coffer}})
+			}
+			ok = ok && agency_undertake_every_with(self.agency, v.id, "coins_home", day + 12 * VILLAGE_HOUR, day + 13 * VILLAGE_HOUR,
+			                                       "market", 4 * VILLAGE_DAY, {{"coffer", coffer}})
 		}
 		if !ok {
 			self.error = fmt.aprintf("%d couldn't take on its day", v.id)
@@ -466,14 +534,24 @@ village_run :: proc(self: ^Village) {
 	for d in 0 ..< i64(VILLAGE_DAYS) {
 		village_step_until(self, d * VILLAGE_DAY + 7 * VILLAGE_HOUR + VILLAGE_HOUR / 2)
 		village_check_each(self, fmt.tprintf("day %d, 07:30: everyone takes a meal to work", d + 1), .Packed)
+		market := d >= VILLAGE_MARKET && (d - VILLAGE_MARKET) % 4 == 0
+		before: [4]i64
+		if market {
+			village_step_until(self, d * VILLAGE_DAY + 9 * VILLAGE_HOUR)
+			for l, k in self.larders do before[k] = village_portions_in(self.world, l)
+		}
 		village_step_until(self, d * VILLAGE_DAY + 11 * VILLAGE_HOUR)
 		village_check_each(self, fmt.tprintf("day %d, 11:00: everyone at work", d + 1), .Work)
+		if market do village_check_market(self, d, before)
 		village_step_until(self, d * VILLAGE_DAY + 14 * VILLAGE_HOUR + VILLAGE_HOUR / 2)
 		village_check_each(self, fmt.tprintf("day %d, 14:30: everyone has eaten it there", d + 1), .Lunched)
 		village_step_until(self, d * VILLAGE_DAY + 15 * VILLAGE_HOUR)
 		now := village_firewood_in(self.world, self.woodpiles[woodcutters])
-		village_check(self, now > stocked, fmt.tprintf("day %d, 15:00: the woodcutters' woodpile rose with their work", d + 1),
-		              fmt.tprintf("%d pieces, %d before", now, stocked))
+		/* on market day they sell it, and work less */
+		if !market {
+			village_check(self, now > stocked, fmt.tprintf("day %d, 15:00: the woodcutters' woodpile rose with their work", d + 1),
+			              fmt.tprintf("%d pieces, %d before", now, stocked))
+		}
 		stocked = now
 		if d == 0 {
 			/* the farmers' work: every plot sown the first day, growing */
@@ -539,17 +617,22 @@ village_run :: proc(self: ^Village) {
 
 
 /* The deer and hares not lying up (content/hunting/animals.tri's bed_down
- * under way), by ID. */
+ * under way, or one just over), by ID. */
 @(private = "file")
 village_game_awake :: proc(self: ^Village) -> [dynamic]string {
 	awake := make([dynamic]string, context.temp_allocator)
 	lying := make(map[Entity_ID]bool, context.temp_allocator)
-	running := u32(tri.type_named(world_tri(self.world), "\"running\""))
+	running   := u32(tri.type_named(world_tri(self.world), "\"running\""))
+	completed := u32(tri.type_named(world_tri(self.world), "\"completed\""))
+	now       := world_time(self.world).ms
 	activities := world_store_for_kind(self.world, world_kind_named(self.world, "Activity"))
 	for i: uint = 0; i < store_count(activities); i += 1 {
 		a := (^Activity)(store_record_at_index(activities, i))
 		op := world_text_field(self.world, "Activity.operation", store_entity_at_index(activities, i))
-		if a.status == running && op != nil && op == "bed_down" do lying[Entity_ID(a.actorRef)] = true
+		/* lying up, or a spell of it just over (the next begins at once) */
+		if op != nil && op == "bed_down" && (a.status == running || (a.status == completed && a.due >= now - 1000)) {
+			lying[Entity_ID(a.actorRef)] = true
+		}
 	}
 	agents := world_store_for_kind(self.world, world_kind_named(self.world, "Agent"))
 	for i: uint = 0; i < store_count(agents); i += 1 {
@@ -571,13 +654,59 @@ village_check_larders :: proc(self: ^Village) {
 	for v in self.people do people[v.household] += 1
 	wrong := make([dynamic]string, context.temp_allocator)
 	for l, k in self.larders {
-		taken := VILLAGE_GRAIN - village_portions_in(self.world, l)
+		taken := village_grain(k) - village_portions_in(self.world, l) + self.marketed[k]
 		if taken < 3 * people[k] * VILLAGE_DAYS || taken > 5 * people[k] * VILLAGE_DAYS {
 			append(&wrong, fmt.tprintf("%s took %d", households[k].name, taken))
 		}
 	}
 	village_check(self, len(wrong) == 0, "each household ate from its own larder, which emptied as it did",
 	              strings.join(wrong[:], ", ", context.temp_allocator))
+}
+
+
+/* The portions of grain a household's larder held at first. */
+@(private = "file")
+village_grain :: proc(k: int) -> i64 {
+	return VILLAGE_FARM_GRAIN if households[k].worksite == "scarecrow" else VILLAGE_GRAIN
+}
+
+
+/* Market day (VILLAGE.md decision 9, content/market/), from 11:00: by
+ * noon every household has sold some of its goods (its stall holds coins);
+ * by 13:00 the takings are home and no coin was made or lost. What each
+ * larder's grain changed by across the market, 09:00 (`before`) to 13:00,
+ * is the market's, not eaten (nobody cooks from it then). */
+@(private = "file")
+village_check_market :: proc(self: ^Village, d: i64, before: [4]i64) {
+	village_step_until(self, d * VILLAGE_DAY + 12 * VILLAGE_HOUR)
+	unsold := make([dynamic]string, context.temp_allocator)
+	for st, k in self.stalls {
+		if village_units_in(self.world, st, "coin") == 0 do append(&unsold, households[k].name)
+	}
+	village_check(self, len(unsold) == 0, fmt.tprintf("day %d, 12:00: every household sold at the market", d + 1),
+	              fmt.tprintf("not: %s", strings.join(unsold[:], ", ", context.temp_allocator)))
+	village_step_until(self, d * VILLAGE_DAY + 13 * VILLAGE_HOUR)
+	coins, left: i64
+	bodies := world_store_for_kind(self.world, world_kind_named(self.world, "Body"))
+	for i: uint = 0; i < store_count(bodies); i += 1 {
+		e := store_entity_at_index(bodies, i)
+		if u := world_unit_of(self.world, e); u != nil && u == "coin" && world_is_live(self.world, e) do coins += world_units_of(self.world, e)
+	}
+	for st in self.stalls do left += village_units_in(self.world, st, "coin")
+	village_check(self, coins == 4 * VILLAGE_COINS && left == 0,
+	              fmt.tprintf("day %d, 13:00: the takings home, and no coin made or lost", d + 1),
+	              fmt.tprintf("%d coins, %d of them still on the stalls", coins, left))
+	for l, k in self.larders do self.marketed[k] += village_portions_in(self.world, l) - before[k]
+}
+
+
+/* The units of a unit in a container. */
+village_units_in :: proc(world: ^World, container: Entity_ID, unit: cstring) -> i64 {
+	inside: [16]Entity_ID
+	total: i64
+	n := world_entities_at(world, container, .In, raw_data(inside[:]), 16)
+	for e in inside[:n] do if u := world_unit_of(world, e); u != nil && u == unit do total += world_units_of(world, e)
+	return total
 }
 
 
@@ -632,7 +761,7 @@ village_check_each :: proc(self: ^Village, name: string, where_: Where) {
 
 // Whether a villager is at its work: about its worksite (within six
 // tiles), or about its work: a woodcutter stocking its woodpile, in the
-// woods or on its way home with firewood.
+// woods or on its way home with firewood; on market day, about the market.
 @(private = "file")
 village_at_work :: proc(self: ^Village, v: Villager) -> bool {
 	la := world_location_of(self.world, v.id)
@@ -640,8 +769,15 @@ village_at_work :: proc(self: ^Village, v: Villager) -> bool {
 	if la.form == .On_Tile && lw.form == .On_Tile && la.level == lw.level && abs(la.x - lw.x) <= 6 && abs(la.y - lw.y) <= 6 {
 		return true
 	}
-	return agency_intends(self.agency, v.id, "woodpile_stocked") || agency_intends(self.agency, v.id, "plot_tended") ||
-	       agency_intends(self.agency, v.id, "game_hunted")
+	if agency_intends(self.agency, v.id, "woodpile_stocked") || agency_intends(self.agency, v.id, "plot_tended") ||
+	   agency_intends(self.agency, v.id, "game_hunted") {
+		return true
+	}
+	/* or about the market, on market day: its stall, its buying, the coins home */
+	for goal in ([?]string{"stall_kept", "grain_stocked", "meat_stocked", "firewood_stocked", "takings_home", "coins_home"}) {
+		if agency_intends(self.agency, v.id, goal) do return true
+	}
+	return false
 }
 
 

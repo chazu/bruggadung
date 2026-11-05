@@ -292,6 +292,19 @@ Known_Law :: struct {
 }
 
 
+/* A price the agent knows, read on a stall's board (content/market/): who
+ * sells goods of the unit there, at so many coins a unit, as of when it
+ * read it. One to a board and unit, the latest: sellers who look alike are
+ * told apart by their stalls' boards. */
+Known_Price :: struct {
+	seller: u32,               /* referent */
+	board:  u32,               /* referent: the board it read it on, standing on the stall */
+	unit:   cstring,           /* interned: the goods' unit, "grain" */
+	coins:  i32,
+	time:   i64,               /* ms */
+}
+
+
 /* What a rule concluded (KNOWLEDGE.md §9): something about a referent. */
 Finding :: struct {
 	kind:     cstring,         /* interned: a #Finding type, "#Tampered" */
@@ -389,6 +402,7 @@ Knowledge_Store :: struct {
 	fcapacity:     uint,
 	laws:          [^]Known_Law,
 	nlaws:         uint,
+	prices:        [dynamic]Known_Price,
 	recipes:       [^]cstring,       /* interned: recipes it learned (ACTIONS.md decision 12) */
 	nrecipes:      uint,
 	hunger:        i32,              /* as felt */
@@ -682,6 +696,19 @@ knowledge_store_recipe_at :: proc(self: ^Knowledge_Store, i: uint) -> cstring {
 }
 
 
+/* A price read (content/market/): in place of what it knew of the board's
+ * price for the unit. */
+knowledge_store_learn_price :: proc(self: ^Knowledge_Store, price: Known_Price) {
+	for &p in self.prices {
+		if p.board == price.board && rawptr(p.unit) == rawptr(price.unit) {
+			p = price
+			return
+		}
+	}
+	append(&self.prices, price)
+}
+
+
 knowledge_store_learn_law :: proc(self: ^Knowledge_Store, law: Known_Law) {
 	i: uint
 
@@ -712,6 +739,7 @@ knowledge_store_dealloc :: proc(self: ^Knowledge_Store) {
 	free(self.traces)
 	free(self.findings)
 	free(self.laws)
+	delete(self.prices)
 	free(self.recipes)
 	free(self.identities)
 	free(self.seenChunks)

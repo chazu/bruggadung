@@ -112,7 +112,8 @@ cut: the levels of detail first, then other topics, then code.
 | `light/` | daylight and lamps |
 | `looks/` | themes: what `lab play`'s map (`text.tri`) and the watcher (`tiles.tri`) draw for each look |
 | `machines/` | latent assembly, wear and servicing (`latent.tri`); the pump and its repair (`pump.tri`) |
-| `money/` | getting money: borrowing, taking; a loan repaid |
+| `money/` | getting money: borrowing, taking; a loan repaid (`money.tri`); coins, the coffer, and what goods are worth in coins (`coins.tri`) |
+| `market/` | stalls and their price boards, keeping a stall, buying to stock a household, the sale (`market.tri`) |
 | `nails/` | nail stacks, wedging a lock, finding nails, putting them away |
 | `promises/` | delivering: what a promise commits to |
 | `reservations/` | a soft claim, its tag, respecting it |

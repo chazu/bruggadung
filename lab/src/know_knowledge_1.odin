@@ -1034,6 +1034,23 @@ knowledge_believe :: proc(self: ^Knowledge, content: cstring, speaker: u32, reco
 		tri.arena_free(arena)
 		return
 	}
+	if claim != nil && tri.type_named(tc, "#Priced") != 0 && tri.subtype(tc, tri.node_type(claim), tri.type_named(tc, "#Priced")) != 0 {
+		/* a price posted (content/market/): who sells goods of what unit, at
+		 * how many coins a unit, on the board it was read on (standing on the
+		 * stall) */
+		coins: i64
+		unit: [64]u8
+		seller := knowledge_person(self, tri.at(tc, claim, "holder"), store, news) if tri.at(tc, claim, "holder") != nil else 0
+		n := tri.print(tc, tri.at(tc, claim, "what.unit"), &unit[0], size_of(unit)) if tri.at(tc, claim, "what.unit") != nil else 0
+		if seller != 0 && seller != knowledge_store_self_referent(store) && record != 0 && n > 2 && unit[0] == '"' &&
+		   know_node_int(tc, claim, "coins", &coins) {
+			unit[n - 1] = 0
+			knowledge_store_learn_price(store, Known_Price{seller, record, world_intern(self.world, cstring(&unit[1])), i32(coins), now})
+			k1_say(news, fmt.tprintf("R%d sells %s at %d coins, R%d says", seller, cstring(&unit[1]), coins, speaker))
+		}
+		tri.arena_free(arena)
+		return
+	}
 	if claim != nil && tri.subtype(tc, tri.node_type(claim), tri.type_named(tc, "#Hiring")) != 0 {
 		/* a deal posted (AGENCY.md decision 15): someone hires, and where to
 		 * find them; believed there, unless seen since */

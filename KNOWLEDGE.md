@@ -223,6 +223,13 @@ These were made while writing this document and have not yet been reviewed.
     its #Danger is gone. Such rules need a skill (`wary`, an animal's;
     `stalking`, a hunter's), so a person draws no danger from every
     passer-by, and costs nothing for those without it.
+24. **A posted price is known as read** (VILLAGE.md decision 9). A
+    `#Priced` claim on a stall's board (a label) is kept as a **known
+    price**: the board, the goods' unit, the coins a unit, when it was
+    read, and who it names. One to a board and unit: sellers who look
+    alike are told apart by their stalls. A label is read on sighting it,
+    or on coming within its `legible` distance from further off, so one
+    first sighted from too far is read as the reader comes up to it.
 
 ## Terms
 

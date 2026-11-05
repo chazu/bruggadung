@@ -9,8 +9,8 @@ village` checks it, as the other scenarios are checked.
 
 This document is a proposal, built a slice at a time: slices 1 (hunger
 over weeks), 2 (looks in content), 3 (the village and its homes), 4
-(cooking and the larder), 5 (firewood), 6 (farming), 7 (hunting) and 8
-(perishing) are built. Each slice below is a ticket: slice n is GitHub issue #n
+(cooking and the larder), 5 (firewood), 6 (farming), 7 (hunting), 8
+(perishing) and 9 (the market) are built. Each slice below is a ticket: slice n is GitHub issue #n
 (label `village`). A slice moves into `lab/PLAN.md` when it is built.
 
 It is the first scenario that runs for weeks, not minutes. That forces two
@@ -202,6 +202,31 @@ things the lab put off:
    - A **sale** is a deal (AGENCY.md d15) of goods for coins, made on the
      spot. It is never "trade", which is the lab's word for a craft
      (`Agent.trade`).
+   - Built (content/market/, content/money/coins.tri; AGENCY.md decision
+     22, KNOWLEDGE.md decision 24). Every household keeps a hundred coins
+     in a **coffer** by its larder. Market day is the third, then every
+     fourth. From 09:00 to 12:00 a household's first person keeps its
+     stall on the green: it sets out a lot of what its trade makes (a
+     recipe of the trade: grain, venison, firewood), keeping enough back
+     at home, posts its price on the stall's board, and minds the stall
+     ten minutes at a time. Its second buys what the household doesn't
+     make, each a kept goal to stock its larder or woodpile to a level:
+     it takes the coins from the coffer, reads the boards, and buys a lot
+     at a time (ask, hand over, pay), taking each home. From 12:00 the
+     seller takes its takings home, and the buyer what it didn't spend.
+   - A buyer buys at the cheapest price it knows, the nearest of those,
+     if no dearer than its own pricing (coins a unit, raised by the need
+     the goods serve, `#Pricing`). A seller prices its spare goods without
+     the need's raise, so every posted price is the kind's: grain 1,
+     venison 2, firewood 1. With the raise, a hungry farmer asked more
+     for grain than a hungry woodcutter would give, and nothing sold.
+   - Farmers start with last year's harvest, two hundred portions of
+     grain, so they have grain to spare before their plots ripen.
+   - Built on the way: what is in a container is known only to whoever
+     looked in it, so buyers look in the coffer and sellers in the supply;
+     a buyer with both hands full (a woodcutter's axe and log, a hunter's
+     bow and coins) puts down what it carries, never its coins, and a
+     hunter takes its bow up again to hunt.
 10. **Looks come from content** (TESSERA.md slice 3; slice 2 below). Each
     blueprint names its look (`look: "tree.oak"`), resolved through the
     type hierarchy, and the watcher's theme gives each look a glyph and
@@ -248,9 +273,10 @@ The day is the light domain's (daylight, dusk, night).
   into the woods.
 - **Midday.** Hunger rises enough to eat what the agent carries, or to go
   home for it.
+- **Market day**, every fourth (the third first), 09:00 to 12:00: a
+  seller from each household stands at its stall on the green, and
+  another comes to buy; the takings and the coins go home by 13:00.
 - **Afternoon.** Firewood carried home, meat butchered, grain brought in.
-  Every fourth day is market day: sellers stand at stalls on the green and
-  the rest come to buy.
 - **Evening.** Supper, the stove stoked, idle talk with whoever is near
   (talk.tri).
 - **22:00 to 06:00, sleep.** At home, in the agent's own bed.
@@ -336,7 +362,7 @@ when it is built:
 6. **Farming**: plots, sowing, ripening, harvesting (built).
 7. **Hunting**: animals, death, butchering (built).
 8. **Perishing**: food that spoils (built).
-9. **The market**: coins, stalls, posted prices, sales.
+9. **The market**: coins, stalls, posted prices, sales (built).
 10. **A week in the village**: the scenario's checks and hashes in CI, and
     how fast it runs.
 11. **The knowledge view in the watcher**: one agent's village as it
@@ -361,10 +387,10 @@ New, and entered in the glossary with this document:
 | Perishable | Good for so long after it was made, then spoiled. (Built.) |
 | Spoiled food | What perishable food is once its time has come: as heavy, made of rot, not food. (Built.) |
 | Carcass | What an animal's body is once it dies: something to butcher. |
-| Stall | Where a seller sets out goods on market day, with its posted prices. |
-| Posted price | A seller's written price for a kind of goods, read by buyers. |
-| Sale | A deal of goods for coins, made on the spot. *Avoid:* trade, which is a craft. |
-| Market day | Every fourth day, when stalls are set out on the green. |
+| Stall | Where a seller sets out goods on market day, with its posted prices. (Built.) |
+| Posted price | A seller's written price for a kind of goods, read by buyers. (Built.) |
+| Sale | A deal of goods for coins, made on the spot. *Avoid:* trade, which is a craft. (Built.) |
+| Market day | Every fourth day, when stalls are set out on the green. (Built.) |
 | Household | The people of a home: kin bonds. Not a **place** (DETAIL_REGIMES.md's entity), until abstract detail needs one. |
 | Worksite | What a household's day's work is done at: a scarecrow in a plot, a chopping block, a hunting blind. *Avoid:* workplace. (Built.) |
 | Meal | Food that isn't raw: cooked, or never raw. (Built.) |
@@ -409,7 +435,31 @@ New, and entered in the glossary with this document:
   is three tonnes now, and the hunters' two deer forty kilograms.
 - **Prices.** A posted price from the seller's values alone ignores what
   others ask. Whether sellers should read each other's stalls and follow is
-  for after the first market works.
+  for after the first market works. Today it is the kind's price, the
+  same at every stall: a seller prices spare goods without its need's
+  raise, and only a buyer's pricing moves (with its hunger).
+- **Carrying.** Everything is carried in two hands. A buyer carries its
+  coins in one and what it bought in the other, so it buys a lot, walks
+  it home, and comes back; a woodcutter must put down its axe to fetch
+  coins, a hunter its bow. A bag, a basket, a backpack or a barrow (a
+  container carried, its contents carried with it) would carry coins and
+  goods together, and the firewood home by the armful. The user asked
+  for it (2026-11-05); it wants its own design: what a carried container
+  holds, how its contents are seen, and taking from it and putting in it
+  while held.
+- **Unsold goods stay on the stall.** What wasn't sold stays set out on
+  the green till the next market, perishable meat spoiling there. Taking
+  it home after is a goal of its own.
+- **A buyer always pays.** Handed the goods, the buyer pays at once; one
+  who walked off without paying would be a thief, a case for the law
+  (INSTITUTIONS.md), not built.
+- **What the market costs.** The village takes 22 s (from 13 s): 43,000
+  boundaries, from 34,000, and perception 10 s, from 5. Most of it isn't
+  market day: without one the run still takes 38,000 boundaries and
+  8.7 s of perception. Not the boards' reading, the market's commitments
+  or the farmers' bigger store; not yet found (the first morning's walk
+  to the green shifts every day after it, and there are more things to
+  know). A profile is the next step.
 - **How weakness is felt.** Strength and cognition fall with reserves, but
   does the agent know it is weak? The interoceptive belief is hunger's.
   Weakness might be felt as fatigue, or as a need of its own.

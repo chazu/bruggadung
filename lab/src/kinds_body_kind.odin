@@ -2,10 +2,10 @@ package lab
 
 /*
  * BGBodyKind — behaviour of the Body component. On the reactions channel:
- * a unit put into a container that holds a stack of the same unit proposes
- * to merge into it, and, food, to spoil when the older would have. Whether
- * the units are indistinguishable is commitment's to decide; a refusal is
- * traced with its reason.
+ * a unit put (or split off) into a container that holds a stack of the
+ * same unit proposes to merge into it, and, food, to spoil when the older
+ * would have. Whether the units are indistinguishable is commitment's to
+ * decide; a refusal is traced with its reason.
  *
  * (ported from the Objective-C lab's kinds/BGBodyKind.m)
  */
@@ -41,7 +41,8 @@ body_kind_react_to_event :: proc(self: ^Body_Kind, committer: ^Committer, event:
 	i:     uint
 	n:     uint
 
-	if event.kind != "moved" || event.location.form != .In do return
+	/* moved in whole, or split off into it */
+	if (event.kind != "moved" && event.kind != "split") || event.location.form != .In do return
 	if !world_is_live(world, event.subject) do return
 	unit = world_unit_of(world, event.subject)
 	if unit == nil do return

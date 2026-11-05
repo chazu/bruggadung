@@ -142,6 +142,21 @@ Out of scope here, except where they touch agency:
     far a flight carries (fleeing's 4; an animal's bolt, 12), along the
     map's edge where straight away is off it. A mind whose
     agent is dead is let go at the next boundary.
+22. **A sale is a request answered with a deal, and paid for**
+    (VILLAGE.md decision 9). A `#Purchase` step asks whoever minds a
+    stall (an agent beside it, not the name on its board: villagers look
+    alike) for a lot of goods (`#Buy`), at the cheapest price the buyer
+    knows, the nearest of those, if that is no more than its own
+    **pricing** (coins a unit, raised by the need the goods serve) and its
+    coins cover it. The seller weighs a `#Buy` as a deal, not as a favour:
+    it sells what it has set out at the price asked if that is no less
+    than its pricing of spare goods (without the need's raise: it keeps
+    enough back), hands the lot over (`hand_over`), and says what is owed
+    (`#Sold`). Answered so, the buyer pays into the stall (`pay`, a split
+    of its coins); refused or told there is none, it forgets that price.
+    Worth is in dB, a thing's kind's, and can't price quantities, so
+    pricing is in coins, a unit's. A mind now holds up to sixteen
+    commitments (a villager's day, and market day's on top).
 
 ## Terms
 

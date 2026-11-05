@@ -1,0 +1,43 @@
+// Money, coins: a stack of a coin unit, kept in a household's coffer, and
+// what goods are worth in them (VILLAGE.md decision 9, slice 9).
+//
+// Cut points:
+// - full:     coins are a stack, counted when handed over (a split), merged
+//             where they are put with others: a stall's takings, a coffer.
+//             What a unit of goods is worth in coins to an agent is its
+//             #Pricing: the most of those whose `valued` it believes the
+//             goods to be, raised by what it feels of the need they serve.
+// - reduced:  the same.
+// - abstract: as reduced. Money as a coarse stock is planned
+//             (DETAIL_REGIMES.md).
+// - frozen:   the same: coins are things.
+// - market:   a seller posts its pricing; a buyer buys at a posted price no
+//             more than its own (market/).
+// - code:     agency_pricing (src/agency_agency.odin). The tempting purse's
+//             money is still cloth (money.tri).
+
+package money
+
+// A coin, a unit of a stack; a household starts with a hundred in its
+// coffer.
+#Coins:    #Stack & {}
+coin:      #Coins & { material: "metal", unit: "coin", unitMass: 10g, count: 1 }
+coins_100: #Coins & { material: "metal", unit: "coin", unitMass: 10g, count: 100 }
+
+// Where a household keeps its coins.
+coffer: #Container & { material: "oak", mass: 8kg, capacity: 4 }
+
+coin_look:   #Look & { kindOf: "#Coins", look: "coins", prevails: 1 } @family(looks)
+coffer_look: #Look & { kindOf: "coffer", look: "container.coffer" } @family(looks)
+
+// What a unit of something like `valued` is worth to an agent in coins: its
+// `coins`, the most of those whose `valued` it believes the thing to be;
+// raised by what it feels of the need the thing serves (`pressure`), `per`
+// tenths of a coin a point. With none, nothing: it isn't for sale, nor
+// bought.
+#Pricing: #Need & { valued: #Body, coins: int & >=0 & <=1000 }
+
+grain_price:    #Pricing & { valued: #Stack & { unit: "grain" }, coins: 1, pressure: "hunger", per: 1 } @family(prices)
+turnip_price:   #Pricing & { valued: #Stack & { unit: "turnip" }, coins: 1, pressure: "hunger", per: 1 } @family(prices)
+venison_price:  #Pricing & { valued: #Stack & { unit: "venison" }, coins: 2, pressure: "hunger", per: 1 } @family(prices)
+firewood_price: #Pricing & { valued: #Stack & { unit: "firewood" }, coins: 1, pressure: "cold", per: 1 } @family(prices)

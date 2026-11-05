@@ -897,10 +897,22 @@ REALITY.md, PRF = PERFORMANCE.md, TER = TERRAIN.md, TES = TESSERA.md, VIL = VILL
   `stalking`. A shot that misses gives the hunter away all the same.
   (VIL d7)
 - **Stall**: where a seller sets out goods on **market day** (every fourth
-  day, on the green), with its **posted prices**: written records of what
-  it asks. (VIL d9)
-- **Sale**: a deal of goods for coins, made on the spot. *Avoid:* trade
-  (a craft, `Agent.trade`). (VIL d9)
+  day from the third, on the green), with its **posted price** on its
+  **price board** (a label standing on it, read at a glance from three
+  tiles): a written record of what it asks a unit. A buyer knows a price
+  by having read it, one to a board. (VIL d9)
+- **Sale**: a deal of goods for coins, made on the spot, in three acts: the
+  buyer asks for a lot (`#Buy`), the seller hands it over from its stall
+  and says what is owed (`#Sold`), the buyer pays into the stall. *Avoid:*
+  trade (a craft, `Agent.trade`). (VIL d9)
+- **Coins**: money, a stack of the unit `coin`, kept in a household's
+  **coffer**. What a buyer carries to market is its **purse**; what a
+  stall was paid, its **takings**. The tempting purse of AGENCY.md's
+  scenario is cloth, a purse in the other sense. (VIL d9)
+- **Pricing**: what a unit of goods is worth to an agent in coins
+  (`#Pricing`): its kind's, raised by a need the goods serve. A seller
+  prices its spare goods without the raise; a buyer buys at a posted
+  price no more than its own. (VIL d9)
 - **Household**: the people of a home, joined by kin bonds. Not a
   **place**, until abstract detail needs one. (VIL d3)
 

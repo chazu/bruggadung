@@ -2634,6 +2634,51 @@ injure :: proc(world: ^World, g: ^Proposal_Group, victim: Entity_ID, by: Entity_
 }
 
 
+/* Posting (content/market/): the command's #Writing on the stall's board,
+ * in place of what it said: a price posted anew. */
+@(private = "file")
+effect_post :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
+	author: string
+
+	if !has_text(a.content) do return "post what?"
+	if _, ok := writing_entries(a.content, &author); !ok || author == "" do return "that is not writing"
+	proposal_group_set_of_to_text(g, "Record.writing", whole(a.roles[.Item]), world_intern(world, a.content))
+	proposal_group_emit_subject_other_detail(g, "wrote", whole(a.roles[.Actor]), whole(a.roles[.Item]), a.content)
+	return ""
+}
+
+
+/* Handing over (content/market/): `amount` units of the stack, or all of it
+ * if no more, into a free hand of the one it is handed to. */
+@(private = "file")
+effect_hand_over :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
+	if amount < 1 do return "hand over how many?"
+	hand := free_hand(world, a.roles[.Destination])
+	if hand < 0 do return "no hand of theirs is free"
+	if amount >= world_units_of(world, a.roles[.Item]) {
+		proposal_group_move_to(g, whole(a.roles[.Item]), held_by(a.roles[.Destination], hand))
+	} else {
+		proposal_group_split(g, whole(a.roles[.Item]), amount, held_by(a.roles[.Destination], hand))
+	}
+	return ""
+}
+
+
+/* Putting some in (content/market/'s paying): `amount` units of the stack
+ * in hand, or all of it if no more, into the container. */
+@(private = "file")
+effect_put_some :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
+	if amount < 1 do return "put in how many?"
+	if amount > world_units_of(world, a.roles[.Item]) do return "it hasn't so many"
+	if amount == world_units_of(world, a.roles[.Item]) {
+		proposal_group_move_to(g, whole(a.roles[.Item]), in_(a.roles[.Destination]))
+	} else {
+		proposal_group_split(g, whole(a.roles[.Item]), amount, in_(a.roles[.Destination]))
+	}
+	return ""
+}
+
+
 /* Death (VILLAGE.md decision 7, content/harm/): a body whose injury reaches
  * 100 is its remains (its `remains`, a blueprint: a deer's carcass, a
  * person's corpse), as heavy as it was, where it was; what it held falls
@@ -2991,6 +3036,9 @@ effects := [?]Named_Effect{
 	{"crouch",    effect_crouch},
 	{"shoot",     effect_shoot},
 	{"butcher",   effect_butcher},
+	{"post",      effect_post},
+	{"hand_over", effect_hand_over},
+	{"put_some",  effect_put_some},
 }
 
 

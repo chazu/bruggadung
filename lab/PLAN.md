@@ -4954,3 +4954,44 @@ Food that spoils, in closed form.
   Only the village's hashes change (food's new fields).
 
 135 tests, 4013 checks.
+
+### After the slice: the market (VILLAGE.md slice 9, issue #9)
+
+Coins, stalls with price boards, and the sale in three acts.
+
+- **Coins** (content/money/coins.tri): a stack of the unit `coin`, a
+  hundred in each household's coffer. `#Pricing`: what a unit of goods is
+  worth to an agent in coins, raised by the need it serves; worth (in dB,
+  a kind's) can't price quantities.
+- **The stall** (content/market/): a container on the green, and its
+  price board standing on it (a `#Label`; first the stall was both, which
+  made every container a possible record, and every bin offered "read").
+  The seller's `stall_kept`: set out a lot of its trade's goods (a recipe
+  `ofTrade`: an agent's trade isn't perceived, even by itself), post its
+  price (`post`: a `#Priced` claim written by the agency), mind the stall
+  ten minutes at a time (kept: as "be by the stall", it was already done
+  for a seller starting beside it).
+- **Buying**: `grain_stocked`, `meat_stocked`, `firewood_stocked`, kept
+  goals to stock a supply to a level, a lot at a time: a `#Purchase`
+  step (agency code) asks whoever minds the cheapest, nearest stall it
+  knows (`#Buy`); the seller weighs it as a deal, `hand_over`s the lot
+  and says `#Sold`; the buyer `pay`s (a split into the stall, merged with
+  the takings: the Body kind now merges what is split into a container,
+  too). `takings_home` and `coins_home` take the coins back to the coffer.
+- **Known prices** (KNOWLEDGE.md decision 24): one to a board and unit,
+  saved with the store. A label is read on coming within reading distance,
+  not only on a fresh sighting: a buyer that first saw a board from four
+  tiles never read it at three.
+- **Found on the way**: a condition describes only the slots in its
+  `find`, so a bound slot it names must be found too (this was known, and
+  bit again); what is in a container is known only by looking in; a mind
+  held at most eight commitments (now sixteen); a buyer told to "put down
+  what it carries" put down its coins (now: goods, a log, an axe, a bow).
+- test_market: a farmer keeps a stall, a woodcutter buys its larder up to
+  twenty kilograms a lot at a time, coins and grain conserved, and the
+  takings and the rest of the coins go home. The village: market day is
+  the third; every household sells (grain twice, venison, firewood) and
+  buys, 400 coins at 13:00, the takings home. 31 checks. 22 s (from
+  13 s): see VILLAGE.md's open question on the market's cost.
+
+136 tests, 4040 checks.

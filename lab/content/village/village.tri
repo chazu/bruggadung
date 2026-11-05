@@ -8,10 +8,11 @@
 // - home:     beds and worksites are home/home.tri's kinds, and the
 //             day's commitments its goals.
 // - hunger:   the villagers get hungry (hunger/body.tri) and eat from
-//             their larders (cooking/cooking.tri): a sack of grain each, so
-//             a larder empties as its household eats, until a harvest
-//             (farming/) fills the farmers' again, a fortnight on, and the
-//             hunters bring venison home (hunting/).
+//             their larders (cooking/cooking.tri): a sack of grain each, a
+//             farming household's last year's harvest, so a larder empties
+//             as its household eats, until a harvest (farming/) fills the
+//             farmers' again, a fortnight on, the hunters bring venison
+//             home (hunting/), and each buys what it doesn't make.
 // - farming:  the map's tilled ground is the two farming households'
 //             plots, each household's block two of them, its scarecrow in
 //             one; their seed is in their larders, and their work is to
@@ -27,6 +28,10 @@
 //             woods with bows, for their larder (hunting/hunting.tri); the
 //             game there at the start, the herds' bounds and where they
 //             come in, and a bow each, are the scenario's.
+// - market:   each household has a coffer of coins by its larder, and a
+//             stall with its board on the green (market/, money/coins.tri);
+//             market days, who keeps the stall and who buys what, are the
+//             scenario's.
 // - terrain:  the map's kinds are terrain/terrain.tri's.
 // - code:     src/scenario_village.odin: where everyone and everything
 //             stands, the households' bonds and claims, the commitments,
@@ -64,11 +69,16 @@ woodcutter_look: #Look & { kindOf: "woodcutter", look: "agent.woodcutter" } @fam
 hunter_look:     #Look & { kindOf: "hunter", look: "agent.hunter" } @family(looks)
 
 // In each house: a bed for each of its people, a larder (stocked with a
-// sack of grain, cooking/'s); by its door, a woodpile. (Its stove is
+// sack of grain, cooking/'s, or a farmer's harvest); by its door, a
+// woodpile. (Its stove is
 // heat/heat.tri's.)
 bed:      #Bed & { material: "oak", mass: 40kg }
 larder:   #Container & { material: "oak", mass: 30kg, capacity: 50 }
 woodpile: #Container & { material: "oak", mass: 5kg, capacity: 100 }
+
+// A farming household's grain at first: last year's harvest, two hundred
+// portions, its own to eat and to sell (market/).
+farm_grain: #Stack & #Food & { material: "food", raw: true, nourishment: 15, cooking: 35, unit: "grain", unitMass: 250g, count: 200 }
 
 // The firewood on a woodpile at first: a household's a hundred pieces, the
 // woodcutters' own twenty (firewood/firewood.tri).

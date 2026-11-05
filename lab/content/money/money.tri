@@ -13,7 +13,9 @@
 // - frozen:   it doesn't decide.
 // - talk:     asking for it, and the answer (#Request, #HaveNone, #Granted).
 // - law:      taking another's purse is a theft (institutions/law.tri).
-// - code:     money is cloth (`material: "cloth"`) for now.
+// - market:   the village's money is coins (coins.tri), bought and sold
+//             with at the market (market/).
+// - code:     this scenario's money is cloth (`material: "cloth"`).
 
 package money
 
