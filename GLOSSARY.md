@@ -621,7 +621,11 @@ REALITY.md, PRF = PERFORMANCE.md, TER = TERRAIN.md, TES = TESSERA.md, VIL = VILL
 - **Terrain**: what each tile is, per level; read by walking, sight, sound,
   light, air, water and Tessera. (TER)
 - **Terrain kind**: an instance of the `terrain` family: `solid`,
-  `opaque`, `floored`, `divides`, `draught`, material, look. (TER d2)
+  `opaque`, `floored`, `divides`, `draught`, `exposed`, material, look.
+  (TER d2)
+- **Exposed ground**: terrain in the open (grass, a path, tilled ground),
+  where hiding hides nothing; anywhere else one hiding is seen only from
+  beside it. (KNO d26)
 - **Open air**: a tile with no floor, showing the level below. (TER)
 - **Chunk**: 32 by 32 tiles on one level: the unit of terrain storage,
   room labels, the spatial index, tile stocks, and detail. (TER d5)
@@ -944,6 +948,11 @@ REALITY.md, PRF = PERFORMANCE.md, TER = TERRAIN.md, TES = TESSERA.md, VIL = VILL
   asks its kind's price; with less, more (twice, with none to spare);
   with more, less (half, at four times plenty): the price's `asks`
   curve. (VIL d9, amended)
+- **Short of food**: an agent that believes its own larder holds less than
+  ten kilograms of food (forty portions); one that hasn't seen inside it
+  isn't. It **rations**: hunger alone makes it no meal, so it eats the
+  meal taken to work and its supper. A farmer sells no grain that would
+  leave its household short. (VIL, rationing; AGE d28)
 - **Short of coins**: a household whose coffer holds less than a trade's
   level (two hundred coins, for woodcutters) as far as its people know.
   Woodcutters short of coins stock their woodpile further, to sell more.

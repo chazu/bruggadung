@@ -4,8 +4,9 @@
 // Cut points:
 // - full:     on market day (every fourth, the scenario's), a seller keeps
 //             its household's stall: it sets out a lot of its goods (its
-//             trade's: grain, venison, firewood; a bigger lot of grain
-//             with plenty to spare) and posts its price on the stall's
+//             trade's: grain, venison, firewood; none that would leave
+//             the household short of food, cooking/'s rationing; a bigger
+//             lot of grain with plenty to spare) and posts its price on the stall's
 //             board, afresh each market day (what it asks moves with its
 //             stock: money/coins.tri), then stands by it. Whoever comes within
 //             three tiles reads the price at a glance, and knows it. A
@@ -130,10 +131,11 @@ put_them_out: #Method & {
 
 // A lot of what its trade makes (a recipe of the trade, ACTIONS.md decision
 // 12: known only to those of it), from where the household keeps it, so
-// long as the household keeps enough back: ten kilograms of grain (forty
-// portions), five of venison (a lot of ten cuts, from ten kilograms), sixty
-// of firewood. With twice as much grain to spare, a lot twice the size:
-// two households buy it, each to twenty kilograms.
+// long as the household keeps enough back: fifteen kilograms of grain, a
+// lot of twenty portions leaving it ten, not short (cooking/'s rationing);
+// five of venison (a lot of ten cuts, from ten kilograms), sixty of
+// firewood. With twenty kilograms, a lot twice the size: two households
+// buy it, each to twenty kilograms.
 fetch_plenty_of_grain: #Method & {
     title:    "fetch plenty of grain to sell"
     goal:     "goods_set_out"
@@ -157,7 +159,7 @@ fetch_grain: #Method & {
     pre: {
         find:  ["supply", "goods"]
         match: #Market & { me: #Agent & { freeHands: >=1 }, supply: #Body & { id: $l },
-                           goods: #Stack & { unit: "grain", mass: >=10kg, place: #Inside & { container: $l } } }
+                           goods: #Stack & { unit: "grain", mass: >=15kg, place: #Inside & { container: $l } } }
     }
     steps: [#Do & { op: "take_some", object: "goods", units: 20 }]
 } @family(methods)

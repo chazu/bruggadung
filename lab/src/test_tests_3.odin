@@ -3756,6 +3756,7 @@ ALL_TESTS := [?]Test_Case{
 	{"village",                       test_village},
 	{"looks",                         test_looks},
 	{"cooking",                       test_cooking},
+	{"rationing",                     test_rationing},
 	{"seen_kinds",                    test_seen_kinds},
 	{"identity_from_context",         test_identity_from_context},
 	{"identity_lost_and_found",       test_identity_lost_and_found},

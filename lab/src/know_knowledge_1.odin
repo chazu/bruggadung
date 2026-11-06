@@ -1038,9 +1038,12 @@ knowledge_believe :: proc(self: ^Knowledge, content: cstring, speaker: u32, reco
 		/* a price posted (content/market/): who sells goods of what unit, at
 		 * how many coins a unit, on the board it was read on (standing on the
 		 * stall) */
-		coins: i64
+		coins, posted: i64
 		unit: [64]u8
-		seller := knowledge_person(self, tri.at(tc, claim, "holder"), store, news) if tri.at(tc, claim, "holder") != nil else 0
+		/* an earlier market's, the seller not posting this one: no price */
+		old := know_node_int(tc, claim, "when", &posted) && now - posted > BG_PRICE_LAPSE
+		if old do k1_say(news, "an old price")
+		seller := knowledge_person(self, tri.at(tc, claim, "holder"), store, news) if tri.at(tc, claim, "holder") != nil && !old else 0
 		n := tri.print(tc, tri.at(tc, claim, "what.unit"), &unit[0], size_of(unit)) if tri.at(tc, claim, "what.unit") != nil else 0
 		if seller != 0 && seller != knowledge_store_self_referent(store) && record != 0 && n > 2 && unit[0] == '"' &&
 		   know_node_int(tc, claim, "coins", &coins) {

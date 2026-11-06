@@ -189,8 +189,9 @@ knowledge_perceive :: proc(self: ^Knowledge, store: ^Knowledge_Store, first: uin
 		}
 		hider = (^Agent)(world_record(self.world, world_kind_named(self.world, "Agent"), e))
 		if hider != nil && hider.hiding && e != agent && !self.omniscient &&
-		   (abs(tile.x - here.x) > 1 || abs(tile.y - here.y) > 1) {
-			continue          /* half hidden: seen only from close by */
+		   (abs(tile.x - here.x) > 1 || abs(tile.y - here.y) > 1) &&
+		   !know_exposed(self.world, tile) {
+			continue          /* half hidden: seen only from close by, but not in the open */
 		}
 		seen[nseen].entity = e
 		seen[nseen].depth  = know_depth_of(self.world, e)
@@ -2325,4 +2326,15 @@ know_forget :: proc(self: ^Knowledge, store: ^Knowledge_Store, now: i64, news: ^
 		knowledge_store_forget_referent(store, id)
 		append(news, fmt.aprintf("R%d: forgotten", id))
 	}
+}
+
+
+/* Whether a tile is in the open (terrain/'s `exposed`: grass, a path,
+ * tilled ground): nowhere to hide. */
+@(private)
+know_exposed :: proc(world: ^World, tile: Location) -> bool {
+	t := world_terrain(world)
+	if t == nil do return false
+	info := terrain_kind_info(t, terrain_at(t, tile.x, tile.y, tile.level))
+	return info != nil && info.exposed
 }

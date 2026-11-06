@@ -156,7 +156,8 @@ things the lab put off:
      seven times in a minute. At the map's edge a flight ran straight into
      it and stayed: it slides along the edge now.
    - **The hunt is a bow, while stalking.** A hunter crouches, hiding
-     (seen only from beside it), and shoots game within three tiles (an
+     (seen only from beside it, not in the open: KNOWLEDGE.md decision
+     26), and shoots game within three tiles (an
      operation's `range`). A shot strikes by a seeded draw, the bow's
      **aim** (80 in a hundred from beside) less its spread (25 a tile
      further), in the hunter's `stalking`: a wound of 40, three to bring
@@ -549,7 +550,7 @@ New, and entered in the glossary with this document:
   three days and a stack spoils whole, so more meat is more rot; they
   stock twenty kilograms now, not forty, and hunt again sooner. Farmers
   can't: their work is their plots'.
-- **Three weeks of the village** (`lab run village --days 21`, 100 s; the
+- **Three weeks of the village** (`lab run village --days 21`, 120 s; the
   week's checks as they fall each day). What it found, and what was done:
   - Past day 7 it ran no further: a hunter with its hands full looked into
     its larder every millisecond, the world never reaching the next
@@ -564,13 +565,38 @@ New, and entered in the glossary with this document:
     farmer couldn't cook. A unit is the instance its unit names, spaces as
     underscores, and a test checks every stack's unit names one.
   - A larder of more than sixteen things overran the scenario's counts.
-  - Still breaking: before the harvest (day 14), food runs short. The
-    Hunts go hungry from day 9 (their meat spoils whole, grain is dear
-    and scarce at market), the Brooks from day 11, the Ashes and the
-    Fells on day 14, last year's grain gone. After the harvest, from day
-    16, nearly everyone still holds at 14:30 the meal it took to work; a
-    Fells' pack isn't put back from day 15; and the larders check counts
-    a harvest as negative eating. Each is for the next run of fixes.
+  - Before the harvest, hunger: once an agent found eating impossible
+    at the most hunger can be felt (its larder empty), it never wanted
+    to eat again; after the harvest the meal packed for work went
+    uneaten for the same reason. A need's goal settled is now weighed
+    again once eased, or two hours on (AGENCY.md decision 27).
+  - **Rationing.** Short of food (less than ten kilograms believed in its
+    own larder: cooking/), hunger alone makes no meal: the meal taken to
+    work and supper, no more. A farmer sells no grain that would leave
+    it short (market/). Not knowing what is in the larder isn't being
+    short (AGENCY.md decision 28). Open: the level is the same for a
+    household of two as of four, an agent not knowing who else eats from
+    its larder.
+  - The larders check counted a harvest as negative eating: what is
+    brought into a larder away from the market is counted apart, boundary
+    by boundary, and turnips are portions as grain is.
+  - What rationing and eating on time showed up at market: a seller with
+    nothing to spare walked home every ten minutes to look in the larder
+    it knew (AGENCY.md decision 29); buyers went by a price left on the
+    board from an earlier market (decision 30); a hunter crouched at its
+    blind, minding its stall on the green, was unseen (nobody hides in
+    the open: KNOWLEDGE.md decision 26). The week's checks also take a
+    hungry agent cooking a meal at 11:00 as at work, and one at its
+    hearth at 21:00 as home.
+  - Still breaking: food runs out before the harvest all the same (the
+    Hunts unfed some days from day 11, the farmers with nothing to pack
+    from day 9); a sleep cut short by the morning (hunger, rationing,
+    waking the sleeper) stays suspended, and the next night going to bed
+    resumes it, its minutes left gone at once, so the agent is up all
+    night (it should be given up when its window closes: whether fatigue
+    is cleared then is the question); a pack isn't put back from day 13;
+    and the Ashes and the Hunts take less from their larders than three
+    portions a head a day (rationing; the Hunts' meat isn't counted).
 - **Seed from the harvest.** Settled: once a harvest, holding more than a
   sack of seed's worth of it (twelve and a half kilograms of grain), a
   farmer keeps a sack back as seed (`keep_back_seed`), marking the plot

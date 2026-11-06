@@ -9,6 +9,8 @@
 //             the nearest containers; else eat raw food in hand. Something
 //             to eat at work is the morning's commitment (scenario-bound):
 //             a meal made the same way, else raw food taken along.
+//             Short of food at home (as far as it knows), hunger alone
+//             makes no meal: a ration of the meal taken along and supper.
 // - reduced:  the same, decided on the cadence's beat; cooking runs its
 //             time.
 // - abstract: as reduced. How a household eats below reduced (a larder's
@@ -77,11 +79,16 @@ have_a_meal: #Goal & {
 
 // Hunger's ways to food, after eating a meal in hand (eat_what_i_have):
 // make one and eat it, or eat raw what the agent holds.
+// Rationing: short of food (less than ten kilograms of it believed in its
+// own larder, forty portions), hunger alone makes no meal: the agent eats
+// the meal it took to work and its supper, no more.
+let short_of_food = [{ input: 9999, output: -1 }, { input: 10000, output: 0 }]
 cook_and_eat: #Method & {
     title: "cook and eat"
     goal:  "eat_when_hungry"
     rank:  2
     pre:   { find: [], match: #Cooking }
+    score: [#AtHome & { stocked: #Food, keptIn: #Larder, curve: short_of_food }]
     steps: [#Achieve & { subgoal: "have_a_meal" }, #Do & { op: "eat", object: "food" }]
 } @family(methods)
 

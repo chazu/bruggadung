@@ -14,10 +14,11 @@
 //             for deciding (DETAIL_REGIMES.md).
 // - frozen:   it doesn't decide; risen, it looks, and so decides, at once.
 // - code:     src/agency_agency.odin: considerations by their kind (#Flat,
-//             #Scaled, #Need, #Trait, ...), conditions, `order`, commitments,
-//             goals arising from findings or from what is held; a method
-//             step's act done again to no end fails it (AGENCY.md decision
-//             24).
+//             #Scaled, #Need, #Trait, #AtHome, ...), conditions, `order`,
+//             commitments, goals arising from findings or from what is
+//             held; a method step's act done again to no end fails it
+//             (AGENCY.md decision 24); a need's goal settled is weighed
+//             again once it is felt more, or eased.
 
 // What a goal and its methods are about: the agent itself, as `me`, and
 // slots for the things involved, each bound to a referent. A goal's frame is
@@ -55,6 +56,12 @@
 // referent: the credence of what it was told, with its findings of
 // `evidence` about the place as a group of their own (KNOWLEDGE.md §11)
 #Suspicion:     #Consideration & { suspect: #Body, inside: text, evidence: text }
+
+// What the agent believes it has at home of something like `stocked`: the
+// mass, in grams, of those it believes are in something like `keptIn` that
+// it knows is its own (an #Owned finding), over the `curve`; without one,
+// or having seen inside none of them, nothing (cooking/'s rationing).
+#AtHome: #Consideration & { stocked: #Body, keptIn: #Body }
 
 // What a need presses for (AGENCY.md §6): pressure over what the agent
 // feels, `per` tenths of a point for each point of it.

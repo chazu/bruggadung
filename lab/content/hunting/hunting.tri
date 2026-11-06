@@ -3,7 +3,8 @@
 //
 // Cut points:
 // - full:     a hunter crouches, hiding (things.tri's `hiding`: seen only
-//             from beside it), and so stalks game it knows of to within
+//             from beside it, in the woods; in the open, terrain/'s
+//             exposed ground, as anyone is), and so stalks game it knows of to within
 //             three tiles, and shoots. The shot strikes by a seeded draw:
 //             the bow's `aim` from beside, less its `spread` for each tile
 //             further, in the hunter's `stalking` (a hundredth of it each).

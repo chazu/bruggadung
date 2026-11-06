@@ -111,6 +111,8 @@ BG_INTERRUPT       :: 5      /* and more, to interrupt an activity under way */
 BG_MAX_SETTLED     :: 16
 BG_MAX_COMMITMENTS :: 16
 BG_KEPT_RETRY :: i64(600000)     /* ms: a kept goal found impossible is tried again ten minutes later */
+BG_NEED_RETRY :: i64(7200000)    /* ms: a need's goal found impossible is weighed again two hours later (rationing:
+                                    the meal packed at dawn is eaten at work, not at once) */
 @(private = "file") BG_AGAIN_WITHIN :: i64(1000)     /* ms: an act done again so soon is done again to no end... */
 @(private = "file") BG_AGAIN_TIMES  :: 10            /* ...once it has been, so many times running */
 BG_MAX_HABITS      :: 16
@@ -188,6 +190,8 @@ Arisen :: struct {
 	about:   u32,            /* referent */
 	verdict: i32,            /* weighed: 1 switch, 0 stay; settled, a goal pressed: what was felt; one
 	                            that arose: when, in seconds */
+	retry:   i64,            /* settled, a goal pressed found impossible: when it is weighed again,
+	                            felt more or not (ms); 0, once felt more */
 }
 
 
@@ -1805,6 +1809,18 @@ agency_put_down :: proc(self: ^Agency, m: ^Motivation, why: string) {
 }
 
 
+/* `since`, or, when what the agent is doing is a commitment, when its
+ * window opened if that is earlier. */
+@(private = "file")
+agency_since_window :: proc(m: ^Motivation, since: i64) -> i64 {
+	if m.nintentions == 0 do return since
+	if root := &m.intentions[0]; root.commitment > 0 && root.commitment <= m.ncommitments {
+		return min(since, m.commitments[root.commitment - 1].from)
+	}
+	return since
+}
+
+
 /* Whether the agent has a suspended activity of one of the method's
  * operations. */
 @(private = "file")
@@ -2446,7 +2462,8 @@ agency_purchase :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Store, 
 	best  := -1
 	bestAt: i32
 	for p, i in store.prices {
-		if rawptr(p.unit) != rawptr(u) do continue
+		/* read at an earlier market: it may not sell this one */
+		if rawptr(p.unit) != rawptr(u) || world_time(self.world).ms - p.time > BG_PRICE_LAPSE do continue
 		r := knowledge_store_referent(store, p.board)
 		if r == nil || !r.present do continue
 		d := max(abs(r.x - me.x), abs(r.y - me.y)) + (0 if r.level == me.level else 1000)
@@ -2512,6 +2529,38 @@ agency_mass_toward :: proc(self: ^Agency, what: ^tri.Node, supply: u32, store: ^
 			toward = c != nil && c.form == .Held_By && c.container == me
 		}
 		if !toward do continue
+		d := tri.value(tc, ns_utf8(knowledge_store_describe_referent(store, r.id)), arena, nil, 0)
+		if d == nil || tri.match(tc, what, d, &result) != .Entailed do continue
+		total += int_at(tc, d, "mass", 0)
+	}
+	return total
+}
+
+
+/* The mass of the things like `what` the agent believes are in something
+ * like `keptIn` that it knows is its own (an #Owned finding): what it has
+ * at home. -1 if it has seen inside none: not knowing isn't having none. */
+@(private = "file")
+agency_at_home :: proc(self: ^Agency, what: ^tri.Node, keptIn: ^tri.Node, store: ^Knowledge_Store) -> i64 {
+	result: tri.Match_Result
+
+	tc    := world_tri(self.world)
+	me    := knowledge_store_self_referent(store)
+	arena := tri.arena_new()
+	defer tri.arena_free(arena)
+	total: i64
+	known := false
+	for i: uint = 0; i < knowledge_store_count(store); i += 1 {
+		r := knowledge_store_referent_at(store, i)
+		owned := knowledge_store_finding(store, "#Owned", r.id)
+		if r.insideSeen >= 0 && owned != nil && owned.choice == me && agency_referent_is_of(self, r, keptIn) do known = true
+	}
+	if !known do return -1
+	for i: uint = 0; what != nil && i < knowledge_store_count(store); i += 1 {
+		r := knowledge_store_referent_at(store, i)
+		if !r.present || r.form != .In do continue
+		owned := knowledge_store_finding(store, "#Owned", r.container)
+		if owned == nil || owned.choice != me || !agency_referent_is_of(self, knowledge_store_referent(store, r.container), keptIn) do continue
 		d := tri.value(tc, ns_utf8(knowledge_store_describe_referent(store, r.id)), arena, nil, 0)
 		if d == nil || tri.match(tc, what, d, &result) != .Entailed do continue
 		total += int_at(tc, d, "mass", 0)
@@ -3105,6 +3154,12 @@ agency_sum :: proc(self: ^Agency, instance: cstring, path: cstring, b: [^]Slot_B
 				if string(law.forbids) == str(act[:]) && string(law.wrong) == "\"anothers\"" && law.weighs > v do v = law.weighs
 			}
 			append(parts, fmt.tprintf("%s %+d", "exposing" if v != 0 else "nothing to hide", v))
+		} else if keptIn := tri.at(tc, c, "keptIn"); keptIn != nil {
+			/* what it believes it has at home (cooking/'s rationing): a curve
+			 * over the mass, in grams */
+			at := agency_at_home(self, tri.at(tc, c, "stocked"), keptIn, store)
+			if at < 0 || !curve_at(tc, tri.at(tc, c, "curve"), at, &v) do v = 0
+			append(parts, fmt.tprintf("%dg at home %+d", at, v) if at >= 0 else fmt.tprintf("not knowing what is at home %+d", v))
 		} else if text_at(tc, c, "watched", slot[:]) {
 			v = -i32(int_at(tc, c, "penalty", 0)) if agency_watched(self, bound(b, n, str(slot[:])), store) else 0
 			append(parts, fmt.tprintf("%s %+d", "watched" if v != 0 else "unwatched", v))
@@ -3200,6 +3255,10 @@ agency_settle :: proc(self: ^Agency, m: ^Motivation, intention: ^Intention, done
 			m.settled[k].goal    = intention.goal
 			m.settled[k].about   = 0
 			m.settled[k].verdict = knowledge_store_feels(knowledge_store_of(self.knowledge, m.agent), cstr(need[:]))
+			/* impossible for now: tried again a while later, as a kept goal is
+			 * (what was in the way may not be: a meal in hand since), when it
+			 * next decides */
+			m.settled[k].retry   = 0 if done else world_time(self.world).ms + BG_NEED_RETRY
 		}
 		return
 	}
@@ -3360,8 +3419,18 @@ agency_weigh :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Store, bus
 		if !text_at(tc, tri.pattern(tc, goal), "pressed.need", finding[:]) do continue
 		felt := knowledge_store_feels(store, cstr(finding[:]))
 		if i64(felt) <= int_at(tc, tri.pattern(tc, goal), "pressed.above", 100) do continue
-		if agency_has(self, raw_data(m.settled[:]), m.nsettled, goal, 0, &was) && felt < was + 20 {
-			continue      /* settled, until it is felt more */
+		for k = 0; k < m.nsettled && !(m.settled[k].goal == goal && m.settled[k].about == 0); k += 1 {}
+		if k < m.nsettled {
+			was = m.settled[k].verdict
+			if m.settled[k].retry != 0 && world_time(self.world).ms >= m.settled[k].retry {
+				m.settled[k].retry = 0      /* impossible a while ago: weighed again */
+			} else if felt < was {
+				/* eased since (met some other way: supper): settled as of now */
+				m.settled[k].verdict = felt
+				continue
+			} else if felt < was + 20 {
+				continue      /* settled, until it is felt more */
+			}
 		}
 		for k = 0; k < m.nintentions && m.intentions[k].goal != goal; k += 1 {}
 		if k < m.nintentions do continue
@@ -3574,6 +3643,11 @@ agency_decide :: proc(self: ^Agency, m: ^Motivation) -> bool {
 	nmethods     := agency_methods_for_mind(self, top.goal, m, raw_data(methods[:]), BG_MAX_METHODS)
 	chosen        = -1
 	unknownMethod = -1
+	/* searched: looked into since the goal was adopted, or, for a
+	 * commitment, since its window opened (tried again, a kept goal doesn't
+	 * look again where it has looked: the larder it knows too low to sell
+	 * from) */
+	searched := agency_since_window(m, top.adopted)
 	for i: uint = 0; i < nmethods; i += 1 {
 		if (top.failed & (u32(1) << u32(i))) != 0 do continue
 		n = top.nparams
@@ -3587,7 +3661,7 @@ agency_decide :: proc(self: ^Agency, m: ^Motivation) -> bool {
 			copy(chosenB[:n], b[:n])
 			break
 		}
-		if !agency_holds(self, methods[i], "pre", top.adopted, raw_data(b[:]), &n, store) {
+		if !agency_holds(self, methods[i], "pre", searched, raw_data(b[:]), &n, store) {
 			/* unknown, not false: a method may find out first (AGENCY.md §5, onUnknown) */
 			if self.nunknown != 0 && unknownMethod < 0 &&
 			   text_at(world_tri(self.world), tri.pattern(world_tri(self.world), methods[i]), "onUnknown", subgoal[:]) {
@@ -3678,7 +3752,9 @@ agency_decide :: proc(self: ^Agency, m: ^Motivation) -> bool {
 
 /* When a mind is next due with nothing happening (REALITY.md decision 7):
  * a wake it set; the answer it waits for late; a commitment's window
- * opening or closing since it last decided. max(i64): not of itself. */
+ * opening or closing since it last decided. max(i64): not of itself (a
+ * need's goal found impossible is weighed again when it next decides, not
+ * woken for: asleep, hungry and rationing, it sleeps on). */
 @(private = "file")
 due_of_ :: proc(m: ^Motivation) -> i64 {
 	at := max(i64)
@@ -3898,7 +3974,13 @@ agency_saved_state :: proc(self: ^Agency) -> []string {
 			}
 		}
 		for k: i32 = 0; k < m.nsettled; k += 1 {
-			append(&lines, fmt.tprintf("settled %d %s %d", m.agent, m.settled[k].goal, m.settled[k].about))
+			if m.settled[k].about == 0 {
+				/* a goal pressed: what was felt, and when it is tried again */
+				append(&lines, fmt.tprintf("settled %d %s 0 %d %d", m.agent, m.settled[k].goal, m.settled[k].verdict,
+				                           m.settled[k].retry))
+			} else {
+				append(&lines, fmt.tprintf("settled %d %s %d", m.agent, m.settled[k].goal, m.settled[k].about))
+			}
 		}
 		for k: i32 = 0; k < m.nweighed; k += 1 {
 			append(&lines, fmt.tprintf("weighed %d %s %d %d", m.agent, m.weighed[k].goal, m.weighed[k].about,
@@ -4001,12 +4083,12 @@ agency_restore_saved_state :: proc(self: ^Agency, lines: []string) {
 			m.threshold  = ns_int_value(words[2])
 			continue
 		}
-		if (len(words) == 4 && words[0] == "settled") || (len(words) == 5 && words[0] == "weighed") {
+		if ((len(words) == 4 || len(words) == 6) && words[0] == "settled") || (len(words) == 5 && words[0] == "weighed") {
 			m = agency_mind_of(self, Entity_ID(ns_long_long_value(words[1])))
-			full := (m.nsettled == BG_MAX_SETTLED) if len(words) == 4 else (m.nweighed == BG_MAX_SETTLED)
+			full := (m.nsettled == BG_MAX_SETTLED) if words[0] == "settled" else (m.nweighed == BG_MAX_SETTLED)
 			if full do continue
 			a: ^Arisen
-			if len(words) == 4 {
+			if words[0] == "settled" {
 				a = &m.settled[m.nsettled]
 				m.nsettled += 1
 			} else {
@@ -4015,7 +4097,8 @@ agency_restore_saved_state :: proc(self: ^Agency, lines: []string) {
 			}
 			a.goal    = world_intern(self.world, ns_utf8(words[2]))
 			a.about   = u32(ns_long_long_value(words[3]))
-			a.verdict = ns_int_value(words[4]) if len(words) == 5 else 0
+			a.verdict = ns_int_value(words[4]) if len(words) >= 5 else 0
+			a.retry   = ns_long_long_value(words[5]) if len(words) == 6 else 0
 			continue
 		}
 		if len(words) == 6 && words[0] == "question" {

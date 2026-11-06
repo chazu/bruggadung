@@ -166,6 +166,7 @@ BG_CONFIRMED :: 5            /* trust gained when a claim is seen to be true */
 BG_REFUTED :: 15             /* trust lost when a claim is found false */
 BG_WRONGED :: 10             /* trust lost in one who harms it, or is seen to wrong another (KNOWLEDGE.md decision 15) */
 BG_SEEN :: 30                /* the strength of a belief of where a thing is, seen just now */
+BG_PRICE_LAPSE :: i64(43200000)  /* ms: a posted price older than half a day is an earlier market's, not a price */
 BG_FOUND :: 20               /* dB that a thing found gone is the one like it seen elsewhere since, if only one is */
 BG_FADE :: 2                 /* strength lost each memory step */
 BG_UNSTATED :: max(i32)      /* a claim that says nothing of how sure */

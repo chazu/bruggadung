@@ -38,13 +38,14 @@ package lab
  * nights (VILLAGE.md's Testing): everyone taking a meal to work at 07:30,
  * at work at 11:00 (about its worksite, or about its work: a woodcutter in
  * the woods, or on its way home with firewood; a hunter on the hunt; on
- * market day, the market), the meal eaten there by 14:30, the woodpile
- * rising (or stocked), every plot sown by 15:00 the first day, home by
- * 21:00; at 02:00 asleep in their own bed, everyone fed that day and no
+ * market day, the market; or, hungry, at a meal), the meal eaten by
+ * 14:30, the woodpile rising (or stocked), every plot sown by 15:00 the
+ * first day, home by 21:00 (by its bed, or at its hearth); at 02:00 asleep in their own bed, everyone fed that day and no
  * reserves below 50, every stove with fuel, every pack back by its larder,
  * and the game bedded down; on each market day, sales by every household
  * with goods to sell, and the takings home with no coin made or lost; and
- * at the end, each household's larder emptied by what it ate, meat and a
+ * at the end, each household's larder emptied by what it ate (what was
+ * brought in, a harvest, the market's, counted apart), meat and a
  * hide in the hunters' larder, the herds alive and within their bounds, no
  * food past its time still food, and every plot growing or harvested.
  */
@@ -166,7 +167,10 @@ Village :: struct {
 	stalls:       [4]Entity_ID,
 	boards:       [4]Entity_ID,      // each stall's price board, standing on it
 	plots:        [4][dynamic]Entity_ID,  // each farming household's
-	marketed:     [4]i64,            // grain each larder gained at the market (sold, less)
+	marketed:     [4]i64,            // portions each larder gained at the market (sold, less)
+	brought:      [4]i64,            // portions brought into each larder, away from the market (a harvest)
+	kept:         [4]i64,            // portions in each larder as of the last boundary
+	marketing:    bool,              // from 09:00 to 13:00 of a market day, when a larder's changes are the market's
 	days:         i64,               // how many days it runs: VILLAGE_DAYS, unless asked for more
 	logged:       [dynamic]Village_Logged,  // agents whose thoughts are printed each night
 	results:      [dynamic]string,   // each cloned
@@ -574,6 +578,13 @@ village_step_until :: proc(self: ^Village, t: i64) {
 		pool_push()
 		more := scheduler_step_until(self.scheduler, time_make(t))
 		pool_drain()
+		/* what was brought into each larder (a harvest put in), boundary by
+		 * boundary: nobody eats what is put in at the same millisecond */
+		for l, k in self.larders {
+			now := village_portions_in(self.world, l)
+			if now > self.kept[k] && !self.marketing do self.brought[k] += now - self.kept[k]
+			self.kept[k] = now
+		}
 		if !more do break
 	}
 }
@@ -599,6 +610,7 @@ village_run :: proc(self: ^Village) {
 	for h, k in households do if h.worksite == "hunting_blind" do hunters = k
 	stocked := village_firewood_in(self.world, self.woodpiles[woodcutters])
 	meatNights := 0      /* nights the hunters' larder held meat */
+	for l, k in self.larders do self.kept[k] = village_portions_in(self.world, l)
 	for d in 0 ..< self.days {
 		village_step_until(self, d * VILLAGE_DAY + 7 * VILLAGE_HOUR + VILLAGE_HOUR / 2)
 		village_check_each(self, fmt.tprintf("day %d, 07:30: everyone takes a meal to work", d + 1), .Packed)
@@ -607,6 +619,7 @@ village_run :: proc(self: ^Village) {
 		if market {
 			village_step_until(self, d * VILLAGE_DAY + 9 * VILLAGE_HOUR)
 			for l, k in self.larders do before[k] = village_portions_in(self.world, l)
+			self.marketing = true
 		}
 		village_step_until(self, d * VILLAGE_DAY + 11 * VILLAGE_HOUR)
 		village_check_each(self, fmt.tprintf("day %d, 11:00: everyone at work", d + 1), .Work)
@@ -784,7 +797,7 @@ village_check_larders :: proc(self: ^Village) {
 	for v in self.people do people[v.household] += 1
 	wrong := make([dynamic]string, context.temp_allocator)
 	for l, k in self.larders {
-		taken := village_grain(k) - village_portions_in(self.world, l) + self.marketed[k]
+		taken := village_grain(k) - village_portions_in(self.world, l) + self.marketed[k] + self.brought[k]
 		if taken < 3 * people[k] * self.days || taken > 5 * people[k] * self.days {
 			append(&wrong, fmt.tprintf("%s took %d", households[k].name, taken))
 		}
@@ -848,6 +861,7 @@ village_check_market :: proc(self: ^Village, d: i64, before: [4]i64) {
 	              fmt.tprintf("day %d, 13:00: the takings home, and no coin made or lost", d + 1),
 	              fmt.tprintf("%d coins, %d of them still on the stalls", coins, left))
 	for l, k in self.larders do self.marketed[k] += village_portions_in(self.world, l) - before[k]
+	self.marketing = false
 }
 
 
@@ -881,12 +895,13 @@ village_firewood_in :: proc(world: ^World, container: Entity_ID) -> i64 {
 }
 
 
-/* The portions of grain in a container (not the seed grain kept there). */
+/* The portions of food kept by the portion in a container, grain and
+ * turnips (not the seed kept there). */
 village_portions_in :: proc(world: ^World, container: Entity_ID) -> i64 {
 	inside: [64]Entity_ID
 	total: i64
 	n := min(world_entities_at(world, container, .In, raw_data(inside[:]), len(inside)), len(inside))
-	for e in inside[:n] do if world_unit_of(world, e) == "grain" do total += world_units_of(world, e)
+	for e in inside[:n] do if u := world_unit_of(world, e); u == "grain" || u == "turnip" do total += world_units_of(world, e)
 	return total
 }
 
@@ -909,7 +924,10 @@ village_check_each :: proc(self: ^Village, name: string, where_: Where) {
 		case .Packed:  ok = village_holds_meal(self.world, v.id) == 1
 		case .Work:    ok = village_at_work(self, v)
 		case .Lunched: ok = village_holds_meal(self.world, v.id) == 0      /* at work, it was at 11:00 */
-		case .Home:    ok = village_within_reach(self.world, v.id, v.bed)
+		/* by its bed, or at its hearth: a late meal cooking at the stove */
+		case .Home:    ok = village_within_reach(self.world, v.id, v.bed) ||
+		                    village_within_reach(self.world, v.id, self.stoves[v.household]) ||
+		                    village_within_reach(self.world, v.id, self.larders[v.household])
 		case .Asleep:  ok = village_within_reach(self.world, v.id, v.bed) && village_asleep_in(self.world, v.id, v.bed)
 		}
 		if !ok do append(&missing, fmt.tprintf("%d", v.id))
@@ -922,7 +940,8 @@ village_check_each :: proc(self: ^Village, name: string, where_: Where) {
 
 // Whether a villager is at its work: about its worksite (within six
 // tiles), or about its work: a woodcutter stocking its woodpile, in the
-// woods or on its way home with firewood; on market day, about the market.
+// woods or on its way home with firewood; on market day, about the market;
+// or at a meal, hungry.
 @(private = "file")
 village_at_work :: proc(self: ^Village, v: Villager) -> bool {
 	la := world_location_of(self.world, v.id)
@@ -932,6 +951,11 @@ village_at_work :: proc(self: ^Village, v: Villager) -> bool {
 	}
 	if agency_intends(self.agency, v.id, "woodpile_stocked") || agency_intends(self.agency, v.id, "plot_tended") ||
 	   agency_intends(self.agency, v.id, "game_hunted") {
+		return true
+	}
+	/* or at a meal, hungry: gone home to cook one (its packed meal eaten
+	 * early) */
+	if agency_intends(self.agency, v.id, "eat_when_hungry") {
 		return true
 	}
 	/* or about the market, on market day: its stall, its buying, the coins

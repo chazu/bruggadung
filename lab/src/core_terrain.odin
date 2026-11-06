@@ -34,6 +34,7 @@ Terrain_Info :: struct {
 	floored: bool,             /* something to stand on */
 	divides: bool,             /* a room ends here without a wall: a doorway */
 	draught: i64,              /* air it passes with no door shut in it, mmol a second each way */
+	exposed: bool,             /* in the open: nowhere to hide, one hiding on it is seen as anyone is */
 }
 
 @(private = "file")
@@ -184,6 +185,7 @@ load_kinds :: proc(t: ^Terrain, content: ^tri.Content, error: ^string) -> bool {
 		t.kinds[i + 1].opaque = is_true(content, kind, "opaque")
 		t.kinds[i + 1].floored = is_true(content, kind, "floored")
 		t.kinds[i + 1].divides = is_true(content, kind, "divides")
+		t.kinds[i + 1].exposed = is_true(content, kind, "exposed")
 		if kind != nil && tri.node_interval(tri.at(content, kind, "draught"), &lo, &hi) != 0 && lo == hi && lo >= 0 {
 			t.kinds[i + 1].draught = lo
 		}

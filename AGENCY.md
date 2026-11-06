@@ -185,6 +185,33 @@ Out of scope here, except where they touch agency:
     `asks` curve; a sale at the price it posted is struck though its
     stock has moved since. A buyer asks the seller whose price it read on
     the board, if it sees it by the stall; else anyone there, as before.
+27. **A need's goal, settled, is weighed again once felt more, eased, or a
+    while on** (VILLAGE.md, rationing). A goal a need pressed, settled, was
+    weighed again only once the need was felt 20 more than when it
+    settled. Found impossible at the most it can be felt (hunger at 100,
+    the larder empty), it never was again: the hunters ate no more on
+    hunger from day 9, nor anyone the meal packed for work after the
+    harvest. Now it is settled as of what is felt whenever that is less
+    (met some other way: supper), and one found impossible is weighed
+    again two hours on, when the agent next decides: it isn't woken for
+    it (asleep, hungry and rationing, it slept no more than ten minutes at
+    a time), and a hunter rationing, refused breakfast at dawn, eats the
+    meal it packed at work, not as soon as it is packed. Saved with what
+    was felt and when it is tried again.
+28. **What the agent has at home is a consideration** (`#AtHome`): the
+    mass it believes is in containers of a kind that it knows are its
+    own, over a curve; nothing if it has seen inside none (not knowing
+    isn't having none). Rationing is one (cooking/): short of food at
+    home, hunger alone makes no meal.
+29. **A commitment's search passes over where it has looked since its
+    window opened**, not only since the goal was adopted: a kept goal
+    tried again every ten minutes (a seller with too little to set out)
+    doesn't walk home each time to look in the larder it knows.
+30. **A posted price lapses** (content/market/). A price on a board
+    posted more than half a day ago is an earlier market's: it isn't
+    learned, and one read that long ago isn't bought at. A seller with
+    nothing to set out leaves its last market's price on the board, and
+    buyers went to it, found nobody minding the stall, and gave up.
 
 ## Terms
 

@@ -5229,3 +5229,35 @@ logging found the rest in Triangle's arena, under `tri_value`.
   C tools (`make gen`) and its tests.
 
 140 tests, 4157 checks.
+
+### After the economy: rationing, and the larders check (VILLAGE.md)
+
+- **Rationing** (cooking/, AGENCY.md decision 28): short of food (under
+  ten kilograms believed in its own larder), hunger alone makes no meal:
+  `cook_and_eat` scores by a new consideration, `#AtHome` (the mass of
+  things like `stocked` the agent believes in its own containers like
+  `keptIn`; nothing if it has seen inside none). A farmer sells no grain
+  that would leave it short (market/: fifteen kilograms for a lot of
+  twenty, twenty for forty).
+- **A need's goal settled is weighed again once eased, or two hours on**
+  (AGENCY.md decision 27): found impossible at hunger 100 it was never
+  weighed again, so packed meals went uneaten after the harvest. Saved
+  with what was felt and when it is tried again; not woken for.
+- **The larders check** counts what is brought into a larder away from
+  the market (a harvest) apart, boundary by boundary; turnips are
+  portions too.
+- **What it showed at market**: a commitment's search passes over where
+  it looked since its window opened (decision 29); a posted price lapses
+  after half a day (decision 30, KNOWLEDGE.md decision 24); nobody hides
+  in the open (terrain/'s `exposed`: grass, path, tilled ground;
+  KNOWLEDGE.md decision 26), so a hunter crouched at its blind is seen
+  minding its stall.
+- **Checks**: at 11:00 a hungry agent at a meal counts as at work; at
+  21:00 one at its hearth counts as home.
+- **Tests**: `rationing` (sixty portions at home, it cooks; two, it
+  doesn't). The village's hashes changed; the other scenarios' didn't.
+- **Three weeks** still break (VILLAGE.md): food runs out before the
+  harvest all the same; a sleep cut short by the morning is resumed the
+  next night and done at once; a pack astray from day 13.
+
+141 tests, 4165 checks.

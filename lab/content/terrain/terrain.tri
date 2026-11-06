@@ -5,6 +5,9 @@
 // - full, reduced, abstract, frozen: alike; terrain changes only as it is
 //            built on or knocked through.
 // - air:     rooms, and so regions of air, are found from it (air/air.tri).
+// - hunting: a hunter crouched hides only off exposed ground
+//            (hunting/): at the market on the green, crouched still, it is
+//            seen.
 // - code:    src/core_terrain.odin; a map's levels are files in maps/,
 //            brought in by @embed (a path from this directory).
 
@@ -20,12 +23,16 @@ package terrain
 // a wall (a doorway: it belongs to neither room it joins, and links them).
 // A doorway's `draught` is the air it passes with no door shut in it, mmol
 // a second each way. Its `look` is its appearance key for Tessera. `madeOf`
-// is its material (`material` is a body's).
+// is its material (`material` is a body's). Ground that is `exposed` (in
+// the open: grass, a path, tilled ground) is nowhere to hide: one hiding
+// on it is seen as anyone is; anywhere else (among the trees, indoors),
+// only from beside it.
 #Terrain: #Looks & {
     solid:   *false | true
     opaque:  *false | true
     floored: *true | false
     divides: *false | true
+    exposed: *false | true
     draught: *0 | int & >=0 & <=1000000
     madeOf:  #Material
 }
@@ -40,10 +47,10 @@ doorway:     #Terrain & { divides: true, draught: 200, madeOf: "stone", look: "d
 open_air:    #Terrain & { floored: false, madeOf: "stone", look: "air" } @family(terrain)
 // out of doors (VILLAGE.md): grass; ground tilled for a crop; the floor of
 // the woods, among the trees; a path worn bare
-grass:       #Terrain & { madeOf: "earth", look: "ground.grass" } @family(terrain)
-tilled_soil: #Terrain & { madeOf: "earth", look: "ground.tilled" } @family(terrain)
+grass:       #Terrain & { exposed: true, madeOf: "earth", look: "ground.grass" } @family(terrain)
+tilled_soil: #Terrain & { exposed: true, madeOf: "earth", look: "ground.tilled" } @family(terrain)
 woodland:    #Terrain & { madeOf: "earth", look: "ground.woodland" } @family(terrain)
-dirt_path:   #Terrain & { madeOf: "earth", look: "ground.path" } @family(terrain)
+dirt_path:   #Terrain & { exposed: true, madeOf: "earth", look: "ground.path" } @family(terrain)
 
 // A map: its levels drawn in characters, a level to a file brought in by
 // @embed; its legend, a terrain kind for each character; and the kind of

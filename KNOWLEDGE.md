@@ -230,6 +230,8 @@ These were made while writing this document and have not yet been reviewed.
     alike are told apart by their stalls. A label is read on sighting it,
     or on coming within its `legible` distance from further off, so one
     first sighted from too far is read as the reader comes up to it.
+    One posted more than half a day before it is read (its `when`) is an
+    earlier market's, and isn't kept (AGENCY.md decision 30).
 25. **What is in a pack its carrier carries, the carrier knows**
     (VILLAGE.md decision 11). Inside a container is seen only by looking
     in (or putting in, or taking out). A pack carried on the back or in a
@@ -239,6 +241,12 @@ These were made while writing this document and have not yet been reviewed.
     seen there, is not where it was, wherever it saw it put in (packs
     that look alike were mistaken for each other, and a hunter walked to
     where it saw a hide packed, to unpack it).
+26. **Nobody hides in the open** (VILLAGE.md decision 7, amended). One
+    hiding (crouched: things.tri's `hiding`) is seen only from beside it,
+    except on exposed ground (terrain/'s `exposed`: grass, a path, tilled
+    ground), where it is seen as anyone is. A hunter crouched at its
+    blind, minding its stall on the green, was unseen by buyers two tiles
+    off: nobody minded it.
 
 ## Terms
 

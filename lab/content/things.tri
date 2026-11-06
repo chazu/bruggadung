@@ -159,7 +159,8 @@ stack_seen: #Seen & { kindOf: "#Stack" } @family(seen)
     // risk tolerance (AGENCY.md §9), 0 to 100: a goal's believed risk counts
     // in full at 50, double at 0, and not at all at 100
     riskTolerance: *50 | int & >=0 & <=100          @field(content, saved, proposable, inspect)
-    // half hidden: seen only from close by, though it sees as well as anyone
+    // half hidden: seen only from close by, though it sees as well as
+    // anyone, but not in the open (terrain/'s `exposed`)
     hiding:        *false | true                    @field(content, saved, proposable, inspect)
     // fatigue (AGENCY.md §6, a component field), 0 to 100: effort raises
     // it, a night's rest clears it
