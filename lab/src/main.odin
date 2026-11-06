@@ -5,8 +5,10 @@
  *   lab run <scenario>       run a scenario and print its trace and checks:
  *                            marked-nail, marked-nail-a, marked-nail-b,
  *                            cistern, cistern-b, cistern-d, cistern-e, village
- *   lab run village --counters
- *                            and, on stderr, what it cost (PERFORMANCE.md)
+ *   lab run village [--counters] [--days n] [--log id]...
+ *                            and, on stderr, what it cost (PERFORMANCE.md);
+ *                            n days, not a week (its checks as they fall);
+ *                            what agent `id` thought, each night
  *   lab save <scenario>      run a scenario and print the save of its end state
  *   lab menu <scenario> <ms> run a scenario to a time and print the worker's menu
  *   lab play <world> [--seed n] [--log file]
@@ -30,7 +32,7 @@ import "core:strings"
 usage :: proc() -> i32 {
 	fmt.eprintf("usage: lab [-C contentdir] [--debug-history] test [name]\n" +
 	            "       lab [-C contentdir] run|save marked-nail|marked-nail-a|marked-nail-b|cistern...|village\n" +
-	            "       lab [-C contentdir] run village --counters\n" +
+	            "       lab [-C contentdir] run village [--counters] [--days n] [--log id]...\n" +
 	            "       lab [-C contentdir] menu marked-nail|marked-nail-a|marked-nail-b <ms>\n" +
 	            "       lab [-C contentdir] play workshop|cistern|shed [--seed n] [--log file]\n" +
 	            "       lab [-C contentdir] bench crowd|spread [agents] [seconds] [anchor[=kind]]\n")
@@ -127,12 +129,14 @@ run_cistern :: proc(name: string) -> i32 {
 
 /* The village: a week of days and nights, its people, its checks. */
 @(private = "file")
-run_village :: proc(save_: bool, counters := false) -> i32 {
+run_village :: proc(save_: bool, counters := false, days: i64 = VILLAGE_DAYS, logged: []Entity_ID = nil) -> i32 {
 	world := test_world(101)
 	if world == nil do return 1
 	release_shared_content_after_use()
 	c := test_committer(world)
 	village := autorelease(village_init_with_world(world, c))
+	village.days = days
+	for e in logged do append(&village.logged, Village_Logged{agent = e})
 	village_run(village)
 	if counters {
 		for line in village_counters(village) do fmt.eprintf("%s\n", line)
@@ -246,8 +250,21 @@ main :: proc() {
 	pool_push()
 	if argv[i] == "test" {
 		status = 1 if run_tests(ALL_TESTS[:], argv[i + 1] if i + 1 < argc else "") != 0 else 0
-	} else if argv[i] == "run" && i + 2 < argc && argv[i + 1] == "village" && argv[i + 2] == "--counters" {
-		status = run_village(false, counters = true)
+	} else if argv[i] == "run" && i + 2 < argc && argv[i + 1] == "village" {
+		counters := false
+		days: i64 = VILLAGE_DAYS
+		logged := make([dynamic]Entity_ID, context.temp_allocator)
+		for k := i + 2; k < argc; k += 1 {
+			if argv[k] == "--counters" do counters = true
+			else if argv[k] == "--days" && k + 1 < argc {
+				days = max(1, i64(libc.atoll(ns_utf8(argv[k + 1]))))
+				k += 1
+			} else if argv[k] == "--log" && k + 1 < argc {
+				append(&logged, Entity_ID(libc.atoll(ns_utf8(argv[k + 1]))))
+				k += 1
+			}
+		}
+		status = run_village(false, counters, days, logged[:])
 	} else if argv[i] == "run" && i + 1 < argc {
 		status = run_scenario(argv[i + 1], false, -1)
 	} else if argv[i] == "save" && i + 1 < argc {

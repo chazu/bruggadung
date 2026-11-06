@@ -4,15 +4,18 @@
 // Cut points:
 // - full:     on market day (every fourth, the scenario's), a seller keeps
 //             its household's stall: it sets out a lot of its goods (its
-//             trade's: grain, venison, firewood) and posts its price on
-//             the stall's board, then stands by it. Whoever comes within
+//             trade's: grain, venison, firewood; a bigger lot of grain
+//             with plenty to spare) and posts its price on the stall's
+//             board, afresh each market day (what it asks moves with its
+//             stock: money/coins.tri), then stands by it. Whoever comes within
 //             three tiles reads the price at a glance, and knows it. A
 //             buyer stocks its household's larder (or woodpile) to a
 //             level: it takes the household's coins from the coffer,
 //             reads the stalls, and buys a lot at a time at the cheapest
 //             price it knows that is no more than what it holds the goods
 //             worth (money/coins.tri's #Pricing). A sale is three acts:
-//             the buyer asks (#Buy), the seller hands the goods over from
+//             the buyer asks (#Buy) the seller whose price it read, if it
+//             sees it by the stall, and the seller hands the goods over from
 //             its stall and says what is owed (#Sold), and the buyer pays
 //             into the stall. Then the buyer takes the goods home. After
 //             the market, each takes its coins home to the coffer, and the
@@ -129,13 +132,28 @@ put_them_out: #Method & {
 // 12: known only to those of it), from where the household keeps it, so
 // long as the household keeps enough back: ten kilograms of grain (forty
 // portions), five of venison (a lot of ten cuts, from ten kilograms), sixty
-// of firewood.
+// of firewood. With twice as much grain to spare, a lot twice the size:
+// two households buy it, each to twenty kilograms.
+fetch_plenty_of_grain: #Method & {
+    title:    "fetch plenty of grain to sell"
+    goal:     "goods_set_out"
+    ofTrade:  "farmer"
+    sequence: true
+    rank:     2
+    pre: {
+        find:  ["supply", "goods"]
+        match: #Market & { me: #Agent & { freeHands: >=1 }, supply: #Body & { id: $l },
+                           goods: #Stack & { unit: "grain", mass: >=20kg, place: #Inside & { container: $l } } }
+    }
+    steps: [#Do & { op: "take_some", object: "goods", units: 40 }]
+} @family(methods)
+
 fetch_grain: #Method & {
     title:    "fetch grain to sell"
     goal:     "goods_set_out"
     ofTrade:  "farmer"
     sequence: true
-    rank:     2
+    rank:     3
     pre: {
         find:  ["supply", "goods"]
         match: #Market & { me: #Agent & { freeHands: >=1 }, supply: #Body & { id: $l },
@@ -149,7 +167,7 @@ fetch_venison: #Method & {
     goal:     "goods_set_out"
     ofTrade:  "hunter"
     sequence: true
-    rank:     3
+    rank:     4
     pre: {
         find:  ["supply", "goods"]
         match: #Market & { me: #Agent & { freeHands: >=1 }, supply: #Body & { id: $l },
@@ -163,7 +181,7 @@ fetch_firewood: #Method & {
     goal:     "goods_set_out"
     ofTrade:  "woodcutter"
     sequence: true
-    rank:     4
+    rank:     5
     pre: {
         find:  ["supply", "goods"]
         match: #Market & { me: #Agent & { freeHands: >=1 }, supply: #Body & { id: $l },
@@ -176,16 +194,17 @@ fetch_firewood: #Method & {
 look_in_supply: #Method & {
     title:  "look in the supply"
     goal:   "goods_set_out"
-    rank:   5
+    rank:   6
     pre:    { find: ["supply"], match: #Market & { supply: #Container } }
     search: "supply"
     steps:  [#Do & { op: "look_in", object: "supply" }]
 } @family(methods)
 
-// The price posted on the stall's board.
+// The price posted on the stall's board, this market day: what it asks
+// moves with its stock (money/'s #Pricing), so it writes it afresh each.
 price_posted: #Goal & {
     title: "post the price"
-    done:  #Did & { did: "post" }
+    done:  #Did & { did: "post", lately: 4h }
 } @family(goals)
 
 write_the_price: #Method & {

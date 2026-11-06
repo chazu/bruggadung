@@ -89,15 +89,17 @@ shoot: #Operation & {
 
 // The day's work, for a hunter: its household's larder stocked with meat,
 // kept through its working hours (bound when undertaken: the larder). Done
-// past forty kilograms of venison, eighty cuts, two deer: more than the
-// household eats in a week, the rest to sell (the market, VILLAGE.md slice
-// 9). A stack is seen by its mass, its count unseen.
+// past twenty kilograms of venison, forty cuts, a deer: what the household
+// eats and sells (the market, VILLAGE.md slice 9) before it spoils, three
+// days on (perishing/: a stack spoils whole, so a bigger stock spoils with
+// more in it, and none is left). A stack is seen by its mass, its count
+// unseen.
 game_hunted: #Goal & {
     title: "hunt"
     done: {
         find:  ["larder", "meat"]
         match: #Hunting & { larder: #Container & { id: $l },
-                            meat: #Food & #Stack & { unit: "venison", mass: >=40kg, place: #Inside & { container: $l } } }
+                            meat: #Food & #Stack & { unit: "venison", mass: >=20kg, place: #Inside & { container: $l } } }
     }
     kept: true
 } @family(goals)

@@ -165,6 +165,26 @@ Out of scope here, except where they touch agency:
     carries if it fits. A `#Purchase` buys no more than its supply lacks,
     counting what is in hand and in the pack; and only if there is a hand
     free or room in the pack for the lot.
+24. **An act done again to no end fails its method** (VILLAGE.md, three
+    weeks). A method step whose act is the same as the agent's last (the
+    operation and its roles), done again within a second, ten times
+    running, fails the method, and with none other the goal is impossible
+    for now. An instant act that changes nothing the agent knows of (a
+    look into a larder it can't unpack at, its hands full) was otherwise
+    chosen again at once, a millisecond on, for ever, and the world never
+    reached its next second.
+25. **A goal can arise from what the agent holds.** An `#Arising` with
+    `held` has a candidate for each thing of its kind the agent believes
+    it holds, while it does, and no finding: spoiled food in hand is put
+    down (perishing/), weighed against whatever it is doing, so a meal
+    carried past its time doesn't fill a hand for good.
+26. **A seller's price goes by its stock; a buyer asks the seller**
+    (VILLAGE.md decision 9, amended). A seller's pricing of its spare
+    goods is moved by what it believes it has of them at home (the
+    supply its stall is kept from, in hand, in its pack), on its price's
+    `asks` curve; a sale at the price it posted is struck though its
+    stock has moved since. A buyer asks the seller whose price it read on
+    the board, if it sees it by the stall; else anyone there, as before.
 
 ## Terms
 

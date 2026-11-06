@@ -7,22 +7,26 @@
 //             What a unit of goods is worth in coins to an agent is its
 //             #Pricing: the most of those whose `valued` it believes the
 //             goods to be, raised by what it feels of the need they serve.
+//             What a seller asks moves with its stock: more when it has
+//             little to spare, less when it has plenty.
 // - reduced:  the same.
 // - abstract: as reduced. Money as a coarse stock is planned
 //             (DETAIL_REGIMES.md).
 // - frozen:   the same: coins are things.
-// - market:   a seller posts its pricing; a buyer buys at a posted price no
-//             more than its own (market/).
-// - code:     agency_pricing (src/agency_agency.odin). The tempting purse's
-//             money is still cloth (money.tri).
+// - market:   a seller posts its pricing, by its stock; a buyer buys at a
+//             posted price no more than its own (market/).
+// - code:     agency_pricing (src/agency_agency.odin): a seller's stock is
+//             what it believes is in the supply its stall is kept from, in
+//             hand, or in a pack it carries. The tempting purse's money is
+//             still cloth (money.tri).
 
 package money
 
-// A coin, a unit of a stack; a household starts with a hundred in its
-// coffer.
+// A coin, a unit of a stack; a household starts with four hundred in its
+// coffer (a coin is small money: a portion of grain is four).
 #Coins:    #Stack & {}
-coin:      #Coins & { material: "metal", unit: "coin", unitMass: 10g, count: 1 }
-coins_100: #Coins & { material: "metal", unit: "coin", unitMass: 10g, count: 100 }
+coin:      #Coins & { material: "brass", unit: "coin", unitMass: 10g, count: 1 }
+coins_400: #Coins & { material: "brass", unit: "coin", unitMass: 10g, count: 400 }
 
 // Where a household keeps its coins.
 coffer: #Container & { material: "oak", mass: 8kg, capacity: 4 }
@@ -35,9 +39,20 @@ coffer_look: #Look & { kindOf: "coffer", look: "container.coffer" } @family(look
 // raised by what it feels of the need the thing serves (`pressure`), `per`
 // tenths of a coin a point. With none, nothing: it isn't for sale, nor
 // bought.
-#Pricing: #Need & { valued: #Body, coins: int & >=0 & <=1000 }
+// What a seller asks for its spare goods goes by its stock of them: at
+// `plenty` it asks `coins`; `asks` is a curve over its stock as a percent
+// of `plenty` (agency.tri's #Point): what it asks, as a percent of
+// `coins`. Never less than a coin.
+#Pricing: #Need & { valued: #Body, coins: int & >=0 & <=1000, plenty: mass, asks: [...#Point] }
 
-grain_price:    #Pricing & { valued: #Stack & { unit: "grain" }, coins: 1, pressure: "hunger", per: 1 } @family(prices)
-turnip_price:   #Pricing & { valued: #Stack & { unit: "turnip" }, coins: 1, pressure: "hunger", per: 1 } @family(prices)
-venison_price:  #Pricing & { valued: #Stack & { unit: "venison" }, coins: 2, pressure: "hunger", per: 1 } @family(prices)
-firewood_price: #Pricing & { valued: #Stack & { unit: "firewood" }, coins: 1, pressure: "cold", per: 1 } @family(prices)
+// Twice the price with nothing to spare, the price at plenty, half at four
+// times that.
+let by_stock = [{ input: 0, output: 200 }, { input: 100, output: 100 }, { input: 400, output: 50 }]
+
+// Plenty: a household's grain for a month (fifty kilograms, two hundred
+// portions); twenty kilograms of venison, a fortnight's meat; a tonne of
+// firewood, a household's for a season.
+grain_price:    #Pricing & { valued: #Stack & { unit: "grain" }, coins: 4, pressure: "hunger", per: 4, plenty: 50kg, asks: by_stock } @family(prices)
+turnip_price:   #Pricing & { valued: #Stack & { unit: "turnip" }, coins: 4, pressure: "hunger", per: 4, plenty: 50kg, asks: by_stock } @family(prices)
+venison_price:  #Pricing & { valued: #Stack & { unit: "venison" }, coins: 8, pressure: "hunger", per: 4, plenty: 20kg, asks: by_stock } @family(prices)
+firewood_price: #Pricing & { valued: #Stack & { unit: "firewood" }, coins: 4, pressure: "cold", per: 4, plenty: 1000kg, asks: by_stock } @family(prices)

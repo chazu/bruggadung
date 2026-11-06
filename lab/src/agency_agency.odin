@@ -111,6 +111,8 @@ BG_INTERRUPT       :: 5      /* and more, to interrupt an activity under way */
 BG_MAX_SETTLED     :: 16
 BG_MAX_COMMITMENTS :: 16
 BG_KEPT_RETRY :: i64(600000)     /* ms: a kept goal found impossible is tried again ten minutes later */
+@(private = "file") BG_AGAIN_WITHIN :: i64(1000)     /* ms: an act done again so soon is done again to no end... */
+@(private = "file") BG_AGAIN_TIMES  :: 10            /* ...once it has been, so many times running */
 BG_MAX_HABITS      :: 16
 BG_HABIT_GAIN      :: 10     /* each repetition */
 BG_HABIT_FADE      :: 1      /* a day */
@@ -164,6 +166,19 @@ Commitment :: struct {
 	resume:  i64,            /* ms: a kept goal found impossible is tried again from then; 0, now */
 	params:  [BG_MAX_SLOTS]Slot_Binding,
 	nparams: i32,
+}
+
+
+/* A method step's act, as last done, and how many times running it was done
+ * again within BG_AGAIN_WITHIN of the last: an act that changes nothing it
+ * knows of (a look into what it has looked into, its hands full) would be
+ * chosen again at once, for ever. */
+Repeated_Act :: struct {
+	op:     cstring,         /* interned */
+	item:   u32,
+	target: u32,
+	at:     i64,             /* ms */
+	times:  i32,
 }
 
 
@@ -228,6 +243,9 @@ Motivation :: struct {
 	threshold:    i32,                 /* worth above which control returns */
 	handedBack:   bool,
 	walking:      Walk_Purpose,        /* what the walk under way is for, if it set out on one */
+	again:        Repeated_Act,        /* its last method step's act, and how often in a row */
+	postedUnit:   cstring,             /* interned: the goods it last posted a price for (content/market/) */
+	postedCoins:  i32,                 /* and that price: a sale at it is struck, its stock since as it may */
 	log:          [dynamic]string,     /* each line in context.allocator */
 }
 
@@ -255,6 +273,8 @@ Agency :: struct {
 	wakes:        ^Wakes,              /* each mind's next time due with nothing happening */
 	nudged:       [dynamic]Entity_ID,  /* minds looked up since the last boundary: checked at it (the
 	                                      realloc'd _nudged, _nnudged, _nudgedcap) */
+	kindTypes:    map[string]tri.Type,     /* a believed kind's type (a referent's `kind`, a type
+	                                      expression), worked out once: content doesn't change */
 	unknown:      [BG_MAX_SLOTS]Slot_Binding,   /* the last condition's first unknown match: its bindings */
 	nunknown:     i32,
 	residual:     [128]u8,             /* and the first path left unknown */
@@ -615,6 +635,8 @@ agency_dealloc :: proc(self: ^Agency) {
 	delete(self.former)
 	wakes_free(self.wakes)
 	delete(self.nudged)
+	for k in self.kindTypes do delete(k)
+	delete(self.kindTypes)
 }
 
 
@@ -1256,19 +1278,34 @@ agency_match :: proc(self: ^Agency, c: ^Condition, b: [^]Slot_Binding, n: i32) -
 }
 
 
+/* The type of a believed kind (a referent's `kind`, a type expression);
+ * 0 if it has none. Worked out once for each: content doesn't change. */
+@(private = "file")
+agency_kind_type :: proc(self: ^Agency, kind: cstring) -> tri.Type {
+	if kind == nil do return 0
+	t, known := self.kindTypes[string(kind)]
+	if !known {
+		arena := tri.arena_new()
+		k     := tri.value(world_tri(self.world), kind, arena, nil, 0)
+		t      = tri.node_type(k) if k != nil else 0
+		tri.arena_free(arena)
+		self.kindTypes[strings.clone(string(kind))] = t
+	}
+	return t
+}
+
+
 /* A believed kind more general than the slot's isn't one (as for an
  * operation's roles). */
 @(private = "file")
 agency_kind_fits_slot :: proc(self: ^Agency, kind: cstring, slot: cstring, c: ^Condition) -> bool {
-	tc    := world_tri(self.world)
-	arena := tri.arena_new()
-	k     := tri.value(tc, kind, arena, nil, 0) if kind != nil else nil
-	fits  := false
-	for v: uint = 0; k != nil && v < c.nvariants && !fits; v += 1 {
+	tc := world_tri(self.world)
+	t  := agency_kind_type(self, kind)
+	fits := false
+	for v: uint = 0; t != 0 && v < c.nvariants && !fits; v += 1 {
 		filler := tri.at(tc, c.match[v], slot)
-		fits    = filler != nil && tri.subtype(tc, tri.node_type(k), tri.node_type(filler)) != 0
+		fits    = filler != nil && tri.subtype(tc, t, tri.node_type(filler)) != 0
 	}
-	tri.arena_free(arena)
 	return fits
 }
 
@@ -1958,7 +1995,7 @@ agency_follow :: proc(self: ^Agency, m: ^Motivation, method: cstring, index: i32
 		} else if string(cstr(op[:])) == "post" && text_at(tc, step, "regarding", slot[:]) {
 			/* a price posted (content/market/): what it holds a unit of the
 			 * goods worth, written on the stall's board */
-			posted := agency_price_writing(self, store, bound(b, n, str(slot[:])), roles[0])
+			posted := agency_price_writing(self, m, store, bound(b, n, str(slot[:])), roles[0])
 			if posted == "" {
 				agency_fail(self, m, index, fmt.tprintf("%s: it can't price what is set out", str(title[:])))
 				return false
@@ -1968,6 +2005,22 @@ agency_follow :: proc(self: ^Agency, m: ^Motivation, method: cstring, index: i32
 		} else if says != nil && tri.node_type(says) != utterance {
 			tri.print(tc, says, raw_data(text[:]), size_of(text))
 			content = cstr(text[:])
+		}
+		/* the same act again and again, at once: it gets nowhere, so the
+		 * method fails (and with no other, the goal is impossible for now) */
+		again := &m.again
+		now   := world_time(self.world).ms
+		opi   := world_intern(self.world, cstr(op[:]))
+		if again.op == opi && again.item == roles[0] && again.target == roles[1] && now - again.at <= BG_AGAIN_WITHIN {
+			again.times += 1
+		} else {
+			again^ = Repeated_Act{op = opi, item = roles[0], target = roles[1], times = 0}
+		}
+		again.at = now
+		if again.times >= BG_AGAIN_TIMES {
+			again^ = {}
+			agency_fail(self, m, index, fmt.tprintf("%s: %s R%d again, to no end", str(title[:]), str(op[:]), roles[0]))
+			return false
 		}
 		if agency_act(self, m, str(title[:]), store, cstr(op[:]), roles[0], roles[1], int_at(tc, step, "units", 0), content) {
 			ctx: [128]u8
@@ -2130,9 +2183,11 @@ agency_held_like :: proc(self: ^Agency, what: ^tri.Node, store: ^Knowledge_Store
  * whose `valued` it entails, raised by what it feels of the need the price
  * names, `per` tenths of a coin a point, unless what it prices is spare
  * (`needed` false: a seller's, kept back from); -1 if none: it isn't
- * goods. */
+ * goods. A seller's `stock` of it (grams; -1, not known) moves what it
+ * asks: the price's `asks`, over the stock as a percent of its `plenty`,
+ * a percent of its `coins`, never less than a coin. */
 @(private = "file")
-agency_pricing :: proc(self: ^Agency, description: ^tri.Node, store: ^Knowledge_Store, needed := true) -> i32 {
+agency_pricing :: proc(self: ^Agency, description: ^tri.Node, store: ^Knowledge_Store, needed := true, stock: i64 = -1) -> i32 {
 	result: tri.Match_Result
 	need:   [32]u8
 
@@ -2147,6 +2202,11 @@ agency_pricing :: proc(self: ^Agency, description: ^tri.Node, store: ^Knowledge_
 		if needed && text_at(tc, pattern, "pressure", need[:]) {
 			v += i32(i64(knowledge_store_feels(store, cstr(need[:]))) * int_at(tc, pattern, "per", 0) / 10)
 		}
+		pct: i32 = 100
+		if plenty := int_at(tc, pattern, "plenty", 0); !needed && stock >= 0 && plenty > 0 &&
+		   curve_at(tc, tri.at(tc, pattern, "asks"), stock * 100 / plenty, &pct) {
+			v = max(1, i32(i64(v) * i64(pct) / 100))
+		}
 		best = max(best, v)
 	}
 	return best
@@ -2156,12 +2216,12 @@ agency_pricing :: proc(self: ^Agency, description: ^tri.Node, store: ^Knowledge_
 /* The agent's pricing of a thing it knows of (agency_pricing, of what it
  * believes the thing to be). */
 @(private = "file")
-agency_pricing_of :: proc(self: ^Agency, thing: u32, store: ^Knowledge_Store, needed := true) -> i32 {
+agency_pricing_of :: proc(self: ^Agency, thing: u32, store: ^Knowledge_Store, needed := true, stock: i64 = -1) -> i32 {
 	tc    := world_tri(self.world)
 	arena := tri.arena_new()
 	defer tri.arena_free(arena)
 	if knowledge_store_referent(store, thing) == nil do return -1
-	return agency_pricing(self, tri.value(tc, ns_utf8(knowledge_store_describe_referent(store, thing)), arena, nil, 0), store, needed)
+	return agency_pricing(self, tri.value(tc, ns_utf8(knowledge_store_describe_referent(store, thing)), arena, nil, 0), store, needed, stock)
 }
 
 
@@ -2184,10 +2244,15 @@ agency_units_of :: proc(self: ^Agency, thing: u32, store: ^Knowledge_Store) -> i
 }
 
 
-/* Whoever it sees minding the stall (content/market/): an agent, not
- * itself, beside it; the lowest. nil if none. */
+/* Whoever it sees minding the stall (content/market/): the seller whose
+ * price it read there (`seller`), if it sees it beside it; else an agent,
+ * not itself, beside it, the lowest. nil if none. */
 @(private = "file")
-agency_minding :: proc(self: ^Agency, stall: ^Referent, store: ^Knowledge_Store) -> ^Referent {
+agency_minding :: proc(self: ^Agency, stall: ^Referent, store: ^Knowledge_Store, seller: u32 = 0) -> ^Referent {
+	if o := knowledge_store_referent(store, seller); stall != nil && o != nil && seller != knowledge_store_self_referent(store) &&
+	   o.present && o.form == .On_Tile && o.level == stall.level && abs(o.x - stall.x) <= 1 && abs(o.y - stall.y) <= 1 {
+		return o
+	}
 	for i: uint = 0; stall != nil && i < knowledge_store_count(store); i += 1 {
 		o := knowledge_store_referent_at(store, i)
 		if o.present && o.id != knowledge_store_self_referent(store) && o.kind != nil && string(o.kind) == "#Agent" &&
@@ -2272,7 +2337,13 @@ agency_sell :: proc(self: ^Agency, m: ^Motivation, question: ^tri.Node, asker: u
 		agency_note(self, m, fmt.tprintf("asked by R%d to sell %s: none set out", asker, said))
 		return fmt.tprintf("#HaveNone & {{ what: %s }}", said)
 	}
-	mine := agency_pricing_of(self, goods, store, false)      /* spare: it keeps enough back */
+	/* spare: it keeps enough back; by its stock at home; and the price it
+	 * posted holds, though its stock has moved since */
+	mine := agency_pricing_of(self, goods, store, false, agency_stock_of(self, m, goods, store))
+	if g := knowledge_store_referent(store, goods); g != nil && mine >= 0 && m.postedUnit != nil &&
+	   agency_unit_of_referent(self, store, goods) == m.postedUnit {
+		mine = min(mine, m.postedCoins)
+	}
 	if mine < 0 || offered < mine {
 		agency_note(self, m, fmt.tprintf("asked by R%d to sell R%d at %d: it holds it worth %d", asker, goods, offered, mine))
 		return fmt.tprintf("#WontSay & {{ what: %s }}", said)
@@ -2286,11 +2357,47 @@ agency_sell :: proc(self: ^Agency, m: ^Motivation, question: ^tri.Node, asker: u
 }
 
 
+/* A seller's stock of goods like `goods` (a referent; content/money/coins.tri):
+ * what it believes it has of their unit in the supply its stall is kept
+ * from (its commitments' `supply`), in hand, or in its pack, in grams; -1
+ * if it keeps none it knows of, or they have no unit. */
+@(private = "file")
+agency_stock_of :: proc(self: ^Agency, m: ^Motivation, goods: u32, store: ^Knowledge_Store) -> i64 {
+	supply: u32
+	for k: i32 = 0; k < m.ncommitments && supply == 0; k += 1 {
+		c := &m.commitments[k]
+		for p in c.params[:c.nparams] do if string(p.slot) == "supply" do supply = p.referent
+	}
+	u := agency_unit_of_referent(self, store, goods)
+	if supply == 0 || u == nil do return -1
+	tc    := world_tri(self.world)
+	arena := tri.arena_new()
+	defer tri.arena_free(arena)
+	what := tri.value(tc, ns_utf8(fmt.tprintf("#Stack & {{ unit: \"%s\" }}", u)), arena, nil, 0)
+	return agency_mass_toward(self, what, supply, store) if what != nil else -1
+}
+
+
+/* The unit a referent is believed a stack of: interned; nil if none. */
+@(private = "file")
+agency_unit_of_referent :: proc(self: ^Agency, store: ^Knowledge_Store, r: u32) -> cstring {
+	unit: [64]u8
+
+	tc    := world_tri(self.world)
+	arena := tri.arena_new()
+	defer tri.arena_free(arena)
+	if knowledge_store_referent(store, r) == nil do return nil
+	d := tri.value(tc, ns_utf8(knowledge_store_describe_referent(store, r)), arena, nil, 0)
+	if d == nil || !text_at(tc, d, "unit", unit[:]) do return nil
+	return world_intern(self.world, cstr(unit[:]))
+}
+
+
 /* A posted price (content/market/): a #Writing, by the agent, of a #Priced
  * claim: it sells goods of the unit of `goods` at the stall `board` stands
  * on, at what it holds a unit worth. "" if it can't say. */
 @(private = "file")
-agency_price_writing :: proc(self: ^Agency, store: ^Knowledge_Store, goods: u32, board: u32) -> string {
+agency_price_writing :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Store, goods: u32, board: u32) -> string {
 	unit: [64]u8
 
 	tc    := world_tri(self.world)
@@ -2301,8 +2408,9 @@ agency_price_writing :: proc(self: ^Agency, store: ^Knowledge_Store, goods: u32,
 	if g == nil || s == nil do return ""
 	d := tri.value(tc, ns_utf8(knowledge_store_describe_referent(store, goods)), arena, nil, 0)
 	if d == nil || !text_at(tc, d, "unit", unit[:]) do return ""
-	coins := agency_pricing(self, d, store, false)           /* spare: it keeps enough back */
+	coins := agency_pricing(self, d, store, false, agency_stock_of(self, m, goods, store))   /* spare, by its stock */
 	if coins < 0 do return ""
+	m.postedUnit, m.postedCoins = world_intern(self.world, cstr(unit[:])), coins
 	me := knowledge_store_describe_looks(store, knowledge_store_self_referent(store))
 	return fmt.tprintf("#Writing & {{ author: %s, entries: [#Priced & {{ what: #Stack & {{ unit: \"%s\" }}, holder: %s, " +
 	                   "site: #OnTile & {{ x: %d, y: %d, level: %d }}, coins: %d, when: %dms, attribution: #Saw & {{ sure: 30 }} }}] }}",
@@ -2363,7 +2471,7 @@ agency_purchase :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Store, 
 	if each <= 0 do each = int_at(tc, tri.pattern(tc, u), "mass", 0)
 	if _, ok := receiving(self.world, m.agent, each * units, true); !ok do return "it has no hand free for it, nor room in its pack"
 	stall  := knowledge_store_referent(store, price.board)      /* the board stands on it */
-	seller := agency_minding(self, stall, store)
+	seller := agency_minding(self, stall, store, price.seller)
 	if seller == nil {
 		if !referent_in_reach(me, stall, 1) {
 			agency_walk(self, m, title, me, stall, store, 1)
@@ -2884,11 +2992,8 @@ agency_suspicion :: proc(self: ^Agency, consideration: ^tri.Node, place: u32, st
 agency_referent_is_of :: proc(self: ^Agency, r: ^Referent, kind: ^tri.Node) -> bool {
 	if kind == nil do return true
 	if r == nil || r.kind == nil do return false
-	arena := tri.arena_new()
-	k     := tri.value(world_tri(self.world), r.kind, arena, nil, 0)
-	yes   := k != nil && tri.subtype(world_tri(self.world), tri.node_type(k), tri.node_type(kind)) != 0
-	tri.arena_free(arena)
-	return yes
+	t := agency_kind_type(self, r.kind)
+	return t != 0 && tri.subtype(world_tri(self.world), t, tri.node_type(kind)) != 0
 }
 
 
@@ -3152,48 +3257,64 @@ agency_weigh :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Store, bus
 	bestSlot  = nil
 	for i: uint = 0; family != nil && i < uint(tri.index_count(family)); i += 1 {
 		goal = world_intern(self.world, cstring(tri.index_tag(family, i)))
-		if !text_at(tc, tri.pattern(tc, goal), "arises.finding", finding[:]) ||
-		   !text_at(tc, tri.pattern(tc, goal), "arises.slot", slot[:]) {
+		pattern := tri.pattern(tc, goal)
+		held    := tri.at(tc, pattern, "arises.held")
+		byHeld  := held != nil && tri.node_type(held) == tri.type_named(tc, "true")
+		if (!byHeld && !text_at(tc, pattern, "arises.finding", finding[:])) || !text_at(tc, pattern, "arises.slot", slot[:]) {
 			continue
 		}
 		/* an office's duty: only for one who holds it, which it knows */
-		if text_at(tc, tri.pattern(tc, goal), "arises.duty", title[:]) {
+		if text_at(tc, pattern, "arises.duty", title[:]) {
 			badge := world_text_field(self.world, "OfficeHolder.badge", m.agent)
 			if badge == nil || string(badge) != str(title[:]) do continue
 		}
 		/* and not for one who does: its office has a goal of its own */
-		if text_at(tc, tri.pattern(tc, goal), "arises.exempt", title[:]) {
+		if text_at(tc, pattern, "arises.exempt", title[:]) {
 			badge := world_text_field(self.world, "OfficeHolder.badge", m.agent)
 			if badge != nil && string(badge) == str(title[:]) do continue
 		}
-		for j: uint = 0; j < knowledge_store_finding_count(store); j += 1 {
-			when_: i32
+		/* what it arises about: what findings of its kind are about, or
+		 * (`held`) what the agent believes it holds */
+		abouts := make([dynamic]u32, context.temp_allocator)
+		if byHeld {
+			me := knowledge_store_self_referent(store)
+			for j: uint = 0; j < knowledge_store_count(store); j += 1 {
+				r := knowledge_store_referent_at(store, j)
+				if r.present && r.form == .Held_By && r.container == me do append(&abouts, r.id)
+			}
+		} else {
+			for j: uint = 0; j < knowledge_store_finding_count(store); j += 1 {
+				when_: i32
 
-			/* settled about it, unless the finding was drawn again since (a
-			 * part serviced, seen wearing again) */
-			f := knowledge_store_finding_at(store, j)
-			if string(f.kind) != str(finding[:]) ||
-			   (agency_has(self, raw_data(m.settled[:]), m.nsettled, goal, f.about, &when_) && f.time / 1000 <= i64(when_)) {
-				continue
+				/* settled about it, unless the finding was drawn again since (a
+				 * part serviced, seen wearing again) */
+				f := knowledge_store_finding_at(store, j)
+				if string(f.kind) != str(finding[:]) ||
+				   (agency_has(self, raw_data(m.settled[:]), m.nsettled, goal, f.about, &when_) && f.time / 1000 <= i64(when_)) {
+					continue
+				}
+				if tri.at(tc, pattern, "arises.lapse") != nil &&
+				   world_time(self.world).ms - f.time > int_at(tc, pattern, "arises.lapse", 0) {
+					continue      /* no longer salient */
+				}
+				append(&abouts, f.about)
 			}
-			if tri.at(tc, tri.pattern(tc, goal), "arises.lapse") != nil &&
-			   world_time(self.world).ms - f.time > int_at(tc, tri.pattern(tc, goal), "arises.lapse", 0) {
-				continue      /* no longer salient */
-			}
-			if !agency_referent_is_of(self, knowledge_store_referent(store, f.about), tri.at(tc, tri.pattern(tc, goal), "arises.of")) {
+		}
+		for about in abouts {
+			if !agency_referent_is_of(self, knowledge_store_referent(store, about), tri.at(tc, pattern, "arises.of")) {
 				continue
 			}
 			for k = 0; k < m.nintentions; k += 1 {
-				if m.intentions[k].goal == goal && m.intentions[k].arose == f.about do break
+				if m.intentions[k].goal == goal && m.intentions[k].arose == about do break
 			}
 			if k < m.nintentions do continue      /* already pursued */
 			b.slot     = world_intern(self.world, cstr(slot[:]))
-			b.referent = f.about
+			b.referent = about
 			parts      = make([dynamic]string, context.temp_allocator)
 			worth      = agency_worth_of_goal(self, goal, &b, 1, store, &parts)
 			if best == nil || worth > bestWorth {
 				best        = goal
-				bestAbout   = f.about
+				bestAbout   = about
 				bestWorth   = worth
 				bestParts   = parts
 				bestSlot    = b.slot

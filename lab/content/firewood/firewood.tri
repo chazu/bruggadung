@@ -29,8 +29,12 @@
 //             (carrying/'s `gather`) and the next lot into its hand, stacks
 //             what it holds, and by the woodpile takes the rest out of the
 //             pack to stack.
+// - money:    a woodpile is stocked at three tonnes while the household's
+//             coffer holds two hundred coins, as far as the woodcutter
+//             knows; short of them, at four and a half, to sell more
+//             (money/coins.tri: more firewood asks less).
 // - village:  the trees, the tools at the chopping block, the woodpiles
-//             and who stocks which are the scenario's
+//             and who stocks which, with its coffer, are the scenario's
 //             (src/scenario_village.odin).
 // - code:     effect_fell, effect_split, effect_stoke, effect_put_down, and
 //             effect_saw's trunks (src/act_actions.odin).
@@ -96,19 +100,28 @@ birch_firewood_20: #Stack & { material: "birch", unit: "firewood", unitMass: 1kg
 axe: #Axe & { material: "iron", mass: 2kg }
 
 // Felling: a tree, the woodpile it goes to, the axe.
-#Felling: #Frame & { tree: #Body, trunk: #Body, log: #Body, wood: #Body, woodpile: #Body, axe: #Body, pack: #Body, packed: #Body }
+#Felling: #Frame & { tree: #Body, trunk: #Body, log: #Body, wood: #Body, woodpile: #Body, axe: #Body, pack: #Body, packed: #Body,
+                     coffer: #Body, coins: #Body }
 
 // The day's work, for a woodcutter: its household's woodpile stocked, kept
 // through its working hours (bound when undertaken: the household's
-// woodpile). Done past three thousand pieces (three tonnes: a stack is seen
-// by its mass, its count unseen): more than a day's work, the surplus a
-// woodcutter's to sell (the market, VILLAGE.md slice 9).
+// woodpile and its coffer). Done past three thousand pieces (three tonnes:
+// a stack is seen by its mass, its count unseen), more than a day's work,
+// the surplus a woodcutter's to sell (the market, VILLAGE.md slice 9), so
+// long as the coffer holds two hundred coins (two kilograms) as far as it
+// knows; short of them, past four and a half thousand, to sell more:
+// firewood keeps, and the more there is the less it asks (money/'s
+// #Pricing).
 woodpile_stocked: #Goal & {
     title: "stock the woodpile"
     done: {
-        find:  ["woodpile", "wood"]
+        find:  ["woodpile", "wood", "coffer", "coins"]
         match: #Felling & { woodpile: #Container & { id: $w },
-                            wood: #Stack & { unit: "firewood", mass: >=3000kg, place: #Inside & { container: $w } } }
+                            wood: #Stack & { unit: "firewood", mass: >=4500kg, place: #Inside & { container: $w } } } |
+            #Felling & { woodpile: #Container & { id: $w },
+                         wood:   #Stack & { unit: "firewood", mass: >=3000kg, place: #Inside & { container: $w } },
+                         coffer: #Container & { id: $c },
+                         coins: #Stack & { unit: "coin", mass: >=2kg, place: #Inside & { container: $c } } }
     }
     kept: true
 } @family(goals)

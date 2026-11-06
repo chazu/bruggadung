@@ -10,7 +10,11 @@ package lab
  * hand, with what it holds of the kind; the last row reaped, it is bare.
  */
 
+import "core:c"
 import "core:fmt"
+import "core:strings"
+
+import tri "../../triangle/odin/triangle"
 
 FARM_DAY :: i64(86400000)
 
@@ -287,4 +291,56 @@ test_keep_seed :: proc() {
 	bg_check(marked && !p.kept && p.stands == plot_stands(w, "sown"))
 	bg_check(village_portions_in(w, larder) == 78 && seed == 436)
 	bg_check(world_entities_at(w, me, .Held_By, raw_data(held[:]), 2) == 0)
+}
+
+
+/*
+ * A unit of a stack is the instance its unit names (a space an underscore:
+ * the committer's unit_blueprint), so one taken from a stack is known for
+ * what it is: every stack's unit names one, with a body. A turnip taken
+ * from a harvest is food, raw, and is seen to be.
+ */
+test_units_name_instances :: proc() {
+	w := test_world(119)
+	if w == nil do return
+	tc := world_tri(w)
+	stack := tri.type_named(tc, "#Stack")
+	body  := tri.type_named(tc, "#Body")
+	unit:  [64]u8
+	missing := make([dynamic]string, context.temp_allocator)
+	for i: uint = 0; i < uint(tri.instance_count(tc)); i += 1 {
+		name    := tri.instance_name(tc, c.size_t(i))
+		pattern := tri.pattern(tc, name)
+		if pattern == nil || tri.subtype(tc, tri.node_type(pattern), stack) == 0 do continue
+		u := tri.at(tc, pattern, "unit")
+		if u == nil || tri.text(tc, u, raw_data(unit[:]), len(unit)) == ~c.size_t(0) do continue
+		named := string(cstring(raw_data(unit[:])))
+		of    := tri.pattern(tc, unit_blueprint(w, cstring(raw_data(unit[:]))))
+		if of == nil || tri.subtype(tc, tri.node_type(of), body) == 0 {
+			append(&missing, fmt.tprintf("%s (%s)", name, named))
+		}
+	}
+	if len(missing) != 0 do fmt.eprintf("    units naming no instance: %v\n", missing[:])
+	bg_check(len(missing) == 0)
+
+	/* a turnip taken: food, raw, believed so */
+	c := test_committer(w)
+	s := autorelease(scheduler_init_with_world(w, c))
+	g := proposal_group_group_with_phase(.System, "setup: a farmer by a harvest of turnips")
+	farmer  := proposal_group_create(g, "farmer", "the farmer", on_tile(2, 2, 0))
+	harvest := proposal_group_create(g, "turnip_harvest", "the turnips", on_tile(3, 2, 0))
+	committer_submit(c, g)
+	scheduler_run_until(s, time_make(1))
+	farmer, harvest = proposal_group_id_for(g, farmer), proposal_group_id_for(g, harvest)
+	g = proposal_group_group_with_phase(.System, "setup: one taken")
+	proposal_group_split(g, whole(harvest), 1, held_by(farmer, 0))
+	committer_submit(c, g)
+	scheduler_run_until(s, time_make(2))
+	held: [2]Entity_ID
+	n := world_entities_at(w, farmer, .Held_By, raw_data(held[:]), 2)
+	bg_check(n == 1)
+	if n != 1 do return
+	info := world_info(w, held[0])
+	bg_check(info != nil && info.blueprint == "turnip")
+	bg_check(strings.contains(kind_of_entity(w, held[0]), "#Food"))
 }

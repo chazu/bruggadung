@@ -5179,3 +5179,53 @@ logging found the rest in Triangle's arena, under `tri_value`.
 - **Tests**: Triangle's `test_runtime_values_keep_content` (2,000 values
   made after loading leave the load arena as it was; it fails without the
   fix).
+
+### After the slice: the economy, and three weeks of the village (VILLAGE.md)
+
+- **Prices move with the seller's stock** (money/coins.tri, AGENCY.md
+  decision 26). Money is four times finer: a coffer starts with four
+  hundred coins (`coins_400`, brass), grain is 4 a portion, venison 8 a
+  cut, firewood 4 a piece. A #Pricing has a `plenty` and an `asks` curve:
+  twice the price with nothing to spare, the price at plenty, half at four
+  times plenty. A seller's stock is what it believes is in the supply its
+  stall is kept from, in hand or in its pack; a sale at the price it
+  posted is struck though its stock has moved since.
+- **The market, on the way**: a seller posts its price afresh each market
+  day (`price_posted` was done once and for all: a sequence's subgoal is
+  checked from time 0); a farmer with twice its keep-back sets out a lot
+  twice the size; a buyer asks the seller whose price it read, if it sees
+  it by the stall, not whoever stands there. The market's check is now
+  that of every trade's goods set out some sold: two farmers compete.
+- **Woodcutters work more for want of coins** (firewood/): the woodpile is
+  stocked at three tonnes while the coffer holds two hundred coins as far
+  as they know, else at four and a half (a goal whose condition has two
+  variants). Everyone looks into the coffer as the village is set up.
+  Hunters stock twenty kilograms, not forty: a stack spoils whole.
+- **Three weeks** (`lab run village --days n`, `--log id` for an agent's
+  thoughts each night):
+  - Day 17 never ended: a hunter looked into its larder every
+    millisecond, its hand full. An act done again ten times running,
+    each within a second, fails its method (AGENCY.md decision 24).
+  - The hand held a meal that spoiled in it: a goal can arise from what
+    is held (`#Arising`'s `held`), and spoiled food held is put down
+    (perishing/, AGENCY.md decision 25).
+  - A turnip taken from a harvest had no content (`turnip` missing), nor
+    a cut of hare meat ("hare meat", but `hare_meat`): a unit is the
+    instance its unit names, spaces as underscores (`unit_blueprint`).
+  - A larder of more than sixteen things overran the scenario's counts.
+  - Still breaking, for the next round: food runs short before the
+    harvest (the Hunts from day 9, the Brooks 11, the Ashes and the Fells
+    14); after it, a meal taken to work is still held at 14:30; a pack
+    isn't put back from day 15; the larders check counts a harvest as
+    negative eating.
+- **Checks**: lunch is the meal it took eaten by 14:30 (at work is
+  checked at 11:00: one who works harder eats earlier); the hunters'
+  meat is meat in their larder on some night.
+- **Tests**: `units_name_instances` (every stack's unit names an
+  instance; a turnip taken is food, raw). The village's hashes changed;
+  the other scenarios' didn't.
+- **Building on this Mac**: the Command Line Tools' clang 16 can't link
+  against the macOS 27.2 SDK; `SDKROOT=.../MacOSX26.5.sdk` links Triangle's
+  C tools (`make gen`) and its tests.
+
+140 tests, 4157 checks.

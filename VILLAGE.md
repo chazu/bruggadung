@@ -225,6 +225,19 @@ things the lab put off:
      the need's raise, so every posted price is the kind's: grain 1,
      venison 2, firewood 1. With the raise, a hungry farmer asked more
      for grain than a hungry woodcutter would give, and nothing sold.
+   - Amended after the week (the economy): money is four times finer (a
+     household's coffer starts with four hundred coins; grain 4 a portion,
+     venison 8 a cut, firewood 4 a piece), so a price can fall. What a
+     seller asks moves with its **stock**, what it believes it has at
+     home: twice the kind's price with nothing to spare, the price at
+     **plenty** (fifty kilograms of grain, twenty of venison, a tonne of
+     firewood), half at four times that (#Pricing's `plenty`, `asks`). It
+     posts afresh each market day, and a sale at the price it posted is
+     struck though its stock has moved since. A farmer with twice its
+     keep-back sets out a lot twice the size. Two farmers selling grain
+     compete: the cheaper (or, as cheap, the nearer) may sell all that is
+     wanted, so the check is that of every trade's goods set out some
+     sold.
    - Farmers start with last year's harvest, two hundred portions of
      grain, so they have grain to spare before their plots ripen.
    - Built on the way: what is in a container is known only to whoever
@@ -487,12 +500,11 @@ New, and entered in the glossary with this document:
 - **What a stack is seen as.** A stack's count isn't perceived, only its
   mass, so a condition on a count never holds of what an agent knows.
   The woodcutters' "past three thousand pieces" was one, never done; it
-  is three tonnes now, and the hunters' two deer forty kilograms.
-- **Prices.** A posted price from the seller's values alone ignores what
-  others ask. Whether sellers should read each other's stalls and follow is
-  for after the first market works. Today it is the kind's price, the
-  same at every stall: a seller prices spare goods without its need's
-  raise, and only a buyer's pricing moves (with its hunger).
+  is three tonnes now, and the hunters' deer twenty kilograms.
+- **Prices.** Settled (decision 9, amended): what a seller asks moves
+  with its own stock, more when it has little to spare, less with plenty,
+  and buyers go to the cheapest. Sellers still don't read each other's
+  stalls and follow, nor haggle.
 - **Carrying.** Settled (decision 11): a backpack and a basket. A barrow
   (a big load pushed with both hands, on open ground) is left for later.
   The basket is little used: a buyer with the basket in one hand and its
@@ -528,21 +540,37 @@ New, and entered in the glossary with this document:
   and left a mind deciding only where a walk ends (PERFORMANCE.md).
   A boundary a step remains; carrying more at a time, or movement in
   closed form (PERFORMANCE.md, open questions), would cut it further.
-- **The week's balance.** The woodcutters stock their three tonnes by the
-  sixth day and stop, and sell thirty pieces a market; the Hunts may have
-  nothing to sell on a market day (the seventh, in the checked run). What
-  a household makes and what the others buy aren't matched yet: prices
-  don't move with plenty, and nobody works more for want of coins.
-- **Three weeks of the village.** A plot sown the first day ripens in a
-  fortnight, so the village's own checks see sowing, not harvest; a plot
-  of its own (src/test_farming.odin) is checked for three weeks. Run for
-  three weeks (35 s), the village finds what happens past its food: each
-  larder holds 60 portions and there is no market, so households go
-  hungry from the fifth day. Some farmers then hold firewood fetched for a
-  stove they couldn't stoke, and a raw portion, and with no hand free
-  can't harvest a ripe plot. A slice that runs that long (10) wants the
-  market first, and something that puts down what a finished goal left in
-  hand.
+- **The week's balance.** Prices move with plenty (above). Woodcutters
+  work more for want of coins: their woodpile is stocked at three tonnes
+  while the coffer holds two hundred coins as far as they know, else at
+  four and a half (content/firewood/: firewood keeps, and more of it is
+  cheaper). Everyone looks into the household's coffer as the village is
+  set up, so not knowing isn't being short. Hunters don't: meat keeps
+  three days and a stack spoils whole, so more meat is more rot; they
+  stock twenty kilograms now, not forty, and hunt again sooner. Farmers
+  can't: their work is their plots'.
+- **Three weeks of the village** (`lab run village --days 21`, 100 s; the
+  week's checks as they fall each day). What it found, and what was done:
+  - Past day 7 it ran no further: a hunter with its hands full looked into
+    its larder every millisecond, the world never reaching the next
+    second. An act done again ten times running, each within a second,
+    now fails its method (AGENCY.md decision 24).
+  - The hand was full of a meal that spoiled in it, which nobody eats or
+    puts down: spoiled food held is now put down (a goal arising from
+    what is held: AGENCY.md decision 25).
+  - A turnip taken from a harvest was made of no content (no `turnip`
+    instance), and a cut of hare meat of none either (its unit has a
+    space), so neither was food to whoever held it: both hands full, a
+    farmer couldn't cook. A unit is the instance its unit names, spaces as
+    underscores, and a test checks every stack's unit names one.
+  - A larder of more than sixteen things overran the scenario's counts.
+  - Still breaking: before the harvest (day 14), food runs short. The
+    Hunts go hungry from day 9 (their meat spoils whole, grain is dear
+    and scarce at market), the Brooks from day 11, the Ashes and the
+    Fells on day 14, last year's grain gone. After the harvest, from day
+    16, nearly everyone still holds at 14:30 the meal it took to work; a
+    Fells' pack isn't put back from day 15; and the larders check counts
+    a harvest as negative eating. Each is for the next run of fixes.
 - **Seed from the harvest.** Settled: once a harvest, holding more than a
   sack of seed's worth of it (twelve and a half kilograms of grain), a
   farmer keeps a sack back as seed (`keep_back_seed`), marking the plot

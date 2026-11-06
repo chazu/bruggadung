@@ -25,7 +25,9 @@
 //             far it has grown isn't seen; how it stands is.
 // - cooking:  what a harvest yields is food (cooking/cooking.tri's raw
 //             grain, and turnips), raw, cooked as any is; in a larder it
-//             merges with a sack of its kind.
+//             merges with a sack of its kind. One taken from it is the
+//             instance its unit names (`grain`, `turnip`): the committer's
+//             split, src/commit_committer.odin.
 // - home:     a farmer's worksite is a scarecrow (home/home.tri) in one of
 //             its plots.
 // - village:  the plots, the seed in each larder, and who farms which are
@@ -81,6 +83,9 @@ let raw_turnip = { material: "food", raw: true, nourishment: 10, cooking: 30 }
 // a time.
 grain_harvest:  #Stack & #Food & raw_grain & { unit: "grain", unitMass: 250g, count: 2, keptAs: "seed_grain" }
 turnip_harvest: #Stack & #Food & raw_turnip & { unit: "turnip", unitMass: 250g, count: 2, keptAs: "turnip_seed" }
+// One turnip, taken from a harvest (a unit of a stack is the instance its
+// unit names, as cooking/'s grain is).
+turnip:         #Body & #Food & raw_turnip & { mass: 250g }
 
 // What food is kept back as, for seed: a #Seed's blueprint; "" for none.
 hunger.#Food: { keptAs: *"" | text @field(content, saved, inspect) }

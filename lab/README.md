@@ -23,6 +23,7 @@ make gen                                 # regenerate src/components.odin from c
 ./build/<platform>/lab menu marked-nail 1000   # what the worker sees, and its menu, at 1000 ms
 ./build/<platform>/lab run cistern       # the fluid domain: two taps and a leak on a dwindling cistern (also -b, -d, -e)
 ./build/<platform>/lab run village       # the village: twelve people, a week of work, market and home, checked
+./build/<platform>/lab run village --days 21 --log 241   # three weeks; what villager 241 thought, each night
 ./build/<platform>/lab play workshop     # play: the map, the menu, commands, the inspector (also cistern)
 make watcher && ./build/<platform>/watcher crowd 40   # a world in a window: 40 workers on the yard (also cistern, marked-nail, ...)
 ./build/<platform>/watcher village --knows             # the village as a villager knows it (k: the truth, or back)

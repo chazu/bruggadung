@@ -43,7 +43,7 @@ test_market :: proc() {
 	clarder  := proposal_group_create(g, "larder", "the woodcutter's larder", on_tile(15, 12, 0))
 	cgrain   := proposal_group_create(g, "grain_sack", "the woodcutter's grain", in_(clarder))
 	coffer   := proposal_group_create(g, "coffer", "the coffer", on_tile(16, 12, 0))
-	purse    := proposal_group_create(g, "coins_100", "the coins", in_(coffer))
+	purse    := proposal_group_create(g, "coins_400", "the coins", in_(coffer))
 	committer_submit(c, g)
 	scheduler_run_until(s, time_make(1))
 	board = proposal_group_id_for(g, board)

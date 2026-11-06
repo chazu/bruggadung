@@ -3777,4 +3777,5 @@ ALL_TESTS := [?]Test_Case{
 	{"carrying",                      test_carrying},
 	{"scene_knowledge",               test_scene_knowledge},
 	{"keep_seed",                     test_keep_seed},
+	{"units_name_instances",          test_units_name_instances},
 }

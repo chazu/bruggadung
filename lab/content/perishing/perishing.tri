@@ -26,6 +26,10 @@
 //             it isn't possible, and nobody values it as food.
 // - cooking:  cooking makes a meal of raw food (cooking/): it keeps its
 //             `mealKeepsFor` from then.
+// - agency:   spoiled food an agent believes it holds is put down where it
+//             stands (`spoiled_put_down`, a goal arising from what is
+//             held: agency.tri's #Arising), so a meal carried past its time
+//             doesn't fill a hand for good.
 // - code:     the perishing domain (src/domains_perishing.odin): it stamps
 //             food made at the last boundary with when it spoils, and its
 //             horizon is the next food to spoil, its one wake then.
@@ -61,3 +65,27 @@ spoiled_look: #Look & { kindOf: "#Spoiled", look: "food.spoiled" } @family(looks
 
 // Its mass is what spoiled, carved from it.
 spoiled_food: #Spoiled & { material: "rot", mass: 1g }
+
+// Getting rid of what has spoiled.
+#Riddance: #Frame & { rot: #Body }
+
+// Spoiled food in hand (a meal carried about past its time): put down
+// where the agent stands, before whatever it is doing, which a full hand
+// would keep it from.
+spoiled_put_down: #Goal & {
+    title:  "put down what has spoiled"
+    arises: { held: true, slot: "rot", of: #Spoiled }
+    done: {
+        find:  ["rot"]
+        match: #Riddance & { me: #Agent & { id: $me }, rot: #Spoiled & { place: #OnTile | #Inside } }
+    }
+    worth: [#Flat & { value: 70 }]
+} @family(goals)
+
+put_it_down: #Method & {
+    title: "put it down"
+    goal:  "spoiled_put_down"
+    rank:  1
+    pre:   { find: ["rot"], match: #Riddance & { me: #Agent & { id: $me }, rot: #Spoiled & { place: #Held & { by: $me } } } }
+    steps: [#Do & { op: "put_down", object: "rot" }]
+} @family(methods)

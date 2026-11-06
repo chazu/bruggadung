@@ -823,9 +823,11 @@ committer_apply :: proc(self: ^Committer, p: ^Proposal, g: ^Proposal_Group, tall
 		proposal_group_set_id(g, e, p.handle)
 		seed  = mix(info.seed ~ (u64(stack.count) * 0x9e3779b97f4a7c15))
 		loc   = world_location_of(self.world, a) if p.location.form == .None else resolve_location(g, p.location)
-		// the new entity: an individual of the unit, or a smaller stack
+		// the new entity: an individual of the unit (the instance its unit
+		// names, spaces as underscores: "hare meat", hare_meat), or a
+		// smaller stack
 		if p.value == 1 {
-			world_add_entity(self.world, e, stack.unit, seed)
+			world_add_entity(self.world, e, unit_blueprint(self.world, stack.unit), seed)
 			body.mass = stack.unitMass
 			world_set_record(self.world, &body, kbody, e)
 		} else {
@@ -1219,4 +1221,13 @@ committer_commit_boundary :: proc(self: ^Committer) -> []^Proposal_Group {
 	}
 	for g in current do release(g)        // the array's own hold, let go
 	return processed[:]
+}
+
+
+/* The blueprint of one unit of a stack: the instance its unit names, a
+ * space in it an underscore ("hare meat": hare_meat). Interned. */
+unit_blueprint :: proc(world: ^World, unit: cstring) -> cstring {
+	if unit == nil || !strings.contains_rune(string(unit), ' ') do return unit
+	name, _ := strings.replace_all(string(unit), " ", "_", context.temp_allocator)
+	return world_intern(world, ns_utf8(name))
 }

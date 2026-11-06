@@ -14,7 +14,10 @@
 //             for deciding (DETAIL_REGIMES.md).
 // - frozen:   it doesn't decide; risen, it looks, and so decides, at once.
 // - code:     src/agency_agency.odin: considerations by their kind (#Flat,
-//             #Scaled, #Need, #Trait, ...), conditions, `order`, commitments.
+//             #Scaled, #Need, #Trait, ...), conditions, `order`, commitments,
+//             goals arising from findings or from what is held; a method
+//             step's act done again to no end fails it (AGENCY.md decision
+//             24).
 
 // What a goal and its methods are about: the agent itself, as `me`, and
 // slots for the things involved, each bound to a referent. A goal's frame is
@@ -65,8 +68,10 @@
 // each finding of the kind about something of kind `of`, the slot bound to
 // it, while the finding is salient: drawn no longer ago than `lapse`; with
 // a `duty`, only for an agent whose office's badge it is (INSTITUTIONS.md:
-// an officer's duty); `exempt`, never for one whose it is.
-#Arising: { finding: text, slot: text, lapse: time, of: #Body, duty: text, exempt: text }
+// an officer's duty); `exempt`, never for one whose it is. With `held`, a
+// candidate for each thing of kind `of` the agent believes it holds, while
+// it does, and no finding (perishing/: spoiled food in hand).
+#Arising: { finding: text, slot: text, lapse: time, of: #Body, duty: text, exempt: text, held: *false | true }
 
 // A goal is done when `done` holds. What it `concerns` is salient to an agent
 // that holds it (AGENCY.md §10): something like one of them seen moved, or

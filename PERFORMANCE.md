@@ -292,6 +292,11 @@ the next to measure; recognition was 2.7 s (decision 4).
    bounded and let go when full. None changes what happens: the scenario
    hashes are the same. The market's village took 22 s, and 14 s after
    (profiled with macOS's `sample` on a `-o:speed -debug` build).
+   - Later, a fourth: the type of a believed kind (a referent's `kind`), a
+     value built from its text and copied whole for every candidate a
+     condition's slot considered. It is kept on the agency by the kind's
+     text (`agency_kind_type`): the village's week took 36 s, and 33 s
+     after, its state hash the same.
 8. **A long run lets go of each boundary's temporaries** (built). The
    temp allocator, and what is autoreleased, are let go when a pool is
    drained, and the village ran its week in one: 7.3 GB at its peak, and

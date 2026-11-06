@@ -882,7 +882,8 @@ REALITY.md, PRF = PERFORMANCE.md, TER = TERRAIN.md, TES = TESSERA.md, VIL = VILL
   away** to nothing. (VIL d8)
 - **Spoiled food**: what perishable food is once its time has come: a
   thing as heavy, where it was, made of **rot**, not food, so nobody eats
-  it; it rots away ten days on. A stack spoils whole; two merged spoil at
+  it; it rots away ten days on. Held, it is put down (a goal that arises
+  from what is held, AGENCY.md d25). A stack spoils whole; two merged spoil at
   their times averaged by mass. (VIL d8)
 - **Carrion**: a carcass left two days unbutchered, gone off: rot, which
   nobody butchers, and which rots away as spoiled food does. (VIL d8)
@@ -917,8 +918,8 @@ REALITY.md, PRF = PERFORMANCE.md, TER = TERRAIN.md, TES = TESSERA.md, VIL = VILL
   buyer asks for a lot (`#Buy`), the seller hands it over from its stall
   and says what is owed (`#Sold`), the buyer pays into the stall. *Avoid:*
   trade (a craft, `Agent.trade`). (VIL d9)
-- **Coins**: money, a stack of the unit `coin`, kept in a household's
-  **coffer**. What a buyer carries to market is its **purse**; what a
+- **Coins**: money, a stack of the unit `coin` (brass), kept in a
+  household's **coffer**, four hundred to begin with. What a buyer carries to market is its **purse**; what a
   stall was paid, its **takings**. The tempting purse of AGENCY.md's
   scenario is cloth, a purse in the other sense. (VIL d9)
 - **Pack**: a container carried, going where its carrier goes: a
@@ -936,8 +937,17 @@ REALITY.md, PRF = PERFORMANCE.md, TER = TERRAIN.md, TES = TESSERA.md, VIL = VILL
   to be, carried home in a pack, else left lying. (VIL d7)
 - **Pricing**: what a unit of goods is worth to an agent in coins
   (`#Pricing`): its kind's, raised by a need the goods serve. A seller
-  prices its spare goods without the raise; a buyer buys at a posted
-  price no more than its own. (VIL d9)
+  prices its spare goods without the raise, moved by its **stock**; a
+  buyer buys at a posted price no more than its own. (VIL d9)
+- **Stock**: what a seller believes it has of its goods at home (the
+  supply its stall is kept from, in hand, in its pack). At **plenty** it
+  asks its kind's price; with less, more (twice, with none to spare);
+  with more, less (half, at four times plenty): the price's `asks`
+  curve. (VIL d9, amended)
+- **Short of coins**: a household whose coffer holds less than a trade's
+  level (two hundred coins, for woodcutters) as far as its people know.
+  Woodcutters short of coins stock their woodpile further, to sell more.
+  (VIL, the week's balance)
 - **Household**: the people of a home, joined by kin bonds. Not a
   **place**, until abstract detail needs one. (VIL d3)
 
