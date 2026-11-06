@@ -3775,4 +3775,5 @@ ALL_TESTS := [?]Test_Case{
 	{"perishing",                     test_perishing},
 	{"market",                        test_market},
 	{"carrying",                      test_carrying},
+	{"scene_knowledge",               test_scene_knowledge},
 }

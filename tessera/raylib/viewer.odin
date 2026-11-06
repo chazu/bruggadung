@@ -8,7 +8,9 @@ the focus level, and selecting a mark. It knows nothing of what a scene came
 from. Running a simulation, and what a selected mark is, are the caller's.
 
 The draw order is TESSERA.md's: terrain, fluid, marks by stack order, then
-light; levels below show, dimmed, through cells with no floor. Overlays and
+light and memory; levels below show, dimmed, through cells with no floor. In
+a knowledge scene a tile never seen is black, one remembered (not in sight)
+is dimmed by its age, and a mark believed gone isn't drawn. Overlays and
 annotations aren't drawn yet (slice 5).
 */
 package tess_raylib
@@ -170,16 +172,21 @@ viewer_draw :: proc(v: ^Viewer, s: ^tessera.Scene, theme: ^Theme, header, panel:
 @(private)
 draw_map :: proc(v: ^Viewer, s: ^tessera.Scene, theme: ^Theme) {
 	e := s.extent
+	knowing := s.meta.view == .Knowledge
 	font := font_at(&v.fonts, i32(v.tile * 0.85 + 0.5))
 	for y in e.y0 ..< e.y0 + e.h {
 		for x in e.x0 ..< e.x0 + e.w {
 			o := tile_origin(v, x, y)
 			c := tessera.cell_at(s, x, y, v.focus)
 			if c == nil do continue
+			if knowing && c.seen < 0 {   // never seen: nothing known of it
+				rl.DrawRectangleV(o, {v.tile, v.tile}, {0, 0, 0, 255})
+				continue
+			}
 			z := v.focus
 			dim: f32 = 1
 			if .Open in c.flags {        // no floor: the level below, dimmed
-				if below := tessera.cell_at(s, x, y, v.focus - 1); below != nil {
+				if below := tessera.cell_at(s, x, y, v.focus - 1); below != nil && (!knowing || below.seen >= 0) {
 					c, z, dim = below, v.focus - 1, 0.45
 				}
 			}
@@ -190,17 +197,34 @@ draw_map :: proc(v: ^Viewer, s: ^tessera.Scene, theme: ^Theme) {
 				g.fg, g.ch = {120, 170, 255, 255}, '~'
 			}
 			on := marks_on(s, x, y, z)
-			if len(on) > 0 {
-				top := theme_glyph(theme, tessera.look_name(s, on[0].look))
-				g.ch, g.fg = top.ch, top.fg
+			shown := 0                   // marks drawn: not those believed gone
+			for m in on {
+				if .Gone in m.flags do continue
+				if shown == 0 {
+					top := theme_glyph(theme, tessera.look_name(s, m.look))
+					g.ch, g.fg = top.ch, top.fg
+				}
+				shown += 1
 			}
-			if v.shade do dim *= 0.6 + 0.4 * f32(c.light) / 255      // the night still readable
+			if knowing && .In_Sight not_in c.flags {
+				dim *= remembered(s.meta.time - c.seen)
+			} else if v.shade {
+				dim *= 0.6 + 0.4 * f32(c.light) / 255      // the night still readable
+			}
 			bg, fg := scale(g.bg, dim), scale(g.fg, dim)
 			rl.DrawRectangleV(o, {v.tile, v.tile}, bg)
 			if g.ch != ' ' && g.ch != 0 do draw_glyph(font, g.ch, o, v.tile, fg)
-			if len(on) > 1 do rl.DrawRectangleV(o + {v.tile - 4, 1}, {3, 3}, scale({255, 255, 255, 255}, dim))
+			if shown > 1 do rl.DrawRectangleV(o + {v.tile - 4, 1}, {3, 3}, scale({255, 255, 255, 255}, dim))
 		}
 	}
+}
+
+// How bright a tile remembered is, seen `age` ms ago: half, fading to a
+// quarter over two days.
+@(private)
+remembered :: proc(age: i64) -> f32 {
+	DAYS2 :: 2 * 86_400_000
+	return 0.5 - 0.25 * f32(clamp(age, 0, DAYS2)) / DAYS2
 }
 
 // A glyph centred on its tile, at the size its font was made for.

@@ -11,8 +11,9 @@ Whatever it shows, it is told about in a **scene**.
 This document is a draft. Slice 1, the scene core, is built in
 [tessera/](tessera/README.md): the Odin package `tessera`. Parts of slices
 2 and 4 are built too: the lab makes truth scenes
-(`lab/src/scene_truth.odin`), and the watcher (`lab/watcher/`) runs a lab
-world and draws them in a window through the raylib backend
+(`lab/src/scene_truth.odin`) and knowledge scenes
+(`lab/src/scene_knowledge.odin`), and the watcher (`lab/watcher/`) runs a
+lab world and draws either in a window through the raylib backend
 (`tessera/raylib/`).
 
 Two things in the repository shape it:
@@ -169,13 +170,22 @@ Scene :: struct {
 - **Things held or inside** are marks with no cell of their own: in a
   frame they hang off their holder's mark. A backend lists them (in an
   inspector, a tooltip), and the map shows the holder.
-- **A knowledge scene has no other source.** Its cells' `seen` comes from
-  the store's tile memory (`tileSeenAtX:y:`). Its marks come from referents
-  and their believed places, with `seen` and the believed-gone flag. Light
-  and fluid come from what the character perceived, not from the world.
-  BGPlay's `look` reads the world's water on tiles in sight today. The
-  knowledge producer takes it from perception instead (see open
-  questions).
+- **A knowledge scene has no other source.** Its cells are the tiles the
+  store has seen, with the terrain it believes there; one never seen is
+  blank. Its marks come from referents and their believed places, with
+  `seen` and the believed-gone flag. Light and fluid come from what the
+  character perceives, not from the world. As built
+  (`lab/src/scene_knowledge.odin`):
+  - A tile in sight now (the character's own sight, from where it believes
+    itself) is seen now, with its light and water as perceived, as BGPlay's
+    `look` draws water. A remembered tile is dark and dry: the store keeps
+    nothing of what it perceived there (see open questions).
+  - A remembered tile's `seen` is when the store last saw any of its chunk
+    (32 tiles a side): the store keeps no time a tile.
+  - Its marks are its referents: itself the `Actor`, one seen at its latest
+    perception `In_Sight`, one not where it was last seen `Gone`, at that
+    tile. One it saw end isn't there. A mark looks as the kind the
+    character believes it is.
 
 ## Drawing a scene
 
@@ -206,7 +216,10 @@ isometric later.
 - **tess-raylib** (`tessera/raylib/`, built in part): a window with a
   camera that pans and zooms, the focus level up and down, and a panel.
   Selecting a mark in a truth scene names its entity, which the watcher's
-  inspector shows. Glyphs and text are DejaVu Sans Mono, built into the
+  inspector shows; in a knowledge scene, a referent. A knowledge scene is
+  drawn as "Drawing a scene" says: a tile never seen black, one remembered
+  at half its brightness, fading to a quarter over two days, and a mark
+  believed gone not at all. Glyphs and text are DejaVu Sans Mono, built into the
   program and rasterised at each size drawn, so they stay sharp at every
   zoom, with the symbols a glyph theme wants (♣, ≈, ⌂, ☺, box drawing,
   shades). A theme maps appearance keys to glyphs and colours; a key with
@@ -221,7 +234,9 @@ isometric later.
   - `scene_truth(world, extent, seq)` builds a truth scene (built). Until
     slice 3, a mark's appearance key is its blueprint's name, and a
     terrain kind's is its `look`;
-  - a knowledge scene from one character's store (to come);
+  - `scene_knowledge(knowledge, agent, extent, seq)` builds a knowledge
+    scene from one character's store (built). It reads no entity but the
+    character, for its sight, and makes no store for one that has none;
   - each frame diffed against the last one published (to come: the
     watcher is in-process, so it draws each frame whole).
 - **BGPlay's `look`** becomes a knowledge scene drawn by tess-term. Its
@@ -233,7 +248,11 @@ isometric later.
   process with its tess-raylib window. It runs the boundaries due by its
   clock and puts none in of its own, so the world goes where it would
   have unwatched (the lab's `watcher` test). A world slower than the
-  clock makes the clock wait, a quarter of a second behind at most.
+  clock makes the clock wait, a quarter of a second behind at most. `k`
+  shows the world as the agent selected knows it (VILLAGE.md slice 11):
+  its inspector then says what the agent recalls of the referent selected,
+  where it believes it, and how long since it saw it; of itself, its
+  concerns and what it lately thought.
 
 ## The plan, in slices
 
@@ -241,7 +260,9 @@ isometric later.
    frame and diff encoding (a compact binary form, plus a text form for
    tests), and tests, including truncated and corrupted input.
 2. **Producers in the lab.** Scenes for both views, and BGPlay's `look`
-   drawn through tess-term, with the same output. Built: truth scenes.
+   drawn through tess-term, with the same output. Built: truth scenes, and
+   knowledge scenes, drawn in the watcher. BGPlay's `look` isn't a
+   knowledge scene yet, and there is no tess-term.
 3. **Appearance in content** (built). A look declared beside blueprints,
    keys resolved by type, and themes in content: BGPlay's glyph table and
    the watcher's are gone. BGPlay's map isn't yet a knowledge scene drawn
@@ -263,7 +284,9 @@ isometric later.
 - **Perceived fields.** For a knowledge scene to show light and water
   without reading the world, the knowledge store has to keep what was
   perceived of a tile, not only when it was seen. How much (water seen,
-  dark, smell of smoke), and for how long?
+  dark, smell of smoke), and for how long? It keeps no time a tile
+  either, only a chunk's: a knowledge-age overlay (slice 5) wants one,
+  which changes what a save holds.
 - **Large worlds.** Chunking scenes and diffs for maps much larger than a
   workshop.
 - **Motion between boundaries.** An activity has progress, so a walking

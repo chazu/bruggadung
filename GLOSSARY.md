@@ -852,6 +852,9 @@ REALITY.md, PRF = PERFORMANCE.md, TER = TERRAIN.md, TES = TESSERA.md, VIL = VILL
   (lab/content/looks/: text, tiles). (TES d6)
 - **Viewer**: the program that displays scenes; the scene's `viewer` field
   is the entity whose knowledge it shows. (TES d5)
+- **Knower**: in the watcher, the agent whose knowledge is shown (the
+  scene's `viewer`), named apart from the viewer program; none, the
+  truth. (TES; VILLAGE.md slice 11)
 - **Watcher**: what runs a lab world and publishes its scenes to a viewer:
   `lab/watcher/`, in one process with its window. Not an activity's
   **watch**. (TES)

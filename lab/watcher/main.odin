@@ -1,23 +1,27 @@
 /*
  * watcher — a lab world in a window (TESSERA.md, slice 4): the watcher and its
  * viewer in one process. The world runs on the viewer's clock, boundary by
- * boundary, and each frame draws a truth scene of what is in view.
+ * boundary, and each frame draws a scene of what is in view: the truth, or
+ * the world as one agent knows it (VILLAGE.md slice 11).
  *
- *   watcher [-C contentdir] <what> [agents] [--from hours] [--shot file.png]
+ *   watcher [-C contentdir] <what> [agents] [--from hours] [--knows] [--shot file.png]
  *
  * <what> is one of lab.WATCHABLE. In the window:
  *
  *   space        pause, or go on          .  one boundary
  *   [  ]         slower, faster           f  follow the one selected, or stop
  *   tab          select the next agent    q  quit
+ *   k            as the agent selected knows it, or the truth again
  *   click        select what is on a tile (again: the one under it)
  *   arrows/WASD, right-drag: pan; wheel: zoom; PgUp/PgDn or < >: level;
  *   L: light; Esc: select nothing
  *
- * --from runs the world that many hours before the window opens (as it
- * would run watched: no boundary put in). --shot draws three seconds of
- * frames, saves the last as a PNG, and quits:
- * a look at the window without anyone at it.
+ * In an agent's knowledge, what is selected is one of its referents, and
+ * tab goes on to the next agent's knowledge. --from runs the world that many
+ * hours before the window opens (as it would run watched: no boundary put
+ * in). --knows opens it as the first agent knows it, following it. --shot draws three
+ * seconds of frames, saves the last as a PNG, and quits: a look at the
+ * window without anyone at it.
  *
  * The lab itself never links raylib: this is its own executable, built by
  * `make watcher`.
@@ -43,11 +47,17 @@ HELP :: [?]string {
 	"space: pause   .: one boundary   [ ]: slower, faster",
 	"click: select (again: the one under it)   tab: next agent   f: follow",
 	"arrows, WASD, right-drag: pan   wheel: zoom   PgUp PgDn, < >: level",
+	"k: as the agent selected knows it, or the truth",
 	"L: light   Esc: select nothing   q: quit",
 }
 
 main :: proc() {
-	args := os.args[1:]
+	args := make([dynamic]string)
+	knows := false                     // --knows: open as the first agent knows it
+	for a in os.args[1:] {
+		if a == "--knows" do knows = true
+		else do append(&args, a)
+	}
 	shot: string
 	from: f64                          // hours of world time run before the window opens
 	for len(args) >= 2 && (args[len(args) - 2] == "--shot" || args[len(args) - 2] == "--from") {
@@ -56,16 +66,17 @@ main :: proc() {
 		} else if h, ok := strconv.parse_f64(args[len(args) - 1]); ok && h >= 0 {
 			from = h
 		}
-		args = args[:len(args) - 2]
+		resize(&args, len(args) - 2)
 	}
 	if len(args) >= 2 && args[0] == "-C" {
 		lab.content_dir = args[1]
-		args = args[2:]
+		remove_range(&args, 0, 2)
 	}
 	if len(args) < 1 {
 		fmt.eprintf("usage: watcher [-C contentdir] <what> [agents]\n  <what>: %s\n", lab.WATCHABLE)
 		os.exit(2)
 	}
+	defer delete(args)
 	agents: i32 = 40
 	if len(args) >= 2 {
 		n, ok := strconv.parse_int(args[1])
@@ -101,12 +112,17 @@ main :: proc() {
 	                      {0, levels - 1})
 	v.selected = u64(w.follow)
 	follow := false                    // f follows the one selected
+	knower: lab.Entity_ID              // whose knowledge is shown; none: the truth
 
 	speeds := SPEEDS
 	speed := 2                         // 1 world second a second
 	paused := false
 	lab.watcher_step_until(&w, i64(from * 3_600_000), max(u64))
 	clock := max(f64(lab.world_time(world).ms), from * 3_600_000)   // the viewer's clock: world ms
+	if knows && lab.watcher_knows(&w, w.follow) {
+		knower, v.selected = w.follow, u64(lab.watcher_self_of(&w, w.follow))
+		follow = true
+	}
 	behind := false
 	seq: u64
 
@@ -120,10 +136,29 @@ main :: proc() {
 		if rl.IsKeyPressed(.LEFT_BRACKET) do speed = max(speed - 1, 0)
 		if rl.IsKeyPressed(.L) do v.shade = !v.shade
 		if rl.IsKeyPressed(.F) do follow = !follow && v.selected != 0
+		if rl.IsKeyPressed(.K) {
+			if knower != 0 {                    // back to the truth, the knower selected
+				v.selected, knower = u64(knower), 0
+			} else if lab.watcher_knows(&w, lab.Entity_ID(v.selected)) {
+				knower = lab.Entity_ID(v.selected)
+				v.selected = u64(lab.watcher_self_of(&w, knower))
+			}
+		}
 		if rl.IsKeyPressed(.TAB) && len(w.ids) > 0 {
-			next := 0
-			for id, i in w.ids do if u64(id) == v.selected do next = (i + 1) % len(w.ids)
-			v.selected = u64(w.ids[next])
+			if knower == 0 {
+				next := 0
+				for id, i in w.ids do if u64(id) == v.selected do next = (i + 1) % len(w.ids)
+				v.selected = u64(w.ids[next])
+			} else {                            // the next agent's knowledge
+				at := 0
+				for id, i in w.ids do if id == knower do at = i
+				for step in 1 ..= len(w.ids) {
+					next := w.ids[(at + step) % len(w.ids)]
+					if !lab.watcher_knows(&w, next) do continue
+					knower, v.selected = next, u64(lab.watcher_self_of(&w, next))
+					break
+				}
+			}
 		}
 		if rl.IsKeyPressed(.PERIOD) && !shift {
 			paused = true
@@ -139,11 +174,16 @@ main :: proc() {
 		}
 
 		if follow && v.selected != 0 {
-			if x, y, z, ok := lab.watcher_tile_of(&w, lab.Entity_ID(v.selected)); ok {
-				v.centre, v.focus = {f32(x), f32(y)}, z
+			x, y, z: i32
+			ok: bool
+			if knower == 0 {
+				x, y, z, ok = lab.watcher_tile_of(&w, lab.Entity_ID(v.selected))
+			} else {
+				x, y, z, ok = lab.watcher_believed_tile(&w, knower, u32(v.selected))
 			}
+			if ok do v.centre, v.focus = {f32(x), f32(y)}, z
 		}
-		scene := lab.scene_truth(world, view.viewer_extent(&v), seq, context.temp_allocator)
+		scene := lab.watcher_scene(&w, knower, view.viewer_extent(&v), seq)
 		seq += 1
 		if view.viewer_input(&v, scene) do follow = false
 
@@ -154,13 +194,16 @@ main :: proc() {
 		header := [?]string {
 			fmt.tprintf("%s   day %d  %02d:%02d:%02d   boundary %d", w.title, now / 86_400_000 + 1,
 			            now / 3_600_000 % 24, now / 60_000 % 60, now / 1000 % 60, lab.world_boundary(world)),
-			fmt.tprintf("x%v%s%s   level %d", speeds[speed], "   paused" if paused else "",
-			            "   (behind)" if behind && !paused else "", v.focus),
+			fmt.tprintf("x%v%s%s   level %d%s", speeds[speed], "   paused" if paused else "",
+			            "   (behind)" if behind && !paused else "", v.focus,
+			            fmt.tprintf("   as %s knows it", lab.watcher_name(&w, knower)) if knower != 0 else ""),
 		}
 		panel := make([dynamic]string, context.temp_allocator)
 		if v.selected != 0 {
 			if follow do append(&panel, "following")
-			for line in lab.watcher_describe(&w, lab.Entity_ID(v.selected)) do append(&panel, line)
+			lines := lab.watcher_describe(&w, lab.Entity_ID(v.selected)) if knower == 0 else
+			         lab.watcher_recall(&w, knower, u32(v.selected))
+			for line in lines do append(&panel, line)
 		} else {
 			append(&panel, "Nothing selected.")
 			for line in HELP do append(&panel, line)

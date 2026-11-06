@@ -5087,3 +5087,36 @@ A backpack and a basket for each household, loads, and a burdened walk.
   if CI wants it: VILLAGE.md's Testing.
 
 137 tests, 4069 checks.
+
+### After the slice: the knowledge view in the watcher (VILLAGE.md slice 11, issue #11)
+
+The watcher shows the village as one villager knows it (TESSERA.md slice
+2's knowledge scenes).
+
+- **The producer**: `scene_knowledge(knowledge, agent, extent, seq)`
+  (src/scene_knowledge.odin) builds a knowledge scene from one store:
+  - cells: the tiles it has seen, with the terrain it believes there;
+  - marks: its referents, by referent id, where it believes them, looking
+    as the kind it believes;
+  - flags: itself the `Actor`, those seen at its latest perception
+    `In_Sight`, those not where it last saw them `Gone`.
+  Tiles in sight now get their light and water as perceived. A remembered
+  tile is dark and dry, `seen` when the store last saw its chunk (it keeps
+  no time a tile: TESSERA.md's open questions). It reads no other entity
+  and makes no store.
+- **Drawing it** (tessera/raylib): a tile never seen is black; one
+  remembered is at half its brightness, fading to a quarter over two days;
+  a mark believed gone isn't drawn.
+- **The watcher**: `k` switches between the truth and the knowledge of the
+  agent selected. There, `tab` goes to the next agent's, `f` follows a
+  referent where it is believed, and the inspector says what the agent
+  recalls of the referent (`knowledge_store_recall`), where and since when;
+  of itself, its concerns and log. `--knows` opens as the first agent knows
+  it, following it.
+- **Tests**: `scene_knowledge` (a farmer sees a sack beside it; gone off,
+  it still has the sack where it was after the sack is carried off unseen;
+  back, it sees it gone). `watcher` also builds a worker's knowledge scene,
+  and what it recalls of itself, between slices: the crowd still ends where
+  it does unwatched.
+
+138 tests, 4138 checks.

@@ -22,9 +22,10 @@ make gen                                 # regenerate src/components.odin from c
 ./build/<platform>/lab save marked-nail  # the save of its end state
 ./build/<platform>/lab menu marked-nail 1000   # what the worker sees, and its menu, at 1000 ms
 ./build/<platform>/lab run cistern       # the fluid domain: two taps and a leak on a dwindling cistern (also -b, -d, -e)
-./build/<platform>/lab run village       # the village: twelve people, three days of work, home and bed, checked
+./build/<platform>/lab run village       # the village: twelve people, a week of work, market and home, checked
 ./build/<platform>/lab play workshop     # play: the map, the menu, commands, the inspector (also cistern)
 make watcher && ./build/<platform>/watcher crowd 40   # a world in a window: 40 workers on the yard (also cistern, marked-nail, ...)
+./build/<platform>/watcher village --knows             # the village as a villager knows it (k: the truth, or back)
 ```
 
 Every scenario ends in the same state on every platform: `make check`
@@ -49,7 +50,7 @@ compares each one's hashes with `ci/scenario-hashes.txt`.
 | `src/save_save.odin` | Saves as text, and restoring them |
 | `src/scenario_*.odin` | The worlds' setups, and *The marked nail*, the cistern and the village: the scenarios, their input logs, and their checks |
 | `src/play_play.odin` | The interactive session behind `lab play` |
-| `src/scene_truth.odin`, `src/looks.odin`, `src/watcher.odin` | Tessera's truth scenes of a world; what things look like, and themes, from content; what the watcher can watch, and its running of it |
+| `src/scene_truth.odin`, `src/scene_knowledge.odin`, `src/looks.odin`, `src/watcher.odin` | Tessera's truth scenes of a world, and knowledge scenes of what one agent knows of it; what things look like, and themes, from content; what the watcher can watch, and its running of it |
 | `watcher/` | The watcher: a lab world in a window, its own executable (raylib), built by `make watcher` |
 | `src/test_*.odin`, `main.odin` | The test runner and the tests; the command line |
 

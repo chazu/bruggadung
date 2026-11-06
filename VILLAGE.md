@@ -10,8 +10,8 @@ village` checks it, as the other scenarios are checked.
 This document is a proposal, built a slice at a time: slices 1 (hunger
 over weeks), 2 (looks in content), 3 (the village and its homes), 4
 (cooking and the larder), 5 (firewood), 6 (farming), 7 (hunting), 8
-(perishing), 9 (the market) and 10 (a week in the village) are built, and
-carrying (decision 11). Each slice below is a ticket: slice n is GitHub issue #n
+(perishing), 9 (the market), 10 (a week in the village) and 11 (the
+knowledge view in the watcher) are built, and carrying (decision 11). Each slice below is a ticket: slice n is GitHub issue #n
 (label `village`). A slice moves into `lab/PLAN.md` when it is built.
 
 It is the first scenario that runs for weeks, not minutes. That forces two
@@ -413,7 +413,7 @@ when it is built:
 10. **A week in the village**: the scenario's checks and hashes in CI, and
     how fast it runs (built).
 11. **The knowledge view in the watcher**: one agent's village as it
-    remembers it (TESSERA.md slice 2's knowledge scenes).
+    remembers it (TESSERA.md slice 2's knowledge scenes; built).
 12. **Carrying**: backpacks and baskets, loads, a burdened walk (built;
     decision 11).
 

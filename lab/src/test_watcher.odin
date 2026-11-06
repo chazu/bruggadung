@@ -2,8 +2,9 @@ package lab
 
 /*
  * Watching changes nothing: a crowd run in the slices a watcher takes, with
- * an autorelease pool drained after each and a truth scene built between,
- * ends where the same crowd run in one go does (watcher.odin).
+ * an autorelease pool drained after each and a truth scene, a worker's
+ * knowledge scene and what it recalls of itself built between, ends where
+ * the same crowd run in one go does (watcher.odin).
  */
 
 import "../../tessera"
@@ -12,6 +13,7 @@ import "../../tessera"
 test_watcher :: proc() {
 	hashes: [2]u64
 	marks:  int
+	known:  int                            /* slices the worker had knowledge in */
 
 	for run in 0 ..< 2 {
 		w, why := watcher_open("crowd", 12)
@@ -28,6 +30,14 @@ test_watcher :: proc() {
 				                 context.temp_allocator)
 				bg_check(s != nil && s.meta.view == .Truth && s.meta.time == world_time(w.world).ms)
 				if s != nil do marks = len(s.marks)
+				k := watcher_scene(&w, w.ids[0], {x0 = 0, y0 = 0, w = 96, h = 64, z0 = 0, z1 = 0, focus = 0}, u64(t))
+				bg_check(k != nil && k.meta.view == .Knowledge)
+				if watcher_knows(&w, w.ids[0]) {
+					known += 1
+					me := watcher_self_of(&w, w.ids[0])
+					m := tessera.mark_find(k, u64(me)) if k != nil else nil
+					bg_check(m != nil && .Actor in m.flags && len(watcher_recall(&w, w.ids[0], me)) >= 3)
+				}
 				pool_drain()
 			}
 			watcher_step_until(&w, 20000, max(u64))
@@ -44,6 +54,7 @@ test_watcher :: proc() {
 	}
 	bg_check(hashes[0] == hashes[1])
 	bg_check(marks >= 12)                  /* the workers, and what they carry */
+	bg_check(known > 10)
 
 	/* a scene is clipped to the world, and names each worker where it stands */
 	w, _ := watcher_open("crowd", 3)
