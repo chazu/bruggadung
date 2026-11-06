@@ -398,7 +398,8 @@ Known shortcuts:
   expected it becomes text again, but the two are different values.
 - **The load arena stays.** Specs are frozen into their own arena, but the
   syntax tree and load-time structures are kept: TDL lexical entries and
-  non-blueprint specs resolve on request.
+  non-blueprint specs resolve on request. A runtime `tri_value`'s syntax is
+  released from it when the call returns.
 - **Units are a table in `units.c`** until the unit descriptors of
   DOMAIN_SIMULATION.md §12 exist.
 - **Arcs are sorted, not positional** (CONTENT_LANGUAGE.md §12).

@@ -129,7 +129,9 @@ size_t         tri_print(TriContent *content, const TriNode *node, char *buf, si
  * full length, writing as much as fits; (size_t) -1 if the node is neither. */
 size_t         tri_text(TriContent *content, const TriNode *node, char *buf, size_t len);
 
-/* Builds a description from an expression, e.g. "#Nut & { size: 19mm }". */
+/* Builds a description from an expression, e.g. "#Nut & { size: 19mm }", in
+ * `out`. Once content has loaded, the expression's syntax is let go with the
+ * call: values made at runtime don't grow the content. */
 const TriNode *tri_value(TriContent *content, const char *expr, TriArena *out,
                          char *err, size_t errlen);
 

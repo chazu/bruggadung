@@ -54,6 +54,33 @@ void test_units(void)
     tri_content_free(c);
 }
 
+/* Values made once content has loaded don't grow it: each one's syntax is
+ * let go with it, and only what is copied out lives on, in the caller's
+ * arena. */
+void test_runtime_values_keep_content(void)
+{
+    TriContent *c = core();
+    CHECK(tri_content_ok(c));
+    TriArena *a = tri_arena_new();
+    TriStats before, after;
+    const TriNode *n = tri_value(c, "#Wrench & { mass: 0.85kg, material: \"steel\" }", a, NULL, 0);
+    CHECK(n != NULL);
+    tri_content_stats(c, &before);
+    for (int i = 0; i < 2000; i++) {
+        char expr[128];
+        snprintf(expr, sizeof expr, "#Wrench & { mass: %d.%02dkg, size: %dmm }", i / 100, i % 100, i + 1);
+        n = tri_value(c, expr, a, NULL, 0);
+        CHECK(n != NULL);
+    }
+    CHECK(!tri_value(c, "#Wrench & { mass: ", a, NULL, 0));
+    tri_content_stats(c, &after);
+    CHECK(after.load_bytes == before.load_bytes);
+    int64_t lo, hi;
+    CHECK(n && tri_node_interval(tri_at(c, n, "mass"), &lo, &hi) && lo == 19990);
+    tri_arena_free(a);
+    tri_content_free(c);
+}
+
 void test_hierarchy(void)
 {
     TriContent *c = core();

@@ -29,7 +29,7 @@ int has_diag(const TriContent *c, const char *needle, int errors_only)
 }
 
 #define TESTS(X) \
-    X(test_units) X(test_hierarchy) X(test_glb) X(test_unify_tags) X(test_closedness) \
+    X(test_units) X(test_runtime_values_keep_content) X(test_hierarchy) X(test_glb) X(test_unify_tags) X(test_closedness) \
     X(test_lists) X(test_subsumption) X(test_components) \
     X(test_scenario1_order_independence) X(test_scenario1_defaults) X(test_scenario1_variation) \
     X(test_scenario1_conflict) X(test_scenario1_inexact) X(test_scenario1_feature_clash) \

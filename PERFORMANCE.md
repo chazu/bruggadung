@@ -298,8 +298,15 @@ the next to measure; recognition was 2.7 s (decision 4).
    with the work after the week 8.3 GB, enough that the system killed
    `make check`. The village (`village_step_until`) and the watcher
    (`watcher_step_until`) now run each boundary in a pool of its own:
-   2.5 GB, the same state hash with the pools as without. What is left is
-   the world's own: its history (finding 5) and the knowledge stores.
+   2.5 GB, the same state hash with the pools as without.
+   - Amended: most of that 2.5 GB was Triangle's, not the lab's. Every
+     `tri_value` (an agent's condition matched against a description, a
+     described action) parsed its expression into the content's load
+     arena, kept for the life of the content: about 60 MB a second of run.
+     A runtime value's syntax is now let go when the call returns
+     (triangle/src/load.c), and the village peaks at 121 MB, its state
+     hash the same. What is left is the world's own: its history (finding
+     5), the match memo, and the knowledge stores.
 
 ## Open questions
 

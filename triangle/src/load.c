@@ -2824,6 +2824,11 @@ const TriNode *tri_value(TriContent *c, const char *expr, TriArena *out, char *e
 {
     size_t ndiag = c->diags.n;
     int nerr = c->nerrors;
+    /* once content has loaded, the syntax of a value is let go with it: only
+     * the value copied out to `out` lives on, so values made at runtime don't
+     * grow the content */
+    bool transient = c->loaded;
+    TriMark lm = tri_arena_mark(c->load);
     X *x = parse_expr_string(c, intern(c, "<value>"), expr);
     if (x && c->parsed_comp) {
         bool ok;
@@ -2864,6 +2869,7 @@ const TriNode *tri_value(TriContent *c, const char *expr, TriArena *out, char *e
     /* runtime values do not leave diagnostics on the content */
     while (c->diags.n > ndiag) free(c->diags.v[--c->diags.n].msg);
     c->nerrors = nerr;
+    if (transient) tri_arena_release(c->load, lm);
     return r;
 }
 

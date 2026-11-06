@@ -149,6 +149,9 @@ tri_print(c, d, buf, sizeof buf);    /* #Nut & { mass: mass, material: #Material
 
 - `tri_value` builds a description from an expression. It is stricter than
   content: no defaults, and no disjunctions of structures or separate numbers.
+  The result lives in `out`. After loading, the expression's syntax is freed
+  when the call returns, so a program that makes values all its life doesn't
+  grow the content.
 - `tri_at` follows a path. It returns `NULL` if the path doesn't exist, and
   it reads through lazy (recursive) nodes.
 - `tri_node_type` gives a node's type. `tri_node_interval` gives a number's

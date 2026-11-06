@@ -5157,3 +5157,25 @@ The watcher shows the village as one villager knows it (TESSERA.md slice
   the other scenarios' didn't.
 
 139 tests, 4153 checks.
+
+### After the slice: what grew was Triangle's (PERFORMANCE.md decision 8)
+
+The village still peaked at 2.5 GB with a pool per boundary, growing
+steadily, about 60 MB a second of run. The lab's own heap held 50 MB of it
+(a tracking allocator, by where each block was made); malloc's stack
+logging found the rest in Triangle's arena, under `tri_value`.
+
+- **The cause**: `tri_value` parsed each expression into the content's
+  load arena, which lives as long as the content. The agents make a new
+  description for each match (`agency_match_supposing`,
+  `match_described`), so every one stayed.
+- **The fix** (triangle/src/load.c): once content has loaded, `tri_value`
+  marks the load arena before it parses and releases it after: the value
+  is copied out to the caller's arena, and nothing kept points into the
+  syntax (a node's arcs are nodes; strings are interned apart; diagnostics
+  are malloc'd).
+- **The village**: 121 MB at its peak (from 2.5 GB), the same state hash;
+  every scenario's hashes the same on macOS and Linux.
+- **Tests**: Triangle's `test_runtime_values_keep_content` (2,000 values
+  made after loading leave the load arena as it was; it fails without the
+  fix).
