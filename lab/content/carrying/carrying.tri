@@ -45,7 +45,7 @@ package carrying
 pack_seen: #Seen & { kindOf: "#Pack" } @family(seen)
 
 backpack: #Pack & { material: "leather", mass: 1kg, capacity: 6, load: 25kg, worn: true }
-basket:   #Pack & { material: "plant", mass: 500g, capacity: 4, load: 8kg }
+basket:   #Pack & { material: "wicker", mass: 500g, capacity: 4, load: 8kg }
 
 backpack_look: #Look & { kindOf: "backpack", look: "pack.back" } @family(looks)
 basket_look:   #Look & { kindOf: "basket", look: "pack.basket" } @family(looks)

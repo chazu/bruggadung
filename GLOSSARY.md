@@ -871,14 +871,21 @@ REALITY.md, PRF = PERFORMANCE.md, TER = TERRAIN.md, TES = TESSERA.md, VIL = VILL
 - **Seed to sow**: `#Seed`, a stack of what sows a crop (seed grain,
   turnip seed), a unit to a tile, **kept back** in a larder. See *Words
   with more than one sense*. (VIL d5)
-- **Perishable**: good for so long after it was made, then spoiled. Food
-  is perishable when it keeps for some time (`keepsFor`: meat, three
-  days); a meal keeps its own (`mealKeepsFor`, two days) from when it is
-  cooked. Grain and turnips keep. (VIL d8)
+- **Keep back seed**: carve a sack of seed from a harvest in hand, as
+  heavy (the food's `keptAs`), once a harvest; the plot is then **kept**
+  till it is sown again. (VIL d5)
+- **Perishable**: `#Perishable`, good for so long after it was made,
+  then spoiled: food, a carcass, spoiled food itself. Food is perishable
+  when it keeps for some time (`keepsFor`: meat, three days); a meal keeps
+  its own (`mealKeepsFor`, two days) from when it is cooked. Grain and
+  turnips keep. What it becomes is its `spoiled`; with none, it **rots
+  away** to nothing. (VIL d8)
 - **Spoiled food**: what perishable food is once its time has come: a
   thing as heavy, where it was, made of **rot**, not food, so nobody eats
-  it. A stack spoils whole; two merged spoil when the older would have.
-  (VIL d8)
+  it; it rots away ten days on. A stack spoils whole; two merged spoil at
+  their times averaged by mass. (VIL d8)
+- **Carrion**: a carcass left two days unbutchered, gone off: rot, which
+  nobody butchers, and which rots away as spoiled food does. (VIL d8)
 - **Carcass**: what an animal's body is once it has died, to butcher
   into meat (its `yields`, so many cuts) and a hide. (VIL d7)
 - **Remains**: what any body is once its injury reaches 100 and it dies,

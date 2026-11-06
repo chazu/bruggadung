@@ -535,7 +535,13 @@ knowledge_perceive :: proc(self: ^Knowledge, store: ^Knowledge_Store, first: uin
 
 		r = knowledge_store_referent_at(store, j)
 		if taken[j] != 0 || !r.present do continue
-		{
+		/* believed in a pack it carries itself: what is in that it knows,
+		 * wherever it saw the thing put there (content/carrying/) */
+		holder = knowledge_store_referent(store, r.container) if r.form == .In else nil
+		carried := holder != nil && holder.truth != NO_ENTITY && world_is_live(self.world, holder.truth) &&
+		           world_location_of(self.world, holder.truth).form == .Held_By &&
+		           world_location_of(self.world, holder.truth).place == agent
+		if !carried {
 			believed: Location
 
 			believed       = here
@@ -544,8 +550,7 @@ knowledge_perceive :: proc(self: ^Knowledge, store: ^Knowledge_Store, first: uin
 			believed.level = r.level
 			if !knowledge_sees(self, believed, here) do continue       /* out of sight, or dark there */
 		}
-		if r.form == .In && !self.omniscient {
-			holder = knowledge_store_referent(store, r.container)
+		if r.form == .In && !self.omniscient && !carried {
 			if holder == nil || !know_contains(raw_data(lookedIn[:]), nlooked, holder.truth) do continue       /* inside, and not looked into: nothing to contradict it */
 		}
 		r.present = false

@@ -234,7 +234,11 @@ These were made while writing this document and have not yet been reviewed.
     (VILLAGE.md decision 11). Inside a container is seen only by looking
     in (or putting in, or taking out). A pack carried on the back or in a
     hand is the exception for its carrier: what is in it is perceived with
-    the carrier, where the carrier is, so unpacking it walks nowhere.
+    the carrier, where the carrier is, so unpacking it walks nowhere. So
+    too what isn't: a thing it believes is in the pack it carries, not
+    seen there, is not where it was, wherever it saw it put in (packs
+    that look alike were mistaken for each other, and a hunter walked to
+    where it saw a hide packed, to unpack it).
 
 ## Terms
 

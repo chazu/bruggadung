@@ -18,7 +18,9 @@
 //             as anything made or ended is: by whoever sees it then, or
 //             looks later. When it will spoil is not seen.
 // - stacks:   a stack spoils whole, at once. Put with a stack of its unit
-//             and merged, the two spoil when the older would have.
+//             and merged, the two spoil at their times averaged, each
+//             weighed by its mass: fresh meat buys older meat time, and
+//             old meat costs fresh meat some.
 // - hunger:   spoiled food isn't food (hunger/eating.tri's #Food), and is
 //             made of rot (things.tri): no method finds it to eat, eating
 //             it isn't possible, and nobody values it as food.
@@ -28,25 +30,31 @@
 //             food made at the last boundary with when it spoils, and its
 //             horizon is the next food to spoil, its one wake then.
 //             effect_cook sets a meal's; spoiling is carved, as death's
-//             remains are (src/act_actions.odin's `become`); a merge keeps
-//             the earlier (src/kinds_body_kind.odin).
+//             remains are (src/act_actions.odin's `become`); a merge
+//             averages (src/kinds_body_kind.odin).
 
 package perishing
 
-// What perishing adds to food: how long it keeps once made (0: it keeps,
-// and never spoils); when it spoils (0: not yet known, or never), set as
-// it is made; how long a meal made of it keeps; and what it is, spoiled.
-hunger.#Food: {
-    keepsFor:     *0ms | time & >=0ms & <=100d     @field(content, saved, inspect)
-    spoilsAt:     *0ms | time & >=0ms & <=10000d   @field(saved, proposable, inspect)
-    mealKeepsFor: *2d | time & >=0ms & <=100d      @field(content, saved, inspect)
-    spoiled:      *"spoiled_food" | text           @field(content, saved, inspect)
+// What perishes: how long it keeps once made (0: it keeps, and never
+// spoils); when it spoils (0: not yet known, or never), set as it is made;
+// and what it becomes, spoiled ("": nothing, it rots away).
+#Perishable: {
+    @component(Perishable)
+    keepsFor: *0ms | time & >=0ms & <=100d     @field(content, saved, inspect)
+    spoilsAt: *0ms | time & >=0ms & <=10000d   @field(saved, proposable, inspect)
+    spoiled:  *"spoiled_food" | text           @field(content, saved, inspect)
 }
 
-// Spoiled food: what was food, gone off. It isn't food, nor made of it
-// (things.tri's "rot", no kind of food): eating takes something made of
-// food (hunger/eating.tri), and nobody values it as food.
-#Spoiled: #Body & {}
+// Food perishes; a meal made of it keeps so long from when it is cooked.
+hunger.#Food: #Perishable & {
+    mealKeepsFor: *2d | time & >=0ms & <=100d  @field(content, saved, inspect)
+}
+
+// Spoiled: what was food (or a carcass, hunting/), gone off. It isn't
+// food, nor made of it (things.tri's "rot", no kind of food): eating takes
+// something made of food (hunger/eating.tri), and nobody values it as food.
+// It rots away to nothing in ten days, wherever it is.
+#Spoiled: #Body & #Perishable & { keepsFor: 10d, spoiled: "" }
 
 spoiled_seen: #Seen & { kindOf: "#Spoiled" } @family(seen)
 spoiled_look: #Look & { kindOf: "#Spoiled", look: "food.spoiled" } @family(looks)

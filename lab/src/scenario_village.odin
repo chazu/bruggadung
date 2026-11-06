@@ -26,11 +26,11 @@ package lab
  * roam there and run from people they see; the herds are kept up from the
  * east edge, six deer and four hares at most (the game domain).
  *
- * Each household keeps coins in a coffer, a stall on the green, and a
- * backpack and a basket by its door (content/market/, content/carrying/):
+ * Each household keeps coins in a coffer, a stall on the green, and
+ * backpacks and a basket by its door (content/market/, content/carrying/):
  * on market day (the third, then every fourth) its first keeps the stall
  * and its second buys what it doesn't make; woodcutters and hunters carry
- * their day's work home in the backpack.
+ * their day's work home in a backpack, one each.
  *
  * The run goes boundary by boundary up to each check's time, putting none
  * in of its own (as the watcher runs it), so `lab run village` and a
@@ -258,8 +258,14 @@ village_setup :: proc(self: ^Village) {
 		coffer := proposal_group_create(g, "coffer", ns_utf8(fmt.tprintf("%s' coffer", h.name)), on_tile(h.coffer.x, h.coffer.y, 0))
 		coffers[k] = coffer
 		coins := proposal_group_create(g, "coins_100", ns_utf8(fmt.tprintf("%s' coins", h.name)), in_(coffer))
-		/* its backpack and basket, by the coffer (content/carrying/) */
-		pack   := proposal_group_create(g, "backpack", ns_utf8(fmt.tprintf("%s' backpack", h.name)), on_tile(h.coffer.x, h.coffer.y, 0))
+		/* its backpacks and basket, by the coffer (content/carrying/): one
+		 * backpack for each who goes out to work (a woodcutter, a hunter), else
+		 * one */
+		packs := make([dynamic]Entity_ID, context.temp_allocator)
+		for i in 0 ..< (1 if h.worksite == "scarecrow" else h.people) {
+			append(&packs, proposal_group_create(g, "backpack", ns_utf8(fmt.tprintf("%s' backpack %d", h.name, i)),
+			                                     on_tile(h.coffer.x, h.coffer.y, 0)))
+		}
 		basket := proposal_group_create(g, "basket", ns_utf8(fmt.tprintf("%s' basket", h.name)), on_tile(h.coffer.x, h.coffer.y, 0))
 		stalls[k] = proposal_group_create(g, "stall", ns_utf8(fmt.tprintf("%s' stall", h.name)), on_tile(h.stall.x, h.stall.y, 0))
 		boards[k] = proposal_group_create(g, "price_board", ns_utf8(fmt.tprintf("%s' board", h.name)), on_tile(h.stall.x, h.stall.y, 0))
@@ -306,7 +312,7 @@ village_setup :: proc(self: ^Village) {
 			village_own(g, v.id, coffer, "the household's coffer")
 			village_own(g, v.id, coins, "the household's coins")
 			village_own(g, v.id, stalls[k], "the household's stall")
-			village_own(g, v.id, pack, "the household's backpack")
+			for pack in packs do village_own(g, v.id, pack, "the household's backpack")
 			village_own(g, v.id, basket, "the household's basket")
 			village_own(g, v.id, wood, "the household's firewood")
 			for seed in seeds do village_own(g, v.id, seed, "the household's seed")
@@ -544,9 +550,16 @@ village_failure_count :: proc(self: ^Village) -> uint {
 }
 
 
-/* Boundaries up to t, none put in: as a watcher runs it. */
+/* Boundaries up to t, none put in: as a watcher runs it. Each in a pool of
+ * its own, so what it allocates for the while (the temp allocator, and what
+ * it autoreleases) is let go after it: a week's would be gigabytes. */
 village_step_until :: proc(self: ^Village, t: i64) {
-	for scheduler_step_until(self.scheduler, time_make(t)) {}
+	for {
+		pool_push()
+		more := scheduler_step_until(self.scheduler, time_make(t))
+		pool_drain()
+		if !more do break
+	}
 }
 
 
@@ -640,12 +653,13 @@ village_run :: proc(self: ^Village) {
 	deer, hares := game_count(self.world, "deer"), game_count(self.world, "hare")
 	village_check(self, deer >= 1 && deer <= 6 && hares >= 1 && hares <= 4, "the herds neither vanished nor outgrew the woods",
 	              fmt.tprintf("%d deer, %d hares", deer, hares))
-	/* food past its time is spoiled, never food still (VILLAGE.md decision 8) */
+	/* food past its time is spoiled, never food still, and spoiled food past
+	 * its own has rotted away (VILLAGE.md decision 8) */
 	stale := make([dynamic]string, context.temp_allocator)
 	spoiled := 0
-	foods := world_store_for_kind(self.world, world_kind_named(self.world, "Food"))
+	foods := world_store_for_kind(self.world, world_kind_named(self.world, "Perishable"))
 	for i: uint = 0; i < store_count(foods); i += 1 {
-		food := (^Food)(store_record_at_index(foods, i))
+		food := (^Perishable)(store_record_at_index(foods, i))
 		if at := perishing_spoils_at(food, world_time(self.world).ms); at > 0 && at <= world_time(self.world).ms {
 			append(&stale, fmt.tprintf("%d", store_entity_at_index(foods, i)))
 		}
@@ -654,7 +668,7 @@ village_run :: proc(self: ^Village) {
 	for i: uint = 0; i < store_count(bodies); i += 1 {
 		if info := world_info(self.world, store_entity_at_index(bodies, i)); info != nil && info.blueprint == "spoiled_food" do spoiled += 1
 	}
-	village_check(self, len(stale) == 0, fmt.tprintf("no food past its time is food still (%d spoiled)", spoiled),
+	village_check(self, len(stale) == 0, fmt.tprintf("nothing past its time unspoiled (%d spoiled food)", spoiled),
 	              fmt.tprintf("not: %s", strings.join(stale[:], ", ", context.temp_allocator)))
 	/* the crops (farming/): each plot still growing, or harvested once ripe
 	 * (ripe a day and more, unharvested, is let go to waste) */

@@ -125,7 +125,7 @@ run_cistern :: proc(name: string) -> i32 {
 }
 
 
-/* The village: three days and nights, its people, its checks. */
+/* The village: a week of days and nights, its people, its checks. */
 @(private = "file")
 run_village :: proc(save_: bool, counters := false) -> i32 {
 	world := test_world(101)

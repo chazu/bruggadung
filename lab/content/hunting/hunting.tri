@@ -9,7 +9,8 @@
 //             further, in the hunter's `stalking` (a hundredth of it each).
 //             Struck, the animal takes a wound of the bow's `wounds`, gets
 //             clear (harm/), and runs from the hunter, whom the shot,
-//             struck or missed, gives away (animals.tri).
+//             struck or missed, gives away (animals.tri); it crouches
+//             again straight after.
 // - reduced:  the same, decided on the cadence's beat; a shot is instant.
 // - abstract: as reduced. Game taken as a yield of the woods, below
 //             reduced, is open (VILLAGE.md decision 3).
@@ -179,7 +180,7 @@ carry_it_home: #Method & {
     steps: [#Do & { op: "look_in", object: "larder" }]
 } @family(methods)
 
-// Game seen: stalk it, crouched, and shoot.
+// Game seen: stalk it, crouched, shoot, and crouch again.
 shoot_it: #Method & {
     title: "stalk and shoot"
     goal:  "game_hunted"
@@ -189,7 +190,8 @@ shoot_it: #Method & {
         match: #Hunting & { me: #Agent & { id: $me }, bow: #Bow & { place: #Held & { by: $me } }, game: #Animal }
     }
     order: ["near"]
-    steps: [#Achieve & { subgoal: "hidden" }, #Do & { op: "shoot", object: "bow", target: "game" }]
+    steps: [#Achieve & { subgoal: "hidden" }, #Do & { op: "shoot", object: "bow", target: "game" },
+            #Do & { op: "crouch", object: "bow" }]
 } @family(methods)
 
 // None seen: through the woods, crouched (to see game before it sees the
@@ -274,11 +276,12 @@ shoot_from_cover: #Method & {
         find:  ["bow", "game"]
         match: #Hunting & { me: #Agent & { id: $me }, bow: #Bow & { place: #Held & { by: $me } }, game: #Animal }
     }
-    steps: [#Achieve & { subgoal: "hidden" }, #Do & { op: "shoot", object: "bow", target: "game" }]
+    steps: [#Achieve & { subgoal: "hidden" }, #Do & { op: "shoot", object: "bow", target: "game" },
+            #Do & { op: "crouch", object: "bow" }]
 } @family(methods)
 
-// Hidden, to stalk: crouched lately (a shot gives it away, and once twenty
-// minutes have passed it crouches again).
+// Hidden, to stalk: crouched lately (a shot gives it away, and it
+// crouches again straight after; else once twenty minutes have passed).
 hidden: #Goal & {
     title: "keep hidden"
     done:  #Did & { did: "crouch", lately: 20min }

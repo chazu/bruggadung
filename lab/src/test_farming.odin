@@ -220,3 +220,71 @@ test_own :: proc(c: ^Committer, owner: Entity_ID, thing: Entity_ID) {
 	proposal_group_relate(g, .Claim_Subject, whole(claim), whole(thing))
 	committer_submit(c, g)
 }
+
+
+/*
+ * Seed kept back from the harvest (content/farming/'s keep_back_seed): a
+ * farmhand tends a ripe plot of 16 by 4, no seed in its larder. Holding
+ * more than a sack's worth of the harvest, it keeps a sack of it back as
+ * seed (the plot marked kept), takes the rest in, and sows the plot again
+ * from the sack, the seed left put back; sown, the plot is no longer kept.
+ */
+test_keep_seed :: proc() {
+	w := test_world(118)
+	why: string
+	bg_check(world_set_terrain_map(w, "farm_map", &why))
+	c := test_committer(w)
+	committer_set_tracing(c, false)
+	activities := activities_with_world(w, c)
+	knowledge  := autorelease(knowledge_init_with_world(w))
+	agency     := autorelease(agency_init_with_world(w, c, knowledge))
+	farming    := autorelease(farming_init_with_world(w))
+	s          := autorelease(scheduler_init_with_world(w, c))
+	agency_set_activities(agency, activities)
+	scheduler_add_domain(s, farming_as_domain(farming))
+	scheduler_set_activities(s, activities_as_activity_clock(activities))
+	scheduler_set_perception(s, knowledge_as_perception_phase(knowledge))
+	scheduler_set_decision(s, agency_as_decision_phase(agency))
+
+	g := proposal_group_group_with_phase(.System, "setup: a farmhand, its ripe plot, its empty larder")
+	plot := proposal_group_create(g, "grain_plot", "its plot", on_tile(2, 3, 0))
+	proposal_group_set_of_to(g, "Area.east", whole(plot), 16)
+	proposal_group_set_of_to(g, "Area.south", whole(plot), 4)
+	proposal_group_set_of_to(g, "Plot.stands", whole(plot), i64(plot_stands(w, "ripe")))
+	me     := proposal_group_create(g, "farmhand", "the farmhand", on_tile(18, 2, 0))
+	larder := proposal_group_create(g, "larder", "its larder", on_tile(19, 1, 0))
+	committer_submit(c, g)
+	scheduler_run_until(s, time_make(1))
+	plot, me, larder = proposal_group_id_for(g, plot), proposal_group_id_for(g, me), proposal_group_id_for(g, larder)
+	test_own(c, me, larder)
+	scheduler_run_until(s, time_make(2))
+	store := knowledge_store_of(knowledge, me)
+	known, kept := u32(0), u32(0)
+	for i: uint = 0; i < knowledge_store_count(store); i += 1 {
+		r := knowledge_store_referent_at(store, i)
+		if r.truth == plot do known = r.id
+		if r.truth == larder do kept = r.id
+	}
+	bg_check(known != 0 && kept != 0)
+	bg_check(agency_undertake_every_with(agency, me, "plot_tended", 7 * 3600 * 1000, 15 * 3600 * 1000, "work", FARM_DAY,
+	                                     {{"plot", known}, {"larder", kept}}))
+
+	marked := false
+	for scheduler_step_until(s, time_make(FARM_DAY)) do if plot_of(w, plot).kept do marked = true
+	/* 128 portions reaped (two a tile), fifty kept back as five hundred units of
+	 * seed, sixty-four of them sown; the rest of each in the larder */
+	seed: i64
+	inside: [8]Entity_ID
+	for e in inside[:world_entities_at(w, larder, .In, raw_data(inside[:]), len(inside))] {
+		if u := world_unit_of(w, e); u != nil && u == "seed grain" do seed += world_units_of(w, e)
+	}
+	held: [2]Entity_ID
+	p := plot_of(w, plot)
+	if p.stands != plot_stands(w, "sown") || village_portions_in(w, larder) != 78 || seed != 436 {
+		fmt.printf("    stands %d, %d portions and %d seed in the larder\n", p.stands, village_portions_in(w, larder), seed)
+		for line in agency_log_of(agency, me) do fmt.printf("    %s\n", line)
+	}
+	bg_check(marked && !p.kept && p.stands == plot_stands(w, "sown"))
+	bg_check(village_portions_in(w, larder) == 78 && seed == 436)
+	bg_check(world_entities_at(w, me, .Held_By, raw_data(held[:]), 2) == 0)
+}

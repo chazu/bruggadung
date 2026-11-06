@@ -920,7 +920,7 @@ effect_cook :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -
 	proposal_group_set_of_to(g, "Food.nourishment", whole(a.roles[.Item]), min(nourishment + cooking, 100))
 	/* a meal keeps so long from now, whatever it was made of (perishing/) */
 	if keeps: i64; world_get_field(world, "Food.mealKeepsFor", a.roles[.Item], &keeps) && keeps > 0 {
-		proposal_group_set_of_to(g, "Food.spoilsAt", whole(a.roles[.Item]), world_time(world).ms + keeps)
+		proposal_group_set_of_to(g, "Perishable.spoilsAt", whole(a.roles[.Item]), world_time(world).ms + keeps)
 	}
 	return ""
 }
@@ -2934,6 +2934,7 @@ effect_sow :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) ->
 		proposal_group_set_of_to_expecting(g, "Plot.sown", whole(at), 0, plot.sown)
 		proposal_group_set_of_to(g, "Plot.stands", whole(at), i64(plot_stands(world, "sown")))
 		proposal_group_set_of_to(g, "Plot.sownAt", whole(at), world_time(world).ms)
+		if plot.kept do proposal_group_set_of_to(g, "Plot.kept", whole(at), 0)   /* seed kept from the next harvest */
 	} else {
 		proposal_group_set_of_to_expecting(g, "Plot.sown", whole(at), plot.sown + n, plot.sown)
 	}
@@ -2942,6 +2943,43 @@ effect_sow :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) ->
 	} else {
 		proposal_group_destroy(g, whole(proposal_group_split(g, whole(seed), n, location_make_none())), "sown")
 	}
+	return ""
+}
+
+
+/* Keeping back seed (content/farming/): of a harvest in hand, a sack of
+ * seed's worth (its `keptAs`, a blueprint) carved off as seed, as heavy,
+ * into a pack or a free hand, or in its place if that is all of it; the
+ * plot it is kept for marked, till it is sown again. */
+@(private = "file")
+effect_keep_seed :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
+	harvest, at := a.roles[.Item], a.roles[.Destination]
+	plot := plot_of(world, at)
+	if plot == nil do return "it is no plot"
+	if plot.kept do return "seed is kept for it already"
+	kept := world_text_field(world, "Food.keptAs", harvest)
+	if kept == nil || len(kept) == 0 do return "it is no seed"
+	tc := world_tri(world)
+	seed := tri.pattern(tc, kept)
+	mass := int_feature(tc, seed, "unitMass", 0) * int_feature(tc, seed, "count", 0)
+	units := world_units_of(world, harvest)
+	each := world_mass_of(world, harvest) / max(units, 1)
+	if mass <= 0 || each <= 0 || mass % each != 0 do return "it can't be kept as that seed"
+	k := mass / each
+	if k > units do return "there is too little of it"
+	part := whole(harvest)
+	place := world_location_of(world, harvest)
+	if k < units {
+		ok: bool
+		place, ok = receiving(world, a.roles[.Actor], mass, operation_stows(world, a.operation))
+		if !ok do return "no hand is free"
+		part = whole(proposal_group_split(g, whole(harvest), k, location_make_none()))
+	}
+	after := proposal_group_create(g, kept, "seed kept back", place)
+	proposal_group_relate(g, .Split_From, whole(after), part)
+	proposal_group_set_of_to(g, "Body.mass", part, 0)
+	proposal_group_destroy(g, part, "kept back as seed")
+	proposal_group_set_of_to(g, "Plot.kept", whole(at), 1)
 	return ""
 }
 
@@ -3106,6 +3144,7 @@ effects := [?]Named_Effect{
 	{"stoke",     effect_stoke},
 	{"put_down",  effect_put_down},
 	{"sow",       effect_sow},
+	{"keep_seed", effect_keep_seed},
 	{"harvest",   effect_harvest},
 	{"give",      effect_give},
 	{"investigate", effect_investigate},

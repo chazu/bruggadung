@@ -101,11 +101,15 @@ watcher_open :: proc(name: string, agents: i32) -> (w: Watcher, why: string) {
 /* Runs boundaries up to `t` (ms), for at most `budget` ns of wall time.
  * The world goes where it would have with nobody watching: no boundary is
  * put in for the watcher, as scheduler_run_until's stop would be. true once
- * every boundary before `t` has run. */
+ * every boundary before `t` has run. Each boundary is in a pool of its own,
+ * so what it allocates for the while is let go after it. */
 watcher_step_until :: proc(w: ^Watcher, t: i64, budget: u64) -> bool {
 	start := time.tick_now()
 	for u64(time.tick_since(start)) < budget {
-		if !scheduler_step_until(w.scheduler, time_make(t)) do return true
+		pool_push()
+		more := scheduler_step_until(w.scheduler, time_make(t))
+		pool_drain()
+		if !more do return true
 	}
 	return false
 }

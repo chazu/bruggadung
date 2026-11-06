@@ -292,6 +292,14 @@ the next to measure; recognition was 2.7 s (decision 4).
    bounded and let go when full. None changes what happens: the scenario
    hashes are the same. The market's village took 22 s, and 14 s after
    (profiled with macOS's `sample` on a `-o:speed -debug` build).
+8. **A long run lets go of each boundary's temporaries** (built). The
+   temp allocator, and what is autoreleased, are let go when a pool is
+   drained, and the village ran its week in one: 7.3 GB at its peak, and
+   with the work after the week 8.3 GB, enough that the system killed
+   `make check`. The village (`village_step_until`) and the watcher
+   (`watcher_step_until`) now run each boundary in a pool of its own:
+   2.5 GB, the same state hash with the pools as without. What is left is
+   the world's own: its history (finding 5) and the knowledge stores.
 
 ## Open questions
 

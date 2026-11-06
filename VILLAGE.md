@@ -187,8 +187,12 @@ things the lab put off:
      eat, `eat` can't take it, and nobody values it as food. Whoever sees
      the larder sees the meat gone and spoiled food there.
    - A stack spoils whole. Put with a stack of its unit and merged, the
-     two spoil when the older would have: fresh meat put in with old
-     spoils with the old.
+     two spoil at their times averaged by mass (amended: it was when the
+     older would have, so fresh meat put in with old spoiled with the old).
+   - Built after the week: what spoils is `#Perishable` (food, a carcass,
+     spoiled food), and with nothing to become rots away. Spoiled food
+     rots away ten days on; a carcass left two days is carrion, which
+     rots away too.
    - In the village's three days nothing spoils yet (the first venison is
      three days old the morning after the run ends); the check that no
      food past its time is food still is there for the week (slice 10).
@@ -235,13 +239,14 @@ things the lab put off:
     (blueprint names, first letters) to read well.
 11. **What is carried is carried in a pack, and weighs on a walk**
     (asked for after slice 9). A household keeps a **backpack** and a
-    **basket** by its door. A backpack is worn on the back, held by no hand,
+    **basket** by its door (amended: a backpack for each of its people
+    who go out to work, the woodcutters and the hunters). A backpack is worn on the back, held by no hand,
     so both stay free; a basket is held in a hand. Each bears no more than
     its **load** (25 kg; 8 kg). What an agent carries in all slows its walk
     past a light amount (15 kg): half pace at 55 kg.
-    - Built (content/carrying/). A woodcutter or a hunter takes the
-      backpack as it leaves home in the morning, the first of the household
-      to want it; whoever finds it gone does without, with its hands. On
+    - Built (content/carrying/). A woodcutter or a hunter takes a
+      backpack as it leaves home in the morning, the household's own
+      first; whoever finds none left does without, with its hands. On
       market day the seller takes a pack, and then the buyer, the backpack
       or else the basket.
     - Operations that **stow** put what is taken, or handed over, into a
@@ -454,31 +459,31 @@ New, and entered in the glossary with this document:
 - **Where game comes from.** Settled (decision 7): it comes in at the
   woods' edge while there are fewer than so many, a scenario input. A herd
   that breeds is a topic of its own.
-- **Hides.** A hunter with the backpack carries the hide home to the
-  larder (decision 11). Dressing them (the Hunts' other trade), and
-  selling them, wait: nobody buys hides yet.
+- **Hides.** A hunter carries the hide home to the larder in its
+  backpack, one each (decision 11). Dressing them (the Hunts' other
+  trade), and selling them, wait: nobody buys hides yet.
 - **The hunt is fair, but the game never learns.** A shot can miss, and a
   deer bolts out of sight from a shot that gives the hunter away. Over a
   week, one hunter in a small wood brings home its two deer from 33
   shots, where before every shot struck and it filled its larder in a
   day or two. Game that learns where hunters wait, wind that carries
   scent, or a wounded animal that runs further and heals would make it
-  harder still. And a hunter that has shot goes on uncrouched for up to
-  twenty minutes (`hidden` is having crouched lately, not hiding now).
-- **What becomes of spoiled food.** It stays where it spoiled: in a
-  larder, beside the food, for good. Nobody throws it out, and nothing
-  rots it away. Clearing out the larder is a chore with no goal yet;
-  spoiled food that rots to nothing over weeks would be a second closed
-  form, after the first.
-- **Meat merged spoils with the oldest.** A larder's venison is one
-  stack, and a stack spoils whole, so a fresh deer's meat put in with
-  three-day-old meat spoils the next day. Keeping each day's meat apart
-  (stacks that merge only when made the same day) would be truer, but
-  then a condition on "forty kilograms of venison" reads one stack, and
-  the hunters' would never hold. Eating the oldest first is the
-  household's answer, and it isn't modelled.
-- **Carcasses keep.** A carcass left unbutchered never spoils; only its
-  meat does. A carcass that spoils is perishing on a body, not food.
+  harder still. A hunter that has shot crouches again straight after
+  (settled: it used to go on uncrouched for up to twenty minutes, `hidden`
+  being having crouched lately); game sees it less, and bolts less.
+- **What becomes of spoiled food.** Settled: it rots away to nothing ten
+  days after it spoiled, wherever it is, a second closed form after the
+  first (perishing/'s `#Perishable`: what spoils, food or not, and what it
+  becomes, nothing for spoiled food). Nobody throws it out first: with
+  nothing yet that smells or is crowded out, a larder clears itself.
+- **Meat merged spoils with the oldest.** Settled: merged, two stacks
+  spoil at their times averaged by mass, so fresh meat buys older meat
+  time and old meat costs fresh some. Keeping each day's meat apart would
+  be truer, but a condition on "forty kilograms of venison" reads one
+  stack.
+- **Carcasses keep.** Settled: a carcass left unbutchered two days is
+  carrion, which nobody butchers, and which rots away as spoiled food
+  does.
 - **What a stack is seen as.** A stack's count isn't perceived, only its
   mass, so a condition on a count never holds of what an agent knows.
   The woodcutters' "past three thousand pieces" was one, never done; it
@@ -492,12 +497,11 @@ New, and entered in the glossary with this document:
   (a big load pushed with both hands, on open ground) is left for later.
   The basket is little used: a buyer with the basket in one hand and its
   coins in the other has no hand for the goods but the basket.
-- **One pack to a household.** Three hunters share one backpack: the first
-  out takes it, and the others hunt with their hands, leaving hides. A
-  pack each, or a peg for each, is a question of what a household owns.
-- **Unsold goods stay on the stall.** What wasn't sold stays set out on
-  the green till the next market, perishable meat spoiling there. Taking
-  it home after is a goal of its own.
+- **One pack to a household.** Settled: a household keeps a backpack for
+  each of its people who go out to work (the woodcutters, the hunters),
+  and one for the farmers, all its own, by its door.
+- **Unsold goods stay on the stall.** Settled with the market: after it,
+  the seller brings what wasn't sold home (`unsold_home`).
 - **A buyer always pays.** Handed the goods, the buyer pays at once; one
   who walked off without paying would be a thief, a case for the law
   (INSTITUTIONS.md), not built.
@@ -539,10 +543,12 @@ New, and entered in the glossary with this document:
   can't harvest a ripe plot. A slice that runs that long (10) wants the
   market first, and something that puts down what a finished goal left in
   hand.
-- **Seed from the harvest.** Seed is kept back at the start and isn't
-  made: a harvest yields food only, so a household sows again from what
-  is left, and the Ashes' second plot runs short. Keeping back part of a
-  harvest as seed is a method of its own.
+- **Seed from the harvest.** Settled: once a harvest, holding more than a
+  sack of seed's worth of it (twelve and a half kilograms of grain), a
+  farmer keeps a sack back as seed (`keep_back_seed`), marking the plot
+  kept till it is sown again, and sows from it. Whether there is enough
+  seed in the larder already isn't asked: a method can't ask what isn't
+  there.
 - **Grouped perception.** A plot is one entity, so it is one referent. Many
   like things seen as one (a stand of trees, a herd) would be knowledge's
   to group, a larger change (KNOWLEDGE.md). The herds of slice 7 didn't

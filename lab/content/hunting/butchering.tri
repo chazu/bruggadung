@@ -11,7 +11,9 @@
 // - abstract: as reduced.
 // - frozen:   nothing is butchered; a carcass keeps.
 // - perishing: meat keeps three days from when it is butchered, then
-//             spoils (perishing/). A carcass keeps (left out).
+//             spoils (perishing/). A carcass left unbutchered keeps two
+//             days, then is carrion, which nobody butchers, and which rots
+//             away as spoiled food does.
 // - harm:     a carcass is what harm/'s death makes of an animal: as heavy
 //             as it was.
 // - cooking:  meat is raw food; in a larder it merges with meat already
@@ -21,12 +23,15 @@
 package hunting
 
 // A carcass: what it yields, butchered: so many cuts of meat (`yields`, a
-// stack's blueprint, a unit to a cut), and a hide.
-#Carcass: #Body & {
+// stack's blueprint, a unit to a cut), and a hide. Left two days, it is
+// carrion (perishing/).
+#Carcass: #Body & #Perishable & {
     @component(Carcass)
-    yields: text @field(content, saved, inspect)
-    cuts:   int & >=0 & <=200 @field(content, saved, inspect)
-    hide:   text @field(content, saved, inspect)
+    yields:   text @field(content, saved, inspect)
+    cuts:     int & >=0 & <=200 @field(content, saved, inspect)
+    hide:     text @field(content, saved, inspect)
+    keepsFor: 2d
+    spoiled:  "carrion"
 }
 
 carcass_seen: #Seen & { kindOf: "#Carcass" } @family(seen)
@@ -34,6 +39,10 @@ carcass_look: #Look & { kindOf: "#Carcass", look: "carcass" } @family(looks)
 
 deer_carcass: #Carcass & { material: "flesh", mass: 60kg, yields: "venison", cuts: 40, hide: "deer_hide" }
 hare_carcass: #Carcass & { material: "flesh", mass: 3kg, yields: "hare_meat", cuts: 3, hide: "hare_pelt" }
+
+// A carcass gone off: rot, as spoiled food is; its mass is the carcass's.
+carrion:      #Spoiled & { material: "rot", mass: 1g }
+carrion_look: #Look & { kindOf: "carrion", look: "carcass.carrion" } @family(looks)
 
 // Meat, raw: a cut is a portion, as grain's is (cooking/). It keeps three
 // days in a cool larder, then spoils (perishing/).

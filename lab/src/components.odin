@@ -1,27 +1,16 @@
-// Generated from Triangle content 8933c04b61744bd2: do not edit. Type IDs are valid
+// Generated from Triangle content b20e90fcd64cc2e9: do not edit. Type IDs are valid
 // only for this content; regenerate when it changes.
 package lab
 
 import tri "../../triangle/odin/triangle"
 
-CONTENT_HASH :: 0x8933c04b61744bd2
+CONTENT_HASH :: 0xb20e90fcd64cc2e9
 
 // Combustor, from #Combustor
 Combustor :: struct {
 	burnRate: i64,    // int, in quanta of 1; content, saved, inspect
 	damper: bool,    // bool; content, saved, proposable, inspect, perceive(sight)
 	lit: bool,    // bool; content, saved, proposable, inspect, perceive(sight)
-}
-
-// Food, from #Food
-Food :: struct {
-	cooking: i64,    // int, in quanta of 1; content, saved, inspect
-	keepsFor: i64,    // time, in quanta of 1ms; content, saved, inspect
-	mealKeepsFor: i64,    // time, in quanta of 1ms; content, saved, inspect
-	nourishment: i64,    // int, in quanta of 1; content, saved, proposable, inspect
-	raw: bool,    // bool; content, saved, proposable, inspect, perceive(sight)
-	spoiled: cstring,    // text; content, saved, inspect
-	spoilsAt: i64,    // time, in quanta of 1ms; saved, proposable, inspect
 }
 
 // FuelContainer, from #FuelContainer
@@ -63,6 +52,22 @@ Lever :: struct {
 Office_Holder :: struct {
 	badge: cstring,    // text; content, saved, proposable, inspect, perceive(sight)
 	office: u64,    // a referent; saved, proposable, inspect
+}
+
+// Perishable, from #Perishable
+Perishable :: struct {
+	keepsFor: i64,    // time, in quanta of 1ms; content, saved, inspect
+	spoiled: cstring,    // text; content, saved, inspect
+	spoilsAt: i64,    // time, in quanta of 1ms; saved, proposable, inspect
+}
+
+// Food, from #Food
+Food :: struct {
+	cooking: i64,    // int, in quanta of 1; content, saved, inspect
+	keptAs: cstring,    // text; content, saved, inspect
+	mealKeepsFor: i64,    // time, in quanta of 1ms; content, saved, inspect
+	nourishment: i64,    // int, in quanta of 1; content, saved, proposable, inspect
+	raw: bool,    // bool; content, saved, proposable, inspect, perceive(sight)
 }
 
 // Respirator, from #Respirator
@@ -224,13 +229,6 @@ Bow :: struct {
 	wounds: i64,    // int, in quanta of 1; content, saved, inspect
 }
 
-// Carcass, from #Carcass
-Carcass :: struct {
-	cuts: i64,    // int, in quanta of 1; content, saved, inspect
-	hide: cstring,    // text; content, saved, inspect
-	yields: cstring,    // text; content, saved, inspect
-}
-
 // Cock, from #Cock
 Cock :: struct {
 	serves: cstring,    // text; content, saved, inspect
@@ -312,6 +310,7 @@ Part :: struct {
 // Plot, from #Plot
 Plot :: struct {
 	grows: cstring,    // text; content, saved, inspect, perceive(sight)
+	kept: bool,    // bool; content, saved, proposable, inspect, perceive(sight)
 	reaped: i64,    // int, in quanta of 1; content, saved, proposable, inspect
 	ripensIn: i64,    // time, in quanta of 1ms; content, saved, inspect
 	sown: i64,    // int, in quanta of 1; content, saved, proposable, inspect
@@ -393,85 +392,93 @@ Water_Store :: struct {
 	waterCapacity: i64,    // volume, in quanta of 1mL; content, saved, inspect, perceive(sight)
 }
 
+// Carcass, from #Carcass
+Carcass :: struct {
+	cuts: i64,    // int, in quanta of 1; content, saved, inspect
+	hide: cstring,    // text; content, saved, inspect
+	yields: cstring,    // text; content, saved, inspect
+}
+
 // Fastener, from #Fastener
 Fastener :: struct {
 	tight: bool,    // bool; content, saved, proposable, inspect, perceive(sight)
 }
 
 // #ActivityStatus
-ACTIVITYSTATUS_ABORTED :: 828
-ACTIVITYSTATUS_COMPLETED :: 829
-ACTIVITYSTATUS_EXHAUSTED :: 830
-ACTIVITYSTATUS_FAILED :: 831
-ACTIVITYSTATUS_RUNNING :: 832
-ACTIVITYSTATUS_SUSPENDED :: 833
+ACTIVITYSTATUS_ABORTED :: 832
+ACTIVITYSTATUS_COMPLETED :: 833
+ACTIVITYSTATUS_EXHAUSTED :: 834
+ACTIVITYSTATUS_FAILED :: 835
+ACTIVITYSTATUS_RUNNING :: 836
+ACTIVITYSTATUS_SUSPENDED :: 837
 
 // #Tie
-TIE_EMPLOY :: 942
-TIE_FRIEND :: 943
-TIE_KIN :: 944
-TIE_SWORN :: 945
+TIE_EMPLOY :: 948
+TIE_FRIEND :: 949
+TIE_KIN :: 950
+TIE_SWORN :: 951
 
 // #ClaimKind
-CLAIMKIND_CUSTODY :: 835
-CLAIMKIND_OWNERSHIP :: 836
-CLAIMKIND_RESERVATION :: 837
+CLAIMKIND_CUSTODY :: 839
+CLAIMKIND_OWNERSHIP :: 840
+CLAIMKIND_RESERVATION :: 841
 
 // #Penalty
-PENALTY_FINE :: 928
-PENALTY_ARREST :: 961
-PENALTY_CONFISCATE :: 962
+PENALTY_FINE :: 934
+PENALTY_ARREST :: 967
+PENALTY_CONFISCATE :: 968
 
 // #Wrong
-WRONG_ANOTHERS :: 953
-WRONG_UNAUTHORIZED :: 954
+WRONG_ANOTHERS :: 959
+WRONG_UNAUTHORIZED :: 960
 
 // #Material
-MATERIAL_CLOTH :: 909
-MATERIAL_EARTH :: 910
-MATERIAL_FOOD :: 911
-MATERIAL_LEATHER :: 912
-MATERIAL_GRAIN :: 914
-MATERIAL_ROT :: 915
-MATERIAL_RUBBER :: 916
-MATERIAL_STONE :: 917
-MATERIAL_TURNIP :: 918
-MATERIAL_FLESH :: 964
-MATERIAL_BRASS :: 966
-MATERIAL_IRON :: 967
-MATERIAL_PAPER :: 968
-MATERIAL_STEEL :: 969
-MATERIAL_BIRCH :: 971
-MATERIAL_OAK :: 972
+MATERIAL_CLOTH :: 914
+MATERIAL_EARTH :: 915
+MATERIAL_FOOD :: 916
+MATERIAL_LEATHER :: 917
+MATERIAL_GRAIN :: 919
+MATERIAL_ROT :: 920
+MATERIAL_RUBBER :: 921
+MATERIAL_STONE :: 922
+MATERIAL_TURNIP :: 923
+MATERIAL_WICKER :: 924
+MATERIAL_FLESH :: 970
+MATERIAL_BRASS :: 972
+MATERIAL_IRON :: 973
+MATERIAL_PAPER :: 974
+MATERIAL_STEEL :: 975
+MATERIAL_BIRCH :: 977
+MATERIAL_OAK :: 978
 
 // "flesh" | "metal" | "natural" | "paper" | "wood"
-BODY_SURFACE_NATURAL :: 604
-BODY_SURFACE_FLESH :: 964
-BODY_SURFACE_BRASS :: 966
-BODY_SURFACE_IRON :: 967
-BODY_SURFACE_PAPER :: 968
-BODY_SURFACE_STEEL :: 969
-BODY_SURFACE_BIRCH :: 971
-BODY_SURFACE_OAK :: 972
+BODY_SURFACE_NATURAL :: 606
+BODY_SURFACE_FLESH :: 970
+BODY_SURFACE_BRASS :: 972
+BODY_SURFACE_IRON :: 973
+BODY_SURFACE_PAPER :: 974
+BODY_SURFACE_STEEL :: 975
+BODY_SURFACE_BIRCH :: 977
+BODY_SURFACE_OAK :: 978
 
 // #Colour
-COLOUR_BLUE :: 840
-COLOUR_BLACK :: 842
-COLOUR_BROWN :: 843
-COLOUR_GREEN :: 844
-COLOUR_GREY :: 845
-COLOUR_NAVY :: 846
-COLOUR_ORANGE :: 847
-COLOUR_PURPLE :: 848
-COLOUR_RED :: 849
-COLOUR_YELLOW :: 850
-COLOUR_BEIGE :: 873
-COLOUR_WHITE :: 905
+COLOUR_BLUE :: 844
+COLOUR_BLACK :: 846
+COLOUR_BROWN :: 847
+COLOUR_GREEN :: 848
+COLOUR_GREY :: 849
+COLOUR_NAVY :: 850
+COLOUR_ORANGE :: 851
+COLOUR_PURPLE :: 852
+COLOUR_RED :: 853
+COLOUR_YELLOW :: 854
+COLOUR_BEIGE :: 878
+COLOUR_WHITE :: 910
 
 // "bare" | "ripe" | "sown"
-PLOT_STANDS_BARE :: 396
-PLOT_STANDS_RIPE :: 675
-PLOT_STANDS_SOWN :: 706
+PLOT_STANDS_BARE :: 395
+PLOT_STANDS_RIPE :: 677
+PLOT_STANDS_SOWN :: 709
 
 // The field registry: what code needs to read and write any component
 // generically.
@@ -499,21 +506,12 @@ Component_Info :: struct {
 	fields:  [^]Field_Info,
 }
 
-COMPONENT_COUNT :: 48
+COMPONENT_COUNT :: 49
 
 @(rodata) Combustor_fields := [?]Field_Info{
 	{"burnRate", offset_of(Combustor, burnRate), VALUE_QUANTITY, "int", "content, saved, inspect"},
 	{"damper", offset_of(Combustor, damper), VALUE_BOOL, "bool", "content, saved, proposable, inspect, perceive(sight)"},
 	{"lit", offset_of(Combustor, lit), VALUE_BOOL, "bool", "content, saved, proposable, inspect, perceive(sight)"},
-}
-@(rodata) Food_fields := [?]Field_Info{
-	{"cooking", offset_of(Food, cooking), VALUE_QUANTITY, "int", "content, saved, inspect"},
-	{"keepsFor", offset_of(Food, keepsFor), VALUE_QUANTITY, "time", "content, saved, inspect"},
-	{"mealKeepsFor", offset_of(Food, mealKeepsFor), VALUE_QUANTITY, "time", "content, saved, inspect"},
-	{"nourishment", offset_of(Food, nourishment), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
-	{"raw", offset_of(Food, raw), VALUE_BOOL, "bool", "content, saved, proposable, inspect, perceive(sight)"},
-	{"spoiled", offset_of(Food, spoiled), VALUE_TEXT, "text", "content, saved, inspect"},
-	{"spoilsAt", offset_of(Food, spoilsAt), VALUE_QUANTITY, "time", "saved, proposable, inspect"},
 }
 @(rodata) Fuel_Container_fields := [?]Field_Info{
 	{"fuel", offset_of(Fuel_Container, fuel), VALUE_QUANTITY, "mass", "content, saved, proposable, inspect, perceive(sight)"},
@@ -545,6 +543,18 @@ COMPONENT_COUNT :: 48
 @(rodata) Office_Holder_fields := [?]Field_Info{
 	{"badge", offset_of(Office_Holder, badge), VALUE_TEXT, "text", "content, saved, proposable, inspect, perceive(sight)"},
 	{"office", offset_of(Office_Holder, office), VALUE_REF, "ref", "saved, proposable, inspect"},
+}
+@(rodata) Perishable_fields := [?]Field_Info{
+	{"keepsFor", offset_of(Perishable, keepsFor), VALUE_QUANTITY, "time", "content, saved, inspect"},
+	{"spoiled", offset_of(Perishable, spoiled), VALUE_TEXT, "text", "content, saved, inspect"},
+	{"spoilsAt", offset_of(Perishable, spoilsAt), VALUE_QUANTITY, "time", "saved, proposable, inspect"},
+}
+@(rodata) Food_fields := [?]Field_Info{
+	{"cooking", offset_of(Food, cooking), VALUE_QUANTITY, "int", "content, saved, inspect"},
+	{"keptAs", offset_of(Food, keptAs), VALUE_TEXT, "text", "content, saved, inspect"},
+	{"mealKeepsFor", offset_of(Food, mealKeepsFor), VALUE_QUANTITY, "time", "content, saved, inspect"},
+	{"nourishment", offset_of(Food, nourishment), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
+	{"raw", offset_of(Food, raw), VALUE_BOOL, "bool", "content, saved, proposable, inspect, perceive(sight)"},
 }
 @(rodata) Respirator_fields := [?]Field_Info{
 	{"atRest", offset_of(Respirator, atRest), VALUE_QUANTITY, "int", "content, saved, inspect"},
@@ -671,11 +681,6 @@ COMPONENT_COUNT :: 48
 	{"spread", offset_of(Bow, spread), VALUE_QUANTITY, "int", "content, saved, inspect"},
 	{"wounds", offset_of(Bow, wounds), VALUE_QUANTITY, "int", "content, saved, inspect"},
 }
-@(rodata) Carcass_fields := [?]Field_Info{
-	{"cuts", offset_of(Carcass, cuts), VALUE_QUANTITY, "int", "content, saved, inspect"},
-	{"hide", offset_of(Carcass, hide), VALUE_TEXT, "text", "content, saved, inspect"},
-	{"yields", offset_of(Carcass, yields), VALUE_TEXT, "text", "content, saved, inspect"},
-}
 @(rodata) Cock_fields := [?]Field_Info{
 	{"serves", offset_of(Cock, serves), VALUE_TEXT, "text", "content, saved, inspect"},
 	{"shut", offset_of(Cock, shut), VALUE_BOOL, "bool", "content, saved, proposable, inspect, perceive(sight)"},
@@ -736,6 +741,7 @@ COMPONENT_COUNT :: 48
 }
 @(rodata) Plot_fields := [?]Field_Info{
 	{"grows", offset_of(Plot, grows), VALUE_TEXT, "text", "content, saved, inspect, perceive(sight)"},
+	{"kept", offset_of(Plot, kept), VALUE_BOOL, "bool", "content, saved, proposable, inspect, perceive(sight)"},
 	{"reaped", offset_of(Plot, reaped), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
 	{"ripensIn", offset_of(Plot, ripensIn), VALUE_QUANTITY, "time", "content, saved, inspect"},
 	{"sown", offset_of(Plot, sown), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
@@ -794,18 +800,24 @@ COMPONENT_COUNT :: 48
 	{"water", offset_of(Water_Store, water), VALUE_QUANTITY, "volume", "content, saved, proposable, inspect, perceive(sight)"},
 	{"waterCapacity", offset_of(Water_Store, waterCapacity), VALUE_QUANTITY, "volume", "content, saved, inspect, perceive(sight)"},
 }
+@(rodata) Carcass_fields := [?]Field_Info{
+	{"cuts", offset_of(Carcass, cuts), VALUE_QUANTITY, "int", "content, saved, inspect"},
+	{"hide", offset_of(Carcass, hide), VALUE_TEXT, "text", "content, saved, inspect"},
+	{"yields", offset_of(Carcass, yields), VALUE_TEXT, "text", "content, saved, inspect"},
+}
 @(rodata) Fastener_fields := [?]Field_Info{
 	{"tight", offset_of(Fastener, tight), VALUE_BOOL, "bool", "content, saved, proposable, inspect, perceive(sight)"},
 }
 
 COMPONENTS := [COMPONENT_COUNT + 1]Component_Info{
 	{"Combustor", "#Combustor", size_of(Combustor), 3, &Combustor_fields[0]},
-	{"Food", "#Food", size_of(Food), 7, &Food_fields[0]},
 	{"FuelContainer", "#FuelContainer", size_of(Fuel_Container), 1, &Fuel_Container_fields[0]},
 	{"GasStore", "#GasStore", size_of(Gas_Store), 8, &Gas_Store_fields[0]},
 	{"Hungry", "#Hungry", size_of(Hungry), 7, &Hungry_fields[0]},
 	{"Lever", "#Lever", size_of(Lever), 3, &Lever_fields[0]},
 	{"OfficeHolder", "#OfficeHolder", size_of(Office_Holder), 2, &Office_Holder_fields[0]},
+	{"Perishable", "#Perishable", size_of(Perishable), 3, &Perishable_fields[0]},
+	{"Food", "#Food", size_of(Food), 5, &Food_fields[0]},
 	{"Respirator", "#Respirator", size_of(Respirator), 4, &Respirator_fields[0]},
 	{"Scribe", "#Scribe", size_of(Scribe), 1, &Scribe_fields[0]},
 	{"Seed", "#Seed", size_of(Seed), 1, &Seed_fields[0]},
@@ -823,7 +835,6 @@ COMPONENTS := [COMPONENT_COUNT + 1]Component_Info{
 	{"Area", "#Area", size_of(Area), 2, &Area_fields[0]},
 	{"Assembly", "#Assembly", size_of(Assembly), 1, &Assembly_fields[0]},
 	{"Bow", "#Bow", size_of(Bow), 3, &Bow_fields[0]},
-	{"Carcass", "#Carcass", size_of(Carcass), 3, &Carcass_fields[0]},
 	{"Cock", "#Cock", size_of(Cock), 2, &Cock_fields[0]},
 	{"Container", "#Container", size_of(Container), 1, &Container_fields[0]},
 	{"Inscription", "#Copy", size_of(Inscription), 6, &Inscription_fields[0]},
@@ -834,7 +845,7 @@ COMPONENTS := [COMPONENT_COUNT + 1]Component_Info{
 	{"Log", "#Log", size_of(Log), 4, &Log_fields[0]},
 	{"Pack", "#Pack", size_of(Pack), 2, &Pack_fields[0]},
 	{"Part", "#Part", size_of(Part), 7, &Part_fields[0]},
-	{"Plot", "#Plot", size_of(Plot), 7, &Plot_fields[0]},
+	{"Plot", "#Plot", size_of(Plot), 8, &Plot_fields[0]},
 	{"Pump", "#Pump", size_of(Pump), 4, &Pump_fields[0]},
 	{"Record", "#Record", size_of(Record), 1, &Record_fields[0]},
 	{"Label", "#Label", size_of(Label), 1, &Label_fields[0]},
@@ -846,6 +857,7 @@ COMPONENTS := [COMPONENT_COUNT + 1]Component_Info{
 	{"Trunk", "#Trunk", size_of(Trunk), 2, &Trunk_fields[0]},
 	{"Valve", "#Valve", size_of(Valve), 3, &Valve_fields[0]},
 	{"WaterStore", "#WaterStore", size_of(Water_Store), 2, &Water_Store_fields[0]},
+	{"Carcass", "#Carcass", size_of(Carcass), 3, &Carcass_fields[0]},
 	{"Fastener", "#Fastener", size_of(Fastener), 1, &Fastener_fields[0]},
 	{},
 }

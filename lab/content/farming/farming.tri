@@ -10,7 +10,9 @@
 //             harvested; else sows a row of a bare plot, its seed in hand
 //             (fetched from where it is kept first); else puts the seed
 //             back. A plot is tended while it stands sown, its farmer's
-//             hands empty.
+//             hands empty. Once a harvest, holding more than a sack of
+//             seed's worth of it, it keeps a sack back as seed (marking
+//             the plot kept, till it is sown again), and sows from it.
 // - reduced:  the same, decided on the cadence's beat; each row's activity
 //             runs its time.
 // - abstract: as reduced. A household's plots as a yield at a place,
@@ -40,7 +42,8 @@ package farming
 // what it grows, how it stands (bare, sown, ripe), how many of its tiles
 // are sown so far (bare) or reaped (ripe), and when its last row was sown;
 // it ripens `ripensIn` after. A tile reaped yields a stack (`yields`, a
-// blueprint).
+// blueprint). Seed kept back from its harvest, it is `kept` (a sheaf set
+// aside, there to be seen) till it is sown again.
 #Plot: #Area & {
     @component(Plot)
     grows:    text                           @field(content, saved, inspect, perceive(sight))
@@ -50,6 +53,7 @@ package farming
     sownAt:   *0ms | time & >=0ms & <=10000d @field(content, saved, proposable, inspect)
     ripensIn: *14d | time & >=1s & <=1000d   @field(content, saved, inspect)
     yields:   text                           @field(content, saved, inspect)
+    kept:     *false | true                  @field(content, saved, proposable, inspect, perceive(sight))
 }
 
 plot_seen: #Seen & { kindOf: "#Plot" } @family(seen)
@@ -73,12 +77,19 @@ turnip_plot: #Plot & { material: "earth", mass: 1kg, grows: "turnip", ripensIn: 
 // What a tile's harvest is: raw food, a stack, as grain is kept.
 let raw_grain  = { material: "food", raw: true, nourishment: 15, cooking: 35 }
 let raw_turnip = { material: "food", raw: true, nourishment: 10, cooking: 30 }
-grain_harvest:  #Stack & #Food & raw_grain & { unit: "grain", unitMass: 250g, count: 2 }
-turnip_harvest: #Stack & #Food & raw_turnip & { unit: "turnip", unitMass: 250g, count: 2 }
+// It can be kept back as seed (`keptAs`, a #Seed's blueprint), a sack at
+// a time.
+grain_harvest:  #Stack & #Food & raw_grain & { unit: "grain", unitMass: 250g, count: 2, keptAs: "seed_grain" }
+turnip_harvest: #Stack & #Food & raw_turnip & { unit: "turnip", unitMass: 250g, count: 2, keptAs: "turnip_seed" }
 
-// Seed, kept back from the last harvest: a sack, by the tile's worth.
+// What food is kept back as, for seed: a #Seed's blueprint; "" for none.
+hunger.#Food: { keptAs: *"" | text @field(content, saved, inspect) }
+
+// Seed, kept back from the last harvest: a sack, by the tile's worth. A
+// sack is twelve and a half kilograms of grain (fifty portions), or seven
+// turnips' worth of turnip seed.
 seed_grain:  #Stack & #Seed & { material: "food", unit: "seed grain", unitMass: 25g, count: 500, sows: "grain" }
-turnip_seed: #Stack & #Seed & { material: "food", unit: "turnip seed", unitMass: 5g, count: 300, sows: "turnip" }
+turnip_seed: #Stack & #Seed & { material: "food", unit: "turnip seed", unitMass: 5g, count: 350, sows: "turnip" }
 
 // Farming: the plot, the seed sown on it, what was harvested, and the
 // larder it goes to (the household's, where cooking/ keeps its food too:
@@ -95,12 +106,28 @@ plot_tended: #Goal & {
     kept:  true
 } @family(goals)
 
+// More than a sack of seed's worth of the harvest in hand (twelve and a
+// half kilograms), and none kept back yet from the plot: a sack of it kept
+// back, to sow it again.
+keep_back_seed: #Method & {
+    title: "keep back seed"
+    goal:  "plot_tended"
+    rank:  1
+    pre: {
+        find:  ["harvest", "plot"]
+        match: #Farming & { me: #Agent & { id: $me, freeHands: >=1 },
+                            harvest: #Food & #Stack & { raw: true, unit: $c, mass: >=12500g, place: #Held & { by: $me } },
+                            plot: #Plot & { grows: $c, kept: false } }
+    }
+    steps: [#Do & { op: "keep_seed", object: "harvest", target: "plot" }]
+} @family(methods)
+
 // A harvest's worth in hand (ten kilograms, forty portions: what is held is
 // weighed by its mass, its count unseen): to the larder.
 bring_it_in: #Method & {
     title: "bring it in"
     goal:  "plot_tended"
-    rank:  1
+    rank:  2
     pre: {
         find:  ["harvest", "larder"]
         match: #Farming & { me: #Agent & { id: $me },
@@ -114,7 +141,7 @@ bring_it_in: #Method & {
 harvest_it: #Method & {
     title: "harvest it"
     goal:  "plot_tended"
-    rank:  2
+    rank:  3
     pre: {
         find:  ["plot"]
         match: #Farming & { me: #Agent & { freeHands: >=1 }, plot: #Plot & { stands: "ripe" } }
@@ -128,7 +155,7 @@ harvest_it: #Method & {
 bring_in_the_rest: #Method & {
     title: "bring in the rest"
     goal:  "plot_tended"
-    rank:  3
+    rank:  4
     pre: {
         find:  ["harvest", "larder"]
         match: #Farming & { me: #Agent & { id: $me },
@@ -142,7 +169,7 @@ bring_in_the_rest: #Method & {
 sow_it: #Method & {
     title: "sow it"
     goal:  "plot_tended"
-    rank:  4
+    rank:  5
     pre:   { find: ["plot"], match: #Farming & { plot: #Plot & { stands: "bare" } } }
     steps: [#Achieve & { subgoal: "seed_in_hand" }, #Do & { op: "sow", object: "seed", target: "plot" }]
 } @family(methods)
@@ -151,7 +178,7 @@ sow_it: #Method & {
 put_back_the_seed: #Method & {
     title: "put back the seed"
     goal:  "plot_tended"
-    rank:  5
+    rank:  6
     pre: {
         find:  ["seed", "larder"]
         match: #Farming & { me: #Agent & { id: $me },
@@ -213,6 +240,22 @@ sow: #Operation & {
         actor:       #Agent & { id: $a }
         item:        #Seed & #Stack & { sows: $c, place: #Held & { by: $a } }
         destination: #Plot & { grows: $c, stands: "bare" }
+    }
+} @family(operations)
+
+// Keep back seed: of a harvest in hand, a sack of seed's worth carved off
+// as the seed it is kept as, as heavy, into a pack or a free hand; the
+// plot in reach it is kept for marked kept. A quarter of an hour, with the
+// hands.
+keep_seed: #Operation & {
+    effect:   "keep_seed"
+    duration: 900s
+    uses:     ["hands"]
+    stow:     true
+    roles: {
+        actor:       #Agent & { id: $a }
+        item:        #Food & #Stack & { place: #Held & { by: $a } }
+        destination: #Plot & { kept: false }
     }
 } @family(operations)
 

@@ -25,7 +25,7 @@
 #Material: "metal" | "wood" | "flesh" | "paper" | "food" | "cloth" | "rubber" | "stone" | "leather" | "earth" | "plant" | "rot"
 "metal":   "iron" | "brass" | "steel"
 "wood":    "oak" | "birch"
-"plant":   "grain" | "turnip"
+"plant":   "grain" | "turnip" | "wicker"
 
 #Colour:  "dark" | "light" | "bright"
 "dark":   "black" | "grey" | "brown" | "navy"

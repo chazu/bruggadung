@@ -5120,3 +5120,40 @@ The watcher shows the village as one villager knows it (TESSERA.md slice
   it does unwatched.
 
 138 tests, 4138 checks.
+
+### After the slice: the village's small open questions (VILLAGE.md)
+
+- **What spoils** is `#Perishable` (content/perishing/), a type of its own
+  that food, a carcass and spoiled food are each a kind of; the
+  perishing domain reads its store. With nothing to become (`spoiled:
+  ""`) a thing rots away: spoiled food ten days after it spoiled. A
+  carcass left two days unbutchered is **carrion** (hunting/), which
+  rots away too.
+- **A merge averages**: two stacks of food merged spoil at their times
+  weighed by mass (src/kinds_body_kind.odin).
+- **Seed is kept back**: once a harvest, holding more than a sack of
+  seed's worth (12.5 kg of grain), a farmer carves a sack off as seed
+  (`keep_seed`, the food's `keptAs`), marks the plot `kept` till it is
+  sown again, and sows from it. A turnip sack is 350 units now, seven
+  turnips' worth.
+- **A backpack each**: a household keeps one for each of its people who
+  go out to work. With three alike, a hunter mistook one for another and
+  believed a hide in the one it carried: what a carrier believes is in
+  the pack it carries, not seen there, is now not where it was, wherever
+  it saw it put in (KNOWLEDGE.md decision 25).
+- **A hunter crouches again** straight after a shot. Over the hunting
+  test's week: 80 venison home as before, from 17 shots (36), and 9
+  bolts (215).
+- **A basket is wicker**: `"plant"` is a supertype of grain and turnip,
+  so a basket of it was made of one of them at random.
+- **Memory** (PERFORMANCE.md decision 8): the village ran its week in one
+  autorelease pool, 7.3 GB at its peak and 8.3 GB with the above, and the
+  system killed `make check`. Each boundary has a pool of its own now
+  (`village_step_until`, `watcher_step_until`): 2.5 GB, the same state
+  hash with the pools as without.
+- **Tests**: `keep_seed` (a farmhand keeps seed back from a ripe plot of
+  16 by 4, and sows it again from it); `perishing` checks the average,
+  spoiled food rotting away, and carrion. The village's hashes changed;
+  the other scenarios' didn't.
+
+139 tests, 4153 checks.

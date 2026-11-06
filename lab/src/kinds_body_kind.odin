@@ -3,8 +3,8 @@ package lab
 /*
  * BGBodyKind — behaviour of the Body component. On the reactions channel:
  * a unit put (or split off) into a container that holds a stack of the
- * same unit proposes to merge into it, and, food, to spoil when the older
- * would have. Whether the units are indistinguishable is commitment's to
+ * same unit proposes to merge into it, and, food, to spoil at the two's
+ * times averaged by mass. Whether the units are indistinguishable is commitment's to
  * decide; a refusal is traced with its reason.
  *
  * (ported from the Objective-C lab's kinds/BGBodyKind.m)
@@ -54,11 +54,20 @@ body_kind_react_to_event :: proc(self: ^Body_Kind, committer: ^Committer, event:
 		                                        fmt.tprintf("Body reaction: merge %d into %d", event.subject, here[i]))
 		proposal_group_set_cause(group, event.index)
 		proposal_group_merge(group, whole(event.subject), whole(here[i]))
-		/* food: the two spoil when the older would have (content/perishing/) */
-		mine, theirs: i64
-		if world_get_field(world, "Food.spoilsAt", event.subject, &mine) && world_get_field(world, "Food.spoilsAt", here[i], &theirs) &&
-		   mine > 0 && (theirs == 0 || mine < theirs) {
-			proposal_group_set_of_to(group, "Food.spoilsAt", whole(here[i]), mine)
+		/* food: the two spoil at their times averaged, weighed by mass
+		 * (content/perishing/); food made since the last boundary, not yet
+		 * stamped, as perishing will stamp it */
+		food := world_kind_named(world, "Perishable")
+		mf := (^Perishable)(world_record(world, food, event.subject))
+		tf := (^Perishable)(world_record(world, food, here[i]))
+		if mf != nil && tf != nil {
+			now := world_time(world).ms
+			mine, theirs := perishing_spoils_at(mf, now), perishing_spoils_at(tf, now)
+			a, b := max(world_mass_of(world, event.subject), 0), max(world_mass_of(world, here[i]), 0)
+			if mine > 0 && theirs > 0 && a + b > 0 {
+				at := (mine * a + theirs * b) / (a + b)
+				if at != tf.spoilsAt do proposal_group_set_of_to(group, "Perishable.spoilsAt", whole(here[i]), at)
+			}
 		}
 		committer_submit(committer, group)
 		return
