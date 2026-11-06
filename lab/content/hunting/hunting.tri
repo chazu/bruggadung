@@ -208,12 +208,14 @@ look_for_game: #Method & {
 } @family(methods)
 
 // No bow in hand (put down at home, to buy at the market): take it up
-// again, when nothing else will do.
+// again, when nothing else will do; with both hands free (so with none in
+// either: with its own in hand, a hunter took up another's too, and, both
+// hands full, could take no food for days).
 take_up_the_bow: #Method & {
     title: "take up the bow"
     goal:  "game_hunted"
     rank:  9
-    pre:   { find: ["bow"], match: #Hunting & { me: #Agent & { freeHands: >=1 }, bow: #Bow & { place: #OnTile | #Inside } } }
+    pre:   { find: ["bow"], match: #Hunting & { me: #Agent & { freeHands: 2 }, bow: #Bow & { place: #OnTile | #Inside } } }
     order: ["near"]
     steps: [#Do & { op: "take", object: "bow" }]
 } @family(methods)

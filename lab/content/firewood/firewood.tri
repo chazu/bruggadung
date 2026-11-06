@@ -212,13 +212,16 @@ fell_a_tree: #Method & {
     steps: [#Do & { op: "fell", object: "axe", target: "tree" }]
 } @family(methods)
 
+// Both hands free (so with no axe in either: with one in hand and no tree
+// in sight, a woodcutter took up the other's too, and, both hands full,
+// could take no food for days).
 take_up_the_axe: #Method & {
     title: "take up the axe"
     goal:  "woodpile_stocked"
     rank:  7
     pre: {
         find:  ["axe"]
-        match: #Felling & { me: #Agent & { freeHands: >=1 }, axe: #Axe & { place: #OnTile } }
+        match: #Felling & { me: #Agent & { freeHands: 2 }, axe: #Axe & { place: #OnTile } }
     }
     order: ["near"]
     steps: [#Do & { op: "take", object: "axe" }]

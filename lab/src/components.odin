@@ -1,10 +1,10 @@
-// Generated from Triangle content e16efdcd246b92fb: do not edit. Type IDs are valid
+// Generated from Triangle content 7fe77433bb4020c7: do not edit. Type IDs are valid
 // only for this content; regenerate when it changes.
 package lab
 
 import tri "../../triangle/odin/triangle"
 
-CONTENT_HASH :: 0xe16efdcd246b92fb
+CONTENT_HASH :: 0x7fe77433bb4020c7
 
 // Combustor, from #Combustor
 Combustor :: struct {
@@ -312,6 +312,15 @@ Part :: struct {
 	wear: i64,    // int, in quanta of 1; content, saved, proposable, inspect, perceive(sight)
 }
 
+// Patch, from #Patch
+Patch :: struct {
+	grewAt: i64,    // time, in quanta of 1ms; content, saved, proposable, inspect
+	handfuls: i64,    // int, in quanta of 1; content, saved, proposable, inspect, perceive(sight)
+	most: i64,    // int, in quanta of 1; content, saved, inspect
+	regrowsIn: i64,    // time, in quanta of 1ms; content, saved, inspect
+	yields: cstring,    // text; content, saved, inspect
+}
+
 // Plot, from #Plot
 Plot :: struct {
 	grows: cstring,    // text; content, saved, inspect, perceive(sight)
@@ -410,80 +419,80 @@ Fastener :: struct {
 }
 
 // #ActivityStatus
-ACTIVITYSTATUS_ABORTED :: 856
-ACTIVITYSTATUS_COMPLETED :: 857
-ACTIVITYSTATUS_EXHAUSTED :: 858
-ACTIVITYSTATUS_FAILED :: 859
-ACTIVITYSTATUS_RUNNING :: 860
-ACTIVITYSTATUS_SUSPENDED :: 861
+ACTIVITYSTATUS_ABORTED :: 867
+ACTIVITYSTATUS_COMPLETED :: 868
+ACTIVITYSTATUS_EXHAUSTED :: 869
+ACTIVITYSTATUS_FAILED :: 870
+ACTIVITYSTATUS_RUNNING :: 871
+ACTIVITYSTATUS_SUSPENDED :: 872
 
 // #Tie
-TIE_EMPLOY :: 973
-TIE_FRIEND :: 974
-TIE_KIN :: 975
-TIE_SWORN :: 976
+TIE_EMPLOY :: 985
+TIE_FRIEND :: 986
+TIE_KIN :: 987
+TIE_SWORN :: 988
 
 // #ClaimKind
-CLAIMKIND_CUSTODY :: 863
-CLAIMKIND_OWNERSHIP :: 864
-CLAIMKIND_RESERVATION :: 865
+CLAIMKIND_CUSTODY :: 874
+CLAIMKIND_OWNERSHIP :: 875
+CLAIMKIND_RESERVATION :: 876
 
 // #Penalty
-PENALTY_FINE :: 959
-PENALTY_ARREST :: 992
-PENALTY_CONFISCATE :: 993
+PENALTY_FINE :: 971
+PENALTY_ARREST :: 1004
+PENALTY_CONFISCATE :: 1005
 
 // #Wrong
-WRONG_ANOTHERS :: 984
-WRONG_UNAUTHORIZED :: 985
+WRONG_ANOTHERS :: 996
+WRONG_UNAUTHORIZED :: 997
 
 // #Material
-MATERIAL_CLOTH :: 939
-MATERIAL_EARTH :: 940
-MATERIAL_FOOD :: 941
-MATERIAL_LEATHER :: 942
-MATERIAL_GRAIN :: 944
-MATERIAL_ROT :: 945
-MATERIAL_RUBBER :: 946
-MATERIAL_STONE :: 947
-MATERIAL_TURNIP :: 948
-MATERIAL_WICKER :: 949
-MATERIAL_FLESH :: 995
-MATERIAL_BRASS :: 997
-MATERIAL_IRON :: 998
-MATERIAL_PAPER :: 999
-MATERIAL_STEEL :: 1000
-MATERIAL_BIRCH :: 1002
-MATERIAL_OAK :: 1003
+MATERIAL_CLOTH :: 951
+MATERIAL_EARTH :: 952
+MATERIAL_FOOD :: 953
+MATERIAL_LEATHER :: 954
+MATERIAL_GRAIN :: 956
+MATERIAL_ROT :: 957
+MATERIAL_RUBBER :: 958
+MATERIAL_STONE :: 959
+MATERIAL_TURNIP :: 960
+MATERIAL_WICKER :: 961
+MATERIAL_FLESH :: 1007
+MATERIAL_BRASS :: 1009
+MATERIAL_IRON :: 1010
+MATERIAL_PAPER :: 1011
+MATERIAL_STEEL :: 1012
+MATERIAL_BIRCH :: 1014
+MATERIAL_OAK :: 1015
 
 // "flesh" | "metal" | "natural" | "paper" | "wood"
-BODY_SURFACE_NATURAL :: 624
-BODY_SURFACE_FLESH :: 995
-BODY_SURFACE_BRASS :: 997
-BODY_SURFACE_IRON :: 998
-BODY_SURFACE_PAPER :: 999
-BODY_SURFACE_STEEL :: 1000
-BODY_SURFACE_BIRCH :: 1002
-BODY_SURFACE_OAK :: 1003
+BODY_SURFACE_NATURAL :: 634
+BODY_SURFACE_FLESH :: 1007
+BODY_SURFACE_BRASS :: 1009
+BODY_SURFACE_IRON :: 1010
+BODY_SURFACE_PAPER :: 1011
+BODY_SURFACE_STEEL :: 1012
+BODY_SURFACE_BIRCH :: 1014
+BODY_SURFACE_OAK :: 1015
 
 // #Colour
-COLOUR_BLUE :: 868
-COLOUR_BLACK :: 870
-COLOUR_BROWN :: 871
-COLOUR_GREEN :: 872
-COLOUR_GREY :: 873
-COLOUR_NAVY :: 874
-COLOUR_ORANGE :: 875
-COLOUR_PURPLE :: 876
-COLOUR_RED :: 877
-COLOUR_YELLOW :: 878
-COLOUR_BEIGE :: 903
-COLOUR_WHITE :: 935
+COLOUR_BLUE :: 879
+COLOUR_BLACK :: 881
+COLOUR_BROWN :: 882
+COLOUR_GREEN :: 883
+COLOUR_GREY :: 884
+COLOUR_NAVY :: 885
+COLOUR_ORANGE :: 886
+COLOUR_PURPLE :: 887
+COLOUR_RED :: 888
+COLOUR_YELLOW :: 889
+COLOUR_BEIGE :: 915
+COLOUR_WHITE :: 947
 
 // "bare" | "ripe" | "sown"
-PLOT_STANDS_BARE :: 407
-PLOT_STANDS_RIPE :: 699
-PLOT_STANDS_SOWN :: 732
+PLOT_STANDS_BARE :: 411
+PLOT_STANDS_RIPE :: 710
+PLOT_STANDS_SOWN :: 743
 
 // The field registry: what code needs to read and write any component
 // generically.
@@ -511,7 +520,7 @@ Component_Info :: struct {
 	fields:  [^]Field_Info,
 }
 
-COMPONENT_COUNT :: 49
+COMPONENT_COUNT :: 50
 
 @(rodata) Combustor_fields := [?]Field_Info{
 	{"burnRate", offset_of(Combustor, burnRate), VALUE_QUANTITY, "int", "content, saved, inspect"},
@@ -749,6 +758,13 @@ COMPONENT_COUNT :: 49
 	{"tended", offset_of(Part, tended), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
 	{"wear", offset_of(Part, wear), VALUE_QUANTITY, "int", "content, saved, proposable, inspect, perceive(sight)"},
 }
+@(rodata) Patch_fields := [?]Field_Info{
+	{"grewAt", offset_of(Patch, grewAt), VALUE_QUANTITY, "time", "content, saved, proposable, inspect"},
+	{"handfuls", offset_of(Patch, handfuls), VALUE_QUANTITY, "int", "content, saved, proposable, inspect, perceive(sight)"},
+	{"most", offset_of(Patch, most), VALUE_QUANTITY, "int", "content, saved, inspect"},
+	{"regrowsIn", offset_of(Patch, regrowsIn), VALUE_QUANTITY, "time", "content, saved, inspect"},
+	{"yields", offset_of(Patch, yields), VALUE_TEXT, "text", "content, saved, inspect"},
+}
 @(rodata) Plot_fields := [?]Field_Info{
 	{"grows", offset_of(Plot, grows), VALUE_TEXT, "text", "content, saved, inspect, perceive(sight)"},
 	{"kept", offset_of(Plot, kept), VALUE_BOOL, "bool", "content, saved, proposable, inspect, perceive(sight)"},
@@ -855,6 +871,7 @@ COMPONENTS := [COMPONENT_COUNT + 1]Component_Info{
 	{"Log", "#Log", size_of(Log), 4, &Log_fields[0]},
 	{"Pack", "#Pack", size_of(Pack), 2, &Pack_fields[0]},
 	{"Part", "#Part", size_of(Part), 7, &Part_fields[0]},
+	{"Patch", "#Patch", size_of(Patch), 5, &Patch_fields[0]},
 	{"Plot", "#Plot", size_of(Plot), 8, &Plot_fields[0]},
 	{"Pump", "#Pump", size_of(Pump), 4, &Pump_fields[0]},
 	{"Record", "#Record", size_of(Record), 1, &Record_fields[0]},

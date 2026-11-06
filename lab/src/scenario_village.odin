@@ -12,7 +12,8 @@ package lab
  *
  * Each has seen its worksite and its home before the first morning:
  * set down by its worksite for the first boundary, by its woodpile, its
- * larder and its stove for the next three, then by its bed, so all are in
+ * larder and its stove for the next three, the green and its edge of the
+ * woods for two more, then by its bed, so all are in
  * what it knows when its commitments are undertaken, bound to them. Its sight is four tiles: the rest of the way it
  * finds as it walks.
  *
@@ -26,6 +27,11 @@ package lab
  * roam there and run from people they see; the herds are kept up from the
  * east edge, six deer and four hares at most (the game domain).
  *
+ * The woods hold forage (content/foraging/): brambles and hazels along the
+ * edges nearest the houses, where each household stands once as it is set
+ * up and sees them, and scattered through the woods, found by looking. A
+ * household short of food forages, and eats what it finds.
+ *
  * Each household keeps coins in a coffer, a stall on the green, and
  * backpacks and a basket by its door (content/market/, content/carrying/):
  * on market day (the third, then every fourth) its first keeps the stall
@@ -35,13 +41,15 @@ package lab
  * The run goes boundary by boundary up to each check's time, putting none
  * in of its own (as the watcher runs it), so `lab run village` and a
  * watched village are the same run. The checks, for a week of days and
- * nights (VILLAGE.md's Testing): everyone taking a meal to work at 07:30,
+ * nights (VILLAGE.md's Testing): everyone taking a meal to work at 07:30
+ * (or late, having foraged first that morning),
  * at work at 11:00 (about its worksite, or about its work: a woodcutter in
  * the woods, or on its way home with firewood; a hunter on the hunt; on
- * market day, the market; or, hungry, at a meal), the meal eaten by
- * 14:30, the woodpile rising (or stocked), every plot sown by 15:00 the
- * first day, home by 21:00 (by its bed, or at its hearth); at 02:00 asleep in their own bed, everyone fed that day and no
- * reserves below 50, every stove with fuel, every pack back by its larder,
+ * market day, the market, or on its way back to work; or, hungry, at a
+ * meal), the meal eaten by 14:30, the woodpile rising (or stocked), every
+ * plot sown by 15:00 the first day, home by 21:00 (by its bed, or at its
+ * hearth); at 02:00 asleep in their own bed (or up at its hearth for a
+ * meal, woken hungry), everyone fed that day and no reserves below 50, every stove with fuel, every pack back by its larder,
  * and the game bedded down; on each market day, sales by every household
  * with goods to sell, and the takings home with no coin made or lost; and
  * at the end, each household's larder emptied by what it ate (what was
@@ -130,6 +138,24 @@ village_game := [7]Village_Game {
 	{"hare", {146, 42}}, {"hare", {138, 58}}, {"hare", {151, 64}},
 }
 
+/* The woods' forage (VILLAGE.md decision 12, content/foraging/): patches
+ * along the edges nearest the houses, each household's edge (where it walks
+ * as it is set up, and sees them), and more through the woods, found by
+ * looking. */
+@(private = "file", rodata)
+village_forage := [18]Village_Game {
+	/* north of the Ashes and the Fells */
+	{"bramble", {42, 22}}, {"bramble", {44, 21}}, {"hazel", {46, 22}}, {"bramble", {48, 21}}, {"bramble", {43, 20}}, {"hazel", {47, 20}},
+	/* north of the Brooks */
+	{"bramble", {69, 22}}, {"bramble", {71, 21}}, {"hazel", {73, 22}}, {"bramble", {75, 21}}, {"bramble", {70, 20}}, {"hazel", {74, 20}},
+	/* east of the Hunts */
+	{"bramble", {129, 56}}, {"bramble", {130, 58}}, {"hazel", {129, 60}}, {"bramble", {131, 55}}, {"bramble", {132, 59}}, {"hazel", {131, 61}},
+}
+
+/* Where each household stands at its woods' edge, in sight of its patches. */
+@(private = "file", rodata)
+village_forage_edge := [4][2]i32{{45, 24}, {72, 24}, {45, 24}, {126, 58}}
+
 /* The seed each household keeps back, by blueprint (village.tri). */
 @(private = "file", rodata)
 village_seed := [4][2]cstring {
@@ -159,6 +185,7 @@ Village :: struct {
 	farming:      ^Farming,          // ripens the crops
 	game:         ^Game,             // keeps the herds up
 	perishing:    ^Perishing,        // spoils meat and meals
+	foraging:     ^Foraging,         // regrows the woods' forage
 	people:       [dynamic]Villager,
 	larders:      [4]Entity_ID,      // each household's, by its index
 	stoves:       [4]Entity_ID,
@@ -202,6 +229,7 @@ village_init_with_world :: proc(world: ^World, committer: ^Committer) -> ^Villag
 	self.farming    = farming_init_with_world(world)
 	self.game       = game_init_with_world(world)
 	self.perishing  = perishing_init_with_world(world)
+	self.foraging   = foraging_init_with_world(world)
 	self.scheduler  = scheduler_init_with_world(world, committer)
 	/* a diagnostic event is kept a day, then counted (KNOWLEDGE.md decision 21) */
 	world_set_history_window(world, 86400000)
@@ -211,6 +239,7 @@ village_init_with_world :: proc(world: ^World, committer: ^Committer) -> ^Villag
 	scheduler_add_domain(self.scheduler, farming_as_domain(self.farming))
 	scheduler_add_domain(self.scheduler, game_as_domain(self.game))
 	scheduler_add_domain(self.scheduler, perishing_as_domain(self.perishing))
+	scheduler_add_domain(self.scheduler, foraging_as_domain(self.foraging))
 	/* the herds of the eastern woods, kept up from the east edge (VILLAGE.md
 	 * decision 7): six deer at most, four hares, one a quarter-day */
 	edge := [][2]i32{{159, 20}, {159, 45}, {159, 70}, {159, 90}}
@@ -236,6 +265,7 @@ village_dealloc :: proc(self: ^Village) {
 	release(self.farming)
 	release(self.game)
 	release(self.perishing)
+	release(self.foraging)
 	delete(self.people)
 	for list in self.plots do delete(list)
 	for r in self.results do delete(r)
@@ -345,6 +375,21 @@ village_setup :: proc(self: ^Village) {
 			for at in village_game do proposal_group_create(g, at.blueprint, at.blueprint, on_tile(at.at.x, at.at.y, 0))
 		}
 	}
+	/* the woods' forage: by the edges, and scattered through, a bramble or
+	 * (one in three) a hazel on a woodland tile picked by a mix of its place */
+	for at in village_forage do proposal_group_create(g, at.blueprint, at.blueprint, on_tile(at.at.x, at.at.y, 0))
+	{
+		t := world_terrain(self.world)
+		n := 0
+		for y: i32 = 0; y < world_tiles_high(self.world); y += 1 {
+			for x: i32 = 0; x < world_tiles_wide(self.world); x += 1 {
+				info := terrain_kind_info(t, terrain_at(t, x, y, 0))
+				if info == nil || info.name != "woodland" || (u32(x) * 73856093 ~ u32(y) * 19349663) % 151 != 0 do continue
+				proposal_group_create(g, "hazel" if n % 3 == 2 else "bramble", "forage", on_tile(x, y, 0))
+				n += 1
+			}
+		}
+	}
 	committer_submit(c, g)
 	scheduler_run_until(self.scheduler, time_make(1))     /* each sees its worksite */
 	for l, k in larders do self.larders[k] = proposal_group_id_for(g, l)
@@ -364,7 +409,7 @@ village_setup :: proc(self: ^Village) {
 
 	/* then round its house: beside the larder (against the west wall), then
 	 * the stove (the east), two to a tile's breadth */
-	for stop, k in ([4]string{"woodpile", "larder", "stove", "green"}) {
+	for stop, k in ([5]string{"woodpile", "larder", "stove", "green", "woods"}) {
 		tour := proposal_group_group_with_phase(.System, fmt.tprintf("setup: by the %s", stop))
 		for v, i in self.people {
 			h := households[v.household]
@@ -377,6 +422,10 @@ village_setup :: proc(self: ^Village) {
 			case 2: proposal_group_move_to(tour, whole(v.id), on_tile(h.stove.x - 1, h.stove.y - 1 + i32(i % 2), 0))
 			/* the green, where the paths cross, in sight of every stall */
 			case 3: proposal_group_move_to(tour, whole(v.id), on_tile(59 + i32(i % 3), 49 + i32(i / 3 % 3), 0))
+			/* the household's edge of the woods, in sight of what grows there */
+			case 4:
+				at := village_forage_edge[v.household]
+				proposal_group_move_to(tour, whole(v.id), on_tile(at.x - 1 + i32(i % 3), at.y, 0))
 			}
 		}
 		committer_submit(c, tour)
@@ -409,7 +458,7 @@ village_setup :: proc(self: ^Village) {
 		}
 	}
 	committer_submit(c, home)
-	scheduler_run_until(self.scheduler, time_make(6))     /* and sees its bed */
+	scheduler_run_until(self.scheduler, time_make(7))     /* and sees its bed */
 
 	/* the day's commitments, every day, bound to its own bed and its work */
 	farmer_index: [4]int
@@ -789,8 +838,8 @@ village_game_awake :: proc(self: ^Village) -> [dynamic]string {
 
 
 /* What each household has taken from its larder, a portion at a time:
- * three to five portions a person a day, as many meals as it ate, and none
- * from another's. */
+ * two to five portions a person a day (not all it eats comes from there:
+ * meat, forage), and none from another's. */
 @(private = "file")
 village_check_larders :: proc(self: ^Village) {
 	people: [4]i64
@@ -798,7 +847,7 @@ village_check_larders :: proc(self: ^Village) {
 	wrong := make([dynamic]string, context.temp_allocator)
 	for l, k in self.larders {
 		taken := village_grain(k) - village_portions_in(self.world, l) + self.marketed[k] + self.brought[k]
-		if taken < 3 * people[k] * self.days || taken > 5 * people[k] * self.days {
+		if taken < 2 * people[k] * self.days || taken > 5 * people[k] * self.days {
 			append(&wrong, fmt.tprintf("%s took %d", households[k].name, taken))
 		}
 	}
@@ -921,14 +970,22 @@ village_check_each :: proc(self: ^Village, name: string, where_: Where) {
 	for v in self.people {
 		ok := false
 		switch where_ {
-		case .Packed:  ok = village_holds_meal(self.world, v.id) == 1
+		/* or, short of food, it foraged this morning and is late packing */
+		case .Packed:
+			ok = village_holds_meal(self.world, v.id) == 1 ||
+			     agency_activity(self.agency, "forage", v.id, "completed",
+			                     world_time(self.world).ms / VILLAGE_DAY * VILLAGE_DAY + 4 * VILLAGE_HOUR) != NO_ENTITY
 		case .Work:    ok = village_at_work(self, v)
 		case .Lunched: ok = village_holds_meal(self.world, v.id) == 0      /* at work, it was at 11:00 */
 		/* by its bed, or at its hearth: a late meal cooking at the stove */
 		case .Home:    ok = village_within_reach(self.world, v.id, v.bed) ||
 		                    village_within_reach(self.world, v.id, self.stoves[v.household]) ||
 		                    village_within_reach(self.world, v.id, self.larders[v.household])
-		case .Asleep:  ok = village_within_reach(self.world, v.id, v.bed) && village_asleep_in(self.world, v.id, v.bed)
+		/* or up at its hearth for a meal, woken hungry */
+		case .Asleep:  ok = (village_within_reach(self.world, v.id, v.bed) && village_asleep_in(self.world, v.id, v.bed)) ||
+		                    ((village_within_reach(self.world, v.id, self.stoves[v.household]) ||
+		                      village_within_reach(self.world, v.id, self.larders[v.household])) &&
+		                     agency_intends(self.agency, v.id, "eat_when_hungry"))
 		}
 		if !ok do append(&missing, fmt.tprintf("%d", v.id))
 	}
@@ -965,6 +1022,8 @@ village_at_work :: proc(self: ^Village, v: Villager) -> bool {
 		if agency_intends(self.agency, v.id, goal) do return true
 	}
 	day := world_time(self.world).ms / VILLAGE_DAY
+	/* on market day, on its way back to work from the market */
+	if day >= VILLAGE_MARKET && (day - VILLAGE_MARKET) % 4 == 0 && agency_intends(self.agency, v.id, "be_at_work") do return true
 	green := self.stalls[0]
 	return day >= VILLAGE_MARKET && (day - VILLAGE_MARKET) % 4 == 0 && green != NO_ENTITY &&
 	       la.form == .On_Tile && abs(la.x - world_location_of(self.world, green).x) <= 8 &&

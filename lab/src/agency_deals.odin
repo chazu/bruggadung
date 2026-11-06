@@ -950,6 +950,7 @@ agency_hand_over :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Store,
 		have := i32(agency_units_of(self, held, store))
 		if have <= 0 do have = 1
 		give := min(have, o.units)
+		if agency_again(self, m, "give_some", held, to) do return fmt.tprintf("give_some R%d again, to no end", held)
 		if !agency_act(self, m, title, store, "give_some", held, to, i64(give), nil) do return "it couldn't hand it over"
 		o.units -= give
 		if o.units <= 0 && kind == .Hand_Over do agency_drop_owed(m, k)
@@ -973,6 +974,7 @@ agency_hand_over :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Store,
 		agency_walk(self, m, title, me, c, store, 1)
 		return ""
 	}
+	if agency_again(self, m, "take_some", kept, 0) do return fmt.tprintf("take_some R%d again, to no end", kept)
 	if !agency_act(self, m, title, store, "take_some", kept, 0, i64(o.units), nil) do return "it couldn't take it"
 	return ""
 }

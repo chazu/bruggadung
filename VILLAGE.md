@@ -273,6 +273,40 @@ things the lab put off:
       decision 23), what is in the pack is taken out and put away. At
       15:00 every pack is emptied (food and hides into the larder, firewood
       onto the woodpile) and put back by the larder.
+12. **Foraging is how the short get by** (asked for after the negotiation
+    round; slice 13). The woods hold forage: **patches** (a bramble, a
+    hazel), each an entity on a woodland tile, holding a few **handfuls**
+    that regrow one at a time (a bramble three, one a day; a hazel four,
+    one every two days), in closed form as crops ripen (decision 5): a
+    patch's handfuls are a function of when it last grew, and it wakes
+    when the next is due. How many it holds is seen.
+    - **Anyone forages**, with no trade and no tool: a search of a patch
+      within reach (`forage`, ten minutes, the hands) gives a handful
+      into a free hand, or nothing from a bare patch. A handful is ready
+      to eat, raw as it is: berries nourish 12 and keep two days; hazelnuts
+      nourish 15 and keep.
+    - **It is the way of the short.** Hunger's ways run: a meal in hand,
+      cook one from home, eat something raw in hand, then **forage and
+      eat** (find a handful: the nearest patch believed to hold some,
+      else go looking at the woods' edge for one never seen). A household
+      short of food (rationing: cooking/) can't make a meal on hunger, so
+      it forages; one that can cook doesn't. Not in the dark: woken hungry
+      at night, it waits for the dawn (AGENCY.md decision 33). Asking someone
+      (NEGOTIATION.md) comes only after, when even the woods fail.
+    - **What it is worth, against the other ways.** By the hour of work:
+      foraging gives about 40 to 60 points of nourishment, a few handfuls
+      at a patch and the walk between, less as the patches near the
+      village are stripped, and never enough to put by. Farming gives the
+      most for its labour, but at harvest, weeks after the sowing, and only
+      it builds a store. Hunting has the best hours and the worst: a deer
+      is forty kilograms of meat, a day may bring nothing, and the meat
+      spoils in three days. Its risk is so far only coming home empty;
+      game that fights back is for later.
+    - **The village's woods** hold patches along the edges nearest the
+      houses: north of the Ashes and the Fells, north of the Brooks, and
+      east of the Hunts. As the village is set up each household walks to
+      its nearest edge and sees what grows there; the rest it finds by
+      looking.
     - What is in a pack its carrier carries, the carrier knows (KNOWLEDGE.md
       decision 25).
     - Built on the way: larders and woodpiles are kinds of their own, seen
@@ -435,6 +469,8 @@ when it is built:
     remembers it (TESSERA.md slice 2's knowledge scenes; built).
 12. **Carrying**: backpacks and baskets, loads, a burdened walk (built;
     decision 11).
+13. **Foraging**: patches in the woods, regrowing; foraging when short
+    (decision 12).
 
 Slice 1 comes first: everything after it depends on hunger working over
 weeks. Slices 2 and 3 can be done alongside it. Slices 4 to 9 depend on
@@ -467,6 +503,10 @@ New, and entered in the glossary with this document:
 | Kept goal | An ongoing condition: a commitment to it arises again whenever it no longer holds, through its window. (Built.) |
 
 ## Open questions
+
+- **Preparing and preserving food.** To return to (lab/PLAN.md): food
+  made from food (bread, stew), and kept longer (dried, salted, smoked),
+  so meat outlasts its three days and a hunt's surplus isn't rot.
 
 - **Can people die?** Settled (decision 7): any body whose injury reaches
   100 dies, a person into a corpse. Nothing in the village comes close.
@@ -588,15 +628,28 @@ New, and entered in the glossary with this document:
     the open: KNOWLEDGE.md decision 26). The week's checks also take a
     hungry agent cooking a meal at 11:00 as at work, and one at its
     hearth at 21:00 as home.
-  - Still breaking: food runs out before the harvest all the same (the
-    Hunts unfed some days from day 11, the farmers with nothing to pack
-    from day 9); a sleep cut short by the morning (hunger, rationing,
-    waking the sleeper) stays suspended, and the next night going to bed
-    resumes it, its minutes left gone at once, so the agent is up all
-    night (it should be given up when its window closes: whether fatigue
-    is cleared then is the question); a pack isn't put back from day 13;
-    and the Ashes and the Hunts take less from their larders than three
-    portions a head a day (rationing; the Hunts' meat isn't counted).
+  - **Foraging** (decision 12): with it, nobody goes a day unfed in the
+    three weeks; the short forage at dawn and in the evening, and eat
+    what they find. A woodcutter that had taken up both axes, both hands
+    full, could take no food for days: it takes one only with both hands
+    free.
+  - A sleep cut short by the morning was taken up again the next night
+    and ended at once, the agent up all night: a commitment's window
+    closing now gives up what it was doing for it (AGENCY.md decision
+    32). A hunter took up a second bow, as a woodcutter a second axe, and
+    with both hands full ate nothing: each takes one up only with both
+    hands free.
+  - Accepted (the user's call): a meal packed late because the short
+    foraged first (the 07:30 check passes one who foraged that morning),
+    and a pack left out some nights.
+  - Still breaking (10 of the three weeks' 222 checks): after the harvest
+    some can't take from their own larder: several households' beliefs of
+    the grain at home are bound to one stack of grain seen elsewhere
+    (stacks of grain look alike, and a referent was taken for another:
+    KNOWLEDGE.md decision 18's "told apart by where it is" doesn't hold
+    for what is moved), so their takes fail, and they go short a day or
+    pack late. The larders check asks two portions a head a day at the
+    least, not three: the short eat forage, and the Hunts meat.
 - **Seed from the harvest.** Settled: once a harvest, holding more than a
   sack of seed's worth of it (twelve and a half kilograms of grain), a
   farmer keeps a sack back as seed (`keep_back_seed`), marking the plot

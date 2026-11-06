@@ -14,9 +14,9 @@
 //             for deciding (DETAIL_REGIMES.md).
 // - frozen:   it doesn't decide; risen, it looks, and so decides, at once.
 // - code:     src/agency_agency.odin: considerations by their kind (#Flat,
-//             #Scaled, #Need, #Trait, #AtHome, ...), conditions, `order`,
-//             commitments, goals arising from findings or from what is
-//             held; a method step's act done again to no end fails it
+//             #Scaled, #Need, #Trait, #AtHome, #ByLight, ...), conditions,
+//             `order`, commitments, goals arising from findings or from
+//             what is held; a method step's act done again to no end fails it
 //             (AGENCY.md decision 24); a need's goal settled is weighed
 //             again once it is felt more, or eased; with no method of a
 //             need's goal holding, asking someone (deals/).
@@ -63,6 +63,10 @@
 // it knows is its own (an #Owned finding), over the `curve`; without one,
 // or having seen inside none of them, nothing (cooking/'s rationing).
 #AtHome: #Consideration & { stocked: #Body, keptIn: #Body }
+
+// How light it is out of doors (light/'s daylight: 0 night, 1 dusk, 2 day),
+// over the `curve`; without one, nothing (foraging/: none in the dark).
+#ByLight: #Consideration & { outdoors: *true | true }
 
 // What a need presses for (AGENCY.md §6): pressure over what the agent
 // feels, `per` tenths of a point for each point of it.

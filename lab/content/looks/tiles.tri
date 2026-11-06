@@ -48,3 +48,4 @@ tiles_log:       #Glyph & { theme: "tiles", look: "log", char: "-", ink: [170, 1
 tiles_trunk:     #Glyph & { theme: "tiles", look: "log.trunk", char: "=", ink: [150, 100, 60] } @family(glyphs)
 tiles_tool:      #Glyph & { theme: "tiles", look: "tool", char: "/", ink: [190, 190, 200] } @family(glyphs)
 tiles_plot:      #Glyph & { theme: "tiles", look: "plot", char: "ψ", ink: [200, 180, 80] } @family(glyphs)
+tiles_patch:     #Glyph & { theme: "tiles", look: "patch", char: "*", ink: [170, 60, 110] } @family(glyphs)

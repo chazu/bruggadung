@@ -1854,6 +1854,67 @@ agency_since_window :: proc(m: ^Motivation, since: i64) -> i64 {
 }
 
 
+/* A commitment's window closed: what it was doing for it, begun in the
+ * window and running still or put down (an operation of the goal's own
+ * methods: a night's sleep), is given up, not taken up again another day
+ * (a sleep cut short by the morning, resumed the next night, ended at once,
+ * and the agent was up all night). */
+@(private = "file")
+agency_give_up_window :: proc(self: ^Agency, m: ^Motivation, c: ^Commitment) {
+	methods: [BG_MAX_METHODS]cstring
+	op:      [64]u8
+	n:       uint
+
+	if self.activities == nil do return
+	tc       := world_tri(self.world)
+	running  := u32(tri.type_named(tc, "\"running\""))
+	starting := u32(tri.type_named(tc, "\"starting\""))
+	put_down := u32(tri.type_named(tc, "\"suspended\""))
+	nm := agency_methods_for_mind(self, c.goal, m, raw_data(methods[:]), BG_MAX_METHODS)
+	mine := world_copy_activities_of(self.world, m.agent, &n)
+	defer free(mine)
+	for i: uint = 0; i < n; i += 1 {
+		record := (^Activity)(world_record(self.world, world_kind_named(self.world, "Activity"), mine[i]))
+		if record == nil || record.started < c.from || (record.status != running && record.status != starting && record.status != put_down) {
+			continue
+		}
+		name := world_text_field(self.world, "Activity.operation", mine[i])
+		ours := false
+		for j: uint = 0; j < nm && !ours; j += 1 {
+			for steps := tri.at(tc, tri.pattern(tc, methods[j]), "steps"); steps != nil && !ours; steps = tri.at(tc, steps, "rest") {
+				step := tri.at(tc, steps, "first")
+				if step == nil do break
+				ours = text_at(tc, step, "op", op[:]) && name != nil && string(name) == str(op[:])
+			}
+		}
+		if ours && activities_abort(self.activities, mine[i], "its window is over", nil) != nil {
+			agency_note(self, m, fmt.tprintf("giving up the %s: its window is over", name))
+		}
+	}
+}
+
+
+/* Whether the act is the same as the agent's last, done again at once
+ * so many times running (AGENCY.md decision 24): it gets nowhere. */
+@(private)
+agency_again :: proc(self: ^Agency, m: ^Motivation, op: cstring, item: u32, target: u32) -> bool {
+	again := &m.again
+	now   := world_time(self.world).ms
+	opi   := world_intern(self.world, op)
+	if again.op == opi && again.item == item && again.target == target && now - again.at <= BG_AGAIN_WITHIN {
+		again.times += 1
+	} else {
+		again^ = Repeated_Act{op = opi, item = item, target = target, times = 0}
+	}
+	again.at = now
+	if again.times >= BG_AGAIN_TIMES {
+		again^ = {}
+		return true
+	}
+	return false
+}
+
+
 /* Whether the agent has a suspended activity of one of the method's
  * operations. */
 @(private = "file")
@@ -2064,17 +2125,7 @@ agency_follow :: proc(self: ^Agency, m: ^Motivation, method: cstring, index: i32
 		}
 		/* the same act again and again, at once: it gets nowhere, so the
 		 * method fails (and with no other, the goal is impossible for now) */
-		again := &m.again
-		now   := world_time(self.world).ms
-		opi   := world_intern(self.world, cstr(op[:]))
-		if again.op == opi && again.item == roles[0] && again.target == roles[1] && now - again.at <= BG_AGAIN_WITHIN {
-			again.times += 1
-		} else {
-			again^ = Repeated_Act{op = opi, item = roles[0], target = roles[1], times = 0}
-		}
-		again.at = now
-		if again.times >= BG_AGAIN_TIMES {
-			again^ = {}
+		if agency_again(self, m, cstr(op[:]), roles[0], roles[1]) {
 			agency_fail(self, m, index, fmt.tprintf("%s: %s R%d again, to no end", str(title[:]), str(op[:]), roles[0]))
 			return false
 		}
@@ -3228,6 +3279,12 @@ agency_sum :: proc(self: ^Agency, instance: cstring, path: cstring, b: [^]Slot_B
 				if string(law.forbids) == str(act[:]) && string(law.wrong) == "\"anothers\"" && law.weighs > v do v = law.weighs
 			}
 			append(parts, fmt.tprintf("%s %+d", "exposing" if v != 0 else "nothing to hide", v))
+		} else if tri.at(tc, c, "outdoors") != nil {
+			/* the daylight out of doors, as anyone sees it (light/) */
+			lit := daylight(self.world, world_time(self.world).ms)
+			if !curve_at(tc, tri.at(tc, c, "curve"), i64(lit), &v) do v = 0
+			names := [3]string{"night", "dusk", "day"}
+			append(parts, fmt.tprintf("%s %+d", names[clamp(lit, 0, 2)], v))
 		} else if keptIn := tri.at(tc, c, "keptIn"); keptIn != nil {
 			/* what it believes it has at home (cooking/'s rationing): a curve
 			 * over the mass, in grams */
@@ -3659,6 +3716,7 @@ agency_decide :: proc(self: ^Agency, m: ^Motivation) -> bool {
 			                                 goal_title(world_tri(self.world), it.goal, title[:]),
 			                                 "; the promise is broken" if string(m.commitments[it.commitment - 1].source) == "promise" else ""))
 			m.commitments[it.commitment - 1].settled = true
+			agency_give_up_window(self, m, &m.commitments[it.commitment - 1])
 			m.nintentions = k      /* it, and what it needed */
 			m.waiting     = false
 		}

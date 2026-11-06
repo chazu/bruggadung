@@ -1,0 +1,117 @@
+// Foraging: patches in the woods that hold a few handfuls of food and
+// regrow them, the forage operation, and foraging when hunger has no other
+// way (VILLAGE.md decision 12, slice 13).
+//
+// Cut points:
+// - full:     a patch holds `handfuls`, at most `most`, and grows one more
+//             every `regrowsIn` while it holds fewer, from `grewAt`.
+//             Foraging a patch within reach (ten minutes, the hands)
+//             gives a handful of what it `yields` into a free hand, ready
+//             to eat; a bare patch gives nothing. Hunger's last way of its
+//             own is to forage and eat: the nearest patch it believes holds
+//             some, else a look at the woods' edge for one never seen; not
+//             at night (agency.tri's #ByLight, light/'s daylight).
+// - reduced:  the same, decided on the cadence's beat; a patch regrows as
+//             at full.
+// - abstract: as reduced. Forage as a yield of the woods below reduced,
+//             with game (hunting/), is open (VILLAGE.md decision 3).
+// - frozen:   a patch regrows; nobody forages.
+// - hunger:   a handful is hunger/'s #Food, not raw: eaten as it is
+//             (eating.tri's eat). Foraging is a way to eat_when_hungry,
+//             after cooking/'s, and so the way of the short: rationing
+//             (cooking/'s cook_and_eat) leaves it.
+// - perishing: berries keep two days (perishing/); hazelnuts keep.
+// - terrain:  patches stand on woodland (terrain/); looking for one goes
+//             to the edge of woodland never seen.
+// - deals:    asking someone for food (deals/) comes only when this fails
+//             too: it is a way of the goal's own.
+// - code:     effect_forage (src/act_actions.odin); src/domains_foraging.odin
+//             regrows a patch, a wake for each handful; the scenario places
+//             the patches (src/scenario_village.odin).
+
+package foraging
+
+// A patch of forage: how many handfuls it holds (seen), at most; how long
+// one takes to grow back; when it last grew one (or was stripped of its
+// last, and began again); and what a handful is (a blueprint).
+#Patch: #Body & {
+    @component(Patch)
+    handfuls:  *0 | int & >=0 & <=100        @field(content, saved, proposable, inspect, perceive(sight))
+    most:      *3 | int & >=1 & <=100        @field(content, saved, inspect)
+    regrowsIn: *1d | time & >=1s & <=1000d   @field(content, saved, inspect)
+    grewAt:    *0ms | time & >=0ms & <=10000d @field(content, saved, proposable, inspect)
+    yields:    text                          @field(content, saved, inspect)
+}
+
+patch_seen: #Seen & { kindOf: "#Patch" } @family(seen)
+patch_look: #Look & { kindOf: "#Patch", look: "patch" } @family(looks)
+
+// A bramble, three handfuls of berries, one back a day; a hazel, four of
+// hazelnuts, one back every two days.
+bramble: #Patch & { material: "wood", mass: 20kg, handfuls: 3, most: 3, regrowsIn: 1d, yields: "berries" }
+hazel:   #Patch & { material: "wood", mass: 200kg, handfuls: 4, most: 4, regrowsIn: 2d, yields: "hazelnuts" }
+
+// A handful: ready to eat, a little nourishment. Berries keep two days;
+// nuts keep.
+berries:   #Body & #Food & { material: "food", mass: 150g, raw: false, nourishment: 12, keepsFor: 2d }
+hazelnuts: #Body & #Food & { material: "food", mass: 100g, raw: false, nourishment: 15 }
+
+// Search a patch within reach for a handful: a while, with the hands.
+forage: #Operation & {
+    effect:   "forage"
+    duration: 10min
+    uses:     ["hands"]
+    roles: {
+        actor: #Agent & { id: $a }
+        item:  #Patch
+    }
+} @family(operations)
+
+// Foraging: the food found, and the patch it is found in.
+#Foraging: #Supper & { patch: #Body }
+
+// A handful found, in hand.
+foraged: #Goal & {
+    title: "find something to eat"
+    done: {
+        find:  ["food"]
+        match: #Foraging & {
+            me:   #Agent & { id: $me }
+            food: #Food & #Body & { raw: false, place: #Held & { by: $me } }
+        }
+    }
+} @family(goals)
+
+// The nearest patch it believes holds some, a hand free.
+forage_it: #Method & {
+    title: "forage"
+    goal:  "foraged"
+    rank:  1
+    pre: {
+        find:  ["patch"]
+        match: #Foraging & { me: #Agent & { freeHands: >=1 }, patch: #Patch & { handfuls: >=1 } }
+    }
+    order: ["near"]
+    steps: [#Do & { op: "forage", object: "patch" }]
+} @family(methods)
+
+// None known to hold any: to the edge of woodland never seen, to find one.
+look_for_forage: #Method & {
+    title: "look for forage"
+    goal:  "foraged"
+    rank:  2
+    pre:   { find: [], match: #Foraging }
+    steps: [#Explore & { beside: "woodland" }]
+} @family(methods)
+
+// Hunger's last way of its own (after eating a meal in hand, cooking one,
+// and eating something raw in hand): forage, and eat what is found; not in
+// the dark (woken hungry at night, rationing, it waits for the dawn).
+forage_and_eat: #Method & {
+    title: "forage and eat"
+    goal:  "eat_when_hungry"
+    rank:  4
+    pre:   { find: [], match: #Foraging }
+    score: [#ByLight & { curve: [{ input: 0, output: -1 }, { input: 1, output: 0 }] }]
+    steps: [#Achieve & { subgoal: "foraged" }, #Do & { op: "eat", object: "food" }]
+} @family(methods)

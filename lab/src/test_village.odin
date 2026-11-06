@@ -15,8 +15,10 @@ test_village :: proc() {
 	bg_check(village_error(village) == "")
 	village_run(village)
 	bg_check(len(village_results(village)) == 79 && village_failure_count(village) == 0)
-	/* asleep at 02:00 on the third night: everyone's sleep is of its own bed */
+	/* at 02:00 on the last night: everyone's sleep is of its own bed (one up
+	 * at its hearth for a meal, woken hungry, aside) */
 	for v in village.people {
+		if agency_intends(village.agency, v.id, "eat_when_hungry") do continue
 		bed := world_location_of(w, v.bed)
 		me  := world_location_of(w, v.id)
 		bg_check(abs(bed.x - me.x) <= 1 && abs(bed.y - me.y) <= 1)

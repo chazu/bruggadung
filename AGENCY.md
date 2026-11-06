@@ -217,10 +217,19 @@ Out of scope here, except where they touch agency:
     buyers went to it, found nobody minding the stall, and gave up.
 31. **Asking and negotiation are NEGOTIATION.md's.** A kept goal found
     impossible is tried again its `retry` later, ten minutes without one
-    (repaying in kind: six hours). Asking is a general
-    method any goal falls back on when none of its methods holds; every
+    (repaying in kind: six hours). Asking is a general method a need's
+    goal falls back on when none of its methods holds; every
     asking is a negotiation over a deal (a gift, in kind, a loan, a sale),
     which leaves debts, credits and gratitude behind.
+32. **A commitment's window closing gives up what it was doing for it.**
+    An activity of the goal's own methods (a night's sleep), begun in the
+    window and running still or put down, is given up when the window
+    closes, not resumed another day: a sleep cut short by the morning was
+    taken up again the next night, its minutes left gone at once, and the
+    agent was up all night. A night's sleep cut short clears no fatigue.
+33. **How light it is outdoors is a consideration** (`#ByLight`, over the
+    clock's daylight: 0 night, 1 dusk, 2 day): nobody forages in the dark
+    (VILLAGE.md decision 12).
 
 ## Terms
 

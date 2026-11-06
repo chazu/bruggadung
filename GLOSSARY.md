@@ -518,6 +518,11 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
 - **Meal**: food that isn't **raw**: cooked (at a lit stove, adding its
   `cooking` to its nourishment) or never raw (a supper). *Avoid:* dish.
   (VIL slice 4, lab/content/cooking/cooking.tri)
+- **Forage**: food found growing wild in the woods; **foraging**, searching
+  a **patch** (a bramble, a hazel: `#Patch`) for a **handful** of it,
+  ready to eat. A patch holds a few handfuls and regrows them one at a
+  time. The way the short get by: little nourishment for the work, never
+  enough to put by. *Avoid:* gathering (a woodcutter's firewood). (VIL d12)
 - **Larder**: a household's container of food (`#Larder`), told from its
   other containers (its coffer, its packs) at a glance, and from its
   neighbours' larders by where it is. Likewise a **woodpile**

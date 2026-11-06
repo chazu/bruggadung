@@ -222,6 +222,43 @@ In rough order, each driven by a scenario:
 5. The command interface, a text map, and the developer inspector.
 6. Perception and knowledge stores, then agency.
 
+## To return to
+
+Questions set aside, each to be taken up in a later round (the user's
+list, 2026-11-06):
+
+- **What a duty may ask of others** (NEGOTIATION.md open question 8):
+  asking is for needs only; a seller short of goods or a buyer short of
+  coins asks nobody. What a duty may ask, and of whom (its employer, its
+  household).
+- **A coin's worth** (NEGOTIATION.md open question 9): one constant
+  (`BG_COIN_TENTHS`); it should follow the agent's own prices and how many
+  coins it has.
+- **An unpaid loan as a grievance** (NEGOTIATION.md open question 2): today
+  only trust is lost; whether an office takes it up (INSTITUTIONS.md).
+- **Asking in the village**: a starving agent asks its kin first, who are
+  starving too, and neighbours have nothing in hand; asking beyond kin,
+  going to a neighbour's house, and giving from the larder at home there,
+  so a farmer's surplus reaches the hunters.
+- **Stacks of grain taken for one another** (VILLAGE.md, three weeks):
+  after the harvest several households' beliefs of the grain at home are
+  bound to one stack seen elsewhere, so their takes from home fail. What
+  is moved can't be told apart by where it is (KNOWLEDGE.md decision 18).
+- **Why an agent picks up a second axe** (or bow): methods are chosen
+  because their precondition holds, not because they move the goal on.
+  With no tree in sight, every better way of stocking the woodpile fails,
+  and "take up the axe" is the next whose precondition holds (an axe
+  lying there, a hand free), so it is done though an axe is in hand
+  already. Requiring both hands free only hides it. The fix belongs in how
+  ways are written and chosen: a tool in hand as a subgoal ("have an
+  axe", passed over once one is held, as AGENCY.md's subgoals already
+  are), and, more generally, a method taken only when its effect isn't
+  already so. Other methods likely fall through the same way.
+- **Preparing and preserving food** (VILLAGE.md open questions): food made
+  from food (bread from grain, a stew), and kept longer (dried, salted,
+  smoked meat), so a hunt's surplus outlasts three days and a harvest
+  outlasts a season.
+
 ## Status
 
 M0 to M6 are built. `lab test` runs 12 tests (111 checks), and all pass under
@@ -5292,3 +5329,43 @@ logging found the rest in Triangle's arena, under `tri_value`.
   for `#Agent`'s new fields.
 
 142 tests, 4187 checks.
+
+### Foraging (VILLAGE.md decision 12, slice 13)
+
+- **Patches** (content/foraging/): a bramble (three handfuls of berries,
+  one back a day) and a hazel (four of hazelnuts, one every two days),
+  each a `#Patch` on woodland; how many handfuls it holds is seen. They
+  regrow in closed form (src/domains_foraging.odin, as crops ripen): a
+  wake for each handful due.
+- **Foraging** (`forage`, ten minutes, the hands): a handful into a free
+  hand, ready to eat (effect_forage); a bare patch gives nothing.
+- **When**: hunger's last way of its own, `forage_and_eat` (after a meal in
+  hand, cooking one, eating something raw): the nearest patch believed to
+  hold some, else a look at the woods' edge. So the short (rationing)
+  forage, and asking someone comes after.
+- **The village**: 18 patches at the edges nearest the houses, and about
+  forty scattered through the woods; each household stands at its edge
+  once as it is set up.
+- **Also**: a woodcutter takes up an axe only with both hands free (with
+  one in hand it took the other's too, and, both hands full, ate nothing
+  for days). The week's checks take one on its way back to work from the
+  market as at work, and one up at its hearth for a meal at 02:00 as home
+  for the night; the larders check asks two portions a head a day at the
+  least (forage and meat are eaten too). A step the code carries out
+  (`#HandOver`) is held to the repeated-act guard too (`agency_again`): a
+  hunter handing over took from a stack that wasn't where it believed,
+  every millisecond, and three weeks never finished.
+- **After review** (the user's calls): a meal packed late because the
+  short foraged first is accepted (the 07:30 check passes one who foraged
+  that morning), and so is a pack left out some nights. A sleep cut short
+  by the morning is given up when its window closes (AGENCY.md decision
+  32), not resumed the next night; nobody forages in the dark
+  (`#ByLight`, decision 33); a hunter takes up a bow, as a woodcutter an
+  axe, only with both hands free.
+- **Three weeks**: 10 of 222 checks fail, all from stacks of grain taken
+  for one another after the harvest (To return to).
+- **Tests**: `foraging` (a farmer short of food forages a bramble and eats;
+  the bramble regrows; one with a sack at home cooks instead). The kind
+  count is 50 (`Patch`); patches have a glyph in both themes.
+
+143 tests, 4261 checks.
