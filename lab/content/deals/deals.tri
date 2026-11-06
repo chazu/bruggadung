@@ -1,0 +1,121 @@
+// Deals: asking another for a thing, the haggling over the deal it is (a
+// gift, in kind, a loan, a sale), handing it over, and repaying a debt in
+// kind (NEGOTIATION.md).
+//
+// Cut points:
+// - full:     an agent whose need's goal no method serves, and that wants
+//             in hand what a method needs, asks someone it knows for a
+//             thing like it, if the goal is worth more than asking costs
+//             it (its pride); a duty asks nothing yet. The one asked, if it answers at all (agency's social
+//             generator: trust, `helpful`), and has something like it,
+//             haggles: each agrees to what meets its target, or offers the
+//             deal worth least to itself that does, or walks away with its
+//             patience spent. Agreed, it hands the thing over, from its
+//             hands or fetched from its own containers; a debt in kind or a
+//             loan is a commitment of the asker's to give as much again.
+// - reduced:  the same, decided on the cadence's beat.
+// - abstract: as reduced. A household provided for by its neighbours,
+//             below reduced, is open (DETAIL_REGIMES.md).
+// - frozen:   it doesn't decide, asks nothing, and answers nothing.
+// - talk:     each move is said (talk/talk.tri's `say`), heard by the one
+//             it is said to; an ask and an offer are questions, awaited.
+// - money:    a sale's coins are valued at a coin's worth (the code's
+//             BG_COIN_TENTHS: a portion of grain is four), asked only of
+//             one seen holding them; what one spares goes by its stock
+//             against the kind's `plenty` (money/coins.tri's #Pricing);
+//             Scenario 3's `#Request` (money/money.tri) stays a plea, with
+//             no haggling.
+// - things:   what a thing is worth to each side is agency's values
+//             (agency.tri's #Valuing), raised by the need it serves.
+// - code:     src/agency_deals.odin: what to ask for (a method's slot
+//             wanted in hand, its place loosened), whom, valuing a deal,
+//             the target and the concession, `#HandOver`, debts and
+//             credits; constants BG_ASK_COST, BG_ASK_PEOPLE, BG_SPARE,
+//             BG_COIN_TENTHS; effect_give_some (src/act_actions.odin).
+// - hunger:   food asked for is valued by hunger/eating.tri's
+//             `food_kind_value`, raised by hunger.
+
+package deals
+
+// What negotiating adds to an agent (NEGOTIATION.md decision 9), its
+// dispositions, 0 to 100: how much kindness a gift is worth to it; how much
+// it means to return what it is given (and how grateful it is); what asking,
+// and a gift, cost it; how slowly it concedes; how long it haggles.
+#Agent: {
+    generosity:  *30 | int & >=0 & <=100 @field(content, saved, proposable, inspect)
+    reciprocity: *50 | int & >=0 & <=100 @field(content, saved, proposable, inspect)
+    pride:       *30 | int & >=0 & <=100 @field(content, saved, proposable, inspect)
+    shrewdness:  *50 | int & >=0 & <=100 @field(content, saved, proposable, inspect)
+    patience:    *50 | int & >=0 & <=100 @field(content, saved, proposable, inspect)
+}
+
+// A deal over a thing: given, nothing owed; in kind, as much again, some
+// time; lent, back by `term`, the very thing (`back: "same"`) or as much
+// again and `extra` more; or sold, for `sum` coins in all.
+#Deal:     {}
+#Gift:     #Deal & {}
+#InKind:   #Deal & {}
+#Loan:     #Deal & { back: *"like" | "same", extra: *0 | int & >=0 & <=100, term: time & >=1ms & <=1000d }
+#ForCoins: #Deal & { sum: int & >=0 & <=100000 }
+
+// What is proposed: `howMany` things like `what`, on `deal`. An ask opens a
+// negotiation, saying how much the asker feels the need it is for
+// (`wanting`, 0 to 100); an offer answers with another deal; both are
+// questions, and expect an answer: agreeing to the last deal proposed,
+// another offer, walking away (#Refuse), or talk/'s #HaveNone (money/), with
+// nothing like it. Repaying, the debtor says so.
+#Proposing: #Utterance & { deal: #Deal, howMany: *1 | int & >=1 & <=100 }
+#Ask:       #Question & #Proposing & { wanting: *0 | int & >=0 & <=100 }
+#Offer:     #Question & #Proposing & {}
+#Agree:     #Proposing & {}
+#Refuse:    #Utterance & {}
+#Repaid:    #Utterance & {}
+
+// Give some of what the actor holds: so many of a stack (coins, portions),
+// split off into the other's free hand; anything else, whole. A moment.
+give_some: #Operation & {
+    effect:   "give_some"
+    duration: 2s
+    roles: {
+        actor:       #Agent & { id: $a }
+        item:        #Body & { place: #Held & { by: $a } }
+        destination: #Agent & { freeHands: >=1 }
+    }
+} @family(operations)
+
+// Handing a thing over to the one it is owed (a commitment, its `to` bound):
+// something like what was agreed, from the agent's hands, or fetched from
+// its own containers first. The step is the code's: what and how many are
+// the deal's.
+#HandOver: #MethodStep & {}
+
+handed_over: #Goal & {
+    title: "hand it over"
+    done:  #Did & { did: "give_some" }
+} @family(goals)
+
+hand_it_over: #Method & {
+    title: "hand it over"
+    goal:  "handed_over"
+    rank:  1
+    pre:   { find: [], match: #Frame }
+    steps: [#HandOver]
+} @family(methods)
+
+// A debt in kind or a loan: as much again given back to the creditor, by the
+// end of its window; tried again every six hours while there is nothing to
+// spare.
+repaid_in_kind: #Goal & {
+    title: "repay in kind"
+    kept:  true
+    retry: 6h
+    done:  #Did & { did: "give_some", lately: 1min }
+} @family(goals)
+
+repay_it: #Method & {
+    title: "give as much back"
+    goal:  "repaid_in_kind"
+    rank:  1
+    pre:   { find: [], match: #Frame }
+    steps: [#HandOver]
+} @family(methods)

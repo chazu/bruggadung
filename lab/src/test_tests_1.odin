@@ -2137,6 +2137,9 @@ test_rumour_ :: proc(variant: Rumour_Variant) -> Rumour {
 	h[5] = proposal_group_create(g, "carter", "carter", on_tile(20, 4, 0))
 	h[6] = proposal_group_create(g, "porter", "porter", on_tile(26, 4, 0))
 	h[7] = proposal_group_create(g, "foreman", "foreman", on_tile(20, 28, 0))
+	/* too proud to ask for food however hungry they grow (NEGOTIATION.md):
+	 * this is a story of what is remembered, and told, of a chest */
+	for k in 1 ..< 8 do if k != 2 do proposal_group_set_of_to(g, "Agent.pride", whole(h[k]), 100)
 	committer_submit(st.c, g)
 	scheduler_run_until(st.s, time_make(1))
 	run.world      = st.w

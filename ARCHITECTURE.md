@@ -26,6 +26,7 @@ proven on COMPONENTS.md's first scenario.
 | [KNOWLEDGE.md](KNOWLEDGE.md) | §4: history, traces, perception, referents, claims, beliefs, memory | Contract proposed, 3 scenarios; all run in [lab/](lab/README.md) |
 | [AGENCY.md](AGENCY.md) | §5: goals, methods, needs, commitments, habits, dispositions, salience | Contract proposed, 3 scenarios; all run in [lab/](lab/README.md), Scenario 1 adapted, its step 5 (loyalty) aside |
 | [INSTITUTIONS.md](INSTITUTIONS.md) | §6: institutions | Decisions being made |
+| [NEGOTIATION.md](NEGOTIATION.md) | Asking for things, the haggling over a deal, gifts, debts in kind and loans | Decisions made; being built in [lab/](lab/README.md) |
 | [LATENT_ASSEMBLY.md](LATENT_ASSEMBLY.md) | Latent physical assembly | The lab's rules adopted; culprits by history and wear by use still to design |
 | [TERRAIN.md](TERRAIN.md) | Terrain: a kind per cell from content, maps embedded, chunked storage, agents' memory of it | Draft; step 1 (kinds, maps, changes, walls stop movement) runs in [lab/](lab/README.md) |
 | [TESSERA.md](TESSERA.md) | Tessera, the visual engine: scenes from the two views, appearance in content, terminal and GPU backends | Draft; the scene core built in [tessera/](tessera/README.md), nothing draws yet |

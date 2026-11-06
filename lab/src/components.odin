@@ -1,10 +1,10 @@
-// Generated from Triangle content a1e0345db4dc50eb: do not edit. Type IDs are valid
+// Generated from Triangle content e16efdcd246b92fb: do not edit. Type IDs are valid
 // only for this content; regenerate when it changes.
 package lab
 
 import tri "../../triangle/odin/triangle"
 
-CONTENT_HASH :: 0xa1e0345db4dc50eb
+CONTENT_HASH :: 0xe16efdcd246b92fb
 
 // Combustor, from #Combustor
 Combustor :: struct {
@@ -187,6 +187,7 @@ Agent :: struct {
 	curious: i64,    // int, in quanta of 1; content, saved, proposable, inspect
 	diligent: i64,    // int, in quanta of 1; content, saved, proposable, inspect
 	fatigue: i64,    // int, in quanta of 1; content, saved, proposable, inspect
+	generosity: i64,    // int, in quanta of 1; content, saved, proposable, inspect
 	gentle: i64,    // int, in quanta of 1; content, saved, proposable, inspect
 	grip: i64,    // force, in quanta of 0.001N; content, saved, inspect
 	hands: i64,    // int, in quanta of 1; content, saved, inspect, perceive(sight)
@@ -199,11 +200,15 @@ Agent :: struct {
 	memory: i64,    // int, in quanta of 1; content, saved, inspect
 	numbness: i64,    // int, in quanta of 1; content, saved, proposable, inspect
 	painting: i64,    // int, in quanta of 1; content, saved, inspect
+	patience: i64,    // int, in quanta of 1; content, saved, proposable, inspect
+	pride: i64,    // int, in quanta of 1; content, saved, proposable, inspect
 	quickness: i64,    // int, in quanta of 1; content, saved, proposable, inspect
+	reciprocity: i64,    // int, in quanta of 1; content, saved, proposable, inspect
 	remains: cstring,    // text; content, saved, inspect
 	respectful: i64,    // int, in quanta of 1; content, saved, proposable, inspect
 	riskTolerance: i64,    // int, in quanta of 1; content, saved, proposable, inspect
 	scruples: i64,    // int, in quanta of 1; content, saved, proposable, inspect
+	shrewdness: i64,    // int, in quanta of 1; content, saved, proposable, inspect
 	stalking: i64,    // int, in quanta of 1; content, saved, inspect
 	temper: i64,    // int, in quanta of 1; content, saved, proposable, inspect
 	trade: cstring,    // text; content, saved, proposable, inspect
@@ -405,80 +410,80 @@ Fastener :: struct {
 }
 
 // #ActivityStatus
-ACTIVITYSTATUS_ABORTED :: 838
-ACTIVITYSTATUS_COMPLETED :: 839
-ACTIVITYSTATUS_EXHAUSTED :: 840
-ACTIVITYSTATUS_FAILED :: 841
-ACTIVITYSTATUS_RUNNING :: 842
-ACTIVITYSTATUS_SUSPENDED :: 843
+ACTIVITYSTATUS_ABORTED :: 856
+ACTIVITYSTATUS_COMPLETED :: 857
+ACTIVITYSTATUS_EXHAUSTED :: 858
+ACTIVITYSTATUS_FAILED :: 859
+ACTIVITYSTATUS_RUNNING :: 860
+ACTIVITYSTATUS_SUSPENDED :: 861
 
 // #Tie
-TIE_EMPLOY :: 954
-TIE_FRIEND :: 955
-TIE_KIN :: 956
-TIE_SWORN :: 957
+TIE_EMPLOY :: 973
+TIE_FRIEND :: 974
+TIE_KIN :: 975
+TIE_SWORN :: 976
 
 // #ClaimKind
-CLAIMKIND_CUSTODY :: 845
-CLAIMKIND_OWNERSHIP :: 846
-CLAIMKIND_RESERVATION :: 847
+CLAIMKIND_CUSTODY :: 863
+CLAIMKIND_OWNERSHIP :: 864
+CLAIMKIND_RESERVATION :: 865
 
 // #Penalty
-PENALTY_FINE :: 940
-PENALTY_ARREST :: 973
-PENALTY_CONFISCATE :: 974
+PENALTY_FINE :: 959
+PENALTY_ARREST :: 992
+PENALTY_CONFISCATE :: 993
 
 // #Wrong
-WRONG_ANOTHERS :: 965
-WRONG_UNAUTHORIZED :: 966
+WRONG_ANOTHERS :: 984
+WRONG_UNAUTHORIZED :: 985
 
 // #Material
-MATERIAL_CLOTH :: 920
-MATERIAL_EARTH :: 921
-MATERIAL_FOOD :: 922
-MATERIAL_LEATHER :: 923
-MATERIAL_GRAIN :: 925
-MATERIAL_ROT :: 926
-MATERIAL_RUBBER :: 927
-MATERIAL_STONE :: 928
-MATERIAL_TURNIP :: 929
-MATERIAL_WICKER :: 930
-MATERIAL_FLESH :: 976
-MATERIAL_BRASS :: 978
-MATERIAL_IRON :: 979
-MATERIAL_PAPER :: 980
-MATERIAL_STEEL :: 981
-MATERIAL_BIRCH :: 983
-MATERIAL_OAK :: 984
+MATERIAL_CLOTH :: 939
+MATERIAL_EARTH :: 940
+MATERIAL_FOOD :: 941
+MATERIAL_LEATHER :: 942
+MATERIAL_GRAIN :: 944
+MATERIAL_ROT :: 945
+MATERIAL_RUBBER :: 946
+MATERIAL_STONE :: 947
+MATERIAL_TURNIP :: 948
+MATERIAL_WICKER :: 949
+MATERIAL_FLESH :: 995
+MATERIAL_BRASS :: 997
+MATERIAL_IRON :: 998
+MATERIAL_PAPER :: 999
+MATERIAL_STEEL :: 1000
+MATERIAL_BIRCH :: 1002
+MATERIAL_OAK :: 1003
 
 // "flesh" | "metal" | "natural" | "paper" | "wood"
-BODY_SURFACE_NATURAL :: 609
-BODY_SURFACE_FLESH :: 976
-BODY_SURFACE_BRASS :: 978
-BODY_SURFACE_IRON :: 979
-BODY_SURFACE_PAPER :: 980
-BODY_SURFACE_STEEL :: 981
-BODY_SURFACE_BIRCH :: 983
-BODY_SURFACE_OAK :: 984
+BODY_SURFACE_NATURAL :: 624
+BODY_SURFACE_FLESH :: 995
+BODY_SURFACE_BRASS :: 997
+BODY_SURFACE_IRON :: 998
+BODY_SURFACE_PAPER :: 999
+BODY_SURFACE_STEEL :: 1000
+BODY_SURFACE_BIRCH :: 1002
+BODY_SURFACE_OAK :: 1003
 
 // #Colour
-COLOUR_BLUE :: 850
-COLOUR_BLACK :: 852
-COLOUR_BROWN :: 853
-COLOUR_GREEN :: 854
-COLOUR_GREY :: 855
-COLOUR_NAVY :: 856
-COLOUR_ORANGE :: 857
-COLOUR_PURPLE :: 858
-COLOUR_RED :: 859
-COLOUR_YELLOW :: 860
-COLOUR_BEIGE :: 884
-COLOUR_WHITE :: 916
+COLOUR_BLUE :: 868
+COLOUR_BLACK :: 870
+COLOUR_BROWN :: 871
+COLOUR_GREEN :: 872
+COLOUR_GREY :: 873
+COLOUR_NAVY :: 874
+COLOUR_ORANGE :: 875
+COLOUR_PURPLE :: 876
+COLOUR_RED :: 877
+COLOUR_YELLOW :: 878
+COLOUR_BEIGE :: 903
+COLOUR_WHITE :: 935
 
 // "bare" | "ripe" | "sown"
-PLOT_STANDS_BARE :: 397
-PLOT_STANDS_RIPE :: 682
-PLOT_STANDS_SOWN :: 714
+PLOT_STANDS_BARE :: 407
+PLOT_STANDS_RIPE :: 699
+PLOT_STANDS_SOWN :: 732
 
 // The field registry: what code needs to read and write any component
 // generically.
@@ -646,6 +651,7 @@ COMPONENT_COUNT :: 49
 	{"curious", offset_of(Agent, curious), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
 	{"diligent", offset_of(Agent, diligent), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
 	{"fatigue", offset_of(Agent, fatigue), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
+	{"generosity", offset_of(Agent, generosity), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
 	{"gentle", offset_of(Agent, gentle), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
 	{"grip", offset_of(Agent, grip), VALUE_QUANTITY, "force", "content, saved, inspect"},
 	{"hands", offset_of(Agent, hands), VALUE_QUANTITY, "int", "content, saved, inspect, perceive(sight)"},
@@ -658,11 +664,15 @@ COMPONENT_COUNT :: 49
 	{"memory", offset_of(Agent, memory), VALUE_QUANTITY, "int", "content, saved, inspect"},
 	{"numbness", offset_of(Agent, numbness), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
 	{"painting", offset_of(Agent, painting), VALUE_QUANTITY, "int", "content, saved, inspect"},
+	{"patience", offset_of(Agent, patience), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
+	{"pride", offset_of(Agent, pride), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
 	{"quickness", offset_of(Agent, quickness), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
+	{"reciprocity", offset_of(Agent, reciprocity), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
 	{"remains", offset_of(Agent, remains), VALUE_TEXT, "text", "content, saved, inspect"},
 	{"respectful", offset_of(Agent, respectful), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
 	{"riskTolerance", offset_of(Agent, riskTolerance), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
 	{"scruples", offset_of(Agent, scruples), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
+	{"shrewdness", offset_of(Agent, shrewdness), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
 	{"stalking", offset_of(Agent, stalking), VALUE_QUANTITY, "int", "content, saved, inspect"},
 	{"temper", offset_of(Agent, temper), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
 	{"trade", offset_of(Agent, trade), VALUE_TEXT, "text", "content, saved, proposable, inspect"},
@@ -831,7 +841,7 @@ COMPONENTS := [COMPONENT_COUNT + 1]Component_Info{
 	{"Law", "#Law", size_of(Law), 6, &Law_fields[0]},
 	{"Organization", "#Organization", size_of(Organization), 1, &Organization_fields[0]},
 	{"Body", "#Body", size_of(Body), 5, &Body_fields[0]},
-	{"Agent", "#Agent", size_of(Agent), 28, &Agent_fields[0]},
+	{"Agent", "#Agent", size_of(Agent), 33, &Agent_fields[0]},
 	{"Area", "#Area", size_of(Area), 2, &Area_fields[0]},
 	{"Assembly", "#Assembly", size_of(Assembly), 1, &Assembly_fields[0]},
 	{"Bow", "#Bow", size_of(Bow), 3, &Bow_fields[0]},

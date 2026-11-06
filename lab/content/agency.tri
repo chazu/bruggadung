@@ -18,7 +18,8 @@
 //             commitments, goals arising from findings or from what is
 //             held; a method step's act done again to no end fails it
 //             (AGENCY.md decision 24); a need's goal settled is weighed
-//             again once it is felt more, or eased.
+//             again once it is felt more, or eased; with no method of a
+//             need's goal holding, asking someone (deals/).
 
 // What a goal and its methods are about: the agent itself, as `me`, and
 // slots for the things involved, each bound to a referent. A goal's frame is
@@ -89,9 +90,10 @@
 // by the deadline.
 // A `kept` goal is an ongoing condition (at work through the shift): a
 // commitment to it isn't settled when it is done, but arises again
-// whenever it no longer holds, until its window closes.
+// whenever it no longer holds, until its window closes; found impossible,
+// it is tried again `retry` later (ten minutes, without one).
 #Goal: #Intent & { done: #Condition, concerns: [...#Body], worth: [...#Consideration], arises: #Arising,
-                   pressed: #Pressing, urgency: [...#Point], kept: *false | true }
+                   pressed: #Pressing, urgency: [...#Point], kept: *false | true, retry: time }
 
 // Conditions of what the agent did, not of how things are: it has looked
 // into the slot's referent since adopting the goal; an activity of the

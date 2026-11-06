@@ -203,15 +203,24 @@ Out of scope here, except where they touch agency:
     own, over a curve; nothing if it has seen inside none (not knowing
     isn't having none). Rationing is one (cooking/): short of food at
     home, hunger alone makes no meal.
-29. **A commitment's search passes over where it has looked since its
-    window opened**, not only since the goal was adopted: a kept goal
+29. **A commitment's search passes over its own places looked into since
+    its window opened**, not only since the goal was adopted: a kept goal
     tried again every ten minutes (a seller with too little to set out)
-    doesn't walk home each time to look in the larder it knows.
+    doesn't walk home each time to look in the larder it knows. Another's
+    place (a stall, whose board may change) it looks at again: passing
+    over every stall read since the market opened, a buyer never read a
+    price posted after.
 30. **A posted price lapses** (content/market/). A price on a board
     posted more than half a day ago is an earlier market's: it isn't
     learned, and one read that long ago isn't bought at. A seller with
     nothing to set out leaves its last market's price on the board, and
     buyers went to it, found nobody minding the stall, and gave up.
+31. **Asking and negotiation are NEGOTIATION.md's.** A kept goal found
+    impossible is tried again its `retry` later, ten minutes without one
+    (repaying in kind: six hours). Asking is a general
+    method any goal falls back on when none of its methods holds; every
+    asking is a negotiation over a deal (a gift, in kind, a loan, a sale),
+    which leaves debts, credits and gratitude behind.
 
 ## Terms
 

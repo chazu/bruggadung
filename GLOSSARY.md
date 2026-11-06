@@ -22,8 +22,9 @@ Rules:
 Doc abbreviations: ACT = ACTIONS.md, AGE = AGENCY.md, ARC =
 ARCHITECTURE.md, CL = CONTENT_LANGUAGE.md, COM = COMPONENTS.md, DES =
 DESIGN.md, DOM = DOMAIN_SIMULATION.md, DR = DETAIL_REGIMES.md, INS =
-INSTITUTIONS.md, KNO = KNOWLEDGE.md, LAT = LATENT_ASSEMBLY.md, REA =
-REALITY.md, PRF = PERFORMANCE.md, TER = TERRAIN.md, TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
+INSTITUTIONS.md, KNO = KNOWLEDGE.md, LAT = LATENT_ASSEMBLY.md, NEG =
+NEGOTIATION.md, REA = REALITY.md, PRF = PERFORMANCE.md, TER = TERRAIN.md,
+TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
 3; "§3" its numbered section.
 
 ## The project
@@ -531,12 +532,30 @@ REALITY.md, PRF = PERFORMANCE.md, TER = TERRAIN.md, TES = TESSERA.md, VIL = VILL
   work through the shift) isn't settled when done: it arises again
   whenever the goal no longer holds, until the window closes, and its
   urgency doesn't rise; found impossible, it is tried again ten minutes
-  later. (AGE d5, §7; VIL d4)
+  later, or its goal's `retry`. (AGE d5, §7; VIL d4, AGE d31)
 - **Promise**: a commitment made by saying it; hearers hold it as
   testimony (attributed `#Pledged`). *Avoid:* pledge, in prose. (AGE §7)
 - **Deal**: an agreement (employment, a loan, a posted offer), said or
   written. **Employment**: a deal of work for pay; a **job** is its task,
-  shift, pay. A **debt** is a commitment to pay. (AGE d15, d18)
+  shift, pay. A **debt** is a commitment to pay, or to give back. Between
+  two agents over a thing a deal is a **gift** (nothing owed), **in kind**
+  (as much again, some time: a **debt in kind**, no date), a **loan** (the
+  very thing, or as much again and `extra`, by a `term`) or a **sale** (so
+  many coins). The other side of a debt is a **credit**. (AGE d15, d18;
+  NEG d4, d8)
+- **Asking**: the general method a need's goal falls back on when no
+  method holds: asking someone for a thing like what a method wants in
+  hand, weighed against the asker's pride. *Avoid:* begging, requesting (a
+  `#Request` is Scenario 3's plea). (NEG d1, d2)
+- **Negotiation**: the exchange over a deal that every asking is: an ask
+  (`#Ask`), counter-offers (`#Offer`), and an end, agreed (`#Agree`) or
+  walked away from (`#Refuse`). *Avoid:* bargaining. Each side's
+  **target**, what a deal must be worth to it to agree, falls round by
+  round as its shrewdness and patience dispose. **Haggling**: the rounds of
+  it. (NEG d6)
+- **Kindness**: what giving is worth to a giver: its generosity, more for
+  the asker's need as it believes it, and its loyalty to the asker. (NEG
+  d5)
 - **Bond**: a reified relation from one agent toward another, with a
   **tie** (kin, friend, employ, sworn) and a **loyalty** weight. (AGE d12,
   lab/content/bonds/bonds.tri)
@@ -553,7 +572,9 @@ REALITY.md, PRF = PERFORMANCE.md, TER = TERRAIN.md, TES = TESSERA.md, VIL = VILL
   another of the same rank; it never comes before an earlier way. (AGE §8,
   §5)
 - **Disposition**: a per-agent weight: honesty, curiosity, diligence, risk
-  tolerance, respect for reservations. *Avoid:* trait (in prose). (AGE §9)
+  tolerance, respect for reservations; in a negotiation, generosity,
+  reciprocity, pride, shrewdness, patience. *Avoid:* trait (in prose).
+  (AGE §9, NEG d9)
 - **Norm**: an agent's own rule weighting kinds of action ("don't take
   what isn't yours"), weighed with its belief about being observed. Not an
   institution's rule. *Avoid:* internal norm (redundant). (AGE d6, §9)

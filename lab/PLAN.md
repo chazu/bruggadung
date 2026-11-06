@@ -5261,3 +5261,34 @@ logging found the rest in Triangle's arena, under `tri_value`.
   next night and done at once; a pack astray from day 13.
 
 141 tests, 4165 checks.
+
+### Negotiation (NEGOTIATION.md)
+
+- **Asking** (decisions 1 to 3): when none of a need's goal's methods
+  holds, the agent asks someone it knows (by loyalty, then nearness; three
+  at most) for a thing like what a method wants in hand, if the goal is
+  worth more than asking costs it (`BG_ASK_COST` and half its pride).
+- **Haggling** (decisions 4 to 6): an ask proposes a deal (a gift, in
+  kind, a loan, a sale); each side values each deal (agency_deals.odin's
+  `deal_value`), and each round agrees to what meets its target, offers
+  the deal worth least to it that does, or, its patience spent, walks
+  away (`#Ask`, `#Offer`, `#Agree`, `#Refuse`).
+- **What it leaves** (decisions 7, 8): the one asked hands it over
+  (`handed_over`, `#HandOver`, `give_some`); a debt in kind or a loan is a
+  kept commitment to give as much again (`repaid_in_kind`, retried every
+  six hours: a goal's `retry`), said `#Repaid`; credits unpaid past their
+  date cost trust; a gift, gratitude.
+- **Dispositions** (decision 9): deals/'s generosity, reciprocity, pride,
+  shrewdness, patience on `#Agent`.
+- **Also**: a need's goal dropped is weighed again when what the agent
+  holds changes (decision 11); eating from a stack eats one (decision 12);
+  a commitment passes over only its own places looked into since its
+  window opened (AGENCY.md decision 29, narrowed: buyers never read a
+  price posted after they first went round).
+- **Tests**: `deals` (a gift; a loan haggled to; walking away; nothing
+  like it; in kind, repaid; a loan unpaid; a sale paid). The rumour
+  scenario's people are proud (they would otherwise ask for food on day
+  ten and wander off). The village's hashes changed, and every scenario's,
+  for `#Agent`'s new fields.
+
+142 tests, 4187 checks.

@@ -896,6 +896,12 @@ effect_eat :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) ->
 	}
 	food := (^Food)(world_record(world, world_kind_named(world, "Food"), a.roles[.Item]))
 	bodies_nourish(world, g, a.roles[.Actor], food.nourishment if food != nil else 0, world_time(world).ms)
+	/* of a stack held (a sack of grain), one: the rest is still held */
+	if world_units_of(world, a.roles[.Item]) > 1 {
+		one := proposal_group_split(g, whole(a.roles[.Item]), 1, world_location_of(world, a.roles[.Item]))
+		proposal_group_destroy(g, whole(one), "eaten")
+		return ""
+	}
 	proposal_group_destroy(g, whole(a.roles[.Item]), "eaten")
 	return ""
 }
@@ -936,6 +942,24 @@ effect_give :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -
 		return "no hand of theirs is free"
 	}
 	proposal_group_move_to(g, whole(a.roles[.Item]), held_by(a.roles[.Destination], hand))
+	return ""
+}
+
+
+/* Giving some of what the actor holds into the destination's free hand
+ * (content/deals/): so many of a stack, split off; all of it, or a thing
+ * that isn't a stack, whole. */
+@(private = "file")
+effect_give_some :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
+	hand := free_hand(world, a.roles[.Destination])
+	if hand < 0 do return "no hand of theirs is free"
+	units := world_units_of(world, a.roles[.Item])
+	if amount > units do return "it hasn't so many"
+	if amount < 1 || amount == units {
+		proposal_group_move_to(g, whole(a.roles[.Item]), held_by(a.roles[.Destination], hand))
+	} else {
+		proposal_group_split(g, whole(a.roles[.Item]), amount, held_by(a.roles[.Destination], hand))
+	}
 	return ""
 }
 
@@ -3173,6 +3197,7 @@ effects := [?]Named_Effect{
 	{"rest",      effect_rest},
 	{"strike",    effect_strike},
 	{"crouch",    effect_crouch},
+	{"give_some", effect_give_some},
 	{"shoot",     effect_shoot},
 	{"butcher",   effect_butcher},
 	{"post",      effect_post},
