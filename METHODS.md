@@ -377,10 +377,12 @@ step 5.
 
 ## Open questions
 
-1. **Depth.** The woodpile's chain is about six goals deep, under the
-   limit of eight, but a duty's goal sits beneath it already. Should
-   `BG_MAX_INTENTIONS` grow? Or should the "near" subgoals of one chain
-   be one goal with several ways?
+1. **Depth.** The woodpile's chain is about six goals deep, and a duty's
+   goal sits beneath it already, so `BG_MAX_INTENTIONS` grew from eight
+   to 16 (a meal on top needs four more). That raises the limit; it
+   doesn't make the chains shallower. Should the "near" subgoals of one
+   chain (`wood_split`, `log_cut`, `trunk_felled`) be one goal with
+   several ways?
 2. **The enough-coins condition's shape** (work item 2): market-specific,
    or a general comparison of a held quantity with a believed one.
 3. **A failure condition.** Should a goal declare when it is hopeless
