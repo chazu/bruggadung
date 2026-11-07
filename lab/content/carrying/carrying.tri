@@ -11,19 +11,22 @@
 //             that is held, hands and back, and what is in it) beyond the
 //             `burden`'s `light` slows a walk, by half at `light` and
 //             `slows` more. What an operation that stows takes, or is
-//             handed (`gather`, `pick_up`; butchering; a purchase), goes into
+//             handed (`gather`, `pick_up`; butchering; seed kept back; a
+//             purchase), goes into
 //             the pack if it fits, else a free hand. Unpacked, a thing is
 //             taken out into a free hand (as from any container) and put
 //             where it goes. A household's
 //             packs are its own, kept by its door: whoever needs one takes
-//             it, and puts it back there after, emptied: food and hides into
-//             the larder, firewood onto the woodpile.
+//             it, and puts it back there after, emptied: food, hides and
+//             seed into the larder, firewood onto the woodpile. (Seed kept
+//             back into a pack worn to market was never emptied, and the
+//             pack never put back.)
 // - reduced:  the same; a walk's pace is set as it starts each tile.
 // - abstract: as reduced. A load as a household's capacity to move goods,
 //             below reduced, is open (DETAIL_REGIMES.md).
 // - frozen:   the same: a pack is a thing.
-// - hunger, hunting, firewood: what is emptied where is theirs (#Food,
-//             #Hide, firewood).
+// - hunger, hunting, farming, firewood: what is emptied where is theirs
+//             (#Food, #Hide, #Seed, firewood).
 // - market, hunting, firewood: their ways of carrying (market/,
 //             hunting/, firewood/) use a pack when the household's is free,
 //             and their hands when it isn't.
@@ -161,7 +164,7 @@ pack_returned: #Goal & {
     done:  #Did & { did: "put_back" }
 } @family(goals)
 
-let kept_in_the_larder = #Food | #Hide
+let kept_in_the_larder = #Food | #Hide | #Seed
 let in_my_pack         = #Carrying & { me: #Agent & { id: $me, freeHands: >=1 }, pack: #Pack & { id: $p, place: #Held & { by: $me } } }
 
 store_it: #Method & {

@@ -94,3 +94,115 @@ test_carrying :: proc() {
 	act(w, c, s, &t, action_make("put_in", farmer, two, basket))
 	bg_check(world_location_of(w, two).form == .Held_By)
 }
+
+
+/*
+ * Seed in a pack (content/carrying/'s kept_in_the_larder): a farmer back
+ * from market, the backpack still on, kept seed back into it at the
+ * harvest. Putting the pack back, it unpacks the seed into the larder, as
+ * it would food or a hide, and the pack lies by the larder, empty. Seed
+ * was neither: it stayed in the pack for good.
+ */
+test_seed_unpacked :: proc() {
+	w := test_world(121)
+	why: string
+	bg_check(world_set_terrain_map(w, "farm_map", &why))
+	c := test_committer(w)
+	committer_set_tracing(c, false)
+	activities := activities_with_world(w, c)
+	knowledge  := autorelease(knowledge_init_with_world(w))
+	agency     := autorelease(agency_init_with_world(w, c, knowledge))
+	s          := autorelease(scheduler_init_with_world(w, c))
+	agency_set_activities(agency, activities)
+	scheduler_set_activities(s, activities_as_activity_clock(activities))
+	scheduler_set_perception(s, knowledge_as_perception_phase(knowledge))
+	scheduler_set_decision(s, agency_as_decision_phase(agency))
+
+	g := proposal_group_group_with_phase(.System, "setup: a farmer, seed in the pack on its back, its larder")
+	me     := proposal_group_create(g, "farmhand", "the farmer", on_tile(10, 2, 0))
+	larder := proposal_group_create(g, "larder", "its larder", on_tile(12, 2, 0))
+	pack   := proposal_group_create(g, "backpack", "its backpack", held_by(me, BG_BACK))
+	seed   := proposal_group_create(g, "seed_grain", "seed kept back", in_(pack))
+	committer_submit(c, g)
+	scheduler_run_until(s, time_make(1))
+	me, larder = proposal_group_id_for(g, me), proposal_group_id_for(g, larder)
+	pack, seed = proposal_group_id_for(g, pack), proposal_group_id_for(g, seed)
+	test_own(c, me, larder)
+	test_own(c, me, pack)
+	scheduler_run_until(s, time_make(2))
+	store := knowledge_store_of(knowledge, me)
+	kept := u32(0)
+	for i: uint = 0; i < knowledge_store_count(store); i += 1 {
+		if r := knowledge_store_referent_at(store, i); r.truth == larder do kept = r.id
+	}
+	bg_check(kept != 0)
+	bg_check(agency_undertake_every_with(agency, me, "pack_returned", 0, 3600 * 1000, "home", FARM_DAY, {{"home", kept}}))
+	scheduler_run_until(s, time_make(3600 * 1000))
+
+	inside: [4]Entity_ID
+	at := world_location_of(w, seed)
+	lp, ll := world_location_of(w, pack), world_location_of(w, larder)
+	ok := at.form == .In && at.place == larder && world_entities_at(w, pack, .In, raw_data(inside[:]), 4) == 0 &&
+	      lp.form == .On_Tile && abs(lp.x - ll.x) <= 1 && abs(lp.y - ll.y) <= 1
+	if !ok {
+		fmt.printf("    seed at %v, pack at %v\n", at, world_location_of(w, pack))
+		for line in agency_log_of(agency, me) do fmt.printf("    %s\n", line)
+	}
+	bg_check(ok)
+}
+
+
+/*
+ * Free after an impossible goal (lab/src/agency_agency.odin): a farmer to
+ * eat its supper, with nothing to eat anywhere it knows, and the pack on
+ * its back to put back by its larder, both now. Supper found impossible, it
+ * puts the pack back at once, as it would after a goal done. Waiting
+ * instead, a seller hungry at three, with nothing to eat, never put back
+ * the pack it had taken to market: the window was over before anything
+ * woke it.
+ */
+test_free_after_impossible :: proc() {
+	w := test_world(122)
+	why: string
+	bg_check(world_set_terrain_map(w, "farm_map", &why))
+	c := test_committer(w)
+	committer_set_tracing(c, false)
+	activities := activities_with_world(w, c)
+	knowledge  := autorelease(knowledge_init_with_world(w))
+	agency     := autorelease(agency_init_with_world(w, c, knowledge))
+	s          := autorelease(scheduler_init_with_world(w, c))
+	agency_set_activities(agency, activities)
+	scheduler_set_activities(s, activities_as_activity_clock(activities))
+	scheduler_set_perception(s, knowledge_as_perception_phase(knowledge))
+	scheduler_set_decision(s, agency_as_decision_phase(agency))
+
+	g := proposal_group_group_with_phase(.System, "setup: a farmer, its empty pack on its back, its empty larder")
+	me     := proposal_group_create(g, "farmhand", "the farmer", on_tile(10, 2, 0))
+	larder := proposal_group_create(g, "larder", "its larder", on_tile(12, 2, 0))
+	pack   := proposal_group_create(g, "backpack", "its backpack", held_by(me, BG_BACK))
+	committer_submit(c, g)
+	scheduler_run_until(s, time_make(1))
+	me, larder, pack = proposal_group_id_for(g, me), proposal_group_id_for(g, larder), proposal_group_id_for(g, pack)
+	test_own(c, me, larder)
+	test_own(c, me, pack)
+	scheduler_run_until(s, time_make(1000))
+	store := knowledge_store_of(knowledge, me)
+	kept := u32(0)
+	for i: uint = 0; i < knowledge_store_count(store); i += 1 {
+		if r := knowledge_store_referent_at(store, i); r.truth == larder do kept = r.id
+	}
+	bg_check(kept != 0)
+	bg_check(agency_undertake_every_with(agency, me, "eat_supper", 0, 3600 * 1000, "home", FARM_DAY, {}))
+	bg_check(agency_undertake_every_with(agency, me, "pack_returned", 0, 3600 * 1000, "home", FARM_DAY, {{"home", kept}}))
+	agency_control(agency, me)
+	/* at once, not when something next wakes it */
+	scheduler_run_until(s, time_make(5000))
+
+	impossible := test_logged_by(agency, me, "[eat supper] nothing I know of will do: impossible for now")
+	back := world_location_of(w, pack).form == .On_Tile
+	if !impossible || !back {
+		fmt.printf("    supper impossible: %v, the pack put back: %v\n", impossible, back)
+		for line in agency_log_of(agency, me) do fmt.printf("    %s\n", line)
+	}
+	bg_check(impossible && back)
+}

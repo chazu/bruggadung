@@ -262,6 +262,13 @@ Out of scope here, except where they touch agency:
     resumed once the subgoal holds (ACTIONS.md Scenario 3, step 5). So what
     a way needs in hand belongs in a subgoal (decision 34), not its
     precondition.
+36. **A goal found impossible leaves the agent free, as one done does.**
+    With nothing beneath it, the agent weighs at once what else it has to
+    do: the goal found impossible is settled (a need's weighed again
+    later, a kept goal tried again later), so it isn't taken up again
+    straight away. A seller hungry at three, with nothing to eat, waited
+    instead: nothing woke it until four, and the window to put back the
+    pack it had taken to market (three to four) was over.
 
 ## Terms
 

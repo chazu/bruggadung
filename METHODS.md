@@ -413,8 +413,29 @@ give 5 FAILs, against 1:
 - the lean household (162, 165) on day 14, as before;
 - night 13: a farmer (20) short of food, asking in vain at 22:00, not
   in bed by 02:00;
-- not yet looked into: a pack left by its larder (night 11), and a meal
-  in hand at 14:30 (20, day 16).
+- a pack left by its larder (night 11), and a meal in hand at 14:30
+  (20, day 16), looked into below.
+
+**The pack and the meal.**
+- **A pack never put back** had two causes. A seller hungry at three,
+  with nothing to eat, found eating impossible and waited: nothing woke it
+  until four, and the window to put back its pack was three to four. A
+  goal found impossible now leaves the agent free, as one done does
+  (AGENCY.md decision 36). Test: `free_after_impossible`. And seed kept
+  back while the market's pack was still on went into the pack (keeping
+  seed stows), and nothing unpacked it: what is kept in the larder was
+  food and hides. Seed is too now (content/carrying/). Test:
+  `seed_unpacked`.
+- **The meal in hand at 14:30** isn't one taken to work: a farmer whose
+  household is short of food lives on forage, a handful at a time, and
+  was eating one when the check looked. It is the lean days again.
+
+After them: no pack astray in three weeks; 8 FAILs, all meals. The lean
+days now come to two households: the woodcutters (162, 165), short from
+day 14 and unfed on days 20 and 21, and a farmers' household (81, 84,
+87, 90), short from day 11, whose larder lasted to the harvest before.
+Over three weeks 12 pieces of food spoiled, against 4 to 6 before
+these changes. Why they are shorter now isn't looked into yet.
 
 Not yet: content step 4 (farming, carrying, the market's selling) and
 step 5.

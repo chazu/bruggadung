@@ -3789,6 +3789,8 @@ ALL_TESTS := [?]Test_Case{
 	{"perishing",                     test_perishing},
 	{"market",                        test_market},
 	{"carrying",                      test_carrying},
+	{"seed_unpacked",                 test_seed_unpacked},
+	{"free_after_impossible",         test_free_after_impossible},
 	{"scene_knowledge",               test_scene_knowledge},
 	{"keep_seed",                     test_keep_seed},
 	{"harvest_overtaken",             test_harvest_overtaken},

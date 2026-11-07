@@ -4095,8 +4095,13 @@ agency_decide :: proc(self: ^Agency, m: ^Motivation) -> bool {
 		}
 		return false
 	}
+	/* free now, as when a goal is done: what has arisen meanwhile is
+	 * weighed (the goal found impossible is settled, and isn't taken up
+	 * again at once). Waiting instead, a seller hungry at three, with
+	 * nothing to eat, never put back the pack it had taken to market: its
+	 * window was over before anything woke it. */
 	m.waiting = true
-	return true
+	return false
 }
 
 

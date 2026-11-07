@@ -215,7 +215,7 @@ test_farming_weeks :: proc() {
 
 
 /* An ownership claim of the owner's on the thing, committed. */
-@(private = "file")
+@(private)
 test_own :: proc(c: ^Committer, owner: Entity_ID, thing: Entity_ID) {
 	g := proposal_group_group_with_phase(.System, "setup: its own")
 	claim := proposal_group_create(g, "ownership", "its own", location_make_none())
