@@ -8,7 +8,8 @@
 //             food from where it is believed kept, or looking for it in
 //             the nearest containers; else eat raw food in hand. Something
 //             to eat at work is the morning's commitment (scenario-bound):
-//             a meal made the same way, else raw food taken along.
+//             a meal made the same way, else raw food taken along (a
+//             last resort that `ends` the goal: done is a meal in hand).
 //             Short of food at home (as far as it knows), hunger alone
 //             makes no meal: a ration of the meal taken along and supper.
 // - reduced:  the same, decided on the cadence's beat; cooking runs its
@@ -192,15 +193,17 @@ look_for_food: #Method & {
     steps:  [#Do & { op: "look_in", object: "larder" }]
 } @family(methods)
 
-// Something to eat at work (the morning's commitment): food in hand, a
-// meal if one can be made, else raw.
+// Something to eat at work (the morning's commitment): a meal in hand; if
+// none can be made, raw food taken along ends it (`ends`), and will do. Not
+// food of any kind in hand: the grain taken up to cook would be that, and
+// the meal given up half made (METHODS.md decision 5).
 food_along: #Goal & {
     title: "take something to eat"
     done: {
         find:  ["food"]
         match: #Cooking & {
             me:   #Agent & { id: $me }
-            food: #Food & #Body & { place: #Held & { by: $me } }
+            food: #Food & #Body & { raw: false, place: #Held & { by: $me } }
         }
     }
 } @family(goals)
@@ -224,8 +227,10 @@ take_some_along: #Method & {
             food: #Food & #Stack & { place: #Inside }
         }
     }
-    order: ["own", "habit", "near"]
-    steps: [#Do & { op: "take_some", object: "food", units: 1 }]
+    order:    ["own", "habit", "near"]
+    sequence: true
+    ends:     true
+    steps:    [#Do & { op: "take_some", object: "food", units: 1 }]
 } @family(methods)
 
 // Cook food the actor holds at a lit stove in reach: a while, with the

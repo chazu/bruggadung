@@ -14,7 +14,9 @@
 //             level: it takes the household's coins from the coffer,
 //             reads the stalls, and buys a lot at a time at the cheapest
 //             price it knows that is no more than what it holds the goods
-//             worth (money/coins.tri's #Pricing). A sale is three acts:
+//             worth (money/coins.tri's #Pricing): one whole way, what it
+//             needs each a subgoal (METHODS.md), worked out by the code as
+//             a #Buying where it is a lot's. A sale is three acts:
 //             the buyer asks (#Buy) the seller whose price it read, if it
 //             sees it by the stall, and the seller hands the goods over from
 //             its stall and says what is owed (#Sold), and the buyer pays
@@ -33,7 +35,8 @@
 //             #Priced claim, believed as any claim read is; #Buy is a
 //             question, waited on as any is.
 // - perishing: goods set out keep spoiling where they are.
-// - code:     the #Purchase step, and the seller's weighing of a #Buy
+// - code:     the #Purchase step and the #Buying condition (agency_lot,
+//             agency_cheapest, agency_buying), the seller's weighing of a #Buy
 //             (src/agency_agency.odin); a #Priced claim known
 //             (src/know_knowledge_1.odin); effect_post, effect_hand_over,
 //             effect_put_some (src/act_actions.odin); market days, the
@@ -70,7 +73,22 @@ board_look:  #Look & { kindOf: "price_board", look: "board" } @family(looks)
 // knows to sell it, `units` of it at most, if the price is no more than its
 // own (src/agency_agency.odin): no more than will bring the `stocking` slot's
 // referent up to `level`, with what it has in hand or in its pack.
-#Purchase: #MethodStep & { what: #Body, units: int & >=1 & <=100, stocking: text, level: mass }
+#Buys:     { what: #Body, units: int & >=1 & <=100, stocking: text, level: mass }
+#Purchase: #MethodStep & #Buys & {}
+
+// What buying a lot like a #Purchase needs, worked out by the code
+// (src/agency_agency.odin, agency_holds) as the purchase works it out;
+// `buying` says which (METHODS.md decision 3):
+// - "coming": so much like `what` in the `stocking` slot's referent, in
+//   hand and in its pack, as `level`: nothing left to buy; or a lot of it
+//   in hand, as much as it carries home this time (its pack full, or none);
+// - "priced": a price for the unit it read this market, its stall there;
+// - "affords": the coins in hand pay for the lot it lacks, at the
+//   cheapest of those prices (knowing none yet, any coins in hand); or it
+//   believes there are no more in the `coinsIn` slot's referent, the
+//   coffer (it buys what they pay for);
+// Nothing left to buy, each holds.
+#Buying: #Condition & #Buys & { buying: "coming" | "priced" | "affords", coinsIn: text }
 
 // The goods a household sells, what its trade makes: food, or firewood.
 let goods = (#Food & #Stack) | #Stack & { unit: "firewood" }
@@ -78,7 +96,8 @@ let goods = (#Food & #Stack) | #Stack & { unit: "firewood" }
 // The market's frame: the household's stall and its board, the goods, its
 // supply (where it keeps them: a larder, a woodpile), its coffer, a purse
 // (coins carried), and a pack it carries (carrying/).
-#Market: #Frame & { stall: #Stall, board: #Label, goods: #Body, supply: #Body, coffer: #Body, purse: #Body, pack: #Body }
+#Market: #Frame & { stall: #Stall, board: #Label, goods: #Body, supply: #Body, coffer: #Body, purse: #Body, pack: #Body,
+                    burden: #Body }
 
 // Keeping the stall (the seller's, through the market's hours): goods set
 // out, the price posted, and minding it ten minutes at a time, again and
@@ -303,161 +322,210 @@ firewood_stocked: #Goal & {
     urgency: [{ input: 0, output: 35 }]
 } @family(goals)
 
-// The ways, for each: goods bought in hand, home with them; in its pack
-// and home (by the supply), take them out; both hands full (a woodcutter's
-// axe and a log; a hunter's bow and its coins), put down what it carries
-// (goods, a log, an axe, a bow: never coins); else buy a lot with the coins
-// in hand (into its pack, if it carries one with room), no more than the
-// supply lacks; bought enough, carry the pack home; else take the coins
-// from the coffer, looked in first if they aren't known to be there; else
-// go to the stalls, to read their prices.
-let bring_home = {
-    title: "bring it home"
+// The ways (METHODS.md: whole ways, what they need as subgoals). Goods
+// bought in hand are brought home and put in, before more are bought (a
+// hand freed for more would put them down). Else stocking the supply is
+// one way: enough coming (bought into its hand or pack), then in hand (out
+// of its pack, by the supply), then put in. Each need is
+// a goal of its own, passed over while it holds, so a buyer resumes where
+// it was (at the stalls, on its way home), and a buy that fails fails the
+// way, not falling to fetching coins it holds already:
+// - enough coming: bought, a lot at a time: the coins in hand (the
+//   coffer's, looked in first if it hasn't seen inside), a price known (a
+//   round of the stalls), the coins for the lot at that price (more from
+//   the coffer; those in hand will do if it believes there are no more),
+//   a hand free (the seller hands the lot over into its pack if there is
+//   room, but to a hand held out), then the purchase;
+// - in hand: taken out of its pack, by the supply;
+// - a hand free: what it carries put down (goods, a log, an axe, a bow:
+//   never coins).
+// The goods are alike but for their unit and the level; `let`s make them.
+let burden = goods | #Log | #Axe | #Bow
+hand_free:         #Goal & {
+    title: "free a hand"
+    done:  { find: [], match: #Market & { me: #Agent & { freeHands: >=1 } } }
+} @family(goals)
+put_down_a_burden: #Method & {
+    title: "put down what it carries"
+    goal:  "hand_free"
     rank:  1
-    steps: [#Do & { op: "put_in", object: "goods", target: "supply" }]
-}
-let unpack_it = {
-    title: "unpack it"
-    rank:  2
-    steps: [#Do & { op: "take", object: "goods" }]
-}
-let carry_home = {
-    title: "carry it home"
-    rank:  5
+    pre:   { find: ["burden"], match: #Market & { me: #Agent & { id: $me }, burden: burden & { place: #Held & { by: $me } } } }
+    steps: [#Do & { op: "put_down", object: "burden" }]
+} @family(methods)
+
+by_the_supply:    #Goal & {
+    title: "go home to the supply"
+    done:  #Reached & { reached: "supply" }
+} @family(goals)
+go_to_the_supply: #Method & {
+    title: "go home"
+    goal:  "by_the_supply"
+    rank:  1
+    pre:   { find: ["supply"], match: #Market & { supply: #Container } }
     steps: [#Do & { op: "look_in", object: "supply" }]
-}
+} @family(methods)
+
 let fetch_coins = {
     title: "fetch the coins"
-    rank:  6
+    rank:  1
     pre: {
         find:  ["coffer", "purse"]
-        match: #Market & { me: #Agent & { freeHands: >=1 }, coffer: #Body & { id: $k },
-                           purse: #Stack & { unit: "coin", place: #Inside & { container: $k } } }
+        match: #Market & { coffer: #Body & { id: $k }, purse: #Stack & { unit: "coin", place: #Inside & { container: $k } } }
     }
-    steps: [#Do & { op: "take", object: "purse" }]
-}
-let burden = goods | #Log | #Axe | #Bow
-let free_stack = {
-    title: "put down what it carries"
-    rank:  3
-    pre:   { find: ["goods"], match: #Market & { me: #Agent & { id: $me, freeHands: 0 }, goods: burden & { place: #Held & { by: $me } } } }
-    steps: [#Do & { op: "put_down", object: "goods" }]
+    steps: [#Achieve & { subgoal: "hand_free" }, #Do & { op: "take", object: "purse" }]
 }
 let look_in_coffer = {
     title:  "look in the coffer"
-    rank:   7
+    rank:   2
     pre:    { find: ["coffer"], match: #Market & { coffer: #Container } }
     search: "coffer"
     steps:  [#Do & { op: "look_in", object: "coffer" }]
 }
-let to_the_stalls = {
+let read_prices = {
     title:  "go to the stalls"
-    rank:   8
+    rank:   1
     pre:    { find: ["stall"], match: #Market & { stall: #Stall } }
     order:  ["near"]
     search: "stall"
     steps:  [#Do & { op: "stand_by", object: "stall" }]
 }
-let holds_coins = #Market & { me: #Agent & { id: $me }, purse: #Stack & { unit: "coin", place: #Held & { by: $me } } }
+let unpack_it = {
+    title: "unpack it"
+    rank:  1
+    steps: [#Achieve & { subgoal: "by_the_supply" }, #Achieve & { subgoal: "hand_free" }, #Do & { op: "take", object: "goods" }]
+}
 
-bring_grain_home:  #Method & bring_home & {
-    goal: "grain_stocked"
-    pre:  { find: ["goods"], match: #Market & { me: #Agent & { id: $me }, goods: #Stack & { unit: "grain", place: #Held & { by: $me } } } }
+// Grain: twenty kilograms in the larder, ten units a lot.
+let grain_lot = { what: #Stack & { unit: "grain" }, units: 10, stocking: "supply", level: 20kg }
+put_grain_in:      #Method & {
+    title: "bring it home"
+    goal:  "grain_stocked"
+    rank:  1
+    pre:   { find: ["goods"], match: #Market & { me: #Agent & { id: $me }, goods: #Stack & { unit: "grain", place: #Held & { by: $me } } } }
+    steps: [#Do & { op: "put_in", object: "goods", target: "supply" }]
 } @family(methods)
-unpack_grain:      #Method & unpack_it & {
-    goal: "grain_stocked"
-    pre:  #Reached & {
-        reached: "supply"
-        find:    ["pack", "goods"]
-        match:   #Market & { me: #Agent & { id: $me, freeHands: >=1 }, pack: #Pack & { id: $p, place: #Held & { by: $me } },
-                             goods: #Stack & { unit: "grain", place: #Inside & { container: $p } } }
-    }
-} @family(methods)
-buy_grain:         #Method & {
+stock_grain:       #Method & {
     title: "buy grain"
     goal:  "grain_stocked"
-    rank:  4
-    pre:   { find: ["purse"], match: holds_coins }
-    steps: [#Purchase & { what: #Stack & { unit: "grain" }, units: 10, stocking: "supply", level: 20kg }]
+    rank:  2
+    pre:   { find: [], match: #Market }
+    steps: [#Achieve & { subgoal: "grain_coming" }, #Achieve & { subgoal: "grain_in_hand" },
+            #Do & { op: "put_in", object: "goods", target: "supply" }]
 } @family(methods)
-carry_grain_home:  #Method & carry_home & {
-    goal: "grain_stocked"
+grain_coming:      #Goal & { title: "buy enough grain", done: #Buying & grain_lot & { buying: "coming" } } @family(goals)
+buy_grain:         #Method & {
+    title: "buy a lot of grain"
+    goal:  "grain_coming"
+    rank:  1
+    pre:   { find: [], match: #Market }
+    steps: [#Achieve & { subgoal: "coins_for_grain" }, #Achieve & { subgoal: "grain_priced" },
+            #Achieve & { subgoal: "hand_free" }, #Purchase & grain_lot]
+} @family(methods)
+grain_priced:      #Goal & { title: "learn the price of grain", done: #Buying & grain_lot & { buying: "priced" } } @family(goals)
+coins_for_grain:   #Goal & { title: "the coins for grain", done: #Buying & grain_lot & { buying: "affords", coinsIn: "coffer" } } @family(goals)
+grain_in_hand:     #Goal & {
+    title: "grain in hand"
+    done:  { find: ["goods"], match: #Market & { me: #Agent & { id: $me }, goods: #Stack & { unit: "grain", place: #Held & { by: $me } } } }
+} @family(goals)
+read_grain_prices: #Method & read_prices & { goal: "grain_priced" } @family(methods)
+fetch_coins_grain: #Method & fetch_coins & { goal: "coins_for_grain" } @family(methods)
+coffer_grain:      #Method & look_in_coffer & { goal: "coins_for_grain" } @family(methods)
+unpack_grain:      #Method & unpack_it & {
+    goal: "grain_in_hand"
     pre: {
-        find:  ["supply", "pack", "goods"]
-        match: #Market & { me: #Agent & { id: $me }, supply: #Container, pack: #Pack & { id: $p, place: #Held & { by: $me } },
+        find:  ["pack", "goods"]
+        match: #Market & { me: #Agent & { id: $me }, pack: #Pack & { id: $p, place: #Held & { by: $me } },
                            goods: #Stack & { unit: "grain", place: #Inside & { container: $p } } }
     }
 } @family(methods)
-fetch_coins_grain: #Method & fetch_coins & { goal: "grain_stocked" } @family(methods)
-coffer_grain:      #Method & look_in_coffer & { goal: "grain_stocked" } @family(methods)
-unburden_grain:    #Method & free_stack & { goal: "grain_stocked" } @family(methods)
-grain_stalls:      #Method & to_the_stalls & { goal: "grain_stocked" } @family(methods)
 
-bring_meat_home:  #Method & bring_home & {
-    goal: "meat_stocked"
-    pre:  { find: ["goods"], match: #Market & { me: #Agent & { id: $me }, goods: #Stack & { unit: "venison", place: #Held & { by: $me } } } }
+// Meat: five kilograms of venison in the larder, ten units a lot.
+let meat_lot = { what: #Stack & { unit: "venison" }, units: 10, stocking: "supply", level: 5kg }
+put_meat_in:      #Method & {
+    title: "bring it home"
+    goal:  "meat_stocked"
+    rank:  1
+    pre:   { find: ["goods"], match: #Market & { me: #Agent & { id: $me }, goods: #Stack & { unit: "venison", place: #Held & { by: $me } } } }
+    steps: [#Do & { op: "put_in", object: "goods", target: "supply" }]
 } @family(methods)
-unpack_meat:      #Method & unpack_it & {
-    goal: "meat_stocked"
-    pre:  #Reached & {
-        reached: "supply"
-        find:    ["pack", "goods"]
-        match:   #Market & { me: #Agent & { id: $me, freeHands: >=1 }, pack: #Pack & { id: $p, place: #Held & { by: $me } },
-                             goods: #Stack & { unit: "venison", place: #Inside & { container: $p } } }
-    }
-} @family(methods)
-buy_meat:         #Method & {
+stock_meat:       #Method & {
     title: "buy meat"
     goal:  "meat_stocked"
-    rank:  4
-    pre:   { find: ["purse"], match: holds_coins }
-    steps: [#Purchase & { what: #Stack & { unit: "venison" }, units: 10, stocking: "supply", level: 5kg }]
+    rank:  2
+    pre:   { find: [], match: #Market }
+    steps: [#Achieve & { subgoal: "meat_coming" }, #Achieve & { subgoal: "meat_in_hand" },
+            #Do & { op: "put_in", object: "goods", target: "supply" }]
 } @family(methods)
-carry_meat_home:  #Method & carry_home & {
-    goal: "meat_stocked"
+meat_coming:      #Goal & { title: "buy enough meat", done: #Buying & meat_lot & { buying: "coming" } } @family(goals)
+buy_meat:         #Method & {
+    title: "buy a lot of meat"
+    goal:  "meat_coming"
+    rank:  1
+    pre:   { find: [], match: #Market }
+    steps: [#Achieve & { subgoal: "coins_for_meat" }, #Achieve & { subgoal: "meat_priced" },
+            #Achieve & { subgoal: "hand_free" }, #Purchase & meat_lot]
+} @family(methods)
+meat_priced:      #Goal & { title: "learn the price of meat", done: #Buying & meat_lot & { buying: "priced" } } @family(goals)
+coins_for_meat:   #Goal & { title: "the coins for meat", done: #Buying & meat_lot & { buying: "affords", coinsIn: "coffer" } } @family(goals)
+meat_in_hand:     #Goal & {
+    title: "meat in hand"
+    done:  { find: ["goods"], match: #Market & { me: #Agent & { id: $me }, goods: #Stack & { unit: "venison", place: #Held & { by: $me } } } }
+} @family(goals)
+read_meat_prices: #Method & read_prices & { goal: "meat_priced" } @family(methods)
+fetch_coins_meat: #Method & fetch_coins & { goal: "coins_for_meat" } @family(methods)
+coffer_meat:      #Method & look_in_coffer & { goal: "coins_for_meat" } @family(methods)
+unpack_meat:      #Method & unpack_it & {
+    goal: "meat_in_hand"
     pre: {
-        find:  ["supply", "pack", "goods"]
-        match: #Market & { me: #Agent & { id: $me }, supply: #Container, pack: #Pack & { id: $p, place: #Held & { by: $me } },
+        find:  ["pack", "goods"]
+        match: #Market & { me: #Agent & { id: $me }, pack: #Pack & { id: $p, place: #Held & { by: $me } },
                            goods: #Stack & { unit: "venison", place: #Inside & { container: $p } } }
     }
 } @family(methods)
-fetch_coins_meat: #Method & fetch_coins & { goal: "meat_stocked" } @family(methods)
-coffer_meat:      #Method & look_in_coffer & { goal: "meat_stocked" } @family(methods)
-unburden_meat:    #Method & free_stack & { goal: "meat_stocked" } @family(methods)
-meat_stalls:      #Method & to_the_stalls & { goal: "meat_stocked" } @family(methods)
 
-bring_firewood_home:  #Method & bring_home & {
-    goal: "firewood_stocked"
-    pre:  { find: ["goods"], match: #Market & { me: #Agent & { id: $me }, goods: #Stack & { unit: "firewood", place: #Held & { by: $me } } } }
+// Firewood: 110 kilograms on the woodpile, ten units a lot.
+let firewood_lot = { what: #Stack & { unit: "firewood" }, units: 10, stocking: "supply", level: 110kg }
+put_firewood_in:      #Method & {
+    title: "bring it home"
+    goal:  "firewood_stocked"
+    rank:  1
+    pre:   { find: ["goods"], match: #Market & { me: #Agent & { id: $me }, goods: #Stack & { unit: "firewood", place: #Held & { by: $me } } } }
+    steps: [#Do & { op: "put_in", object: "goods", target: "supply" }]
 } @family(methods)
-unpack_firewood:      #Method & unpack_it & {
-    goal: "firewood_stocked"
-    pre:  #Reached & {
-        reached: "supply"
-        find:    ["pack", "goods"]
-        match:   #Market & { me: #Agent & { id: $me, freeHands: >=1 }, pack: #Pack & { id: $p, place: #Held & { by: $me } },
-                             goods: #Stack & { unit: "firewood", place: #Inside & { container: $p } } }
-    }
-} @family(methods)
-buy_firewood:         #Method & {
+stock_firewood:       #Method & {
     title: "buy firewood"
     goal:  "firewood_stocked"
-    rank:  4
-    pre:   { find: ["purse"], match: holds_coins }
-    steps: [#Purchase & { what: #Stack & { unit: "firewood" }, units: 10, stocking: "supply", level: 110kg }]
+    rank:  2
+    pre:   { find: [], match: #Market }
+    steps: [#Achieve & { subgoal: "firewood_coming" }, #Achieve & { subgoal: "firewood_in_hand" },
+            #Do & { op: "put_in", object: "goods", target: "supply" }]
 } @family(methods)
-carry_firewood_home:  #Method & carry_home & {
-    goal: "firewood_stocked"
+firewood_coming:      #Goal & { title: "buy enough firewood", done: #Buying & firewood_lot & { buying: "coming" } } @family(goals)
+buy_firewood:         #Method & {
+    title: "buy a lot of firewood"
+    goal:  "firewood_coming"
+    rank:  1
+    pre:   { find: [], match: #Market }
+    steps: [#Achieve & { subgoal: "coins_for_firewood" }, #Achieve & { subgoal: "firewood_priced" },
+            #Achieve & { subgoal: "hand_free" }, #Purchase & firewood_lot]
+} @family(methods)
+firewood_priced:      #Goal & { title: "learn the price of firewood", done: #Buying & firewood_lot & { buying: "priced" } } @family(goals)
+coins_for_firewood:   #Goal & { title: "the coins for firewood", done: #Buying & firewood_lot & { buying: "affords", coinsIn: "coffer" } } @family(goals)
+firewood_in_hand:     #Goal & {
+    title: "firewood in hand"
+    done:  { find: ["goods"], match: #Market & { me: #Agent & { id: $me }, goods: #Stack & { unit: "firewood", place: #Held & { by: $me } } } }
+} @family(goals)
+read_firewood_prices: #Method & read_prices & { goal: "firewood_priced" } @family(methods)
+fetch_coins_firewood: #Method & fetch_coins & { goal: "coins_for_firewood" } @family(methods)
+coffer_firewood:      #Method & look_in_coffer & { goal: "coins_for_firewood" } @family(methods)
+unpack_firewood:      #Method & unpack_it & {
+    goal: "firewood_in_hand"
     pre: {
-        find:  ["supply", "pack", "goods"]
-        match: #Market & { me: #Agent & { id: $me }, supply: #Container, pack: #Pack & { id: $p, place: #Held & { by: $me } },
+        find:  ["pack", "goods"]
+        match: #Market & { me: #Agent & { id: $me }, pack: #Pack & { id: $p, place: #Held & { by: $me } },
                            goods: #Stack & { unit: "firewood", place: #Inside & { container: $p } } }
     }
 } @family(methods)
-fetch_coins_firewood: #Method & fetch_coins & { goal: "firewood_stocked" } @family(methods)
-coffer_firewood:      #Method & look_in_coffer & { goal: "firewood_stocked" } @family(methods)
-unburden_firewood:    #Method & free_stack & { goal: "firewood_stocked" } @family(methods)
-firewood_stalls:      #Method & to_the_stalls & { goal: "firewood_stocked" } @family(methods)
 
 // After the market: the coins home to the coffer. A buyer puts away what
 // it holds; a seller takes its stall's takings (its own: the stall bound

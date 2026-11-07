@@ -167,6 +167,7 @@
     onUnknown: text
     ofTrade:   text
     sequence:  *false | true
+    ends:      *false | true
 }
 
 // A `sequence` method is a recipe (ACTIONS.md §6): its operations are done
@@ -176,6 +177,12 @@
 // of the trade (`Agent.trade`), and to whoever learned it, read or told;
 // without the recipe an agent can't choose it. One with no trade, anyone
 // knows.
+
+// A method that `ends` its goal (a `sequence` one, its steps all done) has
+// done all the goal asks of it, whatever `done` says: the goal's last
+// resort, a way that settles for less than `done` (METHODS.md; the
+// research's procedural goal). Something to eat at work is a meal, but
+// with no meal to be had, raw food taken along will do.
 
 // `onUnknown` (AGENCY.md §5): when the precondition is unknown, rather than
 // false, the goal to adopt first, with the unknown match's bindings: finding

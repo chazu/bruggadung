@@ -3759,6 +3759,7 @@ ALL_TESTS := [?]Test_Case{
 	{"rationing",                     test_rationing},
 	{"deals",                         test_deals},
 	{"foraging",                      test_foraging},
+	{"goal_done_beneath",             test_goal_done_beneath},
 	{"seen_kinds",                    test_seen_kinds},
 	{"identity_from_context",         test_identity_from_context},
 	{"identity_lost_and_found",       test_identity_lost_and_found},

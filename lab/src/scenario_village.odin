@@ -59,6 +59,7 @@ package lab
  */
 
 import "core:fmt"
+import "core:slice"
 import "core:strings"
 import tri "../../triangle/odin/triangle"
 
@@ -608,6 +609,15 @@ village_counters :: proc(self: ^Village) -> []string {
 	append(&lines, fmt.tprintf("perception     %.0f ms", ms(st.perceptionNs)))
 	append(&lines, fmt.tprintf("  interpreting %.0f ms", ms(self.knowledge.interpretationNs)))
 	append(&lines, fmt.tprintf("decision       %.0f ms", ms(st.decisionNs)))
+	/* fall-through (METHODS.md decision 6): a way followed after another of
+	 * the same goal failed, by goal, sorted */
+	{
+		keys := make([dynamic]string, context.temp_allocator)
+		for k in self.agency.fallThroughs do append(&keys, k)
+		slice.sort(keys[:])
+		append(&lines, fmt.tprintf("fall-through   %d pairs", len(keys)))
+		for k in keys do append(&lines, fmt.tprintf("  %5d %s", self.agency.fallThroughs[k], k))
+	}
 	return lines[:]
 }
 

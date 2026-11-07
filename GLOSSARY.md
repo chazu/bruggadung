@@ -494,6 +494,13 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
   credence threshold, and what to do with unknown. A goal's methods are
   whole ways to it, each an alternative to the others; what one needs is
   a subgoal. (AGE d1, d34, §5; MET, proposed)
+- **Last resort**: a method that **ends** its goal (`ends: true`, a
+  `sequence` method): its steps all done, the goal is done whatever
+  `done` says. It settles for less (raw food taken along, when no meal
+  can be made). (MET)
+- **Errand**: the outermost goal of a chain of subgoals, as its subgoals
+  serve it. A subgoal searches as its errand does: places looked into
+  since the errand began are passed over. (MET)
 - **Ladder**: a goal's methods written so that each lower one only
   readies a higher one (fetch the coins, so as to buy), as in a
   teleo-reactive program. Run with fail-and-retry, a failed method falls

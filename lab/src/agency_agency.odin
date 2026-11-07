@@ -283,6 +283,8 @@ Agency :: struct {
 	wakes:        ^Wakes,              /* each mind's next time due with nothing happening */
 	nudged:       [dynamic]Entity_ID,  /* minds looked up since the last boundary: checked at it (the
 	                                      realloc'd _nudged, _nnudged, _nudgedcap) */
+	fallThroughs: map[string]u64,      /* a way followed after another of the same goal's failed, in one
+	                                      intention: "goal: failed → next", counted (METHODS.md decision 6) */
 	kindTypes:    map[string]tri.Type,     /* a believed kind's type (a referent's `kind`, a type
 	                                      expression), worked out once: content doesn't change */
 	unknown:      [BG_MAX_SLOTS]Slot_Binding,   /* the last condition's first unknown match: its bindings */
@@ -649,6 +651,8 @@ agency_dealloc :: proc(self: ^Agency) {
 	delete(self.nudged)
 	for k in self.kindTypes do delete(k)
 	delete(self.kindTypes)
+	for k in self.fallThroughs do delete(k)
+	delete(self.fallThroughs)
 }
 
 
@@ -1432,6 +1436,7 @@ agency_holds :: proc(self: ^Agency, instance: cstring, path: cstring, since: i64
 		       in_reach(knowledge_store_referent(store, knowledge_store_self_referent(store)),
 		                knowledge_store_referent(store, bound(b, n^, str(text[:]))))
 	}
+	if done != nil && text_at(tc, done, "buying", text[:]) do return agency_buying(self, done, str(text[:]), b, n^, store)
 	if done != nil && text_at(tc, done, "did", text[:]) {
 		/* lately: one begun no longer ago than that (a kept goal, done
 		 * again and again) */
@@ -2160,6 +2165,19 @@ agency_follow :: proc(self: ^Agency, m: ^Motivation, method: cstring, index: i32
 		}
 		return true
 	}
+	/* a way that ends its goal: followed through, the goal is done, whatever
+	 * `done` says (its last resort, METHODS.md) */
+	if ends := tri.at(tc, pattern, "ends"); ends != nil && tri.node_type(ends) == tri.type_named(tc, "true") {
+		top := &m.intentions[m.nintentions - 1]
+		agency_note(self, m, fmt.tprintf("done, as %s does", str(title[:])))
+		agency_settle(self, m, top, done = true)
+		m.nintentions -= 1
+		if m.nintentions != 0 {
+			m.intentions[m.nintentions - 1].pending = -1
+			agency_note(self, m, fmt.tprintf("back to it: %s is done", goal_title(tc, top.goal, goal[:])))
+		}
+		return false
+	}
 	agency_fail(self, m, index, fmt.tprintf("%s: every step is done, and the goal is not", str(title[:])))
 	return false
 }
@@ -2529,35 +2547,47 @@ agency_price_writing :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_St
 }
 
 
-/* Buying (content/market/'s #Purchase): `units` like `what` at the
- * cheapest price it knows (the nearest of the cheapest), its stall still
- * there, if no dearer than its own
- * pricing; as many as its coins pay for. To whoever minds the stall, walked
- * to first. "" once it asks, or sets out; else why it can't. */
+/* The lot a #Purchase (or a #Buying, content/market/) is for: the unit of
+ * `what`, and `units` of it, no more than will bring the `stocking` slot's
+ * referent up to `level` with what it has there, in hand and in its pack;
+ * 0 units when that much is coming already. */
 @(private = "file")
-agency_purchase :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Store, me: ^Referent, step: ^tri.Node,
-                        title: string, b: [^]Slot_Binding, n: i32) -> string {
+agency_lot :: proc(self: ^Agency, node: ^tri.Node, b: [^]Slot_Binding, n: i32, store: ^Knowledge_Store) -> (u: cstring, units: i64, ok: bool) {
 	unit: [64]u8
 	slot: [32]u8
 
 	tc   := world_tri(self.world)
-	what := tri.at(tc, step, "what")
-	if what == nil || !text_at(tc, what, "unit", unit[:]) do return "buy what?"
-	u     := world_intern(self.world, cstr(unit[:]))
-	units := int_at(tc, step, "units", 1)
-	/* no more than the supply lacks, with what it has in hand and pack */
-	if level := int_at(tc, step, "level", 0); level > 0 && text_at(tc, step, "stocking", slot[:]) {
+	what := tri.at(tc, node, "what")
+	if what == nil || !text_at(tc, what, "unit", unit[:]) do return nil, 0, false
+	u     = world_intern(self.world, cstr(unit[:]))
+	units = int_at(tc, node, "units", 1)
+	if level := int_at(tc, node, "level", 0); level > 0 && text_at(tc, node, "stocking", slot[:]) {
 		have := agency_mass_toward(self, what, bound(b, n, str(slot[:])), store)
-		each := int_at(tc, tri.pattern(tc, u), "unitMass", 0)
-		if each <= 0 do each = int_at(tc, tri.pattern(tc, u), "mass", 1)
-		if have >= level do return fmt.tprintf("it has enough %s coming", u)
-		units = min(units, (level - have + each - 1) / each)
+		if have >= level do return u, 0, true
+		units = min(units, (level - have + agency_unit_mass(self, u) - 1) / agency_unit_mass(self, u))
 	}
-	/* the cheapest; of those, the nearest; then the lowest */
+	return u, units, true
+}
+
+
+/* A unit's mass, of its blueprint: a stack's unit, else the whole. */
+@(private = "file")
+agency_unit_mass :: proc(self: ^Agency, u: cstring) -> i64 {
+	tc   := world_tri(self.world)
+	each := int_at(tc, tri.pattern(tc, u), "unitMass", 0)
+	if each <= 0 do each = int_at(tc, tri.pattern(tc, u), "mass", 1)
+	return max(each, 1)
+}
+
+
+/* The cheapest price it knows for the unit, read this market (one read at
+ * an earlier market, it may not sell this one), its stall there; of those,
+ * the nearest, then the lowest board. -1 if none. */
+@(private = "file")
+agency_cheapest :: proc(self: ^Agency, store: ^Knowledge_Store, me: ^Referent, u: cstring) -> int {
 	best  := -1
 	bestAt: i32
 	for p, i in store.prices {
-		/* read at an earlier market: it may not sell this one */
 		if rawptr(p.unit) != rawptr(u) || world_time(self.world).ms - p.time > BG_PRICE_LAPSE do continue
 		r := knowledge_store_referent(store, p.board)
 		if r == nil || !r.present do continue
@@ -2567,21 +2597,101 @@ agency_purchase :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Store, 
 			best, bestAt = i, d
 		}
 	}
+	return best
+}
+
+
+/* The coins it holds, as it believes. */
+@(private = "file")
+agency_coins_held :: proc(self: ^Agency, store: ^Knowledge_Store) -> i64 {
+	arena := tri.arena_new()
+	defer tri.arena_free(arena)
+	purse := agency_held_like(self, tri.value(world_tri(self.world), "#Stack & { unit: \"coin\" }", arena, nil, 0), store)
+	return agency_units_of(self, purse, store) if purse != 0 else 0
+}
+
+
+/* When the errand the mind's current intention serves began: the adoption
+ * of the outermost goal of its chain of subgoals. 0 with none. */
+@(private = "file")
+agency_errand_since :: proc(m: ^Motivation) -> i64 {
+	if m == nil || m.nintentions == 0 do return 0
+	base := m.nintentions - 1
+	for base > 0 && m.intentions[base - 1].pending >= 0 do base -= 1
+	return m.intentions[base].adopted
+}
+
+
+/* What buying needs (content/market/'s #Buying, METHODS.md decision 3):
+ * `which` of "coming", "priced", "affords", for the lot. Nothing
+ * left to buy, each holds. */
+@(private = "file")
+agency_buying :: proc(self: ^Agency, cond: ^tri.Node, which: string, b: [^]Slot_Binding, n: i32, store: ^Knowledge_Store) -> bool {
+	slot: [32]u8
+
+	tc := world_tri(self.world)
+	me := knowledge_store_referent(store, knowledge_store_self_referent(store))
+	u, units, ok := agency_lot(self, cond, b, n, store)
+	if !ok || me == nil do return false
+	if units == 0 do return true
+	switch which {
+	case "priced":
+		return agency_cheapest(self, store, me, u) >= 0
+	case "affords":
+		/* knowing no price yet, any coins will do to go and look; knowing
+		 * one, enough for the lot (it is asked again once it does) */
+		best := agency_cheapest(self, store, me, u)
+		held := agency_coins_held(self, store)
+		if best >= 0 && units * i64(store.prices[best].coins) <= held do return true
+		if best < 0 && held > 0 do return true
+		/* or no more at home: the coffer looked into on this errand (one
+		 * seen empty before may have been filled since), and no coins in it */
+		if !text_at(tc, cond, "coinsIn", slot[:]) do return false
+		k := bound(b, n, str(slot[:]))
+		coffer := knowledge_store_referent(store, k) if k != 0 else nil
+		if coffer == nil || coffer.insideSeen < 0 || coffer.insideSeen < agency_errand_since(self.deciding) do return false
+		arena := tri.arena_new()
+		defer tri.arena_free(arena)
+		coin := tri.value(tc, "#Stack & { unit: \"coin\" }", arena, nil, 0)
+		for i: uint = 0; i < knowledge_store_count(store); i += 1 {
+			r := knowledge_store_referent_at(store, i)
+			if r.present && r.form == .In && r.container == k && agency_referent_is_of(self, r, coin) do return false
+		}
+		return true
+	}
+	/* "coming": a lot of it in hand is as much as it carries home this
+	 * time (its pack full, or none): home with it, before buying more */
+	arena := tri.arena_new()
+	defer tri.arena_free(arena)
+	return agency_held_like(self, tri.value(tc, ns_utf8(fmt.tprintf("#Stack & {{ unit: \"%s\" }}", u)), arena, nil, 0), store) != 0
+}
+
+
+/* Buying (content/market/'s #Purchase): the lot (agency_lot) at the
+ * cheapest price it knows (agency_cheapest), if no dearer than its own
+ * pricing; as many as its coins pay for. To whoever minds the stall, walked
+ * to first. "" once it asks, or sets out; else why it can't. */
+@(private = "file")
+agency_purchase :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Store, me: ^Referent, step: ^tri.Node,
+                        title: string, b: [^]Slot_Binding, n: i32) -> string {
+	tc := world_tri(self.world)
+	u, units, ok := agency_lot(self, step, b, n, store)
+	if !ok do return "buy what?"
+	if units == 0 do return fmt.tprintf("it has enough %s coming", u)
+	what := tri.at(tc, step, "what")
+	best := agency_cheapest(self, store, me, u)
 	if best < 0 do return fmt.tprintf("it knows no stall selling %s", u)
 	price := store.prices[best]
 	mine  := agency_pricing(self, what, store)
 	if price.coins > mine do return fmt.tprintf("%s at %d is dearer than it holds it worth, %d", u, price.coins, mine)
-	arena := tri.arena_new()
-	purse := agency_held_like(self, tri.value(tc, "#Stack & { unit: \"coin\" }", arena, nil, 0), store)
-	tri.arena_free(arena)
-	have := agency_units_of(self, purse, store) if purse != 0 else 0
+	have := agency_coins_held(self, store)
 	if price.coins > 0 && units * i64(price.coins) > have do units = have / i64(price.coins)
 	if units < 1 do return "it hasn't the coins"
 	/* somewhere to take the lot: a free hand, or room in its pack (its own
 	 * hands and pack, as it feels them) */
-	each := int_at(tc, tri.pattern(tc, u), "unitMass", 0)
-	if each <= 0 do each = int_at(tc, tri.pattern(tc, u), "mass", 0)
-	if _, ok := receiving(self.world, m.agent, each * units, true); !ok do return "it has no hand free for it, nor room in its pack"
+	if _, room := receiving(self.world, m.agent, agency_unit_mass(self, u) * units, true); !room {
+		return "it has no hand free for it, nor room in its pack"
+	}
 	stall  := knowledge_store_referent(store, price.board)      /* the board stands on it */
 	seller := agency_minding(self, stall, store, price.seller)
 	if seller == nil {
@@ -3759,6 +3869,29 @@ agency_decide :: proc(self: ^Agency, m: ^Motivation) -> bool {
 	bestRank:  i64
 	bestHabit: i32
 
+	/* a goal beneath, achieved meanwhile (METHODS.md decision 5): it is done,
+	 * and the subgoals posted for it go with it, outermost first. Only the
+	 * subgoals' chain: a goal suspended beneath another that won (its
+	 * `pending` -1) isn't what the one above it is for. */
+	base := m.nintentions - 1
+	for base > 0 && m.intentions[base - 1].pending >= 0 do base -= 1
+	for k := base; k < m.nintentions - 1; k += 1 {
+		beneath := &m.intentions[k]
+		n = beneath.nparams
+		copy(b[:n], beneath.params[:n])
+		if !agency_holds(self, beneath.goal, "done", beneath.adopted, raw_data(b[:]), &n, store) do continue
+		agency_note(self, m, fmt.tprintf("%s is done meanwhile: giving up %s",
+		                                 goal_title(world_tri(self.world), beneath.goal, title[:]),
+		                                 goal_title(world_tri(self.world), m.intentions[k + 1].goal, method[:])))
+		agency_settle(self, m, beneath, done = true)
+		m.nintentions = k
+		if k != 0 {
+			m.intentions[k - 1].pending = -1
+			agency_note(self, m, fmt.tprintf("back to it: %s is done", str(title[:])))
+		}
+		return false
+	}
+
 	n = top.nparams
 	copy(b[:n], top.params[:n])
 	if agency_holds(self, top.goal, "done", top.adopted, raw_data(b[:]), &n, store) {
@@ -3783,7 +3916,12 @@ agency_decide :: proc(self: ^Agency, m: ^Motivation) -> bool {
 	 * for a commitment, since its window opened (tried again, a kept goal
 	 * doesn't look again into the larder it knows too low to sell from;
 	 * another's stall, whose board may change, it reads again) */
-	self.ownSearched = agency_since_window(m, top.adopted)
+	/* a subgoal searches as the errand it serves does: what was looked into
+	 * (a stall read, a coffer looked in) since the outermost goal of its
+	 * chain was adopted is passed over, not looked into again each time the
+	 * subgoal is adopted afresh (METHODS.md) */
+	searchedSince := m.intentions[base].adopted
+	self.ownSearched = agency_since_window(m, searchedSince)
 	for i: uint = 0; i < nmethods; i += 1 {
 		if (top.failed & (u32(1) << u32(i))) != 0 do continue
 		n = top.nparams
@@ -3797,7 +3935,7 @@ agency_decide :: proc(self: ^Agency, m: ^Motivation) -> bool {
 			copy(chosenB[:n], b[:n])
 			break
 		}
-		if !agency_holds(self, methods[i], "pre", top.adopted, raw_data(b[:]), &n, store) {
+		if !agency_holds(self, methods[i], "pre", searchedSince, raw_data(b[:]), &n, store) {
 			/* unknown, not false: a method may find out first (AGENCY.md §5, onUnknown) */
 			if self.nunknown != 0 && unknownMethod < 0 &&
 			   text_at(world_tri(self.world), tri.pattern(world_tri(self.world), methods[i]), "onUnknown", subgoal[:]) {
@@ -3843,6 +3981,16 @@ agency_decide :: proc(self: ^Agency, m: ^Motivation) -> bool {
 	if chosen >= 0 {
 		if top.following != chosen && len(scores) != 0 {
 			agency_note(self, m, fmt.tprintf("scoring %s", strings.join(scores[:], "; ", context.temp_allocator)))
+		}
+		/* the way last followed failed, and another is taken: counted */
+		if top.following >= 0 && top.following != chosen && top.following < i32(nmethods) &&
+		   (top.failed & (u32(1) << u32(top.following))) != 0 {
+			key := fmt.tprintf("%s: %s → %s", top.goal, methods[top.following], methods[chosen])
+			if key in self.fallThroughs {
+				self.fallThroughs[key] += 1
+			} else {
+				self.fallThroughs[strings.clone(key)] = 1
+			}
 		}
 		if top.following != chosen {
 			if passed := agency_passed_over(self, raw_data(methods[:]), uint(chosen), top.failed); passed != "" {

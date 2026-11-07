@@ -2,7 +2,8 @@
 
 ## Status and scope
 
-Proposal, with measurements; nothing built yet. This document extends
+Being built (lab/PLAN.md). Built: decisions 5 and 6, the market's buying
+rewritten (decisions 1–4, "Built so far" below). This document extends
 [AGENCY.md](AGENCY.md) §5 (methods) and generalises its decision 34 ("a
 method is taken for what it does, not because it can be done"). It
 covers how a goal's methods are written and run so that an agent doesn't
@@ -268,6 +269,49 @@ way, with its needs as subgoals.
     lines).
 - `ci/scenario-hashes.txt` regenerated, Linux checked identical.
 - `lab bench crowd` before and after the engine's decision-5 check.
+
+## Built so far
+
+- **Decision 5** (`agency_decide`): a goal beneath, achieved meanwhile, is
+  done, and its subgoals go with it ("… is done meanwhile: giving up …").
+  Only the chain of subgoals counts, not a goal suspended beneath one
+  that won. Test: `goal_done_beneath`.
+  - It found a `done` too weak at once: "take something to eat" held
+    with any food in hand, so the grain taken up to cook ended it, and the
+    meal was given up half made.
+  - Its `done` is now a meal in hand. Raw food taken along is its last
+    resort, a method that **ends** its goal (`ends: true`, a `sequence`
+    method's steps all done): the research's procedural goal.
+- **Decision 6** (`--counters`): fall-through pairs, by goal.
+- **Decisions 1–4, the market's buying** (content/market/):
+  - Bringing goods in hand home comes first. Else one whole way: enough
+    coming, then in hand, then put in.
+  - Enough coming is a lot bought: the coins in hand, a price known, the
+    coins for the lot, a hand free, the purchase.
+  - `#Buying` is the condition the code works out (`agency_buying`, from
+    the purchase's own lot and prices):
+    - "coming" holds with a lot of it in hand, as much as it carries home
+      at a time;
+    - "affords" holds with any coins while no price is known;
+    - with no more coins in the coffer (looked into on this errand) the
+      coins in hand will do.
+  - Three things the old ladder did by itself had to be said:
+    - "room" is a free hand: the seller hands over only to a free hand;
+    - a subgoal searches as its errand does, passing over stalls and
+      coffers looked into since the outermost goal was adopted. Adopted
+      afresh, a price subgoal re-read the same board 822 times;
+    - a coffer seen empty before the errand began is looked into again.
+
+Three weeks of the village after it:
+- buying's fall-through is gone (none; 21 of 201 failed buys before);
+- the market checks pass;
+- 8 FAILs, against 4. All but one fall in the lean days 11–19. A farming
+  household's larder empties on day 11, against day 14 before, so its
+  people go hungry and ask about. The other is the larders check, which
+  finds the hunters took too little from their own (116 portions).
+
+Not yet: the rest of the content (firewood/, hunting/ and on), and why the
+farmers' larder now empties sooner.
 
 ## Open questions
 
