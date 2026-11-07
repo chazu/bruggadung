@@ -1336,6 +1336,7 @@ Repair_Run :: struct {
 	nextSame:           bool,         /* and, restored, takes the same next boundary */
 	talked:             bool,         /* saying something while dismantling */
 	refused:            string,       /* why a second activity for the hands was refused */
+	resumeRefused:      string,       /* why resuming without the wrench was refused */
 }
 
 
@@ -1447,6 +1448,9 @@ test_repair_run :: proc(omniscient: bool, shout: bool) -> Repair_Run {
 	proposal_group_move_to(g, whole(wrench), held_by(smith, 0))
 	committer_submit(st.c, g)
 	scheduler_run_until(st.s, time_make(world_time(st.w).ms + 1000))
+	/* 6: resuming, the action side rechecks what it needs: without the
+	 * wrench, refused, with the reason */
+	if activities_resume(activities, a, &run.resumeRefused) != nil do run.resumeRefused = ""
 	world_get_field(st.w, "Activity.stage", a, &run.stage)
 	world_get_field(st.w, "Activity.progress", a, &run.progress)
 	run.openWhileSuspended = world_get_field(st.w, "Pump.opened", run.pump, &v) && v != 0
@@ -1519,8 +1523,12 @@ test_interrupted_repair :: proc() {
 	/* 4: suspended at 60% of the last stage: its progress kept, nothing committed */
 	bg_check(run.stage == 2 && run.progress == 3000)
 	bg_check(!run.openWhileSuspended)
-	/* 6: resuming without the wrench is refused, with the reason */
-	bg_check(test_logged_by(run.agency, run.worker, "could not resume dismantle: what it needs no longer holds"))
+	/* 6: resuming without the wrench is refused, with the reason; the
+	 * worker, the recipe still holding, waits for a wrench in hand, its
+	 * dismantling put down, not given up */
+	bg_check(ns_contains(run.resumeRefused, "what it needs no longer holds"))
+	bg_check(test_logged_by(run.agency, run.worker, "follow the recipe waits: it needs take up a wrench"))
+	bg_check(!test_logged_by(run.agency, run.worker, "giving up the dismantle put down"))
 	/* 5: saved while suspended, restored the same, and the next boundary the same */
 	bg_check(run.saved)
 	bg_check(run.nextSame)
@@ -3783,5 +3791,6 @@ ALL_TESTS := [?]Test_Case{
 	{"carrying",                      test_carrying},
 	{"scene_knowledge",               test_scene_knowledge},
 	{"keep_seed",                     test_keep_seed},
+	{"harvest_overtaken",             test_harvest_overtaken},
 	{"units_name_instances",          test_units_name_instances},
 }

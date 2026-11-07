@@ -59,18 +59,24 @@ test_cooking :: proc() {
 	bg_check(perform(w, c, action_make("cook", cook, portion, stove), 0, &error) == nil)
 
 	/* of the harvest in hand, a stack, one portion is cooked, into the free
-	 * hand; the rest is still raw. With no hand free, none is: the cooking
-	 * comes to nothing at its end. */
+	 * hand; the rest is still raw. With no hand free, the whole of it is. */
 	g = proposal_group_group_with_phase(.System, "setup: the harvest in hand")
 	harvest := proposal_group_create(g, "grain_harvest", "the harvest", held_by(cook, 1))
+	another := proposal_group_create(g, "grain_harvest", "another harvest", in_(larder))
 	committer_submit(c, g)
 	committer_commit_boundary(c)
-	harvest = proposal_group_id_for(g, harvest)
+	harvest, another = proposal_group_id_for(g, harvest), proposal_group_id_for(g, another)
 	error = ""
 	bg_check(perform(w, c, action_make("cook", cook, harvest, stove), 0, &error) != nil)
 	scheduler_run_until(s, time_make(world_time(w).ms + 1200 * 1000 + 1))
-	bg_check(world_get_field(w, "Food.raw", harvest, &raw) && raw == 1)
+	bg_check(world_get_field(w, "Food.raw", harvest, &raw) && raw == 0)
 	bg_check(world_get_field(w, "Stack.count", harvest, &count) && count == 2)
+	g = proposal_group_group_with_phase(.System, "setup: the meals put by, another harvest in hand")
+	proposal_group_move_to(g, whole(harvest), in_(larder))
+	proposal_group_move_to(g, whole(another), held_by(cook, 1))
+	committer_submit(c, g)
+	committer_commit_boundary(c)
+	harvest = another
 	g = proposal_group_group_with_phase(.System, "setup: the meal put by")
 	proposal_group_move_to(g, whole(portion), in_(larder))
 	committer_submit(c, g)

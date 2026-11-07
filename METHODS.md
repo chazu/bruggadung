@@ -384,15 +384,37 @@ Only one of the four was the lean days':
 
 After it: 1 FAIL, that household.
 
-Found on the way, not yet fixed: a farmer's harvest put aside by the
-engine (another reaped the plot's last tiles, so it no longer stands
-ripe) is chosen again and again to be resumed, and fails each time.
-Farmer 90 tried 143 times in an afternoon and never brought in what it
-held. A suspended step's method is chosen without checking `pre`
-("resuming rechecks what it needs"), and a refused resume is given up
-only when what it binds is gone or out of reach. The repair test relies
-on the waiting: its wrench comes back, and the dismantling resumes where
-it was put down.
+Found on the way: a farmer's harvest suspended by the engine (another
+reaped the plot's last tiles, so it no longer stands ripe) was chosen
+again and again to be resumed, and refused each time. Farmer 90 tried 143
+times in an afternoon and never brought in what it held. Now (AGENCY.md
+decision 35):
+- **A refused resume checks the way.** If the way's precondition no longer
+  holds either, the suspended activity is aborted and the goal tries its
+  next way: the harvest given up, the armful brought in. Test:
+  `harvest_overtaken`. Checking the precondition before every resume
+  instead gave up a hunter's aim whenever the game went out of sight.
+- **The pump's wrench is a subgoal** (decision 34), not the recipes'
+  precondition. Taken while the dismantling is suspended, the recipe still
+  holds; "take up a wrench" is impossible for now, and the recipe waits
+  for it rather than failing, while it has work suspended. The wrench
+  back, the dismantling resumes where it was. Check 6 of ACTIONS.md
+  Scenario 3 (rechecking on resume finds the instrument missing) is now
+  asked of the activity, not left to agency trying a blind resume.
+- **Cooking with no hand free** cooks the whole stack: a cook that came
+  to nothing was taken up again and again (a farmer's harvest in one hand,
+  something else in the other).
+
+The rule fires 9 times in three weeks, all in farming: a sow, a harvest
+or seed kept back whose plot changed under it (farmer 17, day 1: its plot
+sown by another, the seed put back, at work by 09:18, not resuming all
+day). The village takes a different course from day 1, and three weeks
+give 5 FAILs, against 1:
+- the lean household (162, 165) on day 14, as before;
+- night 13: a farmer (20) short of food, asking in vain at 22:00, not
+  in bed by 02:00;
+- not yet looked into: a pack left by its larder (night 11), and a meal
+  in hand at 14:30 (20, day 16).
 
 Not yet: content step 4 (farming, carrying, the market's selling) and
 step 5.

@@ -1960,22 +1960,21 @@ agency_again :: proc(self: ^Agency, m: ^Motivation, op: cstring, item: u32, targ
 }
 
 
-/* Whether the agent has a suspended activity of one of the method's
- * operations. */
+/* The agent's suspended activity of one of the method's operations: its
+ * work put down; NO_ENTITY if none. */
 @(private = "file")
-agency_suspended_step_of :: proc(self: ^Agency, method: cstring, m: ^Motivation) -> bool {
+agency_suspended_step_of :: proc(self: ^Agency, method: cstring, m: ^Motivation) -> Entity_ID {
 	op: [64]u8
 
 	tc := world_tri(self.world)
 	for steps := tri.at(tc, tri.pattern(tc, method), "steps"); steps != nil; steps = tri.at(tc, steps, "rest") {
 		step := tri.at(tc, steps, "first")
 		if step == nil do break
-		if text_at(tc, step, "op", op[:]) &&
-		   agency_activity(self, cstr(op[:]), m.agent, "suspended", 0) != NO_ENTITY {
-			return true
+		if text_at(tc, step, "op", op[:]) {
+			if a := agency_activity(self, cstr(op[:]), m.agent, "suspended", 0); a != NO_ENTITY do return a
 		}
 	}
-	return false
+	return NO_ENTITY
 }
 
 
@@ -2137,7 +2136,21 @@ agency_follow :: proc(self: ^Agency, m: ^Motivation, method: cstring, index: i32
 			activities_abort(self.activities, suspended, "given up", nil)
 			resume_failed = ""
 		}
+		/* refused, and the way no longer holds as the agent believes (the
+		 * plot it was reaping reaped by another, no longer ripe): given up,
+		 * and the goal tries its next way (AGENCY.md decision 35). While
+		 * the way holds, it waits to resume. */
 		if resume_failed != "" {
+			pb: [BG_MAX_SLOTS]Slot_Binding
+			pn := min(n, BG_MAX_SLOTS)
+			copy(pb[:pn], b[:pn])
+			if !agency_holds(self, method, "pre", m.intentions[m.nintentions - 1].adopted, raw_data(pb[:]), &pn, store) {
+				agency_note(self, m, fmt.tprintf("%s no longer holds: giving up the %s put down: %s", str(title[:]), str(op[:]),
+				                                 resume_failed))
+				activities_abort(self.activities, suspended, "given up", nil)
+				agency_fail(self, m, index, fmt.tprintf("%s has failed: %s", str(title[:]), resume_failed))
+				return false
+			}
 			agency_note(self, m, fmt.tprintf("%s: could not resume %s: %s", str(title[:]), str(op[:]), resume_failed))
 			return true
 		}
@@ -3968,7 +3981,7 @@ agency_decide :: proc(self: ^Agency, m: ^Motivation) -> bool {
 		copy(b[:n], top.params[:n])
 		self.nunknown    = 0
 		self.residual[0] = 0
-		if i32(i) == top.following && agency_suspended_step_of(self, methods[i], m) {
+		if i32(i) == top.following && agency_suspended_step_of(self, methods[i], m) != NO_ENTITY {
 			/* back to what it put down: resuming rechecks what it needs */
 			chosen  = i32(i)
 			chosenN = n
@@ -4068,6 +4081,15 @@ agency_decide :: proc(self: ^Agency, m: ^Motivation) -> bool {
 			agency_methods_for_mind(self, top.goal, m, raw_data(methods[:]), BG_MAX_METHODS)
 			if !text_at(world_tri(self.world), tri.pattern(world_tri(self.world), methods[top.pending]), "title", method[:]) {
 				put(method[:], string(methods[top.pending]))
+			}
+			/* its work put down: it waits for what it needs (the wrench
+			 * another took), not given up, and is taken up again as what it
+			 * knows changes (AGENCY.md decision 35) */
+			if agency_suspended_step_of(self, methods[top.pending], m) != NO_ENTITY {
+				agency_note(self, m, fmt.tprintf("%s waits: it needs %s", str(method[:]), str(title[:])))
+				top.pending = -1
+				m.waiting   = true
+				return true
 			}
 			agency_fail(self, m, top.pending, fmt.tprintf("%s has failed: it needed %s", str(method[:]), str(title[:])))
 		}

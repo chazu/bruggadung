@@ -248,6 +248,20 @@ Out of scope here, except where they touch agency:
     [METHODS.md](METHODS.md) proposes making this the rule for every goal
     (most of the lab's goals with several methods are still ladders), with
     measurements and the prior work it rests on.
+35. **A suspended activity is gone back to while its way still holds.** A
+    resume refused (what it needs no longer holds), the agent checks the
+    way's precondition as it believes. If that no longer holds either (the
+    plot it was reaping reaped by another, no longer ripe), the activity
+    is aborted, and the goal tries its other ways: a farmer tried to
+    resume a harvest that could no longer be 143 times in an afternoon,
+    and never brought in what it held. Only a refused resume is checked so:
+    checking the precondition before every resume gave up a hunter's aim
+    whenever the game went out of sight. While the way holds, a subgoal it
+    needs that is impossible for now (the wrench another took) is waited
+    for, not failed: the suspended activity keeps its progress, and is
+    resumed once the subgoal holds (ACTIONS.md Scenario 3, step 5). So what
+    a way needs in hand belongs in a subgoal (decision 34), not its
+    precondition.
 
 ## Terms
 
@@ -429,7 +443,8 @@ a disturbance generates no goal to investigate it.
 - **A suspended activity** is resumed once the agent is back within reach
   of what it names. One that binds what is gone or out of reach, when the
   agent is in reach of what its method names now, is given up and begun
-  again.
+  again. One whose way no longer holds is aborted; while it holds, the
+  way waits for what it needs (decision 35).
 - **Promises** are commitments created by a *communicate* act, whose content
   is the promise itself. Hearers hold it as a claim.
   - Keeping or breaking a promise is a history event, which hearers perceive

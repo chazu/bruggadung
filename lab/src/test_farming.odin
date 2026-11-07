@@ -344,3 +344,80 @@ test_units_name_instances :: proc() {
 	bg_check(info != nil && info.blueprint == "turnip")
 	bg_check(strings.contains(kind_of_entity(w, held[0]), "#Food"))
 }
+
+
+/*
+ * A harvest overtaken (METHODS.md): a farmhand reaping its ripe plot finds it
+ * reaped by another, bare, while it works. The harvest, put down by the
+ * engine (what it needs no longer holds), isn't resumed again and again: the
+ * way no longer holding, it is given up, and the plot tended another way.
+ */
+test_harvest_overtaken :: proc() {
+	w := test_world(120)
+	why: string
+	bg_check(world_set_terrain_map(w, "farm_map", &why))
+	c := test_committer(w)
+	committer_set_tracing(c, false)
+	activities := activities_with_world(w, c)
+	knowledge  := autorelease(knowledge_init_with_world(w))
+	agency     := autorelease(agency_init_with_world(w, c, knowledge))
+	farming    := autorelease(farming_init_with_world(w))
+	s          := autorelease(scheduler_init_with_world(w, c))
+	agency_set_activities(agency, activities)
+	scheduler_add_domain(s, farming_as_domain(farming))
+	scheduler_set_activities(s, activities_as_activity_clock(activities))
+	scheduler_set_perception(s, knowledge_as_perception_phase(knowledge))
+	scheduler_set_decision(s, agency_as_decision_phase(agency))
+
+	g := proposal_group_group_with_phase(.System, "setup: a farmhand, its ripe plot, its larder")
+	plot := proposal_group_create(g, "grain_plot", "its plot", on_tile(2, 3, 0))
+	proposal_group_set_of_to(g, "Area.east", whole(plot), 16)
+	proposal_group_set_of_to(g, "Area.south", whole(plot), 4)
+	proposal_group_set_of_to(g, "Plot.stands", whole(plot), i64(plot_stands(w, "ripe")))
+	me     := proposal_group_create(g, "farmhand", "the farmhand", on_tile(18, 2, 0))
+	larder := proposal_group_create(g, "larder", "its larder", on_tile(19, 1, 0))
+	committer_submit(c, g)
+	scheduler_run_until(s, time_make(1))
+	plot, me, larder = proposal_group_id_for(g, plot), proposal_group_id_for(g, me), proposal_group_id_for(g, larder)
+	test_own(c, me, larder)
+	scheduler_run_until(s, time_make(2))
+	store := knowledge_store_of(knowledge, me)
+	known, kept := u32(0), u32(0)
+	for i: uint = 0; i < knowledge_store_count(store); i += 1 {
+		r := knowledge_store_referent_at(store, i)
+		if r.truth == plot do known = r.id
+		if r.truth == larder do kept = r.id
+	}
+	bg_check(known != 0 && kept != 0)
+	bg_check(agency_undertake_every_with(agency, me, "plot_tended", 7 * 3600 * 1000, 15 * 3600 * 1000, "work", FARM_DAY,
+	                                     {{"plot", known}, {"larder", kept}}))
+
+	/* its second harvest under way, the plot is reaped by another */
+	harvests := 0
+	for harvests < 2 && scheduler_step_until(s, time_make(9 * 3600 * 1000)) {
+		if test_activity_of(w, me, "harvest", "running") != NO_ENTITY && harvests == 0 do harvests = 1
+		if harvests == 1 && test_activity_of(w, me, "harvest", "completed") != NO_ENTITY &&
+		   test_activity_of(w, me, "harvest", "running") != NO_ENTITY {
+			harvests = 2
+		}
+	}
+	bg_check(harvests == 2)
+	a := test_activity_of(w, me, "harvest", "running")
+	g = proposal_group_group_with_phase(.System, "setup: another reaps the rest")
+	proposal_group_set_of_to(g, "Plot.stands", whole(plot), i64(plot_stands(w, "bare")))
+	proposal_group_set_of_to(g, "Plot.reaped", whole(plot), 0)
+	committer_submit(c, g)
+	scheduler_run_until(s, time_make(world_time(w).ms + 3600 * 1000))
+
+	/* put down by the engine; then given up, not resumed again and again */
+	put_down := test_activity_of(w, me, "harvest", "suspended")
+	given_up := test_logged_by(agency, me, "harvest it no longer holds: giving up the harvest put down")
+	tries    := 0
+	for line in agency_log_of(agency, me) do if ns_contains(line, "could not resume harvest") do tries += 1
+	if put_down != NO_ENTITY || !given_up || tries > 0 {
+		fmt.printf("    harvest R%d, still put down: %v, tried to resume %d times\n", a, put_down != NO_ENTITY, tries)
+		for line in agency_log_of(agency, me) do fmt.printf("    %s\n", line)
+	}
+	bg_check(a != NO_ENTITY && put_down == NO_ENTITY)
+	bg_check(given_up && tries == 0)
+}

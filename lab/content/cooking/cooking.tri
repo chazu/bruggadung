@@ -40,7 +40,8 @@
 //             (carrying/, money/coins.tri).
 // - code:     effect_cook (src/act_actions.odin): of a stack held (an
 //             armful of the harvest), one portion is cooked, into the
-//             free hand, the rest still raw; the scenario stocks the
+//             free hand, the rest still raw (no hand free, all of it);
+//             the scenario stocks the
 //             larders and undertakes the morning's commitment
 //             (src/scenario_village.odin).
 

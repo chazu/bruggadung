@@ -5,7 +5,10 @@
 // Cut points:
 // - full:     an agent repairs the pump by a recipe, its trade's or one it
 //             read or was told, rightly or not; or mends it, opening it
-//             further until a worn part shows, and replacing that.
+//             further until a worn part shows, and replacing that. A
+//             wrench in hand is a subgoal of the recipes: taken while the
+//             dismantling is put down, the recipe waits for one, and
+//             resumes the dismantling where it was.
 // - reduced:  the same, decided on the cadence's beat; the work runs at full
 //             pace.
 // - abstract: as reduced.
@@ -170,8 +173,12 @@ repair_pump: #Goal & {
     done:  { find: ["pump"], match: #Repairing & { pump: #Pump & { opened: true } } }
 } @family(goals)
 
-// The recipe: shut off the pump's line, then dismantle it. Which cock is
-// the shutoff comes from what the agent knows: a diagram, say.
+// The recipe: shut off the pump's line, then dismantle it, a wrench in
+// hand. Which cock is the shutoff comes from what the agent knows: a
+// diagram, say. The wrench is a subgoal (AGENCY.md decision 34), not the
+// way's precondition: taken from the agent while the dismantling is put
+// down, the way still holds, and waits for one in hand (ACTIONS.md
+// Scenario 3, step 5).
 the_recipe: #Method & {
     title:    "follow the recipe"
     goal:     "repair_pump"
@@ -179,16 +186,15 @@ the_recipe: #Method & {
     sequence: true
     ofTrade:  "fitter"
     pre: {
-        find:  ["shutoff", "tool", "pump"]
+        find:  ["shutoff", "pump"]
         match: #Repairing & {
-            me:      #Agent & { id: $me }
             shutoff: #Cock & { serves: "pump" }
-            tool:    #Wrench & { place: #Held & { by: $me } }
             pump:    #Pump & { opened: false }
         }
     }
     steps: [
         #Do & { op: "shut_off", object: "shutoff" },
+        #Achieve & { subgoal: "wrench_in_hand" },
         #Do & { op: "dismantle", object: "tool", target: "pump" },
     ]
 } @family(methods)
@@ -203,14 +209,32 @@ rash_recipe: #Method & {
     sequence: true
     ofTrade:  "none"
     pre: {
-        find:  ["tool", "pump"]
-        match: #Repairing & {
-            me:   #Agent & { id: $me }
-            tool: #Wrench & { place: #Held & { by: $me } }
-            pump: #Pump & { opened: false }
-        }
+        find:  ["pump"]
+        match: #Repairing & { pump: #Pump & { opened: false } }
     }
-    steps: [#Do & { op: "dismantle", object: "tool", target: "pump" }]
+    steps: [#Achieve & { subgoal: "wrench_in_hand" }, #Do & { op: "dismantle", object: "tool", target: "pump" }]
+} @family(methods)
+
+// A wrench in hand, to dismantle with: a subgoal, so passed over while one
+// is held. Another holding it, there is no way to one yet.
+wrench_in_hand: #Goal & {
+    title: "take up a wrench"
+    done: {
+        find:  ["tool"]
+        match: #Repairing & { me: #Agent & { id: $me }, tool: #Wrench & { place: #Held & { by: $me } } }
+    }
+} @family(goals)
+
+take_up_the_wrench: #Method & {
+    title: "take up the wrench"
+    goal:  "wrench_in_hand"
+    rank:  1
+    pre: {
+        find:  ["tool"]
+        match: #Repairing & { me: #Agent & { freeHands: >=1 }, tool: #Wrench & { place: #OnTile } }
+    }
+    order: ["near"]
+    steps: [#Do & { op: "take", object: "tool" }]
 } @family(methods)
 
 // Shut a cock in reach.

@@ -911,7 +911,10 @@ effect_eat :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) ->
  * and nourishes by what cooking adds to it, to 100 at most; a meal now, it
  * spoils its `mealKeepsFor` from now (content/perishing/). Of a stack held
  * (an armful of the harvest), one portion is cooked, into the free hand:
- * the rest is still raw, as eating takes one of a stack. */
+ * the rest is still raw, as eating takes one of a stack. With no hand free
+ * to take a portion into, the whole of it is cooked: a cook that came to
+ * nothing was taken up again and again, a farmer's harvest in one hand and
+ * the market's pack in the other. */
 @(private = "file")
 effect_cook :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
 	lit, raw, nourishment, cooking: i64
@@ -925,9 +928,7 @@ effect_cook :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -
 	world_get_field(world, "Food.nourishment", a.roles[.Item], &nourishment)
 	world_get_field(world, "Food.cooking", a.roles[.Item], &cooking)
 	meal := a.roles[.Item]
-	if world_units_of(world, a.roles[.Item]) > 1 {
-		hand := free_hand(world, a.roles[.Actor])
-		if hand < 0 do return "no hand is free"
+	if hand := free_hand(world, a.roles[.Actor]); hand >= 0 && world_units_of(world, a.roles[.Item]) > 1 {
 		meal = proposal_group_split(g, whole(a.roles[.Item]), 1, held_by(a.roles[.Actor], hand))
 	}
 	proposal_group_set_of_to(g, "Food.raw", whole(meal), 0)
