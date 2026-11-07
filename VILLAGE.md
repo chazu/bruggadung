@@ -504,9 +504,11 @@ New, and entered in the glossary with this document:
 
 ## Open questions
 
-- **Preparing and preserving food.** To return to (lab/PLAN.md): food
-  made from food (bread, stew), and kept longer (dried, salted, smoked),
-  so meat outlasts its three days and a hunt's surplus isn't rot.
+- **Preparing and preserving food.** Decided in part (lab/PLAN.md, "To
+  return to"): smoking meat first, when there is a surplus to keep;
+  every other way of preserving and preparing food is wanted in the
+  end, each when the village gives it a reason. Grain and turnips keep
+  already: a harvest outlasts a season.
 
 - **Can people die?** Settled (decision 7): any body whose injury reaches
   100 dies, a person into a corpse. Nothing in the village comes close.

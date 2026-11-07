@@ -924,6 +924,12 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
   it; it rots away ten days on. Held, it is put down (a goal that arises
   from what is held, AGENCY.md d25). A stack spoils whole; two merged spoil at
   their times averaged by mass. (VIL d8)
+- **Preserving**: making perishable food keep longer by a process of its
+  own: smoking, drying, salting, pickling, fermenting, jam, sealing in
+  jars, keeping cold. Smoking meat over a stove is the first planned;
+  the rest come when the village gives them a reason. Not built. *Avoid:*
+  curing (one way of it, salting), for the whole. (lab/PLAN.md, VIL open
+  questions)
 - **Carrion**: a carcass left two days unbutchered, gone off: rot, which
   nobody butchers, and which rots away as spoiled food does. (VIL d8)
 - **Carcass**: what an animal's body is once it has died, to butcher

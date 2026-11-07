@@ -271,10 +271,31 @@ list, 2026-11-06):
   to a coin or coffer rung, 2 of 22 coin fetches were made with coins in
   hand. The work (four engine changes, the content rewritten topic by
   topic, market first) is listed there.
-- **Preparing and preserving food** (VILLAGE.md open questions): food made
-  from food (bread from grain, a stew), and kept longer (dried, salted,
-  smoked meat), so a hunt's surplus outlasts three days and a harvest
-  outlasts a season.
+- **Preparing and preserving food** (VILLAGE.md open questions). Grain
+  and turnips keep (perishing/ gives only meat, meals and berries a
+  time): a harvest outlasts a season already. Meat keeps three days,
+  berries two, and over three weeks only 6 pieces of food spoiled, so
+  nothing presses yet. Decided (2026-11-06):
+  - **First, smoking meat.** An operation over a lit stove (hours, and
+    firewood) turns raw meat into smoked meat that keeps about a month:
+    still food, eaten as it is or cooked. The goal arises when an agent
+    believes its larder holds more meat than its household eats before
+    it spoils (the belief rationing uses, `#AtHome`). A hunter's surplus
+    then lasts a lean week, or is sold over several market days. It needs
+    only what the village has; salting waits on salt, from trade. To
+    implement when a surplus to keep shows up.
+  - **In the end, all of it** (the user's wish). Preserving is many
+    ways, each its own process, materials and keeping time: smoking and
+    drying (meat, fish, fruit), salting and curing, pickling (in brine
+    or vinegar), fermenting (sauerkraut, cheese, ale), jam (berries
+    cooked down with sugar or honey), canning and sealing in jars,
+    keeping cold (a cellar, ice). So is preparing: food made from food
+    (bread from grain through a quern and an oven, a stew of meat and
+    turnips), each worth more, or keeping longer, than its parts.
+    Each comes when the village gives it a reason (a surplus to keep, a
+    lean season to last through, a trade in it). Each brings what it
+    needs (salt, vinegar, sugar or honey, jars, a cellar), so several
+    wait on trade or on new trades (a miller, a baker, a brewer).
 
 ## Status
 
