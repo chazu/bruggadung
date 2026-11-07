@@ -34,7 +34,10 @@
 // in its slots, is entailed by `match`. Unknown never holds.
 #Condition: { find: [...text], match: #Frame }
 
-#Intent: { title: text }
+// What a goal or a method finds, its slots' referents ordered so
+// (#Order, below): a goal's `done` binds the nearest log, a method's `pre`
+// the nearest tree.
+#Intent: { title: text, order: [...#Order] }
 
 // What a goal is worth (AGENCY.md §3): its considerations, added, in the
 // units of credence (dB). A consideration over a value (a need's pressure,
@@ -161,7 +164,6 @@
     goal:      text
     rank:      int
     pre:       #Condition
-    order:     [...#Order]
     seeks:     #Thing
     search:    text
     places:    *0 | int & >=0 & <=100

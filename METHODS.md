@@ -332,7 +332,40 @@ After: the farmers' larder lasts to the harvest (3 kg at the least, day
 They are timing ones in the lean days 12–16: a household rationing, hungry,
 asking about instead of at work (lab/PLAN.md, "Asking in the village").
 
-Not yet: the rest of the content (firewood/, hunting/ and on).
+**Firewood and the hunt** (content/firewood/, content/hunting/), rewritten
+the same way:
+- Stocking the woodpile: firewood in hand is stacked; else firewood got
+  into hand, then stacked. Firewood into hand comes out of the pack by the
+  woodpile, is gathered, is split and then gathered, or the pack is carried
+  home. Split firewood comes from a log split, or a log cut and split; a
+  log from a trunk, or a tree felled and cut; a trunk from a tree felled,
+  or the woods looked into.
+- Each "one lying about" (`wood_split`, `log_cut`, `trunk_felled`) is a
+  goal whose `done` binds the nearest. Goals take an `order` now (moved to
+  `#Intent`).
+- Gathering needs a hand free (`hand_for_wood`): the axe is put down by
+  the wood, not the meal carried to eat at work, and taken up again to
+  split. The ladder had never gathered with no hand free; written as a
+  way, the gather was tried and refused over and over.
+- The hunt: meat home, a hide home, a hide unpacked; else meat got into
+  hand (`meat_from_the_hunt`), then put in. Meat into hand comes out of
+  the pack by the larder, is butchered, the hide picked up, the pack
+  carried home, or game brought down (`game_down`, the nearest carcass)
+  and butchered.
+- The chains are up to six goals deep, so `BG_MAX_INTENTIONS` is 16: a
+  meal on top of a deep chain needs four more.
+- Wandering (#Wander) fell back to a ring search that began past the
+  radius, so near woodland the draws had missed was never found. One
+  failed wander gave up the whole hunt, and the hunting week brought home
+  half its venison. The ring now begins beside the agent.
+
+Three weeks after: 3 FAILs, against 4 at the start. One is new: on day 19,
+three sellers left their takings, 127 coins, on their stalls. Each first
+cleared its unsold goods from the stall, then found "take the takings
+home" impossible at once. The takings are a ladder still (content step 4).
+
+Not yet: content step 4 (farming, carrying, the market's selling) and
+step 5.
 
 ## Open questions
 

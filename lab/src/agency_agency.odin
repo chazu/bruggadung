@@ -98,7 +98,7 @@ import "core:strings"
 import tri "../../triangle/odin/triangle"
 
 
-BG_MAX_INTENTIONS  :: 8
+BG_MAX_INTENTIONS  :: 16
 BG_MAX_SLOTS       :: 8
 BG_MAX_QUESTIONS   :: 8
 
@@ -1080,9 +1080,10 @@ agency_wander :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Store, wi
 		m.walking.wander = true
 		return true
 	}
-	/* none of that ground near (a hunter in the village): toward the
-	 * nearest it knows of, ring by ring, up to eight times as far */
-	for d := within + 1; on != 0 && d <= 8 * within; d += 1 {
+	/* none of that ground found near (a hunter in the village; or the
+	 * draws missed what there is, sparse): toward the nearest it knows of,
+	 * ring by ring from beside it, up to eight times as far */
+	for d: i32 = 1; on != 0 && d <= 8 * within; d += 1 {
 		for k := -d; k <= d; k += 1 {
 			for side in 0 ..< 4 {
 				x, y: i32

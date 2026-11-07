@@ -21,6 +21,9 @@
 // - carrying: a hunter with the household's backpack butchers into it,
 //             picks up the hide, and carries both home, its bow in hand;
 //             without one, the meat in its free hand, the hide left lying.
+// - agency:   the hunt is one whole way, what it needs each a subgoal (meat
+//             in hand, game down, a bow in hand, hidden, watched;
+//             METHODS.md), the nearest carcass bound by game down.
 // - market:   a hunter that put its bow down (both hands wanted, to buy:
 //             market/) takes it up again to hunt: a bow in hand is a
 //             subgoal of stalking and of looking for game, passed over
@@ -107,7 +110,14 @@ game_hunted: #Goal & {
     kept: true
 } @family(goals)
 
-// Meat in hand: home with it, to the larder.
+// The ways (METHODS.md: whole ways, what each needs a subgoal): meat in
+// hand, home with it, to the larder; a hide in hand too; a hide in its pack,
+// by the larder, taken out; else the hunt is one way, meat got into hand,
+// then put in. Meat is got into hand: out of its pack, by the larder;
+// butchered from game down; the hide picked up into the pack (butchering
+// done, before it goes); the pack carried home and unpacked; else game
+// brought down and butchered. Game is brought down by stalking it and
+// shooting, or looked for in the woods.
 bring_home_the_meat: #Method & {
     title: "bring home the meat"
     goal:  "game_hunted"
@@ -134,36 +144,66 @@ bring_home_the_hide: #Method & {
     steps: [#Do & { op: "put_in", object: "pelt", target: "larder" }]
 } @family(methods)
 
-// Home with a pack (carrying/): what is in it taken out, by the larder.
-unpack_the_meat: #Method & {
-    title: "unpack it"
+// Home with a hide in its pack (carrying/): taken out, by the larder.
+unpack_the_hide: #Method & {
+    title: "unpack the hide"
     goal:  "game_hunted"
     rank:  3
     pre:   #Reached & {
         reached: "larder"
+        find:    ["pack", "pelt"]
+        match:   #Hunting & { me: #Agent & { id: $me, freeHands: >=1 }, pack: #Pack & { id: $p, place: #Held & { by: $me } },
+                              pelt: #Hide & { place: #Inside & { container: $p } } }
+    }
+    steps: [#Do & { op: "take", object: "pelt" }]
+} @family(methods)
+
+hunt_and_bring: #Method & {
+    title: "hunt"
+    goal:  "game_hunted"
+    rank:  4
+    pre:   { find: [], match: #Hunting }
+    steps: [#Achieve & { subgoal: "meat_from_the_hunt" }, #Do & { op: "put_in", object: "meat", target: "larder" }]
+} @family(methods)
+
+meat_from_the_hunt: #Goal & {
+    title: "meat in hand"
+    done: {
+        find:  ["meat"]
+        match: #Hunting & { me: #Agent & { id: $me }, meat: #Food & #Stack & { raw: true, place: #Held & { by: $me } } }
+    }
+} @family(goals)
+
+// Home with meat in its pack: taken out, by the larder.
+unpack_the_meat: #Method & {
+    title: "unpack it"
+    goal:  "meat_from_the_hunt"
+    rank:  1
+    pre:   #Reached & {
+        reached: "larder"
         find:    ["pack", "packed"]
         match:   #Hunting & { me: #Agent & { id: $me, freeHands: >=1 }, pack: #Pack & { id: $p, place: #Held & { by: $me } },
-                              packed: #Body & { place: #Inside & { container: $p } } }
+                              packed: #Food & #Stack & { place: #Inside & { container: $p } } }
     }
     steps: [#Do & { op: "take", object: "packed" }]
 } @family(methods)
 
-// Game down: butcher it where it lies.
+// Game down: butcher it where it lies (into its pack, if it has one).
 butcher_it: #Method & {
     title: "butcher it"
-    goal:  "game_hunted"
-    rank:  4
+    goal:  "meat_from_the_hunt"
+    rank:  2
     pre:   { find: ["carcass"], match: #Hunting & { me: #Agent & { freeHands: >=1 }, carcass: #Carcass } }
     order: ["near"]
     steps: [#Do & { op: "butcher", object: "carcass" }]
 } @family(methods)
 
-// Butchered, with a pack on the back: its hide picked up into the pack,
-// and the meat and the hide carried home.
+// Butchered, with a pack on the back: its hide picked up into the pack
+// before it goes home (the butchering's end, not a way to meat).
 pick_up_the_hide: #Method & {
     title: "pick up the hide"
-    goal:  "game_hunted"
-    rank:  5
+    goal:  "meat_from_the_hunt"
+    rank:  3
     pre: {
         find:  ["pack", "pelt"]
         match: #Hunting & { me: #Agent & { id: $me, freeHands: >=1 }, pack: #Pack & { worn: true, place: #Held & { by: $me } },
@@ -175,21 +215,49 @@ pick_up_the_hide: #Method & {
 
 carry_it_home: #Method & {
     title: "carry it home"
-    goal:  "game_hunted"
-    rank:  6
+    goal:  "meat_from_the_hunt"
+    rank:  4
     pre: {
-        find:  ["larder", "pack", "packed"]
-        match: #Hunting & { me: #Agent & { id: $me }, larder: #Container, pack: #Pack & { id: $p, place: #Held & { by: $me } },
-                            packed: #Body & { place: #Inside & { container: $p } } }
+        find:  ["pack", "packed"]
+        match: #Hunting & { me: #Agent & { id: $me }, pack: #Pack & { id: $p, place: #Held & { by: $me } },
+                            packed: #Food & #Stack & { place: #Inside & { container: $p } } }
     }
+    steps: [#Achieve & { subgoal: "by_the_larder" }, #Do & { op: "take", object: "packed" }]
+} @family(methods)
+
+shoot_and_butcher: #Method & {
+    title: "bring down game and butcher it"
+    goal:  "meat_from_the_hunt"
+    rank:  5
+    pre:   { find: [], match: #Hunting }
+    steps: [#Achieve & { subgoal: "game_down" }, #Do & { op: "butcher", object: "carcass" }]
+} @family(methods)
+
+by_the_larder: #Goal & {
+    title: "go home to the larder"
+    done:  #Reached & { reached: "larder" }
+} @family(goals)
+
+go_to_the_larder: #Method & {
+    title: "go home"
+    goal:  "by_the_larder"
+    rank:  1
+    pre:   { find: ["larder"], match: #Hunting & { larder: #Container } }
     steps: [#Do & { op: "look_in", object: "larder" }]
 } @family(methods)
+
+// Game down: a carcass lying about, the nearest.
+game_down: #Goal & {
+    title: "bring down game"
+    done:  { find: ["carcass"], match: #Hunting & { carcass: #Carcass } }
+    order: ["near"]
+} @family(goals)
 
 // Game seen: stalk it, crouched, shoot, and crouch again.
 shoot_it: #Method & {
     title: "stalk and shoot"
-    goal:  "game_hunted"
-    rank:  7
+    goal:  "game_down"
+    rank:  1
     pre: {
         find:  ["game"]
         match: #Hunting & { game: #Animal }
@@ -204,8 +272,8 @@ shoot_it: #Method & {
 // again.
 look_for_game: #Method & {
     title: "look for game"
-    goal:  "game_hunted"
-    rank:  8
+    goal:  "game_down"
+    rank:  2
     pre:   { find: [], match: #Hunting & {} }
     steps: [#Achieve & { subgoal: "bow_in_hand" }, #Achieve & { subgoal: "hidden" }, #Achieve & { subgoal: "watched" },
             #Wander & { radius: 12, over: "woodland" }]

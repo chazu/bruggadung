@@ -438,6 +438,7 @@ test_hunting_week :: proc() {
 	}
 	fmt.printf("    a week: %d venison home, %d shots, %d butchered, %d bolts, deer %d to %d\n", venison,
 	           done.counts["shoot"], done.counts["butcher"], done.counts["bolt"], fewest, most)
+	if venison < 40 do for line in agency_log_of(agency, hunter) do fmt.printf("      %s\n", line)
 	bg_check(venison >= 40)
 	bg_check(done.counts["bolt"] > 0)
 	bg_check(done.counts["shoot"] > 3 * done.counts["butcher"])     /* three strike a deer down: some missed */
