@@ -209,7 +209,11 @@ Out of scope here, except where they touch agency:
     doesn't walk home each time to look in the larder it knows. Another's
     place (a stall, whose board may change) it looks at again: passing
     over every stall read since the market opened, a buyer never read a
-    price posted after.
+    price posted after. The window is the errand's (the outermost goal of
+    the chain being followed), not the bottom intention's: a seller's
+    takings, taken up over the day's work, searched as if since the work's
+    window opened, passed over the stall it looked into at nine, and left
+    the later takings on it (METHODS.md).
 30. **A posted price lapses** (content/market/). A price on a board
     posted more than half a day ago is an earlier market's: it isn't
     learned, and one read that long ago isn't bought at. A seller with

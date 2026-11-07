@@ -359,10 +359,18 @@ the same way:
   failed wander gave up the whole hunt, and the hunting week brought home
   half its venison. The ring now begins beside the agent.
 
-Three weeks after: 3 FAILs, against 4 at the start. One is new: on day 19,
-three sellers left their takings, 127 coins, on their stalls. Each first
-cleared its unsold goods from the stall, then found "take the takings
-home" impossible at once. The takings are a ladder still (content step 4).
+Three weeks after: 3 FAILs, against 4 at the start. One was new: on day
+19, three sellers left their takings, 127 coins, on their stalls.
+- The cause was older than the rewrite: the window a commitment's search
+  counts from (AGENCY.md decision 29) was the bottom intention's, the
+  day's work from seven, not the takings' from noon.
+- So the seller's own stall, looked into at nine, was passed over. It never
+  looked again, and believed no coins there.
+- It is now the errand's: the outermost goal of the chain followed. Test:
+  `errand_window`.
+
+After it: 4 FAILs, the lean days' meal timing (days 14–16); every
+market's takings home.
 
 Not yet: content step 4 (farming, carrying, the market's selling) and
 step 5.

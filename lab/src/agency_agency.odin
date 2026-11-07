@@ -1883,13 +1883,17 @@ agency_searched_since :: proc(self: ^Agency, c: ^Condition, place: u32) -> i64 {
 }
 
 
-/* `since`, or, when what the agent is doing is a commitment, when its
- * window opened if that is earlier. */
-@(private = "file")
-agency_since_window :: proc(m: ^Motivation, since: i64) -> i64 {
-	if m.nintentions == 0 do return since
-	if root := &m.intentions[0]; root.commitment > 0 && root.commitment <= m.ncommitments {
-		return min(since, m.commitments[root.commitment - 1].from)
+/* `since`, or, when the errand the agent is on (its intention at `base`, the
+ * outermost of the subgoals' chain) keeps a commitment, when that
+ * commitment's window opened if that is earlier. The errand's, not the
+ * bottom intention's: the takings, taken up over the day's work, searched
+ * as if since the work's window opened, passed over the stall looked into
+ * at the morning's market, and its later takings were left there. */
+@(private)
+agency_since_window :: proc(m: ^Motivation, base: i32, since: i64) -> i64 {
+	if base < 0 || base >= m.nintentions do return since
+	if errand := &m.intentions[base]; errand.commitment > 0 && errand.commitment <= m.ncommitments {
+		return min(since, m.commitments[errand.commitment - 1].from)
 	}
 	return since
 }
@@ -3957,7 +3961,7 @@ agency_decide :: proc(self: ^Agency, m: ^Motivation) -> bool {
 	 * chain was adopted is passed over, not looked into again each time the
 	 * subgoal is adopted afresh (METHODS.md) */
 	searchedSince := m.intentions[base].adopted
-	self.ownSearched = agency_since_window(m, searchedSince)
+	self.ownSearched = agency_since_window(m, base, searchedSince)
 	for i: uint = 0; i < nmethods; i += 1 {
 		if (top.failed & (u32(1) << u32(i))) != 0 do continue
 		n = top.nparams

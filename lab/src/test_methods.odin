@@ -104,3 +104,28 @@ test_eats_what_keeps_least :: proc() {
 	if !ok do for line in agency_log_of(agency, me) do fmt.printf("      %s\n", line)
 	bg_check(ok)
 }
+
+
+/*
+ * A commitment's search passes over its own places looked into since its
+ * window opened (AGENCY.md decision 29): the window of the errand being
+ * searched for, not of the bottom intention. A seller's takings (window from
+ * noon), taken up over the day's work (window from seven), look into the
+ * stall again though it was looked into at nine; the bottom's window had
+ * the stall passed over, and the takings left on it.
+ */
+test_errand_window :: proc() {
+	m: Motivation
+	m.ncommitments = 2
+	m.commitments[0].from = 7 * 3600 * 1000      /* the work, from seven */
+	m.commitments[1].from = 12 * 3600 * 1000     /* the takings, from noon */
+	m.nintentions = 2
+	m.intentions[0].commitment = 1
+	m.intentions[0].pending    = -1              /* suspended beneath: not what the takings are for */
+	m.intentions[1].commitment = 2
+	now := i64(12 * 3600 * 1000 + 17000)
+	bg_check(agency_since_window(&m, 1, now) == 12 * 3600 * 1000)
+	bg_check(agency_since_window(&m, 0, now) == 7 * 3600 * 1000)
+	m.intentions[1].commitment = 0               /* no commitment: since the goal was adopted */
+	bg_check(agency_since_window(&m, 1, now) == now)
+}
