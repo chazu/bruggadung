@@ -38,7 +38,9 @@
 // - carrying: a larder is a kind of its own (#Larder), so looking for food
 //             doesn't look into the coffer or the packs beside it first
 //             (carrying/, money/coins.tri).
-// - code:     effect_cook (src/act_actions.odin); the scenario stocks the
+// - code:     effect_cook (src/act_actions.odin): of a stack held (an
+//             armful of the harvest), one portion is cooked, into the
+//             free hand, the rest still raw; the scenario stocks the
 //             larders and undertakes the morning's commitment
 //             (src/scenario_village.odin).
 

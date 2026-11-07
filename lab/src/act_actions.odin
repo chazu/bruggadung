@@ -909,7 +909,9 @@ effect_eat :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) ->
 
 /* Cooking (content/cooking/): at a lit stove, the food is no longer raw,
  * and nourishes by what cooking adds to it, to 100 at most; a meal now, it
- * spoils its `mealKeepsFor` from now (content/perishing/). */
+ * spoils its `mealKeepsFor` from now (content/perishing/). Of a stack held
+ * (an armful of the harvest), one portion is cooked, into the free hand:
+ * the rest is still raw, as eating takes one of a stack. */
 @(private = "file")
 effect_cook :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
 	lit, raw, nourishment, cooking: i64
@@ -922,11 +924,17 @@ effect_cook :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -
 	}
 	world_get_field(world, "Food.nourishment", a.roles[.Item], &nourishment)
 	world_get_field(world, "Food.cooking", a.roles[.Item], &cooking)
-	proposal_group_set_of_to(g, "Food.raw", whole(a.roles[.Item]), 0)
-	proposal_group_set_of_to(g, "Food.nourishment", whole(a.roles[.Item]), min(nourishment + cooking, 100))
+	meal := a.roles[.Item]
+	if world_units_of(world, a.roles[.Item]) > 1 {
+		hand := free_hand(world, a.roles[.Actor])
+		if hand < 0 do return "no hand is free"
+		meal = proposal_group_split(g, whole(a.roles[.Item]), 1, held_by(a.roles[.Actor], hand))
+	}
+	proposal_group_set_of_to(g, "Food.raw", whole(meal), 0)
+	proposal_group_set_of_to(g, "Food.nourishment", whole(meal), min(nourishment + cooking, 100))
 	/* a meal keeps so long from now, whatever it was made of (perishing/) */
 	if keeps: i64; world_get_field(world, "Food.mealKeepsFor", a.roles[.Item], &keeps) && keeps > 0 {
-		proposal_group_set_of_to(g, "Perishable.spoilsAt", whole(a.roles[.Item]), world_time(world).ms + keeps)
+		proposal_group_set_of_to(g, "Perishable.spoilsAt", whole(meal), world_time(world).ms + keeps)
 	}
 	return ""
 }

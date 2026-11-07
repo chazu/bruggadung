@@ -369,8 +369,30 @@ Three weeks after: 3 FAILs, against 4 at the start. One was new: on day
 - It is now the errand's: the outermost goal of the chain followed. Test:
   `errand_window`.
 
-After it: 4 FAILs, the lean days' meal timing (days 14–16); every
-market's takings home.
+After it: 4 FAILs, days 14–16; every market's takings home.
+
+Only one of the four was the lean days':
+- **A meal cooked from the harvest.** Three were farmers (90, 87, 17)
+  with a meal in hand at 14:30. Hungry at the harvest, they cooked what
+  they held, an armful of grain, and cooking made the whole stack a meal.
+  They ate one portion and carried the rest all afternoon. Cooking now
+  takes one of a stack, as eating does: one portion, into the free hand,
+  the rest still raw. Test: `cooking`.
+- **The lean household** (162, 165, day 15): short of food, rationing,
+  with nowhere left to forage. They asked, got nothing, and went to work
+  with no meal (lab/PLAN.md, "Asking in the village").
+
+After it: 1 FAIL, that household.
+
+Found on the way, not yet fixed: a farmer's harvest put aside by the
+engine (another reaped the plot's last tiles, so it no longer stands
+ripe) is chosen again and again to be resumed, and fails each time.
+Farmer 90 tried 143 times in an afternoon and never brought in what it
+held. A suspended step's method is chosen without checking `pre`
+("resuming rechecks what it needs"), and a refused resume is given up
+only when what it binds is gone or out of reach. The repair test relies
+on the waiting: its wrench comes back, and the dismantling resumes where
+it was put down.
 
 Not yet: content step 4 (farming, carrying, the market's selling) and
 step 5.

@@ -5,7 +5,8 @@ import "core:fmt"
 /*
  * Cooking (VILLAGE.md slice 4, content/cooking/): a portion taken from a
  * sack is food still, raw; cooked at a lit stove it is a meal, and
- * nourishes more; at a cold stove, or cooked again, it can't be.
+ * nourishes more; at a cold stove, or cooked again, it can't be. Of a stack
+ * held, one portion is cooked.
  */
 
 test_cooking :: proc() {
@@ -56,6 +57,34 @@ test_cooking :: proc() {
 
 	/* cooked, it isn't cooked again */
 	bg_check(perform(w, c, action_make("cook", cook, portion, stove), 0, &error) == nil)
+
+	/* of the harvest in hand, a stack, one portion is cooked, into the free
+	 * hand; the rest is still raw. With no hand free, none is: the cooking
+	 * comes to nothing at its end. */
+	g = proposal_group_group_with_phase(.System, "setup: the harvest in hand")
+	harvest := proposal_group_create(g, "grain_harvest", "the harvest", held_by(cook, 1))
+	committer_submit(c, g)
+	committer_commit_boundary(c)
+	harvest = proposal_group_id_for(g, harvest)
+	error = ""
+	bg_check(perform(w, c, action_make("cook", cook, harvest, stove), 0, &error) != nil)
+	scheduler_run_until(s, time_make(world_time(w).ms + 1200 * 1000 + 1))
+	bg_check(world_get_field(w, "Food.raw", harvest, &raw) && raw == 1)
+	bg_check(world_get_field(w, "Stack.count", harvest, &count) && count == 2)
+	g = proposal_group_group_with_phase(.System, "setup: the meal put by")
+	proposal_group_move_to(g, whole(portion), in_(larder))
+	committer_submit(c, g)
+	committer_commit_boundary(c)
+	error = ""
+	bg_check(perform(w, c, action_make("cook", cook, harvest, stove), 0, &error) != nil)
+	scheduler_run_until(s, time_make(world_time(w).ms + 1200 * 1000 + 1))
+	bg_check(world_get_field(w, "Food.raw", harvest, &raw) && raw == 1)
+	bg_check(world_get_field(w, "Stack.count", harvest, &count) && count == 1)
+	bg_check(world_entities_at(w, cook, .Held_By, raw_data(held[:]), 2) == 2)
+	meal := held[0] if held[1] == harvest else held[1]
+	bg_check(world_get_field(w, "Food.raw", meal, &raw) && raw == 0)
+	bg_check(world_get_field(w, "Food.nourishment", meal, &nourishment) && nourishment == 50)
+	bg_check(world_units_of(w, meal) == 1)
 }
 
 
