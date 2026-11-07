@@ -592,20 +592,55 @@ compare_candidates :: proc(c: ^Condition, a: ^Referent, b: ^Referent) -> int {
 			db := knowledge_store_loyalty_to(c.store, b.id)
 			if da != db do return -1 if da > db else 1
 		} else if str(c.order[k][:]) == "own" {
-			/* what it believes its own first (KNOWLEDGE.md decision 18) */
-			me := knowledge_store_self_referent(c.store)
-			fa := knowledge_store_finding(c.store, "#Owned", a.id)
-			fb := knowledge_store_finding(c.store, "#Owned", b.id)
-			da := fa != nil && fa.choice == me
-			db := fb != nil && fb.choice == me
+			/* what it believes its own first (KNOWLEDGE.md decision 18), or
+			 * what lies in something it believes its own, as what it has at
+			 * home is (#AtHome): meat bought and put in its larder */
+			da := believed_own(c.store, a)
+			db := believed_own(c.store, b)
 			if da != db do return -1 if da else 1
 		} else if str(c.order[k][:]) == "likely" {
 			da := likely_in(c, a.id)
 			db := likely_in(c, b.id)
 			if da != db do return -1 if da > db else 1
+		} else if str(c.order[k][:]) == "keeps" {
+			/* what keeps least first: meat before it spoils, grain after */
+			da := keeps_for(c, a)
+			db := keeps_for(c, b)
+			if da != db do return -1 if da < db else 1
 		}
 	}
 	return -1 if a.id < b.id else (1 if a.id > b.id else 0)
+}
+
+
+/* Whether the agent believes the referent its own: an #Owned finding, its
+ * own the choice, of it or of what it is in. */
+@(private = "file")
+believed_own :: proc(store: ^Knowledge_Store, r: ^Referent) -> bool {
+	me := knowledge_store_self_referent(store)
+	f  := knowledge_store_finding(store, "#Owned", r.id)
+	if f != nil do return f.choice == me
+	if r.form != .In || r.container == 0 do return false
+	g := knowledge_store_finding(store, "#Owned", r.container)
+	return g != nil && g.choice == me
+}
+
+
+/* How long a thing of the referent's kind keeps (perishing/'s `keepsFor`),
+ * as the agent knows of the kind: a stack's by its unit, the one it sees.
+ * When this one will spoil it can't see; that meat keeps days and grain
+ * for good, it knows. max(i64) for one that keeps, or of no kind it knows. */
+@(private = "file")
+keeps_for :: proc(c: ^Condition, r: ^Referent) -> i64 {
+	unit: [64]u8
+
+	arena := tri.arena_new()
+	defer tri.arena_free(arena)
+	d := tri.value(c.tri, ns_utf8(knowledge_store_describe_referent(c.store, r.id)), arena, nil, 0)
+	if d == nil || !text_at(c.tri, d, "unit", unit[:]) do return max(i64)
+	name, _ := strings.replace_all(str(unit[:]), " ", "_", context.temp_allocator)
+	keeps := int_at(c.tri, tri.pattern(c.tri, ns_utf8(name)), "keepsFor", 0)
+	return keeps if keeps > 0 else max(i64)
 }
 
 

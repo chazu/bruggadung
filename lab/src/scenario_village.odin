@@ -198,6 +198,9 @@ Village :: struct {
 	marketed:     [4]i64,            // portions each larder gained at the market (sold, less)
 	brought:      [4]i64,            // portions brought into each larder, away from the market (a harvest)
 	kept:         [4]i64,            // portions in each larder as of the last boundary
+	keptMeat:     [4]i64,            // grams of meat in each larder as of the last boundary
+	keptRot:      [4]i64,            // grams of spoiled food in each larder as of the last boundary
+	meatTaken:    [4]i64,            // grams of meat taken from each larder, away from the market, not spoiled
 	marketing:    bool,              // from 09:00 to 13:00 of a market day, when a larder's changes are the market's
 	days:         i64,               // how many days it runs: VILLAGE_DAYS, unless asked for more
 	logged:       [dynamic]Village_Logged,  // agents whose thoughts are printed each night
@@ -643,6 +646,14 @@ village_step_until :: proc(self: ^Village, t: i64) {
 			now := village_portions_in(self.world, l)
 			if now > self.kept[k] && !self.marketing do self.brought[k] += now - self.kept[k]
 			self.kept[k] = now
+			/* meat taken out to cook (keeping least, it is cooked first:
+			 * agency.tri's "keeps"); meat that spoils where it is is as
+			 * heavy spoiled food there, not taken */
+			meat, rot := village_meat_in(self.world, l)
+			if meat < self.keptMeat[k] && !self.marketing {
+				self.meatTaken[k] += max(0, self.keptMeat[k] - meat - max(0, rot - self.keptRot[k]))
+			}
+			self.keptMeat[k], self.keptRot[k] = meat, rot
 		}
 		if !more do break
 	}
@@ -849,14 +860,16 @@ village_game_awake :: proc(self: ^Village) -> [dynamic]string {
 
 /* What each household has taken from its larder, a portion at a time:
  * two to five portions a person a day (not all it eats comes from there:
- * meat, forage), and none from another's. */
+ * forage, meals asked for), and none from another's. A portion is a unit
+ * taken to cook: of grain or turnip, 250 g; of meat, 500 g. */
 @(private = "file")
 village_check_larders :: proc(self: ^Village) {
 	people: [4]i64
 	for v in self.people do people[v.household] += 1
 	wrong := make([dynamic]string, context.temp_allocator)
 	for l, k in self.larders {
-		taken := village_grain(k) - village_portions_in(self.world, l) + self.marketed[k] + self.brought[k]
+		taken := village_grain(k) - village_portions_in(self.world, l) + self.marketed[k] + self.brought[k] +
+		         self.meatTaken[k] / 500
 		if taken < 2 * people[k] * self.days || taken > 5 * people[k] * self.days {
 			append(&wrong, fmt.tprintf("%s took %d", households[k].name, taken))
 		}
@@ -951,6 +964,22 @@ village_firewood_in :: proc(world: ^World, container: Entity_ID) -> i64 {
 	n := min(world_entities_at(world, container, .In, raw_data(inside[:]), len(inside)), len(inside))
 	for e in inside[:n] do if world_unit_of(world, e) == "firewood" do total += world_units_of(world, e)
 	return total
+}
+
+
+/* The grams of meat in the container, and of spoiled food. */
+@(private = "file")
+village_meat_in :: proc(world: ^World, container: Entity_ID) -> (meat: i64, rot: i64) {
+	inside: [64]Entity_ID
+	n := min(world_entities_at(world, container, .In, raw_data(inside[:]), len(inside)), len(inside))
+	for e in inside[:n] {
+		if u := world_unit_of(world, e); u == "venison" || u == "hare meat" {
+			meat += world_mass_of(world, e)
+		} else if info := world_info(world, e); info != nil && info.blueprint == "spoiled_food" {
+			rot += world_mass_of(world, e)
+		}
+	}
+	return
 }
 
 

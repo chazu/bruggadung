@@ -52,3 +52,55 @@ test_goal_done_beneath :: proc() {
 	if !ok do for line in agency_log_of(agency, worker) do fmt.printf("      %s\n", line)
 	bg_check(ok)
 }
+
+
+/*
+ * What keeps least is taken first (METHODS.md, "What the working market
+ * showed"): a hungry farmer, plenty of grain in its own larder and a cut of
+ * venison bought (no ownership claim of its own: it lies in its larder), cooks
+ * the venison, which keeps three days, before the grain, which keeps.
+ */
+test_eats_what_keeps_least :: proc() {
+	why: string
+	count: i64
+
+	w := test_world(104)
+	bg_check(world_set_terrain_map(w, "village_map", &why))
+	c := test_committer(w)
+	committer_set_tracing(c, false)
+	activities := activities_with_world(w, c)
+	knowledge  := autorelease(knowledge_init_with_world(w))
+	agency     := autorelease(agency_init_with_world(w, c, knowledge))
+	s          := autorelease(scheduler_init_with_world(w, c))
+	agency_set_activities(agency, activities)
+	scheduler_set_activities(s, activities_as_activity_clock(activities))
+	scheduler_set_perception(s, knowledge_as_perception_phase(knowledge))
+	scheduler_set_decision(s, agency_as_decision_phase(agency))
+	knowledge_set_omniscient(knowledge, true)      /* it knows what is in the larder */
+
+	g := proposal_group_group_with_phase(.System, "setup: my larder, my grain, venison bought, my stove")
+	me      := proposal_group_create(g, "farmer", "me", on_tile(20, 70, 0))
+	mine    := proposal_group_create(g, "larder", "my larder", on_tile(21, 70, 0))
+	grain   := proposal_group_create(g, "grain_sack", "my grain", in_(mine))
+	venison := proposal_group_create(g, "venison", "venison bought", in_(mine))
+	stove   := proposal_group_create(g, "stove", "my stove", on_tile(20, 72, 0))
+	for thing in ([]Entity_ID{mine, grain, stove}) {
+		claim := proposal_group_create(g, "ownership", "mine", location_make_none())
+		proposal_group_set_of_to(g, "Claim.quantity", whole(claim), 1)
+		proposal_group_relate(g, .Claimant, whole(claim), whole(me))
+		proposal_group_relate(g, .Claim_Subject, whole(claim), whole(thing))
+	}
+	proposal_group_set_of_to(g, "Hungry.satiety", whole(me), 30)
+	committer_submit(c, g)
+	scheduler_run_until(s, time_make(1000))
+	me, grain, venison = proposal_group_id_for(g, me), proposal_group_id_for(g, grain), proposal_group_id_for(g, venison)
+	bg_check(world_get_field(w, "Stack.count", grain, &count))
+	before := count
+	agency_control(agency, me)
+	scheduler_run_until(s, time_make(120000))
+	bg_check(world_get_field(w, "Stack.count", grain, &count))
+	/* the venison taken out (cooked, or eaten), the grain untouched */
+	ok := count == before && (!world_is_live(w, venison) || world_location_of(w, venison).form != .In)
+	if !ok do for line in agency_log_of(agency, me) do fmt.printf("      %s\n", line)
+	bg_check(ok)
+}

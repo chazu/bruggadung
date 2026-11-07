@@ -305,13 +305,34 @@ way, with its needs as subgoals.
 Three weeks of the village after it:
 - buying's fall-through is gone (none; 21 of 201 failed buys before);
 - the market checks pass;
-- 8 FAILs, against 4. All but one fall in the lean days 11–19. A farming
-  household's larder empties on day 11, against day 14 before, so its
-  people go hungry and ask about. The other is the larders check, which
-  finds the hunters took too little from their own (116 portions).
+- 8 FAILs, against 4, explained below.
 
-Not yet: the rest of the content (firewood/, hunting/ and on), and why the
-farmers' larder now empties sooner.
+**What the working market showed.** The farmers bought 5 kg of venison on
+day 7, which the old ladder never managed ("knows no stall selling
+venison"). Rationing counts all food at home, so they stopped rationing.
+But they cooked grain by habit, and the meat spoiled on day 10: the larder
+was empty by day 11, against day 14 before. Two fixes:
+- **What keeps least is taken first.** The order `"keeps"` (agency.tri)
+  ranks a food by the `keepsFor` of its kind, a stack's by its unit. That
+  meat keeps days and grain for good is knowledge of the kind; when this
+  meat will spoil stays unseen. Taking food to cook, or along, is ordered
+  `["own", "keeps", "habit", "near"]`.
+- **What lies in something its own is its own.** The `"own"` order now
+  counts a thing in a container the agent believes its own, as `#AtHome`
+  already did. Meat bought has no ownership claim, so "own" put the
+  household's grain ahead of it, and "keeps" never got a say.
+
+The hunters then cook their own venison before it spoils, and take less
+grain. So the larders check counts meat taken from a larder too, a 500 g
+unit a portion: meat that spoils there is as heavy spoiled food, so it
+isn't counted as taken.
+
+After: the farmers' larder lasts to the harvest (3 kg at the least, day
+14), and the larders check passes. 6 FAILs over three weeks, against 4.
+They are timing ones in the lean days 12–16: a household rationing, hungry,
+asking about instead of at work (lab/PLAN.md, "Asking in the village").
+
+Not yet: the rest of the content (firewood/, hunting/ and on).
 
 ## Open questions
 

@@ -5,7 +5,9 @@
 // - full:     wanting to eat (hunger/eating.tri's goal) has more ways to
 //             it: eat a meal in hand; else make one, cooking raw food in
 //             hand at a lit stove, lighting the stove first, taking the
-//             food from where it is believed kept, or looking for it in
+//             food from where it is believed kept (of what is its own, the
+//             kind that keeps least first: meat before it spoils, then
+//             grain; agency.tri's "keeps"), or looking for it in
 //             the nearest containers; else eat raw food in hand. Something
 //             to eat at work is the morning's commitment (scenario-bound):
 //             a meal made the same way, else raw food taken along (a
@@ -177,7 +179,7 @@ take_to_cook: #Method & {
             stove: #Combustor & #Body
         }
     }
-    order: ["own", "habit", "near"]
+    order: ["own", "keeps", "habit", "near"]
     steps: [#Do & { op: "take_some", object: "food", units: 1 }]
 } @family(methods)
 
@@ -227,7 +229,7 @@ take_some_along: #Method & {
             food: #Food & #Stack & { place: #Inside }
         }
     }
-    order:    ["own", "habit", "near"]
+    order:    ["own", "keeps", "habit", "near"]
     sequence: true
     ends:     true
     steps:    [#Do & { op: "take_some", object: "food", units: 1 }]
