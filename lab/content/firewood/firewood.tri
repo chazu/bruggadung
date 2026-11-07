@@ -7,8 +7,9 @@
 //             its working hours (a kept goal, agency.tri): firewood in hand
 //             it stacks on the woodpile; else it gathers what it has split;
 //             else splits a log, cuts a length off a trunk, fells a tree,
-//             all with the axe (taken up first), so a hand is free for the
-//             firewood. Every household stokes its stove for the night, and
+//             or looks in the woods for one, all with the axe (taken up
+//             first: a subgoal, passed over while one is held), so a hand
+//             is free for the firewood. Every household stokes its stove for the night, and
 //             before lighting it to cook if it has nothing in it to burn.
 // - reduced:  the same, decided on the cadence's beat; each activity runs
 //             its time.
@@ -169,15 +170,11 @@ split_a_log: #Method & {
     goal:  "woodpile_stocked"
     rank:  4
     pre: {
-        find:  ["log", "axe"]
-        match: #Felling & {
-            me:  #Agent & { id: $me }
-            log: #Log & { sawn: 100, place: #OnTile }
-            axe: #Axe & { place: #Held & { by: $me } }
-        }
+        find:  ["log"]
+        match: #Felling & { log: #Log & { sawn: 100, place: #OnTile } }
     }
     order: ["near"]
-    steps: [#Do & { op: "split", object: "axe", target: "log" }]
+    steps: [#Achieve & { subgoal: "axe_in_hand" }, #Do & { op: "split", object: "axe", target: "log" }]
 } @family(methods)
 
 cut_a_trunk: #Method & {
@@ -185,15 +182,11 @@ cut_a_trunk: #Method & {
     goal:  "woodpile_stocked"
     rank:  5
     pre: {
-        find:  ["trunk", "axe"]
-        match: #Felling & {
-            me:    #Agent & { id: $me }
-            trunk: #Trunk & { sawn: <=99, place: #OnTile }
-            axe:   #Axe & { place: #Held & { by: $me } }
-        }
+        find:  ["trunk"]
+        match: #Felling & { trunk: #Trunk & { sawn: <=99, place: #OnTile } }
     }
     order: ["near"]
-    steps: [#Do & { op: "buck", object: "axe", target: "trunk" }]
+    steps: [#Achieve & { subgoal: "axe_in_hand" }, #Do & { op: "buck", object: "axe", target: "trunk" }]
 } @family(methods)
 
 fell_a_tree: #Method & {
@@ -201,52 +194,56 @@ fell_a_tree: #Method & {
     goal:  "woodpile_stocked"
     rank:  6
     pre: {
-        find:  ["tree", "axe"]
-        match: #Felling & {
-            me:   #Agent & { id: $me }
-            tree: #Tree
-            axe:  #Axe & { place: #Held & { by: $me } }
-        }
+        find:  ["tree"]
+        match: #Felling & { tree: #Tree }
     }
     order: ["near"]
-    steps: [#Do & { op: "fell", object: "axe", target: "tree" }]
+    steps: [#Achieve & { subgoal: "axe_in_hand" }, #Do & { op: "fell", object: "axe", target: "tree" }]
 } @family(methods)
 
-// Both hands free (so with no axe in either: with one in hand and no tree
-// in sight, a woodcutter took up the other's too, and, both hands full,
-// could take no food for days).
-take_up_the_axe: #Method & {
-    title: "take up the axe"
-    goal:  "woodpile_stocked"
-    rank:  7
-    pre: {
-        find:  ["axe"]
-        match: #Felling & { me: #Agent & { freeHands: 2 }, axe: #Axe & { place: #OnTile } }
-    }
-    order: ["near"]
-    steps: [#Do & { op: "take", object: "axe" }]
-} @family(methods)
-
-// Nothing to fell in sight: into the woods, to find a tree.
+// Nothing to fell in sight: into the woods, axe in hand, to find a tree.
 look_for_trees: #Method & {
     title: "look for trees"
     goal:  "woodpile_stocked"
-    rank:  8
+    rank:  7
     pre:   { find: [], match: #Felling }
-    steps: [#Explore & { beside: "woodland" }]
+    steps: [#Achieve & { subgoal: "axe_in_hand" }, #Explore & { beside: "woodland" }]
 } @family(methods)
 
 // Nothing left to gather or cut, the pack not empty: home with it.
 carry_the_wood_home: #Method & {
     title: "carry it home"
     goal:  "woodpile_stocked"
-    rank:  9
+    rank:  8
     pre: {
         find:  ["woodpile", "pack", "packed"]
         match: #Felling & { me: #Agent & { id: $me }, woodpile: #Container, pack: #Pack & { id: $p, place: #Held & { by: $me } },
                             packed: #Stack & { unit: "firewood", place: #Inside & { container: $p } } }
     }
     steps: [#Do & { op: "look_in", object: "woodpile" }]
+} @family(methods)
+
+// An axe in hand, to fell, cut or split with: a subgoal, so passed over
+// while one is held (a way of the woodpile's own, taken whenever nothing
+// better would do, had a woodcutter with an axe in hand take up another).
+axe_in_hand: #Goal & {
+    title: "take up an axe"
+    done: {
+        find:  ["axe"]
+        match: #Felling & { me: #Agent & { id: $me }, axe: #Axe & { place: #Held & { by: $me } } }
+    }
+} @family(goals)
+
+take_up_the_axe: #Method & {
+    title: "take up the axe"
+    goal:  "axe_in_hand"
+    rank:  1
+    pre: {
+        find:  ["axe"]
+        match: #Felling & { me: #Agent & { freeHands: >=1 }, axe: #Axe & { place: #OnTile } }
+    }
+    order: ["near"]
+    steps: [#Do & { op: "take", object: "axe" }]
 } @family(methods)
 
 // The night's: the household's stove stoked, six kilograms in it at the

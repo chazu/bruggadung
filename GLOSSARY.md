@@ -22,7 +22,8 @@ Rules:
 Doc abbreviations: ACT = ACTIONS.md, AGE = AGENCY.md, ARC =
 ARCHITECTURE.md, CL = CONTENT_LANGUAGE.md, COM = COMPONENTS.md, DES =
 DESIGN.md, DOM = DOMAIN_SIMULATION.md, DR = DETAIL_REGIMES.md, INS =
-INSTITUTIONS.md, KNO = KNOWLEDGE.md, LAT = LATENT_ASSEMBLY.md, NEG =
+INSTITUTIONS.md, KNO = KNOWLEDGE.md, LAT = LATENT_ASSEMBLY.md, MET =
+METHODS.md, NEG =
 NEGOTIATION.md, REA = REALITY.md, PRF = PERFORMANCE.md, TER = TERRAIN.md,
 TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
 3; "§3" its numbered section.
@@ -490,7 +491,15 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
   *Avoid:* commitment (for persistence of intention). (AGE §3)
 - **Method**: an HTN-style way to a goal: `pre` conditions over the
   knowledge view (three-valued), steps, alternatives tried by rank, a
-  credence threshold, and what to do with unknown. (AGE d1, §5)
+  credence threshold, and what to do with unknown. A goal's methods are
+  whole ways to it, each an alternative to the others; what one needs is
+  a subgoal. (AGE d1, d34, §5; MET, proposed)
+- **Ladder**: a goal's methods written so that each lower one only
+  readies a higher one (fetch the coins, so as to buy), as in a
+  teleo-reactive program. Run with fail-and-retry, a failed method falls
+  to a rung that serves it (**fall-through**). The pattern decision 34
+  and METHODS.md replace with subgoals. *Avoid* writing new ones.
+  (MET)
 - **Subgoal**: a goal a method step raises; a **residual subgoal** is one
   raised from an unknown precondition's residual paths. (AGE §5)
 - **Motivation store**: an agent's private goals, intentions,

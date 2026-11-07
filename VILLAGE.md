@@ -631,24 +631,30 @@ New, and entered in the glossary with this document:
   - **Foraging** (decision 12): with it, nobody goes a day unfed in the
     three weeks; the short forage at dawn and in the evening, and eat
     what they find. A woodcutter that had taken up both axes, both hands
-    full, could take no food for days: it takes one only with both hands
-    free.
+    full, could take no food for days.
   - A sleep cut short by the morning was taken up again the next night
     and ended at once, the agent up all night: a commitment's window
     closing now gives up what it was doing for it (AGENCY.md decision
     32). A hunter took up a second bow, as a woodcutter a second axe, and
-    with both hands full ate nothing: each takes one up only with both
-    hands free.
+    with both hands full ate nothing: taking one up was a way of the day's
+    work, taken when nothing better would do. An axe in hand, a bow in
+    hand, is now a subgoal of the ways that use it, passed over while one
+    is held (AGENCY.md decision 34).
   - Accepted (the user's call): a meal packed late because the short
     foraged first (the 07:30 check passes one who foraged that morning),
     and a pack left out some nights.
-  - Still breaking (10 of the three weeks' 222 checks): after the harvest
-    some can't take from their own larder: several households' beliefs of
-    the grain at home are bound to one stack of grain seen elsewhere
-    (stacks of grain look alike, and a referent was taken for another:
-    KNOWLEDGE.md decision 18's "told apart by where it is" doesn't hold
-    for what is moved), so their takes fail, and they go short a day or
-    pack late. The larders check asks two portions a head a day at the
+  - After the harvest some couldn't take from their own larder, and went
+    short a day or packed late: a cut of hare meat split off a stack was
+    of the unit its instance is named (`hare_meat`), not of the stack's
+    (`hare meat`), so the count looked unconserved and every take of one
+    from a stack was refused, again and again. (It was first taken for
+    stacks of grain told apart wrongly: it was one household, all three
+    believing rightly in the hare meat in their own larder.) A unit's
+    instance is now of the unit it names, so a cut taken counts, and
+    merges back when put with its stack.
+  - Still breaking (4 of the three weeks' 222 checks): a meal cooked at
+    home in place of the one packed, and the short foraging past the
+    14:30 check. The larders check asks two portions a head a day at the
     least, not three: the short eat forage, and the Hunts meat.
 - **Seed from the harvest.** Settled: once a harvest, holding more than a
   sack of seed's worth of it (twelve and a half kilograms of grain), a

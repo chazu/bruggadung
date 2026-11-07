@@ -22,7 +22,9 @@
 //             picks up the hide, and carries both home, its bow in hand;
 //             without one, the meat in its free hand, the hide left lying.
 // - market:   a hunter that put its bow down (both hands wanted, to buy:
-//             market/) takes it up again to hunt.
+//             market/) takes it up again to hunt: a bow in hand is a
+//             subgoal of stalking and of looking for game, passed over
+//             while one is held.
 // - code:     effect_crouch, effect_shoot (src/act_actions.odin); an
 //             operation's `range` (actions.tri), which agency walks to
 //             within and no further.
@@ -189,33 +191,43 @@ shoot_it: #Method & {
     goal:  "game_hunted"
     rank:  7
     pre: {
-        find:  ["bow", "game"]
-        match: #Hunting & { me: #Agent & { id: $me }, bow: #Bow & { place: #Held & { by: $me } }, game: #Animal }
+        find:  ["game"]
+        match: #Hunting & { game: #Animal }
     }
     order: ["near"]
-    steps: [#Achieve & { subgoal: "hidden" }, #Do & { op: "shoot", object: "bow", target: "game" },
-            #Do & { op: "crouch", object: "bow" }]
+    steps: [#Achieve & { subgoal: "bow_in_hand" }, #Achieve & { subgoal: "hidden" },
+            #Do & { op: "shoot", object: "bow", target: "game" }, #Do & { op: "crouch", object: "bow" }]
 } @family(methods)
 
-// None seen: through the woods, crouched (to see game before it sees the
-// hunter), lying in wait a while, then on a way, and in wait again.
+// None seen: through the woods, bow in hand, crouched (to see game before
+// it sees the hunter), lying in wait a while, then on a way, and in wait
+// again.
 look_for_game: #Method & {
     title: "look for game"
     goal:  "game_hunted"
     rank:  8
     pre:   { find: [], match: #Hunting & {} }
-    steps: [#Achieve & { subgoal: "hidden" }, #Achieve & { subgoal: "watched" }, #Wander & { radius: 12, over: "woodland" }]
+    steps: [#Achieve & { subgoal: "bow_in_hand" }, #Achieve & { subgoal: "hidden" }, #Achieve & { subgoal: "watched" },
+            #Wander & { radius: 12, over: "woodland" }]
 } @family(methods)
 
-// No bow in hand (put down at home, to buy at the market): take it up
-// again, when nothing else will do; with both hands free (so with none in
-// either: with its own in hand, a hunter took up another's too, and, both
-// hands full, could take no food for days).
+// A bow in hand, to hunt with: a subgoal, so passed over while one is held
+// (a way of the hunt's own, taken whenever nothing better would do, had a
+// hunter with its bow in hand take up another's). Put down at home, to buy
+// at the market, it is taken up again.
+bow_in_hand: #Goal & {
+    title: "take up a bow"
+    done: {
+        find:  ["bow"]
+        match: #Hunting & { me: #Agent & { id: $me }, bow: #Bow & { place: #Held & { by: $me } } }
+    }
+} @family(goals)
+
 take_up_the_bow: #Method & {
     title: "take up the bow"
-    goal:  "game_hunted"
-    rank:  9
-    pre:   { find: ["bow"], match: #Hunting & { me: #Agent & { freeHands: 2 }, bow: #Bow & { place: #OnTile | #Inside } } }
+    goal:  "bow_in_hand"
+    rank:  1
+    pre:   { find: ["bow"], match: #Hunting & { me: #Agent & { freeHands: >=1 }, bow: #Bow & { place: #OnTile | #Inside } } }
     order: ["near"]
     steps: [#Do & { op: "take", object: "bow" }]
 } @family(methods)

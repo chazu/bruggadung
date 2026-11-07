@@ -1066,7 +1066,7 @@ committer_validate :: proc(self: ^Committer, tally: ^Tally) -> string {
 			if hadStack {
 				unit_name = stack.unit
 			} else {
-				unit_name = info.blueprint if info != nil else "?"
+				unit_name = world_unit_of_blueprint(self.world, info.blueprint) if info != nil else "?"
 			}
 			u = tally_unit(tally, unit_name)
 			if u != nil {

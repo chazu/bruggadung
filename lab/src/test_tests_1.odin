@@ -269,6 +269,37 @@ test_individuation_and_merge_rules :: proc() {
 		committer_commit_boundary(c)
 		bg_check(proposal_group_applied(g) && world_resolve(w, unit_) == nails && world_has_edge(w, .Claim_Subject, claim, nails))
 	}
+
+	/* a unit whose name has a space ("hare meat"): one split off is an
+	 * individual of the instance it names (hare_meat), of the same unit, so
+	 * the count is conserved and, put back, it merges again (taken from a larder of
+	 * hare meat, it was refused, and the household went hungry by it) */
+	{
+		meat:  Entity_ID
+		piece: Entity_ID
+		h:     Entity_ID
+
+		meat = test_commit_create(c, "hare_meat", in_(bin))
+		for _ in 0 ..< 2 {
+			g = proposal_group_group_with_phase(.System, "t")
+			proposal_group_merge(g, whole(test_commit_create(c, "hare_meat", in_(bin))), whole(meat))
+			committer_submit(c, g)
+			committer_commit_boundary(c)
+		}
+		bg_check(proposal_group_applied(g) && world_units_of(w, meat) == 3 && world_unit_of(w, meat) == "hare meat")
+		g = proposal_group_group_with_phase(.System, "t")
+		h = proposal_group_split(g, whole(meat), 1, on_tile(5, 5, 0))
+		committer_submit(c, g)
+		committer_commit_boundary(c)
+		piece = proposal_group_id_for(g, h)
+		bg_check(proposal_group_applied(g) && !world_is_stack(w, piece) && world_unit_of(w, piece) == "hare meat" &&
+		         world_units_of(w, meat) == 2)
+		g = proposal_group_group_with_phase(.System, "t")
+		proposal_group_move_to(g, whole(piece), in_(bin))
+		committer_submit(c, g)
+		committer_commit_boundary(c)
+		bg_check(proposal_group_applied(g) && world_units_of(w, meat) == 3 && world_resolve(w, piece) == meat)
+	}
 }
 
 

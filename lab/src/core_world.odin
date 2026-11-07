@@ -1282,7 +1282,25 @@ world_unit_of :: proc(self: ^World, entity: Entity_ID) -> cstring {
 		return stack.unit
 	}
 	info := world_info(self, entity)
-	return info.blueprint if info != nil else nil
+	return world_unit_of_blueprint(self, info.blueprint) if info != nil else nil
+}
+
+
+/* The unit an individual of a blueprint is one of: the blueprint's name,
+ * or, for the instance a unit names, spaces as underscores
+ * (unit_blueprint), the unit it says: "hare_meat" is one of "hare meat". */
+world_unit_of_blueprint :: proc(self: ^World, blueprint: cstring) -> cstring {
+	buf: [256]u8
+
+	if blueprint == nil || !strings.contains_rune(string(blueprint), '_') do return blueprint
+	tc      := world_tri(self)
+	pattern := tri.pattern(tc, blueprint) if tc != nil else nil
+	v       := tri.at(tc, pattern, "unit") if pattern != nil else nil
+	if v == nil do return blueprint
+	tri.print(tc, v, raw_data(buf[:]), size_of(buf))
+	t := string(cstring(raw_data(buf[:])))
+	if len(t) < 2 || t[0] != '"' || t[len(t) - 1] != '"' do return blueprint
+	return world_intern(self, ns_utf8(t[1:len(t) - 1]))
 }
 
 

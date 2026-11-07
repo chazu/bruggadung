@@ -230,6 +230,20 @@ Out of scope here, except where they touch agency:
 33. **How light it is outdoors is a consideration** (`#ByLight`, over the
     clock's daylight: 0 night, 1 dusk, 2 day): nobody forages in the dark
     (VILLAGE.md decision 12).
+34. **A method is taken for what it does, not because it can be done.**
+    The ways are tried best first, and the first whose precondition holds
+    is followed, so a way that gets something ready ("take up the axe"),
+    written as a way of the goal itself, is taken whenever nothing better
+    would do, though what it gets ready is ready already: a woodcutter
+    with no tree in sight took up a second axe, a hunter a second bow, and,
+    both hands full, ate nothing for days. What a way needs in hand is a
+    subgoal of the ways that need it ("an axe in hand": `#Achieve`), so it
+    is passed over while it holds, as every subgoal is. A way of a goal is
+    written to move that goal on; one that only readies another is the
+    other's subgoal.
+    [METHODS.md](METHODS.md) proposes making this the rule for every goal
+    (most of the lab's goals with several methods are still ladders), with
+    measurements and the prior work it rests on.
 
 ## Terms
 

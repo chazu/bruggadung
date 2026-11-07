@@ -229,31 +229,48 @@ list, 2026-11-06):
 
 - **What a duty may ask of others** (NEGOTIATION.md open question 8):
   asking is for needs only; a seller short of goods or a buyer short of
-  coins asks nobody. What a duty may ask, and of whom (its employer, its
-  household).
+  coins asks nobody. Decided (2026-11-06): a duty asks only those it is
+  done for (its household, for now; an employer once there are any),
+  only for the means of the duty, and they weigh it by the duty's worth
+  to them, not kindness; the deal is the use of the thing (the
+  household's axe, its coins to buy with), not a gift or a debt, without
+  haggling. Neighbours are never asked for a duty. To implement.
 - **A coin's worth** (NEGOTIATION.md open question 9): one constant
-  (`BG_COIN_TENTHS`); it should follow the agent's own prices and how many
-  coins it has.
+  (`BG_COIN_TENTHS`). Decided (2026-11-06): a coin is worth what it buys,
+  to the agent: a portion of food's value to it over the last price it
+  knows for one (a board read, or its own posted price), scaled by the
+  coins it believes it and its household hold against a household's
+  plenty (the 200 the woodcutter's coffer goal keeps), on money/'s curve
+  for goods: short of coins, each is worth more. Knowing no price, the
+  constant. To implement. Later (the user's wish): a fuller model of
+  opportunity cost, a coin worth the best use the agent knows for it.
 - **An unpaid loan as a grievance** (NEGOTIATION.md open question 2): today
-  only trust is lost; whether an office takes it up (INSTITUTIONS.md).
+  only trust is lost. Decided (2026-11-06): social now, the law later.
+  Past the term the lender goes to the borrower and asks for it back (a
+  demand, haggled like any deal: part now, or a new term); refused, it
+  tells its kin and those it is loyal to, who trust the borrower less (by
+  ordinary talk). A debt in kind long unpaid goes the same way, more
+  softly: it was never agreed, so it is never a wrong. Later, once the
+  village has a watch: a common law makes a loan unpaid by its term a
+  wrong (penalty: confiscate what is owed), reported as a grievance
+  (INSTITUTIONS.md). To implement (the social half).
 - **Asking in the village**: a starving agent asks its kin first, who are
-  starving too, and neighbours have nothing in hand; asking beyond kin,
-  going to a neighbour's house, and giving from the larder at home there,
-  so a farmer's surplus reaches the hunters.
-- **Stacks of grain taken for one another** (VILLAGE.md, three weeks):
-  after the harvest several households' beliefs of the grain at home are
-  bound to one stack seen elsewhere, so their takes from home fail. What
-  is moved can't be told apart by where it is (KNOWLEDGE.md decision 18).
-- **Why an agent picks up a second axe** (or bow): methods are chosen
-  because their precondition holds, not because they move the goal on.
-  With no tree in sight, every better way of stocking the woodpile fails,
-  and "take up the axe" is the next whose precondition holds (an axe
-  lying there, a hand free), so it is done though an axe is in hand
-  already. Requiring both hands free only hides it. The fix belongs in how
-  ways are written and chosen: a tool in hand as a subgoal ("have an
-  axe", passed over once one is held, as AGENCY.md's subgoals already
-  are), and, more generally, a method taken only when its effect isn't
-  already so. Other methods likely fall through the same way.
+  starving too, and neighbours have nothing in hand. Decided
+  (2026-11-06): it asks those it knows, not only those in sight: kin
+  first unless it believes they eat from its own empty larder, then by
+  loyalty, those it believes have food before others, then the nearest;
+  three each time still. It goes to their house and asks when they are
+  home (on the way, wherever it meets them); the one asked weighs giving
+  from what it believes is in its own larder, there in reach, as it
+  values what it has at home already. Help comes in the evening; by day
+  the short forage. To implement.
+- **Coins fetched with coins in hand**: folded into **Methods as whole
+  ways** ([METHODS.md](../METHODS.md), proposed): the market's ways, like
+  most goals' with several, are a ladder, and a failed buy falls to a
+  rung of itself. Measured over three weeks: 21 of 201 failed buys fell
+  to a coin or coffer rung, 2 of 22 coin fetches were made with coins in
+  hand. The work (four engine changes, the content rewritten topic by
+  topic, market first) is listed there.
 - **Preparing and preserving food** (VILLAGE.md open questions): food made
   from food (bread from grain, a stew), and kept longer (dried, salted,
   smoked meat), so a hunt's surplus outlasts three days and a harvest
@@ -5363,9 +5380,38 @@ logging found the rest in Triangle's arena, under `tri_value`.
   (`#ByLight`, decision 33); a hunter takes up a bow, as a woodcutter an
   axe, only with both hands free.
 - **Three weeks**: 10 of 222 checks fail, all from stacks of grain taken
-  for one another after the harvest (To return to).
+  for one another after the harvest (To return to; it was hare meat: see
+  the next section).
 - **Tests**: `foraging` (a farmer short of food forages a bramble and eats;
   the bramble regrows; one with a sack at home cooks instead). The kind
   count is 50 (`Patch`); patches have a glyph in both themes.
 
 143 tests, 4261 checks.
+
+### From the list to return to: a tool in hand, and a cut of hare meat
+
+- **A tool in hand is a subgoal** (AGENCY.md decision 34): "take up the
+  axe" and "take up the bow" were ways of the day's work, taken whenever
+  nothing better would do, so one with an axe in hand and no tree in
+  sight took up another. Now `axe_in_hand` and `bow_in_hand` are goals,
+  and felling, cutting, splitting and looking for trees, stalking and
+  looking for game, each achieve one first: passed over while one is
+  held. "Both hands free" is gone. The other ways that take something
+  into hand were looked over: they are ways of a "have it" goal already,
+  but for the market's "fetch the coins", which a buyer with coins in
+  hand might take again with the buy failing; not seen to happen, so left.
+- **A cut of hare meat** (VILLAGE.md, three weeks): "stacks of grain taken
+  for one another" was misread. The takes refused were of hare meat, in
+  the hunters' own larder, rightly believed: a unit split off a stack is
+  an individual of the instance its unit names (`hare_meat`), whose unit
+  was its blueprint's name, not the stack's (`hare meat`), so the
+  committer found a cut gone missing and refused every take of one from a
+  stack. `world_unit_of_blueprint` gives the unit such an instance says,
+  for the world and the committer's tally alike, so the count holds and
+  a cut put back merges with its stack. Check: in
+  `individuation_and_merge_rules`.
+- **Three weeks**: 4 of 222 checks fail (a meal cooked at home in place of
+  the one packed; the short foraging past the 14:30 check). Nobody holds
+  two tools; no take is repeated to no end.
+
+143 tests, 4264 checks.
