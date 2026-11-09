@@ -116,6 +116,8 @@ knowledge_perceive :: proc(self: ^Knowledge, store: ^Knowledge_Store, first: uin
 	clear(news)
 	if !world_is_live(self.world, agent) || !know_ground_tile(self.world, agent, &here) do return
 	now = world_time(self.world).ms
+	/* what everyone knows, it knows from the start */
+	if store.perceivedAt < 0 do know_common(self, store, agent, now, news)
 	/* where it was when it last perceived: a label it has just come close
 	 * enough to read is read, sighted or not */
 	was := knowledge_store_referent(store, knowledge_store_self_referent(store))
@@ -222,6 +224,25 @@ knowledge_perceive :: proc(self: ^Knowledge, store: ^Knowledge_Store, first: uin
 	view     = view_of(agent, self.world)
 	assigned = make([^]u32, nseen + 1)
 	taken    = make([^]u8, knowledge_store_count(store) + nseen + 1)
+	/* what it moved itself (took up, put somewhere) is what it acted on,
+	 * wherever it is now: the referent it acted on (its truth, as acting
+	 * has it), not one like it left where that was believed */
+	handled := make([]u32, nseen + 1, context.temp_allocator)
+	for i = 0; i < nseen; i += 1 {
+		if seen[i].entity == agent do continue
+		moved := false
+		for k := first; k < last && !moved; k += 1 {
+			ev = world_event_at(self.world, k)
+			moved = ev.actor == agent && ev.subject == seen[i].entity && string(ev.kind) == "moved"
+		}
+		for j = 0; moved && j < knowledge_store_count(store); j += 1 {
+			o := knowledge_store_referent_at(store, j)
+			if o.truth != seen[i].entity || o.ended || o.known != 0 || o.id == knowledge_store_self_referent(store) || taken[j] != 0 do continue
+			handled[i] = o.id
+			taken[j] = 1
+			break
+		}
+	}
 	/* the perceiver's state, and its attention (KNOWLEDGE.md decision 12) */
 	memory     = (^Agent)(world_record(self.world, world_kind_named(self.world, "Agent"), agent))
 	impaired   = memory != nil && (memory.fatigue + memory.injury >= BG_IMPAIRED || memory.adrenaline >= BG_IMPAIRED / 2 ||
@@ -262,6 +283,19 @@ knowledge_perceive :: proc(self: ^Knowledge, store: ^Knowledge_Store, first: uin
 					knowledge_store_set_self(store, knowledge_store_add_referent(store, 0).id)
 				}
 				r = knowledge_store_mutable_referent(store, knowledge_store_self_referent(store))
+			} else if handled[i] != 0 {
+				r = knowledge_store_mutable_referent(store, handled[i])
+				if !(r.present && r.form == at.form && r.container == container &&
+				     (container != 0 || (r.x == tile.x && r.y == tile.y))) {
+					append(news, fmt.aprintf("R%d is at (%d, %d) now", r.id, tile.x, tile.y))
+				}
+			} else if known := know_known_by_sight(store, seen[i].entity); known != nil {
+				/* someone it knows by sight it recognizes, wherever it is */
+				r = known
+				if !(r.present && r.form == at.form && r.container == container &&
+				     (container != 0 || (r.x == tile.x && r.y == tile.y))) {
+					append(news, fmt.aprintf("R%d is at (%d, %d) now", r.id, tile.x, tile.y))
+				}
 			} else {
 				best      = NOT_FOUND
 				bestd     = 1 << 30
@@ -271,7 +305,11 @@ knowledge_perceive :: proc(self: ^Knowledge, store: ^Knowledge_Store, first: uin
 				maybePaths[0] = 0
 				for j = 0; j < knowledge_store_count(store); j += 1 {
 					r = knowledge_store_referent_at(store, j)
-					if taken[j] != 0 || r.ended || r.id == knowledge_store_self_referent(store) || r.kind == nil || string(r.kind) != kind do continue
+					/* nor is anyone taken for someone it knows by sight */
+					if taken[j] != 0 || r.ended || r.id == knowledge_store_self_referent(store) || r.known != 0 ||
+					   r.kind == nil || string(r.kind) != kind {
+						continue
+					}
 					exact = r.present && r.form == at.form && r.container == container &&
 					        (container != 0 || (r.x == tile.x && r.y == tile.y))
 					d = 0 if exact else ((1 if r.present else 2) + i32(know_max64(i64(abs(r.x - tile.x)), i64(abs(r.y - tile.y)))))
@@ -739,6 +777,14 @@ knowledge_perceive :: proc(self: ^Knowledge, store: ^Knowledge_Store, first: uin
 
 			owned = knowledge_store_finding(store, "#Owned", o.subject)
 			if knowledge_store_loyalty_to(store, o.subject) > 0 || (owned != nil && knowledge_store_loyalty_to(store, owned.choice) > 0) {
+				o.salience = BG_CONCERN
+			}
+		}
+		/* something put into what it believes its own (its larder): what is
+		 * in it, and who keeps things there (eats from it with it), it
+		 * notices */
+		if o.salience < BG_CONCERN && string(ev.kind) == "moved" && ev.location.form == .In && o.other != 0 {
+			if owned := knowledge_store_finding(store, "#Owned", o.other); owned != nil && owned.choice == knowledge_store_self_referent(store) {
 				o.salience = BG_CONCERN
 			}
 		}
@@ -1801,6 +1847,10 @@ knowledge_saved_state :: proc(self: ^Knowledge) -> []string {
 				                           knowledge_store_referent_at(store, j).id, knowledge_store_referent_at(store, j).sightings,
 				                           knowledge_store_referent_at(store, j).salience))
 			}
+			if knowledge_store_referent_at(store, j).known != 0 {
+				append(&lines, fmt.tprintf("knows %d %d %d", knowledge_store_agent(store),
+				                           knowledge_store_referent_at(store, j).id, knowledge_store_referent_at(store, j).known))
+			}
 		}
 		for j = 0; j < knowledge_store_count(store); j += 1 {
 			for k = 0; k < BG_HYPOTHESES && knowledge_store_referent_at(store, j).supposed[k] != nil; k += 1 {
@@ -2004,6 +2054,8 @@ knowledge_restore_saved_state :: proc(self: ^Knowledge, lines: []string) {
 				m.sightings = trust
 				m.salience  = x
 			}
+		} else if known: u64; libc.sscanf(text, "knows %llu %u %llu", &agent, &id, &known) == 3 {
+			if m := knowledge_store_mutable_referent(knowledge_store_of(self, Entity_ID(agent)), id); m != nil do m.known = Entity_ID(known)
 		} else if libc.sscanf(text, "supposes %llu %u %d %511s", &agent, &id, &trust, &deeper[0]) == 4 {
 			overrides: cstring
 
@@ -2164,6 +2216,159 @@ know_lost :: proc(self: ^Knowledge, store: ^Knowledge_Store, r: ^Referent, news:
 		append(news, fmt.aprintf("R%d may be R%d (%+d dB): gone from where it was, and one like it seen since", c, r.id,
 		                         h.credence))
 	}
+}
+
+
+/* Common knowledge (KNOWLEDGE.md decision 27): who has a thing of a kind
+ * (a #Common's `whose`: a bed, where one lives) knows, from the start and
+ * without having seen them, the others of that kind within `around` tiles
+ * of its own: where each stands, as it looks, and whose it is (an #Owned
+ * finding for each owner), the owners known by sight. Its own it knows on
+ * seeing them, as ever. */
+@(private)
+know_common :: proc(self: ^Knowledge, store: ^Knowledge_Store, agent: Entity_ID, now: i64, news: ^[dynamic]string) {
+	text: [128]u8
+	lo, hi: i64
+
+	tc     := world_tri(self.world)
+	family := tri.family_index(tc, "common")
+	view   := view_of(agent, self.world)
+	for i: uint = 0; family != nil && i < tri.index_count(family); i += 1 {
+		node := tri.pattern(tc, cstring(tri.index_tag(family, i)))
+		v    := tri.at(tc, node, "whose")
+		n    := tri.print(tc, v, &text[0], size_of(text)) if v != nil else 0
+		if n < 3 do continue
+		text[n - 1] = 0
+		of := tri.type_named(tc, cstring(&text[1]))
+		v = tri.at(tc, node, "around")
+		if of == 0 || v == nil || tri.node_interval(v, &lo, &hi) == 0 || lo != hi do continue
+		/* its own, on a tile: where it reckons from */
+		mine := Location{}
+		for e in know_owned_by(self.world, agent) {
+			if loc := world_location_of(self.world, e); loc.form == .On_Tile && know_is_of(self.world, e, of) {
+				mine = loc
+				break
+			}
+		}
+		if mine.form != .On_Tile do continue
+		count := world_entities_near(self.world, mine, i32(lo), nil, 0)
+		near  := make([]Entity_ID, count + 1, context.temp_allocator)
+		count  = world_entities_near(self.world, mine, i32(lo), raw_data(near), count)
+		for e in near[:count] {
+			owners := know_owners_of(self.world, e)
+			if !know_is_of(self.world, e, of) || slice.contains(owners, agent) do continue
+			at   := world_location_of(self.world, e)
+			kind := view_kind_of(view, e)
+			r: ^Referent = nil
+			for j: uint = 0; j < knowledge_store_count(store) && r == nil; j += 1 {
+				o := knowledge_store_referent_at(store, j)
+				if o.present && o.form == .On_Tile && o.x == at.x && o.y == at.y && o.level == at.level &&
+				   o.kind != nil && string(o.kind) == kind {
+					r = knowledge_store_mutable_referent(store, o.id)
+				}
+			}
+			if r == nil {
+				r          = knowledge_store_add_referent(store, 0)
+				r.kind     = strings.clone_to_cstring(kind)
+				r.features = strings.clone_to_cstring(knowledge_features_of(self, e, view))
+				r.form     = .On_Tile
+				r.x, r.y, r.level = at.x, at.y, at.level
+				r.present  = true
+				r.truth    = e                     /* developer-only */
+			}
+			for owner in owners {
+				who := know_acquaintance(self, store, view, agent, owner)
+				known := false
+				for j: uint = 0; j < knowledge_store_finding_count(store); j += 1 {
+					f := knowledge_store_finding_at(store, j)
+					if f.about == r.id && f.choice == who && string(f.kind) == "#Owned" do known = true
+				}
+				if known do continue
+				f: Finding
+				f.kind     = world_intern(self.world, "#Owned")
+				f.about    = r.id
+				f.choice   = who
+				f.credence = BG_SEEN
+				f.rule     = world_intern(self.world, "common")
+				f.time     = now
+				knowledge_store_add_finding(store, f)
+				append(news, fmt.aprintf("R%d is R%d's: everyone knows", r.id, who))
+			}
+		}
+	}
+}
+
+
+/* Someone it knows by sight: its referent of them, made if it has none
+ * (never seen, so nowhere it believes them). */
+@(private)
+know_acquaintance :: proc(self: ^Knowledge, store: ^Knowledge_Store, view: ^View, agent: Entity_ID, e: Entity_ID) -> u32 {
+	if r := know_known_by_sight(store, e); r != nil do return r.id
+	r := knowledge_store_add_referent(store, 0)
+	r.kind     = strings.clone_to_cstring(view_kind_of(view, e))
+	r.features = strings.clone_to_cstring(knowledge_features_of(self, e, view))
+	r.known    = e
+	r.loyalty  = know_loyalty(self.world, agent, e)
+	r.truth    = e                     /* developer-only */
+	return r.id
+}
+
+
+/* Its referent of someone it knows by sight, or nil. */
+@(private)
+know_known_by_sight :: proc(store: ^Knowledge_Store, e: Entity_ID) -> ^Referent {
+	for j: uint = 0; j < knowledge_store_count(store); j += 1 {
+		if knowledge_store_referent_at(store, j).known == e && !knowledge_store_referent_at(store, j).ended {
+			return knowledge_store_mutable_referent(store, knowledge_store_referent_at(store, j).id)
+		}
+	}
+	return nil
+}
+
+
+/* Whether an entity is of a kind, by its blueprint. */
+@(private)
+know_is_of :: proc(world: ^World, e: Entity_ID, of: tri.Type) -> bool {
+	info := world_info(world, e)
+	if info == nil do return false
+	pattern := tri.pattern(world_tri(world), info.blueprint)
+	return pattern != nil && tri.subtype(world_tri(world), tri.node_type(pattern), of) != 0
+}
+
+
+/* Whose an entity is: the claimants of its ownership claims. */
+@(private)
+know_owners_of :: proc(world: ^World, e: Entity_ID) -> []Entity_ID {
+	claims: [64]Entity_ID
+	claimant: [1]Entity_ID
+	owners := make([dynamic]Entity_ID, context.temp_allocator)
+	ownership := u32(tri.type_named(world_tri(world), "\"ownership\""))
+	kclaim := world_kind_named(world, "Claim")
+	n := world_edges_to(world, .Claim_Subject, e, &claims[0], 64)
+	for i: uint = 0; i < n && i < 64; i += 1 {
+		claim := (^Claim)(world_record(world, kclaim, claims[i]))
+		if claim == nil || u32(claim.kind) != ownership do continue
+		if world_edges_from(world, .Claimant, claims[i], &claimant[0], 1) != 0 do append(&owners, claimant[0])
+	}
+	return owners[:]
+}
+
+
+/* What an agent owns: the subjects of its ownership claims. */
+@(private)
+know_owned_by :: proc(world: ^World, agent: Entity_ID) -> []Entity_ID {
+	claims: [256]Entity_ID
+	subject: [1]Entity_ID
+	owned := make([dynamic]Entity_ID, context.temp_allocator)
+	ownership := u32(tri.type_named(world_tri(world), "\"ownership\""))
+	kclaim := world_kind_named(world, "Claim")
+	n := world_edges_to(world, .Claimant, agent, &claims[0], 256)
+	for i: uint = 0; i < n && i < 256; i += 1 {
+		claim := (^Claim)(world_record(world, kclaim, claims[i]))
+		if claim == nil || u32(claim.kind) != ownership do continue
+		if world_edges_from(world, .Claim_Subject, claims[i], &subject[0], 1) != 0 do append(&owned, subject[0])
+	}
+	return owned[:]
 }
 
 

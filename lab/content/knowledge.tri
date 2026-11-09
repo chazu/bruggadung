@@ -12,7 +12,9 @@
 //             times, so it is caught up as it is read.
 // - code:     src/know_knowledge_*.odin: perception, recognition, memory, each
 //             premise's kind, and the findings no rule concludes (#Taken,
-//             #Struck, #Arrested, #Hires, #Owned, #Reserved). What a thing
+//             #Struck, #Arrested, #Hires, #Owned, #Reserved); what is
+//             common knowledge (#Common), learnt at an agent's first
+//             perception, and whom it knows by sight. What a thing
 //             is seen as, from the `seen` family: kind_of_entity
 //             (src/act_view.odin). Rules are read once, and weighed again
 //             for a referent only when what they read of it changed
@@ -105,6 +107,13 @@ usually_puts: #Rule & {
     concludes: "#Habit"
     weight:    10
 } @family(rules)
+
+// Common knowledge (KNOWLEDGE.md decision 27): what a scenario says
+// everyone knows, by kind, not a belief at a time: `whose` each thing of a
+// kind is (a bed: where one lives). Whoever has one of its own knows, from
+// the start, the others within `around` tiles of it: where each stands,
+// and whose it is, its owners known by sight wherever it sees them.
+#Common: { whose: text, around: int & >=0 }
 
 // How long features usually last (KNOWLEDGE.md §8, CONTENT_LANGUAGE.md §17's
 // recognition): a coat changes daily, the rest of how someone looks hardly

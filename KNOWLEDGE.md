@@ -247,6 +247,31 @@ These were made while writing this document and have not yet been reviewed.
     ground), where it is seen as anyone is. A hunter crouched at its
     blind, minding its stall on the green, was unseen by buyers two tiles
     off: nobody minded it.
+27. **Common knowledge is said by kind** (NEGOTIATION.md open question
+    10). What everyone knows is said once, by kind, in content, not
+    belief by belief for each agent: a `#Common` (knowledge.tri) names a
+    kind of thing (`whose`: a bed) and a distance (`around`). Whoever has
+    one of its own knows, from its first perception, the others within
+    that distance of it: where each stands, as it looks, and whose it is
+    (an #Owned finding for each owner, its rule `common`), the owners
+    **known by sight**. Someone known by sight is recognized wherever
+    they are seen, and nobody else is taken for them: two farmers in
+    green coats are told apart by their faces, which features don't
+    hold. The village says everyone knows whose each bed is
+    (village.tri): where everyone lives, and everyone. Before it, an
+    asker knew no neighbour's house: it had to see them keep things there
+    three times, and kept another's comings and goings only when they
+    touched its own, so it asked those it met, at work, away from their
+    larders, and three weeks of asking brought nothing.
+28. **What it moved itself is what it acted on** (decision 18, amended).
+    Acting on a referent reaches the thing it tracks (its truth link:
+    what acting reaches, ACTIONS.md's perform-believed); so a thing it
+    moved itself, taken up or put somewhere, is that referent wherever it
+    is now, not one like it left where that was believed. Taking a
+    portion of grain out of a pack of three alike, the one left behind
+    took over the taken one's referent: the taker believed it had
+    nothing in hand yet, took out another, and another, until its hands
+    were full and it couldn't put the pack back.
 
 ## Terms
 

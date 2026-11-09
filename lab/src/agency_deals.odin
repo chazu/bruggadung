@@ -44,6 +44,9 @@ BG_IN_KIND     :: i64(14 * 86400000)      /* a debt in kind is repaid within a f
 BG_SPARE       :: 5                       /* it repays in kind only with five times as much at home */
 BG_REPAID      :: 3                       /* trust gained in one who repays */
 BG_COIN_TENTHS :: 25                      /* what a coin is worth, in tenths of a point: a portion of grain is four */
+BG_ASK_FRESH   :: i64(60000)              /* ms: one seen no longer ago than this is gone to where it is */
+BG_ASK_WAIT    :: i64(600000)             /* ms: waiting at someone's house for them to come home, it looks again so often */
+BG_ASK_HOME    :: i32(8)                  /* tiles: as near as what is its own must be for it to give from it (at home) */
 
 Deal_Kind :: enum u8 {
 	None,
@@ -469,24 +472,120 @@ deal_sayable :: proc(printed: string) -> string {
 /* Whom to ask next: someone it believes here, a person, not asked for this
  * goal since it took the goal up; by its loyalty to them, then nearness. */
 @(private = "file")
-agency_whom_to_ask :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Store, me: ^Referent, top: ^Intention) -> u32 {
+agency_whom_to_ask :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Store, me: ^Referent, top: ^Intention,
+                           want: string) -> u32 {
+	tc    := world_tri(self.world)
+	arena := tri.arena_new()
+	defer tri.arena_free(arena)
+	like := tri.value(tc, ns_utf8(want), arena, nil, 0)
 	best: ^Referent = nil
 	bestLoyal, bestAt: i32
+	bestHas := false
 	for i: uint = 0; i < knowledge_store_count(store); i += 1 {
 		r := knowledge_store_referent_at(store, i)
-		if !r.present || r.id == me.id || r.form != .On_Tile || !agency_is_a(self, r, "#Agent") || agency_is_a(self, r, "#Animal") {
+		/* on the ground, or known by sight and never seen (nowhere) */
+		if r.id == me.id || (r.form != .On_Tile && r.form != .None) || !agency_is_a(self, r, "#Agent") || agency_is_a(self, r, "#Animal") {
 			continue
 		}
 		asked := false
 		for t in m.talks[:m.ntalks] do if t.asking && t.with == r.id && t.goal == top.goal && t.since >= top.adopted do asked = true
 		if asked do continue
+		/* those it believes live where it does (keep things in what is its
+		 * own, or sleep by its bed: its household) have what it has, which
+		 * is nothing */
+		house := agency_house_of(self, store, r.id)
+		if !r.present && house == nil do continue      /* nowhere it knows to find them */
+		if house != nil && agency_lives_at(store, me.id, house) do continue
+		/* kin first, by loyalty; those it believes have something like it,
+		 * in hand or at their house; then the nearest, by their house */
 		loyal := knowledge_store_loyalty_to(store, r.id)
-		at    := max(abs(r.x - me.x), abs(r.y - me.y)) + (0 if r.level == me.level else 1000)
-		if best == nil || loyal > bestLoyal || (loyal == bestLoyal && at < bestAt) {
-			best, bestLoyal, bestAt = r, loyal, at
-		}
+		has   := agency_believes_has(self, store, r.id, house.id if house != nil else 0, like)
+		where_ := house if house != nil else r
+		at    := max(abs(where_.x - me.x), abs(where_.y - me.y)) + (0 if where_.level == me.level else 1000)
+		better := best == nil || loyal > bestLoyal ||
+		          (loyal == bestLoyal && (has && !bestHas || (has == bestHas && at < bestAt)))
+		if better do best, bestLoyal, bestHas, bestAt = r, loyal, has, at
 	}
 	return best.id if best != nil else 0
+}
+
+
+/* Whether someone it could ask is by it, seen just now, and not asked
+ * lately: a need's goal found impossible is weighed again for them
+ * (wherever it meets them). */
+agency_someone_to_ask :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Store) -> bool {
+	now := world_time(self.world).ms
+	me  := knowledge_store_referent(store, knowledge_store_self_referent(store))
+	if me == nil do return false
+	for i: uint = 0; i < knowledge_store_count(store); i += 1 {
+		r := knowledge_store_referent_at(store, i)
+		if !r.present || r.id == me.id || r.form != .On_Tile || now - r.seen > BG_ASK_FRESH do continue
+		if !agency_is_a(self, r, "#Agent") || agency_is_a(self, r, "#Animal") do continue
+		if house := agency_house_of(self, store, r.id); house != nil && agency_lives_at(store, me.id, house) do continue
+		asked := false
+		/* asked lately for anything (what it asked for is the way's subgoal,
+		 * a meal, not the need) */
+		for t in m.talks[:m.ntalks] do if t.asking && t.with == r.id && now - t.since < BG_NEED_RETRY do asked = true
+		if !asked do return true
+	}
+	return false
+}
+
+
+/* Where someone lives, as the agent believes: where it has seen them keep
+ * things (a #Habit finding: their larder, their woodpile); else a thing on
+ * the ground it believes theirs (an #Owned finding: their bed, as everyone
+ * knows, KNOWLEDGE.md decision 27); nil if neither. */
+@(private = "file")
+agency_house_of :: proc(self: ^Agency, store: ^Knowledge_Store, who: u32) -> ^Referent {
+	if habit := knowledge_store_finding(store, "#Habit", who); habit != nil && habit.choice != 0 {
+		if house := knowledge_store_referent(store, habit.choice); house != nil && house.form == .On_Tile do return house
+	}
+	for i: uint = 0; i < knowledge_store_finding_count(store); i += 1 {
+		f := knowledge_store_finding_at(store, i)
+		if f.choice != who || string(f.kind) != "#Owned" do continue
+		if house := knowledge_store_referent(store, f.about); house != nil && house.present && house.form == .On_Tile do return house
+	}
+	return nil
+}
+
+
+/* Whether the agent lives where a thing is, as it believes: the thing is
+ * its own, or its own of the same kind stands within BG_ASK_HOME of it
+ * (a bed by its own: a household's). */
+@(private = "file")
+agency_lives_at :: proc(store: ^Knowledge_Store, me: u32, house: ^Referent) -> bool {
+	for i: uint = 0; i < knowledge_store_finding_count(store); i += 1 {
+		f := knowledge_store_finding_at(store, i)
+		if f.choice != me || string(f.kind) != "#Owned" do continue
+		if f.about == house.id do return true
+		mine := knowledge_store_referent(store, f.about)
+		if mine == nil || !mine.present || mine.form != .On_Tile || mine.level != house.level || mine.kind == nil || house.kind == nil ||
+		   string(mine.kind) != string(house.kind) {
+			continue
+		}
+		if max(abs(mine.x - house.x), abs(mine.y - house.y)) <= BG_ASK_HOME do return true
+	}
+	return false
+}
+
+
+/* Whether the agent believes someone has something like the description:
+ * in their hands, or in their house. */
+@(private = "file")
+agency_believes_has :: proc(self: ^Agency, store: ^Knowledge_Store, who: u32, house: u32, like: ^tri.Node) -> bool {
+	result: tri.Match_Result
+	if like == nil do return false
+	tc    := world_tri(self.world)
+	arena := tri.arena_new()
+	defer tri.arena_free(arena)
+	for i: uint = 0; i < knowledge_store_count(store); i += 1 {
+		r := knowledge_store_referent_at(store, i)
+		if !r.present || !((r.form == .Held_By && r.container == who) || (house != 0 && r.form == .In && r.container == house)) do continue
+		d := tri.value(tc, ns_utf8(knowledge_store_describe_referent(store, r.id)), arena, nil, 0)
+		if d != nil && tri.match(tc, like, d, &result) == .Entailed do return true
+	}
+	return false
 }
 
 
@@ -555,6 +654,12 @@ agency_ask :: proc(self: ^Agency, m: ^Motivation, top: ^Intention, store: ^Knowl
 	/* agreed: it waits for it to be handed over, an hour at most */
 	for &t in m.talks[:m.ntalks] {
 		if !t.asking || t.goal != top.goal || t.state != .Agreed do continue
+		/* agreed for the goal as it was before: met then (what was handed
+		 * over eaten, say), it is over */
+		if t.since < top.adopted {
+			t.state = .Ended
+			continue
+		}
 		/* handed over: it holds something like it, and goes on without asking */
 		{
 			arena := tri.arena_new()
@@ -567,7 +672,7 @@ agency_ask :: proc(self: ^Agency, m: ^Motivation, top: ^Intention, store: ^Knowl
 			}
 		}
 		if now - t.since < BG_HANDOVER {
-			if m.wake == 0 || m.wake > now + 60000 do m.wake = now + 60000
+			if m.wake <= now || m.wake > now + 60000 do m.wake = now + 60000
 			m.waiting = true
 			return true, true
 		}
@@ -602,7 +707,7 @@ agency_ask :: proc(self: ^Agency, m: ^Motivation, top: ^Intention, store: ^Knowl
 	}
 	if pick == 0 {
 		if asked >= BG_ASK_PEOPLE do return false, false
-		pick = agency_whom_to_ask(self, m, store, me, top)
+		pick = agency_whom_to_ask(self, m, store, me, top, wants[0])
 		if pick == 0 do return false, false
 	}
 	r := knowledge_store_referent(store, pick)
@@ -611,7 +716,21 @@ agency_ask :: proc(self: ^Agency, m: ^Motivation, top: ^Intention, store: ^Knowl
 	goal_title(tc, top.goal, title[:])
 	why := fmt.tprintf("asking R%d for %s", pick, dstr(title[:]))
 	if !in_reach(me, r) {
-		agency_walk(self, m, why, me, r, store, 1)
+		/* seen just now, it goes to them, wherever they are; else to their
+		 * house (where it has seen them keep things), and waits there for
+		 * them to come home */
+		home := agency_house_of(self, store, pick)
+		if home == nil || (r.present && now - r.seen <= BG_ASK_FRESH) {
+			agency_walk(self, m, why, me, r, store, 1)
+			return true, true
+		}
+		if !in_reach(me, home) {
+			agency_walk(self, m, fmt.tprintf("%s, at R%d's", why, pick), me, home, store, 1)
+			return true, true
+		}
+		if !m.waiting do agency_note(self, m, fmt.tprintf("%s: waiting at R%d's for R%d to come home", why, pick, pick))
+		if m.wake <= now || m.wake > now + BG_ASK_WAIT do m.wake = now + BG_ASK_WAIT
+		m.waiting = true
 		return true, true
 	}
 	arena := tri.arena_new()
@@ -630,7 +749,13 @@ agency_ask :: proc(self: ^Agency, m: ^Motivation, top: ^Intention, store: ^Knowl
 	}
 	agency_note(self, m, fmt.tprintf("asking is worth %+d, against %+d: asking R%d, %s", worth, cost, pick, deal_name(opening)))
 	content := fmt.tprintf("#Ask & {{ what: %s, howMany: 1, deal: %s, wanting: %d }}", wants[want], deal_text(opening), wanting)
-	if !agency_act(self, m, why, store, "say", pick, 0, 0, ns_utf8(content)) do return false, false
+	if !agency_act(self, m, why, store, "say", pick, 0, 0, ns_utf8(content)) {
+		/* it couldn't say it (its voice busy): tried, so it asks someone
+		 * else, not the same again and again at once */
+		agency_add_talk(m, Talk{with = pick, asking = true, state = .Ended, goal = top.goal,
+		                        what = world_intern(self.world, ns_utf8(wants[want])), units = 1, want = want, since = now})
+		return false, false
+	}
 	agency_add_talk(m, Talk{with = pick, asking = true, state = .Open, goal = top.goal, what = world_intern(self.world, ns_utf8(wants[want])),
 	                        units = 1, wanting = wanting, rounds = 1, want = want, last = opening, since = now})
 	m.awaiting   = pick
@@ -861,7 +986,9 @@ agency_deal_heard :: proc(self: ^Agency, m: ^Motivation, q: ^Question, said: ^tr
 		defer tri.arena_free(arena)
 		like  := tri.value(tc, ns_utf8(what), arena, nil, 0)
 		thing := agency_held_like(self, like, store)
-		if thing == 0 do thing = agency_kept_like(self, like, store)
+		/* from what is its own, only at home: its larder near (help comes
+		 * when it is home) */
+		if thing == 0 do thing = agency_kept_like(self, like, store, BG_ASK_HOME)
 		if thing == 0 {
 			agency_note(self, m, fmt.tprintf("asked by R%d for something it hasn't", q.asker))
 			agency_act(self, m, "answering", store, "say", q.asker, 0, 0, ns_utf8(fmt.tprintf("#HaveNone & {{ what: %s }}", what)))
@@ -884,12 +1011,14 @@ agency_deal_heard :: proc(self: ^Agency, m: ^Motivation, q: ^Question, said: ^tr
 
 
 /* Something like the description in a container the agent knows is its
- * own (its larder, its coffer), or 0. */
+ * own (its larder, its coffer), or 0; with `near`, a container no further
+ * than that many tiles away. */
 @(private = "file")
-agency_kept_like :: proc(self: ^Agency, what: ^tri.Node, store: ^Knowledge_Store) -> u32 {
+agency_kept_like :: proc(self: ^Agency, what: ^tri.Node, store: ^Knowledge_Store, near: i32 = 0) -> u32 {
 	result: tri.Match_Result
 	tc    := world_tri(self.world)
 	me    := knowledge_store_self_referent(store)
+	self_ := knowledge_store_referent(store, me)
 	arena := tri.arena_new()
 	defer tri.arena_free(arena)
 	for i: uint = 0; what != nil && i < knowledge_store_count(store); i += 1 {
@@ -897,6 +1026,10 @@ agency_kept_like :: proc(self: ^Agency, what: ^tri.Node, store: ^Knowledge_Store
 		if !r.present || r.form != .In do continue
 		owned := knowledge_store_finding(store, "#Owned", r.container)
 		if owned == nil || owned.choice != me do continue
+		if near > 0 && self_ != nil {
+			c := knowledge_store_referent(store, r.container)
+			if c == nil || c.form != .On_Tile || max(abs(c.x - self_.x), abs(c.y - self_.y)) > near || c.level != self_.level do continue
+		}
 		d := tri.value(tc, ns_utf8(knowledge_store_describe_referent(store, r.id)), arena, nil, 0)
 		if d != nil && tri.match(tc, what, d, &result) == .Entailed do return r.id
 	}

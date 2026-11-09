@@ -153,6 +153,74 @@ test_seed_unpacked :: proc() {
 
 
 /*
+ * Things just alike, unpacked (KNOWLEDGE.md decision 18): three portions of
+ * grain in the pack, bought at market. One taken out is the one it took,
+ * in its hand, not one like it left in the pack where that was believed;
+ * and a portion in hand is food to keep, as a stack is: so it puts each
+ * away in turn. Before, the one left in the pack took over the taken one's
+ * referent, a portion in hand was nothing to put away, and a hunter took
+ * them out one after another until its hands were full, and never put the
+ * pack back.
+ */
+test_look_alikes_unpacked :: proc() {
+	w := test_world(125)
+	why: string
+	bg_check(world_set_terrain_map(w, "farm_map", &why))
+	c := test_committer(w)
+	committer_set_tracing(c, false)
+	activities := activities_with_world(w, c)
+	knowledge  := autorelease(knowledge_init_with_world(w))
+	agency     := autorelease(agency_init_with_world(w, c, knowledge))
+	s          := autorelease(scheduler_init_with_world(w, c))
+	agency_set_activities(agency, activities)
+	scheduler_set_activities(s, activities_as_activity_clock(activities))
+	scheduler_set_perception(s, knowledge_as_perception_phase(knowledge))
+	scheduler_set_decision(s, agency_as_decision_phase(agency))
+
+	g := proposal_group_group_with_phase(.System, "setup: a farmer, three portions of grain in the pack on its back, its larder")
+	me     := proposal_group_create(g, "farmhand", "the farmer", on_tile(10, 2, 0))
+	larder := proposal_group_create(g, "larder", "its larder", on_tile(12, 2, 0))
+	pack   := proposal_group_create(g, "backpack", "its backpack", held_by(me, BG_BACK))
+	grains: [3]Entity_ID
+	for &e in grains do e = proposal_group_create(g, "grain", "bought", in_(pack))
+	committer_submit(c, g)
+	scheduler_run_until(s, time_make(1))
+	me, larder, pack = proposal_group_id_for(g, me), proposal_group_id_for(g, larder), proposal_group_id_for(g, pack)
+	for &e in grains do e = proposal_group_id_for(g, e)
+	test_own(c, me, larder)
+	test_own(c, me, pack)
+	scheduler_run_until(s, time_make(2))
+	store := knowledge_store_of(knowledge, me)
+	kept := u32(0)
+	for i: uint = 0; i < knowledge_store_count(store); i += 1 {
+		if r := knowledge_store_referent_at(store, i); r.truth == larder do kept = r.id
+	}
+	bg_check(kept != 0)
+
+	/* one taken out by what it believes it is: that one is in its hand */
+	error: string
+	self_ := knowledge_store_self_referent(store)
+	taken := test_referent_of(store, grains[0])
+	bg_check(taken != 0 && perform_believed(w, c, store, action_make("take", Entity_ID(self_), Entity_ID(taken), NO_ENTITY), 0, &error) != nil)
+	scheduler_run_until(s, time_make(world_time(w).ms + 1000))
+	r := knowledge_store_referent(store, taken)
+	bg_check(r.form == .Held_By && r.container == self_)
+	bg_check(agency_undertake_every_with(agency, me, "pack_returned", 0, 3600 * 1000, "home", FARM_DAY, {{"home", kept}}))
+	scheduler_run_until(s, time_make(3600 * 1000))
+
+	inside: [4]Entity_ID
+	lp, ll := world_location_of(w, pack), world_location_of(w, larder)
+	ok := world_entities_at(w, larder, .In, raw_data(inside[:]), 4) == 3 && world_entities_at(w, pack, .In, raw_data(inside[:]), 4) == 0 &&
+	      lp.form == .On_Tile && abs(lp.x - ll.x) <= 1 && abs(lp.y - ll.y) <= 1
+	if !ok {
+		fmt.printf("    pack at %v\n", lp)
+		for line in agency_log_of(agency, me) do fmt.printf("    %s\n", line)
+	}
+	bg_check(ok)
+}
+
+
+/*
  * Free after an impossible goal (lab/src/agency_agency.odin): a farmer to
  * eat its supper, with nothing to eat anywhere it knows, and the pack on
  * its back to put back by its larder, both now. Supper found impossible, it
@@ -199,7 +267,9 @@ test_free_after_impossible :: proc() {
 	scheduler_run_until(s, time_make(5000))
 
 	impossible := test_logged_by(agency, me, "[eat supper] nothing I know of will do: impossible for now")
-	back := world_location_of(w, pack).form == .On_Tile
+	/* put back, it is done (#Did of an instant operation), not impossible */
+	back := world_location_of(w, pack).form == .On_Tile && test_logged_by(agency, me, "[put the pack back] done") &&
+	        !test_logged_by(agency, me, "[put the pack back] nothing I know of will do")
 	if !impossible || !back {
 		fmt.printf("    supper impossible: %v, the pack put back: %v\n", impossible, back)
 		for line in agency_log_of(agency, me) do fmt.printf("    %s\n", line)

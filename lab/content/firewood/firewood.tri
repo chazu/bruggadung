@@ -102,7 +102,7 @@ birch_firewood_20: #Stack & { material: "birch", unit: "firewood", unitMass: 1kg
 axe: #Axe & { material: "iron", mass: 2kg }
 
 // Felling: a tree, the woodpile it goes to, the axe.
-#Felling: #Frame & { tree: #Body, trunk: #Body, log: #Body, wood: #Body, woodpile: #Body, axe: #Body, pack: #Body, packed: #Body,
+#Felling: #Frame & { tree: #Body, trunk: #Body, log: #Body, wood: #Body, woodpile: #Body, axe: #Body, pack: #Body,
                      coffer: #Body, coins: #Body }
 
 // The day's work, for a woodcutter: its household's woodpile stocked, kept
@@ -164,18 +164,18 @@ wood_in_hand: #Goal & {
     }
 } @family(goals)
 
-// By the woodpile, with a pack (carrying/): the firewood in it taken out.
-unpack_the_wood: #Method & {
-    title: "unpack it"
+// Firewood in its pack: taken in hand by the woodpile (carrying/'s ways,
+// the wood as the thing, the woodpile where it goes); first, home already.
+let out_of_the_pack = {
     goal:  "wood_in_hand"
-    rank:  1
-    pre:   #Reached & {
-        reached: "woodpile"
-        find:    ["pack", "packed"]
-        match:   #Felling & { me: #Agent & { id: $me, freeHands: >=1 }, pack: #Pack & { id: $p, place: #Held & { by: $me } },
-                              packed: #Stack & { unit: "firewood", place: #Inside & { container: $p } } }
-    }
-    steps: [#Do & { op: "take", object: "packed" }]
+    steps: [#Achieve & { subgoal: "thing_in_hand", with: [{ binds: "thing", to: "wood" }, { binds: "into", to: "woodpile" }] }]
+}
+let wood_packed = #Felling & { me: #Agent & { id: $me }, pack: #Pack & { id: $p, place: #Held & { by: $me } },
+                               wood: #Stack & { unit: "firewood", place: #Inside & { container: $p } } }
+unpack_the_wood: #Method & out_of_the_pack & {
+    title: "unpack it"
+    rank: 1
+    pre:  #Reached & { reached: "woodpile", find: ["pack", "wood"], match: wood_packed }
 } @family(methods)
 
 gather_it: #Method & {
@@ -216,29 +216,10 @@ put_down_the_axe: #Method & {
 
 // Nothing left to make it of, the pack not empty: home with it, and out of
 // it.
-carry_the_wood_home: #Method & {
+carry_the_wood_home: #Method & out_of_the_pack & {
     title: "carry it home"
-    goal:  "wood_in_hand"
     rank:  4
-    pre: {
-        find:  ["pack", "packed"]
-        match: #Felling & { me: #Agent & { id: $me }, pack: #Pack & { id: $p, place: #Held & { by: $me } },
-                            packed: #Stack & { unit: "firewood", place: #Inside & { container: $p } } }
-    }
-    steps: [#Achieve & { subgoal: "by_the_woodpile" }, #Do & { op: "take", object: "packed" }]
-} @family(methods)
-
-by_the_woodpile: #Goal & {
-    title: "go home to the woodpile"
-    done:  #Reached & { reached: "woodpile" }
-} @family(goals)
-
-go_to_the_woodpile: #Method & {
-    title: "go home"
-    goal:  "by_the_woodpile"
-    rank:  1
-    pre:   { find: ["woodpile"], match: #Felling & { woodpile: #Container } }
-    steps: [#Do & { op: "look_in", object: "woodpile" }]
+    pre:   { find: ["pack", "wood"], match: wood_packed }
 } @family(methods)
 
 // Firewood lying about, split: the nearest.

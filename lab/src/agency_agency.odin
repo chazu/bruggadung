@@ -110,6 +110,7 @@ BG_MARGIN          :: 5      /* what another goal must beat the current one by *
 BG_INTERRUPT       :: 5      /* and more, to interrupt an activity under way */
 BG_MAX_SETTLED     :: 16
 BG_MAX_COMMITMENTS :: 16
+BG_MAX_ACTED       :: 16      /* the instant operations whose last doing a mind remembers */
 BG_KEPT_RETRY :: i64(600000)     /* ms: a kept goal found impossible is tried again ten minutes later */
 BG_NEED_RETRY :: i64(7200000)    /* ms: a need's goal found impossible is weighed again two hours later (rationing:
                                     the meal packed at dawn is eaten at work, not at once) */
@@ -219,6 +220,13 @@ Walk_Purpose :: struct {
 }
 
 
+/* When the agent last did an instant operation itself (#Did: a timed one
+ * leaves its activity; an instant one leaves nothing else). */
+Acted :: struct {
+	op: cstring,      /* interned */
+	at: i64,          /* ms */
+}
+
 Motivation :: struct {
 	using object: Object,
 	agent:        Entity_ID,
@@ -238,6 +246,8 @@ Motivation :: struct {
 	weighed:      [BG_MAX_SETTLED]Arisen,  /* the last verdict, so it is logged when it changes */
 	nweighed:     i32,
 	commitments:  [BG_MAX_COMMITMENTS]Commitment,
+	acted:        [BG_MAX_ACTED]Acted,
+	nacted:       i32,
 	ncommitments: i32,
 	habits:       [BG_MAX_HABITS]Habit,
 	nhabits:      i32,
@@ -1478,7 +1488,13 @@ agency_holds :: proc(self: ^Agency, instance: cstring, path: cstring, since: i64
 		 * again and again) */
 		lately := int_at(tc, done, "lately", 0)
 		after  := max(since, world_time(self.world).ms - lately) if lately > 0 else since
-		return agency_activity(self, cstr(text[:]), knowledge_store_agent(store), "completed", after) != NO_ENTITY
+		if agency_activity(self, cstr(text[:]), knowledge_store_agent(store), "completed", after) != NO_ENTITY do return true
+		/* an instant one leaves no activity: what the agent remembers doing */
+		if m := agency_existing_mind_of(self, knowledge_store_agent(store)); m != nil {
+			op := world_intern(self.world, cstr(text[:]))
+			for a in m.acted[:m.nacted] do if a.op == op && a.at >= after do return true
+		}
+		return false
 	}
 
 	/* a precondition within reach of a slot's referent (unpacking at the
@@ -1492,12 +1508,48 @@ agency_holds :: proc(self: ^Agency, instance: cstring, path: cstring, since: i64
 		}
 	}
 
+	/* nothing believed fits it (#None): the binding sought, and not kept */
+	cond := tri.at(tc, tri.pattern(tc, instance), path)
+	none := cond != nil && tri.at(tc, cond, "none") != nil && tri.node_type(tri.at(tc, cond, "none")) == tri.type_named(tc, "true")
+
 	if !agency_load(self, &c, instance, path, store) do return false
 	c.since = since
 	start  := n^
-	if agency_bind(self, &c, 0, b, n) do return true
+	if agency_bind(self, &c, 0, b, n) {
+		if !none do return true
+		n^ = start
+		return false
+	}
 	n^ = start
-	return false
+	return none
+}
+
+
+/* An instant operation done by the agent itself, remembered as done now:
+ * its last doing, one to an operation (#Did). A timed one leaves its
+ * activity instead. */
+@(private = "file")
+agency_acted :: proc(self: ^Agency, m: ^Motivation, operation: cstring) {
+	d: i64
+	e: string
+	if operation_stage(self.world, operation, 0, &d, &e) && d > 0 do return
+	op  := world_intern(self.world, operation)
+	now := world_time(self.world).ms
+	for &a in m.acted[:m.nacted] {
+		if a.op == op {
+			a.at = now
+			return
+		}
+	}
+	if m.nacted == BG_MAX_ACTED {
+		/* the one done longest ago makes room */
+		oldest := 0
+		for a, i in m.acted[:m.nacted] do if a.at < m.acted[oldest].at do oldest = i
+		m.acted[oldest] = {op, now}
+		return
+	}
+	m.acted[m.nacted] = {op, now}
+	m.nacted += 1
 }
 
 
@@ -1861,7 +1913,7 @@ agency_put_down :: proc(self: ^Agency, m: ^Motivation, why: string) {
 /* What the agent believes it holds, as one number (the referents, mixed):
  * changed, something came into its hands or left them. */
 @(private)
-agency_held_signature :: proc(store: ^Knowledge_Store) -> u64 {
+agency_held_signature :: proc(self: ^Agency, store: ^Knowledge_Store) -> u64 {
 	sig: u64 = 0
 	me := knowledge_store_self_referent(store)
 	for i: uint = 0; i < knowledge_store_count(store); i += 1 {
@@ -1978,6 +2030,51 @@ agency_suspended_step_of :: proc(self: ^Agency, method: cstring, m: ^Motivation)
 }
 
 
+/* The bindings a subgoal step passes (#Achieve's `with`): the method's, and
+ * each subgoal slot a `with` binds, to the referent of the method's slot it
+ * names (`to`). Without `with`, the method's as they are. */
+@(private = "file")
+agency_pass :: proc(self: ^Agency, step: ^tri.Node, b: [^]Slot_Binding, n: i32, out: []Slot_Binding) -> i32 {
+	slot, is: [32]u8
+	tc := world_tri(self.world)
+	pn := min(n, i32(len(out)))
+	copy(out[:pn], b[:pn])
+	for with := tri.at(tc, step, "with"); with != nil; with = tri.at(tc, with, "rest") {
+		w := tri.at(tc, with, "first")
+		if w == nil do break
+		if !text_at(tc, w, "binds", slot[:]) || !text_at(tc, w, "to", is[:]) do continue
+		r := bound(b, n, str(is[:]))
+		if r == 0 do continue
+		name := world_intern(self.world, cstr(slot[:]))
+		k: i32
+		for k = 0; k < pn && out[k].slot != name; k += 1 {}
+		if k == pn {
+			if pn == i32(len(out)) do continue
+			pn += 1
+		}
+		out[k] = {name, r}
+	}
+	return pn
+}
+
+
+/* The method's own name for a slot a subgoal bound: the slot a `with` binds
+ * it to, else the same name. */
+@(private = "file")
+agency_passed_back :: proc(self: ^Agency, step: ^tri.Node, slot: cstring) -> cstring {
+	name, is: [32]u8
+	tc := world_tri(self.world)
+	for with := tri.at(tc, step, "with"); with != nil; with = tri.at(tc, with, "rest") {
+		w := tri.at(tc, with, "first")
+		if w == nil do break
+		if text_at(tc, w, "binds", name[:]) && string(cstr(name[:])) == string(slot) && text_at(tc, w, "to", is[:]) {
+			return world_intern(self.world, cstr(is[:]))
+		}
+	}
+	return slot
+}
+
+
 /* The method's failure: the goal tries its next. */
 @(private)
 agency_fail :: proc(self: ^Agency, m: ^Motivation, index: i32, why: string) {
@@ -2033,14 +2130,30 @@ agency_follow :: proc(self: ^Agency, m: ^Motivation, method: cstring, index: i32
 				agency_fail(self, m, index, fmt.tprintf("%s: there is no goal %s", str(title[:]), str(goal[:])))
 				return false
 			}
-			if agency_holds(self, cstr(goal[:]), "done", 0, b, &n, store) do continue
+			/* what it passes the subgoal: its bindings, those `with` names
+			 * under the subgoal's slots (the goods as the thing to take in
+			 * hand); what the subgoal's done binds joins its own, under its
+			 * own names */
+			pb: [BG_MAX_SLOTS]Slot_Binding
+			pn := agency_pass(self, step, b, n, pb[:])
+			before := pn
+			if agency_holds(self, cstr(goal[:]), "done", 0, raw_data(pb[:]), &pn, store) {
+				for q := before; q < pn && n < BG_MAX_SLOTS; q += 1 {
+					name := agency_passed_back(self, step, pb[q].slot)
+					if bound(b, n, string(name)) == 0 {
+						b[n] = {name, pb[q].referent}
+						n += 1
+					}
+				}
+				continue
+			}
 			if m.nintentions == BG_MAX_INTENTIONS {
 				agency_fail(self, m, index, fmt.tprintf("%s: too many goals deep", str(title[:])))
 				return false
 			}
 			agency_note(self, m, fmt.tprintf("%s: %s first", str(title[:]), goal_title(tc, cstr(goal[:]), op[:])))
 			m.intentions[m.nintentions - 1].pending = index
-			agency_adopt(self, cstr(goal[:]), m, b, n)
+			agency_adopt(self, cstr(goal[:]), m, raw_data(pb[:]), pn)
 			return false
 		}
 
@@ -2198,6 +2311,7 @@ agency_follow :: proc(self: ^Agency, m: ^Motivation, method: cstring, index: i32
 					m.intentions[m.nintentions - 1].stepsDone |= u32(1) << u32(k)
 				}
 			}
+			agency_acted(self, m, cstr(op[:]))
 
 			/* a repetition of the method, and of what it chose for each slot */
 			put(ctx[:], fmt.tprintf("%s:%s", m.intentions[m.nintentions - 1].goal, method))
@@ -3554,7 +3668,7 @@ agency_settle :: proc(self: ^Agency, m: ^Motivation, intention: ^Intention, done
 			 * (what was in the way may not be: a meal in hand since), when it
 			 * next decides */
 			m.settled[k].retry   = 0 if done else world_time(self.world).ms + BG_NEED_RETRY
-			m.settled[k].held    = agency_held_signature(knowledge_store_of(self.knowledge, m.agent))
+			m.settled[k].held    = agency_held_signature(self, knowledge_store_of(self.knowledge, m.agent))
 		}
 		return
 	}
@@ -3718,9 +3832,17 @@ agency_weigh :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Store, bus
 		for k = 0; k < m.nsettled && !(m.settled[k].goal == goal && m.settled[k].about == 0); k += 1 {}
 		if k < m.nsettled {
 			was = m.settled[k].verdict
-			if m.settled[k].retry != 0 && (world_time(self.world).ms >= m.settled[k].retry ||
-			                               agency_held_signature(store) != m.settled[k].held) {
-				m.settled[k].retry = 0      /* impossible a while ago, or before it held what it holds: weighed again */
+			now := world_time(self.world).ms
+			if m.settled[k].retry != 0 && (now >= m.settled[k].retry ||
+			                               agency_held_signature(self, store) != m.settled[k].held ||
+			                               (now - (m.settled[k].retry - BG_NEED_RETRY) >= BG_ASK_FRESH &&
+			                                agency_someone_to_ask(self, m, store))) {
+				/* impossible a while ago, or before it held what it holds, or
+				 * someone came by it could ask (wherever it meets them; no
+				 * oftener than a minute after: one it then doesn't ask, for
+				 * want of a deal, kept it weighing again and again): weighed
+				 * again */
+				m.settled[k].retry = 0
 			} else if felt < was {
 				/* eased since (met some other way: supper): settled as of now */
 				m.settled[k].verdict = felt
@@ -4308,6 +4430,7 @@ agency_saved_state :: proc(self: ^Agency) -> []string {
 			append(&lines, fmt.tprintf("walking %d %d %d %d %d %s", m.agent, j.toward, j.x, j.y, j.level,
 			                           j.goal if j.goal != nil else "-"))
 		}
+		for a in m.acted[:m.nacted] do append(&lines, fmt.tprintf("acted %d %s %d", m.agent, a.op, a.at))
 		for k: i32 = 0; k < m.nhabits; k += 1 {
 			append(&lines, fmt.tprintf("habit %d %s %d %d %d", m.agent, m.habits[k].context_, m.habits[k].choice,
 			                           m.habits[k].strength, m.habits[k].at))
@@ -4459,6 +4582,14 @@ agency_restore_saved_state :: proc(self: ^Agency, lines: []string) {
 			continue
 		}
 		if agency_deals_restore(self, words) do continue
+		if len(words) == 4 && words[0] == "acted" {
+			m = agency_mind_of(self, Entity_ID(ns_long_long_value(words[1])))
+			if m.nacted < BG_MAX_ACTED {
+				m.acted[m.nacted] = {world_intern(self.world, ns_utf8(words[2])), ns_long_long_value(words[3])}
+				m.nacted += 1
+			}
+			continue
+		}
 		if len(words) == 6 && words[0] == "question" {
 			m = agency_mind_of(self, Entity_ID(ns_long_long_value(words[1])))
 			if m.nquestions == BG_MAX_QUESTIONS do continue

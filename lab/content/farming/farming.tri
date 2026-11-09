@@ -4,15 +4,16 @@
 // Cut points:
 // - full:     a farmer tends a plot of its household's through its
 //             working hours (a kept goal, agency.tri), the plot as a
-//             whole: one referent, an area (things.tri's #Area). Holding a
-//             harvest's worth, it takes it to the larder; else it harvests
-//             a row of a ripe plot, a hand free; else takes in what it
+//             whole: one referent, an area (things.tri's #Area). It
+//             harvests a row of a ripe plot, a hand free, room in its arms
+//             first (no armful of a harvest's worth: one is taken to the
+//             larder, or, holding more than a sack of seed's worth and none
+//             kept back yet, a sack of it kept back as seed, marking the
+//             plot kept till it is sown again); else takes in what it
 //             harvested; else sows a row of a bare plot, its seed in hand
 //             (fetched from where it is kept first); else puts the seed
 //             back. A plot is tended while it stands sown, its farmer's
-//             hands empty. Once a harvest, holding more than a sack of
-//             seed's worth of it, it keeps a sack back as seed (marking
-//             the plot kept, till it is sown again), and sows from it.
+//             hands empty.
 // - reduced:  the same, decided on the cadence's beat; each row's activity
 //             runs its time.
 // - abstract: as reduced. A household's plots as a yield at a place,
@@ -111,12 +112,37 @@ plot_tended: #Goal & {
     kept:  true
 } @family(goals)
 
-// More than a sack of seed's worth of the harvest in hand (twelve and a
-// half kilograms), and none kept back yet from the plot: a sack of it kept
-// back, to sow it again.
+// The ways (METHODS.md: whole ways, what each needs a subgoal): a ripe
+// plot harvested a row at a time, room in its arms first; what is left of
+// the harvest in hand brought in; a bare plot sown, seed in hand first;
+// the seed left put back.
+harvest_it: #Method & {
+    title: "harvest it"
+    goal:  "plot_tended"
+    rank:  1
+    pre: {
+        find:  ["plot"]
+        match: #Farming & { me: #Agent & { freeHands: >=1 }, plot: #Plot & { stands: "ripe" } }
+    }
+    steps: [#Achieve & { subgoal: "room_to_harvest" }, #Do & { op: "harvest", object: "plot" }]
+} @family(methods)
+
+// Room to harvest: no armful of the harvest of ten kilograms or more in
+// hand (forty portions: what is held is weighed by its mass, its count
+// unseen). Made by keeping a sack of it back as seed, if it holds a sack's
+// worth (twelve and a half kilograms) and none is kept back yet from the
+// plot, to sow it again; else by taking it to the larder.
+room_to_harvest: #Goal & {
+    title: "make room to harvest"
+    done: #None & {
+        find:  ["harvest"]
+        match: #Farming & { me: #Agent & { id: $me }, harvest: #Food & #Stack & { raw: true, mass: >=10kg, place: #Held & { by: $me } } }
+    }
+} @family(goals)
+
 keep_back_seed: #Method & {
     title: "keep back seed"
-    goal:  "plot_tended"
+    goal:  "room_to_harvest"
     rank:  1
     pre: {
         find:  ["harvest", "plot"]
@@ -127,11 +153,9 @@ keep_back_seed: #Method & {
     steps: [#Do & { op: "keep_seed", object: "harvest", target: "plot" }]
 } @family(methods)
 
-// A harvest's worth in hand (ten kilograms, forty portions: what is held is
-// weighed by its mass, its count unseen): to the larder.
 bring_it_in: #Method & {
     title: "bring it in"
-    goal:  "plot_tended"
+    goal:  "room_to_harvest"
     rank:  2
     pre: {
         find:  ["harvest", "larder"]
@@ -143,24 +167,13 @@ bring_it_in: #Method & {
     steps: [#Do & { op: "put_in", object: "harvest", target: "larder" }]
 } @family(methods)
 
-harvest_it: #Method & {
-    title: "harvest it"
-    goal:  "plot_tended"
-    rank:  3
-    pre: {
-        find:  ["plot"]
-        match: #Farming & { me: #Agent & { freeHands: >=1 }, plot: #Plot & { stands: "ripe" } }
-    }
-    steps: [#Do & { op: "harvest", object: "plot" }]
-} @family(methods)
-
 // The plot reaped, or no hand free to reap it: what was harvested, taken
 // in. (A portion alone in hand, 250 grams, is the meal taken to work,
 // cooking/'s.)
 bring_in_the_rest: #Method & {
     title: "bring in the rest"
     goal:  "plot_tended"
-    rank:  4
+    rank:  2
     pre: {
         find:  ["harvest", "larder"]
         match: #Farming & { me: #Agent & { id: $me },
@@ -174,7 +187,7 @@ bring_in_the_rest: #Method & {
 sow_it: #Method & {
     title: "sow it"
     goal:  "plot_tended"
-    rank:  5
+    rank:  3
     pre:   { find: ["plot"], match: #Farming & { plot: #Plot & { stands: "bare" } } }
     steps: [#Achieve & { subgoal: "seed_in_hand" }, #Do & { op: "sow", object: "seed", target: "plot" }]
 } @family(methods)
@@ -183,7 +196,7 @@ sow_it: #Method & {
 put_back_the_seed: #Method & {
     title: "put back the seed"
     goal:  "plot_tended"
-    rank:  6
+    rank:  4
     pre: {
         find:  ["seed", "larder"]
         match: #Farming & { me: #Agent & { id: $me },

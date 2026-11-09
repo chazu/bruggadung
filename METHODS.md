@@ -437,8 +437,48 @@ day 14 and unfed on days 20 and 21, and a farmers' household (81, 84,
 Over three weeks 12 pieces of food spoiled, against 4 to 6 before
 these changes. Why they are shorter now isn't looked into yet.
 
-Not yet: content step 4 (farming, carrying, the market's selling) and
-step 5.
+**Content step 4, written once** (content/carrying/, market/, farming/;
+firewood/'s and hunting/'s unpacking too). The topics each had their own
+copy of the same ways: unpack it by where it goes, go home to the
+supply, free a hand. They are written once now, in carrying/, as
+**handling**, and three engine changes make that possible:
+- **`#Achieve`'s `with`**: a subgoal's slot bound to another of the
+  method's (the goods as the `thing`, the supply as where it goes,
+  `into`). A slot couldn't be aliased in content: one referent fills one
+  slot.
+- **`#None`**: a condition that holds when nothing believed fits it (the
+  pack emptied; no armful too heavy to harvest with).
+- **`#Did` of an instant operation**: the mind remembers its own instant
+  acts. A `put_back` or `put_in` leaves no activity, so the goals done by
+  one (the pack put back, the unsold goods home, the coins put away) were
+  never done: they ended only when no way was left.
+
+The handling goals (carrying/): `hand_free` (what it carries put down),
+`beside_into`, and `thing_in_hand` (unpacked beside where it goes, or
+gathered or picked up, into the pack if it fits). Then:
+- **The pack put back** is one way: emptied, then put back. Emptied is
+  a `#None`: nothing in the pack, nor anything kept at home in hand
+  (taken out of it). A weaker one, nothing in the pack, was done as soon
+  as the seed was out, and the pack went back with the seed in hand.
+- **The market's selling**: goods set out is goods to sell in hand,
+  then put out. The unsold goods and the coins come home by one way,
+  described by where they are now (in hand, in the pack, on the stall),
+  each the thing taken in hand by where it goes, then put in.
+- **Buying, firewood, the hunt**: their unpacking is the handling's,
+  the goods, wood or meat as the thing. `by_the_supply`,
+  `by_the_woodpile`, `by_the_larder` and the market's `hand_free` are
+  gone.
+- **Farming**: a ripe plot is harvested after room is made to harvest
+  (`#None` of an armful of ten kilograms: seed kept back, or the armful
+  brought in).
+
+Three weeks after: 7 FAILs, against 8, and 4 pieces of food spoiled,
+against 12. Fall-through: 10 pairs, 31 in all. One fragility shows:
+coins gathered into a hand merge with coins already there, the referent
+followed is gone, and the way fails; the next way puts away the merged
+stack.
+
+Not yet: step 5.
 
 ## Open questions
 

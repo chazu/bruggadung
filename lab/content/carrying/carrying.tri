@@ -1,5 +1,6 @@
 // Carrying: a backpack worn on the back, a basket in a hand, what each can
-// bear, and how a load slows a walk (VILLAGE.md decision 11).
+// bear, and how a load slows a walk (VILLAGE.md decision 11); and handling,
+// the goals every topic uses to move a thing to where it goes (METHODS.md).
 //
 // Cut points:
 // - full:     a pack is a container that goes where its carrier goes: a
@@ -20,7 +21,11 @@
 //             it, and puts it back there after, emptied: food, hides and
 //             seed into the larder, firewood onto the woodpile. (Seed kept
 //             back into a pack worn to market was never emptied, and the
-//             pack never put back.)
+//             pack never put back.) Handling: a thing (`thing`, bound by
+//             the topic's way with #Achieve's `with`) taken in hand,
+//             unpacked beside where it goes (`into`), or gathered or
+//             picked up, a hand freed first by putting down what it
+//             carries.
 // - reduced:  the same; a walk's pace is set as it starts each tile.
 // - abstract: as reduced. A load as a household's capacity to move goods,
 //             below reduced, is open (DETAIL_REGIMES.md).
@@ -29,7 +34,8 @@
 //             (#Food, #Hide, #Seed, firewood).
 // - market, hunting, firewood: their ways of carrying (market/,
 //             hunting/, firewood/) use a pack when the household's is free,
-//             and their hands when it isn't.
+//             and their hands when it isn't; their unpacking, bringing home
+//             and freeing a hand are the handling's.
 // - code:     the back is a hand slot past the hands (BG_BACK); the load
 //             is the committer's to keep (a placement obstacle); the slowed
 //             walk is work_rate's; stowing is `receiving`; effect_shoulder,
@@ -105,13 +111,99 @@ put_back: #Operation & {
     }
 } @family(operations)
 
-// Carrying: the pack, where the household keeps it (by its larder,
-// `home`), its woodpile, and what is packed in it.
-#Carrying: #Frame & { pack: #Body, home: #Body, woodpile: #Body, packed: #Body }
+// Handling: what every topic that moves a thing to where it goes shares
+// (bringing it home, setting it out, putting it away): the thing, `thing`;
+// where it goes, `into`; the pack the agent carries; and what it puts down
+// to free a hand, `burden`. A topic's frame is a #Handling, so these slots
+// pass between its goals and the ones here: its way binds `thing` and
+// `into` to what it means (the goods, the household's supply), and the
+// ways here do the rest, whatever the thing is.
+#Handling: #Frame & { thing: #Body, into: #Body, pack: #Body, burden: #Body }
 
-// A backpack on the back, for the day's work (bound to nothing: the
-// household's own first, then the nearest); taken already by another of the
-// household, it does without.
+// Carrying: the pack, where the household keeps it (by its larder,
+// `home`), and its woodpile.
+#Carrying: #Handling & { home: #Body, woodpile: #Body }
+
+// What may be put down to free a hand: goods (a stack of food, seed or
+// firewood), a hide, a log, a tool. Never coins, nor a meal, nor a pack.
+let burdens = #Food & #Stack | #Seed & #Stack | #Stack & { unit: "firewood" } | #Hide | #Log | #Axe | #Bow
+
+// A hand free: what it carries put down.
+hand_free: #Goal & {
+    title: "free a hand"
+    done:  { find: [], match: #Handling & { me: #Agent & { freeHands: >=1 } } }
+} @family(goals)
+
+put_down_a_burden: #Method & {
+    title: "put down what it carries"
+    goal:  "hand_free"
+    rank:  1
+    pre:   { find: ["burden"], match: #Handling & { me: #Agent & { id: $me }, burden: burdens & { place: #Held & { by: $me } } } }
+    steps: [#Do & { op: "put_down", object: "burden" }]
+} @family(methods)
+
+// Beside where the thing goes (`into`, bound).
+beside_into: #Goal & {
+    title: "go where it goes"
+    done:  #Reached & { reached: "into" }
+} @family(goals)
+
+go_there: #Method & {
+    title: "go there"
+    goal:  "beside_into"
+    rank:  1
+    pre:   { find: ["into"], match: #Handling & { into: #Body } }
+    steps: [#Do & { op: "go_beside", object: "into" }]
+} @family(methods)
+
+// Go beside something: what walking there does when it gets there. A way
+// agency takes, not a menu's (as `gather` is).
+go_beside: #Operation & {
+    effect: "look"
+    roles: {
+        actor: #Agent
+        item:  #Body
+    }
+} @family(going)
+
+// The thing (`thing`, bound) in a hand, to put where it goes (`into`,
+// bound): out of the pack, beside where it goes, so it is carried there
+// in the pack; else taken up where it lies, a hand freed first: a stack
+// gathered and a thing picked up, into the pack if it fits (it is
+// unpacked where it goes), else into the hand.
+thing_in_hand: #Goal & {
+    title: "take it in hand"
+    done:  { find: ["thing"], match: #Handling & { me: #Agent & { id: $me }, thing: #Body & { place: #Held & { by: $me, hand: <8 } } } }
+} @family(goals)
+
+unpack_it: #Method & {
+    title: "unpack it"
+    goal:  "thing_in_hand"
+    rank:  1
+    pre: {
+        find:  ["pack", "thing"]
+        match: #Handling & { me: #Agent & { id: $me }, pack: #Pack & { id: $p, place: #Held & { by: $me } },
+                             thing: #Body & { place: #Inside & { container: $p } } }
+    }
+    steps: [#Achieve & { subgoal: "beside_into" }, #Achieve & { subgoal: "hand_free" }, #Do & { op: "take", object: "thing" }]
+} @family(methods)
+
+gather_it_up: #Method & {
+    title: "gather it up"
+    goal:  "thing_in_hand"
+    rank:  2
+    pre:   { find: ["thing"], match: #Handling & { thing: #Stack & { place: #Inside | #OnTile } } }
+    steps: [#Achieve & { subgoal: "hand_free" }, #Do & { op: "gather", object: "thing", units: 10000 }]
+} @family(methods)
+
+pick_it_up: #Method & {
+    title: "pick it up"
+    goal:  "thing_in_hand"
+    rank:  3
+    pre:   { find: ["thing"], match: #Handling & { thing: #Body & { place: #Inside | #OnTile } } }
+    steps: [#Achieve & { subgoal: "hand_free" }, #Do & { op: "pick_up", object: "thing" }]
+} @family(methods)
+
 pack_worn: #Goal & {
     title: "take the pack"
     done: {
@@ -157,82 +249,52 @@ take_the_basket: #Method & {
 } @family(methods)
 
 // The day done: the pack emptied, what is in it put where the household
-// keeps it (food and hides in the larder, firewood on the woodpile), and
-// put back by the larder (`home`; both bound).
+// keeps it (firewood on the woodpile, anything else in the larder), and
+// put back by the larder (`home`; both bound). One whole way: emptied,
+// then put back; emptied, each thing in it taken in hand by where it goes
+// and put in.
 pack_returned: #Goal & {
     title: "put the pack back"
     done:  #Did & { did: "put_back" }
 } @family(goals)
 
-let kept_in_the_larder = #Food | #Hide | #Seed
-let in_my_pack         = #Carrying & { me: #Agent & { id: $me, freeHands: >=1 }, pack: #Pack & { id: $p, place: #Held & { by: $me } } }
-
-store_it: #Method & {
-    title: "put it in the larder"
-    goal:  "pack_returned"
-    rank:  1
-    pre:   { find: ["packed"], match: #Carrying & { me: #Agent & { id: $me }, packed: kept_in_the_larder & { place: #Held & { by: $me } } } }
-    steps: [#Do & { op: "put_in", object: "packed", target: "home" }]
-} @family(methods)
-
-stack_it_up: #Method & {
-    title: "stack it on the woodpile"
-    goal:  "pack_returned"
-    rank:  2
-    pre:   { find: ["packed"], match: #Carrying & { me: #Agent & { id: $me }, packed: #Stack & { unit: "firewood", place: #Held & { by: $me } } } }
-    steps: [#Do & { op: "put_in", object: "packed", target: "woodpile" }]
-} @family(methods)
-
-unpack_by_the_larder: #Method & {
-    title: "unpack it"
-    goal:  "pack_returned"
-    rank:  3
-    pre:   #Reached & {
-        reached: "home"
-        find:    ["pack", "packed"]
-        match:   in_my_pack & { packed: kept_in_the_larder & { place: #Inside & { container: $p } } }
-    }
-    steps: [#Do & { op: "take", object: "packed" }]
-} @family(methods)
-
-unpack_by_the_woodpile: #Method & {
-    title: "unpack it"
-    goal:  "pack_returned"
-    rank:  4
-    pre:   #Reached & {
-        reached: "woodpile"
-        find:    ["pack", "packed"]
-        match:   in_my_pack & { packed: #Stack & { unit: "firewood", place: #Inside & { container: $p } } }
-    }
-    steps: [#Do & { op: "take", object: "packed" }]
-} @family(methods)
-
-to_the_larder: #Method & {
-    title: "carry it to the larder"
-    goal:  "pack_returned"
-    rank:  5
-    pre: {
-        find:  ["home", "pack", "packed"]
-        match: in_my_pack & { home: #Container, packed: kept_in_the_larder & { place: #Inside & { container: $p } } }
-    }
-    steps: [#Do & { op: "look_in", object: "home" }]
-} @family(methods)
-
-to_the_woodpile: #Method & {
-    title: "carry it to the woodpile"
-    goal:  "pack_returned"
-    rank:  6
-    pre: {
-        find:  ["woodpile", "pack", "packed"]
-        match: in_my_pack & { woodpile: #Container, packed: #Stack & { unit: "firewood", place: #Inside & { container: $p } } }
-    }
-    steps: [#Do & { op: "look_in", object: "woodpile" }]
-} @family(methods)
-
-put_it_back: #Method & {
+return_it: #Method & {
     title: "put it back"
     goal:  "pack_returned"
-    rank:  7
+    rank:  1
     pre:   { find: ["pack"], match: #Carrying & { me: #Agent & { id: $me }, pack: #Pack & { place: #Held & { by: $me } } } }
-    steps: [#Do & { op: "put_back", object: "pack", target: "home" }]
+    steps: [#Achieve & { subgoal: "pack_emptied" }, #Do & { op: "put_back", object: "pack", target: "home" }]
+} @family(methods)
+
+// Emptied: nothing it believes is in the pack (bound), nor anything kept
+// at home in its hands (what it took out of the pack, and goods carried):
+// firewood onto the woodpile; food, seed and hides, and anything else out
+// of the pack, into the larder. Food kept is raw, a stack or a portion
+// bought on its own; a meal carried to eat isn't.
+let kept   = #Food & { raw: true } | #Food & #Stack | #Seed & #Stack | #Hide
+let wood   = #Stack & { unit: "firewood" }
+let packed = #Carrying & { pack: #Pack & { id: $p }, thing: #Body & { place: #Inside & { container: $p } } }
+let held   = #Carrying & { me: #Agent & { id: $me }, thing: (kept | wood) & { place: #Held & { by: $me, hand: <8 } } }
+
+pack_emptied: #Goal & {
+    title: "empty the pack"
+    done:  #None & { find: ["pack", "thing"], match: packed | held }
+} @family(goals)
+
+onto_the_woodpile: #Method & {
+    title: "stack it on the woodpile"
+    goal:  "pack_emptied"
+    rank:  1
+    pre:   { find: ["pack", "thing"], match: packed & { thing: wood } | held & { thing: wood } }
+    steps: [#Achieve & { subgoal: "thing_in_hand", with: [{ binds: "into", to: "woodpile" }] },
+            #Do & { op: "put_in", object: "thing", target: "woodpile" }]
+} @family(methods)
+
+into_the_larder: #Method & {
+    title: "put it in the larder"
+    goal:  "pack_emptied"
+    rank:  2
+    pre:   { find: ["pack", "thing"], match: packed | held }
+    steps: [#Achieve & { subgoal: "thing_in_hand", with: [{ binds: "into", to: "home" }] },
+            #Do & { op: "put_in", object: "thing", target: "home" }]
 } @family(methods)

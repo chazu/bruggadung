@@ -395,10 +395,19 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
 - **Referent**: an agent's own handle for something it thinks exists (R7),
   holding what it last perceived; beliefs are about referents, never
   entities. (KNO d5, §6)
-- **Truth link**: a referent's developer-only link to the entities behind
-  it. *Avoid:* truth projection (for this). (KNO §6)
+- **Truth link**: a referent's link to the entities behind it:
+  developer-only, but for what acting reaches through it, so a thing it
+  moved itself stays the referent it acted on. *Avoid:* truth projection
+  (for this). (KNO §6, d28)
 - **Recognition**: matching a percept to the agent's referents by
   unification, weighing conflicts by persistence. (KNO §6, CL §11)
+- **Common knowledge** (`#Common`): what everyone who has a thing of a
+  kind knows from the start: whose each other of that kind within a
+  distance is, and where it stands (whose each bed is: where everyone
+  lives). Said once by kind in content, never belief by belief. (KNO d27)
+- **Known by sight**: of someone, recognized wherever seen, nobody else
+  taken for them, as their face would tell; common knowledge's owners
+  are. (KNO d27)
 - **Seen kind**: a kind that shows at a glance (a bed, a stove), listed so
   (`#Seen`); an inner state's (hunger) doesn't. A thing is seen as the most
   specific seen kinds it is; a kind not listed shows as the listed kinds
@@ -508,7 +517,18 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
   and METHODS.md replace with subgoals. *Avoid* writing new ones.
   (MET)
 - **Subgoal**: a goal a method step raises; a **residual subgoal** is one
-  raised from an unknown precondition's residual paths. (AGE §5)
+  raised from an unknown precondition's residual paths. Its slots are the
+  method's of the same name; **with** binds one of them to another of the
+  method's slots (`#Achieve`'s `with`: the goods as the **thing**), so a
+  goal written once serves every topic. (AGE §5; MET)
+- **Handling**: carrying/'s goals for moving a thing to where it goes,
+  written once for every topic: the **thing** (a slot) taken **in hand**
+  (`thing_in_hand`: unpacked beside where it goes, `into`, or gathered
+  or picked up, a hand freed first). A topic's way passes its own slots
+  as `thing` and `into`. (MET)
+- **None condition** (`#None`): a condition that holds when nothing the
+  agent believes in fits it: the pack emptied, no armful too heavy to
+  harvest. What it hasn't seen it doesn't believe in. (MET)
 - **Motivation store**: an agent's private goals, intentions,
   commitments, habit strengths. (AGE §2)
 - **Decide**: agency's function at a decision point: start, suspend or

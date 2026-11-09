@@ -210,6 +210,7 @@ Referent :: struct {
 	ended:        bool,                      /* it perceived the thing end (KNOWLEDGE.md decision 19): gone for good */
 	sightings:    i32,                       /* how often it was sighted (not seen for a minute before) */
 	salience:     i32,                       /* the most salient thing it was kept in an observation for */
+	known:        Entity_ID,                 /* whom it knows by sight (KNOWLEDGE.md decision 27): seen, recognized as them; 0 if none */
 	truth:        Entity_ID,                 /* developer-only */
 }
 

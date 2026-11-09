@@ -46,9 +46,16 @@ goal's methods. They stay as they are; what this document adds is general.
    goods asked its neighbours for some to sell, and a buyer for coins
    (open question 8).
 3. **It asks those it knows, kin first.** Whom it asks: agents it believes
-   present, by loyalty to them (AGENCY.md decision 12), then by nearness;
-   no more than three for each time the goal is adopted, and none it has
-   asked since. It walks to each, within reach to talk.
+   present or knows where to find, by loyalty to them (AGENCY.md decision
+   12), then those it believes have something like it (in hand, or at
+   their house), then by nearness; no more than three for each time the
+   goal is adopted, and none it has asked since. Not those it believes
+   live where it does (seen keeping things in what is its own, or whose
+   bed is by its own: its household): they have what it has. Seen just
+   now, it walks to them, wherever it meets them; else to their house
+   (where it has seen them keep things, or their bed: in the village,
+   common knowledge, KNOWLEDGE.md decision 27), and waits there for them
+   to come home.
 4. **Every asking is a negotiation over a deal.** The ask (`#Ask`) says
    what is wanted, how many, the deal the asker proposes, and the need it
    is for. A deal is one of:
@@ -107,7 +114,9 @@ goal's methods. They stay as they are; what this document adds is general.
 7. **Agreed, the one asked hands it over.** From its hands if it holds
    something like it (`give_some`: so many of a stack split off into the
    other's free hand, two seconds); otherwise it fetches it from its own
-   containers (its larder) and brings it. Either is a commitment with a
+   containers (its larder) and brings it. Asked, it gives from its own
+   containers only at home, eight tiles from them at most: help comes
+   when it is home. Either is a commitment with a
    window of an hour (AGENCY.md §7). The asker waits, an hour at most; once
    it holds something like it, it goes on.
 8. **What a deal leaves.**
@@ -148,10 +157,19 @@ goal's methods. They stay as they are; what this document adds is general.
     quantity: repaying gives any thing like it, as many.
 11. **A need's goal dropped as impossible is weighed again when what the
     agent holds changes**, not only two hours on (AGENCY.md decision 27):
-    a portion handed to a starving agent is eaten at once.
+    a portion handed to a starving agent is eaten at once. Likewise when
+    someone it could ask comes by, seen just now and not asked lately:
+    wherever it meets them. (Whoever it had seen in the last minute, as a
+    reason, changed as it walked, and a hunter weighed eating, found it
+    impossible and set off home, again and again, in one minute.)
 12. **Eating from a stack held eats one of it.** An agent handed a sack of
     grain ate all sixty portions in a minute; `eat` now takes one, and the
     rest stays in hand.
+13. **What is put into what is its own, it notices** (KNOWLEDGE.md §10's
+    salience): who keeps things in its larder, so who eats from it with it.
+    Another's comings and goings it didn't keep at all, so it never knew
+    its household from its neighbours, and asked its kin, as hungry as
+    itself.
 
 ## The negotiation, step by step
 
@@ -231,6 +249,9 @@ agreed and paid.
    household).
 9. **Valuing coins.** A coin's worth is one constant; it should follow
    the agent's own prices and how many it has.
+10. **Where neighbours live.** Settled (2026-11-09): common knowledge,
+    said by kind (KNOWLEDGE.md decision 27). In the village everyone knows
+    whose each bed is, and everyone by sight.
 
 ## Terms
 

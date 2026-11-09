@@ -36,6 +36,10 @@
 //             market days, who keeps the stall and who buys what, are the
 //             scenario's.
 // - terrain:  the map's kinds are terrain/terrain.tri's.
+// - knowledge: everyone knows where everyone lives, and each other by
+//             sight: common knowledge of whose each bed is
+//             (knowledge.tri's #Common), so a hungry villager knows whose
+//             door to ask at (deals/).
 // - code:     src/scenario_village.odin: where everyone and everything
 //             stands, the households' bonds and claims, the commitments,
 //             and the checks.
@@ -70,6 +74,11 @@ hunter:     #Agent & person & { mass: 70kg, coat: "grey", trade: "hunter", stalk
 farmer_look:     #Look & { kindOf: "farmer", look: "agent.farmer" } @family(looks)
 woodcutter_look: #Look & { kindOf: "woodcutter", look: "agent.woodcutter" } @family(looks)
 hunter_look:     #Look & { kindOf: "hunter", look: "agent.hunter" } @family(looks)
+
+// Everyone in the village knows where everyone lives: whose each bed is,
+// in the four houses, all within forty tiles of each other, and so each
+// villager by sight (knowledge.tri's #Common).
+where_villagers_live: #Common & { whose: "#Bed", around: 40 } @family(common)
 
 // In each house: a bed for each of its people, a larder (stocked with a
 // sack of grain, cooking/'s, or a farmer's harvest); by its door, a

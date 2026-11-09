@@ -263,7 +263,19 @@ list, 2026-11-06):
   home (on the way, wherever it meets them); the one asked weighs giving
   from what it believes is in its own larder, there in reach, as it
   values what it has at home already. Help comes in the evening; by day
-  the short forage. To implement.
+  the short forage. Built (NEGOTIATION.md decisions 3, 7, 11, 13). Where
+  neighbours live is common knowledge (KNOWLEDGE.md decision 27,
+  2026-11-09): a scenario says what everyone knows by kind (`#Common`),
+  and the village says whose each bed is, so everyone knows where
+  everyone lives, and everyone by sight. Without it, three weeks brought
+  nothing: 295 asks, none handed over, as those met were at work, away
+  from their larders. With it: 161 asks, 109 walks to a neighbour's
+  house, 12 handed over (to the woodcutters, from day 15), 64 "none" and
+  55 refusals, as the village runs short of food from day 11 (7 FAILs,
+  all meals). Asking found two more faults, fixed generally: a thing
+  taken from among others like it stayed the one taken (KNOWLEDGE.md
+  decision 28), and a portion of raw food in hand is kept food, as a
+  stack is (carrying/).
 - **Coins fetched with coins in hand**: folded into **Methods as whole
   ways** ([METHODS.md](../METHODS.md), proposed): the market's ways, like
   most goals' with several, are a ladder, and a failed buy falls to a

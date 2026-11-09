@@ -16,7 +16,9 @@
 // - code:     src/agency_agency.odin: considerations by their kind (#Flat,
 //             #Scaled, #Need, #Trait, #AtHome, #ByLight, ...), conditions,
 //             `order`, commitments, goals arising from findings or from
-//             what is held; a method step's act done again to no end fails it
+//             what is held; #Did of an instant operation, from the mind's
+//             memory of its own acts; #None, a condition negated; a method
+//             step's act done again to no end fails it
 //             (AGENCY.md decision 24); a need's goal settled is weighed
 //             again once it is felt more, or eased; with no method of a
 //             need's goal holding, asking someone (deals/).
@@ -108,6 +110,12 @@
 // longer ago than that, too: a kept goal done again and again).
 #Looked:  #Condition & { looked: text }
 #Did:     #Condition & { did: text, lately: time }
+// A condition that holds when nothing the agent believes in fits it: no
+// referents for its `find` slots (those bound already keep theirs) for
+// which `match` holds. What it hasn't seen it doesn't believe in, so an
+// unknown doesn't stop it holding. The pack emptied: nothing it believes is
+// inside the pack.
+#None:    #Condition & { none: true }
 // ... it is within reach of the slot's referent. As a method's
 // precondition, its `find` and `match` must hold too: within reach of the
 // larder, with meat in the pack.
@@ -133,7 +141,14 @@
 // what it names. Slots name the step's roles. An operation can say something
 // (talk/talk.tri): after a question, the agent waits a while for the answer.
 #MethodStep: {}
-#Achieve:    #MethodStep & { subgoal: text }
+// A subgoal's slots are the method's of the same name; `with` binds one of
+// them (`binds`) to the referent of another of the method's (`to`): the
+// goods as the thing to take in hand, the supply as where it goes. So a
+// goal can be written once (carrying/'s ways to take a thing in hand) and
+// serve every topic, whatever its slots are called. What the subgoal's
+// done binds joins the method's under the method's names.
+#With:       { binds: text, to: text }
+#Achieve:    #MethodStep & { subgoal: text, with: [...#With] }
 // Going where it hasn't been: a step toward the nearest tile it has never
 // seen, beside ground of the terrain kind `beside` that it has (the woods.
 // edge, to find trees).

@@ -6,13 +6,21 @@
 // - full:     an agent whose need's goal no method serves, and that wants
 //             in hand what a method needs, asks someone it knows for a
 //             thing like it, if the goal is worth more than asking costs
-//             it (its pride); a duty asks nothing yet. The one asked, if it answers at all (agency's social
-//             generator: trust, `helpful`), and has something like it,
-//             haggles: each agrees to what meets its target, or offers the
-//             deal worth least to itself that does, or walks away with its
-//             patience spent. Agreed, it hands the thing over, from its
-//             hands or fetched from its own containers; a debt in kind or a
-//             loan is a commitment of the asker's to give as much again.
+//             it (its pride); a duty asks nothing yet. Whom: kin first,
+//             then those it believes have it, then the nearest; not those
+//             it believes live where it does (keep things in its own
+//             larder, or whose bed is by its own: its household). Seen
+//             just now, it goes to them; else to their house (where it
+//             has seen them keep things, or their bed: common knowledge,
+//             knowledge.tri's #Common), to wait for them. The one
+//             asked, if it answers at all (agency's social generator:
+//             trust, `helpful`), and has something like it in hand, or in
+//             its own containers near it (at home), haggles: each agrees
+//             to what meets its target, or offers the deal worth least to
+//             itself that does, or walks away with its patience spent.
+//             Agreed, it hands the thing over, from its hands or fetched
+//             from its own containers; a debt in kind or a loan is a
+//             commitment of the asker's to give as much again.
 // - reduced:  the same, decided on the cadence's beat.
 // - abstract: as reduced. A household provided for by its neighbours,
 //             below reduced, is open (DETAIL_REGIMES.md).
