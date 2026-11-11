@@ -625,6 +625,8 @@ test_menu :: proc() {
 	bg_check(proposal_group_applied(g) && proposal_group_id_for(g, proposal_group_proposals(g)[0].handle) == 7)      /* the claim is 6 */
 	text = test_menu_text(w, 4)
 	bg_check(ns_contains(text, "put_in item 7 destination 1: entailed"))
+	/* what it does is no requirement: putting down, declared, is as sure */
+	bg_check(ns_contains(text, "put_down item 7: entailed"))
 	bg_check(ns_contains(text, "drive item 7 destination 3: entailed"))
 	bg_check(ns_contains(text, "take_some item 7: entailed"))
 	/* the bin is no assembly, and the lock no container */

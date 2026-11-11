@@ -158,7 +158,7 @@ match_described :: proc(world: ^World, pattern: ^tri.Node, action: Action, descr
 	match: tri.Match
 	copied := [?]cstring{"duration", "stages", "uses", "attention", "leaves", "removes", "partial",
 	                     "checkpoints", "hard", "exertion", "floodWatch", "contest"}
-	value: [1024]u8
+	value: [4096]u8
 	effect: [64]u8
 	err: [256]u8
 
@@ -171,7 +171,11 @@ match_described :: proc(world: ^World, pattern: ^tri.Node, action: Action, descr
 	fmt.sbprintf(&expr, "%s & {{ effect: %s, ", tri.type_name(content, tri.node_type(pattern)), buf_c(effect[:]))
 	for k := 0; k < len(copied); k += 1 {
 		if tri.at(content, pattern, copied[k]) != nil {
-			tri.print(content, tri.at(content, pattern, copied[k]), &value[0], size_of(value))
+			/* cut short, it would not build, or build as something else */
+			if tri.print(content, tri.at(content, pattern, copied[k]), &value[0], size_of(value)) >= size_of(value) {
+				if reason != nil do reason^ = fmt.tprintf("%s's %s is too long to describe", action.operation, copied[k])
+				return .Incompatible
+			}
 			fmt.sbprintf(&expr, "%s: %s, ", copied[k], buf_c(value[:]))
 		}
 	}
@@ -203,6 +207,32 @@ match_described :: proc(world: ^World, pattern: ^tri.Node, action: Action, descr
 	}
 	worked: tri.Match_Result
 	match = tri.match_instance(content, action.operation, description, &worked)
+	/* what it does is no requirement: a declared effect (`after`, `moves`,
+	 * `emits`; a stage's too) is nothing for the actor to find out, and an
+	 * operation unknown only in that is entailed. A full list of residuals
+	 * may have dropped some (REVIEW.md §4.2 (8)): then it stays unknown. */
+	if match == .Unknown && worked.nresidual < tri.MAX_RESIDUAL {
+		kept: uint = 0
+		for i: uint = 0; i < worked.nresidual; i += 1 {
+			path := string(cstring(&worked.residual[i][0]))
+			done := false
+			for field in ([?]string{"after", "moves", "emits"}) {
+				if path == field || strings.has_prefix(path, strings.concatenate({field, "."}, context.temp_allocator)) ||
+				   (strings.has_prefix(path, "stages.") &&
+				    strings.contains(path, strings.concatenate({".", field}, context.temp_allocator))) {
+					done = true
+				}
+			}
+			if done do continue
+			worked.residual[kept] = worked.residual[i]
+			kept += 1
+		}
+		worked.nresidual = kept
+		if kept == 0 {
+			match         = .Entailed
+			worked.result = .Entailed
+		}
+	}
 	if result != nil do result^ = worked
 	if match == .Incompatible && reason != nil {
 		reason^ = fmt.tprintf("%s is ruled out at %s", action.operation, cstring(&worked.failure.path[0]))
@@ -689,13 +719,6 @@ effect_take_some :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Gro
 }
 
 
-@(private = "file")
-effect_put_in :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
-	proposal_group_move_to(g, whole(a.roles[.Item]), in_(a.roles[.Destination]))
-	return ""
-}
-
-
 /* One nail is driven, even from a stack: the proposal names one unit, and
  * commitment splits it off. */
 @(private = "file")
@@ -937,20 +960,6 @@ effect_cook :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -
 	if keeps: i64; world_get_field(world, "Food.mealKeepsFor", a.roles[.Item], &keeps) && keeps > 0 {
 		proposal_group_set_of_to(g, "Perishable.spoilsAt", whole(meal), world_time(world).ms + keeps)
 	}
-	return ""
-}
-
-
-/* Giving: into the receiver's free hand. */
-@(private = "file")
-effect_give :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
-	hand: i32
-
-	hand = free_hand(world, a.roles[.Destination])
-	if hand < 0 {
-		return "no hand of theirs is free"
-	}
-	proposal_group_move_to(g, whole(a.roles[.Item]), held_by(a.roles[.Destination], hand))
 	return ""
 }
 
@@ -3085,31 +3094,6 @@ effect_harvest :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group
 }
 
 
-/* Putting down: what the actor holds, on the ground at its feet. */
-@(private = "file")
-effect_put_down :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
-	at := world_location_of(world, a.roles[.Actor])
-	if at.form != .On_Tile do return "there is no ground to put it on"
-	proposal_group_move_to(g, whole(a.roles[.Item]), at)
-	return ""
-}
-
-
-@(private = "file")
-effect_open_door :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
-	proposal_group_set_of_to(g, "Door.ajar", whole(a.roles[.Item]), 1)
-	return ""
-}
-
-
-/* Dismantling's last stage: the pump is open. */
-@(private = "file")
-effect_dismantle :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
-	proposal_group_set_of_to(g, "Pump.opened", whole(a.roles[.Destination]), 1)
-	return ""
-}
-
-
 /* Lighting a stove: it burns, while it has fuel. */
 @(private = "file")
 effect_light :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
@@ -3160,14 +3144,6 @@ effect_rest :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -
 }
 
 
-/* Looking changes nothing in the world; it is an event the looker perceives. */
-@(private = "file")
-effect_look :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
-	proposal_group_emit_subject_other(g, "looked", whole(a.roles[.Actor]), whole(a.roles[.Item]))
-	return ""
-}
-
-
 @(private = "file")
 Named_Effect :: struct {
 	name:     string,
@@ -3178,12 +3154,10 @@ Named_Effect :: struct {
 effects := [?]Named_Effect{
 	{"take",      effect_take},
 	{"take_some", effect_take_some},
-	{"put_in",    effect_put_in},
 	{"drive",     effect_drive},
 	{"open_tap",  effect_open_tap},
 	{"walk",      effect_walk},
 	{"loosen",    effect_loosen},
-	{"look",      effect_look},
 	{"say",       effect_say},
 	{"tend",      effect_tend},
 	{"analyse",   effect_analyse},
@@ -3194,11 +3168,9 @@ effects := [?]Named_Effect{
 	{"fell",      effect_fell},
 	{"split",     effect_split},
 	{"stoke",     effect_stoke},
-	{"put_down",  effect_put_down},
 	{"sow",       effect_sow},
 	{"keep_seed", effect_keep_seed},
 	{"harvest",   effect_harvest},
-	{"give",      effect_give},
 	{"investigate", effect_investigate},
 	{"tighten",   effect_tighten},
 	{"rotate",    effect_rotate},
@@ -3209,9 +3181,7 @@ effects := [?]Named_Effect{
 	{"hire",      effect_hire},
 	{"work",      effect_work},
 	{"shut",      effect_shut},
-	{"dismantle", effect_dismantle},
 	{"light",     effect_light},
-	{"open_door", effect_open_door},
 	{"saw",       effect_saw},
 	{"pass",      effect_pass},
 	{"copy",      effect_copy},
@@ -3268,7 +3238,8 @@ operation_effect :: proc(world: ^World, operation: cstring) -> (string, bool) #o
 		return "", false
 	}
 	n = tri.print(world_tri(world), tri.at(world_tri(world), pattern, "effect"), &effect[0], size_of(effect))
-	if n < 2 || n >= size_of(effect) {
+	/* unnamed, it prints as its type: the operation's effect is declared */
+	if n < 2 || n >= size_of(effect) || effect[0] != '"' {
 		return "", false
 	}
 	effect[n - 1] = 0          /* without its quotes */
@@ -3327,6 +3298,11 @@ operation_stage :: proc(world: ^World, operation: cstring, index: i64, duration:
 	n = tri.print(content, tri.at(content, stage, "effect"), &text[0], size_of(text))
 	if n < 2 || n >= size_of(text) {
 		return false
+	}
+	/* unnamed, it prints as its type: "" */
+	if text[0] != '"' {
+		effect^ = ""
+		return true
 	}
 	text[n - 1] = 0
 	effect^ = strings.clone(string(cstring(&text[1])), context.temp_allocator)
@@ -3673,16 +3649,19 @@ make_trace :: proc(world: ^World, group: ^Proposal_Group, kind: cstring, bearer:
 }
 
 
-/* A named effect, as proposals added to `group`. The reason if it can't be
- * built, "" for none. An effect of "" is the Objective-C's nil. */
-apply_named_effect :: proc(world: ^World, effect: string, action: Action, amount: i64,
+/* An effect, as proposals added to `group`: a named one by its code; with
+ * no name (""), the declared effect of the operation, or of its stage
+ * `stage` if it has stages (act_declared.odin). The
+ * reason if it can't be built, "" for none. */
+apply_named_effect :: proc(world: ^World, effect: string, action: Action, stage: i64, amount: i64,
                            group: ^Proposal_Group) -> string {
+	if effect == "" do return apply_declared_effect(world, action, stage, group)
 	for i := 0; i < len(effects); i += 1 {
-		if effect != "" && effects[i].name == effect {
+		if effects[i].name == effect {
 			return effects[i].function(world, action, amount, group)
 		}
 	}
-	return fmt.tprintf("no code for the effect %s", effect if effect != "" else "(null)")
+	return fmt.tprintf("no code for the effect %s", effect)
 }
 
 
@@ -3693,13 +3672,9 @@ apply_effect :: proc(world: ^World, action: Action, amount: i64, group: ^Proposa
 	effect: string
 	has_effect: bool
 
+	/* named, or declared (""); an operation that isn't one has neither */
 	effect, has_effect = operation_effect(world, action.operation)
-	for i := 0; i < len(effects); i += 1 {
-		if has_effect && effects[i].name == effect {
-			return effects[i].function(world, action, amount, group)
-		}
-	}
-	return fmt.tprintf("no code for the effect %s", effect if has_effect else "(null)")
+	return apply_named_effect(world, effect if has_effect else "", action, 0, amount, group)
 }
 
 

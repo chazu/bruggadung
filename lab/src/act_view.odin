@@ -364,6 +364,55 @@ view_features_of_all :: proc(self: ^View, entity: Entity_ID, all: bool) -> strin
 }
 
 
+/* The truth projection of an entity (EFFECTS.md): its description as it
+ * is, every field of every component it has, whether or not anyone could
+ * perceive it, and its material as it is, not as it appears. What a
+ * declared effect is resolved against; never an agent's to reason from.
+ * "" for no such entity. */
+truth_describe_entity :: proc(world: ^World, entity: Entity_ID) -> string {
+	buf: [64]u8
+
+	if world_info(world, entity) == nil do return ""
+	s := strings.builder_make(context.temp_allocator)
+	fmt.sbprintf(&s, "%s & {{ id: ref(%d)", kind_of_entity(world, entity), entity)
+	if world_is_physical(world, entity) {
+		strings.write_string(&s, ", place: ")
+		append_place(&s, world_location_of(world, entity))
+	}
+	if world_record(world, world_kind_named(world, "Agent"), entity) != nil {
+		fmt.sbprintf(&s, ", freeHands: %d", free_hands(world, entity))
+	}
+	for k: uint = 0; k < world_kind_count(world); k += 1 {
+		record := world_record(world, k, entity)
+		if record == nil do continue
+		kind := world_kind_info(world, k)
+		for i: uint = 0; i < kind.nfields; i += 1 {
+			f  := &kind.fields[i]
+			at := rawptr(uintptr(record) + f.offset)
+			switch f.value {
+			case VALUE_QUANTITY:
+				tri.format_quantity(f.kind, (^i64)(at)^, raw_data(buf[:]), len(buf))
+				fmt.sbprintf(&s, ", %s: %s", f.name, cstring(&buf[0]))
+			case VALUE_TYPE:
+				/* an enum not yet set is no value: left open */
+				if name := tri.type_name(world_tri(world), (^u32)(at)^); (^u32)(at)^ != 0 && name != nil {
+					fmt.sbprintf(&s, ", %s: %s", f.name, name)
+				}
+			case VALUE_BOOL:
+				fmt.sbprintf(&s, ", %s: %s", f.name, "true" if (^bool)(at)^ else "false")
+			case VALUE_REF:
+				fmt.sbprintf(&s, ", %s: ref(%d)", f.name, (^u64)(at)^)
+			case VALUE_TEXT:
+				fmt.sbprintf(&s, ", %s: ", f.name)
+				append_text(&s, (^cstring)(at)^)
+			}
+		}
+	}
+	strings.write_string(&s, " }")
+	return strings.to_string(s)
+}
+
+
 /* the entity's description, as a Triangle expression; "" where the
  * Objective-C returned nil (no such entity) */
 view_describe_entity :: proc(self: ^View, entity: Entity_ID) -> string {

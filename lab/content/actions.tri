@@ -5,8 +5,9 @@
 // Operations (ACTIONS.md §1) are patterns over the descriptions of the
 // entities that fill their roles. An actor's menu lists each operation and
 // binding whose match is not incompatible; unknown never excludes. Tags carry
-// bindings between roles. `effect` names the code that builds the proposal
-// group when the action is performed.
+// bindings between roles. What it does is its effect: declared here
+// (`after`, `moves`, `emits`; EFFECTS.md), or named (`effect`), the name of
+// the code that builds the proposal group when the action is performed.
 //
 // Cut points:
 // - full, reduced, abstract: an activity runs at its own pace while its actor
@@ -15,7 +16,14 @@
 //            (REALITY.md step 4; activities.tri).
 // - code:    an `effect` names a function in src/act_actions.odin
 //            (effect_take, effect_eat, ...). #Effect lists them all: a
-//            topic's new effect is added there and in the code together.
+//            topic's new named effect is added there and in the code
+//            together.
+// - code:    a declared effect is applied by one procedure for all
+//            (src/act_declared.odin), which resolves the operation against
+//            the truth; so far `after`, `moves` and `emits`, for an
+//            operation or a stage. Giving, putting down, putting in and
+//            looking are declared. An operation, or a stage, with no
+//            effect named or declared and no trace is refused at load.
 // - code:    a walk's stages come from its activity's way, not from the
 //            operation (src/act_activities.odin); its way is found by the
 //            walker, over the ground as it believes it, when it sets out,
@@ -25,11 +33,14 @@
 //            (src/act_activities.odin); they are compacted into digests
 //            after the world's history window (src/core_world.odin).
 
-#Effect: "take" | "take_some" | "put_in" | "drive" | "open_tap" | "fill" | "walk" | "loosen" | "look" | "say" | "tend" | "analyse" | "write" | "read" | "eat" | "give" | "investigate" | "tighten" | "rotate" | "strike" | "shut" | "dismantle" | "light" | "rest" | "open_door" | "saw" | "pass" | "copy" | "reveal" | "replace" | "cut" | "shape" | "install" | "issue" | "confiscate" | "arrest" | "flee" | "hit" | "hire" | "work" | "service" | "cook" | "fell" | "split" | "stoke" | "put_down" | "sow" | "keep_seed" | "harvest" | "crouch" | "shoot" | "butcher" | "post" | "hand_over" | "put_some" | "shoulder" | "put_back" | "give_some" | "forage"
+#Effect: "take" | "take_some" | "drive" | "open_tap" | "fill" | "walk" | "loosen" | "say" | "tend" | "analyse" | "write" | "read" | "eat" | "investigate" | "tighten" | "rotate" | "strike" | "shut" | "light" | "rest" | "saw" | "pass" | "copy" | "reveal" | "replace" | "cut" | "shape" | "install" | "issue" | "confiscate" | "arrest" | "flee" | "hit" | "hire" | "work" | "service" | "cook" | "fell" | "split" | "stoke" | "sow" | "keep_seed" | "harvest" | "crouch" | "shoot" | "butcher" | "post" | "hand_over" | "put_some" | "shoulder" | "put_back" | "give_some" | "forage"
 
 // Which roles an operation has is its roles' type: a structure's type is the
 // most general one with all its features.
-#Roles:        { actor: #Agent }
+// #Bound is what `after` is before an operation says anything of it: roles,
+// none of them named yet.
+#Bound:        {}
+#Roles:        #Bound & { actor: #Agent }
 #ItemRoles:    #Roles & { item: #Body }
 #PlacingRoles: #ItemRoles & { destination: #Body }
 
@@ -45,6 +56,28 @@
 // (what it binds gone or out of reach, or what it needs no longer holding)
 // suspends it, or fails it, as it declares (`hard`).
 #Partial: { field: text, showsOn: *"destination" | "item", whole: int }
+
+// A declared effect (EFFECTS.md): what a step does, said here and not in
+// code. `after` is the roles as the effect leaves them: each field it
+// states is set, if the truth isn't that already. `moves` puts a thing
+// (`moved`, by a tag on its role's id) `into` a place: a tile, a container,
+// or a hand (#Held, `by` whom), which is a free one of theirs. `emits` is events, by `event` (its kind), subject
+// and other. A step has a declared effect or names one (`effect`), not
+// both. The requirements stay in `roles`: they are matched once from what
+// the actor perceives, for the menu, and again against the truth when the
+// effect commits, where what doesn't hold fails the action.
+#Moves: { moved: ref, into: #Place }
+#Emits: { event: text, subject: ref, other: ref }
+
+// Looking at something within reach changes nothing in the world: it is
+// an event the looker perceives. Its operations say what is looked at.
+#Looking: #Operation & {
+    roles: {
+        actor: #Agent & { id: $a }
+        item:  #Body & { id: $i }
+    }
+    emits: [{ event: "looked", subject: $a, other: $i }]
+}
 #Step: {
     duration:    time & >=0ms & <=1d
     effect:      #Effect
@@ -55,6 +88,9 @@
     floodWatch:  *0 | int & >=0 & <=1000000
     leaves:      [...#Leaves]
     removes:     [...#Removes]
+    after:       #Bound
+    moves:       [...#Moves]
+    emits:       [...#Emits]
 }
 
 // A stage of an activity: it takes `duration`, and its effect commits when
@@ -155,12 +191,12 @@ take_some: #Operation & {
 
 // Put something the actor holds into a container.
 put_in: #Operation & {
-    effect: "put_in"
     roles: {
         actor:       #Agent & { id: $a }
-        item:        #Body & { place: #Held & { by: $a } }
-        destination: #Container
+        item:        #Body & { id: $i, place: #Held & { by: $a } }
+        destination: #Container & { id: $c }
     }
+    moves: [{ moved: $i, into: #Inside & { container: $c } }]
 } @family(operations)
 
 // Take something up, carefully: a second, then into a free hand. Two who
@@ -180,31 +216,25 @@ take_up: #Operation & {
 
 // Put something the actor holds down on the ground at its feet.
 put_down: #Operation & {
-    effect: "put_down"
     roles: {
-        actor: #Agent & { id: $a }
-        item:  #Body & { place: #Held & { by: $a } }
+        actor: #Agent & { id: $a, place: $p & #OnTile }
+        item:  #Body & { id: $i, place: #Held & { by: $a } }
     }
+    moves: [{ moved: $i, into: $p }]
 } @family(operations)
 
 // Give something the actor holds to someone in reach, into a free hand.
 give: #Operation & {
-    effect: "give"
     roles: {
         actor:       #Agent & { id: $a }
-        item:        #Body & { place: #Held & { by: $a } }
-        destination: #Agent & { freeHands: >=1 }
+        item:        #Body & { id: $i, place: #Held & { by: $a } }
+        destination: #Agent & { id: $d, freeHands: >=1 }
     }
+    moves: [{ moved: $i, into: #Held & { by: $d } }]
 } @family(operations)
 
 // Look into a container: what is inside is perceived only by looking.
-look_in: #Operation & {
-    effect: "look"
-    roles: {
-        actor: #Agent
-        item:  #Container
-    }
-} @family(operations)
+look_in: #Looking & { roles: { item: #Container } } @family(operations)
 
 // Walking, a second a tile. A walk of one tile names its direction in the
 // operation's name; the walker arrives when it is done. What the actor

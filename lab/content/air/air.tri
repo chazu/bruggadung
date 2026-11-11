@@ -12,7 +12,7 @@
 // - terrain:  a region's tiles are found from the terrain, bounded by what is
 //             solid and by doorways (terrain/terrain.tri).
 // - heat:     fire, and the heat of solids, are heat/heat.tri's.
-// - code:     src/domains_atmosphere.odin; effect_open_door, effect_pass.
+// - code:     src/domains_atmosphere.odin; effect_pass. Opening a door is declared.
 
 package air
 
@@ -112,11 +112,11 @@ open_a_door: #Method & {
 
 // Open a door in reach: the air on its two sides mixes faster.
 open_door: #Operation & {
-    effect: "open_door"
     roles: {
         actor: #Agent
         item:  #Door & { ajar: false }
     }
+    after: { item: #Door & { ajar: true } }
 } @family(operations)
 
 // Go through an open door in reach (KNOWLEDGE.md Scenario 3): onto its

@@ -11,7 +11,7 @@
 // - frozen:    it doesn't decide.
 // - knowledge: a size seen from afar is known only roughly (#Sized's
 //              @widen, knowledge.tri's `size_blurs`).
-// - code:      effect_tighten, effect_look.
+// - code:      effect_tighten. Peering is declared (actions.tri's #Looking).
 
 package fastening
 
@@ -134,13 +134,7 @@ tighten: #Operation & {
 } @family(operations)
 
 // Peer at a nut in reach: up close, its size is plain.
-peer_at: #Operation & {
-    effect: "look"
-    roles: {
-        actor: #Agent
-        item:  #Fastener
-    }
-} @family(operations)
+peer_at: #Looking & { roles: { item: #Fastener } } @family(operations)
 
 // For CONTENT_LANGUAGE.md's nut of unknown size: the pump's gland nut, and
 // spanners.

@@ -158,13 +158,7 @@ go_there: #Method & {
 
 // Go beside something: what walking there does when it gets there. A way
 // agency takes, not a menu's (as `gather` is).
-go_beside: #Operation & {
-    effect: "look"
-    roles: {
-        actor: #Agent
-        item:  #Body
-    }
-} @family(going)
+go_beside: #Looking @family(going)
 
 // The thing (`thing`, bound) in a hand, to put where it goes (`into`,
 // bound): out of the pack, beside where it goes, so it is carried there

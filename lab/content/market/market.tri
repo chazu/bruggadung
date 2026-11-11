@@ -248,13 +248,7 @@ write_the_price: #Method & {
 
 // Stand by a stall, within reach of it: what walking there does when it
 // gets there.
-stand_by: #Operation & {
-    effect: "look"
-    roles: {
-        actor: #Agent
-        item:  #Stall
-    }
-} @family(operations)
+stand_by: #Looking & { roles: { item: #Stall } } @family(operations)
 
 // Post the price of what is on the stall on its board, within reach: what
 // the seller holds a unit of it worth (src/agency_agency.odin writes it).
@@ -585,11 +579,11 @@ unsold_on_the_stall: #Method & bring_home & {
 } @family(methods)
 
 put_away_coins: #Operation & {
-    effect: "put_in"
-    uses:   ["hands"]
+    uses: ["hands"]
     roles: {
         actor:       #Agent & { id: $a }
-        item:        #Stack & { unit: "coin", place: #Held & { by: $a } }
-        destination: #Container
+        item:        #Stack & { id: $i, unit: "coin", place: #Held & { by: $a } }
+        destination: #Container & { id: $c }
     }
+    moves: [{ moved: $i, into: #Inside & { container: $c } }]
 } @family(operations)

@@ -290,6 +290,13 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
   outcome by perception. (ACT d3, §4)
 - **Expectation**: the actor's predicted outcome, kept on the activity.
   (ACT §3)
+- **Named effect** (proposed): an effect given as the name of the code
+  that builds it (`effect: "forage"`); all effects today. (EFFECTS.md)
+- **Declared effect** (proposed, not built): an effect stated in content:
+  the roles as it leaves them (`after`), and what it makes, moves,
+  consumes, emits and changes; applied by one generic procedure. Its
+  `changes` are coarse effects. *Avoid:* data effect, effect as data (for
+  the thing; "effects as data" names the idea). (EFFECTS.md)
 - **The five questions**: `formulate` (does it know the operation and
   have referents for the roles), `appearsBeginnable`, `expect`, `resolve`
   (what actually happens), `authorize` (which rules it breaks). (ACT d1)
@@ -775,7 +782,8 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
   coarse effects); a **change of grain**. (REA d4, d13, DR)
 - **Coarse effect**: a declarative change to fields and stocks
   (`{ role, field, by }`), as against an `#Effect`, which names code that
-  moves objects. (DR form 3)
+  moves objects. Also a declared effect's `changes`. (DR form 3,
+  EFFECTS.md)
 - **Closed form**: a formula for the state after any elapsed time, so
   catching up is one computation. (REA d13)
 - **Read lazily**: of a continuous field: kept as a value, when it was so,

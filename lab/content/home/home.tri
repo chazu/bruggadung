@@ -105,10 +105,4 @@ sleep: #Operation & {
 
 // Look over one's bed or one's worksite, within reach: what walking
 // there to be by it does when it gets there.
-look_over: #Operation & {
-    effect: "look"
-    roles: {
-        actor: #Agent
-        item:  #Bed | #Worksite
-    }
-} @family(operations)
+look_over: #Looking & { roles: { item: #Bed | #Worksite } } @family(operations)

@@ -3763,6 +3763,7 @@ ALL_TESTS := [?]Test_Case{
 	{"watcher",                       test_watcher},
 	{"village",                       test_village},
 	{"looks",                         test_looks},
+	{"declared",                      test_declared},
 	{"cooking",                       test_cooking},
 	{"rationing",                     test_rationing},
 	{"deals",                         test_deals},

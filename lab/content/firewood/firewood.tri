@@ -38,8 +38,9 @@
 // - village:  the trees, the tools at the chopping block, the woodpiles
 //             and who stocks which, with its coffer, are the scenario's
 //             (src/scenario_village.odin).
-// - code:     effect_fell, effect_split, effect_stoke, effect_put_down, and
-//             effect_saw's trunks (src/act_actions.odin).
+// - code:     effect_fell, effect_split, effect_stoke, and effect_saw's
+//             trunks (src/act_actions.odin). Putting down is declared
+//             (actions.tri).
 
 package firewood
 

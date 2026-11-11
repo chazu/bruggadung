@@ -18,8 +18,8 @@
 //             (water/water.tri).
 // - talk:     a recipe or a diagram's claim is learned by reading or being
 //             told (#RecipeSays, #Serves).
-// - code:     effect_dismantle, effect_shut, effect_work;
-//             src/kinds_latent_kind.odin.
+// - code:     effect_shut, effect_work; src/kinds_latent_kind.odin.
+//             Dismantling's last stage, the pump open, is declared.
 
 package machines
 
@@ -249,8 +249,8 @@ shut_off: #Operation & {
 // Dismantle a pump with a wrench in hand: the gland nut, the cover, then the
 // piston out; open at the end.
 dismantle: #Operation & {
-    effect: "dismantle"
-    stages: [{ duration: 3s, effect: "tend" }, { duration: 3s, effect: "tend" }, { duration: 5s, effect: "dismantle" }]
+    stages: [{ duration: 3s, effect: "tend" }, { duration: 3s, effect: "tend" },
+             { duration: 5s, after: { destination: #Pump & { opened: true } } }]
     uses:   ["hands"]
     roles: {
         actor:       #Agent & { id: $a }

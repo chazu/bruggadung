@@ -506,7 +506,7 @@ activities_complete_due_at :: proc(self: ^Activities, t: Time) {
 		 * from their hand */
 		reason = activities_requirements_of(self, a, record)
 		if reason == "" {
-			reason = apply_named_effect(self.world, effect, stage_action_of(self.world, a, record), record.amount, group)
+			reason = apply_named_effect(self.world, effect, stage_action_of(self.world, a, record), record.stage, record.amount, group)
 		}
 		/* the effort tells on the actor */
 		if reason == "" && operation_exertion(self.world, operation, record.stage) != 0 {

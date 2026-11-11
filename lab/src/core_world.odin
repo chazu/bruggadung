@@ -383,7 +383,8 @@ stocks_wet :: proc(s: ^Tile_Stocks, out: [^][3]i32, max_: uint) -> uint {
 
 /* --- the world ------------------------------------------------------------ */
 
-/* nil, with the reason, if the content's hash differs from the generated header's */
+/* nil, with the reason, if the content's hash differs from the generated
+ * header's, or an operation in it does nothing (act_declared.odin) */
 world_with_content :: proc(content: ^tri.Content, seed: u64, error: ^string) -> ^World {
 	if tri.content_hash(content) != CONTENT_HASH {
 		if error != nil {
@@ -391,6 +392,10 @@ world_with_content :: proc(content: ^tri.Content, seed: u64, error: ^string) -> 
 			                     "was generated from (%016x): run make gen",
 			                     tri.content_hash(content), u64(CONTENT_HASH))
 		}
+		return nil
+	}
+	if reason := declared_check(content); reason != "" {
+		if error != nil do error^ = reason
 		return nil
 	}
 	world := world_init_with_content(content, seed)

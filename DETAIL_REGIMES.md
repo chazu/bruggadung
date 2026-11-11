@@ -161,6 +161,8 @@ Half Triangle, half engine.
     objects ("take", "put_in"); abstract things change fields and stocks
     instead (REALITY.md decision 11): `{ role: "smithy", field:
     "horseshoes", by: 8 }`. A small new declarative vocabulary.
+    EFFECTS.md uses the same vocabulary for an operation's `changes` at
+    full detail.
 
 ### 4. A change of grain (news, money and stocks, a place settled into things)
 
