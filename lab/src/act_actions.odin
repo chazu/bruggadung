@@ -208,7 +208,7 @@ match_described :: proc(world: ^World, pattern: ^tri.Node, action: Action, descr
 	worked: tri.Match_Result
 	match = tri.match_instance(content, action.operation, description, &worked)
 	/* what it does is no requirement: a declared effect (`after`, `moves`,
-	 * `emits`; a stage's too) is nothing for the actor to find out, and an
+	 * `consumes`, `emits`, and `now`; a stage's too) is nothing for the actor to find out, and an
 	 * operation unknown only in that is entailed. A full list of residuals
 	 * may have dropped some (REVIEW.md §4.2 (8)): then it stays unknown. */
 	if match == .Unknown && worked.nresidual < tri.MAX_RESIDUAL {
@@ -216,7 +216,7 @@ match_described :: proc(world: ^World, pattern: ^tri.Node, action: Action, descr
 		for i: uint = 0; i < worked.nresidual; i += 1 {
 			path := string(cstring(&worked.residual[i][0]))
 			done := false
-			for field in ([?]string{"after", "moves", "emits"}) {
+			for field in ([?]string{"after", "moves", "consumes", "emits", "now"}) {
 				if path == field || strings.has_prefix(path, strings.concatenate({field, "."}, context.temp_allocator)) ||
 				   (strings.has_prefix(path, "stages.") &&
 				    strings.contains(path, strings.concatenate({".", field}, context.temp_allocator))) {
@@ -926,40 +926,6 @@ effect_eat :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) ->
 		return ""
 	}
 	proposal_group_destroy(g, whole(a.roles[.Item]), "eaten")
-	return ""
-}
-
-
-/* Cooking (content/cooking/): at a lit stove, the food is no longer raw,
- * and nourishes by what cooking adds to it, to 100 at most; a meal now, it
- * spoils its `mealKeepsFor` from now (content/perishing/). Of a stack held
- * (an armful of the harvest), one portion is cooked, into the free hand:
- * the rest is still raw, as eating takes one of a stack. With no hand free
- * to take a portion into, the whole of it is cooked: a cook that came to
- * nothing was taken up again and again, a farmer's harvest in one hand and
- * the market's pack in the other. */
-@(private = "file")
-effect_cook :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
-	lit, raw, nourishment, cooking: i64
-
-	if !world_get_field(world, "Combustor.lit", a.roles[.Destination], &lit) || lit == 0 {
-		return "the stove isn't lit"
-	}
-	if !world_get_field(world, "Food.raw", a.roles[.Item], &raw) || raw == 0 {
-		return "it isn't raw"
-	}
-	world_get_field(world, "Food.nourishment", a.roles[.Item], &nourishment)
-	world_get_field(world, "Food.cooking", a.roles[.Item], &cooking)
-	meal := a.roles[.Item]
-	if hand := free_hand(world, a.roles[.Actor]); hand >= 0 && world_units_of(world, a.roles[.Item]) > 1 {
-		meal = proposal_group_split(g, whole(a.roles[.Item]), 1, held_by(a.roles[.Actor], hand))
-	}
-	proposal_group_set_of_to(g, "Food.raw", whole(meal), 0)
-	proposal_group_set_of_to(g, "Food.nourishment", whole(meal), min(nourishment + cooking, 100))
-	/* a meal keeps so long from now, whatever it was made of (perishing/) */
-	if keeps: i64; world_get_field(world, "Food.mealKeepsFor", a.roles[.Item], &keeps) && keeps > 0 {
-		proposal_group_set_of_to(g, "Perishable.spoilsAt", whole(meal), world_time(world).ms + keeps)
-	}
 	return ""
 }
 
@@ -2943,19 +2909,6 @@ effect_split :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) 
 }
 
 
-/* Stoking: the firewood in hand into the stove's fuel, by its mass. */
-@(private = "file")
-effect_stoke :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
-	fuel, mass: i64
-
-	if !world_get_field(world, "FuelContainer.fuel", a.roles[.Destination], &fuel) do return "it burns nothing"
-	world_get_field(world, "Body.mass", a.roles[.Item], &mass)
-	proposal_group_set_of_to(g, "FuelContainer.fuel", whole(a.roles[.Destination]), fuel + mass)
-	proposal_group_destroy(g, whole(a.roles[.Item]), "burned")
-	return ""
-}
-
-
 /* A blueprint's text field ("unit"), or "": a temporary string. */
 @(private = "file")
 blueprint_text :: proc(world: ^World, blueprint: cstring, field: cstring) -> string {
@@ -3164,10 +3117,8 @@ effects := [?]Named_Effect{
 	{"write",     effect_write},
 	{"read",      effect_read},
 	{"eat",       effect_eat},
-	{"cook",      effect_cook},
 	{"fell",      effect_fell},
 	{"split",     effect_split},
-	{"stoke",     effect_stoke},
 	{"sow",       effect_sow},
 	{"keep_seed", effect_keep_seed},
 	{"harvest",   effect_harvest},

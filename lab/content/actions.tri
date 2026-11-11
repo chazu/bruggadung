@@ -20,9 +20,9 @@
 //            together.
 // - code:    a declared effect is applied by one procedure for all
 //            (src/act_declared.odin), which resolves the operation against
-//            the truth; so far `after`, `moves` and `emits`, for an
-//            operation or a stage. Giving, putting down, putting in and
-//            looking are declared. An operation, or a stage, with no
+//            the truth; so far `after`, `moves`, `consumes` and `emits`,
+//            for an operation or a stage. Giving, putting down, putting in
+//            and looking are declared. An operation, or a stage, with no
 //            effect named or declared and no trace is refused at load.
 // - code:    a walk's stages come from its activity's way, not from the
 //            operation (src/act_activities.odin); its way is found by the
@@ -33,7 +33,7 @@
 //            (src/act_activities.odin); they are compacted into digests
 //            after the world's history window (src/core_world.odin).
 
-#Effect: "take" | "take_some" | "drive" | "open_tap" | "fill" | "walk" | "loosen" | "say" | "tend" | "analyse" | "write" | "read" | "eat" | "investigate" | "tighten" | "rotate" | "strike" | "shut" | "light" | "rest" | "saw" | "pass" | "copy" | "reveal" | "replace" | "cut" | "shape" | "install" | "issue" | "confiscate" | "arrest" | "flee" | "hit" | "hire" | "work" | "service" | "cook" | "fell" | "split" | "stoke" | "sow" | "keep_seed" | "harvest" | "crouch" | "shoot" | "butcher" | "post" | "hand_over" | "put_some" | "shoulder" | "put_back" | "give_some" | "forage"
+#Effect: "take" | "take_some" | "drive" | "open_tap" | "fill" | "walk" | "loosen" | "say" | "tend" | "analyse" | "write" | "read" | "eat" | "investigate" | "tighten" | "rotate" | "strike" | "shut" | "light" | "rest" | "saw" | "pass" | "copy" | "reveal" | "replace" | "cut" | "shape" | "install" | "issue" | "confiscate" | "arrest" | "flee" | "hit" | "hire" | "work" | "service" | "fell" | "split" | "sow" | "keep_seed" | "harvest" | "crouch" | "shoot" | "butcher" | "post" | "hand_over" | "put_some" | "shoulder" | "put_back" | "give_some" | "forage"
 
 // Which roles an operation has is its roles' type: a structure's type is the
 // most general one with all its features.
@@ -66,8 +66,17 @@
 // both. The requirements stay in `roles`: they are matched once from what
 // the actor perceives, for the menu, and again against the truth when the
 // effect commits, where what doesn't hold fails the action.
-#Moves: { moved: ref, into: #Place }
-#Emits: { event: text, subject: ref, other: ref }
+//
+// Of a stack, a `portion` is so many of its units: moved, they are split
+// off, and are that role from then on, so what `after` says of the role it
+// says of them, and the rest of the stack is as it was. `consumes` destroys
+// a thing, or a portion of it, `because` of what (its tombstone's reason).
+// An operation's `now` is the time its effect commits (`spoilsAt: $now +
+// $k`). Arithmetic in `after` is Triangle's (CONTENT_LANGUAGE.md §5).
+#OfSome:   { portion: int & >=1 }
+#Moves:    #OfSome & { moved: ref, into: #Place }
+#Consumes: #OfSome & { consumed: ref, because: text }
+#Emits:    { event: text, subject: ref, other: ref }
 
 // Looking at something within reach changes nothing in the world: it is
 // an event the looker perceives. Its operations say what is looked at.
@@ -90,6 +99,7 @@
     removes:     [...#Removes]
     after:       #Bound
     moves:       [...#Moves]
+    consumes:    [...#Consumes]
     emits:       [...#Emits]
 }
 
@@ -119,6 +129,8 @@
 // history.
 #Operation: #Step & {
     roles:            #Roles
+    // when its effect commits: for a declared effect to reckon from
+    now:              time
     // how far its other roles may be from the actor, in tiles: 1, beside it
     // (a shot, further: hunting/)
     range:            *1 | int & >=1 & <=8

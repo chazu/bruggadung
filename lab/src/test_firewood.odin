@@ -71,6 +71,42 @@ test_firewood :: proc() {
 	scheduler_run_until(s, time_make(world_time(w).ms + 40 * 1000))
 	bg_check(world_get_field(w, "FuelContainer.fuel", stove, &fuel) && fuel == before + 6000)
 	bg_check(!world_is_live(w, held))
+
+	/* a stove alight is stoked too, though its fuel burns down meanwhile */
+	bg_check(perform(w, c, action_make("light", me, stove, NO_ENTITY), 0, &error) != nil)
+	scheduler_run_until(s, time_make(world_time(w).ms + 60 * 1000))
+	bg_check(perform(w, c, action_make("take_some", me, wood, NO_ENTITY), 2, &error) != nil)
+	scheduler_run_until(s, time_make(world_time(w).ms + 1))
+	held = NO_ENTITY
+	for e in hands[:world_entities_at(w, me, .Held_By, raw_data(hands[:]), 2)] do if e != axe do held = e
+	world_get_field(w, "FuelContainer.fuel", stove, &fuel)
+	before = fuel
+	bg_check(held != NO_ENTITY && perform(w, c, action_make("stoke", me, held, stove), 0, &error) != nil)
+	scheduler_run_until(s, time_make(world_time(w).ms + 40 * 1000))
+	bg_check(world_get_field(w, "FuelContainer.fuel", stove, &fuel) && fuel > before + 1000)
+	bg_check(!world_is_live(w, held))
+
+	/* two stoking it at once: each reads the fuel the other is about to
+	 * change, and the second to commit is resolved again, not failed; both
+	 * armfuls are burned, and the fuel is up by both */
+	other := test_commit_create(c, "woodcutter", on_tile(62, 21, 0))
+	mine, theirs := NO_ENTITY, NO_ENTITY
+	bg_check(perform(w, c, action_make("take_some", me, wood, NO_ENTITY), 2, &error) != nil)
+	scheduler_run_until(s, time_make(world_time(w).ms + 1))
+	for e in hands[:world_entities_at(w, me, .Held_By, raw_data(hands[:]), 2)] do if e != axe do mine = e
+	g = proposal_group_group_with_phase(.System, "setup: an armful in the other's hand")
+	proposal_group_split(g, whole(wood), 3, held_by(other, 0))
+	committer_submit(c, g)
+	scheduler_run_until(s, time_make(world_time(w).ms + 1))
+	bg_check(world_entities_at(w, other, .Held_By, raw_data(hands[:]), 2) == 1)
+	theirs = hands[0]
+	world_get_field(w, "FuelContainer.fuel", stove, &fuel)
+	before = fuel
+	bg_check(mine != NO_ENTITY && perform(w, c, action_make("stoke", me, mine, stove), 0, &error) != nil)
+	bg_check(perform(w, c, action_make("stoke", other, theirs, stove), 0, &error) != nil)
+	scheduler_run_until(s, time_make(world_time(w).ms + 40 * 1000))
+	bg_check(!world_is_live(w, mine) && !world_is_live(w, theirs))
+	bg_check(world_get_field(w, "FuelContainer.fuel", stove, &fuel) && fuel > before + 4000)
 }
 
 

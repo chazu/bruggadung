@@ -38,10 +38,10 @@
 // - carrying: a larder is a kind of its own (#Larder), so looking for food
 //             doesn't look into the coffer or the packs beside it first
 //             (carrying/, money/coins.tri).
-// - code:     effect_cook (src/act_actions.odin): of a stack held (an
-//             armful of the harvest), one portion is cooked, into the
-//             free hand, the rest still raw (no hand free, all of it);
-//             the scenario stocks the
+// - code:     none for cooking itself: `cook` and `cook_portion` are
+//             declared (actions.tri, EFFECTS.md), and which is tried
+//             first is the ways' (cook_a_portion, cook_what_i_hold); the
+//             scenario stocks the
 //             larders and undertakes the morning's commitment
 //             (src/scenario_village.odin).
 
@@ -131,10 +131,31 @@ eat_it_raw: #Method & {
 // the agent is to a later one, AGENCY.md §5); or,
 // with a stove to cook at, look for food in the nearest containers, two
 // at most.
+// With a hand free, a portion of what it holds (of an armful, one; a
+// portion is itself): the same food as `cook_what_i_hold` wants, so what a
+// neighbour is asked for is the same (deals/).
+cook_a_portion: #Method & {
+    title: "cook a portion of it"
+    goal:  "have_a_meal"
+    rank:  1
+    pre: {
+        find:  ["food", "stove"]
+        match: #Cooking & {
+            me:    #Agent & { id: $me, freeHands: >=1 }
+            food:  #Food & #Body & { raw: true, place: #Held & { by: $me } }
+            stove: #Combustor & #Body
+        }
+    }
+    order: ["own", "habit", "near"]
+    steps: [#Achieve & { subgoal: "stove_lit" }, #Do & { op: "cook_portion", object: "food", target: "stove" }]
+} @family(methods)
+
+// All of what it holds: a portion taken to cook, or the armful with no
+// hand free to take one into.
 cook_what_i_hold: #Method & {
     title: "cook it"
     goal:  "have_a_meal"
-    rank:  1
+    rank:  2
     pre: {
         find:  ["food", "stove"]
         match: #Cooking & {
@@ -173,7 +194,7 @@ stoke_to_cook: #Method & {
 take_to_cook: #Method & {
     title: "take some to cook"
     goal:  "have_a_meal"
-    rank:  2
+    rank:  3
     pre: {
         find:  ["food", "stove"]
         match: #Cooking & {
@@ -189,7 +210,7 @@ take_to_cook: #Method & {
 look_for_food: #Method & {
     title:  "look for food"
     goal:   "have_a_meal"
-    rank:   3
+    rank:   4
     pre:    { find: ["larder", "stove"], match: #Cooking & { larder: #Larder, stove: #Combustor & #Body } }
     order:  ["own", "habit", "likely", "near"]
     seeks:  #Food & #Body
@@ -239,14 +260,27 @@ take_some_along: #Method & {
 } @family(methods)
 
 // Cook food the actor holds at a lit stove in reach: a while, with the
-// hands. It is no longer raw, and nourishes more.
-cook: #Operation & {
-    effect:   "cook"
+// hands. It is no longer raw, and nourishes by what cooking adds to it, to
+// 100 at most; a meal now, it spoils its `mealKeepsFor` from now, whatever
+// it was made of (perishing/). `cook` is of all the actor holds of it;
+// `cook_portion`, with a hand free, is of one portion: of a stack held (an
+// armful of the harvest), one into the free hand, the rest still raw, as
+// eating takes one of a stack; of a single portion, that portion, where it
+// is.
+#Cook:        #Operation & {
     duration: 1200s
     uses:     ["hands"]
     roles: {
         actor:       #Agent & { id: $a }
-        item:        #Food & #Body & { raw: true, place: #Held & { by: $a } }
+        item:        #Food & #Body & { id: $i, raw: true, nourishment: $n, cooking: $c, mealKeepsFor: $k, place: #Held & { by: $a } }
         destination: #Combustor & #Body & { lit: true }
     }
+    now:   $now
+    after: { item: #Food & { raw: false, nourishment: math.Clamp($n + $c, 0, 100), spoilsAt: $now + $k } }
+}
+cook:         #Cook @family(operations)
+cook_portion: #Cook & {
+    // (a tag is its declaration's: #Cook's $a and $i are bound again here)
+    roles: { actor: #Agent & { id: $a, freeHands: >=1 }, item: #Food & { id: $i } }
+    moves: [{ moved: $i, portion: 1, into: #Held & { by: $a } }]
 } @family(operations)

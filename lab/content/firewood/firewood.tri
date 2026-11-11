@@ -38,9 +38,9 @@
 // - village:  the trees, the tools at the chopping block, the woodpiles
 //             and who stocks which, with its coffer, are the scenario's
 //             (src/scenario_village.odin).
-// - code:     effect_fell, effect_split, effect_stoke, and effect_saw's
-//             trunks (src/act_actions.odin). Putting down is declared
-//             (actions.tri).
+// - code:     effect_fell, effect_split, and effect_saw's trunks
+//             (src/act_actions.odin). Stoking is declared, and putting
+//             down (actions.tri).
 
 package firewood
 
@@ -419,12 +419,13 @@ split: #Operation & {
 // Put firewood in hand into a stove in reach: its fuel, by the firewood's
 // mass.
 stoke: #Operation & {
-    effect:   "stoke"
     duration: 30s
     uses:     ["hands"]
     roles: {
         actor:       #Agent & { id: $a }
-        item:        #Stack & { unit: "firewood", place: #Held & { by: $a } }
-        destination: #Stove
+        item:        #Stack & { id: $i, unit: "firewood", mass: $m, place: #Held & { by: $a } }
+        destination: #Stove & { fuel: $f }
     }
+    after:    { destination: #Stove & { fuel: $f + $m } }
+    consumes: [{ consumed: $i, because: "burned" }]
 } @family(operations)

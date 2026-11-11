@@ -28,6 +28,7 @@ package lab
 import "core:fmt"
 import "core:mem"
 import "core:slice"
+import "core:strings"
 import tri "../../triangle/odin/triangle"
 
 
@@ -40,6 +41,9 @@ Activity_Timer :: struct {
 
 // One of _completions' pairs: the group (retained), the activity.
 @(private = "file")
+// How often a declared effect rejected as stale is resolved again.
+BG_RESOLVE_AGAIN :: 4
+
 Completion :: struct {
 	group:    ^Proposal_Group,
 	activity: Entity_ID,
@@ -51,6 +55,7 @@ Activities :: struct {
 	world:        ^World,
 	committer:    ^Committer,               /* not retained: the committer retains us */
 	completions:  [dynamic]Completion,      /* pairs: the group, the activity */
+	retries:      map[Entity_ID]int,        /* how often a declared effect was resolved again; looked up, never iterated */
 	/* when each running activity is next due, a heap, earliest first; an
 	 * entry may be stale, and is checked against the record when it comes
 	 * up. Built from the store when first wanted, kept by the world's word
@@ -70,6 +75,7 @@ activities_with_world :: proc(world: ^World, committer: ^Committer) -> ^Activiti
 	activities.world       = retain(world)
 	activities.committer   = committer
 	activities.completions = make([dynamic]Completion)
+	activities.retries     = make(map[Entity_ID]int)
 	committer_add_listener(committer, activities_as_round_listener(activities))
 	world_set_activity_observer(world, activities_as_record_observer(activities))
 	return activities
@@ -84,6 +90,7 @@ activities_dealloc :: proc(self: ^Activities) {
 	release(self.world)
 	for c in self.completions do release(c.group)
 	delete(self.completions)
+	delete(self.retries)
 }
 
 
@@ -828,7 +835,23 @@ activities_did_commit_round :: proc(self: ^Activities, committer: ^Committer, ro
 			continue
 		}
 		if !proposal_group_applied(group) {
-			activities_end(self, a, "failed", proposal_group_rejection(group), proposal_group_cause(group))
+			/* a declared effect, rejected because what it read is no longer
+			 * so (another stoked the stove in the same round): resolved
+			 * again, against the truth as it now is, where it holds or
+			 * fails by what it requires. A few times, then it has failed. */
+			again := (^Activity)(world_record(self.world, world_kind_named(self.world, "Activity"), a))
+			duration: i64
+			if again != nil && running(self.world, a, again) && strings.contains(proposal_group_rejection(group), STALE) &&
+			   activity_stage(self.world, a, again, again.stage, &duration, &effect) && effect == "" &&
+			   self.retries[a] < BG_RESOLVE_AGAIN {
+				self.retries[a] += 1
+				activities_push(self, a, world_time(self.world).ms)
+			} else {
+				delete_key(&self.retries, a)
+				activities_end(self, a, "failed", proposal_group_rejection(group), proposal_group_cause(group))
+			}
+		} else {
+			delete_key(&self.retries, a)
 		}
 		ordered_remove(&self.completions, int(i))
 		release(group)

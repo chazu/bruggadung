@@ -4,8 +4,9 @@ package lab
  * Declared effects (EFFECTS.md, content/actions.tri): what an operation
  * does, as its content says it, applied by the one procedure here. An
  * operation with no named effect (`effect`) has a declared one: its roles
- * as the effect leaves them (`after`), what it moves (`moves`) and the
- * events it emits (`emits`).
+ * as the effect leaves them (`after`), what it moves (`moves`) and destroys
+ * (`consumes`), whole or a portion of a stack, and the events it emits
+ * (`emits`).
  *
  * Resolving it is a unification: the operation's pattern with the truth
  * projection of what fills its roles. Where that fails, a requirement the
@@ -16,7 +17,7 @@ package lab
  * A staged operation's stages each have their own: the roles are the
  * operation's, and its tags reach every stage.
  *
- * Not built: `makes`, `consumes` and `changes`; a move into an assembly.
+ * Not built: `makes` and `changes`; a move into an assembly.
  * Arithmetic in `after` (`handfuls: $h - 1`, `math.Clamp`) is worked out by
  * the unification: the pattern brings the operation's own arithmetic.
  */
@@ -62,10 +63,12 @@ text_of_node :: proc(tc: ^tri.Content, v: ^tri.Node) -> (string, bool) {
 
 
 /* What `after` says of one field of a role's entity, as a proposal: nothing
- * while the value is open, or is what the field holds already. */
+ * while the value is open, or is what the field holds already. Of a
+ * `portion` just split off the entity (a handle, its fields the entity's),
+ * it is set outright: nobody else can have got to it. */
 @(private = "file")
-declared_set :: proc(world: ^World, entity: Entity_ID, kind: ^Component_Info, f: ^Field_Info, record: rawptr,
-                     v: ^tri.Node, g: ^Proposal_Group) -> string {
+declared_set :: proc(world: ^World, entity: Entity_ID, portion: Entity_ID, kind: ^Component_Info, f: ^Field_Info,
+                     record: rawptr, v: ^tri.Node, g: ^Proposal_Group) -> string {
 	lo, hi: i64
 	value: i64
 
@@ -92,8 +95,8 @@ declared_set :: proc(world: ^World, entity: Entity_ID, kind: ^Component_Info, f:
 		if !strings.contains(string(f.flags), "proposable") {
 			return fmt.tprintf("%s.%s is not an effect's to set", kind.name, f.name)
 		}
-		proposal_group_set_of_to_text(g, world_intern(world, ns_utf8(fmt.tprintf("%s.%s", kind.name, f.name))), whole(entity),
-		                              world_intern(world, ns_utf8(text)))
+		proposal_group_set_of_to_text(g, world_intern(world, ns_utf8(fmt.tprintf("%s.%s", kind.name, f.name))),
+		                              whole(portion if portion != NO_ENTITY else entity), world_intern(world, ns_utf8(text)))
 		return ""
 	case:
 		return ""
@@ -103,6 +106,10 @@ declared_set :: proc(world: ^World, entity: Entity_ID, kind: ^Component_Info, f:
 	if !world_get_field(world, path, entity, &was) || value == was do return ""
 	if !strings.contains(string(f.flags), "proposable") {
 		return fmt.tprintf("%s.%s is not an effect's to set", kind.name, f.name)
+	}
+	if portion != NO_ENTITY {
+		proposal_group_set_of_to(g, path, whole(portion), value)
+		return ""
 	}
 	/* from the value it was read with: if another gets there first, this fails */
 	proposal_group_set_of_to_expecting(g, path, whole(entity), value, was)
@@ -175,7 +182,7 @@ step_says :: proc(tc: ^tri.Content, pattern: ^tri.Node, step: string) -> bool {
 	for r in Role.Actor ..< Role.Count {
 		if tri.at(tc, pattern, ns_utf8(fmt.tprintf("%safter.%s", step, ROLE_NAMES[r]))) != nil do return true
 	}
-	for list in ([?]string{"moves", "emits", "leaves", "removes"}) {
+	for list in ([?]string{"moves", "consumes", "emits", "leaves", "removes"}) {
 		if tri.at(tc, pattern, ns_utf8(fmt.tprintf("%s%s.first", step, list))) != nil do return true
 	}
 	return false
@@ -229,7 +236,10 @@ apply_declared_effect :: proc(world: ^World, action: Action, stage: i64, group: 
 		if action.roles[r] == NO_ENTITY || tri.at(tc, pattern, ns_utf8(fmt.tprintf("roles.%s", ROLE_NAMES[r]))) == nil do continue
 		fmt.sbprintf(&expr, " %s: %s,", ROLE_NAMES[r], truth_describe_entity(world, action.roles[r]))
 	}
-	strings.write_string(&expr, " } }")
+	/* the time this commits, for what the effect reckons from it */
+	clock: [64]u8
+	tri.format_quantity("time", world_time(world).ms, raw_data(clock[:]), len(clock))
+	fmt.sbprintf(&expr, " }}, now: %s }}", cstring(&clock[0]))
 	arena := tri.arena_new()
 	defer tri.arena_free(arena)
 	truth := tri.value(tc, ns_utf8(strings.to_string(expr)), arena, &err[0], size_of(err))
@@ -239,6 +249,32 @@ apply_declared_effect :: proc(world: ^World, action: Action, stage: i64, group: 
 	result := tri.unify(tc, pattern, truth, arena, &failure)
 	if result == nil {
 		return fmt.tprintf("%s fails at %s", action.operation, cstring(&failure.path[0]))
+	}
+
+	/* moves: first, since units moved off a stack are that role from then
+	 * on, and `after` speaks of them */
+	portions: [Role]Entity_ID
+	for list := tri.at(tc, result, ns_utf8(fmt.tprintf("%smoves", step))); list != nil; list = tri.at(tc, list, "rest") {
+		move := tri.at(tc, list, "first")
+		if move == nil do break
+		moved, ok := ref_of(tc, tri.at(tc, move, "moved"))
+		if !ok do return fmt.tprintf("%s moves nothing: tag the role's id", action.operation)
+		to, reason := declared_place(world, tri.at(tc, move, "into"))
+		if reason != "" do return reason
+		/* a portion: so many units, split off; all of them is the thing itself */
+		if n, some := int_of(tri.at(tc, move, "portion")); some && n < world_units_of(world, moved) {
+			part := proposal_group_split(group, whole(moved), n, to)
+			for r in Role.Actor ..< Role.Count do if action.roles[r] == moved do portions[r] = part
+			continue
+		}
+		/* where it is to go already (in a hand of theirs, in that container,
+		 * on that tile): nothing moves */
+		if at := world_location_of(world, moved); at.form == to.form && at.place == to.place &&
+		   (at.form != .On_Tile || (at.x == to.x && at.y == to.y && at.level == to.level)) {
+			continue
+		}
+		/* from where it is now: if someone else gets it first, this fails */
+		proposal_group_move_to_expecting(group, whole(moved), to, world_location_of(world, moved))
 	}
 
 	/* after: each field a role is left with, by role, component and field */
@@ -254,21 +290,26 @@ apply_declared_effect :: proc(world: ^World, action: Action, stage: i64, group: 
 				f := &kind.fields[i]
 				v := tri.at(tc, after, f.name)
 				if v == nil do continue
-				if reason := declared_set(world, entity, kind, f, record, v, group); reason != "" do return reason
+				if reason := declared_set(world, entity, portions[r], kind, f, record, v, group); reason != "" do return reason
 			}
 		}
 	}
 
-	/* moves */
-	for list := tri.at(tc, result, ns_utf8(fmt.tprintf("%smoves", step))); list != nil; list = tri.at(tc, list, "rest") {
-		move := tri.at(tc, list, "first")
-		if move == nil do break
-		moved, ok := ref_of(tc, tri.at(tc, move, "moved"))
-		if !ok do return fmt.tprintf("%s moves nothing: tag the role's id", action.operation)
-		to, reason := declared_place(world, tri.at(tc, move, "into"))
-		if reason != "" do return reason
-		/* from where it is now: if someone else gets it first, this fails */
-		proposal_group_move_to_expecting(group, whole(moved), to, world_location_of(world, moved))
+	/* consumes */
+	for list := tri.at(tc, result, ns_utf8(fmt.tprintf("%sconsumes", step))); list != nil; list = tri.at(tc, list, "rest") {
+		gone := tri.at(tc, list, "first")
+		if gone == nil do break
+		consumed, ok := ref_of(tc, tri.at(tc, gone, "consumed"))
+		because, why := text_of_node(tc, tri.at(tc, gone, "because"))
+		if !ok || !why do return fmt.tprintf("%s consumes nothing, or for no reason: tag the role's id, and say `because`", action.operation)
+		reason := world_intern(world, ns_utf8(because))
+		/* a portion: so many units, split off where the stack is, and gone */
+		if n, some := int_of(tri.at(tc, gone, "portion")); some && n < world_units_of(world, consumed) {
+			part := proposal_group_split(group, whole(consumed), n, world_location_of(world, consumed))
+			proposal_group_destroy(group, whole(part), reason)
+			continue
+		}
+		proposal_group_destroy(group, whole(consumed), reason)
 	}
 
 	/* emits */

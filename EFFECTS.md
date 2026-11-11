@@ -28,7 +28,8 @@ Two terms are proposed, and have entries in GLOSSARY.md marked as such: a
 
 ## Decisions so far
 
-1. **`after` and `changes` are both kept.** `after` states each role's
+1. **`after` and `changes` are both kept** (`changes` not built yet: see
+   step 3). `after` states each role's
    fields as the effect leaves them, arithmetic included (`handfuls: $h -
    1`). `changes` is the coarse effect of DETAIL_REGIMES.md, as it stands
    there, for an operation that is also run below full detail as a
@@ -166,8 +167,8 @@ The vocabulary, all of it fields of `#Step`, so a stage can have its own:
 | --- | --- | --- |
 | `after` | each role's fields as the effect leaves them: constants, values carried by tags, arithmetic over them | a set proposal for each concrete field, expecting the value it read |
 | `makes` | things to construct: a blueprint and a place | a create proposal each |
-| `consumes` | roles destroyed, whole or so many units of a stack | a destroy, or a split and a destroy |
-| `moves` | a thing (`moved`, by a tag on its role's `id`), or so many units of it, `into` a place | a move from where it was read to be, or a split |
+| `consumes` | a thing destroyed (`consumed`), whole or a `portion` of a stack, and `because` of what | a destroy, or a split and a destroy |
+| `moves` | a thing (`moved`, by a tag on its role's `id`), or a `portion` of it, `into` a place | a move from where it was read to be, or a split; nothing, if it is there already |
 | `emits` | events, by `event` (the kind), `subject` and `other` | an emit each |
 | `changes` | coarse effects, `{ role, field, by }` | a set to the value read plus `by`, clamped to the field's bounds, expecting the value read |
 
@@ -202,9 +203,9 @@ CONTENT_LANGUAGE.md §5 gains them in the change that builds them.
    it fails, the action fails, and the failure's path is the reason: a bare
    patch gives `roles.item.handfuls: >=1 & <=99 vs 0` (ran). The guards now
    inside effect procedures become role patterns and are checked here.
-3. Read the result and build the proposal group in a fixed order: `after`
-   by role and field, then `changes`, `moves`, `makes`, `consumes`,
-   `emits`. A place such as `#Held & { by: $a }` names whose hands; the lab
+3. Read the result and build the proposal group in a fixed order:
+   `moves` (a portion moved is its role from then on), `after` by role and
+   field, then `changes`, `makes`, `consumes`, `emits`. A place such as `#Held & { by: $a }` names whose hands; the lab
    chooses which (today's `receiving`, with the operation's `stows`).
 
 The requirement is thereby checked twice, on purpose: from the knowledge
@@ -287,8 +288,15 @@ done after: the first conversions use only the three there are.
    REFERENCE.md say so. Two limits: the arithmetic does not go with the
    result of a unification into a further one, and a copy by name of an
    instance with several variants still drops it.
-3. `changes`, with its load-time check of role and field. Convert the
-   effects with arithmetic; cooking as two operations.
+3. Done, but for `changes`. Stoking (`fuel: $f + $m`, the firewood
+   consumed) and cooking are declared, their procedures gone. Cooking is
+   `cook`, of all that is held, and `cook_portion`, with a hand free, of
+   one portion; both are a `#Cook`, which clamps the nourishment
+   (`math.Clamp`) and reckons `spoilsAt` from `now`. New in the
+   vocabulary: `consumes`; a `portion` of a stack on `moves` and
+   `consumes`; an operation's `now`. `changes` is left until something
+   needs it: with `math.Clamp` in `after`, nothing at full detail does,
+   and DETAIL_REGIMES.md's periodic operations will.
 4. The rest of the primitive effects, a topic at a time; each topic's
    `- code:` cut point in its header goes as its effect does. Forage waits
    for regrowth (decision 6).
@@ -301,6 +309,48 @@ done after: the first conversions use only the three there are.
 
 The test REVIEW.md proposes holds here: the next topic adds no Odin outside
 its tests.
+
+## Found in building step 3
+
+- **Units moved off a stack are that role from then on**: `after` speaks
+  of the portion, and the rest of the stack is as it was. So `moves` is
+  applied before `after`.
+- **A move to where a thing already is moves nothing.** `cook_portion` of
+  a single portion in hand is of that portion, where it is.
+- **A tag is its declaration's.** `cook_portion: #Cook & { moves: [{
+  moved: $i }] }` used `#Cook`'s `$i` without binding it again: it
+  loaded, and moved nothing. An operation that extends a type binds the
+  tags it uses again (`item: #Food & { id: $i }`). Nothing catches this at
+  load; the lab refuses when the effect commits ("moves nothing: tag the
+  role's id").
+- **What a neighbour is asked for comes from the first-ranked way's
+  pattern** (`agency_wants`). A way to a meal that wanted `#Food & #Stack`
+  asked for a stack, whose `count` nobody perceives, so nothing handed
+  over was ever "like it". The way that cooks a portion wants the same
+  food as the way that cooks it all.
+- **A meal whose `mealKeepsFor` is 0 would spoil as it is cooked**
+  (`spoilsAt: $now + $k`), where the procedure left `spoilsAt` unset. No
+  food says 0.
+- **The stove full is now a failure**: `fuel: $f + $m` past the field's
+  1000 kg fails the stoking, where the procedure proposed it regardless.
+
+- **A declared set expects the value it read, and a stale one is resolved
+  again.** Two of a household stoking one stove in one step both read the
+  same `fuel`. The second's set is rejected ("is no longer"); its activity
+  is then pushed again, so the pattern is unified with the truth as it now
+  is, up to 4 times (`BG_RESOLVE_AGAIN`). Without this the second kept its
+  firewood in hand and failed. An instant operation rejected this way is
+  not yet resolved again.
+- **Stoking used to lose fuel, and the village was balanced on it.** The
+  procedure set `fuel` without expecting what it read: of two armfuls
+  stoked in one step, both were destroyed and one was counted. Now both
+  count. Three weeks of the village went from 7 failed checks (all meals)
+  to 20 (from day 13: not home, not in own bed, a pack not put back, two
+  unfed). A build with the expectation switched off gives the 7 again,
+  line for line, so nothing else in step 3 changes the village. How more
+  fuel in the stoves leaves a household short of food is not traced: the
+  village wants looking at again with stoves that keep what they are fed.
+  The village's scenario hashes are regenerated.
 
 ## Found in building step 1
 

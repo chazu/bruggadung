@@ -426,6 +426,11 @@ committer_individuate :: proc(self: ^Committer, group: ^Proposal_Group, count: ^
 
 // --- applying proposals ----------------------------------------------------
 
+// What a rejection says when a proposal expected a value, or a place, that
+// is no longer so: the group was built on a stale reading. A declared
+// effect so rejected is resolved again (act_activities.odin).
+STALE :: "is no longer"
+
 @(private = "file")
 resolve_ref :: proc(g: ^Proposal_Group, r: Ref) -> Entity_ID {
 	return proposal_group_id_for(g, r.entity)
@@ -768,7 +773,7 @@ committer_apply :: proc(self: ^Committer, p: ^Proposal, g: ^Proposal_Group, tall
 		if p.expects {
 			now: i64
 			if !world_get_field(self.world, p.name, e, &now) || now != i64(u64(p.other.entity)) {
-				return fmt.tprintf("%d's %s is no longer %d", e, p.name, i64(u64(p.other.entity)))
+				return fmt.tprintf("%d's %s " + STALE + " %d", e, p.name, i64(u64(p.other.entity)))
 			}
 		}
 		// a reference to something the group creates: its ID now
@@ -800,7 +805,7 @@ committer_apply :: proc(self: ^Committer, p: ^Proposal, g: ^Proposal_Group, tall
 			was = resolve_location(g, p.expected)
 			if now.form != was.form || now.place != was.place || now.slot != was.slot ||
 			   (now.form == .On_Tile && (now.x != was.x || now.y != was.y || now.level != was.level)) {
-				return fmt.tprintf("%d is no longer where it was taken from", e)
+				return fmt.tprintf("%d " + STALE + " where it was taken from", e)
 			}
 		}
 		world_set_location(self.world, loc, e)

@@ -1,5 +1,7 @@
 package lab
 
+import "core:strings"
+
 import "core:fmt"
 
 /*
@@ -58,8 +60,9 @@ test_cooking :: proc() {
 	/* cooked, it isn't cooked again */
 	bg_check(perform(w, c, action_make("cook", cook, portion, stove), 0, &error) == nil)
 
-	/* of the harvest in hand, a stack, one portion is cooked, into the free
-	 * hand; the rest is still raw. With no hand free, the whole of it is. */
+	/* of the harvest in hand, a stack: `cook` is of the whole of it;
+	 * `cook_portion` of one portion, into the free hand, the rest still
+	 * raw, and not to be done with no hand free */
 	g = proposal_group_group_with_phase(.System, "setup: the harvest in hand")
 	harvest := proposal_group_create(g, "grain_harvest", "the harvest", held_by(cook, 1))
 	another := proposal_group_create(g, "grain_harvest", "another harvest", in_(larder))
@@ -67,6 +70,8 @@ test_cooking :: proc() {
 	committer_commit_boundary(c)
 	harvest, another = proposal_group_id_for(g, harvest), proposal_group_id_for(g, another)
 	error = ""
+	bg_check(perform(w, c, action_make("cook_portion", cook, harvest, stove), 0, &error) == nil)
+	bg_check(strings.contains(error, "roles.actor.freeHands"))
 	bg_check(perform(w, c, action_make("cook", cook, harvest, stove), 0, &error) != nil)
 	scheduler_run_until(s, time_make(world_time(w).ms + 1200 * 1000 + 1))
 	bg_check(world_get_field(w, "Food.raw", harvest, &raw) && raw == 0)
@@ -82,7 +87,7 @@ test_cooking :: proc() {
 	committer_submit(c, g)
 	committer_commit_boundary(c)
 	error = ""
-	bg_check(perform(w, c, action_make("cook", cook, harvest, stove), 0, &error) != nil)
+	bg_check(perform(w, c, action_make("cook_portion", cook, harvest, stove), 0, &error) != nil)
 	scheduler_run_until(s, time_make(world_time(w).ms + 1200 * 1000 + 1))
 	bg_check(world_get_field(w, "Food.raw", harvest, &raw) && raw == 1)
 	bg_check(world_get_field(w, "Stack.count", harvest, &count) && count == 1)
