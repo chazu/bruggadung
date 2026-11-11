@@ -1191,6 +1191,95 @@ void test_arithmetic_exponents_and_backwards(void)
     tri_content_free(c);
 }
 
+/* An instance's own arithmetic goes where its pattern goes (REVIEW.md §4.2
+ * (5)): into a unification with the pattern at runtime, and into a copy of
+ * the instance by name. Both dropped it, leaving only the range it had
+ * narrowed to at load. */
+void test_arithmetic_with_patterns(void)
+{
+    TriContent *c = load1_ok(
+        "#Agent: { id: ref }\n"
+        "#Patch: { handfuls: int & >=0 & <=99, yields: text }\n"
+        "#Roles: { actor: #Agent }\n"
+        "#ItemRoles: #Roles & { item: #Patch }\n"
+        "#Operation: { roles: #Roles, after: #Roles }\n"
+        "forage: #Operation & {\n"
+        "    roles: { actor: #Agent & { id: $a }, item: #Patch & { handfuls: $h & >=1 } }\n"
+        "    after: { item: #Patch & { handfuls: $h - 1 } }\n"
+        "}\n"
+        "#Box: { w: length, h: length, girth: length }\n"
+        "base: #Box & { w: $w, h: $h, girth: ($w + $h) * 2 }\n"
+        "derived: base & { w: 10mm, h: 20mm }\n"
+        "#Crate: { box: #Box }\n"
+        "inside: #Crate & { box: base & { w: 1mm, h: 2mm } }\n");
+    TriArena *a = tri_arena_new();
+    TriFailure f;
+    /* at runtime: the pattern, unified with what fills its roles */
+    const TriNode *d = tri_value(c, "#Operation & { roles: { actor: #Agent & { id: ref(7) }, item: #Patch & { handfuls: 3 } } }",
+                                 a, NULL, 0);
+    const TriNode *r = tri_unify(c, tri_pattern(c, "forage"), d, a, &f);
+    CHECK(r != NULL);
+    CHECK_STR(printed(c, tri_at(c, r, "after.item.handfuls")), "2");
+    /* either way round, and an interval stays one */
+    r = tri_unify(c, d, tri_pattern(c, "forage"), a, &f);
+    CHECK(r != NULL);
+    CHECK_STR(printed(c, tri_at(c, r, "after.item.handfuls")), "2");
+    d = tri_value(c, "#Operation & { roles: { actor: #Agent, item: #Patch & { handfuls: >=2 & <=4 } } }", a, NULL, 0);
+    r = tri_unify(c, tri_pattern(c, "forage"), d, a, &f);
+    CHECK_STR(printed(c, tri_at(c, r, "after.item.handfuls")), ">=1 & <=3");
+    /* what the pattern requires still fails */
+    d = tri_value(c, "#Operation & { roles: { actor: #Agent, item: #Patch & { handfuls: 0 } } }", a, NULL, 0);
+    CHECK(tri_unify(c, tri_pattern(c, "forage"), d, a, &f) == NULL);
+    /* by name, at load: at the root, and inside a structure */
+    CHECK_STR(printed(c, tri_at(c, tri_pattern(c, "derived"), "girth")), "60mm");
+    CHECK_STR(printed(c, tri_at(c, tri_pattern(c, "inside"), "box.girth")), "6mm");
+    tri_arena_free(a);
+    tri_content_free(c);
+}
+
+/* math.Min, math.Max and math.Clamp are arithmetic: of constants they fold;
+ * of tags they wait, as + - * / do, at load and at runtime. */
+void test_arithmetic_min_max_clamp(void)
+{
+    TriContent *c = load1_ok(
+        "#Food: { nourishment: int & >=0 & <=100, cooking: int & >=0 & <=100, kept: int & >=0 & <=100, least: int, most: int }\n"
+        "folded: #Food & { kept: math.Clamp(250, 0, 100), least: math.Min(3, 7), most: math.Max(3, 7) }\n"
+        "cooked: #Food & { nourishment: $n & 90, cooking: $c & 20, kept: math.Clamp($n + $c, 0, 100),\n"
+        "                  least: math.Min($n, $c), most: math.Max($n, $c) + 1 }\n"
+        "open: #Food & { nourishment: $n, cooking: $c, kept: math.Clamp($n + $c, 0, 100) }\n"
+        "later: open & { nourishment: 95, cooking: 30 }\n"
+        "#L: { a: length, b: length, c: length }\n"
+        "units: #L & { a: $a & 15mm, b: math.Min($a, 1cm), c: math.Clamp($a, 2cm, 3cm) }\n");
+    CHECK_STR(printed(c, tri_at(c, tri_pattern(c, "folded"), "kept")), "100");
+    CHECK_STR(printed(c, tri_at(c, tri_pattern(c, "folded"), "least")), "3");
+    CHECK_STR(printed(c, tri_at(c, tri_pattern(c, "folded"), "most")), "7");
+    CHECK_STR(printed(c, tri_at(c, tri_pattern(c, "cooked"), "kept")), "100");
+    CHECK_STR(printed(c, tri_at(c, tri_pattern(c, "cooked"), "least")), "20");
+    CHECK_STR(printed(c, tri_at(c, tri_pattern(c, "cooked"), "most")), "91");
+    /* open while its arguments are: the field's own bounds, nothing more */
+    CHECK_STR(printed(c, tri_at(c, tri_pattern(c, "open"), "kept")), ">=0 & <=100");
+    CHECK_STR(printed(c, tri_at(c, tri_pattern(c, "later"), "kept")), "100");
+    /* quantities, in whatever units they were written */
+    CHECK_STR(printed(c, tri_at(c, tri_pattern(c, "units"), "b")), "10mm");
+    CHECK_STR(printed(c, tri_at(c, tri_pattern(c, "units"), "c")), "20mm");
+    /* at runtime: a sum that would leave the field's bounds stops at them */
+    TriArena *a = tri_arena_new();
+    TriFailure f;
+    const TriNode *r = tri_unify(c, tri_pattern(c, "open"), tri_value(c, "#Food & { nourishment: 30, cooking: 20 }", a, NULL, 0), a, &f);
+    CHECK_STR(printed(c, tri_at(c, r, "kept")), "50");
+    r = tri_unify(c, tri_pattern(c, "open"), tri_value(c, "#Food & { nourishment: 90, cooking: 20 }", a, NULL, 0), a, &f);
+    CHECK_STR(printed(c, tri_at(c, r, "kept")), "100");
+    tri_arena_free(a);
+    tri_content_free(c);
+    /* a dimension apart is an error, as for a sum; the other built-ins still take no tag */
+    c = load1("#T: { a: int, b: int }\nbad: #T & { a: $x & 1, b: math.Min($x, 5mm) }\n");
+    CHECK(has_diag(c, "comparing needs the same dimension", 1));
+    tri_content_free(c);
+    c = load1("#T: { a: int, b: int }\nbad: #T & { a: $x, b: math.Abs($x) }\n");
+    CHECK(has_diag(c, "takes a number known when content loads", 1));
+    tri_content_free(c);
+}
+
 void test_clause_solutions_distinct(void)
 {
     char src[4096];

@@ -201,6 +201,7 @@ void        arith_narrow(const X *x, Quantity want, bool (*lookup)(void *ctx, Sy
                          void (*narrow)(void *ctx, Sym tag, const Quantity *q));
 const char *arith_eval(const X *x, bool (*lookup)(void *ctx, Sym tag, Quantity *q), void *ctx, Quantity *out);
 void        arith_tags(const X *x, SymVec *out);
+bool        arith_call(const char *name);   /* math.Min, math.Max, math.Clamp: arithmetic, not expanded at load */
 
 /* regex.c: RE2 syntax, matched anywhere in the text (as CUE's =~). */
 typedef struct Regex Regex;
@@ -423,6 +424,7 @@ struct TriContent {
 
     VEC(InstInfo) insts;
     U64Map instidx;
+    U64Map patidx;               /* a variant's pattern, if it has arithmetic → (instance << 20 | variant) + 1 */
 
     U32Vec **leafcache;          /* type → its enum leaves, computed on demand */
 
@@ -548,6 +550,7 @@ bool     inst_pattern(Content *c, uint32_t inst);
 bool     inst_spec(Content *c, uint32_t inst);
 TriNode *settle_alternatives(Content *c, TriNode *root, TriArena *arena, TriFailure *fail);
 TriNode *settle(Content *c, TriNode *root, const ArithVec *extra, TriArena *arena, TriFailure *fail);
+const ArithVec *pattern_ariths(Content *c, const TriNode *pattern);   /* an instance's own arithmetic, or NULL */
 const char *field_flags(const Content *c, uint32_t f);
 bool     has_flag(const char *flags, const char *flag);
 const char *attr_args(const Attr *attrs, int n, const char *name);

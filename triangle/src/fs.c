@@ -856,7 +856,19 @@ const TriNode *tri_unify(TriContent *c, const TriNode *a, const TriNode *b, TriA
     }
     op_end(c, saved);
     tri_arena_release(c->scratch, m);
-    if (r && (c->disjs.n || c->narith)) r = settle(c, r, NULL, out, failure);   /* alternatives, arithmetic */
+    if (r && (c->disjs.n || c->narith)) {                                       /* alternatives, arithmetic */
+        /* an instance's pattern brings the arithmetic the instance states */
+        const ArithVec *pa = pattern_ariths(c, a), *pb = pattern_ariths(c, b);
+        if (pa && pb) {
+            ArithVec both = { 0 };                 /* the records are borrowed: only the list is freed */
+            for (size_t i = 0; i < pa->n; i++) VEC_PUSH(both, pa->v[i]);
+            for (size_t i = 0; i < pb->n; i++) VEC_PUSH(both, pb->v[i]);
+            r = settle(c, r, &both, out, failure);
+            VEC_FREE(both);
+        } else {
+            r = settle(c, r, pa ? pa : pb, out, failure);
+        }
+    }
     return r;
 }
 

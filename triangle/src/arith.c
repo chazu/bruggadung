@@ -223,6 +223,30 @@ const char *quantity_op(int op, Quantity a, Quantity b, Quantity *out)
     return NULL;
 }
 
+/* The functions that are arithmetic: unlike the other built-ins, which take
+ * only what is known when content loads, these take tags, and wait for them
+ * as + - * / do. */
+bool arith_call(const char *name)
+{
+    return !strcmp(name, "math.Min") || !strcmp(name, "math.Max") || !strcmp(name, "math.Clamp");
+}
+
+/* The lesser (or greater) of two values of the same dimension, as intervals:
+ * each bound is the lesser (greater) of the two. */
+static const char *quantity_minmax(bool min, Quantity a, Quantity b, Quantity *out)
+{
+    if (a.dim >= 0 && !quantity_kinds[a.dim].quantity) return "not a quantity";
+    if (b.dim >= 0 && !quantity_kinds[b.dim].quantity) return "not a quantity";
+    if (memcmp(a.exp, b.exp, sizeof a.exp)) return "comparing needs the same dimension";
+    common_quantum(&a, &b);
+    *out = a;
+    if (min) { out->lo = a.lo < b.lo ? a.lo : b.lo; out->hi = a.hi < b.hi ? a.hi : b.hi; }
+    else { out->lo = a.lo > b.lo ? a.lo : b.lo; out->hi = a.hi > b.hi ? a.hi : b.hi; }
+    int d = quantity_kind_for(out);
+    out->dim = d >= 0 && quantity_kinds[d].qnum == out->qnum && quantity_kinds[d].qden == out->qden ? d : -1;
+    return NULL;
+}
+
 /* Evaluates an arithmetic expression. Returns NULL with the result, an error
  * message, or ARITH_UNKNOWN when some argument is not yet a number. */
 const char *const ARITH_UNKNOWN = "unknown";
@@ -243,8 +267,25 @@ const char *arith_eval(const X *x, bool (*lookup)(void *ctx, Sym tag, Quantity *
         if (e) return e;
         return quantity_op(x->u.ar.op, a, b, out);
     }
+    case X_CALL: {
+        if (!arith_call(x->u.call.name)) return "only math.Min, math.Max and math.Clamp may be called in arithmetic";
+        Quantity v[3];
+        for (int i = 0; i < x->u.call.n && i < 3; i++) {
+            const char *e = arith_eval(x->u.call.args[i], lookup, ctx, &v[i]);
+            if (e) return e;
+        }
+        if (!strcmp(x->u.call.name, "math.Min")) return quantity_minmax(true, v[0], v[1], out);
+        if (!strcmp(x->u.call.name, "math.Max")) return quantity_minmax(false, v[0], v[1], out);
+        /* clamp: no less than the lowest, no more than the highest */
+        if (v[1].lo > v[2].hi && !memcmp(v[1].exp, v[2].exp, sizeof v[1].exp) && v[1].qnum == v[2].qnum &&
+            v[1].qden == v[2].qden)
+            return "math.Clamp's lowest is above its highest";
+        Quantity m;
+        const char *e = quantity_minmax(false, v[0], v[1], &m);
+        return e ? e : quantity_minmax(true, m, v[2], out);
+    }
     default:
-        return "only numbers, tags, and + - * / may appear in arithmetic";
+        return "only numbers, tags, + - * /, and math.Min, math.Max and math.Clamp may appear in arithmetic";
     }
 }
 
@@ -302,6 +343,8 @@ void arith_tags(const X *x, SymVec *out)
     } else if (x->k == X_ARITH) {
         arith_tags(x->u.ar.a, out);
         arith_tags(x->u.ar.b, out);
+    } else if (x->k == X_CALL) {
+        for (int i = 0; i < x->u.call.n; i++) arith_tags(x->u.call.args[i], out);
     } else if (x->k == X_INTERP) {
         for (int i = 0; i < x->u.in.n; i++) arith_tags(x->u.in.parts[i], out);
     }

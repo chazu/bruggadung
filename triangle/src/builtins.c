@@ -25,6 +25,10 @@ static const Builtin builtins[] = {
     { "math.Ceil", 1, 1, "math.Ceil(int | fixed)" },
     { "math.Round", 1, 1, "math.Round(int | fixed)" },
     { "math.Trunc", 1, 1, "math.Trunc(int | fixed)" },
+    /* arithmetic: over numbers, quantities and tags, like + - * / (arith.c) */
+    { "math.Min", 2, 2, "math.Min(number, number)" },
+    { "math.Max", 2, 2, "math.Max(number, number)" },
+    { "math.Clamp", 3, 3, "math.Clamp(number, lowest, highest)" },
     { "strings.ToUpper", 1, 1, "strings.ToUpper(string)" },
     { "strings.ToLower", 1, 1, "strings.ToLower(string)" },
     { "strings.TrimSpace", 1, 1, "strings.TrimSpace(string)" },

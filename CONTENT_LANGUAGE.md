@@ -393,6 +393,21 @@ are the point of a blueprint.
     specs, construction (a computed field is not a variation point), runtime
     values, and unification. A result that contradicts its field fails.
   - Constants fold at load: `size: 2 * 9.5mm` is `19mm`.
+  - `math.Min(a, b)`, `math.Max(a, b)` and `math.Clamp(x, lowest, highest)`
+    are arithmetic too, over values of one dimension: each bound of the
+    result's interval is the lesser, or the greater, of the arguments'
+    bounds. A sum that would leave its field's bounds fails; clamped, it
+    stops at them (`nourishment: math.Clamp($n + $c, 0, 100)`). They wait
+    on their tags as the operators do, and do not narrow backwards. The
+    other built-in functions (§13's, REFERENCE.md) take only what is known
+    when content loads.
+  - An instance's own arithmetic goes where its pattern goes: into a copy
+    of it by name (decision 5), and into a unification with its pattern at
+    runtime (`tri_unify` with `tri_pattern`'s result), so an operation's
+    `after: { item: { handfuls: $h - 1 } }` is worked out when the
+    operation is unified with what fills its roles. It does not go with
+    the *result* of such a unification into a further one: a constraint
+    still open then is dropped.
 - Values code computes, such as a transformer's output torque from a table,
   come from functions named by attribute (`@fn(lever_torque)`), as in
   ACTIONS.md §2.

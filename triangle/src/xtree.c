@@ -162,6 +162,18 @@ bool x_interval(const X *x, int *dim, int64_t *lo, int64_t *hi)
         *dim = kd; *lo = k.lo; *hi = k.hi;
         return true;
     }
+    if (x->k == X_CALL && arith_call(x->u.call.name)) {     /* of constants, it folds as arithmetic does */
+        SymVec tags = { 0 };
+        arith_tags(x, &tags);
+        bool open = tags.n > 0;
+        VEC_FREE(tags);
+        Quantity r, k;
+        if (open || arith_eval(x, NULL, NULL, &r)) return false;
+        int kd = quantity_kind_for(&r);
+        if (kd < 0 || quantity_to(&r, kd, &k)) return false;
+        *dim = kd; *lo = k.lo; *hi = k.hi;
+        return true;
+    }
     if (x->k == X_AND) {
         int d1, d2;
         int64_t l1, h1, l2, h2;

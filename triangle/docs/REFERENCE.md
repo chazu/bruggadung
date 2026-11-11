@@ -566,6 +566,7 @@ r: #R & {
 | `quo(a, b)`, `rem(a, b)` | Quotient and remainder truncated toward zero. |
 | `math.Abs(x)` | Any number, in its kind. |
 | `math.Floor`, `math.Ceil`, `math.Round`, `math.Trunc` | A whole number, from `int` or `fixed`. `Round` is half away from zero. |
+| `math.Min(a, b)`, `math.Max(a, b)`, `math.Clamp(x, lowest, highest)` | Numbers or quantities of one dimension. **These three are arithmetic**, the exception to the rule above: they take tags, wait for them as `+ - * /` do, and are evaluated at runtime too (`kept: math.Clamp($n + $c, 0, 100)`). They do not narrow their arguments backwards. |
 | `strings.ToUpper`, `strings.ToLower` | ASCII letters only. |
 | `strings.TrimSpace(s)` | Without leading and trailing white space. |
 | `strings.Contains`, `strings.HasPrefix`, `strings.HasSuffix` | `true` or `false`. |

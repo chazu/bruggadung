@@ -377,6 +377,23 @@ static TriNode *build_raw(Build *b, X *x)
                 build_error(b, x->loc, "instance %s could not be resolved", x->u.name);
                 return NULL;
             }
+            /* a name unifies a copy of its constraints (CONTENT_LANGUAGE.md
+             * decision 5), its arithmetic among them: each constraint, and
+             * the places of its tags, moved to where the copy stands */
+            const InstInfo *ri = &c->insts.v[v - 1];
+            for (size_t i = 0; ri->vars.n == 1 && i < ri->vars.v[0].ariths.n; i++) {
+                const ArithRec *src = &ri->vars.v[0].ariths.v[i];
+                ArithRec r = { { 0 }, src->expr, { 0 } };
+                for (size_t k = 0; k < b->path.n; k++) VEC_PUSH(r.path, b->path.v[k]);
+                for (size_t k = 0; k < src->path.n; k++) VEC_PUSH(r.path, src->path.v[k]);
+                for (size_t t = 0; t < src->tags.n; t++) {
+                    TagPath tp = { src->tags.v[t].name, { 0 } };
+                    for (size_t k = 0; k < b->path.n; k++) VEC_PUSH(tp.path, b->path.v[k]);
+                    for (size_t k = 0; k < src->tags.v[t].path.n; k++) VEC_PUSH(tp.path, src->tags.v[t].path.v[k]);
+                    VEC_PUSH(r.tags, tp);
+                }
+                VEC_PUSH(b->ariths, r);
+            }
             return copy_raw(c, c->scratch, c->insts.v[v - 1].pattern);
         }
         if (strchr(x->u.name, '.') || strchr(x->u.name, '[')) {
@@ -499,7 +516,28 @@ static TriNode *build_raw(Build *b, X *x)
         VEC_PUSH(b->ariths, r);
         return node_new(c, c->scratch, c->top);
     }
-    case X_COMP: case X_VAR: case X_CALL:    /* expanded when content loads */
+    case X_CALL:
+        if (arith_call(x->u.call.name)) {    /* arithmetic: a number now, or a constraint on this field */
+            int dim;
+            int64_t lo, hi;
+            if (x_interval(x, &dim, &lo, &hi)) return leaf_new(c, c->scratch, c->dimtype[dim], lo, hi);
+            SymVec names = { 0 };
+            arith_tags(x, &names);
+            bool tagged = names.n > 0;
+            VEC_FREE(names);
+            if (!tagged) {
+                Quantity q;
+                const char *err = arith_eval(x, NULL, NULL, &q);
+                build_error(b, x->loc, "arithmetic: %s", err ? err : "its arguments are numbers or tags");
+                return NULL;
+            }
+            ArithRec r = { { 0 }, x, { 0 } };
+            for (size_t i = 0; i < b->path.n; i++) VEC_PUSH(r.path, b->path.v[i]);
+            VEC_PUSH(b->ariths, r);
+            return node_new(c, c->scratch, c->top);
+        }
+        /* fallthrough */
+    case X_COMP: case X_VAR:                 /* expanded when content loads */
         build_error(b, x->loc, "%s", "a comprehension or its variable outside one, not expanded");
         return NULL;
     case X_CMP: case X_LOGIC: case X_NOT:
@@ -1101,6 +1139,17 @@ static bool resolve_ariths(Content *c, Build *b, TriNode *out, ArithVec *dst, Lo
     for (size_t i = 0; i < b->ariths.n; i++) {
         ArithRec r = { { 0 }, b->ariths.v[i].expr, { 0 } };
         for (size_t k = 0; k < b->ariths.v[i].path.n; k++) VEC_PUSH(r.path, b->ariths.v[i].path.v[k]);
+        if (b->ariths.v[i].tags.n) {             /* copied from an instance by name: its tags have their places */
+            for (size_t t = 0; t < b->ariths.v[i].tags.n; t++) {
+                TagPath tp = { b->ariths.v[i].tags.v[t].name, { 0 } };
+                for (size_t k = 0; k < b->ariths.v[i].tags.v[t].path.n; k++)
+                    VEC_PUSH(tp.path, b->ariths.v[i].tags.v[t].path.v[k]);
+                VEC_PUSH(r.tags, tp);
+            }
+            VEC_PUSH(*dst, r);
+            c->narith++;
+            continue;
+        }
         SymVec names = { 0 };
         arith_tags(r.expr, &names);
         for (size_t t = 0; t < names.n; t++) {
@@ -1642,8 +1691,24 @@ bool inst_pattern(Content *c, uint32_t i)
     if (!in->vars.n) { in->pstate = 3; return false; }
     in->pattern = in->vars.v[0].pattern;
     for (size_t k = 1; k < in->vars.n; k++) in->pattern = fs_generalise(c, c->spec, in->pattern, in->vars.v[k].pattern);
+    /* its arithmetic goes with its pattern, wherever the pattern is unified */
+    for (size_t k = 0; k < in->vars.n; k++)
+        if (in->vars.v[k].ariths.n)
+            u64map_put(&c->patidx, (uint64_t) (uintptr_t) in->vars.v[k].pattern, (((uint64_t) i << 20) | k) + 1);
     in->pstate = 2;
     return true;
+}
+
+/* The arithmetic an instance states, by its pattern (one variant's): a
+ * structure carries its types' constraints in its nodes' types, but an
+ * instance's own are kept beside its pattern, and a unification that is
+ * handed the pattern takes them from here. */
+const ArithVec *pattern_ariths(Content *c, const TriNode *pattern)
+{
+    uint64_t v;
+    if (!pattern || !c->patidx.count || !u64map_get(&c->patidx, (uint64_t) (uintptr_t) pattern, &v)) return NULL;
+    v--;
+    return &c->insts.v[v >> 20].vars.v[v & 0xFFFFF].ariths;
 }
 
 /* --- specs: defaults and variation ---------------------------------------------------------- */
@@ -3788,6 +3853,9 @@ static const char *x_tag_in(const X *x)
         return t ? t : x->u.list.elem ? x_tag_in(x->u.list.elem) : x_tag_in(x->u.list.tail);
     case X_AND: case X_OR: return (t = x_tag_in(x->u.bin.a)) ? t : x_tag_in(x->u.bin.b);
     case X_ARITH: return (t = x_tag_in(x->u.ar.a)) ? t : x_tag_in(x->u.ar.b);
+    case X_CALL:
+        for (int i = 0; i < x->u.call.n && !t; i++) t = x_tag_in(x->u.call.args[i]);
+        return t;
     case X_DEFAULT: return x_tag_in(x->u.sub);
     case X_INTERP:
         for (int i = 0; i < x->u.in.n && !t; i++) t = x_tag_in(x->u.in.parts[i]);
@@ -4180,6 +4248,12 @@ static X *expand(Exp *e, X *x, const Env *env)
         X *args[8];
         for (int i = 0; i < x->u.call.n && i < 8; i++) args[i] = expand(e, x->u.call.args[i], env);
         if (!e->ok) return x;
+        if (arith_call(x->u.call.name)) {    /* arithmetic: kept, with its arguments expanded, for the build */
+            X *n = x_copy(e, x);
+            n->u.call.args = arena_alloc(e->c->load, (x->u.call.n ? x->u.call.n : 1) * sizeof(X *));
+            for (int i = 0; i < x->u.call.n && i < 8; i++) n->u.call.args[i] = args[i];
+            return n;
+        }
         char err[400];
         X *r = builtin_call(e->c, x, args, call_data, e, err, sizeof err);
         if (!r) exp_error(e, x->loc, err);
@@ -4379,6 +4453,7 @@ void tri_content_free(TriContent *c)
     u64map_free(&c->labelidx);
     u64map_free(&c->plainidx);
     u64map_free(&c->instidx);
+    u64map_free(&c->patidx);
     free(c->bittype);
     tri_arena_free(c->load);
     tri_arena_free(c->spec);
