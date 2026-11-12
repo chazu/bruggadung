@@ -17,7 +17,7 @@ package lab
  * A staged operation's stages each have their own: the roles are the
  * operation's, and its tags reach every stage.
  *
- * Not built: `changes`; a move into an assembly.
+ * Not built: `changes`.
  * Arithmetic in `after` (`handfuls: $h - 1`, `math.Clamp`) is worked out by
  * the unification: the pattern brings the operation's own arithmetic.
  */
@@ -127,8 +127,8 @@ int_of :: proc(v: ^tri.Node) -> (i64, bool) {
 }
 
 
-/* The place a `moves` or a `makes` names, as a location: a tile, a container, or a
- * hand; into a hand is into a free one of theirs, unless it says which. */
+/* The place a `moves` or a `makes` names, as a location: a tile, a
+ * container, a role in an assembly, or a hand; into a hand is into a free one of theirs, unless it says which. */
 @(private = "file")
 declared_place :: proc(world: ^World, into: ^tri.Node) -> (Location, string) {
 	lo, hi: i64
@@ -147,8 +147,16 @@ declared_place :: proc(world: ^World, into: ^tri.Node) -> (Location, string) {
 		if !ok do return {}, "a move into a container says which: tag the role's id"
 		return in_(container), ""
 	}
+	if strings.has_suffix(name, "#Installed") {
+		assembly, ok := ref_of(tc, tri.at(tc, into, "assembly"))
+		role, fits   := text_of_node(tc, tri.at(tc, into, "role"))
+		if !ok do return {}, "a move into an assembly says which: tag the role's id"
+		if !fits || role == "" do return {}, "it fits no place in it"
+		index, _ := int_of(tri.at(tc, into, "index"))      /* the first of that role, unless it says */
+		return part_of(assembly, role, i32(index)), ""
+	}
 	if !strings.has_suffix(name, "#Held") {
-		return {}, fmt.tprintf("a move into %s is not built", name if name != "" else "nothing")
+		return {}, fmt.tprintf("a move into %s is not a place", name if name != "" else "nothing")
 	}
 	by, ok := ref_of(tc, tri.at(tc, into, "by"))
 	if !ok do return {}, "a move into a hand says whose: tag the role's id"
@@ -189,6 +197,28 @@ step_says :: proc(tc: ^tri.Content, pattern: ^tri.Node, step: string) -> bool {
 }
 
 
+/* Whether what a step moves, consumes and is the subject of is bound to a
+ * role: "" if so, else what isn't. A tag is its declaration's: an operation
+ * that extends a type and uses the type's `$i` without binding it again
+ * loads, and would move nothing. */
+@(private = "file")
+step_binds :: proc(tc: ^tri.Content, pattern: ^tri.Node, step: string) -> string {
+	for named in ([?][2]string{{"moves", "moved"}, {"consumes", "consumed"}, {"emits", "subject"}}) {
+		list := tri.at(tc, pattern, ns_utf8(fmt.tprintf("%s%s", step, named[0])))
+		for ; list != nil; list = tri.at(tc, list, "rest") {
+			what := tri.at(tc, list, ns_utf8(fmt.tprintf("first.%s", named[1])))
+			if tri.at(tc, list, "first") == nil do break
+			bound := false
+			for r in Role.Actor ..< Role.Count {
+				if id := tri.at(tc, pattern, ns_utf8(fmt.tprintf("roles.%s.id", ROLE_NAMES[r]))); id != nil && id == what do bound = true
+			}
+			if !bound do return fmt.tprintf("its %s name no role: tag the role's id (`item: #Thing & {{ id: $i }}`)", named[0])
+		}
+	}
+	return ""
+}
+
+
 /* Every operation's every step says what it does: "" if so, else the first
  * that doesn't. An `effect:` left out by mistake would otherwise load, and
  * do nothing. */
@@ -203,11 +233,15 @@ declared_check :: proc(tc: ^tri.Content) -> string {
 			if pattern == nil do continue
 			if tri.at(tc, pattern, "stages.first") == nil {
 				if !step_says(tc, pattern, "") do return fmt.tprintf("the operation %s does nothing: it has no effect, named or declared", operation)
+				if reason := step_binds(tc, pattern, ""); reason != "" do return fmt.tprintf("the operation %s: %s", operation, reason)
 				continue
 			}
 			for k: i64 = 0; tri.at(tc, pattern, ns_utf8(fmt.tprintf("%sduration", step_path(tc, pattern, k)))) != nil; k += 1 {
 				if !step_says(tc, pattern, step_path(tc, pattern, k)) {
 					return fmt.tprintf("stage %d of the operation %s does nothing: it has no effect, named or declared", k, operation)
+				}
+				if reason := step_binds(tc, pattern, step_path(tc, pattern, k)); reason != "" {
+					return fmt.tprintf("stage %d of the operation %s: %s", k, operation, reason)
 				}
 			}
 		}

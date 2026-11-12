@@ -33,7 +33,7 @@
 //            (src/act_activities.odin); they are compacted into digests
 //            after the world's history window (src/core_world.odin).
 
-#Effect: "take" | "take_some" | "drive" | "open_tap" | "fill" | "walk" | "loosen" | "say" | "tend" | "analyse" | "write" | "read" | "eat" | "investigate" | "tighten" | "rotate" | "strike" | "shut" | "rest" | "saw" | "pass" | "copy" | "reveal" | "replace" | "cut" | "shape" | "install" | "issue" | "confiscate" | "arrest" | "flee" | "hit" | "hire" | "work" | "service" | "sow" | "keep_seed" | "harvest" | "crouch" | "shoot" | "butcher" | "post" | "hand_over" | "put_some" | "shoulder" | "put_back" | "give_some" | "forage"
+#Effect: "take" | "take_some" | "drive" | "open_tap" | "fill" | "walk" | "loosen" | "say" | "tend" | "analyse" | "write" | "read" | "eat" | "investigate" | "tighten" | "rotate" | "strike" | "shut" | "rest" | "saw" | "pass" | "copy" | "reveal" | "replace" | "cut" | "shape" | "issue" | "confiscate" | "arrest" | "flee" | "hit" | "hire" | "work" | "service" | "sow" | "keep_seed" | "harvest" | "crouch" | "shoot" | "butcher" | "post" | "hand_over" | "put_some" | "shoulder" | "put_back" | "give_some" | "forage"
 
 // Which roles an operation has is its roles' type: a structure's type is the
 // most general one with all its features.
@@ -61,7 +61,8 @@
 // code. `after` is the roles as the effect leaves them: each field it
 // states is set, if the truth isn't that already. `moves` puts a thing
 // (`moved`, by a tag on its role's id) `into` a place: a tile, a container,
-// or a hand (#Held, `by` whom), which is a free one of theirs. `emits` is events, by `event` (its kind), subject
+// a hand (#Held, `by` whom), which is a free one of theirs, or a role in an
+// assembly (#Installed). `emits` is events, by `event` (its kind), subject
 // and other. A step has a declared effect or names one (`effect`), not
 // both. The requirements stay in `roles`: they are matched once from what
 // the actor perceives, for the menu, and again against the truth when the

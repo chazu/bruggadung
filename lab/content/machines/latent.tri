@@ -10,8 +10,8 @@
 // - knowledge: a part seen wearing is found wanting servicing
 //             (`wearing_part`), which the diligent do.
 // - code:     src/kinds_latent_kind.odin: opening, wear, failures, servicing;
-//             effect_reveal, effect_replace, effect_service, effect_install,
-//             effect_cut, effect_shape.
+//             effect_reveal, effect_replace, effect_service, effect_cut,
+//             effect_shape. Installing a part is declared (actions.tri).
 
 package machines
 
@@ -151,12 +151,13 @@ clean_out: #Operation & {
 
 // Put a part held back into the assembly it came from, in its role.
 install_part: #Operation & {
-    effect: "install"
     roles: {
         actor:       #Agent & { id: $a }
-        item:        #Part & { place: #Held & { by: $a } }
-        destination: #Latent
+        item:        #Part & { id: $i, fits: $r, place: #Held & { by: $a } }
+        destination: #Latent & { id: $d }
     }
+    moves: [{ moved: $i, into: #Installed & { assembly: $d, role: $r } }]
+    after: { item: #Part & { cameFrom: $d } }
 } @family(operations)
 
 // A leather hide, and a strip cut from it: an individual divided.

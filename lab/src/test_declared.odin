@@ -65,4 +65,47 @@ test_declared :: proc() {
 		p := proposal_group_proposals(g)[0]
 		bg_check(p.kind == .Event && p.name == "looked" && p.target.entity == giver && p.other.entity == larder)
 	}
+	committer_commit_boundary(c)
+
+	/* an instant operation's declared effect is resolved again if it is
+	 * stale when it commits: two open the door shut again in one boundary.
+	 * The second's group, built when the door was shut, is rejected; built
+	 * afresh, opening no longer holds of a door ajar, and nothing replaces
+	 * it */
+	shut := proposal_group_group_with_phase(.System, "test: the door shut again")
+	proposal_group_set_of_to(shut, "Door.ajar", whole(door), 0)
+	committer_submit(c, shut)
+	committer_commit_boundary(c)
+	first  := perform(w, c, action_make("open_door", giver, door, NO_ENTITY), 0, &error)
+	second := perform(w, c, action_make("open_door", taker, door, NO_ENTITY), 0, &error)
+	bg_check(first != nil && second != nil && second.again != nil)
+	settled := committer_commit_boundary(c)
+	bg_check(len(settled) == 2 && world_get_field(w, "Door.ajar", door, &v) && v == 1)
+
+	/* and where it still holds, the fresh group stands in the same
+	 * boundary: two mark the nail, each one more than it read */
+	one := test_marking(w, nail, 0)
+	two := test_marking(w, nail, 0)
+	committer_submit(c, one)
+	committer_submit(c, two)
+	settled = committer_commit_boundary(c)
+	bg_check(len(settled) == 3 && world_get_field(w, "Body.toolMarks", nail, &v) && v == 2)
+}
+
+
+/* A group that marks a thing once more than it read, expecting what it
+ * read, and is built afresh if that is stale. */
+@(private = "file")
+test_marking :: proc(w: ^World, thing: Entity_ID, tries: int) -> ^Proposal_Group {
+	marks: i64
+
+	world_get_field(w, "Body.toolMarks", thing, &marks)
+	g := proposal_group_group_with_phase(.Action, "test: a mark more")
+	proposal_group_set_of_to_expecting(g, "Body.toolMarks", whole(thing), marks + 1, marks)
+	g.action = action_make("mark", NO_ENTITY, thing, NO_ENTITY)
+	g.tries  = tries
+	g.again  = proc(world: ^World, was: ^Proposal_Group) -> ^Proposal_Group {
+		return test_marking(world, was.action.roles[.Item], was.tries + 1)
+	}
+	return g
 }

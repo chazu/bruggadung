@@ -88,6 +88,14 @@ Proposal_Group :: struct {
 	proposals: [dynamic]Proposal,        // _proposals, _count and _capacity
 	handles:   u64,
 	strings:   [dynamic]cstring,         // _strings and _nstrings
+	// rejected because what it expected is no longer so, it is built afresh
+	// from the world as it now is, and submitted in its place: nil for a
+	// group that isn't (an instant operation's declared effect is,
+	// EFFECTS.md). `tries` counts the times, so it ends.
+	again:     proc(world: ^World, was: ^Proposal_Group) -> ^Proposal_Group,
+	action:    Action,
+	amount:    i64,
+	tries:     int,
 
 	// results, set by commitment
 	applied:   bool,

@@ -2323,21 +2323,6 @@ effect_service :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group
 }
 
 
-/* Putting a part back into its assembly, in its role. */
-@(private = "file")
-effect_install :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
-	role: cstring
-
-	role = world_text_field(world, "Part.fits", a.roles[.Item])
-	if !has_text(role) {
-		return "it fits no place in it"
-	}
-	proposal_group_move_to(g, whole(a.roles[.Item]), part_of(a.roles[.Destination], string(role), 0))
-	proposal_group_set_of_to(g, "Part.cameFrom", whole(a.roles[.Item]), i64(a.roles[.Destination]))
-	return ""
-}
-
-
 /* The claims covering an entity (COMPONENTS.md Scenario 3): on it; on an
  * assembly it is part of, or came out of, for kinds that cover parts
  * (content's `coverage`); and on what it was divided from. */
@@ -3101,7 +3086,6 @@ effects := [?]Named_Effect{
 	{"service",   effect_service},
 	{"cut",       effect_cut},
 	{"shape",     effect_shape},
-	{"install",   effect_install},
 	{"issue",     effect_issue},
 	{"rest",      effect_rest},
 	{"strike",    effect_strike},
@@ -3856,7 +3840,25 @@ perform :: proc(world: ^World, committer: ^Committer, action: Action, amount: i6
 			return nil
 		}
 		leave_traces(world, action, group)
+		/* a declared effect read the truth to be built: stale when it comes
+		 * to commit, it is resolved again (as an activity's is, BGActivities) */
+		if effect == "" do group.again, group.action, group.amount = perform_again, action, amount
 	}
 	committer_submit(committer, group)
+	return group
+}
+
+
+/* An instant operation's declared effect, rejected because what it read is
+ * no longer so: its group built afresh from the truth as it now is. nil if
+ * what the operation requires no longer holds: it has failed. */
+@(private = "file")
+perform_again :: proc(world: ^World, was: ^Proposal_Group) -> ^Proposal_Group {
+	group := proposal_group_group_with_phase(.Action, proposal_group_source(was))
+	proposal_group_set_actor(group, was.actor)
+	proposal_group_set_weight(group, was.weight)
+	if apply_effect(world, was.action, was.amount, group) != "" do return nil
+	leave_traces(world, was.action, group)
+	group.again, group.action, group.amount, group.tries = perform_again, was.action, was.amount, was.tries + 1
 	return group
 }

@@ -326,9 +326,9 @@ its tests.
 - **A tag is its declaration's.** `cook_portion: #Cook & { moves: [{
   moved: $i }] }` used `#Cook`'s `$i` without binding it again: it
   loaded, and moved nothing. An operation that extends a type binds the
-  tags it uses again (`item: #Food & { id: $i }`). Nothing catches this at
-  load; the lab refuses when the effect commits ("moves nothing: tag the
-  role's id").
+  tags it uses again (`item: #Food & { id: $i }`). The lab now refuses
+  it when a world is made (`declared_check`): what a step moves, consumes
+  or emits of must be the `id` of one of the operation's roles.
 - **What a neighbour is asked for comes from the first-ranked way's
   pattern** (`agency_wants`). A way to a meal that wanted `#Food & #Stack`
   asked for a stack, whose `count` nobody perceives, so nothing handed
@@ -345,8 +345,9 @@ its tests.
   same `fuel`. The second's set is rejected ("is no longer"); its activity
   is then pushed again, so the pattern is unified with the truth as it now
   is, up to 4 times (`BG_RESOLVE_AGAIN`). Without this the second kept its
-  firewood in hand and failed. An instant operation rejected this way is
-  not yet resolved again.
+  firewood in hand and failed. An instant operation's is resolved
+  again by the committer, in the next round of the same boundary: its
+  group carries how to build it afresh (`again`).
 - **Stoking used to lose fuel, and the village was balanced on it.** The
   procedure set `fuel` without expecting what it read: of two armfuls
   stoked in one step, both were destroyed and one was counted. Now both
@@ -398,8 +399,9 @@ its tests.
 - **Putting down now requires ground in its roles** (`actor: #Agent & {
   place: $p & #OnTile }`), where the procedure refused when the effect
   committed. An actor not on a tile no longer has it on its menu.
-- **A move into an assembly (`#Installed`) is not built**: nothing declared
-  needs it yet.
+- **A move into an assembly (`#Installed`) is built** since, with
+  installing a part (machines/) declared on it: the assembly by a tag,
+  the role by the part's `fits`.
 - **The check for an operation that does nothing is the lab's, when a
   world is made**, not `triangle check`'s: the editor doesn't show it.
 

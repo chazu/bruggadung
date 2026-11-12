@@ -428,8 +428,10 @@ committer_individuate :: proc(self: ^Committer, group: ^Proposal_Group, count: ^
 
 // What a rejection says when a proposal expected a value, or a place, that
 // is no longer so: the group was built on a stale reading. A declared
-// effect so rejected is resolved again (act_activities.odin).
+// effect so rejected is resolved again, so many times at most: an
+// activity's by BGActivities, an instant operation's here.
 STALE :: "is no longer"
+BG_RESOLVE_AGAIN :: 4
 
 @(private = "file")
 resolve_ref :: proc(g: ^Proposal_Group, r: Ref) -> Entity_ID {
@@ -1150,6 +1152,13 @@ committer_commit_group :: proc(self: ^Committer, group: ^Proposal_Group) {
 		world_rollback_group(self.world)
 		proposal_group_set_applied(group, false, reason, self.position)
 		committer_note(self, fmt.tprintf("    rejected: %s", reason))
+		/* what it read is no longer so: built afresh, for the next round */
+		if group.again != nil && group.tries < BG_RESOLVE_AGAIN && strings.contains(reason, STALE) {
+			if fresh := group.again(self.world, group); fresh != nil {
+				committer_note(self, "    resolved again")
+				committer_submit(self, fresh)
+			}
+		}
 		return
 	}
 	world_commit_group(self.world)

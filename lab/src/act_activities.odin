@@ -41,9 +41,6 @@ Activity_Timer :: struct {
 
 // One of _completions' pairs: the group (retained), the activity.
 @(private = "file")
-// How often a declared effect rejected as stale is resolved again.
-BG_RESOLVE_AGAIN :: 4
-
 Completion :: struct {
 	group:    ^Proposal_Group,
 	activity: Entity_ID,
