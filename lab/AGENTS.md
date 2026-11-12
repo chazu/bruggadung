@@ -69,12 +69,16 @@ release that changes them shows up there.
   file of the Odin package.
 - C's `context` is Odin's keyword: such a field or parameter is `context_`.
 
-## The simulation is deterministic, everywhere
+## Scenario hashes notice a change
 
-Every scenario must end in the same state on every platform.
-`ci/scenario-hashes.txt` holds each scenario's hashes and `make check`
-compares. A change meant to change a scenario regenerates it (`make
-scenarios > ci/scenario-hashes.txt`) and says so in the commit.
+A deterministic simulation is not a goal. `ci/scenario-hashes.txt` holds
+each scenario's hashes and `make check` compares, so that a change which
+moves a scenario's outcome is seen. A change that moves one for a reason
+regenerates the file (`make scenarios > ci/scenario-hashes.txt`) and says
+so in the commit; keeping the hashes as they were is never a reason to
+hold a change back.
+
+For the hashes to stay still when nothing changed:
 
 - A sort orders ties fully (by ID, say): `slice.sort_by` isn't stable.
 - Odin's `map` iterates in no fixed order: sort the keys where the order

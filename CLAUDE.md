@@ -28,3 +28,11 @@ lab/content/README.md is the rule for arranging Triangle content. In short:
   point updates the header in the same change.
 
 See also lab/AGENTS.md for the lab's build rules.
+
+## Scenario hashes
+
+A deterministic simulation is not a goal, and probability will come into
+the simulation. The lab's scenario hashes only show that a change moved an
+outcome. That a change would move them is never a cost to weigh against
+it and never a reason to shape a design: make the better change,
+regenerate the hashes, and say so in the commit.

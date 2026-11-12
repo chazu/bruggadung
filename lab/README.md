@@ -29,8 +29,8 @@ make watcher && ./build/<platform>/watcher crowd 40   # a world in a window: 40 
 ./build/<platform>/watcher village --knows             # the village as a villager knows it (k: the truth, or back)
 ```
 
-Every scenario ends in the same state on every platform: `make check`
-compares each one's hashes with `ci/scenario-hashes.txt`.
+`make check` compares each scenario's hashes with
+`ci/scenario-hashes.txt`, to show when a change has moved an outcome.
 
 ## Layout
 

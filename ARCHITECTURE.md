@@ -131,11 +131,12 @@ size.
 
 ## Rules that apply everywhere
 
-### Determinism
+### Stable order
 
-- A run is reproduced bit for bit by its initial state, world seed, and input
-  log. The log records commands and stop boundaries with their simulation
-  times.
+Reproducing a run bit for bit is not a goal. The order things happen in is
+kept stable all the same, so that a change in a scenario's outcome can be
+put down to a change in the code or the content.
+
 - **No iteration in hash order.** Stores iterate by ID. Domains break ties by
   stable ID, rotated by step index. Commitment orders groups by seeded
   permutation.

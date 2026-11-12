@@ -1,9 +1,9 @@
 #!/bin/sh
 # Each scenario, a line: the hash of what `lab run` prints, of what `lab save`
-# prints, and the state hash it ends in. The simulation is deterministic on
-# every platform, so these are the same everywhere; ci/scenario-hashes.txt
-# holds them, and `make check` compares. A change that means to change a
-# scenario regenerates the file: make scenarios > ci/scenario-hashes.txt
+# prints, and the state hash it ends in. ci/scenario-hashes.txt holds them,
+# and `make check` compares, to show when a change has moved a scenario's
+# outcome. A change that moves one for a reason regenerates the file:
+# make scenarios > ci/scenario-hashes.txt
 #
 #   sh ci/scenario-hashes.sh ./build/<platform>/lab
 LAB=${1:-./build/lab}

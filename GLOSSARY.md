@@ -212,9 +212,10 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
   and the tiles something left; what perception is driven by. (REA step 1)
 - **Nudge**: a mind marked to decide at the next boundary because
   something addressed it (another's deal, the player's word). (REA step 1)
-- **Determinism**: a run reproduces bit for bit from initial state, world
-  seed and input log: no hash-order iteration, entity order and commit
-  order everywhere. (ARC)
+- **Determinism**: a run reproducing bit for bit from initial state, world
+  seed and input log. Not a goal of the project. The lab's scenarios
+  repeat on one build, which is what lets their hashes show that a change
+  moved an outcome. (ARC)
 - **Input log**: the recorded commands and stop boundaries that replay a
   session. *Avoid:* replay log. (ARC)
 - **World seed**: the seed from which per-entity seeds and random streams
