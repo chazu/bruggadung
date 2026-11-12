@@ -26,7 +26,14 @@ things the lab put off:
   steps them between boundaries.
 
 **Out of scope:**
-- Institutions: no law, permits or tolls (INSTITUTIONS.md).
+- Institutions: no permits or tolls (INSTITUTIONS.md). The law is on
+  since: the town, its law against theft (which everyone knows), and one
+  watch officer, of the town and of no household, who keeps a post south
+  of the green (a bed, a larder with grain). As first run: nobody is
+  arrested, but the officer has no stove and no income, so it begs its
+  food of the households; and a household's own taking from its larder
+  breaks the law in truth, each of its people's claim being "another's"
+  to the rest. Both are to be put right.
 - Seasons, weather, births and the regrowing of woods.
 - Hunger and food below reduced detail. Abstract detail stays open, as the
   user asked: the whole village runs at full detail.

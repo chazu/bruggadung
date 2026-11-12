@@ -14,7 +14,7 @@ test_village :: proc() {
 	village := autorelease(village_init_with_world(w, test_committer(w)))
 	bg_check(village_error(village) == "")
 	village_run(village)
-	bg_check(len(village_results(village)) == 79 && village_failure_count(village) == 0)
+	bg_check(len(village_results(village)) == 80 && village_failure_count(village) == 0)
 	/* at 02:00 on the last night: everyone's sleep is of its own bed (one up
 	 * at its hearth for a meal, woken hungry, aside) */
 	for v in village.people {

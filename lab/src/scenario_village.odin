@@ -38,6 +38,11 @@ package lab
  * and its second buys what it doesn't make; woodcutters and hunters carry
  * their day's work home in a backpack, one each.
  *
+ * The town, its law against theft, and one watch officer, of no household:
+ * a post south of the green, a bed and a larder there, its nights in the
+ * bed. The checks count it among those fed, and that it has arrested
+ * nobody: nobody here takes what isn't its household's.
+ *
  * The run goes boundary by boundary up to each check's time, putting none
  * in of its own (as the watcher runs it), so `lab run village` and a
  * watched village are the same run. The checks, for a week of days and
@@ -75,6 +80,11 @@ VILLAGE_MARKET :: i64(2)               // the first market day's index (day 3); 
 
 /* What each household buys at the market (content/market/): the goals,
  * each stocking its larder (or woodpile) with what it doesn't make. */
+/* The watch's post, south of the green: where its officer stands, its
+ * bed, and its larder. */
+@(private = "file", rodata)
+village_post := [3][2]i32{{60, 56}, {60, 57}, {61, 57}}
+
 @(private = "file", rodata)
 village_buys := [4][2]cstring {
 	{"meat_stocked", "firewood_stocked"},
@@ -188,6 +198,7 @@ Village :: struct {
 	perishing:    ^Perishing,        // spoils meat and meals
 	foraging:     ^Foraging,         // regrows the woods' forage
 	people:       [dynamic]Villager,
+	officer:      Entity_ID,         // the watch officer: of the town, not of a household
 	larders:      [4]Entity_ID,      // each household's, by its index
 	stoves:       [4]Entity_ID,
 	woodpiles:    [4]Entity_ID,
@@ -394,8 +405,29 @@ village_setup :: proc(self: ^Village) {
 			}
 		}
 	}
+	/* the town, its law against theft, which everyone knows, and its watch:
+	 * one officer, who keeps a post south of the green (a bed and a
+	 * larder of its own, with grain in it), and stands by it */
+	town := proposal_group_create(g, "town", "the town", location_make_none())
+	law  := proposal_group_create(g, "theft_law", "the law against theft", location_make_none())
+	proposal_group_set_of_to(g, "Law.lawOf", whole(law), i64(town))
+	for at in village_post {
+		if terrain_solid(world_terrain(self.world), at.x, at.y, 0) {
+			self.error = fmt.aprintf("the watch's post has no room at (%d, %d)", at.x, at.y)
+			return
+		}
+	}
+	officer   := proposal_group_create(g, "watch_officer", "the watch officer", on_tile(village_post[0].x, village_post[0].y, 0))
+	post_bed  := proposal_group_create(g, "bed", "the watch's bed", on_tile(village_post[1].x, village_post[1].y, 0))
+	post_food := proposal_group_create(g, "larder", "the watch's larder", on_tile(village_post[2].x, village_post[2].y, 0))
+	post_sack := proposal_group_create(g, "grain_sack", "the watch's grain", in_(post_food))
+	proposal_group_set_of_to(g, "OfficeHolder.office", whole(officer), i64(town))
+	village_own(g, officer, post_bed, "a bed of one's own")
+	village_own(g, officer, post_food, "the watch's larder")
+	village_own(g, officer, post_sack, "the watch's grain")
 	committer_submit(c, g)
 	scheduler_run_until(self.scheduler, time_make(1))     /* each sees its worksite */
+	self.officer = proposal_group_id_for(g, officer)
 	for l, k in larders do self.larders[k] = proposal_group_id_for(g, l)
 	for e, k in stoves do self.stoves[k] = proposal_group_id_for(g, e)
 	for e, k in woodpiles do self.woodpiles[k] = proposal_group_id_for(g, e)
@@ -463,6 +495,20 @@ village_setup :: proc(self: ^Village) {
 	}
 	committer_submit(c, home)
 	scheduler_run_until(self.scheduler, time_make(7))     /* and sees its bed */
+
+	/* the watch officer's nights: in its bed, and a supper before */
+	{
+		store := knowledge_store_of(self.knowledge, self.officer)
+		bed   := village_referent_of(store, proposal_group_id_for(g, post_bed))
+		if bed == 0 ||
+		   !agency_undertake_every_with(self.agency, self.officer, "sleep_in_bed", 22 * VILLAGE_HOUR, 30 * VILLAGE_HOUR, "home",
+		                                VILLAGE_DAY, {{"bed", bed}}) ||
+		   !agency_undertake_every_with(self.agency, self.officer, "eat_supper", 18 * VILLAGE_HOUR, 21 * VILLAGE_HOUR, "home",
+		                                VILLAGE_DAY, {}) {
+			self.error = fmt.aprintf("the watch officer couldn't take on its nights")
+			return
+		}
+	}
 
 	/* the day's commitments, every day, bound to its own bed and its work */
 	farmer_index: [4]int
@@ -762,6 +808,17 @@ village_run :: proc(self: ^Village) {
 		              fmt.tprintf("not: %s", strings.join(awake[:], ", ", context.temp_allocator)))
 	}
 	village_check_larders(self)
+	/* the law: with nobody taking what isn't its household's, the watch has
+	 * nobody in custody and nothing confiscated */
+	{
+		custody := u32(tri.type_named(world_tri(self.world), "\"custody\""))
+		held    := 0
+		claims  := world_store_for_kind(self.world, world_kind_named(self.world, "Claim"))
+		for i: uint = 0; i < store_count(claims); i += 1 {
+			if (^Claim)(store_record_at_index(claims, i)).kind == custody do held += 1
+		}
+		village_check(self, held == 0, "the watch arrested nobody and confiscated nothing", fmt.tprintf("%d in its custody", held))
+	}
 	/* the hunters' work: meat brought home, in their larder some night (a
 	 * stack spoils whole, content/perishing/: on any one night it may just
 	 * have); the game kept up (VILLAGE.md decision 7) */
@@ -816,11 +873,14 @@ village_check_fed :: proc(self: ^Village, d: i64) {
 	unfed := make([dynamic]string, context.temp_allocator)
 	low   := make([dynamic]string, context.temp_allocator)
 	now   := world_time(self.world).ms
-	for v in self.people {
-		h := hungry_of(self.world, v.id)
+	everyone := make([dynamic]Entity_ID, context.temp_allocator)
+	for v in self.people do append(&everyone, v.id)
+	append(&everyone, self.officer)
+	for id in everyone {
+		h := hungry_of(self.world, id)
 		if h == nil do continue
-		if h.fedAt < d * VILLAGE_DAY do append(&unfed, fmt.tprintf("%d", v.id))
-		if reserves(h, now) < 50 do append(&low, fmt.tprintf("%d (%d)", v.id, reserves(h, now)))
+		if h.fedAt < d * VILLAGE_DAY do append(&unfed, fmt.tprintf("%d", id))
+		if reserves(h, now) < 50 do append(&low, fmt.tprintf("%d (%d)", id, reserves(h, now)))
 	}
 	village_check(self, len(unfed) == 0 && len(low) == 0,
 	              fmt.tprintf("night %d, 02:00: everyone ate today, and nobody's reserves are below 50", d + 1),
