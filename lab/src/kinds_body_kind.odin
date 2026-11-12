@@ -82,16 +82,16 @@ body_kind_react_to_event :: proc(self: ^Body_Kind, committer: ^Committer, event:
 		/* food: the two spoil at their times averaged, weighed by mass
 		 * (content/perishing/); food made since the last boundary, not yet
 		 * stamped, as perishing will stamp it */
-		food := world_kind_named(world, "Perishable")
-		mf := (^Perishable)(world_record(world, food, event.subject))
-		tf := (^Perishable)(world_record(world, food, here[i]))
+		food := world_kind_named(world, "Becoming")
+		mf := (^Becoming)(world_record(world, food, event.subject))
+		tf := (^Becoming)(world_record(world, food, here[i]))
 		if mf != nil && tf != nil {
 			now := world_time(world).ms
 			mine, theirs := perishing_spoils_at(mf, now), perishing_spoils_at(tf, now)
 			a, b := max(world_mass_of(world, event.subject), 0), max(world_mass_of(world, here[i]), 0)
 			if mine > 0 && theirs > 0 && a + b > 0 {
 				at := (mine * a + theirs * b) / (a + b)
-				if at != tf.spoilsAt do proposal_group_set_of_to(group, "Perishable.spoilsAt", whole(here[i]), at)
+				if at != tf.becomesAt do proposal_group_set_of_to(group, "Becoming.becomesAt", whole(here[i]), at)
 			}
 		}
 		committer_submit(committer, group)

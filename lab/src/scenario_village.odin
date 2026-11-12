@@ -23,7 +23,9 @@ package lab
  *
  * The hunters hunt the eastern woods (content/hunting/), bows in hand: lying
  * in wait, stalking what they see, butchering what they shoot, and bringing
- * the meat home, until the larder holds two deer's worth. Deer and hares
+ * the meat home, until the larder holds two deer's worth; home, they dress
+ * the hides (content/tanning/): laid in the tan pit by their woodpile, and
+ * the leather put by in the larder. Deer and hares
  * roam there and run from people they see; the herds are kept up from the
  * east edge, six deer and four hares at most (the game domain).
  *
@@ -60,8 +62,9 @@ package lab
  * and the game bedded down; on each market day, sales by every household
  * with goods to sell, and the takings home with no coin made or lost; and
  * at the end, each household's larder emptied by what it ate (what was
- * brought in, a harvest, the market's, counted apart), meat and a
- * hide in the hunters' larder, the herds alive and within their bounds, no
+ * brought in, a harvest, the market's, counted apart), meat in the hunters'
+ * larder and a hide there or in their tan pit (leather put by, from a
+ * fortnight on), the herds alive and within their bounds, no
  * food past its time still food, and every plot growing or harvested.
  */
 
@@ -203,6 +206,7 @@ Village :: struct {
 	people:       [dynamic]Villager,
 	officer:      Entity_ID,         // the watch officer: of the town, not of a household
 	larders:      [4]Entity_ID,      // each household's, by its index
+	pit:          Entity_ID,         // the hunters' tan pit (content/tanning/)
 	stoves:       [4]Entity_ID,
 	woodpiles:    [4]Entity_ID,
 	coffers:      [4]Entity_ID,
@@ -299,6 +303,7 @@ village_setup :: proc(self: ^Village) {
 	g := proposal_group_group_with_phase(.System, "setup: the village")
 	handles := make([dynamic]Villager, context.temp_allocator)
 	works, larders, stoves, woodpiles, coffers, stalls, boards: [4]Entity_ID
+	pits := NO_ENTITY
 	self_plots: [4][dynamic]Entity_ID
 	for &h, k in households {
 		works[k] = proposal_group_create(g, h.worksite, ns_utf8(fmt.tprintf("%s' worksite", h.name)),
@@ -343,6 +348,13 @@ village_setup :: proc(self: ^Village) {
 		woodpile := proposal_group_create(g, "woodpile", ns_utf8(fmt.tprintf("%s' woodpile", h.name)),
 		                                  on_tile(h.woodpile.x, h.woodpile.y, 0))
 		woodpiles[k] = woodpile
+		/* the hunters' tan pit, outside by the woodpile (content/tanning/) */
+		pit := NO_ENTITY
+		if h.worksite == "hunting_blind" {
+			pit = proposal_group_create(g, "tan_pit", ns_utf8(fmt.tprintf("%s' tan pit", h.name)),
+			                            on_tile(h.woodpile.x + 2, h.woodpile.y, 0))
+			pits = pit
+		}
 		/* firewood on it: the woodcutters' own a little, the rest what they
 		 * have had of them before (bought, when there is a market) */
 		wood := proposal_group_create(g, "woodcutters_firewood" if h.worksite == "chopping_block" else "household_firewood",
@@ -365,6 +377,7 @@ village_setup :: proc(self: ^Village) {
 			village_own(g, v.id, larder, "the household's larder")
 			village_own(g, v.id, sack, "the household's grain")
 			village_own(g, v.id, woodpile, "the household's woodpile")
+			if pit != NO_ENTITY do village_own(g, v.id, pit, "the household's tan pit")
 			village_own(g, v.id, coffer, "the household's coffer")
 			village_own(g, v.id, coins, "the household's coins")
 			village_own(g, v.id, stalls[k], "the household's stall")
@@ -440,6 +453,7 @@ village_setup :: proc(self: ^Village) {
 	scheduler_run_until(self.scheduler, time_make(1))     /* each sees its worksite */
 	self.officer = proposal_group_id_for(g, officer)
 	for l, k in larders do self.larders[k] = proposal_group_id_for(g, l)
+	self.pit = proposal_group_id_for(g, pits)
 	for e, k in stoves do self.stoves[k] = proposal_group_id_for(g, e)
 	for e, k in woodpiles do self.woodpiles[k] = proposal_group_id_for(g, e)
 	for e, k in coffers do self.coffers[k] = proposal_group_id_for(g, e)
@@ -571,6 +585,10 @@ village_setup :: proc(self: ^Village) {
 			                         "bed" if bed == 0 else ("worksite" if work == 0 else ("stove" if stove == 0 else "woodpile")))
 			return
 		}
+		if households[v.household].worksite == "hunting_blind" && village_referent_of(store, self.pit) == 0 {
+			self.error = fmt.aprintf("%d hasn't seen its household's tan pit", v.id)
+			return
+		}
 		ok := agency_undertake_every_with(self.agency, v.id, "be_at_work", 7 * VILLAGE_HOUR, 15 * VILLAGE_HOUR, "work",
 		                                  VILLAGE_DAY, {{"worksite", work}}) &&
 		      agency_undertake_every_with(self.agency, v.id, "be_home", 15 * VILLAGE_HOUR, 22 * VILLAGE_HOUR, "home",
@@ -589,6 +607,13 @@ village_setup :: proc(self: ^Village) {
 		      (households[v.household].worksite != "hunting_blind" ||
 		       agency_undertake_every_with(self.agency, v.id, "game_hunted", 7 * VILLAGE_HOUR, 15 * VILLAGE_HOUR, "work",
 		                                   VILLAGE_DAY, {{"larder", larder}})) &&
+		      /* the hunters dress their hides, home from the hunt: a look into
+		       * the pit, and the work it shows (content/tanning/) */
+		      (households[v.household].worksite != "hunting_blind" ||
+		       (agency_undertake_every_with(self.agency, v.id, "pit_seen_to", 16 * VILLAGE_HOUR, 18 * VILLAGE_HOUR, "home",
+		                                    VILLAGE_DAY, {{"pit", village_referent_of(store, self.pit)}}) &&
+		        agency_undertake_every_with(self.agency, v.id, "hides_dressed", 16 * VILLAGE_HOUR, 18 * VILLAGE_HOUR, "home",
+		                                    VILLAGE_DAY, {{"pit", village_referent_of(store, self.pit)}, {"store", larder}}))) &&
 		      /* the backpack, for a woodcutter's or a hunter's day; put back by
 		       * the larder after (content/carrying/) */
 		      (households[v.household].worksite == "scarecrow" ||
@@ -873,12 +898,24 @@ village_run :: proc(self: ^Village) {
 	 * have); the game kept up (VILLAGE.md decision 7) */
 	inside: [64]Entity_ID
 	village_check(self, meatNights > 0, "the hunters brought meat home", "none in their larder, any night")
-	/* and a hide, carried home in the pack (content/carrying/), not left lying */
-	hides := 0
-	for e in inside[:min(world_entities_at(self.world, self.larders[hunters], .In, raw_data(inside[:]), len(inside)), len(inside))] {
-		if world_record(self.world, world_kind_named(self.world, "Body"), e) != nil && village_is_hide(self.world, e) do hides += 1
+	/* and a hide, carried home in the pack (content/carrying/), not left
+	 * lying: in their larder, laid in the tan, or leather by now
+	 * (content/tanning/); from a fortnight on, some of it leather, put by */
+	hides, leather := 0, i64(0)
+	for place in ([2]Entity_ID{self.larders[hunters], self.pit}) {
+		for e in inside[:min(world_entities_at(self.world, place, .In, raw_data(inside[:]), len(inside)), len(inside))] {
+			if world_record(self.world, world_kind_named(self.world, "Body"), e) == nil do continue
+			if village_is_a(self.world, e, "#Hide") do hides += 1
+			if village_is_a(self.world, e, "#Leather") {
+				hides += 1
+				if place != self.pit do leather += world_units_of(self.world, e)
+			}
+		}
 	}
-	village_check(self, hides > 0, "the hunters brought a hide home", "none in their larder")
+	village_check(self, hides > 0, "the hunters brought a hide home", "none in their larder or their pit")
+	if self.days >= 14 {
+		village_check(self, leather > 0, "the hunters tanned hides and put the leather by", "no leather in their larder")
+	}
 	deer, hares := game_count(self.world, "deer"), game_count(self.world, "hare")
 	village_check(self, deer >= 1 && deer <= 6 && hares >= 1 && hares <= 4, "the herds neither vanished nor outgrew the woods",
 	              fmt.tprintf("%d deer, %d hares", deer, hares))
@@ -886,9 +923,9 @@ village_run :: proc(self: ^Village) {
 	 * its own has rotted away (VILLAGE.md decision 8) */
 	stale := make([dynamic]string, context.temp_allocator)
 	spoiled := 0
-	foods := world_store_for_kind(self.world, world_kind_named(self.world, "Perishable"))
+	foods := world_store_for_kind(self.world, world_kind_named(self.world, "Becoming"))
 	for i: uint = 0; i < store_count(foods); i += 1 {
-		food := (^Perishable)(store_record_at_index(foods, i))
+		food := (^Becoming)(store_record_at_index(foods, i))
 		if at := perishing_spoils_at(food, world_time(self.world).ms); at > 0 && at <= world_time(self.world).ms {
 			append(&stale, fmt.tprintf("%d", store_entity_at_index(foods, i)))
 		}
@@ -1047,13 +1084,14 @@ village_check_market :: proc(self: ^Village, d: i64, before: [4]i64) {
 }
 
 
-/* Whether a thing is a hide (content/hunting/butchering.tri's #Hide). */
+/* Whether a thing is of a kind, by its blueprint (a hide, hunting/'s #Hide;
+ * leather, tanning/'s #Leather). */
 @(private = "file")
-village_is_hide :: proc(world: ^World, e: Entity_ID) -> bool {
+village_is_a :: proc(world: ^World, e: Entity_ID, kind: cstring) -> bool {
 	info := world_info(world, e)
 	tc   := world_tri(world)
-	return info != nil && tri.pattern(tc, info.blueprint) != nil && tri.type_named(tc, "#Hide") != 0 &&
-	       tri.subtype(tc, tri.node_type(tri.pattern(tc, info.blueprint)), tri.type_named(tc, "#Hide")) != 0
+	return info != nil && tri.pattern(tc, info.blueprint) != nil && tri.type_named(tc, kind) != 0 &&
+	       tri.subtype(tc, tri.node_type(tri.pattern(tc, info.blueprint)), tri.type_named(tc, kind)) != 0
 }
 
 

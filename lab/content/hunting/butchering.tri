@@ -18,6 +18,8 @@
 //             as it was.
 // - cooking:  meat is raw food; in a larder it merges with meat already
 //             there, as grain does.
+// - tanning:  a hide is leather to be: laid in the tan, it becomes the
+//             leather its blueprint names (tanning/).
 // - code:     none: butchering is declared (so many cuts made, gathered
 //             into one stack; actions.tri's `makes`). A carcass with no
 //             hide isn't butchered: all have one.
@@ -33,7 +35,7 @@ package hunting
     cuts:     int & >=0 & <=200 @field(content, saved, inspect)
     hide:     text @field(content, saved, inspect)
     keepsFor: 2d
-    spoiled:  "carrion"
+    becomes:  "carrion"
 }
 
 carcass_seen: #Seen & { kindOf: "#Carcass" } @family(seen)
@@ -51,13 +53,15 @@ carrion_look: #Look & { kindOf: "carrion", look: "carcass.carrion" } @family(loo
 venison:   #Stack & #Food & { material: "food", raw: true, nourishment: 20, cooking: 40, keepsFor: 3d, unit: "venison", unitMass: 500g, count: 1 }
 hare_meat: #Stack & #Food & { material: "food", raw: true, nourishment: 20, cooking: 30, keepsFor: 3d, unit: "hare meat", unitMass: 500g, count: 1 }
 
-// Hides: leather to be, when there is someone to dress them.
-#Hide: #Body & {}
+// Hides: leather to be, laid in the tan (tanning/, which says how a hide
+// tans): something that becomes (perishing/'s #Becoming), it keeps as it
+// is, and laid in the tan becomes the leather its blueprint names.
+#Hide: #Body & #Becoming & { keepsFor: 0ms, ending: "tanned" }
 
 hide_seen: #Seen & { kindOf: "#Hide" } @family(seen)
 
-deer_hide: #Hide & { material: "leather", mass: 4kg }
-hare_pelt: #Hide & { material: "leather", mass: 300g }
+deer_hide: #Hide & { material: "leather", mass: 4kg, becomes: "deer_leather" }
+hare_pelt: #Hide & { material: "leather", mass: 300g, becomes: "hare_leather" }
 
 // Butcher a carcass in reach, a hand free: half an hour, with the hands;
 // the meat into a pack the butcher carries if it fits, else the free hand.

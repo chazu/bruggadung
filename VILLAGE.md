@@ -197,11 +197,16 @@ things the lab put off:
    spoiled thing still exists, but it isn't food any more. Salting and
    smoking are left out.
    - Built (content/perishing/). Food that keeps for some time (meat,
-     three days) spoils at `spoilsAt`, set as it is made; a meal keeps two
+     three days) spoils at `becomesAt`, set as it is made; a meal keeps two
      days from when it is cooked, whatever it was made of; grain and
      turnips keep. The time is all there is: nothing steps it. The
      perishing domain stamps food made at the last boundary (it was made
      at t0), and its horizon is the next food to spoil, its one wake.
+   - What spoils is one use of something more general, a **becoming**
+     (`#Becoming`): a thing that becomes another when its time comes, as
+     heavy, where it is. A hide laid in the tan becoming leather is
+     another (content/tanning/), on the same domain: the fields are named
+     for that (`becomesAt`, `becomes`, `ending`), not for spoiling.
    - Spoiled, food **becomes spoiled food**, as death makes remains: a
      new thing, as heavy, where it was, its mass carved from the food,
      which ends. It is made of **rot**, not food, so no method finds it to
@@ -401,7 +406,8 @@ its cut points. The new and changed ones:
 | --- | --- | --- |
 | `hunger/` | satiety and reserves (`body.tri`), the effect curves, eating, food's `nourishment` | changed (slice 1) |
 | `cooking/` | the larder, cooking at a lit stove (raw food into a meal), meals | new (slice 4) |
-| `perishing/` | perishable food: how long it keeps, when it spoils, spoiled food | new (slice 8) |
+| `perishing/` | perishable food: how long it keeps, when it spoils, spoiled food; what becomes something else at its time (`#Becoming`) | new (slice 8) |
+| `tanning/` | the tan pit, laying a hide in the tan, leather, dressing hides | new |
 | `farming/` | plots, crops, sowing, ripening, harvesting, seed grain | new (slice 6) |
 | `firewood/` | trees, felling, splitting, the woodpile, stoking | new (slice 5), with `sawing/` and `heat/` |
 | `hunting/` | animals and their goals, stalking, dying, carcasses, butchering, hides | new (slice 7), with `harm/` |
@@ -540,7 +546,14 @@ New, and entered in the glossary with this document:
   that breeds is a topic of its own.
 - **Hides.** A hunter carries the hide home to the larder in its
   backpack, one each (decision 11). Dressing them (the Hunts' other
-  trade), and selling them, wait: nobody buys hides yet.
+  trade) is built (content/tanning/): home from the hunt, each hunter
+  looks into the household's tan pit, by its woodpile, draws out what has
+  become leather and puts it by in the larder, and lays the hides from
+  the larder in the tan, where each is leather six days on. Before, the
+  hides lay in the larder, one place each, and would have filled it in
+  six weeks; leather is a stack. Selling it waits: nobody buys leather
+  yet, or makes anything of it. Left out: bark, water and lime, and that
+  a raw hide rots.
 - **The hunt is fair, but the game never learns.** A shot can miss, and a
   deer bolts out of sight from a shot that gives the hunter away. Over a
   week, one hunter in a small wood brings home its two deer from 33

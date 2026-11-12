@@ -106,7 +106,7 @@
 // gathered into one stack; `gathered`, into a hand, they are with a stack
 // of the kind its holder has already, if any (a harvest, with the armful).
 // Into a hand, a made thing goes as a moved one does.
-// An operation's `now` is the time its effect commits (`spoilsAt: $now +
+// An operation's `now` is the time its effect commits (`becomesAt: $now +
 // $k`), its `parameter` the command's (how many), its `said` and `written`
 // what the command says, as a value and as written (market/'s `post`). Into a hand, of an operation
 // that stows (`stow`), is into a pack its actor carries, if it fits. Arithmetic in `after` is Triangle's (CONTENT_LANGUAGE.md §5).

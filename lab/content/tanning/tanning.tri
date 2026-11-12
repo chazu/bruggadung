@@ -1,0 +1,155 @@
+// Tanning: hides laid in the tan, and the leather they become (VILLAGE.md
+// decision 7: dressing hides, the hunters' other trade).
+//
+// Cut points:
+// - full:     a hide in hand is laid in a tan pit in reach (`steep`): ten
+//             minutes, and it lies in the pit, the pit's owners'. So long
+//             after (its `tansIn`, six days), it is leather, as heavy,
+//             where it lies. Whoever dresses its household's hides (a
+//             commitment, bound to the pit and to where hides and leather
+//             are kept) looks into the pit, draws out the leather it
+//             finds there and puts it by, and takes each hide from where
+//             they are kept and lays it in the tan: two commitments, the
+//             look and the work.
+// - reduced:  the same, decided on the cadence's beat.
+// - abstract: as reduced.
+// - frozen:   nobody lays a hide in; one in the tan becomes leather all
+//             the same.
+// - becoming: a hide is something that becomes (perishing/'s #Becoming):
+//             it keeps, and its time is set by laying it in the tan.
+//             Taken out early, it becomes leather at its time all the
+//             same: a shortcut. Bark, water and lime are left out, and a
+//             raw hide never rots.
+// - perception: that a hide has become leather is seen by looking into
+//             the pit, as anything in a container is.
+// - hunting:  a hide is what is left of a carcass (hunting/butchering.tri);
+//             what leather each becomes, its blueprint says there.
+// - village:  the Hunts' pit, by their woodpile, and who dresses the hides
+//             and when, are the scenario's (src/scenario_village.odin).
+//             Nobody buys leather yet, or makes anything of it.
+// - code:     none of its own: laying in the tan is declared; becoming
+//             leather is the perishing domain's (src/domains_perishing.odin).
+
+package tanning
+
+// A tan pit: where hides lie in the tan.
+#TanPit: #Container & {}
+
+tan_pit_seen: #Seen & { kindOf: "#TanPit" } @family(seen)
+
+tan_pit: #TanPit & { material: "oak", mass: 60kg, capacity: 30 }
+
+// A hide tans: it becomes its leather so long (`tansIn`) after it is laid
+// in the tan.
+hunting.#Hide: {
+    @component(Hide)
+    tansIn: *6d | time & >=1h & <=100d @field(content, saved, inspect)
+}
+
+// Leather, by the piece: a stack, so pieces of a kind put by are one.
+#Leather: #Stack & {}
+
+leather_seen: #Seen & { kindOf: "#Leather" } @family(seen)
+
+deer_leather: #Leather & { material: "leather", unit: "deer leather", unitMass: 4kg, count: 1 }
+hare_leather: #Leather & { material: "leather", unit: "hare leather", unitMass: 300g, count: 1 }
+
+// Lay a hide in hand in the tan, in a pit in reach: ten minutes, with the
+// hands. It is the pit's owners' from then, and leather `tansIn` after.
+// One laid in the tan already isn't laid in again.
+steep: #Operation & {
+    duration: 600s
+    uses:     ["hands"]
+    roles: {
+        actor:       #Agent & { id: $a }
+        item:        #Hide & { id: $i, tansIn: $t, becomesAt: 0ms, place: #Held & { by: $a } }
+        destination: #TanPit & { id: $p }
+    }
+    now:   $now
+    moves: [#Moves & { moved: $i, into: #Inside & { container: $p }, passes: true }]
+    after: { item: #Hide & { becomesAt: $now + $t } }
+} @family(operations)
+
+// Dressing hides: the pit, where hides and leather are kept (`store`: a
+// household's larder), and the hide or the leather in hand (`work`).
+#Tanning: #Frame & { pit: #Body, store: #Body, work: #Body }
+
+let dressed = #Hide | #Leather
+
+// The household's hides dressed (bound when undertaken: its pit, and where
+// it keeps them), kept through the hours for it: none of its hides left
+// where they are kept, no leather left in the pit, and neither in hand, as
+// far as the tanner knows. The ways: leather in hand is put by; a hide in
+// hand is laid in the tan; leather in the pit is drawn out; a hide where
+// they are kept is taken up.
+hides_dressed: #Goal & {
+    title: "dress the hides"
+    done:  #None & {
+        find:  ["store", "pit", "work"]
+        match: #Tanning & { me: #Agent & { id: $me }, work: dressed & { place: #Held & { by: $me } } } |
+            #Tanning & { store: #Container & { id: $s }, work: #Hide & { place: #Inside & { container: $s } } } |
+            #Tanning & { pit: #TanPit & { id: $p }, work: #Leather & { place: #Inside & { container: $p } } }
+    }
+    kept:  true
+} @family(goals)
+
+put_by_the_leather: #Method & {
+    title: "put the leather by"
+    goal:  "hides_dressed"
+    rank:  1
+    pre: {
+        find:  ["work", "store"]
+        match: #Tanning & { me: #Agent & { id: $me }, work: #Leather & { place: #Held & { by: $me } }, store: #Container }
+    }
+    steps: [#Do & { op: "put_in", object: "work", target: "store" }]
+} @family(methods)
+
+lay_it_in_the_tan: #Method & {
+    title: "lay it in the tan"
+    goal:  "hides_dressed"
+    rank:  2
+    pre: {
+        find:  ["work", "pit"]
+        match: #Tanning & { me: #Agent & { id: $me }, work: #Hide & { place: #Held & { by: $me } }, pit: #TanPit }
+    }
+    steps: [#Do & { op: "steep", object: "work", target: "pit" }]
+} @family(methods)
+
+draw_the_leather: #Method & {
+    title: "draw the leather"
+    goal:  "hides_dressed"
+    rank:  3
+    pre: {
+        find:  ["work", "pit"]
+        match: #Tanning & { me: #Agent & { freeHands: >=1 }, pit: #TanPit & { id: $p },
+                            work: #Leather & { place: #Inside & { container: $p } } }
+    }
+    steps: [#Do & { op: "take", object: "work" }]
+} @family(methods)
+
+fetch_a_hide: #Method & {
+    title: "fetch a hide"
+    goal:  "hides_dressed"
+    rank:  4
+    pre: {
+        find:  ["work", "store"]
+        match: #Tanning & { me: #Agent & { freeHands: >=1 }, store: #Container & { id: $s },
+                            work: #Hide & { place: #Inside & { container: $s } } }
+    }
+    steps: [#Do & { op: "take", object: "work" }]
+} @family(methods)
+
+// What has become leather is seen by looking: the pit looked into, once
+// for each time the tanner takes this up (bound: the pit).
+pit_seen_to: #Goal & {
+    title: "see to the pit"
+    done:  #Looked & { looked: "pit" }
+} @family(goals)
+
+look_into_the_pit: #Method & {
+    title: "look into the pit"
+    goal:  "pit_seen_to"
+    rank:  1
+    pre:   { find: ["pit"], match: #Tanning & { pit: #TanPit } }
+    steps: [#Do & { op: "look_in", object: "pit" }]
+} @family(methods)

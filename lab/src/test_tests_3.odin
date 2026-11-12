@@ -3818,6 +3818,8 @@ ALL_TESTS := [?]Test_Case{
 	{"butcher",                       test_butcher},
 	{"hunting_week",                  test_hunting_week},
 	{"perishing",                     test_perishing},
+	{"tanning",                       test_tanning},
+	{"dressing_hides",                test_dressing_hides},
 	{"market",                        test_market},
 	{"carrying",                      test_carrying},
 	{"seed_unpacked",                 test_seed_unpacked},

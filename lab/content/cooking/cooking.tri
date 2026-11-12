@@ -299,7 +299,7 @@ take_some_along: #Method & {
         destination: #Combustor & #Body & { lit: true }
     }
     now:   $now
-    after: { item: #Food & { raw: false, nourishment: math.Clamp($n + $c, 0, 100), spoilsAt: $now + $k } }
+    after: { item: #Food & { raw: false, nourishment: math.Clamp($n + $c, 0, 100), becomesAt: $now + $k } }
 }
 cook:         #Cook & { roles: { item: #Body & { mass: <=1kg } } } @family(operations)
 cook_portion: #Cook & {

@@ -30,24 +30,36 @@
 //             stands (`spoiled_put_down`, a goal arising from what is
 //             held: agency.tri's #Arising), so a meal carried past its time
 //             doesn't fill a hand for good.
-// - code:     the perishing domain (src/domains_perishing.odin): it stamps
-//             food made at the last boundary with when it spoils, and its
-//             horizon is the next food to spoil, its one wake then.
+// - becoming: perishing is one use of what becomes something else when
+//             its time comes (#Becoming); a hide in the tan becoming
+//             leather is another (tanning/).
+// - code:     the perishing domain (src/domains_perishing.odin), for all
+//             that becomes: it stamps what was made at the last boundary
+//             with its time, and its horizon is the next thing whose time
+//             comes, its one wake then.
 //             effect_cook sets a meal's; spoiling is carved, as death's
 //             remains are (src/act_actions.odin's `become`); a merge
 //             averages (src/kinds_body_kind.odin).
 
 package perishing
 
-// What perishes: how long it keeps once made (0: it keeps, and never
-// spoils); when it spoils (0: not yet known, or never), set as it is made;
-// and what it becomes, spoiled ("": nothing, it rots away).
-#Perishable: {
-    @component(Perishable)
-    keepsFor: *0ms | time & >=0ms & <=100d     @field(content, saved, inspect)
-    spoilsAt: *0ms | time & >=0ms & <=10000d   @field(saved, proposable, inspect)
-    spoiled:  *"spoiled_food" | text           @field(content, saved, inspect)
+// What becomes something else when its time comes: how long it keeps once
+// made (0: it keeps, and its time is set by something else, or never);
+// when its time is (0: not yet known, or never), set as it is made, or by
+// what starts it (cooking; a hide laid in the tan, tanning/); what it
+// becomes then, as heavy, where it is ("": nothing, it is gone); and what
+// its end is recorded as.
+#Becoming: {
+    @component(Becoming)
+    keepsFor:  *0ms | time & >=0ms & <=100d     @field(content, saved, inspect)
+    becomesAt: *0ms | time & >=0ms & <=10000d   @field(saved, proposable, inspect)
+    becomes:   *"spoiled_food" | text           @field(content, saved, inspect)
+    ending:    *"spoiled" | text                @field(content, saved, inspect)
 }
+
+// What perishes: it keeps so long once made, then spoils: what it becomes
+// is spoiled, or nothing (it rots away).
+#Perishable: #Becoming & {}
 
 // Food perishes; a meal made of it keeps so long from when it is cooked.
 hunger.#Food: #Perishable & {
@@ -58,7 +70,7 @@ hunger.#Food: #Perishable & {
 // food, nor made of it (things.tri's "rot", no kind of food): eating takes
 // something made of food (hunger/eating.tri), and nobody values it as food.
 // It rots away to nothing in ten days, wherever it is.
-#Spoiled: #Body & #Perishable & { keepsFor: 10d, spoiled: "" }
+#Spoiled: #Body & #Perishable & { keepsFor: 10d, becomes: "" }
 
 spoiled_seen: #Seen & { kindOf: "#Spoiled" } @family(seen)
 spoiled_look: #Look & { kindOf: "#Spoiled", look: "food.spoiled" } @family(looks)

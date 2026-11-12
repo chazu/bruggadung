@@ -991,12 +991,19 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
 - **Keep back seed**: carve a sack of seed from a harvest in hand, as
   heavy (the food's `keptAs`, of `keptOf` units of it), once a harvest; the plot is then **kept**
   till it is sown again. (VIL d5)
+- **Becoming**: `#Becoming`, what becomes something else when its time
+  comes: it keeps so long once made (`keepsFor`; 0: it keeps), or its time
+  (`becomesAt`) is set by what starts it (cooking; laying a hide in the
+  tan); then it is its `becomes`, as heavy, where it was, its end recorded
+  as its `ending`. Read in closed form, never stepped: the perishing
+  domain's, for all of it. Its uses: **perishable** things, and hides
+  **tanning**. Not a **progression**. (VIL d8, lab/content/perishing/)
 - **Perishable**: `#Perishable`, good for so long after it was made,
-  then spoiled: food, a carcass, spoiled food itself. Food is perishable
-  when it keeps for some time (`keepsFor`: meat, three days); a meal keeps
-  its own (`mealKeepsFor`, two days) from when it is cooked. Grain and
-  turnips keep. What it becomes is its `spoiled`; with none, it **rots
-  away** to nothing. (VIL d8)
+  then spoiled: food, a carcass, spoiled food itself; a **becoming**. Food
+  is perishable when it keeps for some time (`keepsFor`: meat, three
+  days); a meal keeps its own (`mealKeepsFor`, two days) from when it is
+  cooked. Grain and turnips keep. What it becomes is its `becomes`; with
+  none, it **rots away** to nothing. (VIL d8)
 - **Spoiled food**: what perishable food is once its time has come: a
   thing as heavy, where it was, made of **rot**, not food, so nobody eats
   it; it rots away ten days on. Held, it is put down (a goal that arises
@@ -1057,7 +1064,13 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
   picking up, butchering, a purchase), goes into a pack its taker carries
   if it fits, else into a free hand. (VIL d11)
 - **Hide**: what is left of a carcass besides its meat (`#Hide`): leather
-  to be, carried home in a pack, else left lying. (VIL d7)
+  to be, carried home in a pack, else left lying. It keeps, raw. (VIL d7)
+- **Tanning**: a hide laid in the tan (`steep`) in a **tan pit**
+  (`#TanPit`, a container) is the pit's owners', and **leather** six days
+  after (its `tansIn`): a **becoming**. **Leather** (`#Leather`) is a
+  stack, by the piece. **Dressing hides** is the work: a look into the
+  pit, the leather there drawn out and put by, each hide kept laid in.
+  *Avoid:* curing. (VIL d7, lab/content/tanning/)
 - **Pricing**: what a unit of goods is worth to an agent in coins
   (`#Pricing`): its kind's, raised by a need the goods serve. A seller
   prices its spare goods without the raise, moved by its **stock**; a

@@ -237,7 +237,7 @@ cook_all: #Operation & {
     }
     now:   $now
     after: { item: #Food & { raw: false, nourishment: math.Clamp($n + $c, 0, 100) }
-                   & #Perishable & { spoilsAt: $now + $k } }
+                   & #Perishable & { becomesAt: $now + $k } }
 } @family(operations)
 ```
 
@@ -261,7 +261,7 @@ at full detail and a periodic operation below it can be written with the
 same words. Its `by` may be a constant or a tag (`by: $c`).
 
 An operation's `now` is bound to the time the effect commits, so content
-can write `spoilsAt: $now + $k` (ran, inline: time arithmetic with a tag
+can write `becomesAt: $now + $k` (ran, inline: time arithmetic with a tag
 works).
 
 **The function.** Triangle's built-in functions are expanded on the
@@ -341,7 +341,7 @@ constrain the work.
 - `effect_forage` also sets `grewAt` when the patch was full. That is the
   regrowth progression's business (REVIEW.md §3.2), not foraging's.
 - `effect_cook` cooks one portion of a stack into a free hand, or the whole
-  stack if no hand is free, and sets `spoilsAt` only if the food has a
+  stack if no hand is free, and sets `becomesAt` only if the food has a
   `mealKeepsFor`. A declared effect has no "if", so by decision 3 these
   are two operations, and the methods that cook say which they try first.
   Today the code chooses.
@@ -376,7 +376,7 @@ done after: the first conversions use only the three there are.
    consumed) and cooking are declared, their procedures gone. Cooking is
    `cook`, of all that is held, and `cook_portion`, with a hand free, of
    one portion; both are a `#Cook`, which clamps the nourishment
-   (`math.Clamp`) and reckons `spoilsAt` from `now`. New in the
+   (`math.Clamp`) and reckons `becomesAt` from `now`. New in the
    vocabulary: `consumes`; a `portion` of a stack on `moves` and
    `consumes`; an operation's `now`. `changes` is left until something
    needs it: with `math.Clamp` in `after`, nothing at full detail does,
@@ -488,7 +488,7 @@ its tests.
   over was ever "like it". The way that cooks a portion wants the same
   food as the way that cooks it all.
 - **A meal whose `mealKeepsFor` is 0 would spoil as it is cooked**
-  (`spoilsAt: $now + $k`), where the procedure left `spoilsAt` unset. No
+  (`becomesAt: $now + $k`), where the procedure left `becomesAt` unset. No
   food says 0.
 - **The stove full is now a failure**: `fuel: $f + $m` past the field's
   1000 kg fails the stoking, where the procedure proposed it regardless.

@@ -43,7 +43,7 @@ test_perishing :: proc() {
 	 * nothing is stepped */
 	boundaries := world_boundary(w)
 	spoils: i64
-	bg_check(world_get_field(w, "Perishable.spoilsAt", meat, &spoils) && spoils > 3 * DAY && spoils <= 3 * DAY + 1000)
+	bg_check(world_get_field(w, "Becoming.becomesAt", meat, &spoils) && spoils > 3 * DAY && spoils <= 3 * DAY + 1000)
 	scheduler_run_until(s, time_make(spoils - 1))
 	bg_check(world_is_live(w, meat))
 	scheduler_run_until(s, time_make(spoils))
@@ -51,7 +51,7 @@ test_perishing :: proc() {
 	spoiled := test_perishing_spoiled_in(w, larder)
 	bg_check(spoiled != NO_ENTITY && world_mass_of(w, spoiled) == 500)
 	scheduler_run_until(s, time_make(10 * DAY))
-	bg_check(world_is_live(w, sack) && world_get_field(w, "Perishable.spoilsAt", sack, &spoils) && spoils == 0)
+	bg_check(world_is_live(w, sack) && world_get_field(w, "Becoming.becomesAt", sack, &spoils) && spoils == 0)
 	if world_boundary(w) - boundaries > 4 do fmt.printf("    %d boundaries over ten days\n", world_boundary(w) - boundaries)
 	bg_check(world_boundary(w) - boundaries <= 4)
 
@@ -65,7 +65,7 @@ test_perishing :: proc() {
 	proposal_group_move_to(g, whole(spoiled), on_tile(9, 9, 0))
 	committer_submit(c, g)
 	rots: i64     /* ten days after it spoiled */
-	bg_check(world_get_field(w, "Perishable.spoilsAt", spoiled, &rots) && rots > 13 * DAY && rots <= 13 * DAY + 2000)
+	bg_check(world_get_field(w, "Becoming.becomesAt", spoiled, &rots) && rots > 13 * DAY && rots <= 13 * DAY + 2000)
 
 	/* older meat put with as much fresher: both spoil halfway between */
 	g = proposal_group_group_with_phase(.System, "setup: a cut of meat on the floor, at day 10")
@@ -74,7 +74,7 @@ test_perishing :: proc() {
 	scheduler_run_until(s, time_make(10 * DAY + 100))
 	older = proposal_group_id_for(g, older)
 	olderSpoils: i64
-	bg_check(world_get_field(w, "Perishable.spoilsAt", older, &olderSpoils) && olderSpoils > 13 * DAY && olderSpoils <= 13 * DAY + 100)
+	bg_check(world_get_field(w, "Becoming.becomesAt", older, &olderSpoils) && olderSpoils > 13 * DAY && olderSpoils <= 13 * DAY + 100)
 	scheduler_run_until(s, time_make(11 * DAY))
 	g = proposal_group_group_with_phase(.System, "setup: fresh meat in the larder, a day on")
 	fresh := proposal_group_create(g, "venison", "the fresh meat", in_(larder))
@@ -82,14 +82,14 @@ test_perishing :: proc() {
 	scheduler_run_until(s, time_make(11 * DAY + 100))
 	fresh = proposal_group_id_for(g, fresh)
 	freshSpoils: i64
-	bg_check(world_get_field(w, "Perishable.spoilsAt", fresh, &freshSpoils) && freshSpoils > olderSpoils + DAY - 200)
+	bg_check(world_get_field(w, "Becoming.becomesAt", fresh, &freshSpoils) && freshSpoils > olderSpoils + DAY - 200)
 	g = proposal_group_group_with_phase(.System, "setup: the older cut put in with it")
 	proposal_group_move_to(g, whole(older), in_(larder))
 	committer_submit(c, g)
 	scheduler_run_until(s, time_make(11 * DAY + 200))
 	bg_check(!world_is_live(w, older) && world_units_of(w, fresh) == 2)
 	both := (olderSpoils + freshSpoils) / 2
-	bg_check(world_get_field(w, "Perishable.spoilsAt", fresh, &spoils) && spoils == both)
+	bg_check(world_get_field(w, "Becoming.becomesAt", fresh, &spoils) && spoils == both)
 	scheduler_run_until(s, time_make(both - 1))
 	bg_check(world_is_live(w, fresh))
 	scheduler_run_until(s, time_make(both))
@@ -102,7 +102,7 @@ test_perishing :: proc() {
 	held: [2]Entity_ID
 	portion := NO_ENTITY
 	for e in held[:world_entities_at(w, cook, .Held_By, raw_data(held[:]), 2)] do portion = e
-	bg_check(portion != NO_ENTITY && world_get_field(w, "Perishable.spoilsAt", portion, &spoils) && spoils == 0)
+	bg_check(portion != NO_ENTITY && world_get_field(w, "Becoming.becomesAt", portion, &spoils) && spoils == 0)
 	bg_check(perform(w, c, action_make("light", cook, stove, NO_ENTITY), 0, &error) != nil)
 	scheduler_run_until(s, time_make(world_time(w).ms + 1000))
 	error = ""
@@ -111,7 +111,7 @@ test_perishing :: proc() {
 	raw: i64
 	cooked := world_time(w).ms
 	bg_check(world_get_field(w, "Food.raw", portion, &raw) && raw == 0)
-	bg_check(world_get_field(w, "Perishable.spoilsAt", portion, &spoils) && spoils > cooked - 1000 && spoils <= cooked + 2 * DAY)
+	bg_check(world_get_field(w, "Becoming.becomesAt", portion, &spoils) && spoils > cooked - 1000 && spoils <= cooked + 2 * DAY)
 	scheduler_run_until(s, time_make(spoils - 1))
 	bg_check(world_is_live(w, portion))
 	scheduler_run_until(s, time_make(spoils))
