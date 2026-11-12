@@ -73,7 +73,7 @@ VILLAGE_DAY :: i64(86400000)
 VILLAGE_HOUR :: i64(3600000)
 VILLAGE_DAYS :: 7
 VILLAGE_GRAIN :: i64(60)               // portions in each larder's sack (village.tri's grain_sack)
-VILLAGE_FARM_GRAIN :: i64(200)         // a farming household's harvest in store (village.tri's farm_grain)
+VILLAGE_FARM_GRAIN :: i64(480)         // what is left of a farming household's harvest (village.tri's farm_grain)
 VILLAGE_COINS :: i64(400)              // coins in each household's coffer (money/coins.tri's coins_400)
 VILLAGE_STOCKED :: i64(3000)          // pieces on a stocked woodpile (firewood.tri's woodpile_stocked, three tonnes)
 VILLAGE_MARKET :: i64(2)               // the first market day's index (day 3); then every fourth

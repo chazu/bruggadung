@@ -249,8 +249,11 @@ things the lab put off:
      compete: the cheaper (or, as cheap, the nearer) may sell all that is
      wanted, so the check is that of every trade's goods set out some
      sold.
-   - Farmers start with last year's harvest, two hundred portions of
-     grain, so they have grain to spare before their plots ripen.
+   - Farmers start with what is left of their last harvest, 480
+     portions of grain (120 kg), so they have grain to eat and to spare
+     until their plots ripen. (It was two hundred: fifty kilograms, which
+     four eating a kilogram a day each can't make last a fortnight,
+     selling none.)
    - Built on the way: what is in a container is known only to whoever
      looked in it, so buyers look in the coffer and sellers in the supply;
      a buyer with both hands full (a woodcutter's axe and log, a hunter's
@@ -664,10 +667,31 @@ New, and entered in the glossary with this document:
     believing rightly in the hare meat in their own larder.) A unit's
     instance is now of the unit it names, so a cut taken counts, and
     merges back when put with its stack.
-  - Still breaking (4 of the three weeks' 222 checks): a meal cooked at
-    home in place of the one packed, and the short foraging past the
-    14:30 check. The larders check asks two portions a head a day at the
-    least, not three: the short eat forage, and the Hunts meat.
+  - The larders check asks two portions a head a day at the least, not
+    three: the short eat forage, and the Hunts meat.
+  - **The shortage before the harvest was the scenario's.** A farming
+    household started with fifty kilograms of grain, a fortnight before
+    a harvest of two hundred, and sold of it down to fifteen: by day 9
+    both were rationing, by day 13 the Fells and the Hunts found none
+    to buy, and all four households foraged and asked each other for
+    food, failing 7 to 15 of the three weeks' checks. The farmers' store
+    is now 120 kg. Selling what one will need before the next harvest
+    is still possible: a farmer keeps back a fixed fifteen kilograms,
+    whenever its harvest is due (open).
+  - What the harvest days showed, with food enough: a farmer hungry at
+    the harvest, an armful of it in one hand and seed in the other, had
+    no hand free to cook a portion, so it cooked the armful, sixty-six
+    meals; what it reaped after merged into them, cooked too (198
+    meals, to spoil in two days), and it stood at 14:30 with meals in
+    hand. Now `cook` is of a pot's worth (a kilogram at most); with no
+    hand free an armful is put away in the larder first
+    (`put_the_armful_away`); and cooked food doesn't merge with raw of
+    its unit, in a hand or a container.
+  - With these the three weeks pass every check (223).
+  - Seen on the way, not fixed: a buyer that finds nothing to buy, and
+    is at something more pressing from 12:00 to 13:00, keeps the coins
+    in hand till the next market; with coins in both hands it can't
+    buy, and taking the coins home puts away one stack of the two.
 - **Seed from the harvest.** Settled: once a harvest, holding more than a
   sack of seed's worth of it (twelve and a half kilograms of grain), a
   farmer keeps a sack back as seed (`keep_back_seed`), marking the plot

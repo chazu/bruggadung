@@ -76,8 +76,16 @@ test_cooking :: proc() {
 	scheduler_run_until(s, time_make(world_time(w).ms + 1200 * 1000 + 1))
 	bg_check(world_get_field(w, "Food.raw", harvest, &raw) && raw == 0)
 	bg_check(world_get_field(w, "Stack.count", harvest, &count) && count == 2)
-	g = proposal_group_group_with_phase(.System, "setup: the meals put by, another harvest in hand")
+	/* put by with raw grain, the meals stay meals: cooked and raw don't
+	 * merge */
+	g = proposal_group_group_with_phase(.System, "setup: the meals put by")
 	proposal_group_move_to(g, whole(harvest), in_(larder))
+	committer_submit(c, g)
+	committer_commit_boundary(c)
+	committer_commit_boundary(c)
+	bg_check(world_is_live(w, harvest) && world_is_live(w, another))
+	bg_check(world_get_field(w, "Stack.count", another, &count) && count == 2)
+	g = proposal_group_group_with_phase(.System, "setup: another harvest in hand")
 	proposal_group_move_to(g, whole(another), held_by(cook, 1))
 	committer_submit(c, g)
 	committer_commit_boundary(c)
@@ -96,6 +104,17 @@ test_cooking :: proc() {
 	bg_check(world_get_field(w, "Food.raw", meal, &raw) && raw == 0)
 	bg_check(world_get_field(w, "Food.nourishment", meal, &nourishment) && nourishment == 50)
 	bg_check(world_units_of(w, meal) == 1)
+
+	/* an armful is more than a pot holds: not cooked whole */
+	g = proposal_group_group_with_phase(.System, "setup: a sack in hand")
+	proposal_group_move_to(g, whole(harvest), in_(larder))
+	sack = proposal_group_create(g, "grain_sack", "an armful", held_by(cook, 1))
+	committer_submit(c, g)
+	committer_commit_boundary(c)
+	sack = proposal_group_id_for(g, sack)
+	error = ""
+	bg_check(perform(w, c, action_make("cook", cook, sack, stove), 0, &error) == nil)
+	bg_check(strings.contains(error, "roles.item.mass"))
 }
 
 
@@ -106,6 +125,54 @@ test_cooking :: proc() {
 test_rationing :: proc() {
 	bg_check(test_rationing_takes("grain_sack") == 59)
 	bg_check(test_rationing_takes("grain_harvest") == 2)
+}
+
+
+/* Hungry with both hands full, one of an armful of grain (a sack, fifteen
+ * kilograms), a farmer doesn't cook the armful: it puts it away in its
+ * larder, with the sack there, and cooks a portion taken from it. */
+test_armful_put_away :: proc() {
+	why: string
+	count: i64
+
+	w := test_world(104)
+	bg_check(world_set_terrain_map(w, "village_map", &why))
+	c := test_committer(w)
+	activities := activities_with_world(w, c)
+	knowledge  := autorelease(knowledge_init_with_world(w))
+	agency     := autorelease(agency_init_with_world(w, c, knowledge))
+	s          := autorelease(scheduler_init_with_world(w, c))
+	agency_set_activities(agency, activities)
+	scheduler_set_activities(s, activities_as_activity_clock(activities))
+	scheduler_set_perception(s, knowledge_as_perception_phase(knowledge))
+	scheduler_set_decision(s, agency_as_decision_phase(agency))
+	knowledge_set_omniscient(knowledge, true)
+
+	g := proposal_group_group_with_phase(.System, "setup: my larder, my grain, my stove, my hands full")
+	me     := proposal_group_create(g, "farmer", "me", on_tile(20, 70, 0))
+	mine   := proposal_group_create(g, "larder", "my larder", on_tile(21, 70, 0))
+	grain  := proposal_group_create(g, "grain_sack", "my grain", in_(mine))
+	stove  := proposal_group_create(g, "stove", "my stove", on_tile(20, 72, 0))
+	armful := proposal_group_create(g, "grain_sack", "an armful", held_by(me, 0))
+	proposal_group_create(g, "ashes_seed", "seed", held_by(me, 1))
+	for thing in ([]Entity_ID{mine, grain, stove, armful}) {
+		claim := proposal_group_create(g, "ownership", "mine", location_make_none())
+		proposal_group_set_of_to(g, "Claim.quantity", whole(claim), 1)
+		proposal_group_relate(g, .Claimant, whole(claim), whole(me))
+		proposal_group_relate(g, .Claim_Subject, whole(claim), whole(thing))
+	}
+	proposal_group_set_of_to(g, "Hungry.satiety", whole(me), 30)
+	committer_submit(c, g)
+	scheduler_run_until(s, time_make(1000))
+	me, grain, armful = proposal_group_id_for(g, me), proposal_group_id_for(g, grain), proposal_group_id_for(g, armful)
+	agency_control(agency, me)
+	scheduler_run_until(s, time_make(1800000))
+	bg_check(test_logged_by(agency, me, "put the armful away: put_in"))
+	bg_check(!world_is_live(w, armful))                 /* merged with the sack there */
+	bg_check(world_get_field(w, "Stack.count", grain, &count) && count == 119)
+	satiety: i64
+	bg_check(world_get_field(w, "Hungry.satiety", me, &satiety) && satiety > 30)
+	if count != 119 || satiety <= 30 do for line in agency_log_of(agency, me) do fmt.printf("      %s\n", line)
 }
 
 

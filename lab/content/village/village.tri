@@ -9,7 +9,8 @@
 //             day's commitments its goals.
 // - hunger:   the villagers get hungry (hunger/body.tri) and eat from
 //             their larders (cooking/cooking.tri): a sack of grain each, a
-//             farming household's last year's harvest, so a larder empties
+//             farming household's what is left of its last harvest (enough
+//             to eat and sell till the next), so a larder empties
 //             as its household eats, until a harvest (farming/) fills the
 //             farmers' again, a fortnight on, the hunters bring venison
 //             home (hunting/), and each buys what it doesn't make.
@@ -88,9 +89,10 @@ bed:      #Bed & { material: "oak", mass: 40kg }
 larder:   #Larder & { material: "oak", mass: 30kg, capacity: 50 }
 woodpile: #Woodpile & { material: "oak", mass: 5kg, capacity: 100 }
 
-// A farming household's grain at first: last year's harvest, two hundred
-// portions, its own to eat and to sell (market/).
-farm_grain: #Stack & #Food & { material: "food", raw: true, nourishment: 15, cooking: 35, unit: "grain", unitMass: 250g, count: 200 }
+// A farming household's grain at first: what is left of its last harvest,
+// 480 portions (120 kg), enough to eat and to sell (market/) until the
+// next, a fortnight on.
+farm_grain: #Stack & #Food & { material: "food", raw: true, nourishment: 15, cooking: 35, unit: "grain", unitMass: 250g, count: 480 }
 
 // The firewood on a woodpile at first: a household's a hundred pieces, the
 // woodcutters' own twenty (firewood/firewood.tri).

@@ -493,6 +493,15 @@ bears_trace :: proc(world: ^World, e: Entity_ID) -> bool {
 }
 
 
+// Whether two units of food are the same to eat: both raw, or both cooked
+// (content/cooking/). What isn't food is.
+food_alike :: proc(world: ^World, a: Entity_ID, b: Entity_ID) -> bool {
+	ra, rb: i64
+	if !world_get_field(world, "Food.raw", a, &ra) || !world_get_field(world, "Food.raw", b, &rb) do return true
+	return ra == rb
+}
+
+
 // Why `a` cannot merge into `b`, or "".
 @(private = "file")
 committer_merge_obstacle :: proc(self: ^Committer, a: Entity_ID, b: Entity_ID) -> string {
@@ -519,6 +528,7 @@ committer_merge_obstacle :: proc(self: ^Committer, a: Entity_ID, b: Entity_ID) -
 	if ba.bent || bb.bent do return "units differ physically: one is bent"
 	if ba.toolMarks != 0 || bb.toolMarks != 0 do return "units differ physically: one has tool marks"
 	if bears_trace(self.world, a) || bears_trace(self.world, b) do return "units differ physically: one bears a trace"
+	if !food_alike(self.world, a, b) do return "units differ physically: one is cooked"
 	if !location_equal(world_location_of(self.world, a), world_location_of(self.world, b)) do return "they are not in the same place"
 	// a quantity claim over several entities follows the units; a claim on this one unit alone pins it
 	if !world_is_stack(self.world, a) {

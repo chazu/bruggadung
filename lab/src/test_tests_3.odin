@@ -3789,6 +3789,7 @@ ALL_TESTS := [?]Test_Case{
 	{"declared",                      test_declared},
 	{"cooking",                       test_cooking},
 	{"rationing",                     test_rationing},
+	{"armful_put_away",               test_armful_put_away},
 	{"deals",                         test_deals},
 	{"asking_in_the_village",        test_asking_in_the_village},
 	{"where_neighbours_live",        test_where_neighbours_live},

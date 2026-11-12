@@ -2838,8 +2838,8 @@ effect_keep_seed :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Gro
 
 
 /* Harvesting a row of a ripe plot (content/farming/): what its tiles yield
- * is in the harvester's hand, with a stack of the kind it holds already,
- * else in a free one. The last row reaped, the plot is bare. */
+ * is in the harvester's hand, with a stack of the kind it holds already
+ * (not one cooked), else in a free one. The last row reaped, the plot is bare. */
 @(private = "file")
 effect_harvest :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
 	held: [8]Entity_ID
@@ -2859,7 +2859,11 @@ effect_harvest :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group
 	nheld := world_entities_at(world, a.roles[.Actor], .Held_By, raw_data(held[:]), 8)
 	for e in held[:nheld] {
 		u := world_unit_of(world, e)
-		if world_is_stack(world, e) && u != nil && string(u) == unit_ && with == NO_ENTITY do with = e
+		raw: i64
+		if world_is_stack(world, e) && u != nil && string(u) == unit_ && with == NO_ENTITY &&
+		   (!world_get_field(world, "Food.raw", e, &raw) || raw != 0) {
+			with = e
+		}
 	}
 	where_: Location
 	if with != NO_ENTITY {

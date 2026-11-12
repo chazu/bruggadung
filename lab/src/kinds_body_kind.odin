@@ -3,7 +3,8 @@ package lab
 /*
  * BGBodyKind — behaviour of the Body component. On the reactions channel:
  * a unit put (or split off) into a container that holds a stack of the
- * same unit proposes to merge into it, and, food, to spoil at the two's
+ * same unit (food: raw with raw, cooked with cooked) proposes to merge
+ * into it, and, food, to spoil at the two's
  * times averaged by mass. Whether the units are indistinguishable is commitment's to
  * decide; a refusal is traced with its reason.
  *
@@ -50,6 +51,7 @@ body_kind_react_to_event :: proc(self: ^Body_Kind, committer: ^Committer, event:
 	n = world_entities_at(world, event.location.place, .In, raw_data(here[:]), 256)
 	for i = 0; i < n && i < 256; i += 1 {
 		if here[i] == event.subject || !world_is_stack(world, here[i]) || world_unit_of(world, here[i]) != unit do continue
+		if !food_alike(world, event.subject, here[i]) do continue
 		group = proposal_group_group_with_phase(.System,
 		                                        fmt.tprintf("Body reaction: merge %d into %d", event.subject, here[i]))
 		proposal_group_set_cause(group, event.index)
