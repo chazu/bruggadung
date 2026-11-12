@@ -74,6 +74,25 @@ Two terms are proposed, and have entries in GLOSSARY.md marked as such: a
     within a list, and would make confiscating a taking; nothing yet
     wants it. Taking some of a stack, and gathering into a pack, were
     not theft before (their effect had another name): they are now.
+11. **Ownership passes with a move that says so** (`passes: true` on a
+    `moves` entry): **passing**. Put in another's hand the thing is
+    theirs alone (a new ownership claim; the giver's side's claims on it
+    end); put into a container, it is claimed as the container is (the
+    container's ownership claims take it as a subject too). Only an
+    owner passes a thing on, or anyone what is nobody's; nothing passes
+    to those who own it already, or into a container nobody owns.
+    `give`, `give_some`, `hand_over`, `pay`, `put_in` and
+    `put_away_coins` pass. So a sale passes the goods to the buyer and
+    the coins to the stall's owners, a harvest or a kill put in the
+    larder is the household's, and what a thief hands on is still its
+    owner's. Units split off a stack are claimed as the stack is, and
+    the claims on what a thing was divided from cover it only while it
+    has none of its own. An owner knows on sight what it no longer owns,
+    as it knows what it owns.
+    Left: putting one's own thing into another's container gives it to
+    them (there is no leaving a thing in someone's keeping); a loan of
+    the very thing passes it as a gift does; what is made or caught is
+    nobody's until it is put into a container.
 
 ## The issue
 
@@ -327,7 +346,8 @@ done after: the first conversions use only the three there are.
    over, paying and giving some (moves, of a portion). A portion of
    more than there are is all of them, unless the move is `exact`
    (paying, giving some), where the effect fails. 36 named effects are
-   left of the 50 before step 4.
+   left of the 50 before step 4. A move can pass ownership (decision
+   11).
    Left named, and why: `eat` (satiety and reserves are reckoned to the
    moment of eating from when the eater last ate; the truth projection
    gives the stored fields, so `after` cannot say them: it wants the

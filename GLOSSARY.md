@@ -137,6 +137,15 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
 - **Claim**: a reified relation of ownership or authority (claimant,
   subject, issuer): ownership, custody, reservation. A **quantity claim**
   claims part of a stack. See *Words with more than one sense*. (COM d6)
+- **Passing**: ownership going with a thing as it is moved, by a move
+  that `passes` (giving, handing over, paying, putting into a container).
+  Put in another's hand it is theirs alone; put into a container, each of
+  the container's owners'. Only an owner passes a thing on, or anyone
+  what is nobody's (a harvest brought home is the household's); another's
+  thing, moved by one who doesn't own it, stays whose it was. Nothing
+  passes to those who own it already, or into a container nobody owns.
+  *Avoid:* transfer (a proposal transfers a stock). (EFFECTS.md
+  decision 11)
 - **Location**: the one exclusive relation that places a physical entity:
   `onTile`, `in`, `heldBy`, `wornBy`, `partOf`. (COM §5)
 - **Body**: the component of mass, volume, material and traces. (COM §6)
@@ -299,7 +308,7 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
   which resolves the operation against the truth projection. Its `changes`
   are coarse effects. Of a stack, a declared effect's **portion** is so
   many of its units: moved, they are split off and are that role from
-  then on. *Avoid:* data effect, effect as data (for the thing; "effects
+  then on. A move that `passes` hands on whose the thing is (**passing**). *Avoid:* data effect, effect as data (for the thing; "effects
   as data" names the idea). (EFFECTS.md)
 - **The five questions**: `formulate` (does it know the operation and
   have referents for the roles), `appearsBeginnable`, `expect`, `resolve`

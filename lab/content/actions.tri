@@ -22,7 +22,9 @@
 //            (src/act_declared.odin), which resolves the operation against
 //            the truth; so far `after`, `moves`, `makes`, `consumes` and
 //            `emits`, for an operation or a stage. Taking, giving, putting
-//            down, putting in and looking are declared. An operation, or a stage, with no
+//            down, putting in and looking are declared. A move that
+//            `passes` hands on whose the thing is (declared_pass: giving,
+//            putting in). An operation, or a stage, with no
 //            effect named or declared and no trace is refused at load.
 // - code:    a walk's stages come from its activity's way, not from the
 //            operation (src/act_activities.odin); its way is found by the
@@ -74,6 +76,10 @@
 // a thing, or a portion of it, `because` of what (its tombstone's reason).
 // A portion of more units than there are is all of them, unless it is
 // `exact`: then the effect fails (paying, there must be so many coins).
+// A move that `passes` hands on whose the thing is (a claim of ownership,
+// things.tri) with it: put in another's hand, it is theirs; put into a
+// container, its owners'. Only its owner passes it, or anyone what is
+// nobody's; nothing passes to those who own it already.
 // `makes` constructs a thing from a `blueprint`, `at` a place (where a role
 // was, by a tag on its `place`), `called` what its construction is recorded
 // as; `splitFrom` says what it was carved from, if anything.
@@ -81,7 +87,7 @@
 // $k`), its `parameter` the command's (how many). Into a hand, of an operation
 // that stows (`stow`), is into a pack its actor carries, if it fits. Arithmetic in `after` is Triangle's (CONTENT_LANGUAGE.md §5).
 #OfSome:   { portion: int & >=1, exact: bool }
-#Moves:    #OfSome & { moved: ref, into: #Place }
+#Moves:    #OfSome & { moved: ref, into: #Place, passes: bool }
 #Consumes: #OfSome & { consumed: ref, because: text }
 #Emits:    { event: text, subject: ref, other: ref }
 #Makes:    { blueprint: text, at: #Place, called: text, splitFrom: ref }
@@ -220,14 +226,16 @@ take_some: #Taking & {
     moves: [{ moved: $i, portion: $n, into: #Held & { by: $a } }]
 } @family(operations) @quickcheck(actor.freeHands)
 
-// Put something the actor holds into a container.
+// Put something the actor holds into a container: its own, or nobody's,
+// it is the container's owners' from then on (what is brought home is the
+// household's; what is paid is the seller's).
 put_in: #Operation & {
     roles: {
         actor:       #Agent & { id: $a }
         item:        #Body & { id: $i, place: #Held & { by: $a } }
         destination: #Container & { id: $c }
     }
-    moves: [{ moved: $i, into: #Inside & { container: $c } }]
+    moves: [{ moved: $i, into: #Inside & { container: $c }, passes: true }]
 } @family(operations)
 
 // Take something up, carefully: a second, then into a free hand. Two who
@@ -261,7 +269,7 @@ give: #Operation & {
         item:        #Body & { id: $i, place: #Held & { by: $a } }
         destination: #Agent & { id: $d, freeHands: >=1 }
     }
-    moves: [{ moved: $i, into: #Held & { by: $d } }]
+    moves: [{ moved: $i, into: #Held & { by: $d }, passes: true }]
 } @family(operations)
 
 // Look into a container: what is inside is perceived only by looking.

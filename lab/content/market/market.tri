@@ -35,6 +35,9 @@
 //             #Priced claim, believed as any claim read is; #Buy is a
 //             question, waited on as any is.
 // - perishing: goods set out keep spoiling where they are.
+// - things:   a sale passes ownership (actions.tri's `passes`): the goods
+//             handed over are the buyer's, the coins paid in the stall's
+//             owners', and coins put away the coffer's owners'.
 // - code:     the #Purchase step and the #Buying condition (agency_lot,
 //             agency_cheapest, agency_buying), the seller's weighing of a #Buy
 //             (src/agency_agency.odin); a #Priced claim known
@@ -274,7 +277,7 @@ hand_over: #Operation & {
         item:        #Stack & { id: $i }
         destination: #Agent & { id: $d, freeHands: >=1 }
     }
-    moves: [#Moves & { moved: $i, portion: $n, into: #Held & { by: $d } }]
+    moves: [#Moves & { moved: $i, portion: $n, into: #Held & { by: $d }, passes: true }]
 } @family(operations)
 
 // Pay: `units` of the coins in hand put into a container within two tiles
@@ -288,7 +291,7 @@ pay: #Operation & {
         item:        #Stack & { id: $i, unit: "coin", place: #Held & { by: $a } }
         destination: #Container & { id: $c }
     }
-    moves: [#Moves & { moved: $i, portion: $n, exact: true, into: #Inside & { container: $c } }]
+    moves: [#Moves & { moved: $i, portion: $n, exact: true, into: #Inside & { container: $c }, passes: true }]
 } @family(operations)
 
 // Stocking the household (the buyer's, through the market's hours): its
@@ -500,15 +503,19 @@ unpack_firewood:      #Method & unpack_it & {
 // it holds; a seller takes its stall's takings (its own: the stall bound
 // when it undertook it, never another's), then puts them away. One way:
 // the coins, wherever they are now (in the stall, in hand, in its pack),
-// taken in hand by the coffer (carrying/'s ways), then put away.
+// taken in hand by the coffer (carrying/'s ways), then put away. Found
+// impossible (the takings it knew of gone into another stack, the stall
+// not yet looked in), it is tried again five minutes on, till 13:00.
 coins_home: #Goal & {
     title:   "take the coins home"
+    retry:   5min
     done:    #Did & { did: "put_away_coins" }
     urgency: [{ input: 0, output: 35 }]
 } @family(goals)
 
 takings_home: #Goal & {
     title:   "take the takings home"
+    retry:   5min
     done:    #Did & { did: "put_away_coins" }
     urgency: [{ input: 0, output: 35 }]
 } @family(goals)
@@ -588,5 +595,5 @@ put_away_coins: #Operation & {
         item:        #Stack & { id: $i, unit: "coin", place: #Held & { by: $a } }
         destination: #Container & { id: $c }
     }
-    moves: [{ moved: $i, into: #Inside & { container: $c } }]
+    moves: [{ moved: $i, into: #Inside & { container: $c }, passes: true }]
 } @family(operations)

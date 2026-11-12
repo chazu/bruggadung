@@ -44,3 +44,9 @@ the contract follows once enough is decided.
    theft brings arrest); particular rules (an office's permits, a new
    ordinance) are learned like anything else, by reading a posted notice,
    being told, or seeing someone sanctioned.
+9. **Ownership passes with the thing when its owner gives it**: handed
+   over, paid, given, or put into a container, a thing is the
+   receiver's, or the container's owners' (**passing**; EFFECTS.md
+   decision 11). So a buyer taking bought grain out of its pack, and a
+   seller taking its takings home, break no law; a thief's handing on
+   what it took passes nothing.

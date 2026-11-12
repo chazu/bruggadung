@@ -7,7 +7,8 @@ package lab
  * as the effect leaves them (`after`), what it moves (`moves`), constructs
  * (`makes`) and destroys (`consumes`), whole or a portion of a stack, and
  * the events it emits (`emits`). The command's parameter is the
- * operation's `parameter`, the time its `now`.
+ * operation's `parameter`, the time its `now`. A move that `passes` hands
+ * on whose the thing is (declared_pass).
  *
  * Resolving it is a unification: the operation's pattern with the truth
  * projection of what fills its roles. Where that fails, a requirement the
@@ -24,6 +25,7 @@ package lab
  */
 
 import "core:fmt"
+import "core:slice"
 import "core:strconv"
 import "core:strings"
 import tri "../../triangle/odin/triangle"
@@ -173,6 +175,80 @@ declared_place :: proc(world: ^World, into: ^tri.Node, mass: i64 = 0, stows := f
 }
 
 
+/* The claimants of the ownership claims in `claims`, each once. */
+@(private = "file")
+owners_among :: proc(world: ^World, claims: []Entity_ID) -> []Entity_ID {
+	who: Entity_ID
+
+	owners    := make([dynamic]Entity_ID, context.temp_allocator)
+	ownership := u32(tri.type_named(world_tri(world), "\"ownership\""))
+	kclaim    := world_kind_named(world, "Claim")
+	for c in claims {
+		claim := (^Claim)(world_record(world, kclaim, c))
+		if claim == nil || u32(claim.kind) != ownership do continue
+		if world_edges_from(world, .Claimant, c, &who, 1) != 0 && !slice.contains(owners[:], who) do append(&owners, who)
+	}
+	return owners[:]
+}
+
+
+/* The ownership claims on an entity itself. */
+@(private = "file")
+ownership_on :: proc(world: ^World, entity: Entity_ID) -> []Entity_ID {
+	claims: [64]Entity_ID
+
+	found     := make([dynamic]Entity_ID, context.temp_allocator)
+	ownership := u32(tri.type_named(world_tri(world), "\"ownership\""))
+	kclaim    := world_kind_named(world, "Claim")
+	n := world_edges_to(world, .Claim_Subject, entity, &claims[0], 64)
+	for c in claims[:min(n, 64)] {
+		claim := (^Claim)(world_record(world, kclaim, c))
+		if claim != nil && u32(claim.kind) == ownership do append(&found, c)
+	}
+	return found[:]
+}
+
+
+/* Passing (a move that `passes`): whose `thing` is goes with it, to
+ * `receiver`: the one whose hand it is put in, alone; or, put into a
+ * container, each of the container's owners. `target` is what moves: the
+ * thing, or the units split off it (`portion`), which the split leaves
+ * owned as the thing is.
+ *
+ * Only its owner passes it on, or anyone what is nobody's (brought home, a
+ * harvest is the household's): another's, moved by one who doesn't own it,
+ * stays whose it was. Nothing passes to those who own it already, or into
+ * a container nobody owns. */
+@(private = "file")
+declared_pass :: proc(world: ^World, group: ^Proposal_Group, actor: Entity_ID, thing: Entity_ID, target: Ref, portion: bool,
+                      receiver: Entity_ID, hand: bool) {
+	subjects: [2]Entity_ID
+
+	was := owners_among(world, claims_covering(world, thing))
+	if len(was) > 0 && !slice.contains(was, actor) do return
+	via := ownership_on(world, receiver) if !hand else nil
+	to  := owners_among(world, via) if !hand else []Entity_ID{receiver}
+	news := false
+	for owner in to do if !slice.contains(was, owner) do news = true
+	if !news do return
+	for claim in ownership_on(world, thing) {
+		proposal_group_unrelate(group, .Claim_Subject, whole(claim), target)
+		/* a claim on nothing else is over */
+		if !portion && world_edges_from(world, .Claim_Subject, claim, &subjects[0], 2) == 1 {
+			proposal_group_destroy(group, whole(claim), "passed")
+		}
+	}
+	if hand {
+		claim := proposal_group_create(group, "ownership", "passed", location_make_none())
+		proposal_group_set_of_to(group, "Claim.quantity", whole(claim), 1)
+		proposal_group_relate(group, .Claimant, whole(claim), whole(receiver))
+		proposal_group_relate(group, .Claim_Subject, whole(claim), target)
+		return
+	}
+	for claim in via do proposal_group_relate(group, .Claim_Subject, whole(claim), target)
+}
+
+
 /* Where a step is in its operation, as a path with its dot: "" for an
  * operation with no stages, which is its own one step; else stage `index`. */
 @(private = "file")
@@ -305,19 +381,30 @@ apply_declared_effect :: proc(world: ^World, action: Action, stage: i64, amount:
 		mass    := world_mass_of(world, moved) * (n if some else max(units, 1)) / max(units, 1)
 		to, reason := declared_place(world, tri.at(tc, move, "into"), mass, operation_stows(world, action.operation))
 		if reason != "" do return reason
+		target := whole(moved)
 		if some {
 			part := proposal_group_split(group, whole(moved), n, to)
 			for r in Role.Actor ..< Role.Count do if action.roles[r] == moved do portions[r] = part
-			continue
+			target = whole(part)
+		} else {
+			/* where it is to go already (in a hand of theirs, in that container,
+			 * on that tile): nothing moves */
+			if at := world_location_of(world, moved); at.form == to.form && at.place == to.place &&
+			   (at.form != .On_Tile || (at.x == to.x && at.y == to.y && at.level == to.level)) {
+				continue
+			}
+			/* from where it is now: if someone else gets it first, this fails */
+			proposal_group_move_to_expecting(group, whole(moved), to, world_location_of(world, moved))
 		}
-		/* where it is to go already (in a hand of theirs, in that container,
-		 * on that tile): nothing moves */
-		if at := world_location_of(world, moved); at.form == to.form && at.place == to.place &&
-		   (at.form != .On_Tile || (at.x == to.x && at.y == to.y && at.level == to.level)) {
-			continue
+		/* whose it is goes with it: to whose hand it is (their pack is
+		 * theirs to carry it in), or to the owners of what it is put into */
+		if printed(tc, tri.at(tc, move, "passes")) == "true" {
+			into := tri.at(tc, move, "into")
+			held := strings.has_suffix(string(tri.type_name(tc, tri.node_type(into))), "#Held")
+			if receiver, named := ref_of(tc, tri.at(tc, into, "by" if held else "container")); named {
+				declared_pass(world, group, action.roles[.Actor], moved, target, some, receiver, held)
+			}
 		}
-		/* from where it is now: if someone else gets it first, this fails */
-		proposal_group_move_to_expecting(group, whole(moved), to, world_location_of(world, moved))
 	}
 
 	/* after: each field a role is left with, by role, component and field */

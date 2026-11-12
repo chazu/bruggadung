@@ -106,6 +106,84 @@ test_declared :: proc() {
 }
 
 
+/* An ownership claim of `who`'s on `thing`, committed. */
+@(private = "file")
+test_owning :: proc(c: ^Committer, who: Entity_ID, thing: Entity_ID) -> Entity_ID {
+	g := proposal_group_group_with_phase(.System, "setup: whose it is")
+	claim := proposal_group_create(g, "ownership", "its own", location_make_none())
+	proposal_group_set_of_to(g, "Claim.quantity", whole(claim), 1)
+	proposal_group_relate(g, .Claimant, whole(claim), whole(who))
+	proposal_group_relate(g, .Claim_Subject, whole(claim), whole(thing))
+	committer_submit(c, g)
+	committer_commit_boundary(c)
+	return proposal_group_id_for(g, claim)
+}
+
+
+/* Passing (a move that `passes`, act_declared.odin's declared_pass): what
+ * its owner pays, gives or puts away is the receiver's from then on; what
+ * isn't the actor's to give stays whose it was; what is nobody's, put into
+ * a container, is its owners'. */
+test_passing :: proc() {
+	error: string
+	inside: [4]Entity_ID
+
+	w := test_world(7)
+	c := test_committer(w)
+	ada   := test_commit_create(c, "worker", on_tile(1, 1, 0))
+	bo    := test_commit_create(c, "worker", on_tile(2, 1, 0))
+	cy    := test_commit_create(c, "worker", on_tile(1, 2, 0))
+	dee   := test_commit_create(c, "worker", on_tile(2, 2, 0))
+	stall := test_commit_create(c, "larder", on_tile(2, 2, 0))
+	purse := test_commit_create(c, "coins_400", held_by(ada, 0))
+	nail  := test_commit_create(c, "iron_nail", held_by(cy, 0))
+	sack  := test_commit_create(c, "grain_sack", held_by(cy, 1))
+	ours  := test_commit_create(c, "iron_nail", held_by(ada, 1))
+	test_owning(c, bo, stall)
+	hers := test_owning(c, ada, purse)
+	test_owning(c, ada, nail)
+	test_owning(c, ada, ours)
+	test_owning(c, bo, ours)
+	bg_check(!claimed_by_another(w, purse, ada) && claimed_by_another(w, purse, bo))
+
+	/* paid into Bo's stall, the coins are Bo's; the purse is still Ada's */
+	bg_check(perform(w, c, action_make("pay", ada, purse, stall), 100, &error) != nil)
+	committer_commit_boundary(c)
+	bg_check(world_entities_at(w, stall, .In, raw_data(inside[:]), 4) == 1)
+	paid := inside[0]
+	bg_check(world_units_of(w, paid) == 100 && world_units_of(w, purse) == 300)
+	bg_check(claimed_by_another(w, paid, ada) && !claimed_by_another(w, paid, bo))
+	bg_check(!claimed_by_another(w, purse, ada) && claimed_by_another(w, purse, bo))
+
+	/* what several own, given by one of them to another of them, is still
+	 * theirs */
+	bg_check(perform(w, c, action_make("give", ada, ours, bo), 0, &error) != nil)
+	committer_commit_boundary(c)
+	bg_check(world_location_of(w, ours).place == bo)
+	bg_check(!claimed_by_another(w, ours, ada) && !claimed_by_another(w, ours, bo) && claimed_by_another(w, ours, cy))
+
+	/* given whole, the purse is Bo's alone, and Ada's claim on it is over */
+	bg_check(perform(w, c, action_make("give", ada, purse, bo), 0, &error) != nil)
+	committer_commit_boundary(c)
+	bg_check(world_location_of(w, purse).place == bo)
+	bg_check(claimed_by_another(w, purse, ada) && !claimed_by_another(w, purse, bo))
+	bg_check(!world_is_live(w, hers))
+
+	/* Ada's nail in Cy's hand isn't Cy's to give: given to Dee, it is
+	 * still Ada's */
+	bg_check(perform(w, c, action_make("give", cy, nail, dee), 0, &error) != nil)
+	committer_commit_boundary(c)
+	bg_check(world_location_of(w, nail).place == dee)
+	bg_check(!claimed_by_another(w, nail, ada) && claimed_by_another(w, nail, dee) && claimed_by_another(w, nail, cy))
+
+	/* nobody's, put into Bo's larder, the sack is Bo's */
+	bg_check(!claimed_by_another(w, sack, ada))
+	bg_check(perform(w, c, action_make("put_in", cy, sack, stall), 0, &error) != nil)
+	committer_commit_boundary(c)
+	bg_check(claimed_by_another(w, sack, cy) && !claimed_by_another(w, sack, bo))
+}
+
+
 /* A group that marks a thing once more than it read, expecting what it
  * read, and is built afresh if that is stale. */
 @(private = "file")

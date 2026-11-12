@@ -33,10 +33,10 @@ things the lab put off:
   farm's grain and a woodpile with a household's firewood, its own (it
   has no wage, and makes nothing to sell: a stopgap). Nobody is
   arrested. What several own is each one's own, so a household's taking
-  from its larder is no theft. Still wrong: a sale leaves the goods the
-  seller's household's, and the coins the buyer's, so taking bought
-  grain out of one's own pack breaks the law in truth (21 times in
-  three weeks; nobody sees a theft in it).
+  from its larder is no theft. Ownership passes with what is sold, paid,
+  given or brought home (EFFECTS.md decision 11), so nothing taken in
+  three weeks breaks the law in truth (it was 21 takings: bought grain
+  out of the buyer's own pack, coins off the seller's own stall).
 - Seasons, weather, births and the regrowing of woods.
 - Hunger and food below reduced detail. Abstract detail stays open, as the
   user asked: the whole village runs at full detail.
@@ -688,10 +688,14 @@ New, and entered in the glossary with this document:
     (`put_the_armful_away`); and cooked food doesn't merge with raw of
     its unit, in a hand or a container.
   - With these the three weeks pass every check (223).
-  - Seen on the way, not fixed: a buyer that finds nothing to buy, and
-    is at something more pressing from 12:00 to 13:00, keeps the coins
-    in hand till the next market; with coins in both hands it can't
-    buy, and taking the coins home puts away one stack of the two.
+  - Seen on the way: a buyer that finds nothing to buy, and is at
+    something more pressing from 12:00 to 13:00, keeps the coins in hand
+    till the next market; with coins in both hands it can't buy, and
+    taking the coins home puts away one stack of the two (not fixed). A
+    seller whose takings merged into another stack as it walked to the
+    stall found taking them home impossible, and left them there: taking
+    coins home is now tried again five minutes on, till 13:00
+    (AGENCY.md).
 - **Seed from the harvest.** Settled: once a harvest, holding more than a
   sack of seed's worth of it (twelve and a half kilograms of grain), a
   farmer keeps a sack back as seed (`keep_back_seed`), marking the plot

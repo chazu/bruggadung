@@ -34,7 +34,9 @@
 //             Scenario 3's `#Request` (money/money.tri) stays a plea, with
 //             no haggling.
 // - things:   what a thing is worth to each side is agency's values
-//             (agency.tri's #Valuing), raised by the need it serves.
+//             (agency.tri's #Valuing), raised by the need it serves. What
+//             is given is the other's from then on (actions.tri's
+//             `passes`), a loan of the very thing too.
 // - code:     src/agency_deals.odin: what to ask for (a method's slot
 //             wanted in hand, its place loosened), whom, valuing a deal,
 //             the target and the concession, `#HandOver`, debts and
@@ -89,7 +91,7 @@ give_some: #Operation & {
         item:        #Body & { id: $i, place: #Held & { by: $a } }
         destination: #Agent & { id: $d, freeHands: >=1 }
     }
-    moves: [#Moves & { moved: $i, portion: $n, exact: true, into: #Held & { by: $d } }]
+    moves: [#Moves & { moved: $i, portion: $n, exact: true, into: #Held & { by: $d }, passes: true }]
 } @family(operations)
 
 // Handing a thing over to the one it is owed (a commitment, its `to` bound):

@@ -2374,7 +2374,7 @@ know_owned_by :: proc(world: ^World, agent: Entity_ID) -> []Entity_ID {
 
 /* What the agent owns, it knows as its own when it sees it (KNOWLEDGE.md
  * decision 18), as it knows whom it is bound to: an #Owned finding, its own
- * the choice. */
+ * the choice; and what it owned and has passed on, as no longer its own. */
 @(private)
 know_own :: proc(self: ^Knowledge, store: ^Knowledge_Store, agent: Entity_ID, e: Entity_ID, referent: u32, now: i64) {
 	claims: [64]Entity_ID
@@ -2382,7 +2382,11 @@ know_own :: proc(self: ^Knowledge, store: ^Knowledge_Store, agent: Entity_ID, e:
 	me := knowledge_store_self_referent(store)
 	if me == 0 do return
 	held := knowledge_store_finding(store, "#Owned", referent)
-	if held != nil && held.choice == me do return
+	if held != nil && held.choice == me {
+		/* passed on since (sold, given, paid): it knows it isn't its own */
+		if !slice.contains(know_owners_of(self.world, e), agent) do knowledge_store_retract_finding(store, "#Owned", referent)
+		return
+	}
 	ownership := u32(tri.type_named(world_tri(self.world), "\"ownership\""))
 	kclaim := world_kind_named(self.world, "Claim")
 	n := world_edges_to(self.world, .Claim_Subject, e, &claims[0], 64)

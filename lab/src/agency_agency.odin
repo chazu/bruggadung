@@ -3637,7 +3637,11 @@ agency_settle :: proc(self: ^Agency, m: ^Motivation, intention: ^Intention, done
 	if intention.commitment > 0 && intention.commitment <= m.ncommitments {
 		c := &m.commitments[intention.commitment - 1]
 		if !goal_kept(world_tri(self.world), intention.goal) {
-			c.settled = true
+			/* impossible for now, of a goal that says when to try again
+			 * (`retry`): not settled while its window is open */
+			again := int_at(world_tri(self.world), tri.pattern(world_tri(self.world), intention.goal), "retry", 0)
+			if !done && again > 0 do c.resume = world_time(self.world).ms + again
+			else do c.settled = true
 		} else if !done {
 			c.resume = world_time(self.world).ms + int_at(world_tri(self.world), tri.pattern(world_tri(self.world), intention.goal),
 			                                              "retry", BG_KEPT_RETRY)

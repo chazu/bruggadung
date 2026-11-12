@@ -100,7 +100,10 @@
 // A `kept` goal is an ongoing condition (at work through the shift): a
 // commitment to it isn't settled when it is done, but arises again
 // whenever it no longer holds, until its window closes; found impossible,
-// it is tried again `retry` later (ten minutes, without one).
+// it is tried again `retry` later (ten minutes, without one). A commitment
+// to a goal that isn't kept is settled when it is done, or found impossible:
+// unless the goal says a `retry`, when it is tried again that much later,
+// while its window is open.
 #Goal: #Intent & { done: #Condition, concerns: [...#Body], worth: [...#Consideration], arises: #Arising,
                    pressed: #Pressing, urgency: [...#Point], kept: *false | true, retry: time }
 

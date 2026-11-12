@@ -446,7 +446,12 @@ a disturbance generates no goal to investigate it.
   its window is open it arises again whenever it no longer holds, and,
   having no deadline to meet, its urgency doesn't rise (lab
   content/agency.tri's `kept`; VILLAGE.md decision 4). Found impossible,
-  it isn't given up for the window but tried again a while later.
+  it isn't given up for the window but tried again a while later. A
+  commitment to a goal that isn't kept is settled when it is done or
+  found impossible, unless the goal says a `retry`: then it is tried
+  again that much later, while its window is open (taking the takings
+  home, five minutes: the coins it knew of merged into another stack
+  while it walked to the stall).
 - **A suspended activity** is resumed once the agent is back within reach
   of what it names. One that binds what is gone or out of reach, when the
   agent is in reach of what its method names now, is given up and begun

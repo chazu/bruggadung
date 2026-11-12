@@ -2294,8 +2294,10 @@ claims_covering :: proc(world: ^World, entity: Entity_ID) -> []Entity_ID {
 	found = make([dynamic]Entity_ID, context.temp_allocator)
 	/* on it */
 	add_claims(world, entity, false, &found)
-	/* on what it was divided from */
-	if world_edges_from(world, .Split_From, entity, &source, 1) != 0 {
+	/* on what it was divided from, for what has no claim of its own (a
+	 * split leaves it claimed as its stack is; passed on since, it is
+	 * claimed as it was passed) */
+	if len(found) == 0 && world_edges_from(world, .Split_From, entity, &source, 1) != 0 {
 		add_claims(world, source, false, &found)
 	}
 	/* on the assemblies it is part of, or came out of, up the chain: only
