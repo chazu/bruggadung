@@ -33,7 +33,7 @@
 //            (src/act_activities.odin); they are compacted into digests
 //            after the world's history window (src/core_world.odin).
 
-#Effect: "drive" | "open_tap" | "fill" | "walk" | "say" | "tend" | "analyse" | "write" | "read" | "eat" | "investigate" | "tighten" | "rotate" | "strike" | "shut" | "rest" | "saw" | "pass" | "copy" | "reveal" | "replace" | "cut" | "shape" | "issue" | "confiscate" | "arrest" | "flee" | "hit" | "hire" | "work" | "service" | "sow" | "keep_seed" | "harvest" | "crouch" | "shoot" | "butcher" | "post" | "hand_over" | "put_some" | "shoulder" | "put_back" | "give_some" | "forage"
+#Effect: "drive" | "fill" | "walk" | "say" | "tend" | "analyse" | "write" | "read" | "eat" | "investigate" | "rotate" | "strike" | "rest" | "saw" | "pass" | "copy" | "reveal" | "replace" | "cut" | "shape" | "issue" | "confiscate" | "arrest" | "flee" | "hit" | "hire" | "work" | "service" | "sow" | "keep_seed" | "harvest" | "crouch" | "shoot" | "butcher" | "post" | "shoulder" | "forage"
 
 // Which roles an operation has is its roles' type: a structure's type is the
 // most general one with all its features.
@@ -72,13 +72,15 @@
 // off, and are that role from then on, so what `after` says of the role it
 // says of them, and the rest of the stack is as it was. `consumes` destroys
 // a thing, or a portion of it, `because` of what (its tombstone's reason).
+// A portion of more units than there are is all of them, unless it is
+// `exact`: then the effect fails (paying, there must be so many coins).
 // `makes` constructs a thing from a `blueprint`, `at` a place (where a role
 // was, by a tag on its `place`), `called` what its construction is recorded
 // as; `splitFrom` says what it was carved from, if anything.
 // An operation's `now` is the time its effect commits (`spoilsAt: $now +
 // $k`), its `parameter` the command's (how many). Into a hand, of an operation
 // that stows (`stow`), is into a pack its actor carries, if it fits. Arithmetic in `after` is Triangle's (CONTENT_LANGUAGE.md §5).
-#OfSome:   { portion: int & >=1 }
+#OfSome:   { portion: int & >=1, exact: bool }
 #Moves:    #OfSome & { moved: ref, into: #Place }
 #Consumes: #OfSome & { consumed: ref, because: text }
 #Emits:    { event: text, subject: ref, other: ref }

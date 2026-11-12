@@ -18,7 +18,8 @@
 //             (water/water.tri).
 // - talk:     a recipe or a diagram's claim is learned by reading or being
 //             told (#RecipeSays, #Serves).
-// - code:     effect_shut, effect_work; src/kinds_latent_kind.odin.
+// - code:     effect_work; src/kinds_latent_kind.odin. Shutting a cock
+//             is declared (actions.tri).
 //             Dismantling's last stage, the pump open, is declared.
 
 package machines
@@ -239,11 +240,11 @@ take_up_the_wrench: #Method & {
 
 // Shut a cock in reach.
 shut_off: #Operation & {
-    effect: "shut"
     roles: {
         actor: #Agent
         item:  #Cock & { shut: false }
     }
+    after: { item: #Cock & { shut: true } }
 } @family(operations)
 
 // Dismantle a pump with a wrench in hand: the gland nut, the cover, then the

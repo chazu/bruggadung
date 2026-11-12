@@ -300,6 +300,7 @@ apply_declared_effect :: proc(world: ^World, action: Action, stage: i64, amount:
 		/* a portion: so many units, split off; all of them is the thing itself */
 		n, some := int_of(tri.at(tc, move, "portion"))
 		units   := world_units_of(world, moved)
+		if some && n > units && printed(tc, tri.at(tc, move, "exact")) == "true" do return "it hasn't so many"
 		some     = some && n < units
 		mass    := world_mass_of(world, moved) * (n if some else max(units, 1)) / max(units, 1)
 		to, reason := declared_place(world, tri.at(tc, move, "into"), mass, operation_stows(world, action.operation))

@@ -82,6 +82,19 @@ test_declared :: proc() {
 	settled := committer_commit_boundary(c)
 	bg_check(len(settled) == 2 && world_get_field(w, "Door.ajar", door, &v) && v == 1)
 
+	/* a portion: paying puts so many coins in; `exact`, more than there
+	 * are is refused, where taking more than there are takes them all */
+	purse := test_commit_create(c, "coins_400", held_by(giver, 0))
+	bg_check(perform(w, c, action_make("pay", giver, purse, larder), 500, &error) == nil && strings.contains(error, "it hasn't so many"))
+	bg_check(perform(w, c, action_make("pay", giver, purse, larder), 100, &error) != nil)
+	committer_commit_boundary(c)
+	bg_check(world_units_of(w, purse) == 300 && world_location_of(w, purse).place == giver)
+	bg_check(perform(w, c, action_make("put_down", giver, purse, NO_ENTITY), 0, &error) != nil)
+	committer_commit_boundary(c)
+	bg_check(perform(w, c, action_make("take_some", giver, purse, NO_ENTITY), 500, &error) != nil)
+	committer_commit_boundary(c)
+	bg_check(world_units_of(w, purse) == 300 && world_location_of(w, purse).place == giver)
+
 	/* and where it still holds, the fresh group stands in the same
 	 * boundary: two mark the nail, each one more than it read */
 	one := test_marking(w, nail, 0)

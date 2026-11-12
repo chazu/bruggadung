@@ -38,8 +38,10 @@
 //             and freeing a hand are the handling's.
 // - code:     the back is a hand slot past the hands (BG_BACK); the load
 //             is the committer's to keep (a placement obstacle); the slowed
-//             walk is work_rate's; stowing is `receiving`; effect_shoulder,
-//             effect_put_back (src/act_actions.odin).
+//             walk is work_rate's; stowing is `receiving`; effect_shoulder
+//             (src/act_actions.odin: the back has no name in content, and
+//             that nothing is on it already is no field). Taking into a
+//             pack and putting the pack back are declared (actions.tri).
 
 package carrying
 
@@ -104,12 +106,12 @@ pick_up: #Taking & {
 // Put a pack back where the household keeps it: down beside something in
 // reach (its larder).
 put_back: #Operation & {
-    effect: "put_back"
     roles: {
         actor:       #Agent & { id: $a }
-        item:        #Pack & { place: #Held & { by: $a } }
-        destination: #Body
+        item:        #Pack & { id: $i, place: #Held & { by: $a } }
+        destination: #Body & { place: $p & #OnTile }
     }
+    moves: [#Moves & { moved: $i, into: $p }]
 } @family(operations)
 
 // Handling: what every topic that moves a thing to where it goes shares

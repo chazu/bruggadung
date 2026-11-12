@@ -714,13 +714,6 @@ effect_drive :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) 
 
 
 @(private = "file")
-effect_open_tap :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
-	proposal_group_set_of_to(g, "Tap.open", whole(a.roles[.Item]), 1)
-	return ""
-}
-
-
-@(private = "file")
 effect_walk :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
 	at: Location
 	op: string
@@ -886,24 +879,6 @@ effect_eat :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) ->
 }
 
 
-/* Giving some of what the actor holds into the destination's free hand
- * (content/deals/): so many of a stack, split off; all of it, or a thing
- * that isn't a stack, whole. */
-@(private = "file")
-effect_give_some :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
-	hand := free_hand(world, a.roles[.Destination])
-	if hand < 0 do return "no hand of theirs is free"
-	units := world_units_of(world, a.roles[.Item])
-	if amount > units do return "it hasn't so many"
-	if amount < 1 || amount == units {
-		proposal_group_move_to(g, whole(a.roles[.Item]), held_by(a.roles[.Destination], hand))
-	} else {
-		proposal_group_split(g, whole(a.roles[.Item]), amount, held_by(a.roles[.Destination], hand))
-	}
-	return ""
-}
-
-
 /* Foraging a patch (content/foraging/): a handful of what it yields into a
  * free hand, the patch one fewer; stripped of the first of a full patch,
  * it begins to grow one back from now. A bare patch gives nothing. */
@@ -928,14 +903,6 @@ effect_forage :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group)
 @(private = "file")
 effect_investigate :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
 	proposal_group_emit_subject_other(g, "investigated", whole(a.roles[.Actor]), whole(a.roles[.Actor]))
-	return ""
-}
-
-
-/* Tightening: the nut is tight. */
-@(private = "file")
-effect_tighten :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
-	proposal_group_set_of_to(g, "Fastener.tight", whole(a.roles[.Destination]), 1)
 	return ""
 }
 
@@ -1467,14 +1434,6 @@ effect_rotate :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group)
 effect_strike :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
 	proposal_group_emit_subject_other_amount(g, "struck", whole(a.roles[.Destination]), whole(a.roles[.Actor]), 30000,
 	                                         nil)
-	return ""
-}
-
-
-/* Shutting a cock. */
-@(private = "file")
-effect_shut :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
-	proposal_group_set_of_to(g, "Cock.shut", whole(a.roles[.Item]), 1)
 	return ""
 }
 
@@ -2690,40 +2649,6 @@ effect_post :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -
 }
 
 
-/* Handing over (content/market/): `amount` units of the stack, or all of it
- * if no more, into a free hand of the one it is handed to, or, stowing, a
- * pack it carries. */
-@(private = "file")
-effect_hand_over :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
-	if amount < 1 do return "hand over how many?"
-	units := world_units_of(world, a.roles[.Item])
-	mass  := world_mass_of(world, a.roles[.Item]) * min(amount, units) / max(units, 1)
-	into, ok := receiving(world, a.roles[.Destination], mass, operation_stows(world, a.operation))
-	if !ok do return "no hand of theirs is free"
-	if amount >= units {
-		proposal_group_move_to(g, whole(a.roles[.Item]), into)
-	} else {
-		proposal_group_split(g, whole(a.roles[.Item]), amount, into)
-	}
-	return ""
-}
-
-
-/* Putting some in (content/market/'s paying): `amount` units of the stack
- * in hand, or all of it if no more, into the container. */
-@(private = "file")
-effect_put_some :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
-	if amount < 1 do return "put in how many?"
-	if amount > world_units_of(world, a.roles[.Item]) do return "it hasn't so many"
-	if amount == world_units_of(world, a.roles[.Item]) {
-		proposal_group_move_to(g, whole(a.roles[.Item]), in_(a.roles[.Destination]))
-	} else {
-		proposal_group_split(g, whole(a.roles[.Item]), amount, in_(a.roles[.Destination]))
-	}
-	return ""
-}
-
-
 /* Shouldering a backpack (content/carrying/): onto the back, which is no
  * hand, if nothing is there already. */
 @(private = "file")
@@ -2733,17 +2658,6 @@ effect_shoulder :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Grou
 		if world_location_of(world, e).slot == BG_BACK do return "something is on its back already"
 	}
 	proposal_group_move_to(g, whole(a.roles[.Item]), held_by(a.roles[.Actor], BG_BACK))
-	return ""
-}
-
-
-/* Putting a pack back (content/carrying/): down on the ground, beside what
- * it is kept by. */
-@(private = "file")
-effect_put_back :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
-	tile: Location
-	if !know_ground_tile(world, a.roles[.Destination], &tile) do return "it is nowhere to put it by"
-	proposal_group_move_to(g, whole(a.roles[.Item]), on_tile(tile.x, tile.y, tile.level))
 	return ""
 }
 
@@ -3011,7 +2925,6 @@ Named_Effect :: struct {
 @(private = "file")
 effects := [?]Named_Effect{
 	{"drive",     effect_drive},
-	{"open_tap",  effect_open_tap},
 	{"walk",      effect_walk},
 	{"say",       effect_say},
 	{"tend",      effect_tend},
@@ -3023,7 +2936,6 @@ effects := [?]Named_Effect{
 	{"keep_seed", effect_keep_seed},
 	{"harvest",   effect_harvest},
 	{"investigate", effect_investigate},
-	{"tighten",   effect_tighten},
 	{"rotate",    effect_rotate},
 	{"confiscate", effect_confiscate},
 	{"arrest",    effect_arrest},
@@ -3031,7 +2943,6 @@ effects := [?]Named_Effect{
 	{"hit",       effect_hit},
 	{"hire",      effect_hire},
 	{"work",      effect_work},
-	{"shut",      effect_shut},
 	{"saw",       effect_saw},
 	{"pass",      effect_pass},
 	{"copy",      effect_copy},
@@ -3044,15 +2955,11 @@ effects := [?]Named_Effect{
 	{"rest",      effect_rest},
 	{"strike",    effect_strike},
 	{"crouch",    effect_crouch},
-	{"give_some", effect_give_some},
 	{"forage",    effect_forage},
 	{"shoot",     effect_shoot},
 	{"butcher",   effect_butcher},
 	{"post",      effect_post},
-	{"hand_over", effect_hand_over},
-	{"put_some",  effect_put_some},
 	{"shoulder",  effect_shoulder},
-	{"put_back",  effect_put_back},
 }
 
 

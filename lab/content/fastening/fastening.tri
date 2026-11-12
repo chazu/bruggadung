@@ -11,7 +11,8 @@
 // - frozen:    it doesn't decide.
 // - knowledge: a size seen from afar is known only roughly (#Sized's
 //              @widen, knowledge.tri's `size_blurs`).
-// - code:      effect_tighten. Peering is declared (actions.tri's #Looking).
+// - code:      none of its own: tightening is declared, and peering
+//              (actions.tri's #Looking).
 
 package fastening
 
@@ -124,13 +125,13 @@ go_and_peer: #Method & {
 
 // Tighten a nut with a spanner the actor holds that fits it: the same size.
 tighten: #Operation & {
-    effect: "tighten"
-    uses:   ["hands"]
+    uses: ["hands"]
     roles: {
         actor:       #Agent & { id: $a }
         item:        #Spanner & { size: $s, place: #Held & { by: $a } }
         destination: #Fastener & { size: $s, tight: false }
     }
+    after: { destination: #Fastener & { tight: true } }
 } @family(operations)
 
 // Peer at a nut in reach: up close, its size is plain.

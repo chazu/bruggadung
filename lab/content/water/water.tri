@@ -9,7 +9,8 @@
 //             when the store runs dry.
 // - machines: a pump lifts water from a store into its riser
 //             (machines/pump.tri).
-// - code:     src/domains_fluid_domain.odin; effect_open_tap, effect_fill.
+// - code:     src/domains_fluid_domain.odin; effect_fill. Opening a tap is
+//             declared (actions.tri).
 
 package water
 
@@ -48,11 +49,11 @@ bucket:  #WaterStore & #Body & { material: "oak", mass: 1500g, water: 0mL, water
 
 // Open a tap the actor can reach.
 open_tap: #Operation & {
-    effect: "open_tap"
     roles: {
         actor: #Agent
         item:  #Tap & { open: false }
     }
+    after: { item: #Tap & { open: true } }
 } @family(operations)
 
 // Fill a bucket from a tap: open it, and keep filling until the bucket holds

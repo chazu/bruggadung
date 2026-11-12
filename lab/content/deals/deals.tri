@@ -39,7 +39,7 @@
 //             wanted in hand, its place loosened), whom, valuing a deal,
 //             the target and the concession, `#HandOver`, debts and
 //             credits; constants BG_ASK_COST, BG_ASK_PEOPLE, BG_SPARE,
-//             BG_COIN_TENTHS; effect_give_some (src/act_actions.odin).
+//             BG_COIN_TENTHS. Giving some is declared (actions.tri).
 // - hunger:   food asked for is valued by hunger/eating.tri's
 //             `food_kind_value`, raised by hunger.
 
@@ -82,13 +82,14 @@ package deals
 // Give some of what the actor holds: so many of a stack (coins, portions),
 // split off into the other's free hand; anything else, whole. A moment.
 give_some: #Operation & {
-    effect:   "give_some"
-    duration: 2s
+    duration:  2s
+    parameter: $n & >=1
     roles: {
         actor:       #Agent & { id: $a }
-        item:        #Body & { place: #Held & { by: $a } }
-        destination: #Agent & { freeHands: >=1 }
+        item:        #Body & { id: $i, place: #Held & { by: $a } }
+        destination: #Agent & { id: $d, freeHands: >=1 }
     }
+    moves: [#Moves & { moved: $i, portion: $n, exact: true, into: #Held & { by: $d } }]
 } @family(operations)
 
 // Handing a thing over to the one it is owed (a commitment, its `to` bound):

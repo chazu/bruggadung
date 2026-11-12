@@ -38,8 +38,9 @@
 // - code:     the #Purchase step and the #Buying condition (agency_lot,
 //             agency_cheapest, agency_buying), the seller's weighing of a #Buy
 //             (src/agency_agency.odin); a #Priced claim known
-//             (src/know_knowledge_1.odin); effect_post, effect_hand_over,
-//             effect_put_some (src/act_actions.odin); market days, the
+//             (src/know_knowledge_1.odin); effect_post
+//             (src/act_actions.odin; handing over and paying are declared,
+//             actions.tri); market days, the
 //             stalls and the coins (src/scenario_village.odin).
 
 package market
@@ -265,27 +266,29 @@ post: #Operation & {
 // Hand `units` of a stack within reach over to someone beside, into a pack
 // they carry if it fits, else a free hand of theirs.
 hand_over: #Operation & {
-    effect: "hand_over"
-    uses:   ["hands"]
-    stow:   true
+    uses:      ["hands"]
+    stow:      true
+    parameter: $n & >=1
     roles: {
         actor:       #Agent
-        item:        #Stack
-        destination: #Agent & { freeHands: >=1 }
+        item:        #Stack & { id: $i }
+        destination: #Agent & { id: $d, freeHands: >=1 }
     }
+    moves: [#Moves & { moved: $i, portion: $n, into: #Held & { by: $d } }]
 } @family(operations)
 
 // Pay: `units` of the coins in hand put into a container within two tiles
 // (the stall's takings, beside its seller).
 pay: #Operation & {
-    effect: "put_some"
-    range:  2
-    uses:   ["hands"]
+    range:     2
+    uses:      ["hands"]
+    parameter: $n & >=1
     roles: {
         actor:       #Agent & { id: $a }
-        item:        #Stack & { unit: "coin", place: #Held & { by: $a } }
-        destination: #Container
+        item:        #Stack & { id: $i, unit: "coin", place: #Held & { by: $a } }
+        destination: #Container & { id: $c }
     }
+    moves: [#Moves & { moved: $i, portion: $n, exact: true, into: #Inside & { container: $c } }]
 } @family(operations)
 
 // Stocking the household (the buyer's, through the market's hours): its
@@ -512,14 +515,14 @@ takings_home: #Goal & {
 
 // The purse (coins), wherever it is now: in hand, in its pack, in the
 // stall; taken in hand by the coffer, as the thing, then put away.
-let coins    = #Stack & { unit: "coin" }
+let coins = #Stack & { unit: "coin" }
 let put_away = {
     title: "put the coins away"
     steps: [#Achieve & { subgoal: "thing_in_hand", with: [{ binds: "thing", to: "purse" }, { binds: "into", to: "coffer" }] },
             #Do & { op: "put_away_coins", object: "purse", target: "coffer" }]
 }
 let coins_in_hand = { find: ["purse"], match: #Market & { me: #Agent & { id: $me }, purse: coins & { place: #Held & { by: $me, hand: <8 } } } }
-let coins_packed  = {
+let coins_packed = {
     find:  ["pack", "purse"]
     match: #Market & { me: #Agent & { id: $me }, pack: #Pack & { id: $p, place: #Held & { by: $me } },
                        purse: coins & { place: #Inside & { container: $p } } }
@@ -561,11 +564,11 @@ let bring_home = {
     steps: [#Achieve & { subgoal: "thing_in_hand", with: [{ binds: "thing", to: "goods" }, { binds: "into", to: "supply" }] },
             #Do & { op: "put_in", object: "goods", target: "supply" }]
 }
-unsold_in_hand: #Method & bring_home & {
+unsold_in_hand:      #Method & bring_home & {
     rank: 1
     pre:  { find: ["goods"], match: #Market & { me: #Agent & { id: $me }, goods: goods & { place: #Held & { by: $me, hand: <8 } } } }
 } @family(methods)
-unsold_packed: #Method & bring_home & {
+unsold_packed:       #Method & bring_home & {
     rank: 2
     pre: {
         find:  ["pack", "goods"]

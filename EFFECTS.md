@@ -322,7 +322,18 @@ done after: the first conversions use only the three there are.
    command's (how many, for `take_some`: `portion: $n`), and into a
    hand, of an operation that stows, is into a pack that bears it
    (`receiving`, as before). Installing a part is declared, on a move
-   into an assembly.
+   into an assembly. Then the plain ones: tightening a nut, shutting a
+   cock, opening a tap (one field each); putting a pack back, handing
+   over, paying and giving some (moves, of a portion). A portion of
+   more than there are is all of them, unless the move is `exact`
+   (paying, giving some), where the effect fails. 36 named effects are
+   left of the 50 before step 4.
+   Left named, and why: `eat` (satiety and reserves are reckoned to the
+   moment of eating from when the eater last ate; the truth projection
+   gives the stored fields, so `after` cannot say them: it wants the
+   projection to give a body's hunger as of now); `shoulder` (the back
+   is a hand slot with no name in content, and that nothing is on it
+   already is no field).
 5. `rest` and `fill`: the watches `perform` adds by effect name become
    fields of the operation.
 6. Roles read generically.
