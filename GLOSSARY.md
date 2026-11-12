@@ -1057,6 +1057,10 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
   **price board** (a label standing on it, read at a glance from three
   tiles): a written record of what it asks a unit. A buyer knows a price
   by having read it, one to a board. (VIL d9)
+- **Posting**: writing a price on a board (`#Posting`): what the seller
+  holds a unit of the goods worth. `post` is the stall's board's, once a
+  market; `post_beside` a second board's, for a second kind of goods set
+  out beside the first (a board holds one price). (VIL d9)
 - **Sale**: a deal of goods for coins, made on the spot, in three acts: the
   buyer asks for a lot (`#Buy`), the seller hands it over from its stall
   and says what is owed (`#Sold`), the buyer pays into the stall. *Avoid:*
@@ -1087,6 +1091,15 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
   stack, by the piece. **Dressing hides** is the work: a look into the
   pit, the leather there drawn out and put by, each hide kept laid in.
   *Avoid:* curing. (VIL d7, lab/content/tanning/)
+- **Leatherwork**: leather sewn (`sew`) into what its blueprint says
+  (`sewnInto`), so many pieces of it used up (`sewnOf`): a piece of deer
+  leather a backpack, two of hare leather a **pouch** (`#Pouch`, a small
+  container, for coins). A household buys two pieces of hare leather at
+  the hunters' stall, where it is set out beside the venison with its
+  price on a second board (`price_sign`; posting on it is `post_beside`,
+  a **posting** as `post` is), and makes its pouch of them, kept in its
+  coffer.
+  (VIL d7, lab/content/leatherwork/)
 - **Pricing**: what a unit of goods is worth to an agent in coins
   (`#Pricing`): its kind's, raised by a need the goods serve. A seller
   prices its spare goods without the raise, moved by its **stock**; a

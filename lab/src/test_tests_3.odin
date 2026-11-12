@@ -3821,6 +3821,8 @@ ALL_TESTS := [?]Test_Case{
 	{"changes",                       test_changes},
 	{"tanning",                       test_tanning},
 	{"dressing_hides",                test_dressing_hides},
+	{"leatherwork",                   test_leatherwork},
+	{"making_a_pouch",                test_making_a_pouch},
 	{"market",                        test_market},
 	{"carrying",                      test_carrying},
 	{"seed_unpacked",                 test_seed_unpacked},

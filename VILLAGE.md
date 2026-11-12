@@ -408,6 +408,7 @@ its cut points. The new and changed ones:
 | `cooking/` | the larder, cooking at a lit stove (raw food into a meal), meals | new (slice 4) |
 | `perishing/` | perishable food: how long it keeps, when it spoils, spoiled food; what becomes something else at its time (`#Becoming`) | new (slice 8) |
 | `tanning/` | the tan pit, laying a hide in the tan, leather, dressing hides | new |
+| `leatherwork/` | sewing leather, a household's pouch | new |
 | `farming/` | plots, crops, sowing, ripening, harvesting, seed grain | new (slice 6) |
 | `firewood/` | trees, felling, splitting, the woodpile, stoking | new (slice 5), with `sawing/` and `heat/` |
 | `hunting/` | animals and their goals, stalking, dying, carcasses, butchering, hides | new (slice 7), with `harm/` |
@@ -554,8 +555,19 @@ New, and entered in the glossary with this document:
   the larder in the tan, where each is leather six days on (in the pit: taken out early
   it is a raw hide again, and a raw hide rots in five days). Before, the
   hides lay in the larder, one place each, and would have filled it in
-  six weeks; leather is a stack. Selling it waits: nobody buys leather
-  yet, or makes anything of it. Left out: bark, water and lime.
+  six weeks; leather is a stack. It is sold and sewn since (content/leatherwork/): the hunters' seller
+  sets out four pieces of hare leather beside its venison, their price
+  on a second board at the stall (a board holds one price); the other
+  households' buyers buy two pieces each, and of an evening make a pouch
+  of them, kept in the coffer; then two pieces more, kept by. In three
+  weeks two households had made a pouch and the third had bought its
+  leather. A piece of deer leather is sewn into a backpack, which nobody
+  in the village wants: each household has its own, so deer leather
+  still only piles up. Nothing is carried in a pouch yet. With no
+  venison set out the seller doesn't mind the stall, so sells no leather
+  either. Tried first, and dropped: leather set out only when there is
+  no venison to spare (in three weeks it never was), and leather on the
+  one board (its price replaced the venison's). Left out: bark, water and lime.
 - **The hunt is fair, but the game never learns.** A shot can miss, and a
   deer bolts out of sight from a shot that gives the hunter away. Over a
   week, one hunter in a small wood brings home its two deer from 33

@@ -56,3 +56,8 @@ grain_price:    #Pricing & { valued: #Stack & { unit: "grain" }, coins: 4, press
 turnip_price:   #Pricing & { valued: #Stack & { unit: "turnip" }, coins: 4, pressure: "hunger", per: 4, plenty: 50kg, asks: by_stock } @family(prices)
 venison_price:  #Pricing & { valued: #Stack & { unit: "venison" }, coins: 8, pressure: "hunger", per: 4, plenty: 20kg, asks: by_stock } @family(prices)
 firewood_price: #Pricing & { valued: #Stack & { unit: "firewood" }, coins: 4, pressure: "cold", per: 4, plenty: 1000kg, asks: by_stock } @family(prices)
+
+// Leather, by the piece: no need raises what it is worth to a buyer, so a
+// seller with little of it asks more than anyone gives. Plenty is three
+// pieces.
+hare_leather_price: #Pricing & { valued: #Stack & { unit: "hare leather" }, coins: 6, pressure: "none", per: 0, plenty: 900g, asks: by_stock } @family(prices)

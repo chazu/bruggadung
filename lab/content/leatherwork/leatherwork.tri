@@ -1,0 +1,110 @@
+// Leatherwork: what leather is sewn into, and a household's pouch
+// (VILLAGE.md decision 7: what becomes of the hunters' leather).
+//
+// Cut points:
+// - full:     leather in hand is sewn (`sew`), a hand free: two hours, and
+//             so many pieces of it (its `sewnOf`) are what it is sewn into
+//             (its `sewnInto`, a blueprint), in the free hand; what is cut
+//             away is waste. A piece of deer leather is a backpack
+//             (carrying/); two of hare leather, a pouch. Whoever makes its
+//             household's pouch (a commitment, bound to where it keeps
+//             leather and to its coffer) takes two pieces of hare leather
+//             from where it is kept, sews them, and puts the pouch by in
+//             the coffer; with a pouch there, or no leather, it does
+//             nothing.
+// - reduced:  the same, decided on the cadence's beat; sewing runs its time.
+// - abstract: as reduced.
+// - frozen:   nothing is sewn.
+// - tanning:  leather is tanning/'s; what each kind is sewn into, its
+//             blueprint says there.
+// - market:   leather is bought at a hunter's stall (market/), where it is
+//             set out beside the venison, by the piece: a household
+//             keeps two pieces of hare leather by.
+// - village:  who makes its household's pouch, and when, is the
+//             scenario's (src/scenario_village.odin). Nothing is carried in
+//             a pouch yet: a buyer's coins are in its hand. Nobody wants a
+//             backpack: each household has its own.
+// - code:     none: sewing is declared.
+
+package leatherwork
+
+// What leather is sewn into: so many pieces of it make one.
+tanning.#Leather: {
+    @component(Leather)
+    sewnInto: *"" | text               @field(content, saved, inspect)
+    sewnOf:   *1 | int & >=1 & <=20    @field(content, saved, inspect)
+}
+
+// A pouch: a small bag of soft leather, for coins.
+#Pouch: #Container & {}
+
+pouch_seen: #Seen & { kindOf: "#Pouch" } @family(seen)
+
+pouch: #Pouch & { material: "leather", mass: 200g, capacity: 1 }
+
+// Sew leather in hand into what it makes, a hand free for it: two hours,
+// with the hands. So many pieces are used up, and there must be so many.
+sew: #Operation & {
+    duration: 2h
+    uses:     ["hands"]
+    roles: {
+        actor: #Agent & { id: $a, freeHands: >=1 }
+        item:  #Leather & { id: $i, sewnInto: $b, sewnOf: $n, place: #Held & { by: $a } }
+    }
+    makes:    [{ blueprint: $b, at: #Held & { by: $a }, called: "sewn" }]
+    consumes: [{ consumed: $i, portion: $n, exact: true, because: "sewn" }]
+} @family(operations)
+
+// Making a pouch: where the household keeps its leather (`store`: its
+// larder), its coffer, the leather in hand (`work`), and the pouch (`made`).
+#Leatherwork: #Frame & { store: #Body, coffer: #Body, work: #Body, made: #Body }
+
+// The household's pouch (bound when undertaken: its coffer, and where it
+// keeps leather): one in the coffer, as far as the agent knows.
+pouch_made: #Goal & {
+    title: "make a pouch"
+    done: {
+        find:  ["coffer", "made"]
+        match: #Leatherwork & { coffer: #Container & { id: $k }, made: #Pouch & { place: #Inside & { container: $k } } }
+    }
+} @family(goals)
+
+put_the_pouch_by: #Method & {
+    title: "put the pouch by"
+    goal:  "pouch_made"
+    rank:  1
+    pre: {
+        find:  ["made", "coffer"]
+        match: #Leatherwork & { me: #Agent & { id: $me }, made: #Pouch & { place: #Held & { by: $me } }, coffer: #Container }
+    }
+    steps: [#Do & { op: "put_in", object: "made", target: "coffer" }]
+} @family(methods)
+
+sew_a_pouch: #Method & {
+    title: "sew a pouch"
+    goal:  "pouch_made"
+    rank:  2
+    pre: {
+        find:  ["work"]
+        match: #Leatherwork & {
+            me:   #Agent & { id: $me, freeHands: >=1 }
+            work: #Leather & { unit: "hare leather", mass: >=600g, place: #Held & { by: $me } }
+        }
+    }
+    steps: [#Do & { op: "sew", object: "work" }]
+} @family(methods)
+
+fetch_leather_to_sew: #Method & {
+    title: "fetch the leather"
+    goal:  "pouch_made"
+    rank:  3
+    pre: {
+        find:  ["work", "store"]
+        match: #Leatherwork & {
+            me:    #Agent & { freeHands: >=2 }
+            store: #Container & { id: $s }
+            work:  #Leather & { unit: "hare leather", mass: >=600g, place: #Inside & { container: $s } }
+        }
+    }
+    steps: [#Do & { op: "take_some", object: "work", units: 2 }]
+} @family(methods)

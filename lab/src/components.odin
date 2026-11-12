@@ -1,10 +1,10 @@
-// Generated from Triangle content bf3f9bcb0af1ed9e: do not edit. Type IDs are valid
+// Generated from Triangle content 8b88582dd595ebb9: do not edit. Type IDs are valid
 // only for this content; regenerate when it changes.
 package lab
 
 import tri "../../triangle/odin/triangle"
 
-CONTENT_HASH :: 0xbf3f9bcb0af1ed9e
+CONTENT_HASH :: 0x8b88582dd595ebb9
 
 // Becoming, from #Becoming
 Becoming :: struct {
@@ -367,6 +367,12 @@ Stack :: struct {
 	unitMass: i64,    // mass, in quanta of 1g; content, saved, inspect
 }
 
+// Leather, from #Leather
+Leather :: struct {
+	sewnInto: cstring,    // text; content, saved, inspect
+	sewnOf: i64,    // int, in quanta of 1; content, saved, inspect
+}
+
 // Stamp, from #Stamp
 Stamp :: struct {
 	presses: cstring,    // text; saved, proposable, inspect, perceive(sight)
@@ -427,81 +433,81 @@ Fastener :: struct {
 }
 
 // #ActivityStatus
-ACTIVITYSTATUS_ABORTED :: 1035
-ACTIVITYSTATUS_COMPLETED :: 1036
-ACTIVITYSTATUS_EXHAUSTED :: 1037
-ACTIVITYSTATUS_FAILED :: 1038
-ACTIVITYSTATUS_RUNNING :: 1039
-ACTIVITYSTATUS_SUSPENDED :: 1040
+ACTIVITYSTATUS_ABORTED :: 1072
+ACTIVITYSTATUS_COMPLETED :: 1073
+ACTIVITYSTATUS_EXHAUSTED :: 1074
+ACTIVITYSTATUS_FAILED :: 1075
+ACTIVITYSTATUS_RUNNING :: 1076
+ACTIVITYSTATUS_SUSPENDED :: 1077
 
 // #Tie
-TIE_EMPLOY :: 1122
-TIE_FRIEND :: 1123
-TIE_KIN :: 1124
-TIE_SWORN :: 1125
+TIE_EMPLOY :: 1159
+TIE_FRIEND :: 1160
+TIE_KIN :: 1161
+TIE_SWORN :: 1162
 
 // #ClaimKind
-CLAIMKIND_CUSTODY :: 1042
-CLAIMKIND_KEEPING :: 1043
-CLAIMKIND_OWNERSHIP :: 1044
-CLAIMKIND_RESERVATION :: 1045
+CLAIMKIND_CUSTODY :: 1079
+CLAIMKIND_KEEPING :: 1080
+CLAIMKIND_OWNERSHIP :: 1081
+CLAIMKIND_RESERVATION :: 1082
 
 // #Penalty
-PENALTY_FINE :: 1108
-PENALTY_ARREST :: 1141
-PENALTY_CONFISCATE :: 1142
+PENALTY_FINE :: 1145
+PENALTY_ARREST :: 1178
+PENALTY_CONFISCATE :: 1179
 
 // #Wrong
-WRONG_ANOTHERS :: 1133
-WRONG_UNAUTHORIZED :: 1134
+WRONG_ANOTHERS :: 1170
+WRONG_UNAUTHORIZED :: 1171
 
 // #Material
-MATERIAL_CLOTH :: 1087
-MATERIAL_EARTH :: 1088
-MATERIAL_FOOD :: 1089
-MATERIAL_LEATHER :: 1090
-MATERIAL_GRAIN :: 1092
-MATERIAL_ROT :: 1093
-MATERIAL_RUBBER :: 1094
-MATERIAL_STONE :: 1095
-MATERIAL_TURNIP :: 1096
-MATERIAL_WICKER :: 1097
-MATERIAL_FLESH :: 1144
-MATERIAL_BRASS :: 1146
-MATERIAL_IRON :: 1147
-MATERIAL_PAPER :: 1148
-MATERIAL_STEEL :: 1149
-MATERIAL_BIRCH :: 1151
-MATERIAL_OAK :: 1152
+MATERIAL_CLOTH :: 1124
+MATERIAL_EARTH :: 1125
+MATERIAL_FOOD :: 1126
+MATERIAL_LEATHER :: 1127
+MATERIAL_GRAIN :: 1129
+MATERIAL_ROT :: 1130
+MATERIAL_RUBBER :: 1131
+MATERIAL_STONE :: 1132
+MATERIAL_TURNIP :: 1133
+MATERIAL_WICKER :: 1134
+MATERIAL_FLESH :: 1181
+MATERIAL_BRASS :: 1183
+MATERIAL_IRON :: 1184
+MATERIAL_PAPER :: 1185
+MATERIAL_STEEL :: 1186
+MATERIAL_BIRCH :: 1188
+MATERIAL_OAK :: 1189
 
 // "flesh" | "metal" | "natural" | "paper" | "wood"
-BODY_SURFACE_NATURAL :: 758
-BODY_SURFACE_FLESH :: 1144
-BODY_SURFACE_BRASS :: 1146
-BODY_SURFACE_IRON :: 1147
-BODY_SURFACE_PAPER :: 1148
-BODY_SURFACE_STEEL :: 1149
-BODY_SURFACE_BIRCH :: 1151
-BODY_SURFACE_OAK :: 1152
+BODY_SURFACE_NATURAL :: 779
+BODY_SURFACE_FLESH :: 1181
+BODY_SURFACE_BRASS :: 1183
+BODY_SURFACE_IRON :: 1184
+BODY_SURFACE_PAPER :: 1185
+BODY_SURFACE_STEEL :: 1186
+BODY_SURFACE_BIRCH :: 1188
+BODY_SURFACE_OAK :: 1189
 
 // #Colour
-COLOUR_BLUE :: 1048
-COLOUR_BLACK :: 1050
-COLOUR_BROWN :: 1051
-COLOUR_GREEN :: 1052
-COLOUR_GREY :: 1053
-COLOUR_BEIGE :: 1055
-COLOUR_NAVY :: 1056
-COLOUR_ORANGE :: 1057
-COLOUR_PURPLE :: 1058
-COLOUR_RED :: 1059
-COLOUR_WHITE :: 1060
-COLOUR_YELLOW :: 1061
+COLOUR_BLUE :: 1085
+COLOUR_BLACK :: 1087
+COLOUR_BROWN :: 1088
+COLOUR_GREEN :: 1089
+COLOUR_GREY :: 1090
+COLOUR_BEIGE :: 1092
+COLOUR_NAVY :: 1093
+COLOUR_ORANGE :: 1094
+COLOUR_PURPLE :: 1095
+COLOUR_RED :: 1096
+COLOUR_WHITE :: 1097
+COLOUR_YELLOW :: 1098
 
 // "bare" | "ripe" | "sown"
-PLOT_STANDS_BARE :: 455
-PLOT_STANDS_RIPE :: 844
-PLOT_STANDS_SOWN :: 885
+PLOT_STANDS_BARE :: 459
+PLOT_STANDS_RIPE :: 871
+PLOT_STANDS_SOWN :: 919
 
 // The field registry: what code needs to read and write any component
 // generically.
@@ -529,7 +535,7 @@ Component_Info :: struct {
 	fields:  [^]Field_Info,
 }
 
-COMPONENT_COUNT :: 50
+COMPONENT_COUNT :: 51
 
 @(rodata) Becoming_fields := [?]Field_Info{
 	{"becomes", offset_of(Becoming, becomes), VALUE_TEXT, "text", "content, saved, inspect"},
@@ -810,6 +816,10 @@ COMPONENT_COUNT :: 50
 	{"unit", offset_of(Stack, unit), VALUE_TEXT, "text", "content, saved, inspect, perceive(sight)"},
 	{"unitMass", offset_of(Stack, unitMass), VALUE_QUANTITY, "mass", "content, saved, inspect"},
 }
+@(rodata) Leather_fields := [?]Field_Info{
+	{"sewnInto", offset_of(Leather, sewnInto), VALUE_TEXT, "text", "content, saved, inspect"},
+	{"sewnOf", offset_of(Leather, sewnOf), VALUE_QUANTITY, "int", "content, saved, inspect"},
+}
 @(rodata) Stamp_fields := [?]Field_Info{
 	{"presses", offset_of(Stamp, presses), VALUE_TEXT, "text", "saved, proposable, inspect, perceive(sight)"},
 	{"sealOf", offset_of(Stamp, sealOf), VALUE_TEXT, "text", "saved, proposable, inspect, perceive(sight)"},
@@ -894,6 +904,7 @@ COMPONENTS := [COMPONENT_COUNT + 1]Component_Info{
 	{"Record", "#Record", size_of(Record), 1, &Record_fields[0]},
 	{"Label", "#Label", size_of(Label), 1, &Label_fields[0]},
 	{"Stack", "#Stack", size_of(Stack), 3, &Stack_fields[0]},
+	{"Leather", "#Leather", size_of(Leather), 2, &Leather_fields[0]},
 	{"Stamp", "#Stamp", size_of(Stamp), 2, &Stamp_fields[0]},
 	{"Tap", "#Tap", size_of(Tap), 2, &Tap_fields[0]},
 	{"Trace", "#Trace", size_of(Trace), 8, &Trace_fields[0]},

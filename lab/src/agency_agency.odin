@@ -2288,7 +2288,7 @@ agency_follow :: proc(self: ^Agency, m: ^Motivation, method: cstring, index: i32
 			}
 			put(text[:], grievance)
 			content = cstr(text[:])
-		} else if string(cstr(op[:])) == "post" && text_at(tc, step, "regarding", slot[:]) {
+		} else if operation_is_a(self.world, cstr(op[:]), "#Posting") && text_at(tc, step, "regarding", slot[:]) {
 			/* a price posted (content/market/): what it holds a unit of the
 			 * goods worth, written on the stall's board */
 			posted := agency_price_writing(self, m, store, bound(b, n, str(slot[:])), roles[0])

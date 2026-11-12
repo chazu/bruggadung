@@ -7,7 +7,7 @@
 //             trade's: grain, venison, firewood; none that would leave
 //             the household short of food, cooking/'s rationing; a bigger
 //             lot of grain with plenty to spare) and posts its price on the stall's
-//             board, afresh each market day (what it asks moves with its
+//             board, as it sets them out, and afresh each market day (what it asks moves with its
 //             stock: money/coins.tri), then stands by it. Whoever comes within
 //             three tiles reads the price at a glance, and knows it. A
 //             buyer stocks its household's larder (or woodpile) to a
@@ -28,6 +28,11 @@
 //             supply, so a buyer buys what it lacks before walking home.
 //             A buyer's coins go home till none are left in its hands,
 //             through the afternoon if it is kept from it.
+//             A hunter sets out leather too (tanning/), beside its
+//             venison: four pieces of hare leather, its price on a second
+//             board at the stall; what doesn't sell stays on the stall
+//             for the next market. Other households buy it, two pieces
+//             each, to sew (leatherwork/).
 // - reduced:  the same, decided on the cadence's beat.
 // - abstract: as reduced. A market as a clearing of households' stocks,
 //             below reduced, is open (DETAIL_REGIMES.md).
@@ -40,10 +45,15 @@
 // - things:   a sale passes ownership (actions.tri's `passes`): the goods
 //             handed over are the buyer's, the coins paid in the stall's
 //             owners', and coins put away the coffer's owners'.
+// - leather:  what leather is, and what is made of it, are tanning/'s and
+//             leatherwork/'s; a second kind of goods has its own board
+//             (`sign`) and its own posting (`post_beside`), since a board
+//             holds one price and a posting is done once a market.
 // - code:     the #Purchase step and the #Buying condition (agency_lot,
 //             agency_cheapest, agency_buying), the seller's weighing of a #Buy
 //             (src/agency_agency.odin); a #Priced claim known
-//             (src/know_knowledge_1.odin); posting, handing over and
+//             (src/know_knowledge_1.odin); posting (any #Posting: the
+//             price is written by src/agency_agency.odin), handing over and
 //             paying are declared (actions.tri); market days, the
 //             stalls and the coins (src/scenario_village.odin).
 
@@ -60,6 +70,11 @@ stall_look: #Look & { kindOf: "#Stall", look: "stall", prevails: 1 } @family(loo
 stall:       #Stall & { material: "oak", mass: 20kg, capacity: 8 }
 price_board: #Label & { material: "oak", mass: 2kg, legible: 3 }
 board_look:  #Look & { kindOf: "price_board", look: "board" } @family(looks)
+
+// A second board, for a second kind of goods: of birch, to tell it from
+// the first.
+price_sign: #Label & { material: "birch", mass: 1kg, legible: 3 }
+sign_look:  #Look & { kindOf: "price_sign", look: "board" } @family(looks)
 
 // So many coins; and a lot: so many units, for so many coins.
 #Costing: { coins: int & >=0 & <=100000 }
@@ -96,14 +111,27 @@ board_look:  #Look & { kindOf: "price_board", look: "board" } @family(looks)
 #Buying: #Condition & #Buys & { buying: "coming" | "priced" | "affords", coinsIn: text }
 
 // The goods a household sells, what its trade makes: food, or firewood.
+// (A hunter's leather is set out beside its goods: `wares`, below.)
 let goods = (#Food & #Stack) | #Stack & { unit: "firewood" }
 
 // The market's frame: the household's stall and its board, the goods, its
 // supply (where it keeps them: a larder, a woodpile), its coffer, a purse
-// (coins carried), and a pack it carries (carrying/). Its ways pass the
+// (coins carried), and a pack it carries (carrying/); and, of a household
+// that sells a second kind of goods beside the first (a hunter's leather),
+// those (`wares`) and the board their price is posted on (`sign`). Its ways pass the
 // goods or the purse as the thing to take in hand, and the supply or the
 // coffer as where it goes, to carrying/'s ways.
-#Market: #Frame & { stall: #Stall, board: #Label, goods: #Body, supply: #Body, coffer: #Body, purse: #Body, pack: #Body }
+#Market: #Frame & {
+    stall:  #Stall
+    board:  #Label
+    goods:  #Body
+    supply: #Body
+    coffer: #Body
+    purse:  #Body
+    pack:   #Body
+    sign:   #Label
+    wares:  #Body
+}
 
 // Keeping the stall (the seller's, through the market's hours): goods set
 // out, the price posted, and minding it ten minutes at a time, again and
@@ -116,10 +144,78 @@ stall_kept: #Goal & {
     urgency: [{ input: 0, output: 40 }]
 } @family(goals)
 
+// A hunter's, with a second board at its stall: leather set out beside
+// the venison, at its own price. With no leather to set out, the plain way.
+keep_the_stall_with_leather: #Method & {
+    title:    "set out, leather too, and mind it"
+    goal:     "stall_kept"
+    ofTrade:  "hunter"
+    rank:     1
+    pre:      { find: ["stall", "sign"], match: #Market & { stall: #Stall, sign: #Label } }
+    sequence: true
+    steps:    [#Achieve & { subgoal: "goods_set_out" }, #Achieve & { subgoal: "price_posted" },
+               #Achieve & { subgoal: "leather_out" }, #Achieve & { subgoal: "leather_price_posted" },
+               #Do & { op: "mind_stall", object: "stall" }]
+} @family(methods)
+
+// Leather on the stall: four pieces of hare leather from where the
+// household keeps it, of two or more, put out.
+leather_out: #Goal & {
+    title: "set out leather"
+    done: {
+        find:  ["stall", "wares"]
+        match: #Market & { stall: #Stall & { id: $s }, wares: #Leather & { place: #Inside & { container: $s } } }
+    }
+} @family(goals)
+
+set_out_leather: #Method & {
+    title: "set leather out"
+    goal:  "leather_out"
+    rank:  1
+    pre:   { find: ["stall"], match: #Market & { stall: #Stall } }
+    steps: [#Achieve & { subgoal: "leather_to_sell" }, #Do & { op: "put_in", object: "wares", target: "stall" }]
+} @family(methods)
+
+// Leather to sell in hand.
+leather_to_sell: #Goal & {
+    title: "fetch leather to sell"
+    done:  { find: ["wares"], match: #Market & { me: #Agent & { id: $me }, wares: #Leather & { place: #Held & { by: $me, hand: <8 } } } }
+} @family(goals)
+
+fetch_leather_too: #Method & {
+    title:    "fetch leather to sell"
+    goal:     "leather_to_sell"
+    rank:     1
+    sequence: true
+    pre: {
+        find:  ["supply", "wares"]
+        match: #Market & { me: #Agent & { freeHands: >=1 }, supply: #Body & { id: $l },
+                           wares: #Stack & { unit: "hare leather", mass: >=600g, place: #Inside & { container: $l } } }
+    }
+    steps: [#Do & { op: "take_some", object: "wares", units: 4 }]
+} @family(methods)
+
+// Its price on the second board, this market day.
+leather_price_posted: #Goal & {
+    title: "post the price of the leather"
+    done:  #Did & { did: "post_beside", lately: 4h }
+} @family(goals)
+
+write_the_leather_price: #Method & {
+    title: "write the price of the leather"
+    goal:  "leather_price_posted"
+    rank:  1
+    pre: {
+        find:  ["stall", "wares"]
+        match: #Market & { stall: #Stall & { id: $s }, wares: #Leather & { place: #Inside & { container: $s } } }
+    }
+    steps: [#Do & { op: "post_beside", object: "sign", regarding: "wares" }]
+} @family(methods)
+
 keep_the_stall: #Method & {
     title:    "set out and mind it"
     goal:     "stall_kept"
-    rank:     1
+    rank:     2
     pre:      { find: ["stall"], match: #Market & { stall: #Stall } }
     sequence: true
     steps:    [#Achieve & { subgoal: "goods_set_out" }, #Achieve & { subgoal: "price_posted" },
@@ -254,11 +350,11 @@ write_the_price: #Method & {
 // gets there.
 stand_by: #Looking & { roles: { item: #Stall } } @family(operations)
 
-// Post the price of what is on the stall on its board, within reach: what
-// the seller holds a unit of it worth (src/agency_agency.odin writes it).
-// What the command says, a #Writing, is the board's writing from then on,
-// in place of what it said.
-post: #Operation & {
+// Posting a price on a board within reach: what the seller holds a unit
+// of the goods worth (src/agency_agency.odin writes it). What the command
+// says, a #Writing, is the board's writing from then on, in place of what
+// it said.
+#Posting: #Operation & {
     duration: 10s
     uses:     ["hands"]
     said:     #Writing
@@ -269,7 +365,13 @@ post: #Operation & {
     }
     after: { item: #Label & { writing: $w } }
     emits: [{ event: "wrote", subject: $a, other: $i, detail: $w }]
-} @family(operations)
+}
+
+// Post the price of what is on the stall on its board; and of a second
+// kind of goods, on a second board beside it (an operation of its own, so
+// that each is done once a market).
+post:        #Posting @family(operations)
+post_beside: #Posting @family(operations)
 
 // Hand `units` of a stack within reach over to someone beside, into a pack
 // they carry if it fits, else a free hand of theirs.
@@ -322,6 +424,16 @@ meat_stocked: #Goal & {
         match: #Market & { supply: #Body & { id: $l }, goods: #Stack & { unit: "venison", mass: >=5kg, place: #Inside & { container: $l } } }
     }
     urgency: [{ input: 0, output: 35 }]
+} @family(goals)
+
+leather_stocked: #Goal & {
+    title: "buy leather"
+    kept:  true
+    done: {
+        find:  ["supply", "goods"]
+        match: #Market & { supply: #Body & { id: $l }, goods: #Stack & { unit: "hare leather", mass: >=600g, place: #Inside & { container: $l } } }
+    }
+    urgency: [{ input: 0, output: 30 }]
 } @family(goals)
 
 firewood_stocked: #Goal & {
@@ -462,6 +574,47 @@ coffer_meat:      #Method & look_in_coffer & { goal: "coins_for_meat" } @family(
 unpack_meat:      #Method & unpack_it & {
     goal: "meat_in_hand"
     pre:  { find: ["pack", "goods"], match: in_my_pack & { goods: #Stack & { unit: "venison", place: #Inside & { container: $p } } } }
+} @family(methods)
+
+// Leather: two pieces of hare leather in the larder (a pouch's worth,
+// leatherwork/), two a lot.
+let leather_lot = { what: #Stack & { unit: "hare leather" }, units: 2, stocking: "supply", level: 600g }
+put_leather_in:      #Method & {
+    title: "bring it home"
+    goal:  "leather_stocked"
+    rank:  1
+    pre:   { find: ["goods"], match: #Market & { me: #Agent & { id: $me }, goods: #Stack & { unit: "hare leather", place: #Held & { by: $me } } } }
+    steps: [#Do & { op: "put_in", object: "goods", target: "supply" }]
+} @family(methods)
+stock_leather:       #Method & {
+    title: "buy leather"
+    goal:  "leather_stocked"
+    rank:  2
+    pre:   { find: [], match: #Market }
+    steps: [#Achieve & { subgoal: "leather_coming" }, #Achieve & { subgoal: "leather_in_hand" },
+            #Do & { op: "put_in", object: "goods", target: "supply" }]
+} @family(methods)
+leather_coming:      #Goal & { title: "buy enough leather", done: #Buying & leather_lot & { buying: "coming" } } @family(goals)
+buy_leather:         #Method & {
+    title: "buy a lot of leather"
+    goal:  "leather_coming"
+    rank:  1
+    pre:   { find: [], match: #Market }
+    steps: [#Achieve & { subgoal: "coins_for_leather" }, #Achieve & { subgoal: "leather_priced" },
+            #Achieve & { subgoal: "hand_free" }, #Purchase & leather_lot]
+} @family(methods)
+leather_priced:      #Goal & { title: "learn the price of leather", done: #Buying & leather_lot & { buying: "priced" } } @family(goals)
+coins_for_leather:   #Goal & { title: "the coins for leather", done: #Buying & leather_lot & { buying: "affords", coinsIn: "coffer" } } @family(goals)
+leather_in_hand:     #Goal & {
+    title: "leather in hand"
+    done:  { find: ["goods"], match: #Market & { me: #Agent & { id: $me }, goods: #Stack & { unit: "hare leather", place: #Held & { by: $me } } } }
+} @family(goals)
+read_leather_prices: #Method & read_prices & { goal: "leather_priced" } @family(methods)
+fetch_coins_leather: #Method & fetch_coins & { goal: "coins_for_leather" } @family(methods)
+coffer_leather:      #Method & look_in_coffer & { goal: "coins_for_leather" } @family(methods)
+unpack_leather:      #Method & unpack_it & {
+    goal: "leather_in_hand"
+    pre:  { find: ["pack", "goods"], match: in_my_pack & { goods: #Stack & { unit: "hare leather", place: #Inside & { container: $p } } } }
 } @family(methods)
 
 // Firewood: 110 kilograms on the woodpile, ten units a lot.

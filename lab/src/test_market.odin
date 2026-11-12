@@ -81,7 +81,8 @@ test_market :: proc() {
 		post  := action_make("post", farmer, board, NO_ENTITY)
 		bg_check(strings.contains(apply_declared_effect(w, post, 0, 0, trial), "post what?"))
 		post.content = world_intern(w, "#Here & { what: #Body }")
-		bg_check(strings.contains(apply_declared_effect(w, post, 0, 0, trial), "fails at said"))
+		/* a posting is typed so (#Posting): the conflict is at what is said */
+		bg_check(strings.contains(apply_declared_effect(w, post, 0, 0, trial), "conflict at said"))
 		post.content = written
 		bg_check(apply_declared_effect(w, post, 0, 0, trial) == "")
 	}

@@ -27,7 +27,8 @@
 //             what leather each becomes, its blueprint says there.
 // - village:  the Hunts' pit, by their woodpile, and who dresses the hides
 //             and when, are the scenario's (src/scenario_village.odin).
-//             Nobody buys leather yet, or makes anything of it.
+//             Hare leather is sold at the hunters' stall (market/), and
+//             sewn (leatherwork/); nobody wants the deer leather yet.
 // - code:     none of its own: laying in the tan is declared (a move);
 //             a hide's time in the pit and out of it, and its becoming
 //             leather, are the perishing domain's
@@ -47,8 +48,10 @@ tan_pit: #TanPit & { material: "oak", mass: 60kg, capacity: 30 }
 
 leather_seen: #Seen & { kindOf: "#Leather" } @family(seen)
 
-deer_leather: #Leather & { material: "leather", unit: "deer leather", unitMass: 4kg, count: 1 }
-hare_leather: #Leather & { material: "leather", unit: "hare leather", unitMass: 300g, count: 1 }
+// What each is sewn into (leatherwork/): a piece of deer leather a
+// backpack, two of hare leather a pouch.
+deer_leather: #Leather & { material: "leather", unit: "deer leather", unitMass: 4kg, count: 1, sewnInto: "backpack" }
+hare_leather: #Leather & { material: "leather", unit: "hare leather", unitMass: 300g, count: 1, sewnInto: "pouch", sewnOf: 2 }
 
 // Lay a hide in hand in the tan, in a pit in reach: ten minutes, with the
 // hands. It is the pit's owners' from then. What the pit makes of it is

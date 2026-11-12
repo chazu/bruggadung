@@ -64,7 +64,8 @@ package lab
  * at the end, each household's larder emptied by what it ate (what was
  * brought in, a harvest, the market's, counted apart), meat in the hunters'
  * larder and a hide there or in their tan pit (leather put by, from a
- * fortnight on), the herds alive and within their bounds, no
+ * fortnight on; a pouch made of what was sold, from three weeks), the
+ * herds alive and within their bounds, no
  * food past its time still food, and every plot growing or harvested.
  */
 
@@ -207,6 +208,7 @@ Village :: struct {
 	officer:      Entity_ID,         // the watch officer: of the town, not of a household
 	larders:      [4]Entity_ID,      // each household's, by its index
 	pit:          Entity_ID,         // the hunters' tan pit (content/tanning/)
+	sign:         Entity_ID,         // the hunters' second board, for their leather (content/market/)
 	stoves:       [4]Entity_ID,
 	woodpiles:    [4]Entity_ID,
 	coffers:      [4]Entity_ID,
@@ -304,6 +306,7 @@ village_setup :: proc(self: ^Village) {
 	handles := make([dynamic]Villager, context.temp_allocator)
 	works, larders, stoves, woodpiles, coffers, stalls, boards: [4]Entity_ID
 	pits := NO_ENTITY
+	signs := NO_ENTITY
 	self_plots: [4][dynamic]Entity_ID
 	for &h, k in households {
 		works[k] = proposal_group_create(g, h.worksite, ns_utf8(fmt.tprintf("%s' worksite", h.name)),
@@ -354,6 +357,9 @@ village_setup :: proc(self: ^Village) {
 			pit = proposal_group_create(g, "tan_pit", ns_utf8(fmt.tprintf("%s' tan pit", h.name)),
 			                            on_tile(h.woodpile.x + 2, h.woodpile.y, 0))
 			pits = pit
+			/* and a second board at their stall, for the price of their leather */
+			signs = proposal_group_create(g, "price_sign", ns_utf8(fmt.tprintf("%s' leather board", h.name)),
+			                              on_tile(h.stall.x, h.stall.y, 0))
 		}
 		/* firewood on it: the woodcutters' own a little, the rest what they
 		 * have had of them before (bought, when there is a market) */
@@ -454,6 +460,7 @@ village_setup :: proc(self: ^Village) {
 	self.officer = proposal_group_id_for(g, officer)
 	for l, k in larders do self.larders[k] = proposal_group_id_for(g, l)
 	self.pit = proposal_group_id_for(g, pits)
+	self.sign = proposal_group_id_for(g, signs)
 	for e, k in stoves do self.stoves[k] = proposal_group_id_for(g, e)
 	for e, k in woodpiles do self.woodpiles[k] = proposal_group_id_for(g, e)
 	for e, k in coffers do self.coffers[k] = proposal_group_id_for(g, e)
@@ -652,10 +659,15 @@ village_setup :: proc(self: ^Village) {
 		}
 		if ok && which == 0 {
 			supply := pile if households[v.household].worksite == "chopping_block" else larder
+			/* the hunters' stall has a second board, for their leather */
+			keeping := []Slot_Binding{{"stall", stall}, {"board", board}, {"supply", supply}}
+			if households[v.household].worksite == "hunting_blind" {
+				keeping = []Slot_Binding{{"stall", stall}, {"board", board}, {"supply", supply}, {"sign", village_referent_of(store, self.sign)}}
+			}
 			ok = agency_undertake_every_with(self.agency, v.id, "pack_carried", day + 9 * VILLAGE_HOUR, day + 9 * VILLAGE_HOUR + VILLAGE_HOUR / 2,
 			                                 "market", 4 * VILLAGE_DAY, {}) &&
 			     agency_undertake_every_with(self.agency, v.id, "stall_kept", day + 9 * VILLAGE_HOUR, day + 12 * VILLAGE_HOUR, "market",
-			                                 4 * VILLAGE_DAY, {{"stall", stall}, {"board", board}, {"supply", supply}}) &&
+			                                 4 * VILLAGE_DAY, keeping) &&
 			     agency_undertake_every_with(self.agency, v.id, "unsold_home", day + 12 * VILLAGE_HOUR, day + 13 * VILLAGE_HOUR,
 			                                 "market", 4 * VILLAGE_DAY, {{"stall", stall}, {"supply", supply}}) &&
 			     agency_undertake_every_with(self.agency, v.id, "takings_home", day + 12 * VILLAGE_HOUR, day + 13 * VILLAGE_HOUR,
@@ -668,6 +680,16 @@ village_setup :: proc(self: ^Village) {
 				ok = ok && agency_undertake_every_with(self.agency, v.id, goal, day + 9 * VILLAGE_HOUR + VILLAGE_HOUR / 2,
 				                                       day + 12 * VILLAGE_HOUR, "market", 4 * VILLAGE_DAY,
 				                                       {{"supply", supply}, {"coffer", coffer}})
+			}
+			/* but a hunter's, leather too: two pieces of hare leather, of
+			 * which, evenings, it makes its household's pouch
+			 * (content/leatherwork/) */
+			if households[v.household].worksite != "hunting_blind" {
+				ok = ok && agency_undertake_every_with(self.agency, v.id, "leather_stocked", day + 9 * VILLAGE_HOUR + VILLAGE_HOUR / 2,
+				                                       day + 12 * VILLAGE_HOUR, "market", 4 * VILLAGE_DAY,
+				                                       {{"supply", larder}, {"coffer", coffer}}) &&
+				     agency_undertake_every_with(self.agency, v.id, "pouch_made", 16 * VILLAGE_HOUR, 18 * VILLAGE_HOUR, "home",
+				                                 VILLAGE_DAY, {{"store", larder}, {"coffer", coffer}})
 			}
 			/* till none are left in its hands: through the afternoon, if
 			 * something keeps it from it at noon */
@@ -915,6 +937,17 @@ village_run :: proc(self: ^Village) {
 	village_check(self, hides > 0, "the hunters brought a hide home", "none in their larder or their pit")
 	if self.days >= 14 {
 		village_check(self, leather > 0, "the hunters tanned hides and put the leather by", "no leather in their larder")
+	}
+	/* and from three weeks, leather sold at their stall, and sewn: a pouch
+	 * in some household's coffer (content/leatherwork/) */
+	if self.days >= 21 {
+		pouches := 0
+		for coffer in self.coffers {
+			for e in inside[:min(world_entities_at(self.world, coffer, .In, raw_data(inside[:]), len(inside)), len(inside))] {
+				if info := world_info(self.world, e); info != nil && info.blueprint == "pouch" do pouches += 1
+			}
+		}
+		village_check(self, pouches > 0, "a household bought leather and made its pouch of it", "no pouch in any coffer")
 	}
 	deer, hares := game_count(self.world, "deer"), game_count(self.world, "hare")
 	village_check(self, deer >= 1 && deer <= 6 && hares >= 1 && hares <= 4, "the herds neither vanished nor outgrew the woods",
@@ -1204,7 +1237,7 @@ village_at_work :: proc(self: ^Village, v: Villager) -> bool {
 	}
 	/* or about the market, on market day: its stall, its buying, the coins
 	 * home; or at the green, where the stalls are, between one and the next */
-	for goal in ([?]string{"stall_kept", "grain_stocked", "meat_stocked", "firewood_stocked", "takings_home", "coins_home",
+	for goal in ([?]string{"stall_kept", "grain_stocked", "meat_stocked", "firewood_stocked", "leather_stocked", "takings_home", "coins_home",
 	                       "unsold_home", "pack_carried"}) {
 		if agency_intends(self.agency, v.id, goal) do return true
 	}
