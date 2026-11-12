@@ -183,8 +183,8 @@ let meat_packed = #Hunting & { me: #Agent & { id: $me }, pack: #Pack & { id: $p,
                                meat: #Food & #Stack & { place: #Inside & { container: $p } } }
 unpack_the_meat: #Method & out_of_the_pack & {
     title: "unpack it"
-    rank: 1
-    pre:  #Reached & { reached: "larder", find: ["pack", "meat"], match: meat_packed }
+    rank:  1
+    pre:   #Reached & { reached: "larder", find: ["pack", "meat"], match: meat_packed }
 } @family(methods)
 
 // Game down: butcher it where it lies (into its pack, if it has one).

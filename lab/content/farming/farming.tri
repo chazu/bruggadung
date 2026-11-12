@@ -134,7 +134,7 @@ harvest_it: #Method & {
 // plot, to sow it again; else by taking it to the larder.
 room_to_harvest: #Goal & {
     title: "make room to harvest"
-    done: #None & {
+    done:  #None & {
         find:  ["harvest"]
         match: #Farming & { me: #Agent & { id: $me }, harvest: #Food & #Stack & { raw: true, mass: >=10kg, place: #Held & { by: $me } } }
     }
