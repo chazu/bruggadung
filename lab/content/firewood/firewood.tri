@@ -38,9 +38,9 @@
 // - village:  the trees, the tools at the chopping block, the woodpiles
 //             and who stocks which, with its coffer, are the scenario's
 //             (src/scenario_village.odin).
-// - code:     effect_fell, effect_split, and effect_saw's trunks
-//             (src/act_actions.odin). Stoking is declared, and putting
-//             down (actions.tri).
+// - code:     effect_saw's trunks (src/act_actions.odin). Felling,
+//             splitting and stoking are declared, and putting down
+//             (actions.tri).
 
 package firewood
 
@@ -175,8 +175,8 @@ let wood_packed = #Felling & { me: #Agent & { id: $me }, pack: #Pack & { id: $p,
                                wood: #Stack & { unit: "firewood", place: #Inside & { container: $p } } }
 unpack_the_wood: #Method & out_of_the_pack & {
     title: "unpack it"
-    rank: 1
-    pre:  #Reached & { reached: "woodpile", find: ["pack", "wood"], match: wood_packed }
+    rank:  1
+    pre:   #Reached & { reached: "woodpile", find: ["pack", "wood"], match: wood_packed }
 } @family(methods)
 
 gather_it: #Method & {
@@ -376,15 +376,16 @@ look_in_the_woodpile: #Method & {
 // Fell a tree in reach, an axe in hand: a while, with the hands, and hard
 // work (bucking and splitting are steady work: no exertion of their own). Where it stood, its trunk lies.
 fell: #Operation & {
-    effect:   "fell"
     duration: 1200s
     uses:     ["hands"]
     exertion: 3
     roles: {
         actor:       #Agent & { id: $a }
         item:        #Axe & { place: #Held & { by: $a } }
-        destination: #Tree
+        destination: #Tree & { id: $t, fellsInto: $b, place: $p }
     }
+    makes:    [{ blueprint: $b, at: $p, called: "a felled trunk" }]
+    consumes: [{ consumed: $t, because: "felled" }]
 } @family(operations)
 
 // Cut a length off a trunk, an axe in hand (bucking): a few minutes, with
@@ -406,14 +407,15 @@ buck: #Operation & {
 // Split a log, sawn through, an axe in hand: it is firewood, lying where it
 // was.
 split: #Operation & {
-    effect:   "split"
     duration: 300s
     uses:     ["hands"]
     roles: {
         actor:       #Agent & { id: $a }
         item:        #Axe & { place: #Held & { by: $a } }
-        destination: #Log & { sawn: 100 }
+        destination: #Log & { id: $l, sawn: 100, splitsInto: $b, place: $p }
     }
+    makes:    [{ blueprint: $b, at: $p, called: "firewood" }]
+    consumes: [{ consumed: $l, because: "split" }]
 } @family(operations)
 
 // Put firewood in hand into a stove in reach: its fuel, by the firewood's

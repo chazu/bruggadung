@@ -2885,30 +2885,6 @@ effect_saw :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) ->
 }
 
 
-/* Felling: where the tree stood, its trunk lies (content/firewood/). */
-@(private = "file")
-effect_fell :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
-	tree  := a.roles[.Destination]
-	trunk := world_text_field(world, "Tree.fellsInto", tree)
-	if trunk == nil || len(trunk) == 0 do return "it fells into nothing"
-	proposal_group_create(g, trunk, "a felled trunk", world_location_of(world, tree))
-	proposal_group_destroy(g, whole(tree), "felled")
-	return ""
-}
-
-
-/* Splitting a log: it is firewood, a stack, lying where it was. */
-@(private = "file")
-effect_split :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
-	log  := a.roles[.Destination]
-	into := world_text_field(world, "Log.splitsInto", log)
-	if into == nil || len(into) == 0 do return "it splits into nothing"
-	proposal_group_create(g, into, "firewood", world_location_of(world, log))
-	proposal_group_destroy(g, whole(log), "split")
-	return ""
-}
-
-
 /* A blueprint's text field ("unit"), or "": a temporary string. */
 @(private = "file")
 blueprint_text :: proc(world: ^World, blueprint: cstring, field: cstring) -> string {
@@ -3047,19 +3023,6 @@ effect_harvest :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group
 }
 
 
-/* Lighting a stove: it burns, while it has fuel. */
-@(private = "file")
-effect_light :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
-	fuel: i64
-
-	if !world_get_field(world, "FuelContainer.fuel", a.roles[.Item], &fuel) || fuel <= 0 {
-		return "there is nothing in it to burn"
-	}
-	proposal_group_set_of_to(g, "Combustor.lit", whole(a.roles[.Item]), 1)
-	return ""
-}
-
-
 /* The region of air (a GasStore) over the entity's tile, or 0. */
 air_over :: proc(world: ^World, e: Entity_ID) -> Entity_ID {
 	at: Location
@@ -3117,8 +3080,6 @@ effects := [?]Named_Effect{
 	{"write",     effect_write},
 	{"read",      effect_read},
 	{"eat",       effect_eat},
-	{"fell",      effect_fell},
-	{"split",     effect_split},
 	{"sow",       effect_sow},
 	{"keep_seed", effect_keep_seed},
 	{"harvest",   effect_harvest},
@@ -3132,7 +3093,6 @@ effects := [?]Named_Effect{
 	{"hire",      effect_hire},
 	{"work",      effect_work},
 	{"shut",      effect_shut},
-	{"light",     effect_light},
 	{"saw",       effect_saw},
 	{"pass",      effect_pass},
 	{"copy",      effect_copy},

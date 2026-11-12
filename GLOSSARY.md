@@ -294,8 +294,8 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
 - **Named effect**: an effect given as the name of the code that builds
   it (`effect: "forage"`). (EFFECTS.md)
 - **Declared effect**: an effect stated in content: the roles as it
-  leaves them (`after`), and what it moves, consumes and emits (built);
-  what it makes and changes (not built). Applied by one generic procedure,
+  leaves them (`after`), and what it moves, makes, consumes and emits
+  (built); what it changes (not built). Applied by one generic procedure,
   which resolves the operation against the truth projection. Its `changes`
   are coarse effects. Of a stack, a declared effect's **portion** is so
   many of its units: moved, they are split off and are that role from

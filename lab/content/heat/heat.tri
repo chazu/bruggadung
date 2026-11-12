@@ -12,7 +12,7 @@
 // - air:      a fire burns the oxygen of its room's air and heats its gas; a
 //             solid exchanges heat with the air around it (air/air.tri).
 // - code:     src/domains_thermal.odin (solids), domains_atmosphere.odin (fire, the
-//             gas's heat); effect_light.
+//             gas's heat). Lighting is declared (actions.tri).
 
 package heat
 
@@ -90,9 +90,9 @@ light_the_stove: #Method & {
 
 // Light a stove in reach, with fuel in it.
 light: #Operation & {
-    effect: "light"
     roles: {
         actor: #Agent
-        item:  #Combustor & #Body & { lit: false }
+        item:  #Combustor & #Body & #FuelContainer & { lit: false, fuel: >=1g }
     }
+    after: { item: #Combustor & { lit: true } }
 } @family(operations)

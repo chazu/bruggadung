@@ -4,9 +4,9 @@ package lab
  * Declared effects (EFFECTS.md, content/actions.tri): what an operation
  * does, as its content says it, applied by the one procedure here. An
  * operation with no named effect (`effect`) has a declared one: its roles
- * as the effect leaves them (`after`), what it moves (`moves`) and destroys
- * (`consumes`), whole or a portion of a stack, and the events it emits
- * (`emits`).
+ * as the effect leaves them (`after`), what it moves (`moves`), constructs
+ * (`makes`) and destroys (`consumes`), whole or a portion of a stack, and
+ * the events it emits (`emits`).
  *
  * Resolving it is a unification: the operation's pattern with the truth
  * projection of what fills its roles. Where that fails, a requirement the
@@ -17,7 +17,7 @@ package lab
  * A staged operation's stages each have their own: the roles are the
  * operation's, and its tags reach every stage.
  *
- * Not built: `makes` and `changes`; a move into an assembly.
+ * Not built: `changes`; a move into an assembly.
  * Arithmetic in `after` (`handfuls: $h - 1`, `math.Clamp`) is worked out by
  * the unification: the pattern brings the operation's own arithmetic.
  */
@@ -127,7 +127,7 @@ int_of :: proc(v: ^tri.Node) -> (i64, bool) {
 }
 
 
-/* The place a `moves` names, as a location: a tile, a container, or a
+/* The place a `moves` or a `makes` names, as a location: a tile, a container, or a
  * hand; into a hand is into a free one of theirs, unless it says which. */
 @(private = "file")
 declared_place :: proc(world: ^World, into: ^tri.Node) -> (Location, string) {
@@ -182,7 +182,7 @@ step_says :: proc(tc: ^tri.Content, pattern: ^tri.Node, step: string) -> bool {
 	for r in Role.Actor ..< Role.Count {
 		if tri.at(tc, pattern, ns_utf8(fmt.tprintf("%safter.%s", step, ROLE_NAMES[r]))) != nil do return true
 	}
-	for list in ([?]string{"moves", "consumes", "emits", "leaves", "removes"}) {
+	for list in ([?]string{"moves", "makes", "consumes", "emits", "leaves", "removes"}) {
 		if tri.at(tc, pattern, ns_utf8(fmt.tprintf("%s%s.first", step, list))) != nil do return true
 	}
 	return false
@@ -292,6 +292,23 @@ apply_declared_effect :: proc(world: ^World, action: Action, stage: i64, group: 
 				if v == nil do continue
 				if reason := declared_set(world, entity, portions[r], kind, f, record, v, group); reason != "" do return reason
 			}
+		}
+	}
+
+	/* makes: before what is consumed, which a thing made may stand where */
+	for list := tri.at(tc, result, ns_utf8(fmt.tprintf("%smakes", step))); list != nil; list = tri.at(tc, list, "rest") {
+		made := tri.at(tc, list, "first")
+		if made == nil do break
+		blueprint, ok := text_of_node(tc, tri.at(tc, made, "blueprint"))
+		if !ok || blueprint == "" do return fmt.tprintf("%s makes nothing: it says no blueprint", action.operation)
+		if tri.pattern(tc, ns_utf8(blueprint)) == nil do return fmt.tprintf("%s makes a %s, which is no blueprint", action.operation, blueprint)
+		at, reason := declared_place(world, tri.at(tc, made, "at"))
+		if reason != "" do return reason
+		called, named := text_of_node(tc, tri.at(tc, made, "called"))
+		thing := proposal_group_create(group, world_intern(world, ns_utf8(blueprint)),
+		                               world_intern(world, ns_utf8(called if named else blueprint)), at)
+		if from, carved := ref_of(tc, tri.at(tc, made, "splitFrom")); carved {
+			proposal_group_relate(group, .Split_From, whole(thing), whole(from))
 		}
 	}
 

@@ -166,7 +166,7 @@ The vocabulary, all of it fields of `#Step`, so a stage can have its own:
 | Field | Says | Becomes |
 | --- | --- | --- |
 | `after` | each role's fields as the effect leaves them: constants, values carried by tags, arithmetic over them | a set proposal for each concrete field, expecting the value it read |
-| `makes` | things to construct: a blueprint and a place | a create proposal each |
+| `makes` | things to construct: a `blueprint`, `at` a place, `called` what, and what it was carved from (`splitFrom`) | a create proposal each, and a split-from relation |
 | `consumes` | a thing destroyed (`consumed`), whole or a `portion` of a stack, and `because` of what | a destroy, or a split and a destroy |
 | `moves` | a thing (`moved`, by a tag on its role's `id`), or a `portion` of it, `into` a place | a move from where it was read to be, or a split; nothing, if it is there already |
 | `emits` | events, by `event` (the kind), `subject` and `other` | an emit each |
@@ -297,9 +297,15 @@ done after: the first conversions use only the three there are.
    `consumes`; an operation's `now`. `changes` is left until something
    needs it: with `math.Clamp` in `after`, nothing at full detail does,
    and DETAIL_REGIMES.md's periodic operations will.
-4. The rest of the primitive effects, a topic at a time; each topic's
-   `- code:` cut point in its header goes as its effect does. Forage waits
-   for regrowth (decision 6).
+4. Under way: the rest of the primitive effects, a topic at a time; each
+   topic's `- code:` cut point in its header goes as its effect does.
+   Forage waits for regrowth (decision 6). `makes` is built. Declared so
+   far: felling and splitting (firewood/: a thing made where the role
+   was, by a tag on its `place`, and the role consumed) and lighting a
+   stove (heat/, the topic's last procedure: fuel in it is now required
+   of the role, where the procedure refused). Sawing is left in
+   firewood/: a length cut off a trunk and a log cut through are two
+   cases of one named effect, to be two operations (decision 3).
 5. `rest` and `fill`: the watches `perform` adds by effect name become
    fields of the operation.
 6. Roles read generically.
@@ -347,10 +353,14 @@ its tests.
   count. Three weeks of the village went from 7 failed checks (all meals)
   to 20 (from day 13: not home, not in own bed, a pack not put back, two
   unfed). A build with the expectation switched off gives the 7 again,
-  line for line, so nothing else in step 3 changes the village. How more
-  fuel in the stoves leaves a household short of food is not traced: the
-  village wants looking at again with stoves that keep what they are fed.
-  The village's scenario hashes are regenerated.
+  line for line, so nothing else in step 3 changes the village. The
+  village's scenario hashes are regenerated. Traced since: fuel had
+  nothing to do with it. Two households run out of food before the
+  harvest in either build; the change shifted who was hungry when, and
+  two hungry villagers each went to wait at the other's house for the
+  other to come home, for good (hunger outweighs every duty). A wait is
+  now an hour at most (NEGOTIATION.md decision 3), and the three weeks
+  fail 7 checks again, all of them the two households short of food.
 
 ## Found in building step 1
 
