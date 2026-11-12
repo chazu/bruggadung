@@ -2648,20 +2648,6 @@ injure :: proc(world: ^World, g: ^Proposal_Group, victim: Entity_ID, by: Entity_
 }
 
 
-/* Posting (content/market/): the command's #Writing on the stall's board,
- * in place of what it said: a price posted anew. */
-@(private = "file")
-effect_post :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
-	author: string
-
-	if !has_text(a.content) do return "post what?"
-	if _, ok := writing_entries(a.content, &author); !ok || author == "" do return "that is not writing"
-	proposal_group_set_of_to_text(g, "Record.writing", whole(a.roles[.Item]), world_intern(world, a.content))
-	proposal_group_emit_subject_other_detail(g, "wrote", whole(a.roles[.Actor]), whole(a.roles[.Item]), a.content)
-	return ""
-}
-
-
 /* Shouldering a backpack (content/carrying/): onto the back, which is no
  * hand, if nothing is there already. */
 @(private = "file")
@@ -2975,7 +2961,6 @@ effects := [?]Named_Effect{
 	{"forage",    effect_forage},
 	{"shoot",     effect_shoot},
 	{"butcher",   effect_butcher},
-	{"post",      effect_post},
 	{"shoulder",  effect_shoulder},
 }
 

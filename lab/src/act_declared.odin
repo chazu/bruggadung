@@ -36,7 +36,7 @@ import tri "../../triangle/odin/triangle"
 /* A node as Triangle prints it, "" for nil. */
 @(private = "file")
 printed :: proc(tc: ^tri.Content, v: ^tri.Node) -> string {
-	buf: [256]u8
+	buf: [4096]u8
 
 	if v == nil do return ""
 	n := tri.print(tc, v, raw_data(buf[:]), len(buf))
@@ -58,7 +58,7 @@ ref_of :: proc(tc: ^tri.Content, v: ^tri.Node) -> (Entity_ID, bool) {
 /* A node's text, decoded: false unless it is a concrete text. */
 @(private = "file")
 text_of_node :: proc(tc: ^tri.Content, v: ^tri.Node) -> (string, bool) {
-	buf: [256]u8
+	buf: [4096]u8
 
 	if !strings.has_prefix(printed(tc, v), "\"") do return "", false
 	n := tri.text(tc, v, raw_data(buf[:]), len(buf))
@@ -452,6 +452,12 @@ apply_declared_effect :: proc(world: ^World, action: Action, stage: i64, amount:
 	if pattern == nil do return fmt.tprintf("there is no operation %s", action.operation)
 	step := step_path(tc, pattern, stage)
 
+	/* an operation that says what is to be said (`said: #Writing`) needs
+	 * the command to say something */
+	if !has_text(action.content) && printed(tc, tri.at(tc, pattern, "said")) != "_" {
+		return fmt.tprintf("%s what? The command says nothing", action.operation)
+	}
+
 	/* resolve: the pattern, with what fills its roles as it truly is */
 	expr := strings.builder_make(context.temp_allocator)
 	// Odin's fmt reads "{" as the start of an argument index: "{{" is a brace
@@ -463,7 +469,21 @@ apply_declared_effect :: proc(world: ^World, action: Action, stage: i64, amount:
 	/* the time this commits, for what the effect reckons from it */
 	clock: [64]u8
 	tri.format_quantity("time", world_time(world).ms, raw_data(clock[:]), len(clock))
-	fmt.sbprintf(&expr, " }}, now: %s, parameter: %d }}", cstring(&clock[0]), amount)
+	fmt.sbprintf(&expr, " }}, now: %s, parameter: %d", cstring(&clock[0]), amount)
+	/* what the command says: as a value, and as it is written */
+	if has_text(action.content) {
+		fmt.sbprintf(&expr, ", said: %s, written: \"", action.content)
+		for ch in transmute([]u8)string(action.content) {
+			switch ch {
+			case '"':  strings.write_string(&expr, "\\\"")
+			case '\\': strings.write_string(&expr, "\\\\")
+			case '\n': strings.write_string(&expr, "\\n")
+			case:      strings.write_byte(&expr, ch)
+			}
+		}
+		strings.write_string(&expr, "\"")
+	}
+	strings.write_string(&expr, " }")
 	arena := tri.arena_new()
 	defer tri.arena_free(arena)
 	truth := tri.value(tc, ns_utf8(strings.to_string(expr)), arena, &err[0], size_of(err))
@@ -574,7 +594,8 @@ apply_declared_effect :: proc(world: ^World, action: Action, stage: i64, amount:
 		proposal_group_destroy(group, whole(consumed), reason)
 	}
 
-	/* emits */
+	/* emits: with a detail, if the operation gives one that is said (what
+	 * was written) */
 	for list := tri.at(tc, result, ns_utf8(fmt.tprintf("%semits", step))); list != nil; list = tri.at(tc, list, "rest") {
 		emit := tri.at(tc, list, "first")
 		if emit == nil do break
@@ -582,6 +603,11 @@ apply_declared_effect :: proc(world: ^World, action: Action, stage: i64, amount:
 		subject, has := ref_of(tc, tri.at(tc, emit, "subject"))
 		other, _     := ref_of(tc, tri.at(tc, emit, "other"))
 		if !named || !has do return fmt.tprintf("%s emits an event with no kind or subject", action.operation)
+		if detail, said := text_of_node(tc, tri.at(tc, emit, "detail")); said {
+			proposal_group_emit_subject_other_detail(group, world_intern(world, ns_utf8(event)), whole(subject), whole(other),
+			                                         world_intern(world, ns_utf8(detail)))
+			continue
+		}
 		proposal_group_emit_subject_other(group, world_intern(world, ns_utf8(event)), whole(subject), whole(other))
 	}
 	return ""

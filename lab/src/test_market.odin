@@ -13,6 +13,7 @@ package lab
  */
 
 import "core:fmt"
+import "core:strings"
 
 
 test_market :: proc() {
@@ -65,6 +66,25 @@ test_market :: proc() {
 	/* the stall: grain set out, its price posted on its board */
 	written := world_text_field(w, "Record.writing", board)
 	bg_check(written != nil && len(written) > 0)
+	/* as the farmer wrote it, quotes and all: a #Writing with its author,
+	 * one entry, the price of grain */
+	{
+		author: string
+		entries, ok := writing_entries(written, &author)
+		bg_check(ok && author != "" && len(entries) == 1 && strings.contains(string(written), "unit: \"grain\""))
+		bg_check(test_happened(w, "wrote", farmer, board))
+	}
+	/* posting is the command's writing put on the board (declared,
+	 * content/market/): saying nothing, or what is no writing, it fails */
+	{
+		trial := proposal_group_group_with_phase(.Action, "test: posting")
+		post  := action_make("post", farmer, board, NO_ENTITY)
+		bg_check(strings.contains(apply_declared_effect(w, post, 0, 0, trial), "post what?"))
+		post.content = world_intern(w, "#Here & { what: #Body }")
+		bg_check(strings.contains(apply_declared_effect(w, post, 0, 0, trial), "fails at said"))
+		post.content = written
+		bg_check(apply_declared_effect(w, post, 0, 0, trial) == "")
+	}
 	/* the woodcutter's larder: twenty kilograms of grain, or more; the
 	 * stall holds what it was paid; nothing made or lost */
 	inside: [8]Entity_ID

@@ -43,9 +43,8 @@
 // - code:     the #Purchase step and the #Buying condition (agency_lot,
 //             agency_cheapest, agency_buying), the seller's weighing of a #Buy
 //             (src/agency_agency.odin); a #Priced claim known
-//             (src/know_knowledge_1.odin); effect_post
-//             (src/act_actions.odin; handing over and paying are declared,
-//             actions.tri); market days, the
+//             (src/know_knowledge_1.odin); posting, handing over and
+//             paying are declared (actions.tri); market days, the
 //             stalls and the coins (src/scenario_village.odin).
 
 package market
@@ -258,14 +257,19 @@ stand_by: #Looking & { roles: { item: #Stall } } @family(operations)
 
 // Post the price of what is on the stall on its board, within reach: what
 // the seller holds a unit of it worth (src/agency_agency.odin writes it).
+// What the command says, a #Writing, is the board's writing from then on,
+// in place of what it said.
 post: #Operation & {
-    effect:   "post"
     duration: 10s
     uses:     ["hands"]
+    said:     #Writing
+    written:  $w
     roles: {
-        actor: #Agent
-        item:  #Label
+        actor: #Agent & { id: $a }
+        item:  #Label & { id: $i }
     }
+    after: { item: #Label & { writing: $w } }
+    emits: [{ event: "wrote", subject: $a, other: $i, detail: $w }]
 } @family(operations)
 
 // Hand `units` of a stack within reach over to someone beside, into a pack

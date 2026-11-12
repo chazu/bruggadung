@@ -22,7 +22,8 @@
 //            (src/act_declared.odin), which resolves the operation against
 //            the truth; so far `after`, `moves`, `makes`, `consumes` and
 //            `emits`, for an operation or a stage. Taking, giving, putting
-//            down, putting in and looking are declared. A move that
+//            down, putting in and looking are declared; what a command
+//            says reaches an effect as `said` and `written`. A move that
 //            `passes` hands on whose the thing is (declared_pass: giving,
 //            putting in); one that `lends` leaves it its owner's, in the
 //            other's keeping (declared_lend: lending). What is nobody's
@@ -39,7 +40,7 @@
 //            (src/act_activities.odin); they are compacted into digests
 //            after the world's history window (src/core_world.odin).
 
-#Effect: "drive" | "fill" | "walk" | "say" | "tend" | "analyse" | "write" | "read" | "eat" | "investigate" | "rotate" | "strike" | "rest" | "saw" | "pass" | "copy" | "reveal" | "replace" | "cut" | "shape" | "issue" | "confiscate" | "arrest" | "flee" | "hit" | "hire" | "work" | "service" | "sow" | "keep_seed" | "harvest" | "crouch" | "shoot" | "butcher" | "post" | "shoulder" | "forage"
+#Effect: "drive" | "fill" | "walk" | "say" | "tend" | "analyse" | "write" | "read" | "eat" | "investigate" | "rotate" | "strike" | "rest" | "saw" | "pass" | "copy" | "reveal" | "replace" | "cut" | "shape" | "issue" | "confiscate" | "arrest" | "flee" | "hit" | "hire" | "work" | "service" | "sow" | "keep_seed" | "harvest" | "crouch" | "shoot" | "butcher" | "shoulder" | "forage"
 
 // Which roles an operation has is its roles' type: a structure's type is the
 // most general one with all its features.
@@ -69,7 +70,7 @@
 // (`moved`, by a tag on its role's id) `into` a place: a tile, a container,
 // a hand (#Held, `by` whom), which is a free one of theirs, or a role in an
 // assembly (#Installed). `emits` is events, by `event` (its kind), subject
-// and other. A step has a declared effect or names one (`effect`), not
+// and other, and a `detail` if it gives one (what was written). A step has a declared effect or names one (`effect`), not
 // both. The requirements stay in `roles`: they are matched once from what
 // the actor perceives, for the menu, and again against the truth when the
 // effect commits, where what doesn't hold fails the action.
@@ -99,12 +100,13 @@
 // was, by a tag on its `place`), `called` what its construction is recorded
 // as; `splitFrom` says what it was carved from, if anything.
 // An operation's `now` is the time its effect commits (`spoilsAt: $now +
-// $k`), its `parameter` the command's (how many). Into a hand, of an operation
+// $k`), its `parameter` the command's (how many), its `said` and `written`
+// what the command says, as a value and as written (market/'s `post`). Into a hand, of an operation
 // that stows (`stow`), is into a pack its actor carries, if it fits. Arithmetic in `after` is Triangle's (CONTENT_LANGUAGE.md §5).
 #OfSome:   { portion: int & >=1, exact: bool }
 #Moves:    #OfSome & { moved: ref, into: #Place, passes: bool, lends: bool, until: time }
 #Consumes: #OfSome & { consumed: ref, because: text }
-#Emits:    { event: text, subject: ref, other: ref }
+#Emits:    { event: text, subject: ref, other: ref, detail: text }
 #Makes:    { blueprint: text, at: #Place, called: text, splitFrom: ref }
 
 // Looking at something within reach changes nothing in the world: it is
@@ -164,6 +166,12 @@
     // the command's parameter (how many, for take_some): for a declared
     // effect to use (`portion: $n`)
     parameter:        int
+    // what the command says (a price to post), twice: as a value, for
+    // what the operation requires of it (`said: #Writing`: a command that
+    // says nothing, or something else, fails), and as it is written, for
+    // a declared effect to write down or tell of (`written`)
+    said:             _
+    written:          text
     // how far its other roles may be from the actor, in tiles: 1, beside it
     // (a shot, further: hunting/)
     range:            *1 | int & >=1 & <=8

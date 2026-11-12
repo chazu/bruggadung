@@ -395,6 +395,18 @@ done after: the first conversions use only the three there are.
    (paying, giving some), where the effect fails. 36 named effects are
    left of the 50 before step 4. A move can pass ownership (decision
    11).
+   Posting a price is declared, one fewer named. What the command says
+   reaches a declared effect twice, as `now` and `parameter` do: `said`
+   is its value, for what the operation requires of it (`said:
+   #Writing`: a command that says nothing, or says something else,
+   fails), and `written` is the same as text, which `after` puts in the
+   board's `writing` and `emits` gives as the event's `detail`. The
+   text is the command's own, not the unified value printed: that
+   prints every feature of every type in it (some three thousand
+   characters for one price), and what reads a record reads it as it
+   was written. Nothing is made: a board's writing is a field of the
+   board. `write_down` stays named: it appends the command's entries to
+   those the record holds, and content has no way to join two lists.
    Left named, and why: `eat` (satiety and reserves are reckoned to the
    moment of eating from when the eater last ate; the truth projection
    gives the stored fields, so `after` cannot say them: it wants the
