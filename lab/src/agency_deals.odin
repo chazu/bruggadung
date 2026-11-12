@@ -1109,7 +1109,15 @@ agency_hand_over :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Store,
 		if have <= 0 do have = 1
 		give := min(have, o.units)
 		if agency_again(self, m, op, held, to) do return fmt.tprintf("%s R%d again, to no end", op, held)
-		if !agency_act(self, m, title, store, op, held, to, i64(give), nil) do return "it couldn't hand it over"
+		/* lent, it is lent whole, for the loan's term: till what it is owed
+		 * back is due */
+		amount := i64(give)
+		if op == "lend" {
+			amount = BG_LOAN_TERM
+			for c in m.owed[:m.nowed] do if c.kind == .Credit && c.other == to && c.due > world_time(self.world).ms do amount = c.due - world_time(self.world).ms
+			give = o.units
+		}
+		if !agency_act(self, m, title, store, op, held, to, amount, nil) do return "it couldn't hand it over"
 		o.units -= give
 		if o.units <= 0 && kind == .Hand_Over do agency_drop_owed(m, k)
 		return ""

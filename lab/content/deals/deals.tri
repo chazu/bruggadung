@@ -40,7 +40,8 @@
 //             `passes`): a gift, a sale, and what is lent to be repaid
 //             with as much again. A loan of the very thing is lent
 //             (actions.tri's `lends`): the lender's own still, in the
-//             borrower's keeping till it is given back.
+//             borrower's keeping till it is given back, or the loan's
+//             term is over.
 // - code:     src/agency_deals.odin: what to ask for (a method's slot
 //             wanted in hand, its place loosened), whom, valuing a deal,
 //             the target and the concession, `#HandOver`, debts and
@@ -117,9 +118,9 @@ hand_it_over: #Method & {
     steps: [#HandOver]
 } @family(methods)
 
-// A loan of the very thing, agreed: lent (actions.tri's `lend`), not given.
-// It stays the lender's own, in the borrower's keeping till it is given
-// back.
+// A loan of the very thing, agreed: lent (actions.tri's `lend`), not given,
+// for the loan's term. It stays the lender's own, in the borrower's
+// keeping till it is given back, or the term is over.
 lent_out: #Goal & {
     title: "lend it"
     done:  #Did & { did: "lend" }

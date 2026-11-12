@@ -186,9 +186,11 @@ test_passing :: proc() {
 
 
 /* Lending (a move that `lends`, act_declared.odin's declared_lend): what
- * its owner lends stays its own, in the other's keeping, who may hold and
- * use it but not give it away; back with its owner, by whatever move, it is
- * in nobody's keeping. What isn't the actor's it can't lend. */
+ * its owner lends stays its own, in the keeping of the other and its
+ * household, who may hold and use it but not give it away, till the
+ * loan's term is over; back with its owner, by whatever move, it is in
+ * nobody's keeping. What isn't the actor's it can't lend; what is nobody's
+ * is its own by lending it. */
 test_lending :: proc() {
 	error: string
 
@@ -197,22 +199,36 @@ test_lending :: proc() {
 	ada   := test_commit_create(c, "worker", on_tile(1, 1, 0))
 	bo    := test_commit_create(c, "worker", on_tile(2, 1, 0))
 	cy    := test_commit_create(c, "worker", on_tile(1, 2, 0))
+	dee   := test_commit_create(c, "worker", on_tile(2, 2, 0))
 	nail  := test_commit_create(c, "iron_nail", held_by(ada, 0))
 	purse := test_commit_create(c, "coins_400", held_by(ada, 1))
 	other := test_commit_create(c, "iron_nail", held_by(cy, 0))
+	spare := test_commit_create(c, "iron_nail", held_by(cy, 1))
 	test_owning(c, ada, nail)
 	test_owning(c, ada, purse)
 	test_owning(c, ada, other)
+	{
+		kin := proposal_group_group_with_phase(.System, "setup: Bo and Dee, kin")
+		for pair in ([2][2]Entity_ID{{bo, dee}, {dee, bo}}) {
+			bond := proposal_group_create(kin, "kin_bond", "kin", location_make_none())
+			proposal_group_set_of_to(kin, "Bond.bondOf", whole(bond), i64(pair[0]))
+			proposal_group_set_of_to(kin, "Bond.toward", whole(bond), i64(pair[1]))
+		}
+		committer_submit(c, kin)
+		committer_commit_boundary(c)
+	}
+	hour := i64(3600000)
 
-	/* lent to Bo, the nail is Ada's still, and Bo's to hold */
-	bg_check(perform(w, c, action_make("lend", ada, nail, bo), 1, &error) != nil)
+	/* lent to Bo for an hour, the nail is Ada's still, and Bo's to hold,
+	 * and his household's: Dee's too */
+	bg_check(perform(w, c, action_make("lend", ada, nail, bo), hour, &error) != nil)
 	committer_commit_boundary(c)
 	bg_check(world_location_of(w, nail).place == bo)
-	bg_check(slice.equal(owners_of(w, nail), []Entity_ID{ada}) && in_keeping_of(w, nail, bo))
-	bg_check(!claimed_by_another(w, nail, ada) && !claimed_by_another(w, nail, bo) && claimed_by_another(w, nail, cy))
+	bg_check(slice.equal(owners_of(w, nail), []Entity_ID{ada}) && in_keeping_of(w, nail, bo) && in_keeping_of(w, nail, dee))
+	bg_check(!claimed_by_another(w, nail, ada) && !claimed_by_another(w, nail, bo) && !claimed_by_another(w, nail, dee) &&
+	         claimed_by_another(w, nail, cy))
 	kept := claims_on(w, nail, "\"keeping\"")
-	bg_check(len(kept) == 1)
-	lent := kept[0] if len(kept) == 1 else NO_ENTITY
+	bg_check(len(kept) == 2)
 
 	/* put down and taken up again by Bo, it is in Bo's keeping still, and
 	 * not Bo's own */
@@ -226,34 +242,50 @@ test_lending :: proc() {
 	/* given back, it is in nobody's keeping, and Ada's as it was */
 	bg_check(perform(w, c, action_make("give", bo, nail, ada), 0, &error) != nil)
 	committer_commit_boundary(c)
-	bg_check(world_location_of(w, nail).place == ada && !in_keeping_of(w, nail, bo) && !world_is_live(w, lent))
+	bg_check(world_location_of(w, nail).place == ada && !in_keeping_of(w, nail, bo) && !in_keeping_of(w, nail, dee))
+	for claim in kept do bg_check(!world_is_live(w, claim))
 	bg_check(slice.equal(owners_of(w, nail), []Entity_ID{ada}) && claimed_by_another(w, nail, bo))
 
-	/* some of a stack lent: those are in Bo's keeping, the rest not */
-	bg_check(perform(w, c, action_make("lend", ada, purse, bo), 100, &error) != nil)
+	/* lent, the purse isn't Bo's to give: given to Cy, it is Ada's still,
+	 * and not Cy's to hold */
+	bg_check(perform(w, c, action_make("lend", ada, purse, bo), hour, &error) != nil)
 	committer_commit_boundary(c)
-	inhand: [4]Entity_ID
-	coins := NO_ENTITY
-	for e in inhand[:min(world_entities_at(w, bo, .Held_By, raw_data(inhand[:]), 4), 4)] do coins = e
-	bg_check(coins != NO_ENTITY && world_units_of(w, coins) == 100 && world_units_of(w, purse) == 300)
-	bg_check(in_keeping_of(w, coins, bo) && !in_keeping_of(w, purse, bo))
-	bg_check(slice.equal(owners_of(w, coins), []Entity_ID{ada}))
-
-	/* lent, it isn't Bo's to give: given to Cy, it is Ada's still, and
-	 * not Cy's to hold */
+	bg_check(world_location_of(w, purse).place == bo && in_keeping_of(w, purse, bo))
 	bg_check(perform(w, c, action_make("put_down", cy, other, NO_ENTITY), 0, &error) != nil)
 	committer_commit_boundary(c)
-	bg_check(perform(w, c, action_make("give", bo, coins, cy), 0, &error) != nil)
+	bg_check(perform(w, c, action_make("give", bo, purse, cy), 0, &error) != nil)
 	committer_commit_boundary(c)
-	bg_check(world_location_of(w, coins).place == cy)
-	bg_check(slice.equal(owners_of(w, coins), []Entity_ID{ada}) && claimed_by_another(w, coins, cy))
+	bg_check(world_location_of(w, purse).place == cy)
+	bg_check(slice.equal(owners_of(w, purse), []Entity_ID{ada}) && claimed_by_another(w, purse, cy))
 
 	/* Ada's other nail, in Cy's hand, isn't Cy's to lend */
+	bg_check(perform(w, c, action_make("put_down", cy, purse, NO_ENTITY), 0, &error) != nil)
+	committer_commit_boundary(c)
 	bg_check(perform(w, c, action_make("take", cy, other, NO_ENTITY), 0, &error) != nil)
 	committer_commit_boundary(c)
-	bg_check(perform(w, c, action_make("lend", cy, other, bo), 1, &error) != nil)
+	bg_check(perform(w, c, action_make("lend", cy, other, bo), hour, &error) != nil)
 	committer_commit_boundary(c)
 	bg_check(world_location_of(w, other).place == bo && !in_keeping_of(w, other, bo) && claimed_by_another(w, other, bo))
+
+	/* the spare nail is nobody's: lent by Cy, it is Cy's own by that, and
+	 * in Bo's keeping */
+	bg_check(len(owners_of(w, spare)) == 0)
+	bg_check(perform(w, c, action_make("lend", cy, spare, bo), hour, &error) != nil)
+	committer_commit_boundary(c)
+	bg_check(world_location_of(w, spare).place == bo && slice.equal(owners_of(w, spare), []Entity_ID{cy}))
+	bg_check(in_keeping_of(w, spare, bo) && !claimed_by_another(w, spare, bo) && claimed_by_another(w, spare, ada))
+
+	/* the hour over, the keeping has lapsed: Bo holds Cy's nail as he
+	 * would any other's; given back even so, the claim is gone */
+	world_set_time(w, time_make(world_time(w).ms + hour))
+	bg_check(!in_keeping_of(w, spare, bo) && !in_keeping_of(w, spare, dee) && claimed_by_another(w, spare, bo))
+	bg_check(len(laws_broken(w, action_make("take", bo, spare, NO_ENTITY))) == 0)      /* no law in this world */
+	late := claims_on(w, spare, "\"keeping\"")
+	bg_check(len(late) == 2)
+	bg_check(perform(w, c, action_make("give", bo, spare, cy), 0, &error) != nil)
+	committer_commit_boundary(c)
+	bg_check(world_location_of(w, spare).place == cy)
+	for claim in late do bg_check(!world_is_live(w, claim))
 }
 
 

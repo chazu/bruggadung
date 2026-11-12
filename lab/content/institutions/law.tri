@@ -11,7 +11,8 @@
 //             (DETAIL_REGIMES.md).
 // - frozen:   it doesn't decide.
 // - things:   what is lent (actions.tri's `lends`) is in the borrower's
-//             keeping: its taking it up is no theft, seen or not.
+//             keeping, and its household's: their taking it up is no
+//             theft, seen or not, till the loan's term is over.
 // - talk:     a grievance is told to an office holder; a law is learned by
 //             reading or being told (#LawSays).
 // - code:     BGLawsBroken (whether an act breaks a law); effect_confiscate,

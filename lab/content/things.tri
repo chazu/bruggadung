@@ -199,7 +199,8 @@ assembly_seen: #Seen & { kindOf: "#Assembly" } @family(seen)
 #ClaimKind: "ownership" | "custody" | "reservation" | "keeping"
 
 // A reified claim: an informational entity, with no body and no location.
-// Its claimant and subjects are edges. It ends with what it is on: a
+// Its claimant and subjects are edges. One that `lapses` holds until then
+// (a keeping, to the end of the loan's term); at 0, for good. It ends with what it is on: a
 // subject destroyed is its subject no more, and a claim on nothing is
 // destroyed; and units merged into a stack bring no second claim of a
 // claimant's who has one on it (src/commit_committer.odin).
@@ -207,11 +208,12 @@ assembly_seen: #Seen & { kindOf: "#Assembly" } @family(seen)
     @component(Claim)
     kind:     #ClaimKind       @field(content, saved, inspect)
     quantity: int & >=0 & <=100000 @field(content, saved, proposable, inspect)
+    lapses:   *0ms | time & >=0ms & <=100000d @field(content, saved, proposable, inspect)
 }
 
 // An ownership claim, as the lab makes them.
 ownership: #Claim & { kind: "ownership" }
 
 // A claim of keeping: the thing is another's, lent to the claimant
-// (actions.tri's `lends`), who may hold and use it.
+// (actions.tri's `lends`), who may hold and use it, till it lapses.
 keeping: #Claim & { kind: "keeping" }

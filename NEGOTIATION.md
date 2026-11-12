@@ -158,7 +158,7 @@ goal's methods. They stay as they are; what this document adds is general.
     quantity: repaying gives any thing like it, as many. A loan of the
     very thing is **lent** (GLOSSARY.md; EFFECTS.md decision 12): it
     stays the lender's own, in the borrower's keeping, till it is given
-    back. A loan by quantity is given, and is the borrower's.
+    back or the term is over: kept past it, it is held without leave. A loan by quantity is given, and is the borrower's.
 11. **A need's goal dropped as impossible is weighed again when what the
     agent holds changes**, not only two hours on (AGENCY.md decision 27):
     a portion handed to a starving agent is eaten at once. Likewise when

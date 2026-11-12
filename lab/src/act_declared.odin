@@ -239,11 +239,21 @@ household_of :: proc(world: ^World, who: Entity_ID) -> []Entity_ID {
 }
 
 
-/* Whether an entity is in someone's keeping: lent to them. */
+/* Whether a claim has lapsed: its time is past (a keeping's, the loan's
+ * term). */
+claim_lapsed :: proc(world: ^World, claim: Entity_ID) -> bool {
+	record := (^Claim)(world_record(world, world_kind_named(world, "Claim"), claim))
+	return record != nil && record.lapses != 0 && world_time(world).ms >= record.lapses
+}
+
+
+/* Whether an entity is in someone's keeping: lent to them, or to one of
+ * their household, and the loan's term not over. */
 in_keeping_of :: proc(world: ^World, entity: Entity_ID, who: Entity_ID) -> bool {
 	claimant: Entity_ID
 
 	for claim in claims_on(world, entity, "\"keeping\"") {
+		if claim_lapsed(world, claim) do continue
 		if world_edges_from(world, .Claimant, claim, &claimant, 1) != 0 && claimant == who do return true
 	}
 	return false
@@ -293,20 +303,32 @@ declared_pass :: proc(world: ^World, group: ^Proposal_Group, actor: Entity_ID, t
 
 
 /* Lending (a move that `lends`): `thing` stays whose it is, and is in the
- * keeping of `receiver`: the one whose hand it is put in; or, put into a
- * container, each of the container's owners. `target` is what moves, as
- * in passing. Only its owner lends it; and not to one who owns it, or has
- * it in keeping already. */
+ * keeping of `receiver`: the one whose hand it is put in, and its household
+ * (household_of); or, put into a container, each of the container's
+ * owners; `until` a time, or 0 for good. `target` is what moves, as in
+ * passing. Its owner lends it, and not to one who owns it, or has it in
+ * keeping already; what is nobody's is the lender's, and its household's,
+ * by lending it. */
 @(private = "file")
 declared_lend :: proc(world: ^World, group: ^Proposal_Group, actor: Entity_ID, thing: Entity_ID, target: Ref, receiver: Entity_ID,
-                      hand: bool) {
+                      hand: bool, until: i64) {
 	was := owners_of(world, thing)
+	if len(was) == 0 {
+		was = household_of(world, actor)
+		for owner in was {
+			claim := proposal_group_create(group, "ownership", "lent out", location_make_none())
+			proposal_group_set_of_to(group, "Claim.quantity", whole(claim), 1)
+			proposal_group_relate(group, .Claimant, whole(claim), whole(owner))
+			proposal_group_relate(group, .Claim_Subject, whole(claim), target)
+		}
+	}
 	if !slice.contains(was, actor) do return
-	to := owners_among(world, ownership_on(world, receiver)) if !hand else []Entity_ID{receiver}
+	to := owners_among(world, ownership_on(world, receiver)) if !hand else household_of(world, receiver)
 	for keeper in to {
 		if slice.contains(was, keeper) || in_keeping_of(world, thing, keeper) do continue
 		claim := proposal_group_create(group, "keeping", "lent", location_make_none())
 		proposal_group_set_of_to(group, "Claim.quantity", whole(claim), 1)
+		if until > 0 do proposal_group_set_of_to(group, "Claim.lapses", whole(claim), until)
 		proposal_group_relate(group, .Claimant, whole(claim), whole(keeper))
 		proposal_group_relate(group, .Claim_Subject, whole(claim), target)
 	}
@@ -492,7 +514,8 @@ apply_declared_effect :: proc(world: ^World, action: Action, stage: i64, amount:
 			if printed(tc, tri.at(tc, move, "passes")) == "true" {
 				declared_pass(world, group, action.roles[.Actor], moved, target, some, receiver, held)
 			} else if printed(tc, tri.at(tc, move, "lends")) == "true" {
-				declared_lend(world, group, action.roles[.Actor], moved, target, receiver, held)
+				until, _ := int_of(tri.at(tc, move, "until"))
+				declared_lend(world, group, action.roles[.Actor], moved, target, receiver, held, until)
 			}
 			/* lent, and back with its owner */
 			declared_return(world, group, moved, target, some, receiver, held)

@@ -3298,8 +3298,9 @@ agency_consider_questions :: proc(self: ^Agency, m: ^Motivation, store: ^Knowled
 				agency_note(self, m, fmt.tprintf("asked by R%d: worth %+d, granting", q.asker, worth))
 				/* on terms (AGENCY.md decision 18): to a friend, none said, the
 				 * default between them; to anyone else, a day */
-				if agency_act(self, m, "granting", store, "lend", given, q.asker, 1, nil) {
-					if knowledge_store_loyalty_to(store, q.asker) > 0 {
+				friend := knowledge_store_loyalty_to(store, q.asker) > 0
+				if agency_act(self, m, "granting", store, "lend", given, q.asker, BG_LOAN_TERM if friend else BG_LOAN_SHORT, nil) {
+					if friend {
 						answer = fmt.tprintf("#Granted & {{ what: %s }}", knowledge_store_describe_looks(store, given))
 					} else {
 						answer = fmt.tprintf("#Granted & {{ what: %s, owedIn: %dms }}",

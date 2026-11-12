@@ -1,10 +1,10 @@
-// Generated from Triangle content c6b9c77f61e2afde: do not edit. Type IDs are valid
+// Generated from Triangle content 44344802e4a33a7f: do not edit. Type IDs are valid
 // only for this content; regenerate when it changes.
 package lab
 
 import tri "../../triangle/odin/triangle"
 
-CONTENT_HASH :: 0xc6b9c77f61e2afde
+CONTENT_HASH :: 0x44344802e4a33a7f
 
 // Combustor, from #Combustor
 Combustor :: struct {
@@ -146,6 +146,7 @@ Bond :: struct {
 // Claim, from #Claim
 Claim :: struct {
 	kind: u32,    // #ClaimKind: a type ID; content, saved, inspect
+	lapses: i64,    // time, in quanta of 1ms; content, saved, proposable, inspect
 	quantity: i64,    // int, in quanta of 1; content, saved, proposable, inspect
 }
 
@@ -630,6 +631,7 @@ COMPONENT_COUNT :: 50
 }
 @(rodata) Claim_fields := [?]Field_Info{
 	{"kind", offset_of(Claim, kind), VALUE_TYPE, "#ClaimKind", "content, saved, inspect"},
+	{"lapses", offset_of(Claim, lapses), VALUE_QUANTITY, "time", "content, saved, proposable, inspect"},
 	{"quantity", offset_of(Claim, quantity), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
 }
 @(rodata) Information_fields := [?]Field_Info{
@@ -853,7 +855,7 @@ COMPONENTS := [COMPONENT_COUNT + 1]Component_Info{
 	{"Activity", "#Activity", size_of(Activity), 22, &Activity_fields[0]},
 	{"Authorization", "#Authorization", size_of(Authorization), 3, &Authorization_fields[0]},
 	{"Bond", "#Bond", size_of(Bond), 4, &Bond_fields[0]},
-	{"Claim", "#Claim", size_of(Claim), 2, &Claim_fields[0]},
+	{"Claim", "#Claim", size_of(Claim), 3, &Claim_fields[0]},
 	{"Information", "#Content", size_of(Information), 2, &Information_fields[0]},
 	{"Law", "#Law", size_of(Law), 6, &Law_fields[0]},
 	{"Organization", "#Organization", size_of(Organization), 1, &Organization_fields[0]},

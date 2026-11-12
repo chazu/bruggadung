@@ -2390,7 +2390,8 @@ authorize :: proc(world: ^World, action: Action) -> []Entity_ID {
 
 /* Whether it is another's and not `who`'s: someone else claims it
  * (ownership or custody), and `who` doesn't own it, nor has it in keeping
- * (lent it, holding and using it is no wrong). What several own is each
+ * (lent it, holding and using it is no wrong, till the loan's term is
+ * over). What several own is each
  * one's own: a household's larder is every one of its people's. */
 claimed_by_another :: proc(world: ^World, entity: Entity_ID, who: Entity_ID) -> bool {
 	claim: ^Claim
@@ -2408,6 +2409,8 @@ claimed_by_another :: proc(world: ^World, entity: Entity_ID, who: Entity_ID) -> 
 			continue      /* a reservation is no claim to it, unless an institution says so */
 		}
 		if world_edges_from(world, .Claimant, c, &claimant, 1) == 0 do continue
+		/* a keeping past its term is no claim any more */
+		if claim_lapsed(world, c) do continue
 		/* its own, unless only in its custody: custody isn't ownership */
 		if claimant == who {
 			if claim.kind != u32(tri.type_named(world_tri(world), "\"custody\"")) do return false

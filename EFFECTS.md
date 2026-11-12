@@ -93,19 +93,30 @@ Two terms are proposed, and have entries in GLOSSARY.md marked as such: a
     that is what `put_in` says. Leaving it there one's own would be a
     move that `lends` (decision 12); no operation does that yet.
 12. **A move may lend instead** (`lends: true`): the thing stays its
-    owner's, and the receiver (whose hand it is put in, or the owners of
-    the container) has a claim of **keeping** on it: holding it, taking
+    owner's, and the receiver (whose hand it is put in, with their
+    household, as in passing; or the owners of the container) has a
+    claim of **keeping** on it: holding it, taking
     it up again and using it are no wrong (`claimed_by_another` is false
     of its keeper), but it isn't the keeper's to pass on, so given away
-    it is still its owner's. Only an owner lends. Any move that puts it
-    back in an owner's hand, or into something of an owner's, ends the
-    keeping, whoever makes it. `lend` is the operation (actions.tri): a
+    it is still its owner's. Its owner lends it; what is nobody's is the
+    lender's own, and its household's, by lending it (as taking it up
+    would make it, decision 13). A move may say `until` when: the claim
+    `lapses` then, and from then on the borrower's holding it is as
+    holding any other's thing, so that taking it up breaks the law
+    against theft. `lend` takes the loan's term as its parameter, and
+    lends the thing whole. Any move that puts it back in an owner's
+    hand, or into something of an owner's, ends the keeping, whoever
+    makes it and lapsed or not: giving back is a `give`, which passes
+    nothing since the thing isn't the giver's; there is no operation of
+    returning. `lend` is the operation (actions.tri): a
     loan of the very thing is lent (deals/'s `lent_out`, and Scenario
     3's granted request), and what was lent goes back first when the
     debt is repaid. The borrower knows what is lent to it (a `#Lent`
     finding), so the law doesn't weigh against its using it. A shortcut:
     whoever sees a keeper take the thing up knows it is lent, since
-    nobody is told of a loan yet.
+    nobody is told of a loan yet. Left: a borrower handing the thing to
+    a third is no wrong, and the keeping stays the borrower's; and no
+    operation leaves a thing in another's container as one's own.
 13. **What is nobody's is whoever's gets it into its own hand.** Taken
     up, split off a stack nobody owns, made, harvested, shot and
     butchered: when an agent's own act puts into its hand a thing no

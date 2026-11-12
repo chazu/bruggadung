@@ -152,10 +152,14 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
   *Avoid:* transfer (a proposal transfers a stock). (EFFECTS.md
   decision 11)
 - **Lending**: handing a thing over by a move that `lends`: it stays its
-  owner's, and is in the other's **keeping**, a claim by which holding
-  and using it is no wrong, and which gives no right to pass it on. Only
-  an owner lends a thing. Back in its owner's hand, or in something of
-  its owner's, by whatever move, it is in nobody's keeping. A **loan** of
+  owner's, and is in the **keeping** of the other and their household, a
+  claim by which holding and using it is no wrong, and which gives no
+  right to pass it on. A keeping **lapses** at the end of the loan's
+  term: held on past it, the thing is another's like any other. Its
+  owner lends a thing; what is nobody's is the lender's own by lending
+  it. Back in its owner's hand, or in something of its owner's, by
+  whatever move (given back, it is a giving that passes nothing), it is
+  in nobody's keeping. A **loan** of
   the very thing is lent; a loan of as much again is given, and passes.
   *Avoid:* custody (the watch's, over what it confiscates). (EFFECTS.md
   decision 12)

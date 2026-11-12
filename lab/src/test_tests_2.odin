@@ -2796,6 +2796,13 @@ test_tempting_purse :: proc() {
 	again = test_tempting_purse_(.Base)
 	bg_check(world_state_hash(again.world) == world_state_hash(base.world))
 	bg_check(again.text == base.text)
+
+	/* the wages lent for a week: Kasimir's taking them up breaks no law
+	 * within it, and does once it is over (the keeping has lapsed) */
+	lent := action_make("take", honest.kasimir, honest.wages, NO_ENTITY)
+	bg_check(in_keeping_of(honest.world, honest.wages, honest.kasimir) && len(laws_broken(honest.world, lent)) == 0)
+	world_set_time(honest.world, time_make(world_time(honest.world).ms + 8 * 86400000))
+	bg_check(!in_keeping_of(honest.world, honest.wages, honest.kasimir) && len(laws_broken(honest.world, lent)) == 1)
 }
 
 

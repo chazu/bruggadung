@@ -86,10 +86,15 @@
 // its owners'. Only its owner passes it, or anyone what is
 // nobody's; nothing passes to those who own it already.
 // A move that `lends` leaves it whose it was, in the keeping of the one
-// whose hand it is put in (or of the owners of what it is put into): a
-// claim of keeping, by which holding and using it is no wrong. Only its
-// owner lends it. Moved back into its owner's hand, or into something of
-// its owner's, by any move, it is in nobody's keeping any more.
+// whose hand it is put in and their household (or of the owners of what it
+// is put into): a claim of keeping, by which holding and using it is no
+// wrong, `until` a time if the move says one: past it, the claim has
+// lapsed, and holding it on is as holding any other's thing. Its owner
+// lends it; one who lends what is nobody's is its owner by lending it.
+// Moved back into its owner's hand, or into something of its owner's, by
+// any move, it is in nobody's keeping any more: giving it back is a `give`
+// like any, which passes nothing (it isn't the giver's) and ends the
+// keeping.
 // `makes` constructs a thing from a `blueprint`, `at` a place (where a role
 // was, by a tag on its `place`), `called` what its construction is recorded
 // as; `splitFrom` says what it was carved from, if anything.
@@ -97,7 +102,7 @@
 // $k`), its `parameter` the command's (how many). Into a hand, of an operation
 // that stows (`stow`), is into a pack its actor carries, if it fits. Arithmetic in `after` is Triangle's (CONTENT_LANGUAGE.md §5).
 #OfSome:   { portion: int & >=1, exact: bool }
-#Moves:    #OfSome & { moved: ref, into: #Place, passes: bool, lends: bool }
+#Moves:    #OfSome & { moved: ref, into: #Place, passes: bool, lends: bool, until: time }
 #Consumes: #OfSome & { consumed: ref, because: text }
 #Emits:    { event: text, subject: ref, other: ref }
 #Makes:    { blueprint: text, at: #Place, called: text, splitFrom: ref }
@@ -272,7 +277,9 @@ put_down: #Operation & {
     moves: [{ moved: $i, into: $p }]
 } @family(operations)
 
-// Give something the actor holds to someone in reach, into a free hand.
+// Give something the actor holds to someone in reach, into a free hand. It
+// is theirs from then on, if it was the actor's to give. What was lent is
+// given back so: nothing passes, and its owner has it again.
 give: #Operation & {
     roles: {
         actor:       #Agent & { id: $a }
@@ -284,15 +291,16 @@ give: #Operation & {
 
 // Lend something the actor holds to someone in reach, into a free hand: it
 // stays the actor's own, in the other's keeping (deals/'s loan of the very
-// thing). So many of a stack, split off; anything else, whole.
+// thing), for the loan's term: so many milliseconds, the command's.
 lend: #Operation & {
-    parameter: $n & >=1
+    parameter: $t & >=1
     roles: {
         actor:       #Agent & { id: $a }
         item:        #Body & { id: $i, place: #Held & { by: $a } }
         destination: #Agent & { id: $d, freeHands: >=1 }
     }
-    moves: [#Moves & { moved: $i, portion: $n, into: #Held & { by: $d }, lends: true }]
+    now:   $now
+    moves: [#Moves & { moved: $i, into: #Held & { by: $d }, lends: true, until: $now + $t * 1ms }]
 } @family(operations)
 
 // Look into a container: what is inside is perceived only by looking.
