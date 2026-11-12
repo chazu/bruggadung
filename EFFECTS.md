@@ -61,8 +61,19 @@ Two terms are proposed, and have entries in GLOSSARY.md marked as such: a
 9. **Keeping the scenario hashes as they were is not a constraint.** A
    conversion that improves what happens regenerates them and says so.
 10. **A law says what it forbids as a pattern over the operation**, not
-    as an effect's name (`forbids: "take"` today). To be designed in the
-    law topic, and built before `take` is declared (step 4).
+    as an effect's name. Built: the pattern is a type of operation. A
+    **taking** (`#Taking: #Operation & { roles: { actor: #Agent, item:
+    #Body } }`) is an operation by which its actor comes to hold its
+    item; `take`, `take_some`, `take_up`, `pick_up`, `gather` and
+    `pry_out` are declared takings, and `theft_law` says `forbids:
+    "#Taking"`. An action breaks the law if its operation's type is the
+    one named or under it (`laws_broken`). So an operation is forbidden
+    by what it is declared to be, whatever its effect and stages.
+    Considered and left: a pattern over the effect itself ("anything
+    whose `moves` put a thing into its actor's hand"). It needs matching
+    within a list, and would make confiscating a taking; nothing yet
+    wants it. Taking some of a stack, and gathering into a pack, were
+    not theft before (their effect had another name): they are now.
 
 ## The issue
 
@@ -306,6 +317,12 @@ done after: the first conversions use only the three there are.
    of the role, where the procedure refused). Sawing is left in
    firewood/: a length cut off a trunk and a log cut through are two
    cases of one named effect, to be two operations (decision 3).
+   Taking is declared, all six operations of it, with the stage of
+   prying that marks the nail: an operation's `parameter` is the
+   command's (how many, for `take_some`: `portion: $n`), and into a
+   hand, of an operation that stows, is into a pack that bears it
+   (`receiving`, as before). Installing a part is declared, on a move
+   into an assembly.
 5. `rest` and `fill`: the watches `perform` adds by effect name become
    fields of the operation.
 6. Roles read generically.
@@ -381,10 +398,15 @@ its tests.
 - **A set expects the value it read.** `effect_open_door` set `Door.ajar`
   whatever it was; the declared effect is rejected if the door was opened
   by another in the same commit round. Likewise the move in giving.
-- **A law forbids by effect name** (`theft_law: #Law & { forbids: "take"
-  }`, `institutions/law.tri:55`; `act_actions.odin`'s `breaks`). When
-  `take` is declared it has no name to forbid: a law will need to say what
-  it forbids as a pattern over the operation (decision 10).
+- **A law forbade by effect name** (`forbids: "take"`). It names a type
+  of operation since (decision 10).
+- **A feature's name is its package's first.** carrying/ has its own
+  `into` (`#Handling`'s), so `moves: [{ moved: $i, into: ... }]` there is
+  "no type has all of these features". Saying the element's type settles
+  it: `moves: [#Moves & { moved: $i, into: ... }]`.
+- **Taking none is refused by the pattern** (`parameter: $n & >=1`):
+  "take_some fails at parameter", where the procedure said "take how
+  many?".
 - **A declared effect made its operation "unknown" on the menu.** The
   menu's match is of the whole operation against a description of its
   roles, so a value a tag carries into `moves` (which thing, into what)

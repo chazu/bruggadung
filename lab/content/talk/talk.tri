@@ -119,7 +119,7 @@ read: #Operation & {
 // honesty, and the risk of being found out (the thing in sight of someone).
 deny_it: #Lie & {
     title: "deny it"
-    score: [#Exposing & { exposing: "what", act: "take" }, #Trait & { trait: "honesty", per: -5 },
+    score: [#Exposing & { exposing: "what", act: "#Taking" }, #Trait & { trait: "honesty", per: -5 },
             #Watched & { watched: "what", penalty: 20 }]
 } @family(lies)
 

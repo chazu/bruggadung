@@ -59,7 +59,7 @@ test_firewood :: proc() {
 	bg_check(wood != NO_ENTITY && world_units_of(w, wood) == 20)
 	/* made and consumed in one: a log split is not there to split again */
 	twice := proposal_group_group_with_phase(.Action, "test: a log split twice")
-	bg_check(apply_declared_effect(w, action_make("split", me, axe, log), 0, twice) != "" && proposal_group_count(twice) == 0)
+	bg_check(apply_declared_effect(w, action_make("split", me, axe, log), 0, 0, twice) != "" && proposal_group_count(twice) == 0)
 
 	/* six pieces stoked: the stove's fuel up by six kilograms */
 	bg_check(perform(w, c, action_make("take_some", me, wood, NO_ENTITY), 6, &error) != nil)

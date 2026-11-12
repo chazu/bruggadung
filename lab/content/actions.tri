@@ -15,14 +15,14 @@
 // - frozen:  its activities wait; risen, a stage long due ends at once
 //            (REALITY.md step 4; activities.tri).
 // - code:    an `effect` names a function in src/act_actions.odin
-//            (effect_take, effect_eat, ...). #Effect lists them all: a
+//            (effect_eat, effect_drive, ...). #Effect lists them all: a
 //            topic's new named effect is added there and in the code
 //            together.
 // - code:    a declared effect is applied by one procedure for all
 //            (src/act_declared.odin), which resolves the operation against
-//            the truth; so far `after`, `moves`, `consumes` and `emits`,
-//            for an operation or a stage. Giving, putting down, putting in
-//            and looking are declared. An operation, or a stage, with no
+//            the truth; so far `after`, `moves`, `makes`, `consumes` and
+//            `emits`, for an operation or a stage. Taking, giving, putting
+//            down, putting in and looking are declared. An operation, or a stage, with no
 //            effect named or declared and no trace is refused at load.
 // - code:    a walk's stages come from its activity's way, not from the
 //            operation (src/act_activities.odin); its way is found by the
@@ -33,7 +33,7 @@
 //            (src/act_activities.odin); they are compacted into digests
 //            after the world's history window (src/core_world.odin).
 
-#Effect: "take" | "take_some" | "drive" | "open_tap" | "fill" | "walk" | "loosen" | "say" | "tend" | "analyse" | "write" | "read" | "eat" | "investigate" | "tighten" | "rotate" | "strike" | "shut" | "rest" | "saw" | "pass" | "copy" | "reveal" | "replace" | "cut" | "shape" | "issue" | "confiscate" | "arrest" | "flee" | "hit" | "hire" | "work" | "service" | "sow" | "keep_seed" | "harvest" | "crouch" | "shoot" | "butcher" | "post" | "hand_over" | "put_some" | "shoulder" | "put_back" | "give_some" | "forage"
+#Effect: "drive" | "open_tap" | "fill" | "walk" | "say" | "tend" | "analyse" | "write" | "read" | "eat" | "investigate" | "tighten" | "rotate" | "strike" | "shut" | "rest" | "saw" | "pass" | "copy" | "reveal" | "replace" | "cut" | "shape" | "issue" | "confiscate" | "arrest" | "flee" | "hit" | "hire" | "work" | "service" | "sow" | "keep_seed" | "harvest" | "crouch" | "shoot" | "butcher" | "post" | "hand_over" | "put_some" | "shoulder" | "put_back" | "give_some" | "forage"
 
 // Which roles an operation has is its roles' type: a structure's type is the
 // most general one with all its features.
@@ -76,7 +76,8 @@
 // was, by a tag on its `place`), `called` what its construction is recorded
 // as; `splitFrom` says what it was carved from, if anything.
 // An operation's `now` is the time its effect commits (`spoilsAt: $now +
-// $k`). Arithmetic in `after` is Triangle's (CONTENT_LANGUAGE.md §5).
+// $k`), its `parameter` the command's (how many). Into a hand, of an operation
+// that stows (`stow`), is into a pack its actor carries, if it fits. Arithmetic in `after` is Triangle's (CONTENT_LANGUAGE.md §5).
 #OfSome:   { portion: int & >=1 }
 #Moves:    #OfSome & { moved: ref, into: #Place }
 #Consumes: #OfSome & { consumed: ref, because: text }
@@ -137,6 +138,9 @@
     roles:            #Roles
     // when its effect commits: for a declared effect to reckon from
     now:              time
+    // the command's parameter (how many, for take_some): for a declared
+    // effect to use (`portion: $n`)
+    parameter:        int
     // how far its other roles may be from the actor, in tiles: 1, beside it
     // (a shot, further: hunting/)
     range:            *1 | int & >=1 & <=8
@@ -185,26 +189,33 @@
 // groups when they conflict with others in the action phase; taking is a
 // matter of quickness. Without one, who goes first is an even draw.
 
+// A taking: an operation by which its actor comes to hold its item, which
+// it did not. It is what a law forbids (institutions/law.tri's `forbids`
+// names this type, or one under it): an operation is a taking by being
+// declared one, whatever its effect is and however many stages it has.
+#Taking: #Operation & { roles: { actor: #Agent, item: #Body } }
+
 // Pick something up into a free hand: from a container, the ground, or an
 // assembly it is installed in.
-take: #Operation & {
-    effect:  "take"
+take: #Taking & {
     contest: "quickness"
     roles: {
-        actor: #Agent & { freeHands: >=1 }
-        item:  #Body & { place: #Inside | #OnTile | #Installed }
+        actor: #Agent & { id: $a, freeHands: >=1 }
+        item:  #Body & { id: $i, place: #Inside | #OnTile | #Installed }
     }
+    moves: [{ moved: $i, into: #Held & { by: $a } }]
 } @family(operations) @quickcheck(actor.freeHands)
 
 // Take some units of a stack into a free hand: from a container, the ground,
 // or the actor's other hand. How many is the command's.
-take_some: #Operation & {
-    effect:  "take_some"
-    contest: "quickness"
+take_some: #Taking & {
+    contest:   "quickness"
+    parameter: $n & >=1
     roles: {
         actor: #Agent & { id: $a, freeHands: >=1 }
-        item:  #Stack & { place: #Inside | #OnTile | #Held & { by: $a } }
+        item:  #Stack & { id: $i, place: #Inside | #OnTile | #Held & { by: $a } }
     }
+    moves: [{ moved: $i, portion: $n, into: #Held & { by: $a } }]
 } @family(operations) @quickcheck(actor.freeHands)
 
 // Put something the actor holds into a container.
@@ -220,16 +231,16 @@ put_in: #Operation & {
 // Take something up, carefully: a second, then into a free hand. Two who
 // start together finish together, and only one gets it. Taken from where it
 // was meanwhile, the take fails: there is nothing to come back to.
-take_up: #Operation & {
-    effect:   "take"
+take_up: #Taking & {
     contest:  "quickness"
     duration: 1s
     uses:     ["hands"]
     hard:     "fail"
     roles: {
-        actor: #Agent & { freeHands: >=1 }
-        item:  #Body & { place: #OnTile | #Inside }
+        actor: #Agent & { id: $a, freeHands: >=1 }
+        item:  #Body & { id: $i, place: #OnTile | #Inside }
     }
+    moves: [{ moved: $i, into: #Held & { by: $a } }]
 } @family(operations)
 
 // Put something the actor holds down on the ground at its feet.

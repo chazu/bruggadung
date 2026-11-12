@@ -649,6 +649,12 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
   rule, a permit. Whether an act breaks one is objective. **Common rules**
   are known from the start; **particular rules** are learnt. Not a norm.
   (INS d2, d8)
+- **Taking**: an operation by which its actor comes to hold its item,
+  which it did not (`#Taking`: take, take some, pick up, gather, pry
+  out). A law forbids a kind of operation by naming its type (`forbids:
+  "#Taking"`); an operation is of the kind by being declared of it, not
+  by its effect. Not a stall's **takings**, the coins a day's sales
+  brought. (EFFECTS.md decision 10)
 - **Permit**: an issued authorization; revoked, it is void. *Avoid:*
   licence. (INS d7)
 - **Authorize**: reports which rules an act breaks; never blocks. (INS d3)

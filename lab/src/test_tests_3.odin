@@ -2556,7 +2556,7 @@ test_learning_laws :: proc() {
 	notice = proposal_group_create(g, "seal_tag", "the notice", on_tile(6, 5, 0))
 	proposal_group_set_of_to_text(g, "Record.writing", whole(notice),
 	                              world_intern(st.w, "#Writing & { author: #Agent & { coat: \"black\" }, entries: [#LawSays & { law: #Law & " +
-	                                                 "{ forbids: \"take\", wrong: \"unauthorized\", brings: \"fine\", weighs: 15 } }] }"))
+	                                                 "{ forbids: \"#Taking\", wrong: \"unauthorized\", brings: \"fine\", weighs: 15 } }] }"))
 	committer_submit(st.c, g)
 	scheduler_run_until(st.s, time_make(1000))
 	worker = proposal_group_id_for(g, worker)
@@ -2651,7 +2651,13 @@ test_laws :: proc() {
 	bg_check(len(broken) == 1 && broken[0] == law)
 	bg_check(len(laws_broken(w, action_make("take", merchant, purse, NO_ENTITY))) == 0)
 	bg_check(len(laws_broken(w, action_make("take", kasimir, seal, NO_ENTITY))) == 0)
-	/* walking isn't taking */
+	/* the law forbids a kind of operation (#Taking), not an effect by its
+	 * name: taking some of it, picking it up into a pack and prying it out
+	 * are takings too; looking at it, and walking, are not */
+	for taking in ([?]cstring{"take_some", "take_up", "pick_up", "gather", "pry_out"}) {
+		bg_check(len(laws_broken(w, action_make(taking, kasimir, purse, NO_ENTITY))) == 1)
+	}
+	bg_check(len(laws_broken(w, action_make("look", kasimir, purse, NO_ENTITY))) == 0)
 	bg_check(len(laws_broken(w, action_make("walk_east", kasimir, NO_ENTITY, NO_ENTITY))) == 0)
 	/* the act isn't blocked: he takes it */
 	error = ""

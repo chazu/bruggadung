@@ -216,7 +216,7 @@ match_described :: proc(world: ^World, pattern: ^tri.Node, action: Action, descr
 		for i: uint = 0; i < worked.nresidual; i += 1 {
 			path := string(cstring(&worked.residual[i][0]))
 			done := false
-			for field in ([?]string{"after", "moves", "consumes", "emits", "now"}) {
+			for field in ([?]string{"after", "moves", "makes", "consumes", "emits", "now", "parameter"}) {
 				if path == field || strings.has_prefix(path, strings.concatenate({field, "."}, context.temp_allocator)) ||
 				   (strings.has_prefix(path, "stages.") &&
 				    strings.contains(path, strings.concatenate({".", field}, context.temp_allocator))) {
@@ -687,38 +687,6 @@ menu_describe_at :: proc(self: ^Menu, i: uint) -> string {
 @(private = "file")
 Effect :: #type proc(world: ^World, action: Action, amount: i64, group: ^Proposal_Group) -> string
 
-@(private = "file")
-effect_take :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
-	into, ok := receiving(world, a.roles[.Actor], world_mass_of(world, a.roles[.Item]), operation_stows(world, a.operation))
-	if !ok {
-		return "no hand is free"
-	}
-	/* from where it is now: if someone else gets it first, this fails */
-	proposal_group_move_to_expecting(g, whole(a.roles[.Item]), into, world_location_of(world, a.roles[.Item]))
-	return ""
-}
-
-
-@(private = "file")
-effect_take_some :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
-	if amount < 1 {
-		return "take how many?"
-	}
-	units := world_units_of(world, a.roles[.Item])
-	mass  := world_mass_of(world, a.roles[.Item]) * min(amount, units) / max(units, 1)
-	into, ok := receiving(world, a.roles[.Actor], mass, operation_stows(world, a.operation))
-	if !ok {
-		return "no hand is free"
-	}
-	if amount >= units {
-		proposal_group_move_to(g, whole(a.roles[.Item]), into)
-	} else {
-		proposal_group_split(g, whole(a.roles[.Item]), amount, into)
-	}
-	return ""
-}
-
-
 /* One nail is driven, even from a stack: the proposal names one unit, and
  * commitment splits it off. */
 @(private = "file")
@@ -808,18 +776,6 @@ tread :: proc(world: ^World, at: Location, g: ^Proposal_Group) {
 		                         now + (trace.expires - now) * (100 - lo) / 100)
 	}
 	free(here)
-}
-
-
-/* A stage of prying: the item works loose, and takes a mark. */
-@(private = "file")
-effect_loosen :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
-	marks: i64
-
-	marks = 0
-	world_get_field(world, "Body.toolMarks", a.roles[.Item], &marks)
-	proposal_group_set_of_to(g, "Body.toolMarks", whole(a.roles[.Item]), marks + 1)
-	return ""
 }
 
 
@@ -2496,29 +2452,30 @@ claimed_by_another :: proc(world: ^World, entity: Entity_ID, who: Entity_ID) -> 
 
 /* The laws the action breaks (INSTITUTIONS.md decision 2), as entity IDs:
  * true, for the inspector and for those who act on it; nothing blocks it. A
- * law forbids its effect when the act is its kind of wrong: "anothers", the
+ * law forbids a kind of operation (the type `forbids` names: the action's
+ * operation is of it, or of one under it) when the act is its kind of
+ * wrong: "anothers", the
  * item claimed (owned or held in custody) by someone else and no
  * authorization of the actor over it; "unauthorized", no authorization over
  * what it binds. Settled: []Entity_ID, in the temporary allocator. */
 laws_broken :: proc(world: ^World, action: Action) -> []Entity_ID {
 	law: ^Law
 	broken: [dynamic]Entity_ID
-	effect: string
-	has_effect: bool
 	laws: ^Store
 	content: ^tri.Content
 	i: uint
 	authorized: bool
 	wrong: bool
 
-	broken             = make([dynamic]Entity_ID, context.temp_allocator)
-	effect, has_effect = operation_effect(world, action.operation)
-	content            = world_tri(world)
-	laws               = world_store_for_kind(world, world_kind_named(world, "Law"))
-	authorized         = len(authorize(world, action)) > 0
-	for i = 0; has_effect && i < store_count(laws); i += 1 {
+	broken     = make([dynamic]Entity_ID, context.temp_allocator)
+	content    = world_tri(world)
+	pattern   := tri.pattern(content, action.operation) if action.operation != nil else nil
+	laws       = world_store_for_kind(world, world_kind_named(world, "Law"))
+	authorized = len(authorize(world, action)) > 0
+	for i = 0; pattern != nil && i < store_count(laws); i += 1 {
 		law = (^Law)(store_record_at_index(laws, i))
-		if law.forbids == nil || effect != string(law.forbids) {
+		forbidden := tri.type_named(content, law.forbids) if law.forbids != nil else 0
+		if forbidden == 0 || tri.subtype(content, tri.node_type(pattern), forbidden) == 0 {
 			continue
 		}
 		if law.wrong == u32(tri.type_named(content, "\"anothers\"")) {
@@ -3053,12 +3010,9 @@ Named_Effect :: struct {
 
 @(private = "file")
 effects := [?]Named_Effect{
-	{"take",      effect_take},
-	{"take_some", effect_take_some},
 	{"drive",     effect_drive},
 	{"open_tap",  effect_open_tap},
 	{"walk",      effect_walk},
-	{"loosen",    effect_loosen},
 	{"say",       effect_say},
 	{"tend",      effect_tend},
 	{"analyse",   effect_analyse},
@@ -3550,7 +3504,7 @@ make_trace :: proc(world: ^World, group: ^Proposal_Group, kind: cstring, bearer:
  * reason if it can't be built, "" for none. */
 apply_named_effect :: proc(world: ^World, effect: string, action: Action, stage: i64, amount: i64,
                            group: ^Proposal_Group) -> string {
-	if effect == "" do return apply_declared_effect(world, action, stage, group)
+	if effect == "" do return apply_declared_effect(world, action, stage, amount, group)
 	for i := 0; i < len(effects); i += 1 {
 		if effects[i].name == effect {
 			return effects[i].function(world, action, amount, group)

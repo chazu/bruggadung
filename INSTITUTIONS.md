@@ -15,6 +15,9 @@ the contract follows once enough is decided.
 2. **Their rules are real content they issue**: a law, a licensing rule, a
    permit. Whether an act breaks a rule is objectively true, and the
    developer inspector can show it. `authorize(action)` reports that truth.
+   A law forbids a kind of operation, by its type (a **taking**,
+   `#Taking`): an operation of that type, or of one under it, is what it
+   forbids, whatever its effect (EFFECTS.md decision 10).
 3. **The world never blocks anything.** An act against the rules commits
    like any other (ACTIONS.md §3: authorization "never blocks an attempt").
 4. **An organization acts only through its members, by fiat.** It does

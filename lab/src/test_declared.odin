@@ -29,7 +29,7 @@ test_declared :: proc() {
 	bg_check(world_get_field(w, "Door.ajar", door, &v) && v == 1)
 	/* ajar already, the truth doesn't bear out what opening requires */
 	g := proposal_group_group_with_phase(.Action, "test: a door opened twice")
-	reason := apply_declared_effect(w, action_make("open_door", giver, door, NO_ENTITY), 0, g)
+	reason := apply_declared_effect(w, action_make("open_door", giver, door, NO_ENTITY), 0, 0, g)
 	bg_check(strings.contains(reason, "open_door fails at roles.item.ajar"))
 	bg_check(proposal_group_count(g) == 0)
 
@@ -40,7 +40,7 @@ test_declared :: proc() {
 	bg_check(at.form == .Held_By && at.place == taker)
 	/* not the giver's to give now: the item is no longer in its hand */
 	g = proposal_group_group_with_phase(.Action, "test: given twice")
-	reason = apply_declared_effect(w, action_make("give", giver, nail, taker), 0, g)
+	reason = apply_declared_effect(w, action_make("give", giver, nail, taker), 0, 0, g)
 	bg_check(strings.contains(reason, "give fails at roles.item.place"))
 
 	/* moves, into a container and onto a tile: the taker puts the nail in

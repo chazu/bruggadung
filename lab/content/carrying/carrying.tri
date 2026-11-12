@@ -80,24 +80,25 @@ shoulder: #Operation & {
 // but into a pack the taker carries, if it fits; else a free hand. Ways
 // agency takes, not a menu's: the menu's taking is take and take_some
 // (`stowing`, not `operations`).
-gather: #Operation & {
-    effect:  "take_some"
-    stow:    true
-    contest: "quickness"
+gather: #Taking & {
+    stow:      true
+    contest:   "quickness"
+    parameter: $n & >=1
     roles: {
-        actor: #Agent & { freeHands: >=1 }
-        item:  #Stack & { place: #Inside | #OnTile }
+        actor: #Agent & { id: $a, freeHands: >=1 }
+        item:  #Stack & { id: $i, place: #Inside | #OnTile }
     }
+    moves: [#Moves & { moved: $i, portion: $n, into: #Held & { by: $a } }]
 } @family(stowing)
 
-pick_up: #Operation & {
-    effect:  "take"
+pick_up: #Taking & {
     stow:    true
     contest: "quickness"
     roles: {
-        actor: #Agent & { freeHands: >=1 }
-        item:  #Body & { place: #Inside | #OnTile }
+        actor: #Agent & { id: $a, freeHands: >=1 }
+        item:  #Body & { id: $i, place: #Inside | #OnTile }
     }
+    moves: [#Moves & { moved: $i, into: #Held & { by: $a } }]
 } @family(stowing)
 
 // Put a pack back where the household keeps it: down beside something in

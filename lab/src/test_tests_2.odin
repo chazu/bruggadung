@@ -2605,7 +2605,7 @@ test_tempting_purse :: proc() {
 	 * knows the law but not that it applies, and takes it: belief, not
 	 * truth (the law is truly broken all the same) */
 	store = knowledge_store_of(base.knowledge, base.kasimir)
-	bg_check(knowledge_store_law_count(store) == 1 && string(knowledge_store_law_at(store, 0).forbids) == "take" &&
+	bg_check(knowledge_store_law_count(store) == 1 && string(knowledge_store_law_at(store, 0).forbids) == "#Taking" &&
 	         knowledge_store_law_at(store, 0).weighs == 40)
 	bg_check(knowledge_store_finding(store, "#Owned", test_referent_of(store, base.purse)) != nil)
 	untold = test_tempting_purse_(.Untold)

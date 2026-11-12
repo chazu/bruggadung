@@ -6,7 +6,8 @@ package lab
  * operation with no named effect (`effect`) has a declared one: its roles
  * as the effect leaves them (`after`), what it moves (`moves`), constructs
  * (`makes`) and destroys (`consumes`), whole or a portion of a stack, and
- * the events it emits (`emits`).
+ * the events it emits (`emits`). The command's parameter is the
+ * operation's `parameter`, the time its `now`.
  *
  * Resolving it is a unification: the operation's pattern with the truth
  * projection of what fills its roles. Where that fails, a requirement the
@@ -128,9 +129,11 @@ int_of :: proc(v: ^tri.Node) -> (i64, bool) {
 
 
 /* The place a `moves` or a `makes` names, as a location: a tile, a
- * container, a role in an assembly, or a hand; into a hand is into a free one of theirs, unless it says which. */
+ * container, a role in an assembly, or a hand; into a hand is into a free
+ * one of theirs, unless it says which, or, of an operation that stows,
+ * into a pack they carry that bears `mass` more. */
 @(private = "file")
-declared_place :: proc(world: ^World, into: ^tri.Node) -> (Location, string) {
+declared_place :: proc(world: ^World, into: ^tri.Node, mass: i64 = 0, stows := false) -> (Location, string) {
 	lo, hi: i64
 
 	tc   := world_tri(world)
@@ -163,9 +166,10 @@ declared_place :: proc(world: ^World, into: ^tri.Node) -> (Location, string) {
 	if hand := tri.at(tc, into, "hand"); hand != nil && tri.node_interval(hand, &lo, &hi) != 0 && lo == hi {
 		return held_by(by, i32(lo)), ""
 	}
-	hand := free_hand(world, by)
-	if hand < 0 do return {}, "no hand of theirs is free"
-	return held_by(by, hand), ""
+	/* a free one; of an operation that stows, a pack they carry, if it fits */
+	to, free := receiving(world, by, mass, stows)
+	if !free do return {}, "no hand of theirs is free"
+	return to, ""
 }
 
 
@@ -253,7 +257,7 @@ declared_check :: proc(tc: ^tri.Content) -> string {
 /* A step's declared effect, as proposals added to `group`: the operation's
  * own, or its stage `stage`'s if it has stages. The reason if it can't be
  * built, "" for none. */
-apply_declared_effect :: proc(world: ^World, action: Action, stage: i64, group: ^Proposal_Group) -> string {
+apply_declared_effect :: proc(world: ^World, action: Action, stage: i64, amount: i64, group: ^Proposal_Group) -> string {
 	err: [256]u8
 	failure: tri.Failure
 
@@ -273,7 +277,7 @@ apply_declared_effect :: proc(world: ^World, action: Action, stage: i64, group: 
 	/* the time this commits, for what the effect reckons from it */
 	clock: [64]u8
 	tri.format_quantity("time", world_time(world).ms, raw_data(clock[:]), len(clock))
-	fmt.sbprintf(&expr, " }}, now: %s }}", cstring(&clock[0]))
+	fmt.sbprintf(&expr, " }}, now: %s, parameter: %d }}", cstring(&clock[0]), amount)
 	arena := tri.arena_new()
 	defer tri.arena_free(arena)
 	truth := tri.value(tc, ns_utf8(strings.to_string(expr)), arena, &err[0], size_of(err))
@@ -293,10 +297,14 @@ apply_declared_effect :: proc(world: ^World, action: Action, stage: i64, group: 
 		if move == nil do break
 		moved, ok := ref_of(tc, tri.at(tc, move, "moved"))
 		if !ok do return fmt.tprintf("%s moves nothing: tag the role's id", action.operation)
-		to, reason := declared_place(world, tri.at(tc, move, "into"))
-		if reason != "" do return reason
 		/* a portion: so many units, split off; all of them is the thing itself */
-		if n, some := int_of(tri.at(tc, move, "portion")); some && n < world_units_of(world, moved) {
+		n, some := int_of(tri.at(tc, move, "portion"))
+		units   := world_units_of(world, moved)
+		some     = some && n < units
+		mass    := world_mass_of(world, moved) * (n if some else max(units, 1)) / max(units, 1)
+		to, reason := declared_place(world, tri.at(tc, move, "into"), mass, operation_stows(world, action.operation))
+		if reason != "" do return reason
+		if some {
 			part := proposal_group_split(group, whole(moved), n, to)
 			for r in Role.Actor ..< Role.Count do if action.roles[r] == moved do portions[r] = part
 			continue

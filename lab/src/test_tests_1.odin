@@ -615,7 +615,7 @@ test_menu :: proc() {
 	bg_check(ns_contains(error, "not in the actor's reach"))
 	bg_check(perform(w, c, action_make("fly", 4, NO_ENTITY, NO_ENTITY), 0, &error) == nil)
 	bg_check(perform(w, c, action_make("take_some", 4, 2, NO_ENTITY), 0, &error) == nil)
-	bg_check(ns_contains(error, "how many"))
+	bg_check(ns_contains(error, "take_some fails at parameter"))
 
 	/* take five: then they can be put back, driven, or split between hands */
 	g = perform(w, c, action_make("take_some", 4, 2, NO_ENTITY), 5, &error)

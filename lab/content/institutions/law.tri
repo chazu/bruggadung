@@ -29,9 +29,10 @@ package institutions
 // What breaking it brings, done by the organization's members (decision 7).
 #Penalty: "arrest" | "fine" | "confiscate"
 
-// A law: content an organization issues (`lawOf`), forbidding an
-// operation's effect (`forbids`, as actions.tri names effects) when it
-// is a wrong of its kind. A common law is one everyone in its society
+// A law: content an organization issues (`lawOf`), forbidding a kind of
+// operation (`forbids`: the name of a type of operation, as actions.tri's
+// #Taking; an operation of that type, or of one under it, is forbidden)
+// when it is a wrong of its kind. A common law is one everyone in its society
 // knows from the start (decision 8). What breaking it brings `weighs` that
 // much (dB) with someone who knows it and believes itself seen (decision 5).
 #Law: #Content & {
@@ -52,8 +53,8 @@ package institutions
 // an ordinance, known only to whoever reads or is told it: no taking
 // firewood from the commons without leave, a fine.
 town:      #Organization & {}
-theft_law: #Law & { forbids: "take", wrong: "anothers", brings: "arrest", weighs: 40, common: true }
-wood_law:  #Law & { forbids: "take", wrong: "unauthorized", brings: "fine", weighs: 15, common: false }
+theft_law: #Law & { forbids: "#Taking", wrong: "anothers", brings: "arrest", weighs: 40, common: true }
+wood_law:  #Law & { forbids: "#Taking", wrong: "unauthorized", brings: "fine", weighs: 15, common: false }
 
 // Custody (decision 7): a claim the watch takes on what it confiscates, and
 // on whom it arrests.

@@ -148,15 +148,15 @@ drive: #Operation & {
 
 // Pry a wedged nail out of an assembly: loosen it, then pull it free into a
 // free hand. Walking away suspends it; coming back, it can be resumed.
-pry_out: #Operation & {
-    effect:    "take"
-    stages:    [{ duration: 3s, effect: "loosen", leaves: [{ trace: "scratch", on: "item", strength: 30 }] },
-                { duration: 2s, effect: "take" }]
+pry_out: #Taking & {
+    stages:    [{ duration: 3s, after: { item: #Body & { toolMarks: math.Min($m + 1, 100) } },
+                  leaves: [{ trace: "scratch", on: "item", strength: 30 }] },
+                { duration: 2s, moves: [{ moved: $i, into: #Held & { by: $a } }] }]
     uses:      ["hands"]
     attention: 10
     roles: {
-        actor: #Agent & { freeHands: >=1 }
-        item:  #Body & { place: #Installed }
+        actor: #Agent & { id: $a, freeHands: >=1 }
+        item:  #Body & { id: $i, toolMarks: $m, place: #Installed }
     }
 } @family(operations)
 
