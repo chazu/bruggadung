@@ -65,7 +65,7 @@ test_registry_and_construction :: proc() {
 
 	w = test_world(1)
 	c = test_committer(w)
-	bg_check(world_kind_count(w) == 51)
+	bg_check(world_kind_count(w) == 50)
 	bg_check(world_kind_named(w, "Body") != NOT_FOUND && world_kind_named(w, "Nonesuch") == NOT_FOUND)
 	bin   = test_commit_create(c, "bin", on_tile(0, 0, 0))
 	nails = test_commit_create(c, "nails_30", in_(bin))

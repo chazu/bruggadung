@@ -551,11 +551,11 @@ New, and entered in the glossary with this document:
   trade) is built (content/tanning/): home from the hunt, each hunter
   looks into the household's tan pit, by its woodpile, draws out what has
   become leather and puts it by in the larder, and lays the hides from
-  the larder in the tan, where each is leather six days on. Before, the
+  the larder in the tan, where each is leather six days on (in the pit: taken out early
+  it is a raw hide again, and a raw hide rots in five days). Before, the
   hides lay in the larder, one place each, and would have filled it in
   six weeks; leather is a stack. Selling it waits: nobody buys leather
-  yet, or makes anything of it. Left out: bark, water and lime, and that
-  a raw hide rots.
+  yet, or makes anything of it. Left out: bark, water and lime.
 - **The hunt is fair, but the game never learns.** A shot can miss, and a
   deer bolts out of sight from a shot that gives the hunter away. Over a
   week, one hunter in a small wood brings home its two deer from 33

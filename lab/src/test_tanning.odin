@@ -2,7 +2,8 @@ package lab
 
 /*
  * Tanning (content/tanning/): a hide laid in a tan pit is the pit's
- * owners', and six days after it is leather, as heavy, where it lies; one
+ * owners', and six days in it is leather, as heavy, where it lies; out of
+ * the pit it is a raw hide, and rots in five; one
  * who dresses its household's hides takes them from where they are kept,
  * lays them in the tan, and puts the leather by.
  */
@@ -56,11 +57,12 @@ test_tanning :: proc() {
 	test_own(c, tanner, hide)
 	scheduler_run_until(s, time_make(2))
 
-	/* a hide keeps: nothing sets its time but the tan */
+	/* a raw hide rots in five days, from when it was made */
 	scheduler_run_until(s, time_make(TAN_DAY))
-	bg_check(world_is_live(w, hide) && world_get_field(w, "Becoming.becomesAt", hide, &at) && at == 0)
+	bg_check(world_is_live(w, hide) && world_get_field(w, "Becoming.becomesAt", hide, &at) && at > 0 && at <= 5 * TAN_DAY + 2)
 
-	/* laid in the tan: in the pit, the pit's owner's, its time six days on */
+	/* laid in the tan: in the pit, the pit's owner's, its time six days
+	 * from then, and what it becomes there leather */
 	bg_check(perform(w, c, action_make("steep", tanner, hide, pit), 0, &error) != nil)
 	scheduler_run_until(s, time_make(TAN_DAY + 601 * 1000))
 	laid := world_time(w).ms
@@ -72,30 +74,36 @@ test_tanning :: proc() {
 	scheduler_run_until(s, time_make(world_time(w).ms + 601 * 1000))
 	bg_check(world_location_of(w, pelt).place == pit && slice.equal(owners_of(w, pelt), []Entity_ID{tanner}))
 
-	/* five days on, a hide still; taken out and laid in again, its time is
-	 * as it was */
+	/* five days on, past when it would have rotted raw, a hide still; and
+	 * the one left raw on the ground has rotted */
 	scheduler_run_until(s, time_make(laid + 5 * TAN_DAY))
 	bg_check(world_is_live(w, hide) && len(tanning_inside(w, pit, "deer_leather")) == 0)
-	was := at
+	bg_check(!world_is_live(w, second))
+	/* taken out early, it is a raw hide again: its time five days from
+	 * then, to rot */
+	tanned := at
 	bg_check(perform(w, c, action_make("take", tanner, hide, NO_ENTITY), 0, &error) != nil)
 	scheduler_run_until(s, time_make(world_time(w).ms + 10 * 1000))
 	bg_check(world_location_of(w, hide).place == tanner)
-	bg_check(perform(w, c, action_make("steep", tanner, hide, pit), 0, &error) != nil)
-	scheduler_run_until(s, time_make(world_time(w).ms + 601 * 1000))
-	bg_check(world_location_of(w, hide).place == tanner && world_get_field(w, "Becoming.becomesAt", hide, &at) && at == was)
+	bg_check(world_get_field(w, "Becoming.becomesAt", hide, &at) && at > tanned + 3 * TAN_DAY && at <= world_time(w).ms + 5 * TAN_DAY)
+	/* put back, by any move, its tanning starts over: six days from then */
 	bg_check(perform(w, c, action_make("put_in", tanner, hide, pit), 0, &error) != nil)
 	scheduler_run_until(s, time_make(world_time(w).ms + 10 * 1000))
 	bg_check(world_location_of(w, hide).place == pit)
+	bg_check(world_get_field(w, "Becoming.becomesAt", hide, &at) && at > tanned + 4 * TAN_DAY && at <= world_time(w).ms + 6 * TAN_DAY)
+	again := at
 
-	/* at its time, leather: a piece, as heavy, in the pit; the hide gone */
-	scheduler_run_until(s, time_make(was - 1))
+	/* the pelt, left in, is leather at its time; the hide not yet */
+	scheduler_run_until(s, time_make(tanned + TAN_DAY))
+	bg_check(len(tanning_inside(w, pit, "hare_leather")) == 1 && !world_is_live(w, pelt))
 	bg_check(world_is_live(w, hide))
-	scheduler_run_until(s, time_make(was))
+	/* at its time, leather: a piece, as heavy, in the pit; the hide gone */
+	scheduler_run_until(s, time_make(again - 1))
+	bg_check(world_is_live(w, hide))
+	scheduler_run_until(s, time_make(again))
 	bg_check(!world_is_live(w, hide))
 	leather := tanning_inside(w, pit, "deer_leather")
 	bg_check(len(leather) == 1 && world_units_of(w, leather[0]) == 1 && world_mass_of(w, leather[0]) == 4000)
-	scheduler_run_until(s, time_make(was + TAN_DAY))
-	bg_check(len(tanning_inside(w, pit, "hare_leather")) == 1 && !world_is_live(w, pelt))
 	if len(leather) != 1 do return
 
 	/* drawn out and put by; a second piece put with it is one stack */
@@ -104,9 +112,8 @@ test_tanning :: proc() {
 	bg_check(perform(w, c, action_make("put_in", tanner, leather[0], chest), 0, &error) != nil)
 	scheduler_run_until(s, time_make(world_time(w).ms + 10 * 1000))
 	bg_check(world_location_of(w, leather[0]).place == chest)
-	bg_check(perform(w, c, action_make("take", tanner, second, NO_ENTITY), 0, &error) != nil)
-	scheduler_run_until(s, time_make(world_time(w).ms + 10 * 1000))
-	bg_check(perform(w, c, action_make("steep", tanner, second, pit), 0, &error) != nil)
+	third := test_commit_create(c, "deer_hide", held_by(tanner, 0))
+	bg_check(perform(w, c, action_make("steep", tanner, third, pit), 0, &error) != nil)
 	scheduler_run_until(s, time_make(world_time(w).ms + 7 * TAN_DAY))
 	more := tanning_inside(w, pit, "deer_leather")
 	bg_check(len(more) == 1)

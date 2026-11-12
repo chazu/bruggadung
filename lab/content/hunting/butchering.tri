@@ -18,8 +18,9 @@
 //             as it was.
 // - cooking:  meat is raw food; in a larder it merges with meat already
 //             there, as grain does.
-// - tanning:  a hide is leather to be: laid in the tan, it becomes the
-//             leather its blueprint names (tanning/).
+// - tanning:  a hide is leather to be: in a tan pit, it becomes the
+//             leather its blueprint names (tanning/). Left raw five
+//             days, it rots, and rots away as spoiled food does.
 // - code:     none: butchering is declared (so many cuts made, gathered
 //             into one stack; actions.tri's `makes`). A carcass with no
 //             hide isn't butchered: all have one.
@@ -53,15 +54,25 @@ carrion_look: #Look & { kindOf: "carrion", look: "carcass.carrion" } @family(loo
 venison:   #Stack & #Food & { material: "food", raw: true, nourishment: 20, cooking: 40, keepsFor: 3d, unit: "venison", unitMass: 500g, count: 1 }
 hare_meat: #Stack & #Food & { material: "food", raw: true, nourishment: 20, cooking: 30, keepsFor: 3d, unit: "hare meat", unitMass: 500g, count: 1 }
 
-// Hides: leather to be, laid in the tan (tanning/, which says how a hide
-// tans): something that becomes (perishing/'s #Becoming), it keeps as it
-// is, and laid in the tan becomes the leather its blueprint names.
-#Hide: #Body & #Becoming & { keepsFor: 0ms, ending: "tanned" }
+// Hides: leather to be (tanning/). Something that becomes (perishing/'s
+// #Becoming), on two courses: left raw, a hide rots in five days; in a
+// tan pit, it is the leather its blueprint names in six.
+#Hide: #Body & #Becoming & {
+    keepsFor:     5d
+    becomes:      "rotten_hide"
+    ending:       "rotted"
+    within:       "#TanPit"
+    keepsWithin:  6d
+    endingWithin: "tanned"
+}
 
 hide_seen: #Seen & { kindOf: "#Hide" } @family(seen)
 
-deer_hide: #Hide & { material: "leather", mass: 4kg, becomes: "deer_leather" }
-hare_pelt: #Hide & { material: "leather", mass: 300g, becomes: "hare_leather" }
+deer_hide: #Hide & { material: "leather", mass: 4kg, becomesWithin: "deer_leather" }
+hare_pelt: #Hide & { material: "leather", mass: 300g, becomesWithin: "hare_leather" }
+
+// A hide gone off: rot, as spoiled food is; its mass is the hide's.
+rotten_hide: #Spoiled & { material: "rot", mass: 1g }
 
 // Butcher a carcass in reach, a hand free: half an hour, with the hands;
 // the meat into a pack the butcher carries if it fits, else the free hand.

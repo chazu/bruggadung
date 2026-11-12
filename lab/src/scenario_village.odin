@@ -926,7 +926,7 @@ village_run :: proc(self: ^Village) {
 	foods := world_store_for_kind(self.world, world_kind_named(self.world, "Becoming"))
 	for i: uint = 0; i < store_count(foods); i += 1 {
 		food := (^Becoming)(store_record_at_index(foods, i))
-		if at := perishing_spoils_at(food, world_time(self.world).ms); at > 0 && at <= world_time(self.world).ms {
+		if at := perishing_time_of(self.world, store_entity_at_index(foods, i), food, world_time(self.world).ms); at > 0 && at <= world_time(self.world).ms {
 			append(&stale, fmt.tprintf("%d", store_entity_at_index(foods, i)))
 		}
 	}

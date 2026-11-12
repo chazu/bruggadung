@@ -1002,9 +1002,13 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
   till it is sown again. (VIL d5)
 - **Becoming**: `#Becoming`, what becomes something else when its time
   comes: it keeps so long once made (`keepsFor`; 0: it keeps), or its time
-  (`becomesAt`) is set by what starts it (cooking; laying a hide in the
-  tan); then it is its `becomes`, as heavy, where it was, its end recorded
-  as its `ending`. Read in closed form, never stepped: the perishing
+  (`becomesAt`) is set by what starts it (cooking); then it is its
+  `becomes`, as heavy, where it was, its end recorded
+  as its `ending`. Where it lies may give it another **course**: `within`
+  a kind of container it keeps `keepsWithin`, becomes its `becomesWithin`,
+  and ends as its `endingWithin`; its time starts over when it comes to
+  lie there, and when it is taken out. Read in closed form, never
+  stepped: the perishing
   domain's, for all of it. Its uses: **perishable** things, and hides
   **tanning**. Not a **progression**. (VIL d8, lab/content/perishing/)
 - **Perishable**: `#Perishable`, good for so long after it was made,
@@ -1073,10 +1077,13 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
   picking up, butchering, a purchase), goes into a pack its taker carries
   if it fits, else into a free hand. (VIL d11)
 - **Hide**: what is left of a carcass besides its meat (`#Hide`): leather
-  to be, carried home in a pack, else left lying. It keeps, raw. (VIL d7)
+  to be, carried home in a pack, else left lying. Raw, it rots in five
+  days (a **rotten hide**, which rots away as spoiled food does); in a
+  tan pit, it tans. (VIL d7)
 - **Tanning**: a hide laid in the tan (`steep`) in a **tan pit**
-  (`#TanPit`, a container) is the pit's owners', and **leather** six days
-  after (its `tansIn`): a **becoming**. **Leather** (`#Leather`) is a
+  (`#TanPit`, a container) is the pit's owners', and **leather** after
+  six days in it: a **becoming**, on the course a hide has within a tan
+  pit. Taken out early it is a raw hide again, its tanning lost. **Leather** (`#Leather`) is a
   stack, by the piece. **Dressing hides** is the work: a look into the
   pit, the leather there drawn out and put by, each hide kept laid in.
   *Avoid:* curing. (VIL d7, lab/content/tanning/)

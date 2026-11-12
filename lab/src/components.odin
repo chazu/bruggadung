@@ -1,17 +1,22 @@
-// Generated from Triangle content 47aaa9a7aafa5f31: do not edit. Type IDs are valid
+// Generated from Triangle content bf3f9bcb0af1ed9e: do not edit. Type IDs are valid
 // only for this content; regenerate when it changes.
 package lab
 
 import tri "../../triangle/odin/triangle"
 
-CONTENT_HASH :: 0x47aaa9a7aafa5f31
+CONTENT_HASH :: 0xbf3f9bcb0af1ed9e
 
 // Becoming, from #Becoming
 Becoming :: struct {
 	becomes: cstring,    // text; content, saved, inspect
 	becomesAt: i64,    // time, in quanta of 1ms; saved, proposable, inspect
+	becomesWithin: cstring,    // text; content, saved, inspect
 	ending: cstring,    // text; content, saved, inspect
+	endingWithin: cstring,    // text; content, saved, inspect
 	keepsFor: i64,    // time, in quanta of 1ms; content, saved, inspect
+	keepsWithin: i64,    // time, in quanta of 1ms; content, saved, inspect
+	liesWithin: bool,    // bool; saved, proposable, inspect
+	within: cstring,    // text; content, saved, inspect
 }
 
 // Combustor, from #Combustor
@@ -409,11 +414,6 @@ Water_Store :: struct {
 	waterCapacity: i64,    // volume, in quanta of 1mL; content, saved, inspect, perceive(sight)
 }
 
-// Hide, from #Hide
-Hide :: struct {
-	tansIn: i64,    // time, in quanta of 1ms; content, saved, inspect
-}
-
 // Carcass, from #Carcass
 Carcass :: struct {
 	cuts: i64,    // int, in quanta of 1; content, saved, inspect
@@ -427,81 +427,81 @@ Fastener :: struct {
 }
 
 // #ActivityStatus
-ACTIVITYSTATUS_ABORTED :: 1033
-ACTIVITYSTATUS_COMPLETED :: 1034
-ACTIVITYSTATUS_EXHAUSTED :: 1035
-ACTIVITYSTATUS_FAILED :: 1036
-ACTIVITYSTATUS_RUNNING :: 1037
-ACTIVITYSTATUS_SUSPENDED :: 1038
+ACTIVITYSTATUS_ABORTED :: 1035
+ACTIVITYSTATUS_COMPLETED :: 1036
+ACTIVITYSTATUS_EXHAUSTED :: 1037
+ACTIVITYSTATUS_FAILED :: 1038
+ACTIVITYSTATUS_RUNNING :: 1039
+ACTIVITYSTATUS_SUSPENDED :: 1040
 
 // #Tie
-TIE_EMPLOY :: 1120
-TIE_FRIEND :: 1121
-TIE_KIN :: 1122
-TIE_SWORN :: 1123
+TIE_EMPLOY :: 1122
+TIE_FRIEND :: 1123
+TIE_KIN :: 1124
+TIE_SWORN :: 1125
 
 // #ClaimKind
-CLAIMKIND_CUSTODY :: 1040
-CLAIMKIND_KEEPING :: 1041
-CLAIMKIND_OWNERSHIP :: 1042
-CLAIMKIND_RESERVATION :: 1043
+CLAIMKIND_CUSTODY :: 1042
+CLAIMKIND_KEEPING :: 1043
+CLAIMKIND_OWNERSHIP :: 1044
+CLAIMKIND_RESERVATION :: 1045
 
 // #Penalty
-PENALTY_FINE :: 1106
-PENALTY_ARREST :: 1139
-PENALTY_CONFISCATE :: 1140
+PENALTY_FINE :: 1108
+PENALTY_ARREST :: 1141
+PENALTY_CONFISCATE :: 1142
 
 // #Wrong
-WRONG_ANOTHERS :: 1131
-WRONG_UNAUTHORIZED :: 1132
+WRONG_ANOTHERS :: 1133
+WRONG_UNAUTHORIZED :: 1134
 
 // #Material
-MATERIAL_CLOTH :: 1085
-MATERIAL_EARTH :: 1086
-MATERIAL_FOOD :: 1087
-MATERIAL_LEATHER :: 1088
-MATERIAL_GRAIN :: 1090
-MATERIAL_ROT :: 1091
-MATERIAL_RUBBER :: 1092
-MATERIAL_STONE :: 1093
-MATERIAL_TURNIP :: 1094
-MATERIAL_WICKER :: 1095
-MATERIAL_FLESH :: 1142
-MATERIAL_BRASS :: 1144
-MATERIAL_IRON :: 1145
-MATERIAL_PAPER :: 1146
-MATERIAL_STEEL :: 1147
-MATERIAL_BIRCH :: 1149
-MATERIAL_OAK :: 1150
+MATERIAL_CLOTH :: 1087
+MATERIAL_EARTH :: 1088
+MATERIAL_FOOD :: 1089
+MATERIAL_LEATHER :: 1090
+MATERIAL_GRAIN :: 1092
+MATERIAL_ROT :: 1093
+MATERIAL_RUBBER :: 1094
+MATERIAL_STONE :: 1095
+MATERIAL_TURNIP :: 1096
+MATERIAL_WICKER :: 1097
+MATERIAL_FLESH :: 1144
+MATERIAL_BRASS :: 1146
+MATERIAL_IRON :: 1147
+MATERIAL_PAPER :: 1148
+MATERIAL_STEEL :: 1149
+MATERIAL_BIRCH :: 1151
+MATERIAL_OAK :: 1152
 
 // "flesh" | "metal" | "natural" | "paper" | "wood"
 BODY_SURFACE_NATURAL :: 758
-BODY_SURFACE_FLESH :: 1142
-BODY_SURFACE_BRASS :: 1144
-BODY_SURFACE_IRON :: 1145
-BODY_SURFACE_PAPER :: 1146
-BODY_SURFACE_STEEL :: 1147
-BODY_SURFACE_BIRCH :: 1149
-BODY_SURFACE_OAK :: 1150
+BODY_SURFACE_FLESH :: 1144
+BODY_SURFACE_BRASS :: 1146
+BODY_SURFACE_IRON :: 1147
+BODY_SURFACE_PAPER :: 1148
+BODY_SURFACE_STEEL :: 1149
+BODY_SURFACE_BIRCH :: 1151
+BODY_SURFACE_OAK :: 1152
 
 // #Colour
-COLOUR_BLUE :: 1046
-COLOUR_BLACK :: 1048
-COLOUR_BROWN :: 1049
-COLOUR_GREEN :: 1050
-COLOUR_GREY :: 1051
-COLOUR_BEIGE :: 1053
-COLOUR_NAVY :: 1054
-COLOUR_ORANGE :: 1055
-COLOUR_PURPLE :: 1056
-COLOUR_RED :: 1057
-COLOUR_WHITE :: 1058
-COLOUR_YELLOW :: 1059
+COLOUR_BLUE :: 1048
+COLOUR_BLACK :: 1050
+COLOUR_BROWN :: 1051
+COLOUR_GREEN :: 1052
+COLOUR_GREY :: 1053
+COLOUR_BEIGE :: 1055
+COLOUR_NAVY :: 1056
+COLOUR_ORANGE :: 1057
+COLOUR_PURPLE :: 1058
+COLOUR_RED :: 1059
+COLOUR_WHITE :: 1060
+COLOUR_YELLOW :: 1061
 
 // "bare" | "ripe" | "sown"
 PLOT_STANDS_BARE :: 455
 PLOT_STANDS_RIPE :: 844
-PLOT_STANDS_SOWN :: 883
+PLOT_STANDS_SOWN :: 885
 
 // The field registry: what code needs to read and write any component
 // generically.
@@ -529,13 +529,18 @@ Component_Info :: struct {
 	fields:  [^]Field_Info,
 }
 
-COMPONENT_COUNT :: 51
+COMPONENT_COUNT :: 50
 
 @(rodata) Becoming_fields := [?]Field_Info{
 	{"becomes", offset_of(Becoming, becomes), VALUE_TEXT, "text", "content, saved, inspect"},
 	{"becomesAt", offset_of(Becoming, becomesAt), VALUE_QUANTITY, "time", "saved, proposable, inspect"},
+	{"becomesWithin", offset_of(Becoming, becomesWithin), VALUE_TEXT, "text", "content, saved, inspect"},
 	{"ending", offset_of(Becoming, ending), VALUE_TEXT, "text", "content, saved, inspect"},
+	{"endingWithin", offset_of(Becoming, endingWithin), VALUE_TEXT, "text", "content, saved, inspect"},
 	{"keepsFor", offset_of(Becoming, keepsFor), VALUE_QUANTITY, "time", "content, saved, inspect"},
+	{"keepsWithin", offset_of(Becoming, keepsWithin), VALUE_QUANTITY, "time", "content, saved, inspect"},
+	{"liesWithin", offset_of(Becoming, liesWithin), VALUE_BOOL, "bool", "saved, proposable, inspect"},
+	{"within", offset_of(Becoming, within), VALUE_TEXT, "text", "content, saved, inspect"},
 }
 @(rodata) Combustor_fields := [?]Field_Info{
 	{"burnRate", offset_of(Combustor, burnRate), VALUE_QUANTITY, "int", "content, saved, inspect"},
@@ -838,9 +843,6 @@ COMPONENT_COUNT :: 51
 	{"water", offset_of(Water_Store, water), VALUE_QUANTITY, "volume", "content, saved, proposable, inspect, perceive(sight)"},
 	{"waterCapacity", offset_of(Water_Store, waterCapacity), VALUE_QUANTITY, "volume", "content, saved, inspect, perceive(sight)"},
 }
-@(rodata) Hide_fields := [?]Field_Info{
-	{"tansIn", offset_of(Hide, tansIn), VALUE_QUANTITY, "time", "content, saved, inspect"},
-}
 @(rodata) Carcass_fields := [?]Field_Info{
 	{"cuts", offset_of(Carcass, cuts), VALUE_QUANTITY, "int", "content, saved, inspect"},
 	{"hide", offset_of(Carcass, hide), VALUE_TEXT, "text", "content, saved, inspect"},
@@ -851,7 +853,7 @@ COMPONENT_COUNT :: 51
 }
 
 COMPONENTS := [COMPONENT_COUNT + 1]Component_Info{
-	{"Becoming", "#Becoming", size_of(Becoming), 4, &Becoming_fields[0]},
+	{"Becoming", "#Becoming", size_of(Becoming), 9, &Becoming_fields[0]},
 	{"Combustor", "#Combustor", size_of(Combustor), 3, &Combustor_fields[0]},
 	{"FuelContainer", "#FuelContainer", size_of(Fuel_Container), 1, &Fuel_Container_fields[0]},
 	{"GasStore", "#GasStore", size_of(Gas_Store), 8, &Gas_Store_fields[0]},
@@ -899,7 +901,6 @@ COMPONENTS := [COMPONENT_COUNT + 1]Component_Info{
 	{"Trunk", "#Trunk", size_of(Trunk), 1, &Trunk_fields[0]},
 	{"Valve", "#Valve", size_of(Valve), 3, &Valve_fields[0]},
 	{"WaterStore", "#WaterStore", size_of(Water_Store), 2, &Water_Store_fields[0]},
-	{"Hide", "#Hide", size_of(Hide), 1, &Hide_fields[0]},
 	{"Carcass", "#Carcass", size_of(Carcass), 3, &Carcass_fields[0]},
 	{"Fastener", "#Fastener", size_of(Fastener), 1, &Fastener_fields[0]},
 	{},

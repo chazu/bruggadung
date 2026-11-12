@@ -87,7 +87,7 @@ body_kind_react_to_event :: proc(self: ^Body_Kind, committer: ^Committer, event:
 		tf := (^Becoming)(world_record(world, food, here[i]))
 		if mf != nil && tf != nil {
 			now := world_time(world).ms
-			mine, theirs := perishing_spoils_at(mf, now), perishing_spoils_at(tf, now)
+			mine, theirs := perishing_time_of(world, event.subject, mf, now), perishing_time_of(world, here[i], tf, now)
 			a, b := max(world_mass_of(world, event.subject), 0), max(world_mass_of(world, here[i]), 0)
 			if mine > 0 && theirs > 0 && a + b > 0 {
 				at := (mine * a + theirs * b) / (a + b)

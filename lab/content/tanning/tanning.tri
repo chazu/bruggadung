@@ -3,9 +3,9 @@
 //
 // Cut points:
 // - full:     a hide in hand is laid in a tan pit in reach (`steep`): ten
-//             minutes, and it lies in the pit, the pit's owners'. So long
-//             after (its `tansIn`, six days), it is leather, as heavy,
-//             where it lies. Whoever dresses its household's hides (a
+//             minutes, and it lies in the pit, the pit's owners'. Six
+//             days in the pit (its `keepsWithin`), it is leather, as
+//             heavy, where it lies. Whoever dresses its household's hides (a
 //             commitment, bound to the pit and to where hides and leather
 //             are kept) looks into the pit, draws out the leather it
 //             finds there and puts it by, and takes each hide from where
@@ -15,11 +15,12 @@
 // - abstract: as reduced.
 // - frozen:   nobody lays a hide in; one in the tan becomes leather all
 //             the same.
-// - becoming: a hide is something that becomes (perishing/'s #Becoming):
-//             it keeps, and its time is set by laying it in the tan.
-//             Taken out early, it becomes leather at its time all the
-//             same: a shortcut. Bark, water and lime are left out, and a
-//             raw hide never rots.
+// - becoming: a hide is something that becomes (perishing/'s #Becoming),
+//             on two courses: raw, it rots; in a tan pit, it tans. The
+//             pit does it, not the laying in: a hide put in by any move
+//             tans, and one taken out early is a raw hide again, its
+//             tanning lost, and rots from then. Bark, water and lime are
+//             left out.
 // - perception: that a hide has become leather is seen by looking into
 //             the pit, as anything in a container is.
 // - hunting:  a hide is what is left of a carcass (hunting/butchering.tri);
@@ -27,8 +28,10 @@
 // - village:  the Hunts' pit, by their woodpile, and who dresses the hides
 //             and when, are the scenario's (src/scenario_village.odin).
 //             Nobody buys leather yet, or makes anything of it.
-// - code:     none of its own: laying in the tan is declared; becoming
-//             leather is the perishing domain's (src/domains_perishing.odin).
+// - code:     none of its own: laying in the tan is declared (a move);
+//             a hide's time in the pit and out of it, and its becoming
+//             leather, are the perishing domain's
+//             (src/domains_perishing.odin).
 
 package tanning
 
@@ -39,13 +42,6 @@ tan_pit_seen: #Seen & { kindOf: "#TanPit" } @family(seen)
 
 tan_pit: #TanPit & { material: "oak", mass: 60kg, capacity: 30 }
 
-// A hide tans: it becomes its leather so long (`tansIn`) after it is laid
-// in the tan.
-hunting.#Hide: {
-    @component(Hide)
-    tansIn: *6d | time & >=1h & <=100d @field(content, saved, inspect)
-}
-
 // Leather, by the piece: a stack, so pieces of a kind put by are one.
 #Leather: #Stack & {}
 
@@ -55,19 +51,17 @@ deer_leather: #Leather & { material: "leather", unit: "deer leather", unitMass: 
 hare_leather: #Leather & { material: "leather", unit: "hare leather", unitMass: 300g, count: 1 }
 
 // Lay a hide in hand in the tan, in a pit in reach: ten minutes, with the
-// hands. It is the pit's owners' from then, and leather `tansIn` after.
-// One laid in the tan already isn't laid in again.
+// hands. It is the pit's owners' from then. What the pit makes of it is
+// the hide's to say (hunting/butchering.tri).
 steep: #Operation & {
     duration: 600s
     uses:     ["hands"]
     roles: {
         actor:       #Agent & { id: $a }
-        item:        #Hide & { id: $i, tansIn: $t, becomesAt: 0ms, place: #Held & { by: $a } }
+        item:        #Hide & { id: $i, place: #Held & { by: $a } }
         destination: #TanPit & { id: $p }
     }
-    now:   $now
     moves: [#Moves & { moved: $i, into: #Inside & { container: $p }, passes: true }]
-    after: { item: #Hide & { becomesAt: $now + $t } }
 } @family(operations)
 
 // Dressing hides: the pit, where hides and leather are kept (`store`: a
