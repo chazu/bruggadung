@@ -3769,6 +3769,7 @@ ALL_TESTS := [?]Test_Case{
 	{"deals",                         test_deals},
 	{"asking_in_the_village",        test_asking_in_the_village},
 	{"where_neighbours_live",        test_where_neighbours_live},
+	{"never_came_home",              test_never_came_home},
 	{"foraging",                      test_foraging},
 	{"goal_done_beneath",             test_goal_done_beneath},
 	{"eats_what_keeps_least",         test_eats_what_keeps_least},

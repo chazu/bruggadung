@@ -46,6 +46,7 @@ BG_REPAID      :: 3                       /* trust gained in one who repays */
 BG_COIN_TENTHS :: 25                      /* what a coin is worth, in tenths of a point: a portion of grain is four */
 BG_ASK_FRESH   :: i64(60000)              /* ms: one seen no longer ago than this is gone to where it is */
 BG_ASK_WAIT    :: i64(600000)             /* ms: waiting at someone's house for them to come home, it looks again so often */
+BG_ASK_WAITS   :: i64(3600000)            /* ms: and waits an hour at most, then counts them asked */
 BG_ASK_HOME    :: i32(8)                  /* tiles: as near as what is its own must be for it to give from it (at home) */
 
 Deal_Kind :: enum u8 {
@@ -70,6 +71,7 @@ Talk_State :: enum u8 {
 	Agreed,
 	Ended,
 	None_Like,               /* asked, the other had nothing like it */
+	Waiting,                 /* the asker's: at their house, for them to come home */
 }
 
 /* A negotiation the agent is in, as the asker or the one asked. */
@@ -613,7 +615,7 @@ agency_add_talk :: proc(m: ^Motivation, t: Talk) {
 	if m.ntalks == BG_MAX_TALKS {
 		/* the oldest that is over makes room, else the oldest */
 		k: i32 = 0
-		for i: i32 = 0; i < m.ntalks; i += 1 do if m.talks[i].state != .Open && m.talks[i].state != .Agreed { k = i; break }
+		for i: i32 = 0; i < m.ntalks; i += 1 do if m.talks[i].state != .Open && m.talks[i].state != .Agreed && m.talks[i].state != .Waiting { k = i; break }
 		copy(m.talks[k:m.ntalks - 1], m.talks[k + 1:m.ntalks])
 		m.ntalks -= 1
 	}
@@ -705,6 +707,20 @@ agency_ask :: proc(self: ^Agency, m: ^Motivation, top: ^Intention, store: ^Knowl
 			t.state = .Ended
 		}
 	}
+	/* the one it waits for at their house, an hour at most: two waiting at
+	 * each other's houses would wait for good */
+	waited: ^Talk = nil
+	for &t in m.talks[:m.ntalks] {
+		if !t.asking || t.goal != top.goal || t.state != .Waiting do continue
+		if t.since < top.adopted {
+			t.state = .Ended
+		} else if now - t.since >= BG_ASK_WAITS {
+			t.state = .Ended
+			agency_note(self, m, fmt.tprintf("R%d never came home", t.with))
+		} else if pick == 0 {
+			pick, want, waited = t.with, t.want, &t
+		}
+	}
 	if pick == 0 {
 		if asked >= BG_ASK_PEOPLE do return false, false
 		pick = agency_whom_to_ask(self, m, store, me, top, wants[0])
@@ -728,11 +744,16 @@ agency_ask :: proc(self: ^Agency, m: ^Motivation, top: ^Intention, store: ^Knowl
 			agency_walk(self, m, fmt.tprintf("%s, at R%d's", why, pick), me, home, store, 1)
 			return true, true
 		}
-		if !m.waiting do agency_note(self, m, fmt.tprintf("%s: waiting at R%d's for R%d to come home", why, pick, pick))
+		if waited == nil {
+			agency_note(self, m, fmt.tprintf("%s: waiting at R%d's for R%d to come home", why, pick, pick))
+			agency_add_talk(m, Talk{with = pick, asking = true, state = .Waiting, goal = top.goal,
+			                        what = world_intern(self.world, ns_utf8(wants[want])), units = 1, want = want, since = now})
+		}
 		if m.wake <= now || m.wake > now + BG_ASK_WAIT do m.wake = now + BG_ASK_WAIT
 		m.waiting = true
 		return true, true
 	}
+	if waited != nil do waited.state = .Ended       /* come home: asked now */
 	arena := tri.arena_new()
 	defer tri.arena_free(arena)
 	what := tri.value(tc, ns_utf8(wants[want]), arena, nil, 0)

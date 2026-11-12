@@ -1,6 +1,7 @@
 package lab
 
 import "core:fmt"
+import "core:strings"
 
 /*
  * Asking and negotiation (NEGOTIATION.md, content/deals/): Ada, hungry past
@@ -342,4 +343,61 @@ test_where_neighbours_live :: proc() {
 		for line in agency_log_of(agency, bo) do fmt.printf("      Bo  %s\n", line)
 	}
 	bg_check(went && asked && given)
+}
+
+
+/*
+ * Waiting at a neighbour's house is for an hour at most (NEGOTIATION.md
+ * decision 3): Bo is away and stays away. Ada, hungry with nothing at
+ * home, goes to his house and waits; after the hour she counts him asked,
+ * for that goal, and with nobody else to ask finds eating impossible for
+ * now. Two hungry
+ * neighbours waiting at each other's houses waited for good.
+ */
+test_never_came_home :: proc() {
+	why: string
+
+	w := test_world(125)
+	bg_check(world_set_terrain_map(w, "village_map", &why))
+	c := test_committer(w)
+	committer_set_tracing(c, false)
+	activities := activities_with_world(w, c)
+	knowledge  := autorelease(knowledge_init_with_world(w))
+	agency     := autorelease(agency_init_with_world(w, c, knowledge))
+	s          := autorelease(scheduler_init_with_world(w, c))
+	agency_set_activities(agency, activities)
+	scheduler_set_activities(s, activities_as_activity_clock(activities))
+	scheduler_set_perception(s, knowledge_as_perception_phase(knowledge))
+	scheduler_set_decision(s, agency_as_decision_phase(agency))
+
+	g      := proposal_group_group_with_phase(.System, "setup: Ada hungry at home, Bo far from his")
+	ada    := proposal_group_create(g, "farmer", "Ada", on_tile(20, 70, 0))
+	bo     := proposal_group_create(g, "farmer", "Bo", on_tile(70, 70, 0))
+	herBed := proposal_group_create(g, "bed", "Ada's bed", on_tile(20, 69, 0))
+	hisBed := proposal_group_create(g, "bed", "Bo's bed", on_tile(36, 69, 0))
+	for own in ([][2]Entity_ID{{ada, herBed}, {bo, hisBed}}) {
+		claim := proposal_group_create(g, "ownership", "its own", location_make_none())
+		proposal_group_set_of_to(g, "Claim.quantity", whole(claim), 1)
+		proposal_group_relate(g, .Claimant, whole(claim), whole(own[0]))
+		proposal_group_relate(g, .Claim_Subject, whole(claim), whole(own[1]))
+	}
+	proposal_group_set_of_to(g, "Hungry.satiety", whole(ada), 0)
+	committer_submit(c, g)
+	scheduler_run_until(s, time_make(3000))
+	ada = proposal_group_id_for(g, ada)
+
+	agency_control(agency, ada)
+	scheduler_run_until(s, time_make(world_time(w).ms + 30 * 60000))
+	waited := test_logged_by(agency, ada, "to come home")
+	early  := test_logged_by(agency, ada, "never came home")
+	scheduler_run_until(s, time_make(world_time(w).ms + 60 * 60000))
+	gaveUp := test_logged_by(agency, ada, "never came home")
+	scheduler_run_until(s, time_make(world_time(w).ms + 120 * 60000))
+	log  := agency_log_of(agency, ada)
+	over := len(log) != 0 && strings.contains(log[len(log) - 1], "impossible for now")
+	if !waited || early || !gaveUp || !over {
+		fmt.printf("    waited: %v, early: %v, gave up: %v, over: %v\n", waited, early, gaveUp, over)
+		for line in log do fmt.printf("      Ada %s\n", line)
+	}
+	bg_check(waited && !early && gaveUp && over)
 }

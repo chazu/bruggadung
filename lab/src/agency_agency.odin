@@ -3986,7 +3986,9 @@ agency_decide :: proc(self: ^Agency, m: ^Motivation) -> bool {
 	store        := knowledge_store_of(self.knowledge, m.agent)
 	me           := knowledge_store_referent(store, knowledge_store_self_referent(store))
 	self.deciding = m
-	if m.wake != 0 && m.wake <= world_time(self.world).ms do m.wake = 0
+	/* a wake it set has come: waiting, it looks again with no news */
+	woke := m.wake != 0 && m.wake <= world_time(self.world).ms
+	if woke do m.wake = 0
 	if me == nil || m.handedBack do return true
 	agency_hear_questions(self, m, store)
 	agency_consider_questions(self, m, store)
@@ -4033,7 +4035,7 @@ agency_decide :: proc(self: ^Agency, m: ^Motivation) -> bool {
 		return true
 	}
 	if m.nintentions == 0 || busy do return true     /* mid-activity, or nothing to do: no cost */
-	if m.waiting && len(knowledge_store_news(store)) == 0 do return true
+	if m.waiting && !woke && len(knowledge_store_news(store)) == 0 do return true
 	m.waiting = false
 	m.decisions += 1
 	self.deliberations += 1

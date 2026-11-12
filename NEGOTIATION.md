@@ -55,7 +55,8 @@ goal's methods. They stay as they are; what this document adds is general.
    now, it walks to them, wherever it meets them; else to their house
    (where it has seen them keep things, or their bed: in the village,
    common knowledge, KNOWLEDGE.md decision 27), and waits there for them
-   to come home.
+   to come home, an hour at most: then it counts them asked. Two hungry
+   neighbours each waiting at the other's house waited for good.
 4. **Every asking is a negotiation over a deal.** The ask (`#Ask`) says
    what is wanted, how many, the deal the asker proposes, and the need it
    is for. A deal is one of:
