@@ -18,7 +18,9 @@
 //             as it was.
 // - cooking:  meat is raw food; in a larder it merges with meat already
 //             there, as grain does.
-// - code:     effect_butcher (src/act_actions.odin).
+// - code:     none: butchering is declared (so many cuts made, gathered
+//             into one stack; actions.tri's `makes`). A carcass with no
+//             hide isn't butchered: all have one.
 
 package hunting
 
@@ -60,12 +62,14 @@ hare_pelt: #Hide & { material: "leather", mass: 300g }
 // Butcher a carcass in reach, a hand free: half an hour, with the hands;
 // the meat into a pack the butcher carries if it fits, else the free hand.
 butcher: #Operation & {
-    effect:   "butcher"
     duration: 30min
     stow:     true
     uses:     ["hands"]
     roles: {
-        actor: #Agent & { freeHands: >=1 }
-        item:  #Carcass
+        actor: #Agent & { id: $a, freeHands: >=1 }
+        item:  #Carcass & { id: $c, yields: $y, cuts: $n & >=1, hide: $h, place: $p }
     }
+    makes:    [{ blueprint: $y, many: $n, at: #Held & { by: $a }, called: "meat" },
+               { blueprint: $h, at: $p, called: "a hide" }]
+    consumes: [{ consumed: $c, because: "butchered" }]
 } @family(operations)

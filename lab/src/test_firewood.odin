@@ -36,16 +36,19 @@ test_firewood :: proc() {
 	scheduler_run_until(s, time_make(world_time(w).ms + 1200 * 1000 + 1))
 	bg_check(!world_is_live(w, tree))
 	trunk := test_entity_at(w, "birch_trunk", 60, 20)
-	bg_check(trunk != NO_ENTITY && world_get_field(w, "Trunk.lengths", trunk, &lengths) && lengths == 3)
+	bg_check(trunk != NO_ENTITY && world_get_field(w, "Log.lengths", trunk, &lengths) && lengths == 3)
 
 	/* bucked twice: two logs, the trunk one length; a third time, it is cut
 	 * through, the last log */
 	for k in 0 ..< 3 {
 		error = ""
-		if perform(w, c, action_make("buck", me, axe, trunk), 0, &error) == nil do fmt.printf("    buck %d: %s\n", k, error)
+		/* the last length isn't bucked: it is cut through */
+		if k == 2 do bg_check(perform(w, c, action_make("buck", me, axe, trunk), 0, &error) == nil)
+		error = ""
+		if perform(w, c, action_make("buck" if k < 2 else "cut_through", me, axe, trunk), 0, &error) == nil do fmt.printf("    buck %d: %s\n", k, error)
 		scheduler_run_until(s, time_make(world_time(w).ms + 360 * 1000))      /* a little slower, worn by the felling */
 	}
-	bg_check(world_get_field(w, "Trunk.lengths", trunk, &lengths) && lengths == 1)
+	bg_check(world_get_field(w, "Log.lengths", trunk, &lengths) && lengths == 1)
 	bg_check(world_get_field(w, "Log.sawn", trunk, &v) && v == 100)
 	log := test_entity_at(w, "birch_log", 60, 20)
 	bg_check(log != NO_ENTITY && world_get_field(w, "Log.sawn", log, &v) && v == 100)

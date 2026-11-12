@@ -1544,7 +1544,6 @@ latent_role :: proc(content: ^tri.Content, schema: ^tri.Node, role: cstring) -> 
 }
 
 
-@(private = "file")
 int_feature :: proc(content: ^tri.Content, node: ^tri.Node, path: cstring, otherwise: i64) -> i64 {
 	lo: i64
 	hi: i64
@@ -2608,34 +2607,6 @@ effect_shoot :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) 
 }
 
 
-/* Butchering a carcass (content/hunting/butchering.tri): its meat, a stack
- * of so many cuts, in the butcher's free hand, or, stowing, a pack it
- * carries; its hide lying where it lay; the rest is waste. */
-@(private = "file")
-effect_butcher :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
-	cuts: i64
-	carcass := a.roles[.Item]
-	meat := world_text_field(world, "Carcass.yields", carcass)
-	hide := world_text_field(world, "Carcass.hide", carcass)
-	if meat == nil || len(meat) == 0 || !world_get_field(world, "Carcass.cuts", carcass, &cuts) do return "it is no carcass"
-	each := int_feature(world_tri(world), tri.pattern(world_tri(world), meat), "unitMass", 0)
-	place, ok := receiving(world, a.roles[.Actor], each * cuts, operation_stows(world, a.operation))
-	if !ok do return "no hand is free"
-	at := world_location_of(world, carcass)
-	/* a cut each, gathered into one stack: each made as its blueprint is,
-	 * so the count and the mass are declared */
-	into := NO_ENTITY
-	for _ in 0 ..< cuts {
-		cut := proposal_group_create(g, meat, "meat", place)
-		if into == NO_ENTITY do into = cut
-		else do proposal_group_merge(g, whole(cut), whole(into))
-	}
-	if hide != nil && len(hide) > 0 do proposal_group_create(g, hide, "a hide", at)
-	proposal_group_destroy(g, whole(carcass), "butchered")
-	return ""
-}
-
-
 /* An injury to a body (things.tri's #Agent), which it feels, and knows who
  * dealt (a "struck" event, a #Struck finding); at 100 it dies. */
 injure :: proc(world: ^World, g: ^Proposal_Group, victim: Entity_ID, by: Entity_ID, amount: i64) {
@@ -2714,174 +2685,6 @@ effect_pass :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -
 }
 
 
-/* Sawing's end: the log is sawn through. */
-@(private = "file")
-effect_saw :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
-	lengths, mass, unit_mass: i64
-
-	/* a trunk of more than one length: a length sawn off, a log of its own
-	 * (content/firewood/), and the trunk shorter, to saw again */
-	trunk := a.roles[.Destination]
-	if world_get_field(world, "Trunk.lengths", trunk, &lengths) && lengths > 1 {
-		cuts := world_text_field(world, "Trunk.cutsInto", trunk)
-		if cuts == nil || len(cuts) == 0 do return "it saws into nothing"
-		world_get_field(world, "Body.mass", trunk, &mass)
-		unit_mass = mass / lengths
-		/* the log is carved from the trunk, which is lighter by as much */
-		log := proposal_group_create(g, cuts, "a log sawn off", world_location_of(world, trunk))
-		proposal_group_relate(g, .Split_From, whole(log), whole(trunk))
-		proposal_group_set_of_to(g, "Trunk.lengths", whole(trunk), lengths - 1)
-		proposal_group_set_of_to(g, "Body.mass", whole(trunk), mass - unit_mass)
-		proposal_group_set_of_to(g, "Log.sawn", whole(trunk), 0)
-		return ""
-	}
-	proposal_group_set_of_to(g, "Log.sawn", whole(trunk), 100)
-	return ""
-}
-
-
-/* A blueprint's text field ("unit"), or "": a temporary string. */
-@(private = "file")
-blueprint_text :: proc(world: ^World, blueprint: cstring, field: cstring) -> string {
-	buf: [256]u8
-
-	tc      := world_tri(world)
-	pattern := tri.pattern(tc, blueprint)
-	v       := tri.at(tc, pattern, field) if pattern != nil else nil
-	if v == nil do return ""
-	tri.print(tc, v, raw_data(buf[:]), size_of(buf))
-	s := string(cstring(raw_data(buf[:])))
-	if len(s) < 2 || s[0] != '"' || s[len(s) - 1] != '"' do return ""
-	return strings.clone(s[1:len(s) - 1], context.temp_allocator)
-}
-
-
-/* Sowing a row (content/farming/): as many tiles of the bare plot as a row
- * has, or as the seed in hand or the plot have left, a unit of the seed to
- * each. The last row sown, the plot stands sown, growing from now. Two
- * sowing it at once can't both count on the rows they read: the second
- * fails. */
-@(private = "file")
-effect_sow :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
-	seed := a.roles[.Item]
-	at   := a.roles[.Destination]
-	plot := plot_of(world, at)
-	if plot == nil do return "it is no plot"
-	if plot.stands != plot_stands(world, "bare") do return "it is sown already"
-	sows  := world_text_field(world, "Seed.sows", seed)
-	grows := world_text_field(world, "Plot.grows", at)
-	if sows == nil || grows == nil || string(sows) != string(grows) do return "that seed doesn't sow it"
-	east, south := world_area_extent(world, at)
-	tiles := i64(east) * i64(south)
-	n     := min(i64(east), tiles - plot.sown, world_units_of(world, seed))
-	if n <= 0 do return "there is nothing to sow"
-	if plot.sown + n >= tiles {
-		proposal_group_set_of_to_expecting(g, "Plot.sown", whole(at), 0, plot.sown)
-		proposal_group_set_of_to(g, "Plot.stands", whole(at), i64(plot_stands(world, "sown")))
-		proposal_group_set_of_to(g, "Plot.sownAt", whole(at), world_time(world).ms)
-		if plot.kept do proposal_group_set_of_to(g, "Plot.kept", whole(at), 0)   /* seed kept from the next harvest */
-	} else {
-		proposal_group_set_of_to_expecting(g, "Plot.sown", whole(at), plot.sown + n, plot.sown)
-	}
-	if n >= world_units_of(world, seed) {
-		proposal_group_destroy(g, whole(seed), "sown")
-	} else {
-		proposal_group_destroy(g, whole(proposal_group_split(g, whole(seed), n, location_make_none())), "sown")
-	}
-	return ""
-}
-
-
-/* Keeping back seed (content/farming/): of a harvest in hand, a sack of
- * seed's worth (its `keptAs`, a blueprint) carved off as seed, as heavy,
- * into a pack or a free hand, or in its place if that is all of it; the
- * plot it is kept for marked, till it is sown again. */
-@(private = "file")
-effect_keep_seed :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
-	harvest, at := a.roles[.Item], a.roles[.Destination]
-	plot := plot_of(world, at)
-	if plot == nil do return "it is no plot"
-	if plot.kept do return "seed is kept for it already"
-	kept := world_text_field(world, "Food.keptAs", harvest)
-	if kept == nil || len(kept) == 0 do return "it is no seed"
-	tc := world_tri(world)
-	seed := tri.pattern(tc, kept)
-	mass := int_feature(tc, seed, "unitMass", 0) * int_feature(tc, seed, "count", 0)
-	units := world_units_of(world, harvest)
-	each := world_mass_of(world, harvest) / max(units, 1)
-	if mass <= 0 || each <= 0 || mass % each != 0 do return "it can't be kept as that seed"
-	k := mass / each
-	if k > units do return "there is too little of it"
-	part := whole(harvest)
-	place := world_location_of(world, harvest)
-	if k < units {
-		ok: bool
-		place, ok = receiving(world, a.roles[.Actor], mass, operation_stows(world, a.operation))
-		if !ok do return "no hand is free"
-		part = whole(proposal_group_split(g, whole(harvest), k, location_make_none()))
-	}
-	after := proposal_group_create(g, kept, "seed kept back", place)
-	proposal_group_relate(g, .Split_From, whole(after), part)
-	proposal_group_set_of_to(g, "Body.mass", part, 0)
-	proposal_group_destroy(g, part, "kept back as seed")
-	proposal_group_set_of_to(g, "Plot.kept", whole(at), 1)
-	return ""
-}
-
-
-/* Harvesting a row of a ripe plot (content/farming/): what its tiles yield
- * is in the harvester's hand, with a stack of the kind it holds already
- * (not one cooked), else in a free one. The last row reaped, the plot is bare. */
-@(private = "file")
-effect_harvest :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
-	held: [8]Entity_ID
-
-	at   := a.roles[.Item]
-	plot := plot_of(world, at)
-	if plot == nil do return "it is no plot"
-	if plot.stands != plot_stands(world, "ripe") do return "it isn't ripe"
-	yields := world_text_field(world, "Plot.yields", at)
-	if yields == nil || len(yields) == 0 do return "it yields nothing"
-	east, south := world_area_extent(world, at)
-	tiles := i64(east) * i64(south)
-	n     := min(i64(east), tiles - plot.reaped)
-	if n <= 0 do return "there is nothing to reap"
-	unit_ := blueprint_text(world, yields, "unit")
-	with  := NO_ENTITY
-	nheld := world_entities_at(world, a.roles[.Actor], .Held_By, raw_data(held[:]), 8)
-	for e in held[:nheld] {
-		u := world_unit_of(world, e)
-		raw: i64
-		if world_is_stack(world, e) && u != nil && string(u) == unit_ && with == NO_ENTITY &&
-		   (!world_get_field(world, "Food.raw", e, &raw) || raw != 0) {
-			with = e
-		}
-	}
-	where_: Location
-	if with != NO_ENTITY {
-		where_ = world_location_of(world, with)
-	} else {
-		hand := free_hand(world, a.roles[.Actor])
-		if hand < 0 do return "no hand is free"
-		where_ = held_by(a.roles[.Actor], hand)
-	}
-	/* a tile's yield each, gathered into one stack */
-	into := with
-	for _ in 0 ..< n {
-		got := proposal_group_create(g, yields, "a harvest", where_)
-		if into == NO_ENTITY do into = got
-		else do proposal_group_merge(g, whole(got), whole(into))
-	}
-	if plot.reaped + n >= tiles {
-		proposal_group_set_of_to_expecting(g, "Plot.reaped", whole(at), 0, plot.reaped)
-		proposal_group_set_of_to(g, "Plot.stands", whole(at), i64(plot_stands(world, "bare")))
-	} else {
-		proposal_group_set_of_to_expecting(g, "Plot.reaped", whole(at), plot.reaped + n, plot.reaped)
-	}
-	return ""
-}
-
-
 /* The region of air (a GasStore) over the entity's tile, or 0. */
 air_over :: proc(world: ^World, e: Entity_ID) -> Entity_ID {
 	at: Location
@@ -2935,9 +2738,6 @@ effects := [?]Named_Effect{
 	{"write",     effect_write},
 	{"read",      effect_read},
 	{"eat",       effect_eat},
-	{"sow",       effect_sow},
-	{"keep_seed", effect_keep_seed},
-	{"harvest",   effect_harvest},
 	{"investigate", effect_investigate},
 	{"rotate",    effect_rotate},
 	{"confiscate", effect_confiscate},
@@ -2946,7 +2746,6 @@ effects := [?]Named_Effect{
 	{"hit",       effect_hit},
 	{"hire",      effect_hire},
 	{"work",      effect_work},
-	{"saw",       effect_saw},
 	{"pass",      effect_pass},
 	{"copy",      effect_copy},
 	{"reveal",    effect_reveal},
@@ -2960,7 +2759,6 @@ effects := [?]Named_Effect{
 	{"crouch",    effect_crouch},
 	{"forage",    effect_forage},
 	{"shoot",     effect_shoot},
-	{"butcher",   effect_butcher},
 	{"shoulder",  effect_shoulder},
 }
 

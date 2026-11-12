@@ -1,10 +1,10 @@
-// Generated from Triangle content 29bfbd9091c5c461: do not edit. Type IDs are valid
+// Generated from Triangle content 4f1c6c980fcc443b: do not edit. Type IDs are valid
 // only for this content; regenerate when it changes.
 package lab
 
 import tri "../../triangle/odin/triangle"
 
-CONTENT_HASH :: 0x29bfbd9091c5c461
+CONTENT_HASH :: 0x4f1c6c980fcc443b
 
 // Combustor, from #Combustor
 Combustor :: struct {
@@ -65,6 +65,7 @@ Perishable :: struct {
 Food :: struct {
 	cooking: i64,    // int, in quanta of 1; content, saved, inspect
 	keptAs: cstring,    // text; content, saved, inspect
+	keptOf: i64,    // int, in quanta of 1; content, saved, inspect
 	mealKeepsFor: i64,    // time, in quanta of 1ms; content, saved, inspect
 	nourishment: i64,    // int, in quanta of 1; content, saved, proposable, inspect
 	raw: bool,    // bool; content, saved, proposable, inspect, perceive(sight)
@@ -292,6 +293,7 @@ Latent :: struct {
 Log :: struct {
 	finish: i64,    // int, in quanta of 1; content, saved, proposable, inspect, perceive(sight)
 	hardness: i64,    // int, in quanta of 1; content, saved, inspect
+	lengths: i64,    // int, in quanta of 1; content, saved, proposable, inspect, perceive(sight)
 	sawn: i64,    // int, in quanta of 1; content, saved, proposable, inspect, perceive(sight)
 	splitsInto: cstring,    // text; content, saved, inspect
 }
@@ -391,7 +393,6 @@ Tree :: struct {
 // Trunk, from #Trunk
 Trunk :: struct {
 	cutsInto: cstring,    // text; content, saved, inspect
-	lengths: i64,    // int, in quanta of 1; content, saved, proposable, inspect, perceive(sight)
 }
 
 // Valve, from #Valve
@@ -420,81 +421,81 @@ Fastener :: struct {
 }
 
 // #ActivityStatus
-ACTIVITYSTATUS_ABORTED :: 988
-ACTIVITYSTATUS_COMPLETED :: 989
-ACTIVITYSTATUS_EXHAUSTED :: 990
-ACTIVITYSTATUS_FAILED :: 991
-ACTIVITYSTATUS_RUNNING :: 992
-ACTIVITYSTATUS_SUSPENDED :: 993
+ACTIVITYSTATUS_ABORTED :: 1000
+ACTIVITYSTATUS_COMPLETED :: 1001
+ACTIVITYSTATUS_EXHAUSTED :: 1002
+ACTIVITYSTATUS_FAILED :: 1003
+ACTIVITYSTATUS_RUNNING :: 1004
+ACTIVITYSTATUS_SUSPENDED :: 1005
 
 // #Tie
-TIE_EMPLOY :: 1086
-TIE_FRIEND :: 1087
-TIE_KIN :: 1088
-TIE_SWORN :: 1089
+TIE_EMPLOY :: 1093
+TIE_FRIEND :: 1094
+TIE_KIN :: 1095
+TIE_SWORN :: 1096
 
 // #ClaimKind
-CLAIMKIND_CUSTODY :: 995
-CLAIMKIND_KEEPING :: 996
-CLAIMKIND_OWNERSHIP :: 997
-CLAIMKIND_RESERVATION :: 998
+CLAIMKIND_CUSTODY :: 1007
+CLAIMKIND_KEEPING :: 1008
+CLAIMKIND_OWNERSHIP :: 1009
+CLAIMKIND_RESERVATION :: 1010
 
 // #Penalty
-PENALTY_FINE :: 1072
-PENALTY_ARREST :: 1105
-PENALTY_CONFISCATE :: 1106
+PENALTY_FINE :: 1079
+PENALTY_ARREST :: 1112
+PENALTY_CONFISCATE :: 1113
 
 // #Wrong
-WRONG_ANOTHERS :: 1097
-WRONG_UNAUTHORIZED :: 1098
+WRONG_ANOTHERS :: 1104
+WRONG_UNAUTHORIZED :: 1105
 
 // #Material
-MATERIAL_CLOTH :: 1051
-MATERIAL_EARTH :: 1052
-MATERIAL_FOOD :: 1053
-MATERIAL_LEATHER :: 1054
-MATERIAL_GRAIN :: 1056
-MATERIAL_ROT :: 1057
-MATERIAL_RUBBER :: 1058
-MATERIAL_STONE :: 1059
-MATERIAL_TURNIP :: 1060
-MATERIAL_WICKER :: 1061
-MATERIAL_FLESH :: 1108
-MATERIAL_BRASS :: 1110
-MATERIAL_IRON :: 1111
-MATERIAL_PAPER :: 1112
-MATERIAL_STEEL :: 1113
-MATERIAL_BIRCH :: 1115
-MATERIAL_OAK :: 1116
+MATERIAL_CLOTH :: 1058
+MATERIAL_EARTH :: 1059
+MATERIAL_FOOD :: 1060
+MATERIAL_LEATHER :: 1061
+MATERIAL_GRAIN :: 1063
+MATERIAL_ROT :: 1064
+MATERIAL_RUBBER :: 1065
+MATERIAL_STONE :: 1066
+MATERIAL_TURNIP :: 1067
+MATERIAL_WICKER :: 1068
+MATERIAL_FLESH :: 1115
+MATERIAL_BRASS :: 1117
+MATERIAL_IRON :: 1118
+MATERIAL_PAPER :: 1119
+MATERIAL_STEEL :: 1120
+MATERIAL_BIRCH :: 1122
+MATERIAL_OAK :: 1123
 
 // "flesh" | "metal" | "natural" | "paper" | "wood"
-BODY_SURFACE_NATURAL :: 724
-BODY_SURFACE_FLESH :: 1108
-BODY_SURFACE_BRASS :: 1110
-BODY_SURFACE_IRON :: 1111
-BODY_SURFACE_PAPER :: 1112
-BODY_SURFACE_STEEL :: 1113
-BODY_SURFACE_BIRCH :: 1115
-BODY_SURFACE_OAK :: 1116
+BODY_SURFACE_NATURAL :: 734
+BODY_SURFACE_FLESH :: 1115
+BODY_SURFACE_BRASS :: 1117
+BODY_SURFACE_IRON :: 1118
+BODY_SURFACE_PAPER :: 1119
+BODY_SURFACE_STEEL :: 1120
+BODY_SURFACE_BIRCH :: 1122
+BODY_SURFACE_OAK :: 1123
 
 // #Colour
-COLOUR_BLUE :: 1001
-COLOUR_BLACK :: 1003
-COLOUR_BROWN :: 1004
-COLOUR_GREEN :: 1005
-COLOUR_GREY :: 1006
-COLOUR_BEIGE :: 1008
-COLOUR_NAVY :: 1009
-COLOUR_ORANGE :: 1010
-COLOUR_PURPLE :: 1011
-COLOUR_RED :: 1012
-COLOUR_WHITE :: 1013
-COLOUR_YELLOW :: 1014
+COLOUR_BLUE :: 1013
+COLOUR_BLACK :: 1015
+COLOUR_BROWN :: 1016
+COLOUR_GREEN :: 1017
+COLOUR_GREY :: 1018
+COLOUR_BEIGE :: 1020
+COLOUR_NAVY :: 1021
+COLOUR_ORANGE :: 1022
+COLOUR_PURPLE :: 1023
+COLOUR_RED :: 1024
+COLOUR_WHITE :: 1025
+COLOUR_YELLOW :: 1026
 
 // "bare" | "ripe" | "sown"
-PLOT_STANDS_BARE :: 443
-PLOT_STANDS_RIPE :: 807
-PLOT_STANDS_SOWN :: 842
+PLOT_STANDS_BARE :: 446
+PLOT_STANDS_RIPE :: 817
+PLOT_STANDS_SOWN :: 854
 
 // The field registry: what code needs to read and write any component
 // generically.
@@ -568,6 +569,7 @@ COMPONENT_COUNT :: 50
 @(rodata) Food_fields := [?]Field_Info{
 	{"cooking", offset_of(Food, cooking), VALUE_QUANTITY, "int", "content, saved, inspect"},
 	{"keptAs", offset_of(Food, keptAs), VALUE_TEXT, "text", "content, saved, inspect"},
+	{"keptOf", offset_of(Food, keptOf), VALUE_QUANTITY, "int", "content, saved, inspect"},
 	{"mealKeepsFor", offset_of(Food, mealKeepsFor), VALUE_QUANTITY, "time", "content, saved, inspect"},
 	{"nourishment", offset_of(Food, nourishment), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
 	{"raw", offset_of(Food, raw), VALUE_BOOL, "bool", "content, saved, proposable, inspect, perceive(sight)"},
@@ -745,6 +747,7 @@ COMPONENT_COUNT :: 50
 @(rodata) Log_fields := [?]Field_Info{
 	{"finish", offset_of(Log, finish), VALUE_QUANTITY, "int", "content, saved, proposable, inspect, perceive(sight)"},
 	{"hardness", offset_of(Log, hardness), VALUE_QUANTITY, "int", "content, saved, inspect"},
+	{"lengths", offset_of(Log, lengths), VALUE_QUANTITY, "int", "content, saved, proposable, inspect, perceive(sight)"},
 	{"sawn", offset_of(Log, sawn), VALUE_QUANTITY, "int", "content, saved, proposable, inspect, perceive(sight)"},
 	{"splitsInto", offset_of(Log, splitsInto), VALUE_TEXT, "text", "content, saved, inspect"},
 }
@@ -818,7 +821,6 @@ COMPONENT_COUNT :: 50
 }
 @(rodata) Trunk_fields := [?]Field_Info{
 	{"cutsInto", offset_of(Trunk, cutsInto), VALUE_TEXT, "text", "content, saved, inspect"},
-	{"lengths", offset_of(Trunk, lengths), VALUE_QUANTITY, "int", "content, saved, proposable, inspect, perceive(sight)"},
 }
 @(rodata) Valve_fields := [?]Field_Info{
 	{"breakaway", offset_of(Valve, breakaway), VALUE_QUANTITY, "torque", "content, saved, proposable, inspect"},
@@ -846,7 +848,7 @@ COMPONENTS := [COMPONENT_COUNT + 1]Component_Info{
 	{"Lever", "#Lever", size_of(Lever), 3, &Lever_fields[0]},
 	{"OfficeHolder", "#OfficeHolder", size_of(Office_Holder), 2, &Office_Holder_fields[0]},
 	{"Perishable", "#Perishable", size_of(Perishable), 3, &Perishable_fields[0]},
-	{"Food", "#Food", size_of(Food), 5, &Food_fields[0]},
+	{"Food", "#Food", size_of(Food), 6, &Food_fields[0]},
 	{"Respirator", "#Respirator", size_of(Respirator), 4, &Respirator_fields[0]},
 	{"Scribe", "#Scribe", size_of(Scribe), 1, &Scribe_fields[0]},
 	{"Seed", "#Seed", size_of(Seed), 1, &Seed_fields[0]},
@@ -871,7 +873,7 @@ COMPONENTS := [COMPONENT_COUNT + 1]Component_Info{
 	{"HandSaw", "#HandSaw", size_of(Hand_Saw), 1, &Hand_Saw_fields[0]},
 	{"Lamp", "#Lamp", size_of(Lamp), 4, &Lamp_fields[0]},
 	{"Latent", "#Latent", size_of(Latent), 9, &Latent_fields[0]},
-	{"Log", "#Log", size_of(Log), 4, &Log_fields[0]},
+	{"Log", "#Log", size_of(Log), 5, &Log_fields[0]},
 	{"Pack", "#Pack", size_of(Pack), 2, &Pack_fields[0]},
 	{"Part", "#Part", size_of(Part), 7, &Part_fields[0]},
 	{"Patch", "#Patch", size_of(Patch), 5, &Patch_fields[0]},
@@ -884,7 +886,7 @@ COMPONENTS := [COMPONENT_COUNT + 1]Component_Info{
 	{"Tap", "#Tap", size_of(Tap), 2, &Tap_fields[0]},
 	{"Trace", "#Trace", size_of(Trace), 8, &Trace_fields[0]},
 	{"Tree", "#Tree", size_of(Tree), 1, &Tree_fields[0]},
-	{"Trunk", "#Trunk", size_of(Trunk), 2, &Trunk_fields[0]},
+	{"Trunk", "#Trunk", size_of(Trunk), 1, &Trunk_fields[0]},
 	{"Valve", "#Valve", size_of(Valve), 3, &Valve_fields[0]},
 	{"WaterStore", "#WaterStore", size_of(Water_Store), 2, &Water_Store_fields[0]},
 	{"Carcass", "#Carcass", size_of(Carcass), 3, &Carcass_fields[0]},

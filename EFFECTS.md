@@ -139,7 +139,14 @@ Two terms are proposed, and have entries in GLOSSARY.md marked as such: a
     an edge to every portion it had ever owned. And units merged into a
     stack don't bring a second claim of its claimant's: an armful a
     farmer owns, put with the household's grain, would else leave the
-    stack claimed once more by each of them with every armful.
+    stack claimed once more by each of them with every armful. For the
+    same reason one unit, claimed alone by its owner, goes into a stack
+    that owner has a claim on already: a claim on a unit alone pinned it
+    whoever's it was, so every portion handed to one of a household lay
+    loose in its larder for good, and in three weeks a larder was full
+    of them (found when sawing, butchering and farming were declared:
+    the run shifted, and the hunters' larder filled on day 17). Another's
+    portion in one's sack still stays apart.
 
 ## The issue
 
@@ -380,9 +387,9 @@ done after: the first conversions use only the three there are.
    far: felling and splitting (firewood/: a thing made where the role
    was, by a tag on its `place`, and the role consumed) and lighting a
    stove (heat/, the topic's last procedure: fuel in it is now required
-   of the role, where the procedure refused). Sawing is left in
-   firewood/: a length cut off a trunk and a log cut through are two
-   cases of one named effect, to be two operations (decision 3).
+   of the role, where the procedure refused). Sawing was left in
+   firewood/ at first: a length cut off a trunk and a log cut through
+   were two cases of one named effect (declared since: below).
    Taking is declared, all six operations of it, with the stage of
    prying that marks the nail: an operation's `parameter` is the
    command's (how many, for `take_some`: `portion: $n`), and into a
@@ -407,6 +414,45 @@ done after: the first conversions use only the three there are.
    was written. Nothing is made: a board's writing is a field of the
    board. `write_down` stays named: it appends the command's entries to
    those the record holds, and content has no way to join two lists.
+   Sawing, butchering and farming are declared, five fewer named (30
+   left), and firewood/, hunting/'s butchering and farming/ have no
+   effect of their own in code:
+   - Sawing is two operations and a third (decision 3). `buck` cuts a
+     length off a trunk of two or more: a log made, carved from the trunk
+     (`splitFrom`), the trunk a length shorter and lighter by `$m / $n`.
+     `cut_through` is the trunk's last length cut through, with the axe;
+     `saw_through` (sawing/) a log of one length, with the saw. `lengths`
+     is the log's now (sawing/), 1 unless it is a trunk, so that sawing
+     through can say it is of a log of one length: a pattern can't say
+     "not a trunk". The named effect cut a length off a trunk with the
+     saw too; nothing does now, and nothing did in any scenario.
+   - A thing made can be `many`, gathered into one stack (a carcass's
+     cuts, a row's tiles), and `gathered` with a stack of the kind its
+     holder has already (the next row with the armful). Into a hand, a
+     made thing goes as a moved one does: a free hand, or, of an
+     operation that stows, a pack.
+   - A thing made `splitFrom` what the step consumes has its mass: the
+     consumed thing's is set to nothing before it goes, as `become` does
+     it, and the committer's conservation holds the two to be as heavy.
+     Keeping seed back is so: `keptOf` units of the harvest consumed
+     (`exact`, which `consumes` now knows as `moves` did), a sack of its
+     `keptAs` made of them. `keptOf` is new, on the food: the procedure
+     reckoned it from the seed's blueprint, which a pattern can't reach
+     by its name. If the two disagree, keeping back fails (mass is not
+     conserved). Kept back of the whole of a harvest, the seed now wants
+     a free hand or a pack, where the procedure left it in place.
+   - Sowing and harvesting count rows (`sown: $w + ...`, `reaped: $r +
+     $e`), and how the plot stands when the last is sown or reaped is
+     the plot's own: a reaction of the Plot kind to its count
+     (src/domains_farming.odin). The alternative by decision 3, a last
+     row as its own operation, needs the farmer to see how many tiles
+     are reaped, and a requirement that is an inequality over a product.
+     Sowing's row is `math.Min` of the row, the seed in hand and the
+     tiles left. Two sowing a plot at once both count now: the second's
+     set is stale, and is resolved again (step 3), where the procedure
+     failed it.
+   - A carcass with no hide isn't butchered (`hide: $h` must name a
+     blueprint); all have one.
    Left named, and why: `eat` (satiety and reserves are reckoned to the
    moment of eating from when the eater last ate; the truth projection
    gives the stored fields, so `after` cannot say them: it wants the

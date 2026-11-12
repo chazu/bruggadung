@@ -325,7 +325,11 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
   which resolves the operation against the truth projection. Its `changes`
   are coarse effects. Of a stack, a declared effect's **portion** is so
   many of its units: moved, they are split off and are that role from
-  then on. A move that `passes` hands on whose the thing is (**passing**). *Avoid:* data effect, effect as data (for the thing; "effects
+  then on. A move that `passes` hands on whose the thing is (**passing**).
+  It makes one of a blueprint, or so `many` gathered into one stack;
+  `gathered`, into a hand, with a stack of the kind held there already. A
+  thing made is **carved** from another (`splitFrom`) when its mass is
+  that one's: lowered by as much, or consumed. *Avoid:* data effect, effect as data (for the thing; "effects
   as data" names the idea). (EFFECTS.md)
 - **The five questions**: `formulate` (does it know the operation and
   have referents for the roles), `appearsBeginnable`, `expect`, `resolve`
@@ -601,8 +605,9 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
   neighbours' larders by where it is. Likewise a **woodpile**
   (`#Woodpile`). (VIL d3, lab/content/cooking/)
 - **Firewood**: split wood by the piece (a kilogram), a stack; stoked into
-  a stove, its fuel. A tree is **felled** into a **trunk**, **bucked** a
-  length at a time into **logs**, and a log **split** into firewood.
+  a stove, its fuel. A tree is **felled** into a **trunk**, a log of
+  several **lengths**, **bucked** a length at a time into **logs**, its
+  last length **cut through**, and a log **split** into firewood.
   (VIL d6, lab/content/firewood/firewood.tri)
 - **Commitment**: a goal an agent is bound to (a shift, a promise, a
   debt), with a window or deadline and an **urgency curve**. Not change
@@ -974,6 +979,8 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
 - **Plot**: tilled ground a household farms (`#Plot`): an **area**, known
   to an agent as a whole, by one referent. It **stands** bare, sown or
   ripe; it is sown and reaped a **row** (its width in tiles) at a time.
+  Sowing and harvesting count its rows; how it stands when the last is
+  sown or reaped is the plot's own (a reaction).
   *Avoid:* field (a component's field). (VIL d5)
 - **Crop**: what a plot grows, kept as the plot's state: sown a row at a
   time, growing from its last row, ripe after its growth, read lazily. Not
@@ -982,7 +989,7 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
   turnip seed), a unit to a tile, **kept back** in a larder. See *Words
   with more than one sense*. (VIL d5)
 - **Keep back seed**: carve a sack of seed from a harvest in hand, as
-  heavy (the food's `keptAs`), once a harvest; the plot is then **kept**
+  heavy (the food's `keptAs`, of `keptOf` units of it), once a harvest; the plot is then **kept**
   till it is sown again. (VIL d5)
 - **Perishable**: `#Perishable`, good for so long after it was made,
   then spoiled: food, a carcass, spoiled food itself. Food is perishable

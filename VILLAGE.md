@@ -122,9 +122,11 @@ things the lab put off:
      what it grows, how it **stands** (bare, sown, ripe), the tiles sown or
      reaped so far, and when its last row was sown. Sowing and harvesting
      go a row at a time; its growth runs from its last row, and it stands
-     ripe once grown: the plot's one wake. Two farmers working a plot at
-     once can't both count the same row: each sets its count expecting the
-     value it read, and the second's group fails.
+     ripe once grown: the plot's one wake. Sowing and harvesting count
+     rows; the last one counted, the plot stands sown, or bare: its own
+     reaction. Two farmers working a plot at once can't both count the
+     same row: each sets its count expecting the value it read, and the
+     second's, stale, is resolved again and counts the next.
    - Each household's tilled block is two plots: the Ashes' two of grain,
      the Brooks' grain and turnips. Each farmer tends one of them (a kept
      commitment, bound to the plot and the larder), so it carries one kind
@@ -138,8 +140,8 @@ things the lab put off:
    cold is felt, and `get_warm` lights the stove. All of that after
    stoking exists already.
    - Built (content/firewood/): the woodcutters work with an axe alone:
-     it fells, bucks a trunk a length at a time (`buck`, with sawing's
-     effect) and splits, so a hand is free for the firewood. Sawing with
+     it fells, bucks a trunk a length at a time (`buck`), cuts its last
+     length through (`cut_through`) and splits, so a hand is free for the firewood. Sawing with
      a saw in the other hand meant putting it down and taking it up, which
      ran in circles. Their work is a kept commitment to stock their
      woodpile, past more than a day's work; with no tree in sight they go

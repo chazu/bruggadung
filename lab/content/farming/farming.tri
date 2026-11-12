@@ -33,11 +33,14 @@
 //             its plots.
 // - village:  the plots, the seed in each larder, and who farms which are
 //             the scenario's (village/village.tri, src/scenario_village.odin).
-// - code:     effect_sow and effect_harvest (src/act_actions.odin), a row a
-//             time, each counting on the plot's rows as it read them (two
-//             at once, the second fails); the plots' growth and their wake
-//             (src/domains_farming.odin). Where a plot is seen and reached
-//             from is an area's (things.tri).
+// - code:     how a plot stands when its last row is reaped (bare) or sown
+//             (sown, growing from then, the seed kept for it used): the
+//             plot's own, a reaction to its rows' count
+//             (src/domains_farming.odin), with its growth and its wake.
+//             Sowing, harvesting and keeping seed back are declared, a row
+//             a time, each counting on the plot's rows as it read them.
+//             Where a plot is seen and reached from is an area's
+//             (things.tri).
 
 package farming
 
@@ -82,14 +85,19 @@ let raw_grain  = { material: "food", raw: true, nourishment: 15, cooking: 35 }
 let raw_turnip = { material: "food", raw: true, nourishment: 10, cooking: 30 }
 // It can be kept back as seed (`keptAs`, a #Seed's blueprint), a sack at
 // a time.
-grain_harvest:  #Stack & #Food & raw_grain & { unit: "grain", unitMass: 250g, count: 2, keptAs: "seed_grain" }
-turnip_harvest: #Stack & #Food & raw_turnip & { unit: "turnip", unitMass: 250g, count: 2, keptAs: "turnip_seed" }
+grain_harvest:  #Stack & #Food & raw_grain & { unit: "grain", unitMass: 250g, count: 2, keptAs: "seed_grain", keptOf: 50 }
+turnip_harvest: #Stack & #Food & raw_turnip & { unit: "turnip", unitMass: 250g, count: 2, keptAs: "turnip_seed", keptOf: 7 }
 // One turnip, taken from a harvest (a unit of a stack is the instance its
 // unit names, as cooking/'s grain is).
 turnip:         #Body & #Food & raw_turnip & { mass: 250g }
 
-// What food is kept back as, for seed: a #Seed's blueprint; "" for none.
-hunger.#Food: { keptAs: *"" | text @field(content, saved, inspect) }
+// What food is kept back as, for seed: a #Seed's blueprint ("" for none),
+// and how many units of the food make one of it (`keptOf`): as heavy, or
+// keeping it back fails.
+hunger.#Food: {
+    keptAs: *"" | text                   @field(content, saved, inspect)
+    keptOf: *0 | int & >=0 & <=100000    @field(content, saved, inspect)
+}
 
 // Seed, kept back from the last harvest: a sack, by the tile's worth. A
 // sack is twelve and a half kilograms of grain (fifty portions), or seven
@@ -249,46 +257,51 @@ look_for_seed: #Method & {
 // Sow a row of a bare plot in reach, seed for its crop in hand: a quarter
 // of an hour, with the hands. As many tiles as a row has, or as the seed
 // or the plot have left, are sown, a unit of the seed to each; the last
-// row sown, the plot stands sown, growing from then.
+// row sown, the plot stands sown, growing from then (the plot's own).
 sow: #Operation & {
-    effect:   "sow"
     duration: 900s
     uses:     ["hands"]
     roles: {
         actor:       #Agent & { id: $a }
-        item:        #Seed & #Stack & { sows: $c, place: #Held & { by: $a } }
-        destination: #Plot & { grows: $c, stands: "bare" }
+        item:        #Seed & #Stack & { id: $i, sows: $c, count: $q, place: #Held & { by: $a } }
+        destination: #Plot & { grows: $c, stands: "bare", east: $e, south: $s, sown: $w }
     }
+    consumes: [{ consumed: $i, portion: math.Min(math.Min($e, $q), $e * $s - $w), because: "sown" }]
+    after:    { destination: #Plot & { sown: $w + math.Min(math.Min($e, $q), $e * $s - $w) } }
 } @family(operations)
 
-// Keep back seed: of a harvest in hand, a sack of seed's worth carved off
-// as the seed it is kept as, as heavy, into a pack or a free hand; the
-// plot in reach it is kept for marked kept. A quarter of an hour, with the
-// hands.
+// Keep back seed: of a harvest in hand, a sack of seed's worth (`keptOf`
+// units of it) carved off as the seed it is kept as, as heavy, into a pack
+// or a free hand; the plot in reach it is kept for marked kept. A quarter
+// of an hour, with the hands.
 keep_seed: #Operation & {
-    effect:   "keep_seed"
     duration: 900s
     uses:     ["hands"]
     stow:     true
     roles: {
         actor:       #Agent & { id: $a }
-        item:        #Food & #Stack & { place: #Held & { by: $a } }
+        item:        #Food & #Stack & { id: $i, keptAs: $k, keptOf: $n & >=1, place: #Held & { by: $a } }
         destination: #Plot & { kept: false }
     }
+    makes:    [{ blueprint: $k, at: #Held & { by: $a }, called: "seed kept back", splitFrom: $i }]
+    consumes: [{ consumed: $i, portion: $n, exact: true, because: "kept back as seed" }]
+    after:    { destination: #Plot & { kept: true } }
 } @family(operations)
 
 // Harvest a row of a ripe plot in reach: half an hour, with the hands, and
-// work. What the row yields is in the harvester's hand, with what it holds
-// of the kind already; the last row reaped, the plot is bare.
+// work. What the row's tiles yield is in the harvester's hand, with what
+// it holds of the kind already (not cooked), else in a free one; the last
+// row reaped, the plot is bare (the plot's own).
 harvest: #Operation & {
-    effect:   "harvest"
     duration: 1800s
     uses:     ["hands"]
     exertion: 1
     roles: {
-        actor: #Agent
-        item:  #Plot & { stands: "ripe" }
+        actor: #Agent & { id: $a }
+        item:  #Plot & { stands: "ripe", yields: $y, east: $e, reaped: $r }
     }
+    makes: [{ blueprint: $y, many: $e, at: #Held & { by: $a }, called: "a harvest", gathered: true }]
+    after: { item: #Plot & { reaped: $r + $e } }
 } @family(operations)
 
 // The three weeks' test (src/test_farming.odin): a plot of 8 by 4 in a

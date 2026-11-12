@@ -97,7 +97,8 @@ test_farming :: proc() {
 	bg_check(world_entities_at(w, me, .Held_By, raw_data(held[:]), 2) == 2)
 	bg_check(stands(w, plot) == plot_stands(w, "bare") && plot_of(w, plot).reaped == 0)
 
-	/* two sowing a bare plot at once: one row counted, one seed spent */
+	/* two sowing a bare plot at once: both rows counted, both lots of seed
+	 * spent (the second, its count stale, is resolved again) */
 	g = proposal_group_group_with_phase(.System, "setup: another, with seed, beside the plot")
 	other      := proposal_group_create(g, "farmhand", "another", on_tile(3, 3, 0))
 	other_seed := proposal_group_create(g, "seed_grain", "its seed", held_by(other, 0))
@@ -109,8 +110,47 @@ test_farming :: proc() {
 	bg_check(perform(w, c, action_make("sow", me, seed, plot), 0, &error) != nil)
 	bg_check(perform(w, c, action_make("sow", other, other_seed, plot), 0, &error) != nil)
 	scheduler_run_until(s, time_make(world_time(w).ms + 1200 * 1000))
-	bg_check(plot_of(w, plot).sown == 8)
-	bg_check(world_units_of(w, seed) + world_units_of(w, other_seed) == 468 + 500 - 8)
+	bg_check(plot_of(w, plot).sown == 16)
+	bg_check(world_units_of(w, seed) + world_units_of(w, other_seed) == 468 + 500 - 16)
+
+	/* short of seed: three units sow three tiles, and are gone */
+	g = proposal_group_group_with_phase(.System, "setup: all but three of its seed put down")
+	proposal_group_split(g, whole(other_seed), world_units_of(w, other_seed) - 3, on_tile(3, 2, 0))
+	committer_submit(c, g)
+	scheduler_run_until(s, time_make(world_time(w).ms + 1))
+	bg_check(world_units_of(w, other_seed) == 3)
+	bg_check(perform(w, c, action_make("sow", other, other_seed, plot), 0, &error) != nil)
+	scheduler_run_until(s, time_make(world_time(w).ms + 1200 * 1000))
+	bg_check(plot_of(w, plot).sown == 19 && !world_is_live(w, other_seed))
+	/* and the plot's last tiles are as many as it has left: five of a row
+	 * of eight, then the last eight, and it stands sown */
+	for _ in 0 ..< 2 {
+		bg_check(perform(w, c, action_make("sow", me, seed, plot), 0, &error) != nil)
+		scheduler_run_until(s, time_make(world_time(w).ms + 1200 * 1000))
+	}
+	bg_check(stands(w, plot) == plot_stands(w, "sown") && plot_of(w, plot).sown == 0)
+	bg_check(world_units_of(w, seed) == 468 - 8 - 13)
+
+	/* seed kept back, a hand free for it: of sixty-four portions, fifty are
+	 * a sack of seed, as heavy; of the fourteen left, none is */
+	bg_check(perform(w, c, action_make("put_down", me, seed, NO_ENTITY), 0, &error) != nil)
+	scheduler_run_until(s, time_make(world_time(w).ms + 10 * 1000))
+	bg_check(!plot_of(w, plot).kept)
+	bg_check(perform(w, c, action_make("keep_seed", me, harvest, plot), 0, &error) != nil)
+	scheduler_run_until(s, time_make(world_time(w).ms + 1200 * 1000))
+	bg_check(plot_of(w, plot).kept && world_units_of(w, harvest) == 14)
+	kept_back := NO_ENTITY
+	for e in held[:world_entities_at(w, me, .Held_By, raw_data(held[:]), 2)] do if e != harvest do kept_back = e
+	bg_check(kept_back != NO_ENTITY && world_unit_of(w, kept_back) == "seed grain" && world_units_of(w, kept_back) == 500)
+	bg_check(world_mass_of(w, kept_back) == 12500 && world_mass_of(w, harvest) == 14 * 250)
+	g = proposal_group_group_with_phase(.System, "setup: the seed put by, none kept for the plot")
+	proposal_group_move_to(g, whole(kept_back), on_tile(11, 8, 0))
+	proposal_group_set_of_to(g, "Plot.kept", whole(plot), 0)
+	committer_submit(c, g)
+	scheduler_run_until(s, time_make(world_time(w).ms + 1))
+	bg_check(perform(w, c, action_make("keep_seed", me, harvest, plot), 0, &error) != nil)
+	scheduler_run_until(s, time_make(world_time(w).ms + 1200 * 1000))
+	bg_check(!plot_of(w, plot).kept && world_units_of(w, harvest) == 14)
 
 	/* saved, how the plot stood (its events) and a change still to commit
 	 * (expecting it bare) are by name, not by type ID, which content

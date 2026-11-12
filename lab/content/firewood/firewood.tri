@@ -22,9 +22,10 @@
 //             firewood's mass to it. Cold isn't felt in the village: its
 //             people aren't thermal bodies yet, so stoking for the night is
 //             a commitment, not a want.
-// - sawing:   a trunk is a #Log (sawing/sawing.tri), cut a length at a time
-//             (`buck`, with sawing's effect); a log split into firewood is
-//             one cut through.
+// - sawing:   a trunk is a #Log (sawing/sawing.tri) of several lengths,
+//             cut a length at a time (`buck`), its last length cut
+//             through (`cut_through`); a log split into firewood is one
+//             cut through.
 // - cooking:  a stove lit to cook is stoked first if empty
 //             (cooking/cooking.tri's `stove_lit`).
 // - carrying: a woodcutter with the household's backpack gathers into it
@@ -38,7 +39,7 @@
 // - village:  the trees, the tools at the chopping block, the woodpiles
 //             and who stocks which, with its coffer, are the scenario's
 //             (src/scenario_village.odin).
-// - code:     effect_saw's trunks (src/act_actions.odin). Felling,
+// - code:     none of its own: felling, bucking, cutting through,
 //             splitting and stoking are declared, and putting down
 //             (actions.tri).
 
@@ -60,12 +61,11 @@ tree_seen: #Seen & { kindOf: "#Tree" } @family(seen)
 
 tree_look: #Look & { kindOf: "#Tree", look: "tree" } @family(looks)
 
-// A felled tree: a log of so many lengths, each cut off as a log of its
-// own (a blueprint), the last the trunk itself.
+// A felled tree: a log of so many lengths (sawing/'s `lengths`), each cut
+// off as a log of its own (a blueprint), the last the trunk itself.
 #Trunk: #Log & {
     @component(Trunk)
-    lengths:  int & >=1 & <=20 @field(content, saved, proposable, inspect, perceive(sight))
-    cutsInto: text             @field(content, saved, inspect)
+    cutsInto: text @field(content, saved, inspect)
 }
 
 trunk_seen: #Seen & { kindOf: "#Trunk" } @family(seen)
@@ -134,8 +134,9 @@ woodpile_stocked: #Goal & {
 // got into hand, then stacked. Firewood is got into hand: out of its pack,
 // by the woodpile; gathered where it lies; split from a log, then
 // gathered; else, nothing left to make it of, the pack carried home and
-// unpacked. A log to split is one lying about, or one cut off a trunk; a
-// trunk, one lying about, or a tree felled; a tree, one known, or the
+// unpacked. A log to split is one lying about, or one cut off a trunk, or
+// a trunk's last length cut through; a trunk, one lying about, or a tree
+// felled; a tree, one known, or the
 // woods looked into for one. Each "one about" is a goal, passed over while
 // one is: the nearest, bound for the step that needs it.
 stack_it: #Method & {
@@ -264,25 +265,38 @@ cut_a_trunk: #Method & {
     rank:  1
     pre: {
         find:  ["trunk"]
-        match: #Felling & { trunk: #Trunk & { sawn: <=99, place: #OnTile } }
+        match: #Felling & { trunk: #Trunk & { lengths: >=2, place: #OnTile } }
     }
     order: ["near"]
     steps: [#Achieve & { subgoal: "axe_in_hand" }, #Do & { op: "buck", object: "axe", target: "trunk" }]
 } @family(methods)
 
+// A trunk down to its last length: that cut through.
+cut_the_last: #Method & {
+    title: "cut the last length through"
+    goal:  "log_cut"
+    rank:  2
+    pre: {
+        find:  ["trunk"]
+        match: #Felling & { trunk: #Trunk & { lengths: 1, sawn: <=99, place: #OnTile } }
+    }
+    order: ["near"]
+    steps: [#Achieve & { subgoal: "axe_in_hand" }, #Do & { op: "cut_through", object: "axe", target: "trunk" }]
+} @family(methods)
+
 fell_and_cut: #Method & {
     title: "fell a tree and cut it"
     goal:  "log_cut"
-    rank:  2
+    rank:  3
     pre:   { find: [], match: #Felling }
     steps: [#Achieve & { subgoal: "trunk_felled" }, #Achieve & { subgoal: "axe_in_hand" },
             #Do & { op: "buck", object: "axe", target: "trunk" }]
 } @family(methods)
 
-// A trunk lying about, to cut: the nearest.
+// A trunk lying about, of more than a length, to cut: the nearest.
 trunk_felled: #Goal & {
     title: "fell a tree"
-    done:  { find: ["trunk"], match: #Felling & { trunk: #Trunk & { sawn: <=99, place: #OnTile } } }
+    done:  { find: ["trunk"], match: #Felling & { trunk: #Trunk & { lengths: >=2, place: #OnTile } } }
     order: ["near"]
 } @family(goals)
 
@@ -388,20 +402,35 @@ fell: #Operation & {
     consumes: [{ consumed: $t, because: "felled" }]
 } @family(operations)
 
-// Cut a length off a trunk, an axe in hand (bucking): a few minutes, with
-// the hands; the length is a log of its own, the trunk shorter. Sawing a
+// Cut a length off a trunk of more than one, an axe in hand (bucking): a
+// few minutes, with the hands; the length is a log of its own (as heavy as
+// a length of the trunk is, carved from it), the trunk shorter. Sawing a
 // log right through, its cut showing as it goes, is sawing/sawing.tri's;
 // the woodcutters work with the axe alone, so as to have a hand free for
 // the firewood.
 buck: #Operation & {
-    effect:   "saw"
     duration: 300s
     uses:     ["hands"]
     roles: {
         actor:       #Agent & { id: $a }
         item:        #Axe & { place: #Held & { by: $a } }
-        destination: #Trunk & { sawn: <=99 }
+        destination: #Trunk & { id: $t, lengths: $n & >=2, mass: $m, cutsInto: $b, place: $p }
     }
+    makes: [{ blueprint: $b, at: $p, called: "a log sawn off", splitFrom: $t }]
+    after: { destination: #Trunk & { lengths: $n - 1, mass: $m - $m / $n, sawn: 0 } }
+} @family(operations)
+
+// Cut a trunk's last length through, an axe in hand: as long again; it is
+// a log, to split.
+cut_through: #Operation & {
+    duration: 300s
+    uses:     ["hands"]
+    roles: {
+        actor:       #Agent & { id: $a }
+        item:        #Axe & { place: #Held & { by: $a } }
+        destination: #Trunk & { lengths: 1, sawn: <=99 }
+    }
+    after: { destination: #Trunk & { sawn: 100 } }
 } @family(operations)
 
 // Split a log, sawn through, an axe in hand: it is firewood, lying where it

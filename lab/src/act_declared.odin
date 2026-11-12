@@ -5,8 +5,10 @@ package lab
  * does, as its content says it, applied by the one procedure here. An
  * operation with no named effect (`effect`) has a declared one: its roles
  * as the effect leaves them (`after`), what it moves (`moves`), constructs
- * (`makes`) and destroys (`consumes`), whole or a portion of a stack, and
- * the events it emits (`emits`). The command's parameter is the
+ * (`makes`: one, or so `many` gathered into a stack, with what its holder
+ * has of the kind if it says `gathered`) and destroys (`consumes`), whole
+ * or a portion of a stack, and the events it emits (`emits`). A thing made
+ * `splitFrom` what the step consumes has its mass. The command's parameter is the
  * operation's `parameter`, the time its `now`. A move that `passes` hands
  * on whose the thing is (declared_pass); one that `lends` leaves it its
  * owner's, in the other's keeping (declared_lend), till it is back with
@@ -174,6 +176,27 @@ declared_place :: proc(world: ^World, into: ^tri.Node, mass: i64 = 0, stows := f
 	to, free := receiving(world, by, mass, stows)
 	if !free do return {}, "no hand of theirs is free"
 	return to, ""
+}
+
+
+/* A stack someone holds that a unit of `blueprint` would go with: of its
+ * unit, and, food, raw as it is or cooked as it is. NO_ENTITY for none. */
+@(private = "file")
+held_alike :: proc(world: ^World, holder: Entity_ID, blueprint: string) -> Entity_ID {
+	held: [8]Entity_ID
+
+	tc   := world_tri(world)
+	name := world_intern(world, ns_utf8(blueprint))
+	unit := world_unit_of_blueprint(world, name)
+	raw  := printed(tc, tri.at(tc, tri.pattern(tc, name), "raw"))
+	for e in held[:min(world_entities_at(world, holder, .Held_By, raw_data(held[:]), 8), 8)] {
+		was: i64
+		u := world_unit_of(world, e)
+		if !world_is_stack(world, e) || u == nil || unit == nil || string(u) != string(unit) do continue
+		if world_get_field(world, "Food.raw", e, &was) && (raw == "true" || raw == "false") && (was != 0) != (raw == "true") do continue
+		return e
+	}
+	return NO_ENTITY
 }
 
 
@@ -561,19 +584,42 @@ apply_declared_effect :: proc(world: ^World, action: Action, stage: i64, amount:
 	}
 
 	/* makes: before what is consumed, which a thing made may stand where */
+	carved := make([dynamic]Entity_ID, context.temp_allocator)
 	for list := tri.at(tc, result, ns_utf8(fmt.tprintf("%smakes", step))); list != nil; list = tri.at(tc, list, "rest") {
 		made := tri.at(tc, list, "first")
 		if made == nil do break
 		blueprint, ok := text_of_node(tc, tri.at(tc, made, "blueprint"))
 		if !ok || blueprint == "" do return fmt.tprintf("%s makes nothing: it says no blueprint", action.operation)
-		if tri.pattern(tc, ns_utf8(blueprint)) == nil do return fmt.tprintf("%s makes a %s, which is no blueprint", action.operation, blueprint)
-		at, reason := declared_place(world, tri.at(tc, made, "at"))
-		if reason != "" do return reason
+		shape := tri.pattern(tc, ns_utf8(blueprint))
+		if shape == nil do return fmt.tprintf("%s makes a %s, which is no blueprint", action.operation, blueprint)
+		/* so many of it, gathered into one stack */
+		many, several := int_of(tri.at(tc, made, "many"))
+		if !several do many = 1
+		if many < 1 do return fmt.tprintf("%s makes none of it", action.operation)
+		/* gathered: with a stack of its kind held already by the one whose
+		 * hand it is made in; else where it says */
+		at: Location
+		into  := NO_ENTITY
+		place := tri.at(tc, made, "at")
+		if printed(tc, tri.at(tc, made, "gathered")) == "true" {
+			if by, held := ref_of(tc, tri.at(tc, place, "by")); held do into = held_alike(world, by, blueprint)
+		}
+		if into != NO_ENTITY {
+			at = world_location_of(world, into)
+		} else {
+			reason: string
+			at, reason = declared_place(world, place, int_feature(tc, shape, "mass", 0) * many, operation_stows(world, action.operation))
+			if reason != "" do return reason
+		}
 		called, named := text_of_node(tc, tri.at(tc, made, "called"))
-		thing := proposal_group_create(group, world_intern(world, ns_utf8(blueprint)),
-		                               world_intern(world, ns_utf8(called if named else blueprint)), at)
-		if from, carved := ref_of(tc, tri.at(tc, made, "splitFrom")); carved {
-			proposal_group_relate(group, .Split_From, whole(thing), whole(from))
+		from, cut     := ref_of(tc, tri.at(tc, made, "splitFrom"))
+		if cut do append(&carved, from)
+		for _ in 0 ..< many {
+			thing := proposal_group_create(group, world_intern(world, ns_utf8(blueprint)),
+			                               world_intern(world, ns_utf8(called if named else blueprint)), at)
+			if cut do proposal_group_relate(group, .Split_From, whole(thing), whole(from))
+			if into == NO_ENTITY do into = thing
+			else do proposal_group_merge(group, whole(thing), whole(into))
 		}
 	}
 
@@ -586,12 +632,15 @@ apply_declared_effect :: proc(world: ^World, action: Action, stage: i64, amount:
 		if !ok || !why do return fmt.tprintf("%s consumes nothing, or for no reason: tag the role's id, and say `because`", action.operation)
 		reason := world_intern(world, ns_utf8(because))
 		/* a portion: so many units, split off where the stack is, and gone */
-		if n, some := int_of(tri.at(tc, gone, "portion")); some && n < world_units_of(world, consumed) {
-			part := proposal_group_split(group, whole(consumed), n, world_location_of(world, consumed))
-			proposal_group_destroy(group, whole(part), reason)
-			continue
-		}
-		proposal_group_destroy(group, whole(consumed), reason)
+		target  := whole(consumed)
+		n, some := int_of(tri.at(tc, gone, "portion"))
+		units   := world_units_of(world, consumed)
+		if some && n > units && printed(tc, tri.at(tc, gone, "exact")) == "true" do return "there is too little of it"
+		if some && n < units do target = whole(proposal_group_split(group, whole(consumed), n, world_location_of(world, consumed)))
+		/* what a thing made here was carved from: its mass is the made
+		 * thing's, none of it lost */
+		if slice.contains(carved[:], consumed) do proposal_group_set_of_to(group, "Body.mass", target, 0)
+		proposal_group_destroy(group, target, reason)
 	}
 
 	/* emits: with a detail, if the operation gives one that is said (what

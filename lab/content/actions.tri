@@ -22,7 +22,8 @@
 //            (src/act_declared.odin), which resolves the operation against
 //            the truth; so far `after`, `moves`, `makes`, `consumes` and
 //            `emits`, for an operation or a stage. Taking, giving, putting
-//            down, putting in and looking are declared; what a command
+//            down, putting in and looking are declared, and most topics'
+//            own operations; what a command
 //            says reaches an effect as `said` and `written`. A move that
 //            `passes` hands on whose the thing is (declared_pass: giving,
 //            putting in); one that `lends` leaves it its owner's, in the
@@ -40,7 +41,7 @@
 //            (src/act_activities.odin); they are compacted into digests
 //            after the world's history window (src/core_world.odin).
 
-#Effect: "drive" | "fill" | "walk" | "say" | "tend" | "analyse" | "write" | "read" | "eat" | "investigate" | "rotate" | "strike" | "rest" | "saw" | "pass" | "copy" | "reveal" | "replace" | "cut" | "shape" | "issue" | "confiscate" | "arrest" | "flee" | "hit" | "hire" | "work" | "service" | "sow" | "keep_seed" | "harvest" | "crouch" | "shoot" | "butcher" | "shoulder" | "forage"
+#Effect: "drive" | "fill" | "walk" | "say" | "tend" | "analyse" | "write" | "read" | "eat" | "investigate" | "rotate" | "strike" | "rest" | "pass" | "copy" | "reveal" | "replace" | "cut" | "shape" | "issue" | "confiscate" | "arrest" | "flee" | "hit" | "hire" | "work" | "service" | "crouch" | "shoot" | "shoulder" | "forage"
 
 // Which roles an operation has is its roles' type: a structure's type is the
 // most general one with all its features.
@@ -98,7 +99,13 @@
 // keeping.
 // `makes` constructs a thing from a `blueprint`, `at` a place (where a role
 // was, by a tag on its `place`), `called` what its construction is recorded
-// as; `splitFrom` says what it was carved from, if anything.
+// as; `splitFrom` says what it was carved from, if anything: the mass of
+// what is made is then no new mass, so the effect lowers the other's by as
+// much (`after`), or consumes it, whole or the portion carved (its mass is
+// the made thing's), or it fails. So `many` of the blueprint are made,
+// gathered into one stack; `gathered`, into a hand, they are with a stack
+// of the kind its holder has already, if any (a harvest, with the armful).
+// Into a hand, a made thing goes as a moved one does.
 // An operation's `now` is the time its effect commits (`spoilsAt: $now +
 // $k`), its `parameter` the command's (how many), its `said` and `written`
 // what the command says, as a value and as written (market/'s `post`). Into a hand, of an operation
@@ -107,7 +114,7 @@
 #Moves:    #OfSome & { moved: ref, into: #Place, passes: bool, lends: bool, until: time }
 #Consumes: #OfSome & { consumed: ref, because: text }
 #Emits:    { event: text, subject: ref, other: ref, detail: text }
-#Makes:    { blueprint: text, at: #Place, called: text, splitFrom: ref }
+#Makes:    { blueprint: text, at: #Place, called: text, splitFrom: ref, many: int & >=1, gathered: bool }
 
 // Looking at something within reach changes nothing in the world: it is
 // an event the looker perceives. Its operations say what is looked at.

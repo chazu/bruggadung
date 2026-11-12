@@ -146,6 +146,7 @@ test_committer :: proc(world: ^World) -> ^Committer {
 	committer_add_reactor(committer, body_kind_as_reactor(autorelease(body_kind_new())), "Body")
 	committer_add_reactor(committer, valve_kind_as_reactor(autorelease(valve_kind_new())), "Valve")
 	committer_add_reactor(committer, latent_kind_as_reactor(autorelease(latent_kind_new())), "Part")
+	committer_add_reactor(committer, plot_kind_as_reactor(autorelease(plot_kind_new())), "Plot")
 	return committer
 }
 

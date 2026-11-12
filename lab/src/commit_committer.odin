@@ -553,11 +553,17 @@ committer_merge_obstacle :: proc(self: ^Committer, a: Entity_ID, b: Entity_ID) -
 	if bears_trace(self.world, a) || bears_trace(self.world, b) do return "units differ physically: one bears a trace"
 	if !food_alike(self.world, a, b) do return "units differ physically: one is cooked"
 	if !location_equal(world_location_of(self.world, a), world_location_of(self.world, b)) do return "they are not in the same place"
-	// a quantity claim over several entities follows the units; a claim on this one unit alone pins it
+	// a quantity claim over several entities follows the units; a claim on
+	// this one unit alone pins it, unless it is its owner's or keeper's,
+	// whose the stack is as much (claim_doubles): one portion of a
+	// household's, put with the household's sack
 	if !world_is_stack(self.world, a) {
 		n = world_edges_to(self.world, .Claim_Subject, a, &claims[0], 8)
 		for i: uint = 0; i < n && i < 8; i += 1 {
-			if world_edges_from(self.world, .Claim_Subject, claims[i], &subjects[0], 2) == 1 do return "a claim is on this unit alone"
+			if world_edges_from(self.world, .Claim_Subject, claims[i], &subjects[0], 2) == 1 &&
+			   !claim_doubles(self.world, claims[i], b) {
+				return "a claim is on this unit alone"
+			}
 		}
 	}
 	return ""

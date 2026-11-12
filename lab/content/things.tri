@@ -17,7 +17,8 @@
 // - code:    whose a thing is (#Claim): what is nobody's is whoever's gets
 //            it into its own hand, and their household's (bonds/'s kin;
 //            src/kinds_body_kind.odin); a claim ends
-//            with what it is on (src/commit_committer.odin); passing and
+//            with what it is on, and one unit goes into a stack its
+//            owner owns already (src/commit_committer.odin); passing and
 //            lending are a move's to say (actions.tri).
 // - code:    the structs and the registry the lab uses are generated from all
 //            the content, every topic's fields with these (make gen:

@@ -340,6 +340,18 @@ test_taking_up :: proc() {
 	committer_commit_boundary(c)
 	bg_check(!world_is_live(w, more) && world_units_of(w, some) == 20 && len(claims_on(w, some, "\"ownership\"")) == 1)
 
+	/* one unit of it, hers alone by taking it up, goes with hers in the
+	 * chest all the same; put with what is nobody's it would stay apart */
+	bg_check(perform(w, c, action_make("take_some", ada, sack, NO_ENTITY), 1, &error) != nil)
+	committer_commit_boundary(c)
+	one := NO_ENTITY
+	for e in inhand[:min(world_entities_at(w, ada, .Held_By, raw_data(inhand[:]), 4), 4)] do if e != found do one = e
+	bg_check(one != NO_ENTITY && !world_is_stack(w, one) && len(claims_on(w, one, "\"ownership\"")) == 1)
+	bg_check(perform(w, c, action_make("put_in", ada, one, chest), 0, &error) != nil)
+	committer_commit_boundary(c)
+	committer_commit_boundary(c)
+	bg_check(!world_is_live(w, one) && world_units_of(w, some) == 21 && len(claims_on(w, some, "\"ownership\"")) == 1)
+
 	/* what one of a household takes up is the household's: Bo's kin Cy
 	 * owns it too, and takes it up after him with no wrong */
 	cy   := test_commit_create(c, "worker", on_tile(2, 2, 0))

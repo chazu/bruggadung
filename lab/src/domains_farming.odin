@@ -5,6 +5,13 @@ package lab
 // `sownAt` and `ripensIn`), a function of time read when needed, never
 // stepped. Grown, the plot stands ripe, set at that moment: its one wake.
 // The horizon is the next plot to ripen; nothing happens between.
+//
+// How a plot stands follows its rows too (BGPlotKind, on the reactions
+// channel): its last row reaped, it is bare; its last row sown, it stands
+// sown, growing from then, and the seed kept back for it is used. Sowing
+// and harvesting only count rows (content/farming/farming.tri).
+
+import "core:fmt"
 
 import tri "../../triangle/odin/triangle"
 
@@ -116,5 +123,53 @@ farming_as_domain :: proc(self: ^Farming) -> Domain {
 		advance_from        = proc(data: rawptr, t0: Time, t1: Time, world: ^World, committer: ^Committer) {
 			farming_advance_from((^Farming)(data), t0, t1, world, committer)
 		},
+	}
+}
+
+
+Plot_Kind :: struct {
+	using object: Object,
+}
+
+
+plot_kind_new :: proc() -> ^Plot_Kind {
+	return object_new(Plot_Kind, nil)
+}
+
+
+plot_kind_as_reactor :: proc(self: ^Plot_Kind) -> Reactor {
+	return Reactor{
+		data = self,
+		react_to_event = proc(data: rawptr, committer: ^Committer, event: ^Event, world: ^World) {
+			plot_kind_react_to_event((^Plot_Kind)(data), committer, event, world)
+		},
+	}
+}
+
+
+// A plot whose rows are all reaped is bare; all sown, it stands sown.
+plot_kind_react_to_event :: proc(self: ^Plot_Kind, committer: ^Committer, event: ^Event, world: ^World) {
+	if event.kind != "changed" || event.detail == nil do return
+	plot := plot_of(world, event.subject)
+	if plot == nil do return
+	east, south := world_area_extent(world, event.subject)
+	tiles := i64(east) * i64(south)
+	switch string(event.detail) {
+	case "Plot.reaped":
+		if plot.stands != plot_stands(world, "ripe") || plot.reaped < tiles do return
+		group := proposal_group_group_with_phase(.System, fmt.tprintf("Plot reaction: %d is reaped, and bare", event.subject))
+		proposal_group_set_cause(group, event.index)
+		proposal_group_set_of_to(group, "Plot.reaped", whole(event.subject), 0)
+		proposal_group_set_of_to(group, "Plot.stands", whole(event.subject), i64(plot_stands(world, "bare")))
+		committer_submit(committer, group)
+	case "Plot.sown":
+		if plot.stands != plot_stands(world, "bare") || plot.sown < tiles do return
+		group := proposal_group_group_with_phase(.System, fmt.tprintf("Plot reaction: %d is sown", event.subject))
+		proposal_group_set_cause(group, event.index)
+		proposal_group_set_of_to(group, "Plot.sown", whole(event.subject), 0)
+		proposal_group_set_of_to(group, "Plot.stands", whole(event.subject), i64(plot_stands(world, "sown")))
+		proposal_group_set_of_to(group, "Plot.sownAt", whole(event.subject), world_time(world).ms)
+		if plot.kept do proposal_group_set_of_to(group, "Plot.kept", whole(event.subject), 0)   /* seed kept from the next harvest */
+		committer_submit(committer, group)
 	}
 }
