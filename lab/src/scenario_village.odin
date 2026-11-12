@@ -39,8 +39,8 @@ package lab
  * their day's work home in a backpack, one each.
  *
  * The town, its law against theft, and one watch officer, of no household:
- * a post south of the green, a bed and a larder there, its nights in the
- * bed. The checks count it among those fed, and that it has arrested
+ * a post south of the green, which the town keeps (a bed, a stove, a
+ * larder and a woodpile, stocked), its nights there. The checks count it among those fed, and that it has arrested
  * nobody: nobody here takes what isn't its household's.
  *
  * The run goes boundary by boundary up to each check's time, putting none
@@ -81,9 +81,9 @@ VILLAGE_MARKET :: i64(2)               // the first market day's index (day 3); 
 /* What each household buys at the market (content/market/): the goals,
  * each stocking its larder (or woodpile) with what it doesn't make. */
 /* The watch's post, south of the green: where its officer stands, its
- * bed, and its larder. */
+ * bed, its larder, its stove and its woodpile. */
 @(private = "file", rodata)
-village_post := [3][2]i32{{60, 56}, {60, 57}, {61, 57}}
+village_post := [5][2]i32{{60, 56}, {60, 57}, {61, 57}, {59, 57}, {61, 56}}
 
 @(private = "file", rodata)
 village_buys := [4][2]cstring {
@@ -406,8 +406,10 @@ village_setup :: proc(self: ^Village) {
 		}
 	}
 	/* the town, its law against theft, which everyone knows, and its watch:
-	 * one officer, who keeps a post south of the green (a bed and a
-	 * larder of its own, with grain in it), and stands by it */
+	 * one officer, who keeps a post south of the green and stands by it. The
+	 * town keeps its watch: a bed, a stove, a larder with a farm's grain in
+	 * it and a woodpile with a household's firewood, the officer's own
+	 * (it has no wage yet, and makes nothing to sell) */
 	town := proposal_group_create(g, "town", "the town", location_make_none())
 	law  := proposal_group_create(g, "theft_law", "the law against theft", location_make_none())
 	proposal_group_set_of_to(g, "Law.lawOf", whole(law), i64(town))
@@ -420,7 +422,7 @@ village_setup :: proc(self: ^Village) {
 	officer   := proposal_group_create(g, "watch_officer", "the watch officer", on_tile(village_post[0].x, village_post[0].y, 0))
 	post_bed  := proposal_group_create(g, "bed", "the watch's bed", on_tile(village_post[1].x, village_post[1].y, 0))
 	post_food := proposal_group_create(g, "larder", "the watch's larder", on_tile(village_post[2].x, village_post[2].y, 0))
-	post_sack := proposal_group_create(g, "grain_sack", "the watch's grain", in_(post_food))
+	post_sack := proposal_group_create(g, "farm_grain", "the watch's grain", in_(post_food))
 	proposal_group_set_of_to(g, "OfficeHolder.office", whole(officer), i64(town))
 	village_own(g, officer, post_bed, "a bed of one's own")
 	village_own(g, officer, post_food, "the watch's larder")
@@ -496,11 +498,25 @@ village_setup :: proc(self: ^Village) {
 	committer_submit(c, home)
 	scheduler_run_until(self.scheduler, time_make(7))     /* and sees its bed */
 
-	/* the watch officer's nights: in its bed, and a supper before */
+	/* the watch's hearth, by its post, as the officer stands there */
+	hearth    := proposal_group_group_with_phase(.System, "setup: the watch's hearth")
+	post_fire := proposal_group_create(hearth, "stove", "the watch's stove", on_tile(village_post[3].x, village_post[3].y, 0))
+	post_pile := proposal_group_create(hearth, "woodpile", "the watch's woodpile", on_tile(village_post[4].x, village_post[4].y, 0))
+	post_wood := proposal_group_create(hearth, "household_firewood", "the watch's firewood", in_(post_pile))
+	village_own(hearth, self.officer, post_fire, "the watch's stove")
+	village_own(hearth, self.officer, post_pile, "the watch's woodpile")
+	village_own(hearth, self.officer, post_wood, "the watch's firewood")
+	committer_submit(c, hearth)
+	scheduler_run_until(self.scheduler, time_make(8))
+
+	/* the watch officer's nights: a supper, its stove stoked, and its bed */
 	{
 		store := knowledge_store_of(self.knowledge, self.officer)
 		bed   := village_referent_of(store, proposal_group_id_for(g, post_bed))
-		if bed == 0 ||
+		stove := village_referent_of(store, proposal_group_id_for(hearth, post_fire))
+		if bed == 0 || stove == 0 ||
+		   !agency_undertake_every_with(self.agency, self.officer, "stove_stoked", 19 * VILLAGE_HOUR, 21 * VILLAGE_HOUR, "home",
+		                                VILLAGE_DAY, {{"stove", stove}}) ||
 		   !agency_undertake_every_with(self.agency, self.officer, "sleep_in_bed", 22 * VILLAGE_HOUR, 30 * VILLAGE_HOUR, "home",
 		                                VILLAGE_DAY, {{"bed", bed}}) ||
 		   !agency_undertake_every_with(self.agency, self.officer, "eat_supper", 18 * VILLAGE_HOUR, 21 * VILLAGE_HOUR, "home",

@@ -2386,7 +2386,9 @@ authorize :: proc(world: ^World, action: Action) -> []Entity_ID {
 }
 
 
-/* Whether someone other than `who` claims it (ownership or custody). */
+/* Whether it is another's and not `who`'s: someone else claims it
+ * (ownership or custody), and `who` doesn't own it. What several own is
+ * each one's own: a household's larder is every one of its people's. */
 claimed_by_another :: proc(world: ^World, entity: Entity_ID, who: Entity_ID) -> bool {
 	claim: ^Claim
 	claims: []Entity_ID
@@ -2394,6 +2396,7 @@ claimed_by_another :: proc(world: ^World, entity: Entity_ID, who: Entity_ID) -> 
 	claimant: Entity_ID
 	i: int
 
+	another := false
 	claims = claims_covering(world, entity)
 	for i = 0; i < len(claims); i += 1 {
 		c     = claims[i]
@@ -2401,11 +2404,15 @@ claimed_by_another :: proc(world: ^World, entity: Entity_ID, who: Entity_ID) -> 
 		if claim == nil || claim.kind == u32(tri.type_named(world_tri(world), "\"reservation\"")) {
 			continue      /* a reservation is no claim to it, unless an institution says so */
 		}
-		if world_edges_from(world, .Claimant, c, &claimant, 1) != 0 && claimant != who {
-			return true
+		if world_edges_from(world, .Claimant, c, &claimant, 1) == 0 do continue
+		/* its own, unless only in its custody: custody isn't ownership */
+		if claimant == who {
+			if claim.kind != u32(tri.type_named(world_tri(world), "\"custody\"")) do return false
+			continue
 		}
+		another = true
 	}
-	return false
+	return another
 }
 
 

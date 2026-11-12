@@ -2659,6 +2659,23 @@ test_laws :: proc() {
 	}
 	bg_check(len(laws_broken(w, action_make("look", kasimir, purse, NO_ENTITY))) == 0)
 	bg_check(len(laws_broken(w, action_make("walk_east", kasimir, NO_ENTITY, NO_ENTITY))) == 0)
+	/* what two own is each one's own: with a claim of his own on the purse
+	 * beside the merchant's (a household's larder is all its people's),
+	 * his taking it is no theft; without it again, it is */
+	g = proposal_group_group_with_phase(.System, "setup: his too")
+	shared := proposal_group_create(g, "ownership", "his own too", location_make_none())
+	proposal_group_relate(g, .Claimant, whole(shared), whole(kasimir))
+	proposal_group_relate(g, .Claim_Subject, whole(shared), whole(purse))
+	committer_submit(c, g)
+	committer_commit_boundary(c)
+	shared = proposal_group_id_for(g, shared)
+	bg_check(len(laws_broken(w, action_make("take", kasimir, purse, NO_ENTITY))) == 0)
+	bg_check(len(laws_broken(w, action_make("take", merchant, purse, NO_ENTITY))) == 0)
+	g = proposal_group_group_with_phase(.System, "setup: his no longer")
+	proposal_group_destroy(g, whole(shared), "withdrawn")
+	committer_submit(c, g)
+	committer_commit_boundary(c)
+	bg_check(len(laws_broken(w, action_make("take", kasimir, purse, NO_ENTITY))) == 1)
 	/* the act isn't blocked: he takes it */
 	error = ""
 	bg_check(perform(w, c, action_make("take", kasimir, purse, NO_ENTITY), 0, &error) != nil)
