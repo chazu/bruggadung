@@ -24,7 +24,8 @@ package lab
  * away.
  *
  * Agreed, the one asked hands it over (`handed_over`, a commitment of an
- * hour); the asker owes as much again (`repaid_in_kind`), for a loan by its
+ * hour; a loan of the very thing is lent, `lent_out`: it stays its own, in
+ * the asker's keeping till it is given back); the asker owes as much again (`repaid_in_kind`), for a loan by its
  * term, in kind within a fortnight if its reciprocity has it, and for a
  * sale at once, in coins. Each side remembers what is owed (`Owed`):
  * repaid, the creditor trusts the debtor more; unrepaid by the date, less.
@@ -910,7 +911,7 @@ agency_agreed :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Store, t:
 	}
 	if !t.asking {
 		agency_add_owed(m, Owed{kind = .Hand_Over, other = t.with, what = t.what, units = t.units, since = now, due = now + BG_HANDOVER})
-		agency_commit_to(self, m, "handed_over", now, now + BG_HANDOVER, t.with)
+		agency_commit_to(self, m, "lent_out" if d.kind == .Loan && d.same else "handed_over", now, now + BG_HANDOVER, t.with)
 		if d.kind != .Gift && d.kind != .None {
 			owed.kind = .Credit
 			agency_add_owed(m, owed)
@@ -1062,21 +1063,23 @@ agency_kept_like :: proc(self: ^Agency, what: ^tri.Node, store: ^Knowledge_Store
 
 /* The `#HandOver` step: to whom the commitment binds (`to`), what is owed
  * them (handed over as agreed, or repaid): from its hands, so many split
- * off; else fetched from its own containers first. "" once it acts; else
- * why it can't. */
+ * off; else fetched from its own containers first. A loan of the very
+ * thing (`lent_out`) is lent, not given; repaying, what was lent to it
+ * goes back first. "" once it acts; else why it can't. */
 agency_hand_over :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Store, me: ^Referent, title: string, b: [^]Slot_Binding,
                          n: i32) -> string {
 	tc   := world_tri(self.world)
 	to   := dbound(b, n, "to")
 	goal := m.intentions[m.nintentions - 1].goal
 	kind := Owed_Kind.Debt if string(goal) == "repaid_in_kind" else Owed_Kind.Hand_Over
+	op   := cstring("lend") if string(goal) == "lent_out" else cstring("give_some")
 	k: i32 = -1
 	for i: i32 = 0; i < m.nowed && k < 0; i += 1 do if m.owed[i].kind == kind && m.owed[i].other == to do k = i
 	if to == 0 || k < 0 {
 		/* handed over just now: done once the giving has completed */
 		adopted := m.intentions[m.nintentions - 1].adopted
-		if agency_activity(self, "give_some", m.agent, "running", adopted) != NO_ENTITY ||
-		   agency_activity(self, "give_some", m.agent, "starting", adopted) != NO_ENTITY {
+		if agency_activity(self, op, m.agent, "running", adopted) != NO_ENTITY ||
+		   agency_activity(self, op, m.agent, "starting", adopted) != NO_ENTITY {
 			return ""
 		}
 		return fmt.tprintf("nothing is owed R%d", to)
@@ -1095,7 +1098,8 @@ agency_hand_over :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Store,
 	arena := tri.arena_new()
 	defer tri.arena_free(arena)
 	what := tri.value(tc, o.what, arena, nil, 0)
-	held := agency_held_like(self, what, store)
+	held := agency_held_like(self, what, store, true) if kind == .Debt else 0
+	if held == 0 do held = agency_held_like(self, what, store)
 	if held != 0 {
 		if !in_reach(me, r) {
 			agency_walk(self, m, title, me, r, store, 1)
@@ -1104,8 +1108,8 @@ agency_hand_over :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Store,
 		have := i32(agency_units_of(self, held, store))
 		if have <= 0 do have = 1
 		give := min(have, o.units)
-		if agency_again(self, m, "give_some", held, to) do return fmt.tprintf("give_some R%d again, to no end", held)
-		if !agency_act(self, m, title, store, "give_some", held, to, i64(give), nil) do return "it couldn't hand it over"
+		if agency_again(self, m, op, held, to) do return fmt.tprintf("%s R%d again, to no end", op, held)
+		if !agency_act(self, m, title, store, op, held, to, i64(give), nil) do return "it couldn't hand it over"
 		o.units -= give
 		if o.units <= 0 && kind == .Hand_Over do agency_drop_owed(m, k)
 		return ""

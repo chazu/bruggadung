@@ -26,6 +26,8 @@
 //             household's backpack or basket, if it is there (carrying/):
 //             what is handed over goes into it, and is taken out by the
 //             supply, so a buyer buys what it lacks before walking home.
+//             A buyer's coins go home till none are left in its hands,
+//             through the afternoon if it is kept from it.
 // - reduced:  the same, decided on the cadence's beat.
 // - abstract: as reduced. A market as a clearing of households' stocks,
 //             below reduced, is open (DETAIL_REGIMES.md).
@@ -505,11 +507,14 @@ unpack_firewood:      #Method & unpack_it & {
 // the coins, wherever they are now (in the stall, in hand, in its pack),
 // taken in hand by the coffer (carrying/'s ways), then put away. Found
 // impossible (the takings it knew of gone into another stack, the stall
-// not yet looked in), it is tried again five minutes on, till 13:00.
+// not yet looked in), it is tried again five minutes on, while its window
+// is open. A buyer's is done with no coins left in its hands (#None): each
+// stack it holds is put away, and one who took none has nothing to do.
 coins_home: #Goal & {
     title:   "take the coins home"
     retry:   5min
-    done:    #Did & { did: "put_away_coins" }
+    done:    #None & { find: ["purse"], match: #Market & { me: #Agent & { id: $me },
+                                                           purse: #Stack & { unit: "coin", place: #Held & { by: $me, hand: <8 } } } }
     urgency: [{ input: 0, output: 35 }]
 } @family(goals)
 

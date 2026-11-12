@@ -76,8 +76,8 @@ Two terms are proposed, and have entries in GLOSSARY.md marked as such: a
     not theft before (their effect had another name): they are now.
 11. **Ownership passes with a move that says so** (`passes: true` on a
     `moves` entry): **passing**. Put in another's hand the thing is
-    theirs alone (a new ownership claim; the giver's side's claims on it
-    end); put into a container, it is claimed as the container is (the
+    theirs and their household's, and no one else's (new ownership
+    claims; the giver's side's claims on it end); put into a container, it is claimed as the container is (the
     container's ownership claims take it as a subject too). Only an
     owner passes a thing on, or anyone what is nobody's; nothing passes
     to those who own it already, or into a container nobody owns.
@@ -89,10 +89,46 @@ Two terms are proposed, and have entries in GLOSSARY.md marked as such: a
     the claims on what a thing was divided from cover it only while it
     has none of its own. An owner knows on sight what it no longer owns,
     as it knows what it owns.
-    Left: putting one's own thing into another's container gives it to
-    them (there is no leaving a thing in someone's keeping); a loan of
-    the very thing passes it as a gift does; what is made or caught is
-    nobody's until it is put into a container.
+    Putting one's own thing into another's container gives it to them:
+    that is what `put_in` says. Leaving it there one's own would be a
+    move that `lends` (decision 12); no operation does that yet.
+12. **A move may lend instead** (`lends: true`): the thing stays its
+    owner's, and the receiver (whose hand it is put in, or the owners of
+    the container) has a claim of **keeping** on it: holding it, taking
+    it up again and using it are no wrong (`claimed_by_another` is false
+    of its keeper), but it isn't the keeper's to pass on, so given away
+    it is still its owner's. Only an owner lends. Any move that puts it
+    back in an owner's hand, or into something of an owner's, ends the
+    keeping, whoever makes it. `lend` is the operation (actions.tri): a
+    loan of the very thing is lent (deals/'s `lent_out`, and Scenario
+    3's granted request), and what was lent goes back first when the
+    debt is repaid. The borrower knows what is lent to it (a `#Lent`
+    finding), so the law doesn't weigh against its using it. A shortcut:
+    whoever sees a keeper take the thing up knows it is lent, since
+    nobody is told of a loan yet.
+13. **What is nobody's is whoever's gets it into its own hand.** Taken
+    up, split off a stack nobody owns, made, harvested, shot and
+    butchered: when an agent's own act puts into its hand a thing no
+    claim of ownership covers, the thing is its own from then on, and
+    its household's: a claim for it and for each it has a kin bond
+    toward, as the scenarios claim a household's things. So is what
+    passes into a hand (decision 11). Owned by the one alone, a log one
+    woodcutter cut was not the other's to carry home: sixty-one takings
+    in three weeks of the village broke the law in truth; owned by the
+    household, none does. This
+    is a reaction of the Body kind to the event, not an entry in each
+    operation, because it holds for named effects and declared ones
+    alike. What a scenario places in a hand, and what another puts
+    there, isn't covered: the first is the scenario's to claim, the
+    second passes or doesn't by decision 11. Brought home, it passes to
+    the household as before. A claim ends with what it is on: when a
+    thing is destroyed (eaten, burnt, used up), the claims on it let go
+    of it, and one left on nothing is destroyed (the committer's, as
+    claims following merged units is). Before, a household's claim kept
+    an edge to every portion it had ever owned. And units merged into a
+    stack don't bring a second claim of its claimant's: an armful a
+    farmer owns, put with the household's grain, would else leave the
+    stack claimed once more by each of them with every armful.
 
 ## The issue
 

@@ -3788,6 +3788,8 @@ ALL_TESTS := [?]Test_Case{
 	{"looks",                         test_looks},
 	{"declared",                      test_declared},
 	{"passing",                       test_passing},
+	{"lending",                       test_lending},
+	{"taking_up",                     test_taking_up},
 	{"cooking",                       test_cooking},
 	{"rationing",                     test_rationing},
 	{"armful_put_away",               test_armful_put_away},

@@ -14,6 +14,11 @@
 // - code:    an #Area's tiles are the world's to say: what is near, what is
 //            seen and what is in reach (src/core_world.odin, src/act_view.odin,
 //            src/know_knowledge_2.odin, src/agency_agency.odin).
+// - code:    whose a thing is (#Claim): what is nobody's is whoever's gets
+//            it into its own hand, and their household's (bonds/'s kin;
+//            src/kinds_body_kind.odin); a claim ends
+//            with what it is on (src/commit_committer.odin); passing and
+//            lending are a move's to say (actions.tri).
 // - code:    the structs and the registry the lab uses are generated from all
 //            the content, every topic's fields with these (make gen:
 //            src/components.odin); the lab refuses to run on content
@@ -191,10 +196,13 @@ container_seen: #Seen & { kindOf: "#Container" } @family(seen)
 
 assembly_seen: #Seen & { kindOf: "#Assembly" } @family(seen)
 
-#ClaimKind: "ownership" | "custody" | "reservation"
+#ClaimKind: "ownership" | "custody" | "reservation" | "keeping"
 
 // A reified claim: an informational entity, with no body and no location.
-// Its claimant and subjects are edges.
+// Its claimant and subjects are edges. It ends with what it is on: a
+// subject destroyed is its subject no more, and a claim on nothing is
+// destroyed; and units merged into a stack bring no second claim of a
+// claimant's who has one on it (src/commit_committer.odin).
 #Claim: #Thing & {
     @component(Claim)
     kind:     #ClaimKind       @field(content, saved, inspect)
@@ -203,3 +211,7 @@ assembly_seen: #Seen & { kindOf: "#Assembly" } @family(seen)
 
 // An ownership claim, as the lab makes them.
 ownership: #Claim & { kind: "ownership" }
+
+// A claim of keeping: the thing is another's, lent to the claimant
+// (actions.tri's `lends`), who may hold and use it.
+keeping: #Claim & { kind: "keeping" }

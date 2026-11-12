@@ -860,8 +860,11 @@ knowledge_perceive :: proc(self: ^Knowledge, store: ^Knowledge_Store, first: uin
 			owned: ^Finding
 			f:     Finding
 
+			/* not what is lent them: that a thing is lent is known to whoever
+			 * sees it taken up (a shortcut: nobody is told of a loan yet) */
 			owned = knowledge_store_finding(store, "#Owned", o.subject)
-			if owned != nil && owned.choice != o.actor && knowledge_store_finding(store, "#Taken", o.subject) == nil {
+			if owned != nil && owned.choice != o.actor && knowledge_store_finding(store, "#Taken", o.subject) == nil &&
+			   !in_keeping_of(self.world, ev.subject, ev.actor) {
 				f = {}
 				f.kind     = world_intern(self.world, "#Taken")
 				f.about    = o.subject
@@ -2374,13 +2377,31 @@ know_owned_by :: proc(world: ^World, agent: Entity_ID) -> []Entity_ID {
 
 /* What the agent owns, it knows as its own when it sees it (KNOWLEDGE.md
  * decision 18), as it knows whom it is bound to: an #Owned finding, its own
- * the choice; and what it owned and has passed on, as no longer its own. */
+ * the choice; and what it owned and has passed on, as no longer its own.
+ * What is lent to it, it knows too: a #Lent finding. */
 @(private)
 know_own :: proc(self: ^Knowledge, store: ^Knowledge_Store, agent: Entity_ID, e: Entity_ID, referent: u32, now: i64) {
 	claims: [64]Entity_ID
 	claimant: [1]Entity_ID
 	me := knowledge_store_self_referent(store)
 	if me == 0 do return
+	/* lent to it, it knows it has it in keeping (a #Lent finding, itself
+	 * the choice), till it is back with its owner */
+	lent := knowledge_store_finding(store, "#Lent", referent)
+	if in_keeping_of(self.world, e, agent) {
+		if lent == nil {
+			f: Finding
+			f.kind     = world_intern(self.world, "#Lent")
+			f.about    = referent
+			f.choice   = me
+			f.credence = BG_SEEN
+			f.rule     = world_intern(self.world, "own")
+			f.time     = now
+			knowledge_store_add_finding(store, f)
+		}
+	} else if lent != nil && lent.choice == me {
+		knowledge_store_retract_finding(store, "#Lent", referent)
+	}
 	held := knowledge_store_finding(store, "#Owned", referent)
 	if held != nil && held.choice == me {
 		/* passed on since (sold, given, paid): it knows it isn't its own */

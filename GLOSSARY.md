@@ -135,17 +135,30 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
   attributes. A **reified relation** is one whose instances are entities.
   (COM §5)
 - **Claim**: a reified relation of ownership or authority (claimant,
-  subject, issuer): ownership, custody, reservation. A **quantity claim**
-  claims part of a stack. See *Words with more than one sense*. (COM d6)
+  subject, issuer): ownership, custody, reservation, keeping. A
+  **quantity claim** claims part of a stack. What no claim of ownership
+  covers is **nobody's**: got into its own hand by an agent (taken up,
+  made, caught, gathered), it is that agent's own, and its household's.
+  A claim ends with what it is on. See *Words with more than one
+  sense*. (COM d6; EFFECTS.md decision 13)
 - **Passing**: ownership going with a thing as it is moved, by a move
   that `passes` (giving, handing over, paying, putting into a container).
-  Put in another's hand it is theirs alone; put into a container, each of
-  the container's owners'. Only an owner passes a thing on, or anyone
+  Put in another's hand it is theirs, and their household's (those they
+  have kin bonds toward), and no one else's; put into a container, each
+  of the container's owners'. Only an owner passes a thing on, or anyone
   what is nobody's (a harvest brought home is the household's); another's
   thing, moved by one who doesn't own it, stays whose it was. Nothing
   passes to those who own it already, or into a container nobody owns.
   *Avoid:* transfer (a proposal transfers a stock). (EFFECTS.md
   decision 11)
+- **Lending**: handing a thing over by a move that `lends`: it stays its
+  owner's, and is in the other's **keeping**, a claim by which holding
+  and using it is no wrong, and which gives no right to pass it on. Only
+  an owner lends a thing. Back in its owner's hand, or in something of
+  its owner's, by whatever move, it is in nobody's keeping. A **loan** of
+  the very thing is lent; a loan of as much again is given, and passes.
+  *Avoid:* custody (the watch's, over what it confiscates). (EFFECTS.md
+  decision 12)
 - **Location**: the one exclusive relation that places a physical entity:
   `onTile`, `in`, `heldBy`, `wornBy`, `partOf`. (COM §5)
 - **Body**: the component of mass, volume, material and traces. (COM §6)
@@ -601,8 +614,8 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
   shift, pay. A **debt** is a commitment to pay, or to give back. Between
   two agents over a thing a deal is a **gift** (nothing owed), **in kind**
   (as much again, some time: a **debt in kind**, no date), a **loan** (the
-  very thing, or as much again and `extra`, by a `term`) or a **sale** (so
-  many coins). The other side of a debt is a **credit**. (AGE d15, d18;
+  very thing, which is lent and stays the lender's (**lending**), or as
+  much again and `extra`, by a `term`) or a **sale** (so many coins). The other side of a debt is a **credit**. (AGE d15, d18;
   NEG d4, d8)
 - **Asking**: the general method a need's goal falls back on when no
   method holds: asking someone for a thing like what a method wants in
@@ -1052,8 +1065,10 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
   level (two hundred coins, for woodcutters) as far as its people know.
   Woodcutters short of coins stock their woodpile further, to sell more.
   (VIL, the week's balance)
-- **Household**: the people of a home, joined by kin bonds. Not a
-  **place**, until abstract detail needs one. (VIL d3)
+- **Household**: the people of a home, joined by kin bonds. What one of
+  them comes to own (passed to it, or taken up when nobody's), each owns.
+  Not a **place**, until abstract detail needs one. (VIL d3; EFFECTS.md
+  decisions 11 and 13)
 
 ## Words with more than one sense
 
@@ -1063,7 +1078,7 @@ Each row says which term to use for which sense.
 | --- | --- | --- |
 | level | a storey (z) | **detail** / level of detail |
 | trace | physical evidence of an event | **causal trace** (developer's record) |
-| claim | a reified right: ownership, custody, reservation | **telling** (content said or written), **testimony** (heard) |
+| claim | a reified right: ownership, custody, reservation, keeping | **telling** (content said or written), **testimony** (heard) |
 | event | a committed event | **domain event** (a domain's discrete happening) |
 | commitment | an agent's bound goal: shift, promise, debt | **change commitment** / commit (writing state); **margin** (intention persisting) |
 | content | authored Triangle material | `Content` (the component); `content` (the field flag) |

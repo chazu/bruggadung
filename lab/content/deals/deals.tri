@@ -20,7 +20,8 @@
 //             itself that does, or walks away with its patience spent.
 //             Agreed, it hands the thing over, from its hands or fetched
 //             from its own containers; a debt in kind or a loan is a
-//             commitment of the asker's to give as much again.
+//             commitment of the asker's to give as much again, or the
+//             very thing back.
 // - reduced:  the same, decided on the cadence's beat.
 // - abstract: as reduced. A household provided for by its neighbours,
 //             below reduced, is open (DETAIL_REGIMES.md).
@@ -36,7 +37,10 @@
 // - things:   what a thing is worth to each side is agency's values
 //             (agency.tri's #Valuing), raised by the need it serves. What
 //             is given is the other's from then on (actions.tri's
-//             `passes`), a loan of the very thing too.
+//             `passes`): a gift, a sale, and what is lent to be repaid
+//             with as much again. A loan of the very thing is lent
+//             (actions.tri's `lends`): the lender's own still, in the
+//             borrower's keeping till it is given back.
 // - code:     src/agency_deals.odin: what to ask for (a method's slot
 //             wanted in hand, its place loosened), whom, valuing a deal,
 //             the target and the concession, `#HandOver`, debts and
@@ -108,6 +112,22 @@ handed_over: #Goal & {
 hand_it_over: #Method & {
     title: "hand it over"
     goal:  "handed_over"
+    rank:  1
+    pre:   { find: [], match: #Frame }
+    steps: [#HandOver]
+} @family(methods)
+
+// A loan of the very thing, agreed: lent (actions.tri's `lend`), not given.
+// It stays the lender's own, in the borrower's keeping till it is given
+// back.
+lent_out: #Goal & {
+    title: "lend it"
+    done:  #Did & { did: "lend" }
+} @family(goals)
+
+lend_it: #Method & {
+    title: "lend it"
+    goal:  "lent_out"
     rank:  1
     pre:   { find: [], match: #Frame }
     steps: [#HandOver]

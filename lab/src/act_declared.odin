@@ -8,7 +8,9 @@ package lab
  * (`makes`) and destroys (`consumes`), whole or a portion of a stack, and
  * the events it emits (`emits`). The command's parameter is the
  * operation's `parameter`, the time its `now`. A move that `passes` hands
- * on whose the thing is (declared_pass).
+ * on whose the thing is (declared_pass); one that `lends` leaves it its
+ * owner's, in the other's keeping (declared_lend), till it is back with
+ * its owner (declared_return).
  *
  * Resolving it is a unification: the operation's pattern with the truth
  * projection of what fills its roles. Where that fails, a requirement the
@@ -176,7 +178,6 @@ declared_place :: proc(world: ^World, into: ^tri.Node, mass: i64 = 0, stows := f
 
 
 /* The claimants of the ownership claims in `claims`, each once. */
-@(private = "file")
 owners_among :: proc(world: ^World, claims: []Entity_ID) -> []Entity_ID {
 	who: Entity_ID
 
@@ -192,26 +193,66 @@ owners_among :: proc(world: ^World, claims: []Entity_ID) -> []Entity_ID {
 }
 
 
-/* The ownership claims on an entity itself. */
-@(private = "file")
-ownership_on :: proc(world: ^World, entity: Entity_ID) -> []Entity_ID {
+/* The claims of a kind (`"ownership"`, quoted as content writes it) on an
+ * entity itself. */
+claims_on :: proc(world: ^World, entity: Entity_ID, kind: cstring) -> []Entity_ID {
 	claims: [64]Entity_ID
 
-	found     := make([dynamic]Entity_ID, context.temp_allocator)
-	ownership := u32(tri.type_named(world_tri(world), "\"ownership\""))
-	kclaim    := world_kind_named(world, "Claim")
+	found  := make([dynamic]Entity_ID, context.temp_allocator)
+	of     := u32(tri.type_named(world_tri(world), kind))
+	kclaim := world_kind_named(world, "Claim")
 	n := world_edges_to(world, .Claim_Subject, entity, &claims[0], 64)
 	for c in claims[:min(n, 64)] {
 		claim := (^Claim)(world_record(world, kclaim, c))
-		if claim != nil && u32(claim.kind) == ownership do append(&found, c)
+		if claim != nil && u32(claim.kind) == of do append(&found, c)
 	}
 	return found[:]
 }
 
 
+/* The ownership claims on an entity itself. */
+@(private = "file")
+ownership_on :: proc(world: ^World, entity: Entity_ID) -> []Entity_ID {
+	return claims_on(world, entity, "\"ownership\"")
+}
+
+
+/* Whose an entity is: those who own it, by the claims covering it. */
+owners_of :: proc(world: ^World, entity: Entity_ID) -> []Entity_ID {
+	return owners_among(world, claims_covering(world, entity))
+}
+
+
+/* Someone's household: itself, and those it has a kin bond toward. What it
+ * comes to own, they own with it. */
+household_of :: proc(world: ^World, who: Entity_ID) -> []Entity_ID {
+	people := make([dynamic]Entity_ID, context.temp_allocator)
+	append(&people, who)
+	kin   := u32(tri.type_named(world_tri(world), "\"kin\""))
+	bonds := world_store_for_kind(world, world_kind_named(world, "Bond"))
+	for i: uint = 0; i < store_count(bonds); i += 1 {
+		bond := (^Bond)(store_record_at_index(bonds, i))
+		if Entity_ID(bond.bondOf) != who || bond.tie != kin do continue
+		if toward := Entity_ID(bond.toward); world_is_live(world, toward) && !slice.contains(people[:], toward) do append(&people, toward)
+	}
+	return people[:]
+}
+
+
+/* Whether an entity is in someone's keeping: lent to them. */
+in_keeping_of :: proc(world: ^World, entity: Entity_ID, who: Entity_ID) -> bool {
+	claimant: Entity_ID
+
+	for claim in claims_on(world, entity, "\"keeping\"") {
+		if world_edges_from(world, .Claimant, claim, &claimant, 1) != 0 && claimant == who do return true
+	}
+	return false
+}
+
+
 /* Passing (a move that `passes`): whose `thing` is goes with it, to
- * `receiver`: the one whose hand it is put in, alone; or, put into a
- * container, each of the container's owners. `target` is what moves: the
+ * `receiver`: the one whose hand it is put in, and its household
+ * (household_of); or, put into a container, each of the container's owners. `target` is what moves: the
  * thing, or the units split off it (`portion`), which the split leaves
  * owned as the thing is.
  *
@@ -224,10 +265,10 @@ declared_pass :: proc(world: ^World, group: ^Proposal_Group, actor: Entity_ID, t
                       receiver: Entity_ID, hand: bool) {
 	subjects: [2]Entity_ID
 
-	was := owners_among(world, claims_covering(world, thing))
+	was := owners_of(world, thing)
 	if len(was) > 0 && !slice.contains(was, actor) do return
 	via := ownership_on(world, receiver) if !hand else nil
-	to  := owners_among(world, via) if !hand else []Entity_ID{receiver}
+	to  := owners_among(world, via) if !hand else household_of(world, receiver)
 	news := false
 	for owner in to do if !slice.contains(was, owner) do news = true
 	if !news do return
@@ -239,13 +280,60 @@ declared_pass :: proc(world: ^World, group: ^Proposal_Group, actor: Entity_ID, t
 		}
 	}
 	if hand {
-		claim := proposal_group_create(group, "ownership", "passed", location_make_none())
-		proposal_group_set_of_to(group, "Claim.quantity", whole(claim), 1)
-		proposal_group_relate(group, .Claimant, whole(claim), whole(receiver))
-		proposal_group_relate(group, .Claim_Subject, whole(claim), target)
+		for owner in to {
+			claim := proposal_group_create(group, "ownership", "passed", location_make_none())
+			proposal_group_set_of_to(group, "Claim.quantity", whole(claim), 1)
+			proposal_group_relate(group, .Claimant, whole(claim), whole(owner))
+			proposal_group_relate(group, .Claim_Subject, whole(claim), target)
+		}
 		return
 	}
 	for claim in via do proposal_group_relate(group, .Claim_Subject, whole(claim), target)
+}
+
+
+/* Lending (a move that `lends`): `thing` stays whose it is, and is in the
+ * keeping of `receiver`: the one whose hand it is put in; or, put into a
+ * container, each of the container's owners. `target` is what moves, as
+ * in passing. Only its owner lends it; and not to one who owns it, or has
+ * it in keeping already. */
+@(private = "file")
+declared_lend :: proc(world: ^World, group: ^Proposal_Group, actor: Entity_ID, thing: Entity_ID, target: Ref, receiver: Entity_ID,
+                      hand: bool) {
+	was := owners_of(world, thing)
+	if !slice.contains(was, actor) do return
+	to := owners_among(world, ownership_on(world, receiver)) if !hand else []Entity_ID{receiver}
+	for keeper in to {
+		if slice.contains(was, keeper) || in_keeping_of(world, thing, keeper) do continue
+		claim := proposal_group_create(group, "keeping", "lent", location_make_none())
+		proposal_group_set_of_to(group, "Claim.quantity", whole(claim), 1)
+		proposal_group_relate(group, .Claimant, whole(claim), whole(keeper))
+		proposal_group_relate(group, .Claim_Subject, whole(claim), target)
+	}
+}
+
+
+/* What was lent, back with its owner: moved (`target`, as in passing) into
+ * an owner's hand, or into a container of an owner's, by whatever move, it
+ * is in nobody's keeping any more. */
+@(private = "file")
+declared_return :: proc(world: ^World, group: ^Proposal_Group, thing: Entity_ID, target: Ref, portion: bool, receiver: Entity_ID,
+                        hand: bool) {
+	subjects: [2]Entity_ID
+
+	kept := claims_on(world, thing, "\"keeping\"")
+	if len(kept) == 0 do return
+	was  := owners_of(world, thing)
+	to   := owners_among(world, ownership_on(world, receiver)) if !hand else []Entity_ID{receiver}
+	home := false
+	for owner in to do if slice.contains(was, owner) do home = true
+	if !home do return
+	for claim in kept {
+		proposal_group_unrelate(group, .Claim_Subject, whole(claim), target)
+		if !portion && world_edges_from(world, .Claim_Subject, claim, &subjects[0], 2) == 1 {
+			proposal_group_destroy(group, whole(claim), "returned")
+		}
+	}
 }
 
 
@@ -398,12 +486,16 @@ apply_declared_effect :: proc(world: ^World, action: Action, stage: i64, amount:
 		}
 		/* whose it is goes with it: to whose hand it is (their pack is
 		 * theirs to carry it in), or to the owners of what it is put into */
-		if printed(tc, tri.at(tc, move, "passes")) == "true" {
-			into := tri.at(tc, move, "into")
-			held := strings.has_suffix(string(tri.type_name(tc, tri.node_type(into))), "#Held")
-			if receiver, named := ref_of(tc, tri.at(tc, into, "by" if held else "container")); named {
+		into := tri.at(tc, move, "into")
+		held := strings.has_suffix(string(tri.type_name(tc, tri.node_type(into))), "#Held")
+		if receiver, named := ref_of(tc, tri.at(tc, into, "by" if held else "container")); named {
+			if printed(tc, tri.at(tc, move, "passes")) == "true" {
 				declared_pass(world, group, action.roles[.Actor], moved, target, some, receiver, held)
+			} else if printed(tc, tri.at(tc, move, "lends")) == "true" {
+				declared_lend(world, group, action.roles[.Actor], moved, target, receiver, held)
 			}
+			/* lent, and back with its owner */
+			declared_return(world, group, moved, target, some, receiver, held)
 		}
 	}
 

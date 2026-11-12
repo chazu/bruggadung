@@ -2389,8 +2389,9 @@ authorize :: proc(world: ^World, action: Action) -> []Entity_ID {
 
 
 /* Whether it is another's and not `who`'s: someone else claims it
- * (ownership or custody), and `who` doesn't own it. What several own is
- * each one's own: a household's larder is every one of its people's. */
+ * (ownership or custody), and `who` doesn't own it, nor has it in keeping
+ * (lent it, holding and using it is no wrong). What several own is each
+ * one's own: a household's larder is every one of its people's. */
 claimed_by_another :: proc(world: ^World, entity: Entity_ID, who: Entity_ID) -> bool {
 	claim: ^Claim
 	claims: []Entity_ID

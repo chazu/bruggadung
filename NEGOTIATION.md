@@ -155,7 +155,10 @@ goal's methods. They stay as they are; what this document adds is general.
 10. **Loans in general.** A loan is of the very thing (an axe, back the
     same) or of a quantity of a kind (three portions of grain, back as
     much again). Things used up (food, fuel, coins) are lent only by
-    quantity: repaying gives any thing like it, as many.
+    quantity: repaying gives any thing like it, as many. A loan of the
+    very thing is **lent** (GLOSSARY.md; EFFECTS.md decision 12): it
+    stays the lender's own, in the borrower's keeping, till it is given
+    back. A loan by quantity is given, and is the borrower's.
 11. **A need's goal dropped as impossible is weighed again when what the
     agent holds changes**, not only two hours on (AGENCY.md decision 27):
     a portion handed to a starving agent is eaten at once. Likewise when

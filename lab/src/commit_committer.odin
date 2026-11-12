@@ -18,6 +18,7 @@ package lab
 import "core:fmt"
 import "core:mem"
 import "core:strings"
+import tri "../../triangle/odin/triangle"
 
 // _reactors' pairs: kind index, reactor.
 @(private = "file")
@@ -502,6 +503,28 @@ food_alike :: proc(world: ^World, a: Entity_ID, b: Entity_ID) -> bool {
 }
 
 
+/* Whether a claim of ownership or keeping would double one on `stack`: its
+ * claimant has a claim of its kind on the stack already. */
+@(private = "file")
+claim_doubles :: proc(world: ^World, claim: Entity_ID, stack: Entity_ID) -> bool {
+	there: [64]Entity_ID
+	who, other: Entity_ID
+
+	kclaim := world_kind_named(world, "Claim")
+	mine   := (^Claim)(world_record(world, kclaim, claim))
+	if mine == nil || world_edges_from(world, .Claimant, claim, &who, 1) == 0 do return false
+	tc := world_tri(world)
+	if mine.kind != u32(tri.type_named(tc, "\"ownership\"")) && mine.kind != u32(tri.type_named(tc, "\"keeping\"")) do return false
+	n := world_edges_to(world, .Claim_Subject, stack, &there[0], 64)
+	for c in there[:min(n, 64)] {
+		theirs := (^Claim)(world_record(world, kclaim, c))
+		if c == claim || theirs == nil || theirs.kind != mine.kind do continue
+		if world_edges_from(world, .Claimant, c, &other, 1) != 0 && other == who do return true
+	}
+	return false
+}
+
+
 // Why `a` cannot merge into `b`, or "".
 @(private = "file")
 committer_merge_obstacle :: proc(self: ^Committer, a: Entity_ID, b: Entity_ID) -> string {
@@ -767,7 +790,15 @@ committer_apply :: proc(self: ^Committer, p: ^Proposal, g: ^Proposal_Group, tall
 		}
 		/* where it was: a witness knows the thing that ended there (KNOWLEDGE.md decision 19) */
 		ev = committer_emit(self, "destroyed", e, NO_ENTITY, 0, p.name, world_location_of(self.world, e), g)
+		// the claims on it are on it no more; one on nothing else is over
+		n = world_edges_to(self.world, .Claim_Subject, e, &claims[0], 64)
 		world_destroy(self.world, e, NO_ENTITY, ev, p.name if p.name != nil else "destroyed")
+		for i: uint = 0; i < n && i < 64; i += 1 {
+			world_remove_edge(self.world, .Claim_Subject, claims[i], e)
+			if !world_is_live(self.world, claims[i]) || world_edges_from(self.world, .Claim_Subject, claims[i], &a, 1) != 0 do continue
+			over := committer_emit(self, "destroyed", claims[i], NO_ENTITY, 0, "its subject gone", location_make_none(), g)
+			world_destroy(self.world, claims[i], NO_ENTITY, over, "its subject gone")
+		}
 		return ""
 
 	case .Set_Field:
@@ -893,11 +924,19 @@ committer_apply :: proc(self: ^Committer, p: ^Proposal, g: ^Proposal_Group, tall
 		body.mass   += world_mass_of(self.world, a)
 		world_set_record(self.world, &stack, kstack, b)
 		world_set_record(self.world, &body, kbody, b)
-		// quantity claims follow the units; each keeps its quantity
+		// quantity claims follow the units; each keeps its quantity. A claim
+		// of ownership or keeping the stack's claimant has on it already
+		// isn't doubled: left on nothing, it is over
 		n = world_edges_to(self.world, .Claim_Subject, a, &claims[0], 64)
 		for i: uint = 0; i < n && i < 64; i += 1 {
+			one: Entity_ID
 			world_remove_edge(self.world, .Claim_Subject, claims[i], a)
-			world_add_edge(self.world, .Claim_Subject, claims[i], b)
+			if !claim_doubles(self.world, claims[i], b) {
+				world_add_edge(self.world, .Claim_Subject, claims[i], b)
+			} else if world_edges_from(self.world, .Claim_Subject, claims[i], &one, 1) == 0 {
+				over := committer_emit(self, "destroyed", claims[i], NO_ENTITY, 0, "its subject merged", location_make_none(), g)
+				world_destroy(self.world, claims[i], NO_ENTITY, over, "its subject merged")
+			}
 		}
 		ev = committer_emit(self, "merged", a, b, world_units_of(self.world, a), nil, world_location_of(self.world, b), g)
 		world_destroy(self.world, a, b, ev, "merged")

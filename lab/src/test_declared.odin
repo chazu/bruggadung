@@ -8,6 +8,7 @@ package lab
  * and the truth doesn't bear out fails, with the path as the reason.
  */
 
+import "core:slice"
 import "core:strings"
 
 test_declared :: proc() {
@@ -181,6 +182,161 @@ test_passing :: proc() {
 	bg_check(perform(w, c, action_make("put_in", cy, sack, stall), 0, &error) != nil)
 	committer_commit_boundary(c)
 	bg_check(claimed_by_another(w, sack, cy) && !claimed_by_another(w, sack, bo))
+}
+
+
+/* Lending (a move that `lends`, act_declared.odin's declared_lend): what
+ * its owner lends stays its own, in the other's keeping, who may hold and
+ * use it but not give it away; back with its owner, by whatever move, it is
+ * in nobody's keeping. What isn't the actor's it can't lend. */
+test_lending :: proc() {
+	error: string
+
+	w := test_world(7)
+	c := test_committer(w)
+	ada   := test_commit_create(c, "worker", on_tile(1, 1, 0))
+	bo    := test_commit_create(c, "worker", on_tile(2, 1, 0))
+	cy    := test_commit_create(c, "worker", on_tile(1, 2, 0))
+	nail  := test_commit_create(c, "iron_nail", held_by(ada, 0))
+	purse := test_commit_create(c, "coins_400", held_by(ada, 1))
+	other := test_commit_create(c, "iron_nail", held_by(cy, 0))
+	test_owning(c, ada, nail)
+	test_owning(c, ada, purse)
+	test_owning(c, ada, other)
+
+	/* lent to Bo, the nail is Ada's still, and Bo's to hold */
+	bg_check(perform(w, c, action_make("lend", ada, nail, bo), 1, &error) != nil)
+	committer_commit_boundary(c)
+	bg_check(world_location_of(w, nail).place == bo)
+	bg_check(slice.equal(owners_of(w, nail), []Entity_ID{ada}) && in_keeping_of(w, nail, bo))
+	bg_check(!claimed_by_another(w, nail, ada) && !claimed_by_another(w, nail, bo) && claimed_by_another(w, nail, cy))
+	kept := claims_on(w, nail, "\"keeping\"")
+	bg_check(len(kept) == 1)
+	lent := kept[0] if len(kept) == 1 else NO_ENTITY
+
+	/* put down and taken up again by Bo, it is in Bo's keeping still, and
+	 * not Bo's own */
+	bg_check(perform(w, c, action_make("put_down", bo, nail, NO_ENTITY), 0, &error) != nil)
+	committer_commit_boundary(c)
+	bg_check(perform(w, c, action_make("take", bo, nail, NO_ENTITY), 0, &error) != nil)
+	committer_commit_boundary(c)
+	bg_check(world_location_of(w, nail).place == bo && in_keeping_of(w, nail, bo))
+	bg_check(slice.equal(owners_of(w, nail), []Entity_ID{ada}))
+
+	/* given back, it is in nobody's keeping, and Ada's as it was */
+	bg_check(perform(w, c, action_make("give", bo, nail, ada), 0, &error) != nil)
+	committer_commit_boundary(c)
+	bg_check(world_location_of(w, nail).place == ada && !in_keeping_of(w, nail, bo) && !world_is_live(w, lent))
+	bg_check(slice.equal(owners_of(w, nail), []Entity_ID{ada}) && claimed_by_another(w, nail, bo))
+
+	/* some of a stack lent: those are in Bo's keeping, the rest not */
+	bg_check(perform(w, c, action_make("lend", ada, purse, bo), 100, &error) != nil)
+	committer_commit_boundary(c)
+	inhand: [4]Entity_ID
+	coins := NO_ENTITY
+	for e in inhand[:min(world_entities_at(w, bo, .Held_By, raw_data(inhand[:]), 4), 4)] do coins = e
+	bg_check(coins != NO_ENTITY && world_units_of(w, coins) == 100 && world_units_of(w, purse) == 300)
+	bg_check(in_keeping_of(w, coins, bo) && !in_keeping_of(w, purse, bo))
+	bg_check(slice.equal(owners_of(w, coins), []Entity_ID{ada}))
+
+	/* lent, it isn't Bo's to give: given to Cy, it is Ada's still, and
+	 * not Cy's to hold */
+	bg_check(perform(w, c, action_make("put_down", cy, other, NO_ENTITY), 0, &error) != nil)
+	committer_commit_boundary(c)
+	bg_check(perform(w, c, action_make("give", bo, coins, cy), 0, &error) != nil)
+	committer_commit_boundary(c)
+	bg_check(world_location_of(w, coins).place == cy)
+	bg_check(slice.equal(owners_of(w, coins), []Entity_ID{ada}) && claimed_by_another(w, coins, cy))
+
+	/* Ada's other nail, in Cy's hand, isn't Cy's to lend */
+	bg_check(perform(w, c, action_make("take", cy, other, NO_ENTITY), 0, &error) != nil)
+	committer_commit_boundary(c)
+	bg_check(perform(w, c, action_make("lend", cy, other, bo), 1, &error) != nil)
+	committer_commit_boundary(c)
+	bg_check(world_location_of(w, other).place == bo && !in_keeping_of(w, other, bo) && claimed_by_another(w, other, bo))
+}
+
+
+/* What is nobody's is whoever's gets it into its own hand
+ * (kinds_body_kind.odin): taken up, it is the taker's own; another's taken
+ * stays whose it was. */
+test_taking_up :: proc() {
+	error: string
+
+	w := test_world(7)
+	c := test_committer(w)
+	ada   := test_commit_create(c, "worker", on_tile(1, 1, 0))
+	bo    := test_commit_create(c, "worker", on_tile(2, 1, 0))
+	found := test_commit_create(c, "iron_nail", on_tile(1, 1, 0))
+	hers  := test_commit_create(c, "iron_nail", on_tile(2, 1, 0))
+	sack  := test_commit_create(c, "grain_sack", on_tile(1, 1, 0))
+	test_owning(c, ada, hers)
+	bg_check(len(owners_of(w, found)) == 0)
+
+	bg_check(perform(w, c, action_make("take", ada, found, NO_ENTITY), 0, &error) != nil)
+	committer_commit_boundary(c)
+	bg_check(slice.equal(owners_of(w, found), []Entity_ID{ada}) && claimed_by_another(w, found, bo))
+
+	/* Ada's, taken by Bo, is Ada's still */
+	bg_check(perform(w, c, action_make("take", bo, hers, NO_ENTITY), 0, &error) != nil)
+	committer_commit_boundary(c)
+	bg_check(world_location_of(w, hers).place == bo && slice.equal(owners_of(w, hers), []Entity_ID{ada}))
+
+	/* some of a stack nobody's, taken: those are the taker's, the rest
+	 * nobody's */
+	bg_check(perform(w, c, action_make("take_some", ada, sack, NO_ENTITY), 10, &error) != nil)
+	committer_commit_boundary(c)
+	inhand: [4]Entity_ID
+	some := NO_ENTITY
+	for e in inhand[:min(world_entities_at(w, ada, .Held_By, raw_data(inhand[:]), 4), 4)] do if e != found do some = e
+	bg_check(some != NO_ENTITY && some != sack && slice.equal(owners_of(w, some), []Entity_ID{ada}))
+	bg_check(len(owners_of(w, sack)) == 0)
+
+	/* put by, and more of it taken up and put with it: the stack they merge
+	 * into is claimed by her once, not once for each armful */
+	chest := test_commit_create(c, "larder", on_tile(1, 1, 0))
+	test_owning(c, ada, chest)
+	bg_check(perform(w, c, action_make("put_in", ada, some, chest), 0, &error) != nil)
+	committer_commit_boundary(c)
+	bg_check(perform(w, c, action_make("take_some", ada, sack, NO_ENTITY), 10, &error) != nil)
+	committer_commit_boundary(c)
+	more := NO_ENTITY
+	for e in inhand[:min(world_entities_at(w, ada, .Held_By, raw_data(inhand[:]), 4), 4)] do if e != found do more = e
+	bg_check(more != NO_ENTITY && more != some && slice.equal(owners_of(w, more), []Entity_ID{ada}))
+	bg_check(perform(w, c, action_make("put_in", ada, more, chest), 0, &error) != nil)
+	committer_commit_boundary(c)
+	committer_commit_boundary(c)
+	bg_check(!world_is_live(w, more) && world_units_of(w, some) == 20 && len(claims_on(w, some, "\"ownership\"")) == 1)
+
+	/* what one of a household takes up is the household's: Bo's kin Cy
+	 * owns it too, and takes it up after him with no wrong */
+	cy   := test_commit_create(c, "worker", on_tile(2, 2, 0))
+	hook := test_commit_create(c, "iron_nail", on_tile(2, 1, 0))
+	{
+		kin := proposal_group_group_with_phase(.System, "setup: Bo and Cy, kin")
+		for pair in ([2][2]Entity_ID{{bo, cy}, {cy, bo}}) {
+			bond := proposal_group_create(kin, "kin_bond", "kin", location_make_none())
+			proposal_group_set_of_to(kin, "Bond.bondOf", whole(bond), i64(pair[0]))
+			proposal_group_set_of_to(kin, "Bond.toward", whole(bond), i64(pair[1]))
+		}
+		committer_submit(c, kin)
+		committer_commit_boundary(c)
+	}
+	bg_check(perform(w, c, action_make("put_down", bo, hers, NO_ENTITY), 0, &error) != nil)
+	committer_commit_boundary(c)
+	bg_check(perform(w, c, action_make("take", bo, hook, NO_ENTITY), 0, &error) != nil)
+	committer_commit_boundary(c)
+	bg_check(len(owners_of(w, hook)) == 2 && !claimed_by_another(w, hook, bo) && !claimed_by_another(w, hook, cy) &&
+	         claimed_by_another(w, hook, ada))
+
+	/* a claim on what is gone, and on nothing else, is over */
+	mine := claims_on(w, found, "\"ownership\"")
+	bg_check(len(mine) == 1)
+	g := proposal_group_group_with_phase(.System, "test: the nail lost")
+	proposal_group_destroy(g, whole(found), "lost")
+	committer_submit(c, g)
+	committer_commit_boundary(c)
+	bg_check(!world_is_live(w, found) && len(mine) == 1 && !world_is_live(w, mine[0]))
 }
 
 

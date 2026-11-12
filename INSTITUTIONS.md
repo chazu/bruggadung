@@ -49,4 +49,9 @@ the contract follows once enough is decided.
    receiver's, or the container's owners' (**passing**; EFFECTS.md
    decision 11). So a buyer taking bought grain out of its pack, and a
    seller taking its takings home, break no law; a thief's handing on
-   what it took passes nothing.
+   what it took passes nothing. What is lent stays its owner's, in the
+   borrower's **keeping** (EFFECTS.md decision 12): the borrower's
+   holding and using it breaks no law, and anyone else's taking it
+   does. What is nobody's is whoever's takes it up, and their
+   household's (decision 13), so what one has gathered, made or caught
+   is one's household's before it is home.

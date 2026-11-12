@@ -30,13 +30,21 @@ things the lab put off:
   since: the town, its law against theft (which everyone knows), and one
   watch officer, of the town and of no household, who keeps a post south
   of the green. The town keeps it: a bed, a stove, a larder with a
-  farm's grain and a woodpile with a household's firewood, its own (it
-  has no wage, and makes nothing to sell: a stopgap). Nobody is
+  sack of grain and a woodpile with a household's firewood, its own;
+  and pays it a wage, twelve markets' ahead: a coffer of 1200 coins at
+  its post, a hundred a market, with which it buys its grain and
+  firewood at the market as a household's buyer does (it makes nothing
+  to sell; one person's grain and firewood came to some 400 coins in
+  three weeks). Who pays the town, and a wage paid as it is earned,
+  are open. Nobody is
   arrested. What several own is each one's own, so a household's taking
   from its larder is no theft. Ownership passes with what is sold, paid,
   given or brought home (EFFECTS.md decision 11), so nothing taken in
   three weeks breaks the law in truth (it was 21 takings: bought grain
-  out of the buyer's own pack, coins off the seller's own stall).
+  out of the buyer's own pack, coins off the seller's own stall). What
+  is nobody's is whoever's takes it up, and their household's (decision
+  13): a log one woodcutter cut is the Fells', before it is home.
+  Lending is built (decision 12); nobody in the village lends yet.
 - Seasons, weather, births and the regrowing of woods.
 - Hunger and food below reduced detail. Abstract detail stays open, as the
   user asked: the whole village runs at full detail.
@@ -677,7 +685,8 @@ New, and entered in the glossary with this document:
     food, failing 7 to 15 of the three weeks' checks. The farmers' store
     is now 120 kg. Selling what one will need before the next harvest
     is still possible: a farmer keeps back a fixed fifteen kilograms,
-    whenever its harvest is due (open).
+    whenever its harvest is due. With the store as it is, it doesn't
+    happen in three weeks; it would with a poorer harvest.
   - What the harvest days showed, with food enough: a farmer hungry at
     the harvest, an armful of it in one hand and seed in the other, had
     no hand free to cook a portion, so it cooked the armful, sixty-six
@@ -689,9 +698,12 @@ New, and entered in the glossary with this document:
     its unit, in a hand or a container.
   - With these the three weeks pass every check (223).
   - Seen on the way: a buyer that finds nothing to buy, and is at
-    something more pressing from 12:00 to 13:00, keeps the coins in hand
-    till the next market; with coins in both hands it can't buy, and
-    taking the coins home puts away one stack of the two (not fixed). A
+    something more pressing from 12:00 to 13:00, kept the coins in hand
+    till the next market; with coins in both hands it couldn't buy, and
+    taking the coins home put away one stack of the two. Now a buyer's
+    taking the coins home is done when no coins are left in its hands
+    (not when it has put a stack away once), and its window is open
+    till 15:00. A
     seller whose takings merged into another stack as it walked to the
     stall found taking them home impossible, and left them there: taking
     coins home is now tried again five minutes on, till 13:00

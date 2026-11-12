@@ -33,7 +33,7 @@ package lab
  * asker can still be waiting. Otherwise it says it won't. A request for
  * something it holds (comply or refuse) costs what lending it costs: its
  * worth to the agent (AGENCY.md decision 16), less by the agent's trust in
- * the asker. Granted, the agent gives what it holds like it, and says so;
+ * the asker. Granted, the agent lends what it holds like it, and says so;
  * with nothing like it in hand, it says it has none.
  *
  * Goals have worth (AGENCY.md §3): their considerations, added in dB, among
@@ -620,6 +620,14 @@ compare_candidates :: proc(c: ^Condition, a: ^Referent, b: ^Referent) -> int {
 		}
 	}
 	return -1 if a.id < b.id else (1 if a.id > b.id else 0)
+}
+
+
+/* Whether the agent knows the referent lent to it: a #Lent finding, itself
+ * the choice. */
+agency_has_lent :: proc(store: ^Knowledge_Store, thing: u32) -> bool {
+	f := knowledge_store_finding(store, "#Lent", thing) if thing != 0 else nil
+	return f != nil && f.choice == knowledge_store_self_referent(store)
 }
 
 
@@ -2455,9 +2463,10 @@ agency_drop_question :: proc(self: ^Agency, m: ^Motivation, k: i32) {
 }
 
 
-/* Something the agent holds like the description, or 0. */
+/* Something the agent holds like the description, or 0: its own to give
+ * (not lent to it), or, `lent`, something lent to it. */
 @(private)
-agency_held_like :: proc(self: ^Agency, what: ^tri.Node, store: ^Knowledge_Store) -> u32 {
+agency_held_like :: proc(self: ^Agency, what: ^tri.Node, store: ^Knowledge_Store, lent := false) -> u32 {
 	result: tri.Match_Result
 
 	tc    := world_tri(self.world)
@@ -2466,6 +2475,7 @@ agency_held_like :: proc(self: ^Agency, what: ^tri.Node, store: ^Knowledge_Store
 	for i: uint = 0; what != nil && i < knowledge_store_count(store) && found == 0; i += 1 {
 		r := knowledge_store_referent_at(store, i)
 		if !r.present || r.form != .Held_By || r.container != knowledge_store_self_referent(store) do continue
+		if agency_has_lent(store, r.id) != lent do continue
 		description := tri.value(tc, ns_utf8(knowledge_store_describe_referent(store, r.id)), arena, nil, 0)
 		if description != nil && tri.match(tc, what, description, &result) == .Entailed do found = r.id
 	}
@@ -3288,7 +3298,7 @@ agency_consider_questions :: proc(self: ^Agency, m: ^Motivation, store: ^Knowled
 				agency_note(self, m, fmt.tprintf("asked by R%d: worth %+d, granting", q.asker, worth))
 				/* on terms (AGENCY.md decision 18): to a friend, none said, the
 				 * default between them; to anyone else, a day */
-				if agency_act(self, m, "granting", store, "give", given, q.asker, 0, nil) {
+				if agency_act(self, m, "granting", store, "lend", given, q.asker, 1, nil) {
 					if knowledge_store_loyalty_to(store, q.asker) > 0 {
 						answer = fmt.tprintf("#Granted & {{ what: %s }}", knowledge_store_describe_looks(store, given))
 					} else {
@@ -3350,7 +3360,8 @@ agency_owe :: proc(self: ^Agency, m: ^Motivation, answer: cstring, lender: u32, 
 	/* the terms said; none, the default between them (AGENCY.md decision 18) */
 	term := BG_LOAN_TERM if knowledge_store_loyalty_to(store, lender) > 0 else BG_LOAN_SHORT
 	if granted != nil && tri.subtype(tc, tri.node_type(granted), tri.type_named(tc, "#Granted")) != 0 {
-		loan = agency_held_like(self, tri.at(tc, granted, "what"), store)
+		loan = agency_held_like(self, tri.at(tc, granted, "what"), store, true)
+		if loan == 0 do loan = agency_held_like(self, tri.at(tc, granted, "what"), store)
 		if tri.at(tc, granted, "owedIn") != nil do term = int_at(tc, granted, "owedIn", term)
 	}
 	tri.arena_free(arena)
@@ -3549,6 +3560,7 @@ agency_sum :: proc(self: ^Agency, instance: cstring, path: cstring, b: [^]Slot_B
 			thing := bound(b, n, str(slot[:]))
 			r     := knowledge_store_referent(store, thing) if thing != 0 else nil
 			owned := knowledge_store_finding(store, "#Owned", thing) if thing != 0 else nil
+			if agency_has_lent(store, thing) do owned = nil      /* lent it: nothing to hide */
 			v = 0
 			for k: uint = 0; r != nil && r.form == .Held_By && r.container == knowledge_store_self_referent(store) && owned != nil &&
 			                 owned.choice != knowledge_store_self_referent(store) && k < knowledge_store_law_count(store); k += 1 {
@@ -3577,6 +3589,7 @@ agency_sum :: proc(self: ^Agency, instance: cstring, path: cstring, b: [^]Slot_B
 			 * itself seen; unseen, nothing */
 			thing  := bound(b, n, str(slot[:]))
 			owned  := knowledge_store_finding(store, "#Owned", thing) if thing != 0 else nil
+			if agency_has_lent(store, thing) do owned = nil      /* lent it: taking it up is no wrong */
 			known  := false
 			weighs: i32 = 0
 			for k: uint = 0; owned != nil && owned.choice != knowledge_store_self_referent(store) && k < knowledge_store_law_count(store); k += 1 {

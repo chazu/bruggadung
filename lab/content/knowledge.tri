@@ -12,7 +12,7 @@
 //             times, so it is caught up as it is read.
 // - code:     src/know_knowledge_*.odin: perception, recognition, memory, each
 //             premise's kind, and the findings no rule concludes (#Taken,
-//             #Struck, #Arrested, #Hires, #Owned, #Reserved); what is
+//             #Struck, #Arrested, #Hires, #Owned, #Lent, #Reserved); what is
 //             common knowledge (#Common), learnt at an agent's first
 //             perception, and whom it knows by sight. What a thing
 //             is seen as, from the `seen` family: kind_of_entity
@@ -42,6 +42,9 @@
 #Reserved:    #Finding & {}
 // It is someone's own, the finding's choice: as the agent was told.
 #Owned:       #Finding & {}
+// It is lent to someone, the finding's choice: in their keeping, another's
+// own. What is lent to the agent itself, it knows.
+#Lent:        #Finding & {}
 // Someone, the finding's choice, took it from its owner: seen, or told.
 #Taken:       #Finding & {}
 // It (the agent itself) is under arrest, by the finding's choice.

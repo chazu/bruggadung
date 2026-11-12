@@ -5,7 +5,8 @@
 // - full:     a debt due raises getting money: borrowing from a friend,
 //             asking for work (work/work.tri), or taking an unwatched purse,
 //             as the agent's honesty and scruples weigh it. A loan granted is
-//             a debt to repay within its term.
+//             lent (actions.tri's `lend`): the lender's own still, in the
+//             borrower's keeping, a debt to hand back within its term.
 // - reduced:  the same, decided on the cadence's beat; a debt's window wakes
 //             it on the beat.
 // - abstract: as reduced. Money as a coarse stock is planned

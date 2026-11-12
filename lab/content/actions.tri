@@ -24,7 +24,11 @@
 //            `emits`, for an operation or a stage. Taking, giving, putting
 //            down, putting in and looking are declared. A move that
 //            `passes` hands on whose the thing is (declared_pass: giving,
-//            putting in). An operation, or a stage, with no
+//            putting in); one that `lends` leaves it its owner's, in the
+//            other's keeping (declared_lend: lending). What is nobody's
+//            is whoever's takes it in hand, and their household's
+//            (src/kinds_body_kind.odin).
+//            An operation, or a stage, with no
 //            effect named or declared and no trace is refused at load.
 // - code:    a walk's stages come from its activity's way, not from the
 //            operation (src/act_activities.odin); its way is found by the
@@ -77,9 +81,15 @@
 // A portion of more units than there are is all of them, unless it is
 // `exact`: then the effect fails (paying, there must be so many coins).
 // A move that `passes` hands on whose the thing is (a claim of ownership,
-// things.tri) with it: put in another's hand, it is theirs; put into a
-// container, its owners'. Only its owner passes it, or anyone what is
+// things.tri) with it: put in another's hand, it is theirs, and their
+// household's (those they have kin bonds toward); put into a container,
+// its owners'. Only its owner passes it, or anyone what is
 // nobody's; nothing passes to those who own it already.
+// A move that `lends` leaves it whose it was, in the keeping of the one
+// whose hand it is put in (or of the owners of what it is put into): a
+// claim of keeping, by which holding and using it is no wrong. Only its
+// owner lends it. Moved back into its owner's hand, or into something of
+// its owner's, by any move, it is in nobody's keeping any more.
 // `makes` constructs a thing from a `blueprint`, `at` a place (where a role
 // was, by a tag on its `place`), `called` what its construction is recorded
 // as; `splitFrom` says what it was carved from, if anything.
@@ -87,7 +97,7 @@
 // $k`), its `parameter` the command's (how many). Into a hand, of an operation
 // that stows (`stow`), is into a pack its actor carries, if it fits. Arithmetic in `after` is Triangle's (CONTENT_LANGUAGE.md §5).
 #OfSome:   { portion: int & >=1, exact: bool }
-#Moves:    #OfSome & { moved: ref, into: #Place, passes: bool }
+#Moves:    #OfSome & { moved: ref, into: #Place, passes: bool, lends: bool }
 #Consumes: #OfSome & { consumed: ref, because: text }
 #Emits:    { event: text, subject: ref, other: ref }
 #Makes:    { blueprint: text, at: #Place, called: text, splitFrom: ref }
@@ -270,6 +280,19 @@ give: #Operation & {
         destination: #Agent & { id: $d, freeHands: >=1 }
     }
     moves: [{ moved: $i, into: #Held & { by: $d }, passes: true }]
+} @family(operations)
+
+// Lend something the actor holds to someone in reach, into a free hand: it
+// stays the actor's own, in the other's keeping (deals/'s loan of the very
+// thing). So many of a stack, split off; anything else, whole.
+lend: #Operation & {
+    parameter: $n & >=1
+    roles: {
+        actor:       #Agent & { id: $a }
+        item:        #Body & { id: $i, place: #Held & { by: $a } }
+        destination: #Agent & { id: $d, freeHands: >=1 }
+    }
+    moves: [#Moves & { moved: $i, portion: $n, into: #Held & { by: $d }, lends: true }]
 } @family(operations)
 
 // Look into a container: what is inside is perceived only by looking.

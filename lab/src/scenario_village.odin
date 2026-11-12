@@ -40,7 +40,9 @@ package lab
  *
  * The town, its law against theft, and one watch officer, of no household:
  * a post south of the green, which the town keeps (a bed, a stove, a
- * larder and a woodpile, stocked), its nights there. The checks count it among those fed, and that it has arrested
+ * larder and a woodpile, stocked as a household's are), its nights there,
+ * and its wage, paid twelve markets ahead: a coffer of coins, with which it buys
+ * its grain and its firewood at the market as anyone does. The checks count it among those fed, and that it has arrested
  * nobody: nobody here takes what isn't its household's.
  *
  * The run goes boundary by boundary up to each check's time, putting none
@@ -75,15 +77,16 @@ VILLAGE_DAYS :: 7
 VILLAGE_GRAIN :: i64(60)               // portions in each larder's sack (village.tri's grain_sack)
 VILLAGE_FARM_GRAIN :: i64(480)         // what is left of a farming household's harvest (village.tri's farm_grain)
 VILLAGE_COINS :: i64(400)              // coins in each household's coffer (money/coins.tri's coins_400)
+VILLAGE_WAGE :: i64(1200)              // the watch officer's wage, paid ahead (village.tri's watch_wage)
 VILLAGE_STOCKED :: i64(3000)          // pieces on a stocked woodpile (firewood.tri's woodpile_stocked, three tonnes)
 VILLAGE_MARKET :: i64(2)               // the first market day's index (day 3); then every fourth
 
 /* What each household buys at the market (content/market/): the goals,
  * each stocking its larder (or woodpile) with what it doesn't make. */
 /* The watch's post, south of the green: where its officer stands, its
- * bed, its larder, its stove and its woodpile. */
+ * bed, its larder, its stove, its woodpile and its coffer. */
 @(private = "file", rodata)
-village_post := [5][2]i32{{60, 56}, {60, 57}, {61, 57}, {59, 57}, {61, 56}}
+village_post := [6][2]i32{{60, 56}, {60, 57}, {61, 57}, {59, 57}, {61, 56}, {59, 56}}
 
 @(private = "file", rodata)
 village_buys := [4][2]cstring {
@@ -407,9 +410,11 @@ village_setup :: proc(self: ^Village) {
 	}
 	/* the town, its law against theft, which everyone knows, and its watch:
 	 * one officer, who keeps a post south of the green and stands by it. The
-	 * town keeps its watch: a bed, a stove, a larder with a farm's grain in
-	 * it and a woodpile with a household's firewood, the officer's own
-	 * (it has no wage yet, and makes nothing to sell) */
+	 * town keeps its watch: a bed, a stove, a larder with a sack of grain in
+	 * it and a woodpile with a household's firewood, the officer's own; and
+	 * pays it a wage, twelve markets' ahead: a coffer of coins, a hundred a
+	 * market (what one person's grain and firewood come to), to buy them
+	 * with (it makes nothing to sell). Who pays the town is open */
 	town := proposal_group_create(g, "town", "the town", location_make_none())
 	law  := proposal_group_create(g, "theft_law", "the law against theft", location_make_none())
 	proposal_group_set_of_to(g, "Law.lawOf", whole(law), i64(town))
@@ -422,7 +427,11 @@ village_setup :: proc(self: ^Village) {
 	officer   := proposal_group_create(g, "watch_officer", "the watch officer", on_tile(village_post[0].x, village_post[0].y, 0))
 	post_bed  := proposal_group_create(g, "bed", "the watch's bed", on_tile(village_post[1].x, village_post[1].y, 0))
 	post_food := proposal_group_create(g, "larder", "the watch's larder", on_tile(village_post[2].x, village_post[2].y, 0))
-	post_sack := proposal_group_create(g, "farm_grain", "the watch's grain", in_(post_food))
+	post_sack := proposal_group_create(g, "grain_sack", "the watch's grain", in_(post_food))
+	post_coffer := proposal_group_create(g, "coffer", "the watch's coffer", on_tile(village_post[5].x, village_post[5].y, 0))
+	post_wage   := proposal_group_create(g, "watch_wage", "the watch's wage", in_(post_coffer))
+	village_own(g, officer, post_coffer, "the watch's coffer")
+	village_own(g, officer, post_wage, "the watch's wage")
 	proposal_group_set_of_to(g, "OfficeHolder.office", whole(officer), i64(town))
 	village_own(g, officer, post_bed, "a bed of one's own")
 	village_own(g, officer, post_food, "the watch's larder")
@@ -465,6 +474,12 @@ village_setup :: proc(self: ^Village) {
 				at := village_forage_edge[v.household]
 				proposal_group_move_to(tour, whole(v.id), on_tile(at.x - 1 + i32(i % 3), at.y, 0))
 			}
+		}
+		/* the watch officer goes to the green with them, to see the stalls,
+		 * and back to its post */
+		if k == 3 || k == 4 {
+			at := [2]i32{62, 50} if k == 3 else village_post[0]
+			if !terrain_solid(world_terrain(self.world), at.x, at.y, 0) do proposal_group_move_to(tour, whole(self.officer), on_tile(at.x, at.y, 0))
 		}
 		committer_submit(c, tour)
 		scheduler_run_until(self.scheduler, time_make(2 + i64(k)))
@@ -509,11 +524,27 @@ village_setup :: proc(self: ^Village) {
 	committer_submit(c, hearth)
 	scheduler_run_until(self.scheduler, time_make(8))
 
-	/* the watch officer's nights: a supper, its stove stoked, and its bed */
+	/* the watch officer's nights: a supper, its stove stoked, and its bed;
+	 * and on market day it buys its grain and its firewood with its wage,
+	 * as a household's buyer does */
 	{
-		store := knowledge_store_of(self.knowledge, self.officer)
-		bed   := village_referent_of(store, proposal_group_id_for(g, post_bed))
-		stove := village_referent_of(store, proposal_group_id_for(hearth, post_fire))
+		store  := knowledge_store_of(self.knowledge, self.officer)
+		bed    := village_referent_of(store, proposal_group_id_for(g, post_bed))
+		stove  := village_referent_of(store, proposal_group_id_for(hearth, post_fire))
+		larder := village_referent_of(store, proposal_group_id_for(g, post_food))
+		pile   := village_referent_of(store, proposal_group_id_for(hearth, post_pile))
+		coffer := village_referent_of(store, proposal_group_id_for(g, post_coffer))
+		day    := VILLAGE_MARKET * VILLAGE_DAY
+		if larder == 0 || pile == 0 || coffer == 0 ||
+		   !agency_undertake_every_with(self.agency, self.officer, "grain_stocked", day + 9 * VILLAGE_HOUR + VILLAGE_HOUR / 2,
+		                                day + 12 * VILLAGE_HOUR, "market", 4 * VILLAGE_DAY, {{"supply", larder}, {"coffer", coffer}}) ||
+		   !agency_undertake_every_with(self.agency, self.officer, "firewood_stocked", day + 9 * VILLAGE_HOUR + VILLAGE_HOUR / 2,
+		                                day + 12 * VILLAGE_HOUR, "market", 4 * VILLAGE_DAY, {{"supply", pile}, {"coffer", coffer}}) ||
+		   !agency_undertake_every_with(self.agency, self.officer, "coins_home", day + 12 * VILLAGE_HOUR, day + 15 * VILLAGE_HOUR,
+		                                "market", 4 * VILLAGE_DAY, {{"coffer", coffer}}) {
+			self.error = fmt.aprintf("the watch officer couldn't take on its marketing")
+			return
+		}
 		if bed == 0 || stove == 0 ||
 		   !agency_undertake_every_with(self.agency, self.officer, "stove_stoked", 19 * VILLAGE_HOUR, 21 * VILLAGE_HOUR, "home",
 		                                VILLAGE_DAY, {{"stove", stove}}) ||
@@ -613,7 +644,9 @@ village_setup :: proc(self: ^Village) {
 				                                       day + 12 * VILLAGE_HOUR, "market", 4 * VILLAGE_DAY,
 				                                       {{"supply", supply}, {"coffer", coffer}})
 			}
-			ok = ok && agency_undertake_every_with(self.agency, v.id, "coins_home", day + 12 * VILLAGE_HOUR, day + 13 * VILLAGE_HOUR,
+			/* till none are left in its hands: through the afternoon, if
+			 * something keeps it from it at noon */
+			ok = ok && agency_undertake_every_with(self.agency, v.id, "coins_home", day + 12 * VILLAGE_HOUR, day + 15 * VILLAGE_HOUR,
 			                                       "market", 4 * VILLAGE_DAY, {{"coffer", coffer}})
 		}
 		if !ok {
@@ -1005,7 +1038,8 @@ village_check_market :: proc(self: ^Village, d: i64, before: [4]i64) {
 		if u := world_unit_of(self.world, e); u != nil && u == "coin" && world_is_live(self.world, e) do coins += world_units_of(self.world, e)
 	}
 	for st in self.stalls do left += village_units_in(self.world, st, "coin")
-	village_check(self, coins == 4 * VILLAGE_COINS && left == 0,
+	/* the four households' coffers, and the watch's wage */
+	village_check(self, coins == 4 * VILLAGE_COINS + VILLAGE_WAGE && left == 0,
 	              fmt.tprintf("day %d, 13:00: the takings home, and no coin made or lost", d + 1),
 	              fmt.tprintf("%d coins, %d of them still on the stalls", coins, left))
 	for l, k in self.larders do self.marketed[k] += village_portions_in(self.world, l) - before[k]

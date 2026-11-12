@@ -2220,6 +2220,11 @@ test_tempting_purse_ :: proc(variant: Purse) -> Purse_Run {
 	h[2] = proposal_group_create(g, "kasimir", "kasimir", on_tile(9, 10, 0))
 	h[3] = proposal_group_create(g, "carter", "carter", on_tile(5, 10, 0))
 	h[5] = proposal_group_create(g, "purse", "the carter's wages", held_by(h[3], 0))
+	{
+		claim := proposal_group_create(g, "ownership", "the carter's wages", location_make_none())
+		proposal_group_relate(g, .Claimant, whole(claim), whole(h[3]))
+		proposal_group_relate(g, .Claim_Subject, whole(claim), whole(h[5]))
+	}
 	h[4] = NO_ENTITY
 	if variant != .No_Witness {
 		h[4] = proposal_group_create(g, "mira", "mira", on_tile(12, 12, 0))
@@ -2488,8 +2493,11 @@ test_tempting_purse :: proc() {
 	bg_check(world_location_of(honest.world, honest.purse).form == .On_Tile)
 	bg_check(test_logged_by(honest.agency, honest.carter, "worth 30 to it: lending it costs 4"))
 	bg_check(test_logged_by(honest.agency, honest.carter, "worth +18, granting"))
-	bg_check(test_logged_by(honest.agency, honest.carter, "granting: give R"))
+	bg_check(test_logged_by(honest.agency, honest.carter, "granting: lend R"))
 	bg_check(world_location_of(honest.world, honest.wages).place == honest.kasimir)
+	/* lent, the wages are the carter's still, in Kasimir's keeping */
+	bg_check(in_keeping_of(honest.world, honest.wages, honest.kasimir) &&
+	         !claimed_by_another(honest.world, honest.wages, honest.carter))
 	bg_check(!test_logged_by(noticed.agency, noticed.mira, "for something it hasn't"))
 	/* a wary carter, disposed to trust no one (-20), trusts him at 2: lending
 	 * costs nearly half the wages' worth, and it refuses */
@@ -2583,6 +2591,8 @@ test_tempting_purse :: proc() {
 	bg_check(test_logged_by(repaid.agency, repaid.kasimir, "hand it back: give R"))
 	bg_check(world_location_of(repaid.world, repaid.wages).form == .Held_By &&
 	         world_location_of(repaid.world, repaid.wages).place == repaid.carter)
+	bg_check(!in_keeping_of(repaid.world, repaid.wages, repaid.kasimir) &&
+	         claimed_by_another(repaid.world, repaid.wages, repaid.kasimir))
 	/* and promised so (§7): the carter holds it as a claim about the
 	 * seventh day, kept when the wages are back in its hand, and trusts
 	 * Kasimir more */
