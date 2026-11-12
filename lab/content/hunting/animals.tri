@@ -150,8 +150,7 @@ lie_up: #Method & {
     steps: [#Do & { op: "bed_down" }]
 } @family(methods)
 
-bed_down: #Operation & {
-    effect:   "rest"
+bed_down: #Resting & {
     duration: 2h
     uses:     ["legs"]
     roles: {
@@ -160,8 +159,7 @@ bed_down: #Operation & {
 } @family(operations)
 
 // Grazing: an hour in one spot, resting.
-graze: #Operation & {
-    effect:   "rest"
+graze: #Resting & {
     duration: 1h
     uses:     ["legs"]
     roles: {

@@ -427,9 +427,11 @@ What content can't say yet:
 - **Body fields** (slice 1): satiety and reserves read lazily, their
   wakes, and the effect curves applied where they act: the pace of work
   (`work_rate`), grip, the attention budget, and how precisely the agent
-  perceives (knowledge's impairment). `effect_eat` stops doing the body's
-  arithmetic (`fed = satiety + 50`); it proposes nourishment, and the bodies
-  domain applies it.
+  perceives (knowledge's impairment). Eating stops doing the body's
+  arithmetic (`fed = satiety + 50`); it proposes nourishment, and the body
+  keeps it. (Since: eating is declared, a `changes` of the eater's
+  satiety; that satiety and reserves are kept as of the meal is the
+  body's code. EFFECTS.md step 4.)
 - **Looks** (slice 2): the producer reads a blueprint's look. The watcher's
   theme comes from a content file of glyphs, not from code.
 - **New effects**, each a small effect function: `cook`, `fell`, `split`,

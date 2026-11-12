@@ -82,10 +82,10 @@ with. It applies to all content, and to every agent and person adding to it.
 // - abstract: as reduced. How hunger and food work below reduced is open
 //             (DETAIL_REGIMES.md).
 // - frozen:   it doesn't decide, so it doesn't eat; ...
-// - body:     eating nourishes the eater by the food's `nourishment`: the
-//             body's code raises its satiety (body.tri). ...
-// - code:     effect_eat (src/act_actions.odin) destroys the food and asks
-//             the body to be nourished (bodies_nourish, domains_bodies.odin).
+// - body:     eating nourishes the eater by the food's `nourishment`: its
+//             satiety is so much more (a `changes`; body.tri). ...
+// - code:     none: eating is declared. Of a stack held, one is eaten,
+//             the rest still in hand.
 ```
 
 The title line names the topic, the part of it the file holds, and the

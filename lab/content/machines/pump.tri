@@ -250,7 +250,7 @@ shut_off: #Operation & {
 // Dismantle a pump with a wrench in hand: the gland nut, the cover, then the
 // piston out; open at the end.
 dismantle: #Operation & {
-    stages: [{ duration: 3s, effect: "tend" }, { duration: 3s, effect: "tend" },
+    stages: [{ duration: 3s }, { duration: 3s },
              { duration: 5s, after: { destination: #Pump & { opened: true } } }]
     uses:   ["hands"]
     roles: {

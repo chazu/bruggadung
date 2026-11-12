@@ -548,7 +548,7 @@ atmosphere_breath_of :: proc(self: ^Atmosphere, b: i32) -> i64 {
 	for i = 0; i < n && !resting; i += 1 {
 		record  = (^Activity)(world_record(self.world, world_kind_named(self.world, "Activity"), mine[i]))
 		resting = record != nil && record.status == u32(tri.type_named(world_tri(self.world), "\"running\"")) &&
-		          operation_effect(self.world, world_text_field(self.world, "Activity.operation", mine[i])) == "rest"
+		          operation_is_a(self.world, world_text_field(self.world, "Activity.operation", mine[i]), "#Resting")
 	}
 	free(mine)
 	return respirator.atRest if resting else respirator.atWork

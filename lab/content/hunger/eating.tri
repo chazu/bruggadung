@@ -10,18 +10,19 @@
 // - abstract: as reduced. How hunger and food work below reduced is open
 //             (DETAIL_REGIMES.md).
 // - frozen:   it doesn't decide, so it doesn't eat; an eat under way waits.
-// - body:     eating nourishes the eater by the food's `nourishment`: the
-//             body's code raises its satiety (body.tri). Eating knows nothing
-//             of how the body keeps it, and the body nothing of food.
+// - body:     eating nourishes the eater by the food's `nourishment`: its
+//             satiety is so much more (a `changes`; body.tri). Eating
+//             knows nothing of how the body keeps it, and the body
+//             nothing of food. What doesn't get hungry eats, and is none
+//             the fuller.
 // - cooking: food raw or not, and what cooking adds, are cooking's
 //             fields on #Food (cooking/cooking.tri), as are the ways from a
 //             larder to a meal.
 // - perishing: how long food keeps, and when it spoils, are perishing's
 //             fields on #Food (perishing/). Spoiled, it isn't food, and is
 //             made of rot: `eat` takes only what is made of food.
-// - code:     effect_eat (src/act_actions.odin) destroys the food (one of a
-//             stack held, the rest still in hand) and asks the body to be
-//             nourished (bodies_nourish, domains_bodies.odin).
+// - code:     none: eating is declared. Of a stack held, one is eaten,
+//             the rest still in hand.
 // - deals:    what is wanted, asked for, is valued as food, whatever it is
 //             made of (`food_kind_value`; deals/).
 
@@ -85,16 +86,17 @@ supper: #Body & #Food & { material: "food", mass: 300g, nourishment: 50 }
 food_seen: #Seen & { kindOf: "#Food" } @family(seen)
 
 // Eat what the actor holds: a while, with the hands, easily put down. It
-// is gone, and the actor is fed.
+// is gone (of a stack, one of it), and the actor is fed by what it gives.
 eat: #Operation & {
-    effect:    "eat"
     duration:  60s
     uses:      ["hands"]
     attention: 5
     roles: {
         actor: #Agent & { id: $a }
-        item:  #Body & { material: "food", place: #Held & { by: $a } }
+        item:  #Food & { id: $i, nourishment: $n, material: "food", place: #Held & { by: $a } }
     }
+    changes:  [{ changedOf: "actor", changed: "satiety", changedBy: $n }]
+    consumes: [{ consumed: $i, portion: 1, because: "eaten" }]
 } @family(operations)
 
 food_value:      #Valuing & { valued: #Body & { material: "food" }, value: 10, pressure: "hunger", per: 5 } @family(values)

@@ -28,9 +28,9 @@
 //             market/) takes it up again to hunt: a bow in hand is a
 //             subgoal of stalking and of looking for game, passed over
 //             while one is held.
-// - code:     effect_crouch, effect_shoot (src/act_actions.odin); an
-//             operation's `range` (actions.tri), which agency walks to
-//             within and no further.
+// - code:     effect_shoot (src/act_actions.odin; crouching is
+//             declared); an operation's `range` (actions.tri), which
+//             agency walks to within and no further.
 
 package hunting
 
@@ -65,12 +65,12 @@ sure_bow: #Bow & { material: "oak", mass: 1kg, aim: 100, spread: 0 }
 // Crouch, bow in hand, to stalk: from now on, hiding, until a shot gives it
 // away. A second.
 crouch: #Operation & {
-    effect:   "crouch"
     duration: 1s
     roles: {
         actor: #Agent & { id: $a, place: #OnTile }
         item:  #Bow & { place: #Held & { by: $a } }
     }
+    after: { actor: #Agent & { hiding: true } }
 } @family(operations)
 
 // Shoot game within three tiles, the bow in hand: two seconds, with the
@@ -297,8 +297,7 @@ lie_low: #Method & {
 
 // Lie in wait, bow in hand, crouched: a quarter of an hour, watching. Game
 // coming into sight is taken a shot at (take_the_shot), whatever else.
-lie_in_wait: #Operation & {
-    effect:   "rest"
+lie_in_wait: #Resting & {
     duration: 15min
     roles: {
         actor: #Agent & { id: $a, place: #OnTile }

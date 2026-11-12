@@ -3818,6 +3818,7 @@ ALL_TESTS := [?]Test_Case{
 	{"butcher",                       test_butcher},
 	{"hunting_week",                  test_hunting_week},
 	{"perishing",                     test_perishing},
+	{"changes",                       test_changes},
 	{"tanning",                       test_tanning},
 	{"dressing_hides",                test_dressing_hides},
 	{"market",                        test_market},

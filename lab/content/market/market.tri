@@ -128,8 +128,7 @@ keep_the_stall: #Method & {
 
 // Minding a stall within reach: ten minutes by it, the hands free to hand
 // goods over.
-mind_stall: #Operation & {
-    effect:   "rest"
+mind_stall: #Resting & {
     duration: 10min
     roles: {
         actor: #Agent

@@ -12,8 +12,9 @@
 // - actions:  an operation's `leaves` and `removes` (actions.tri) make and
 //             remove traces, with its effect.
 // - code:     src/domains_traces.odin; perceiving traces, and the premises
-//             (#Sign, #Near, ...), in src/know_knowledge_*.odin; effect_tend,
-//             effect_analyse, effect_investigate.
+//             (#Sign, #Near, ...), in src/know_knowledge_*.odin; effect_analyse.
+//             An operation that changes nothing but traces says only
+//             those; watching closely is declared (an event).
 
 package traces
 
@@ -58,7 +59,6 @@ clatter:     #TraceKind & { sense: "hearing", lasts: 2s } @family(traces)
 // Wash the floor where the actor stands: the scuffs go, and the floor is left
 // damp, smelling of soap.
 wash_floor: #Operation & {
-    effect:    "tend"
     duration:  10s
     uses:      ["hands"]
     attention: 5
@@ -71,7 +71,6 @@ wash_floor: #Operation & {
 // Touch up the paint on an assembly: its tool marks go under fresh paint,
 // which smells.
 touch_up: #Operation & {
-    effect:    "tend"
     duration:  20s
     uses:      ["hands"]
     attention: 10
@@ -100,7 +99,6 @@ test_scratch: #Operation & {
 
 // Knock things over, as a cat does at night: a clatter where it is.
 knock_over: #Operation & {
-    effect: "tend"
     roles:  { actor: #Agent & { hands: 0 } }
     leaves: [{ trace: "clatter", on: "tile", strength: 60 }]
 } @family(operations)
@@ -109,10 +107,10 @@ knock_over: #Operation & {
 // minute watching closely, which ends with the actor noticing fainter traces
 // and drawing the rules that take thought.
 watch_closely: #Operation & {
-    effect:    "investigate"
     duration:  30s
     attention: 20
-    roles:     { actor: #Agent & { place: #OnTile } }
+    roles:     { actor: #Agent & { id: $a, place: #OnTile } }
+    emits:     [{ event: "investigated", subject: $a, other: $a }]
 } @family(operations)
 
 // Fresh paint, to a painter's eye, means something was touched up: something

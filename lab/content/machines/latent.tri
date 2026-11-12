@@ -103,6 +103,7 @@ open_up: #Operation & {
         item:        #Wrench & { place: #Held & { by: $a } }
         destination: #Latent
     }
+    leaves: [{ trace: "tool_marks", on: "destination", strength: 40 }]
 } @family(operations)
 
 // Replace a worn part in an assembly with a spare that fits its role, held:
@@ -137,8 +138,8 @@ service_part: #Operation & {
 
 // Clean out an open assembly's cylinder, with a wrench in hand, for ten
 // minutes: watching the floor, as water may come (ACTIONS.md Scenario 3).
+// Nothing of the assembly is changed by it but the marks the wrench leaves.
 clean_out: #Operation & {
-    effect:     "tend"
     duration:   10min
     uses:       ["hands"]
     floodWatch: 500
@@ -147,6 +148,7 @@ clean_out: #Operation & {
         item:        #Wrench & { place: #Held & { by: $a } }
         destination: #Latent
     }
+    leaves: [{ trace: "tool_marks", on: "destination", strength: 40 }]
 } @family(operations)
 
 // Put a part held back into the assembly it came from, in its role.

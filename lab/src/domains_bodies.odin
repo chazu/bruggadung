@@ -10,8 +10,8 @@ package lab
 // is, they fall over `lastsFor`. Nothing is computed between: the domain's
 // horizon is the next time anyone's satiety crosses into another band of
 // ten (so interoception, and the needs it feels, are refreshed there), or
-// its reserves run out. Eating nourishes through bodies_nourish: the food
-// says how much, the body how it keeps it.
+// its reserves run out. Eating is declared (content/hunger/): the food says
+// how much, the body how it keeps it (bodies_kept_as_of_now).
 //
 // Weakness (content/hunger/weakness.tri) is read from reserves by curves,
 // where it acts: attention, the pace of work, perception, grip.
@@ -82,15 +82,16 @@ hunger_exhausted_at :: proc(h: ^Hungry) -> i64 {
 	return empty + r * per_point(h.lastsFor)
 }
 
-// Eating's way into the body: satiety `n` more (100 at most), as of t, and
-// reserves as they stand then. Proposed into g; nothing, for what doesn't
-// get hungry.
-bodies_nourish :: proc(world: ^World, g: ^Proposal_Group, eater: Entity_ID, n: i64, t: i64) {
-	h := hungry_of(world, eater)
+// How the body keeps what an effect makes of its stomach: an effect reads
+// satiety as it is now (the truth projection, src/act_view.odin) and sets
+// it as of now, so the reserves are written down as they stand now, and
+// now is when both are as of. Proposed into g, with the effect's set.
+bodies_kept_as_of_now :: proc(world: ^World, g: ^Proposal_Group, body: Entity_ID) {
+	h := hungry_of(world, body)
 	if h == nil do return
-	proposal_group_set_of_to(g, "Hungry.satiety", whole(eater), min(satiety(h, t) + max(n, 0), 100))
-	proposal_group_set_of_to(g, "Hungry.reserves", whole(eater), reserves(h, t))
-	proposal_group_set_of_to(g, "Hungry.fedAt", whole(eater), t)
+	t := world_time(world).ms
+	if r := reserves(h, t); r != h.reserves do proposal_group_set_of_to(g, "Hungry.reserves", whole(body), r)
+	proposal_group_set_of_to(g, "Hungry.fedAt", whole(body), t)
 }
 
 

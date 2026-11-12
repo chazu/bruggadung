@@ -216,7 +216,7 @@ match_described :: proc(world: ^World, pattern: ^tri.Node, action: Action, descr
 		for i: uint = 0; i < worked.nresidual; i += 1 {
 			path := string(cstring(&worked.residual[i][0]))
 			done := false
-			for field in ([?]string{"after", "moves", "makes", "consumes", "emits", "now", "parameter"}) {
+			for field in ([?]string{"after", "moves", "makes", "consumes", "emits", "changes", "now", "parameter"}) {
 				if path == field || strings.has_prefix(path, strings.concatenate({field, "."}, context.temp_allocator)) ||
 				   (strings.has_prefix(path, "stages.") &&
 				    strings.contains(path, strings.concatenate({".", field}, context.temp_allocator))) {
@@ -858,26 +858,6 @@ effect_read :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -
 }
 
 
-/* Eating: the food is gone, and the eater nourished by what the food gives
- * (its #Food's nourishment; none, nothing). How the body keeps it is the
- * body's (bodies_nourish). */
-@(private = "file")
-effect_eat :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
-	if world_record(world, world_kind_named(world, "Agent"), a.roles[.Actor]) == nil {
-		return "only an agent eats"
-	}
-	food := (^Food)(world_record(world, world_kind_named(world, "Food"), a.roles[.Item]))
-	bodies_nourish(world, g, a.roles[.Actor], food.nourishment if food != nil else 0, world_time(world).ms)
-	/* of a stack held (a sack of grain), one: the rest is still held */
-	if world_units_of(world, a.roles[.Item]) > 1 {
-		one := proposal_group_split(g, whole(a.roles[.Item]), 1, world_location_of(world, a.roles[.Item]))
-		proposal_group_destroy(g, whole(one), "eaten")
-		return ""
-	}
-	proposal_group_destroy(g, whole(a.roles[.Item]), "eaten")
-	return ""
-}
-
 
 /* Foraging a patch (content/foraging/): a handful of what it yields into a
  * free hand, the patch one fewer; stripped of the first of a full patch,
@@ -897,14 +877,6 @@ effect_forage :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group)
 	return ""
 }
 
-
-/* Investigating changes nothing: it ends in an event the investigator
- * perceives, a close look. */
-@(private = "file")
-effect_investigate :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
-	proposal_group_emit_subject_other(g, "investigated", whole(a.roles[.Actor]), whole(a.roles[.Actor]))
-	return ""
-}
 
 
 /* A trace of wear made by an effect: tool marks on what was used. */
@@ -2568,14 +2540,6 @@ effect_hit :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) ->
 }
 
 
-/* Crouching (content/hunting/): hiding, seen only from beside it, until a
- * shot gives it away. */
-@(private = "file")
-effect_crouch :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
-	proposal_group_set_of_to(g, "Agent.hiding", whole(a.roles[.Actor]), 1)
-	return ""
-}
-
 
 /* A shot (content/hunting/): it strikes by a seeded draw, as the bow aims
  * at that many tiles and the hunter's stalking; struck, the game is
@@ -2677,13 +2641,6 @@ effect_hire :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -
 }
 
 
-/* Through a door: onto its tile. */
-@(private = "file")
-effect_pass :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
-	proposal_group_move_to(g, whole(a.roles[.Actor]), world_location_of(world, a.roles[.Item]))
-	return ""
-}
-
 
 /* The region of air (a GasStore) over the entity's tile, or 0. */
 air_over :: proc(world: ^World, e: Entity_ID) -> Entity_ID {
@@ -2705,21 +2662,6 @@ air_over :: proc(world: ^World, e: Entity_ID) -> Entity_ID {
 }
 
 
-/* Tending changes nothing but traces, which the operation declares. */
-@(private = "file")
-effect_tend :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
-	return ""
-}
-
-
-/* A rest, rested through: fatigue is gone. */
-@(private = "file")
-effect_rest :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
-	if world_record(world, world_kind_named(world, "Agent"), a.roles[.Actor]) != nil {
-		proposal_group_set_of_to(g, "Agent.fatigue", whole(a.roles[.Actor]), 0)
-	}
-	return ""
-}
 
 
 @(private = "file")
@@ -2733,12 +2675,9 @@ effects := [?]Named_Effect{
 	{"drive",     effect_drive},
 	{"walk",      effect_walk},
 	{"say",       effect_say},
-	{"tend",      effect_tend},
 	{"analyse",   effect_analyse},
 	{"write",     effect_write},
 	{"read",      effect_read},
-	{"eat",       effect_eat},
-	{"investigate", effect_investigate},
 	{"rotate",    effect_rotate},
 	{"confiscate", effect_confiscate},
 	{"arrest",    effect_arrest},
@@ -2746,7 +2685,6 @@ effects := [?]Named_Effect{
 	{"hit",       effect_hit},
 	{"hire",      effect_hire},
 	{"work",      effect_work},
-	{"pass",      effect_pass},
 	{"copy",      effect_copy},
 	{"reveal",    effect_reveal},
 	{"replace",   effect_replace},
@@ -2754,9 +2692,7 @@ effects := [?]Named_Effect{
 	{"cut",       effect_cut},
 	{"shape",     effect_shape},
 	{"issue",     effect_issue},
-	{"rest",      effect_rest},
 	{"strike",    effect_strike},
-	{"crouch",    effect_crouch},
 	{"forage",    effect_forage},
 	{"shoot",     effect_shoot},
 	{"shoulder",  effect_shoulder},
@@ -2800,6 +2736,16 @@ operation_effect :: proc(world: ^World, operation: cstring) -> (string, bool) #o
 	}
 	effect[n - 1] = 0          /* without its quotes */
 	return strings.clone(string(cstring(&effect[1])), context.temp_allocator), true
+}
+
+
+/* Whether an operation is of a type, or of one under it (a rest: rest/'s
+ * `#Resting`). */
+operation_is_a :: proc(world: ^World, operation: cstring, type: cstring) -> bool {
+	tc      := world_tri(world)
+	pattern := tri.pattern(tc, operation) if operation != nil else nil
+	of      := tri.type_named(tc, type)
+	return pattern != nil && of != 0 && tri.subtype(tc, tri.node_type(pattern), of) != 0
 }
 
 
@@ -3477,7 +3423,7 @@ perform :: proc(world: ^World, committer: ^Committer, action: Action, amount: i6
 				proposal_group_set_of_to(group, "Activity.watchLevel", whole(activity), i64(floor.level))
 			}
 		}
-		if effect == "rest" && air_over(world, action.roles[.Actor]) != 0 {
+		if operation_is_a(world, action.operation, "#Resting") && air_over(world, action.roles[.Actor]) != 0 {
 			breather: ^Respirator
 
 			/* resting, with a watch on the air: woken when it grows stuffy, or

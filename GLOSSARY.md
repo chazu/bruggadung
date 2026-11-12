@@ -317,13 +317,20 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
   outcome by perception. (ACT d3, §4)
 - **Expectation**: the actor's predicted outcome, kept on the activity.
   (ACT §3)
+- **Rest**: an operation passed at ease (`#Resting`, rest/): rested
+  through, fatigue is gone; through it its actor breathes as at rest, and
+  its activity has a watch on the air over it. A night's sleep, minding a
+  stall, lying in wait and an animal's grazing are rests. (EFFECTS.md
+  step 5)
 - **Named effect**: an effect given as the name of the code that builds
   it (`effect: "forage"`). (EFFECTS.md)
 - **Declared effect**: an effect stated in content: the roles as it
-  leaves them (`after`), and what it moves, makes, consumes and emits
-  (built); what it changes (not built). Applied by one generic procedure,
+  leaves them (`after`), and what it moves, makes, consumes, emits and
+  changes. Applied by one generic procedure,
   which resolves the operation against the truth projection. Its `changes`
-  are coarse effects. Of a stack, a declared effect's **portion** is so
+  are coarse effects: a field of a role, more or less by so much, no
+  further than its type lets it go, and read by no role (eating: the
+  eater's satiety, by the food's nourishment). Of a stack, a declared effect's **portion** is so
   many of its units: moved, they are split off and are that role from
   then on. A move that `passes` hands on whose the thing is (**passing**).
   It makes one of a blueprint, or so `many` gathered into one stack;
@@ -823,7 +830,9 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
   coarse effects); a **change of grain**. (REA d4, d13, DR)
 - **Coarse effect**: a declarative change to fields and stocks
   (`{ role, field, by }`), as against an `#Effect`, which names code that
-  moves objects. Also a declared effect's `changes`. (DR form 3,
+  moves objects. Also a declared effect's `changes`, where the three are
+  written `changedOf`, `changed` and `changedBy` (a feature's name is one
+  type's). (DR form 3,
   EFFECTS.md)
 - **Closed form**: a formula for the state after any elapsed time, so
   catching up is one computation. (REA d13)

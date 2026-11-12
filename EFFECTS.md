@@ -2,11 +2,12 @@
 
 ## Status and scope
 
-The decisions below were taken on 2026-11-11. Steps 1 and 2 of the order of
+The decisions below were taken on 2026-11-11. Steps 1 to 3 of the order of
 work are built: step 2 in Triangle (arithmetic that goes with a pattern;
-`math.Min`, `math.Max`, `math.Clamp`), step 1 (`lab/src/act_declared.odin`): `after`, `moves` and `emits`, for
-an operation or a stage. Looking, giving, opening a door, putting down,
-putting in, and the last stage of dismantling a pump are declared. The rest
+`math.Min`, `math.Max`, `math.Clamp`), steps 1 and 3 in
+`lab/src/act_declared.odin`: `after`, `moves`, `makes`, `consumes`,
+`emits` and `changes`, for an operation or a stage. Step 4 is under way
+(24 named effects are left), and of step 5, resting. The rest
 is a draft. It takes up
 REVIEW.md §3.1 (and step 7 of its order of work) and turns it into a design
 that could be built an operation at a time.
@@ -28,8 +29,7 @@ Two terms are proposed, and have entries in GLOSSARY.md marked as such: a
 
 ## Decisions so far
 
-1. **`after` and `changes` are both kept** (`changes` not built yet: see
-   step 3). `after` states each role's
+1. **`after` and `changes` are both kept** (both built). `after` states each role's
    fields as the effect leaves them, arithmetic included (`handfuls: $h -
    1`). `changes` is the coarse effect of DETAIL_REGIMES.md, as it stands
    there, for an operation that is also run below full detail as a
@@ -48,16 +48,23 @@ Two terms are proposed, and have entries in GLOSSARY.md marked as such: a
    (emits), `give` (moves), and one that sets a constant (`open_door`).
    Done.
 5. **`changes` names its role and field in `text` for now.** The loader
-   rejects a role the operation doesn't have and a field the role's type
-   doesn't have. Ending the names in `text` is a later change (REVIEW.md
-   §3.3).
+   rejects a role the operation doesn't have and a field no component
+   has. Ending the names in `text` is a later change (REVIEW.md
+   §3.3). As built, the three are `changedOf`, `changed` and `changedBy`
+   (`role` and `by` are other types' features), and the field need not be
+   one the role's type has: a role that said `#Hungry` would be off the
+   menu of everyone, since a person is seen to be an `#Agent` and no
+   more, and a believed kind more general than the role's isn't one. So
+   the field is looked for in what fills the role when the effect
+   commits, and what hasn't it is unchanged.
 6. **Forage stays a named effect until regrowth is a progression**
    (REVIEW.md §3.2): its effect sets `grewAt`, which is regrowth's
    business, and it would be converted twice.
 7. **`after` as a goal's `done` is out of scope.** Nothing here prevents
    it; it wants its own design once expectation works.
 8. **`after` and `changes` naming the same field of the same role is a
-   load error.**
+   load error.** As built: where `after` states a constant; where it
+   reckons the value, the effect fails when it is resolved.
 9. **Keeping the scenario hashes as they were is not a constraint.** A
    conversion that improves what happens regenerates them and says so.
 10. **A law says what it forbids as a pattern over the operation**, not
@@ -378,9 +385,8 @@ done after: the first conversions use only the three there are.
    one portion; both are a `#Cook`, which clamps the nourishment
    (`math.Clamp`) and reckons `becomesAt` from `now`. New in the
    vocabulary: `consumes`; a `portion` of a stack on `moves` and
-   `consumes`; an operation's `now`. `changes` is left until something
-   needs it: with `math.Clamp` in `after`, nothing at full detail does,
-   and DETAIL_REGIMES.md's periodic operations will.
+   `consumes`; an operation's `now`. `changes` was left until something
+   needed it, and eating does (step 4): done.
 4. Under way: the rest of the primitive effects, a topic at a time; each
    topic's `- code:` cut point in its header goes as its effect does.
    Forage waits for regrowth (decision 6). `makes` is built. Declared so
@@ -453,14 +459,50 @@ done after: the first conversions use only the three there are.
      failed it.
    - A carcass with no hide isn't butchered (`hide: $h` must name a
      blueprint); all have one.
-   Left named, and why: `eat` (satiety and reserves are reckoned to the
-   moment of eating from when the eater last ate; the truth projection
-   gives the stored fields, so `after` cannot say them: it wants the
-   projection to give a body's hunger as of now); `shoulder` (the back
+   Eating, crouching, going through a door and watching closely are
+   declared, and `tend` is gone: six fewer named (24 left).
+   - **`changes` is built**, and eating is its first use: `changes: [{
+     changedOf: "actor", changed: "satiety", changedBy: $n }]`, and one
+     of the food consumed. The value is the truth's plus so much, held
+     to the bounds the field's component gives it (`int & >=0 & <=100`),
+     set expecting what was kept.
+   - **A stomach is kept as of the last meal**, which is why eating
+     stayed named. Two things, both the body's: the truth projection
+     gives satiety and reserves as they are now (`truth_describe_entity`),
+     and a `changes` of satiety has reserves written down as they stand
+     and `fedAt` now (`bodies_kept_as_of_now`). Content says only that
+     the eater is fuller by what the food gives. Tried and dropped:
+     saying the bookkeeping in content (`after: { actor: #Hungry & {
+     reserves: $r, fedAt: $now } }`): it reads `#Hungry` through the
+     role, which takes eating off every menu (decision 5).
+   - Eating now takes `#Food`, where it took anything made of food;
+     nothing made of food is anything else.
+   - `tend` meant "nothing but traces": an operation that only leaves
+     or removes traces says only that. A stage may be only its time
+     (dismantling's first two); an operation none of whose stages says
+     anything is still refused. Cleaning out a cylinder said nothing at
+     all: it now leaves the wrench's marks on the assembly.
+   - Going through a door is a move of the actor onto the door's tile,
+     expecting where it was.
+   Left named, and why: `shoulder` (the back
    is a hand slot with no name in content, and that nothing is on it
-   already is no field).
-5. `rest` and `fill`: the watches `perform` adds by effect name become
-   fields of the operation.
+   already is no field); `hit` and `shoot` (an injury that reaches 100 is
+   a death, which is code: it wants to be the body's reaction to its
+   injury, as a plot's standing is to its count); `hire` (a bond made
+   with its two ends set: `makes` sets no fields); `confiscate` and
+   `arrest` (custody is a claim made).
+5. Resting is done, `fill` is not. `rest` was three things by its name:
+   fatigue gone, a watch on the air hung on the activity by `perform`,
+   and breathing as at rest (the atmosphere domain). Now a rest is an
+   operation of the type `#Resting` (rest/), which declares the first
+   (`after: { actor: #Agent & { fatigue: 0 } }`); the other two ask
+   whether the operation is one (`operation_is_a`). Six operations are:
+   a rest, a night's sleep, minding a stall, lying in wait, grazing,
+   bedding down. That a quarter of an hour's lying in wait clears a
+   day's fatigue is unchanged, and is now there to read. `fill` is an
+   activity with no duration, opened and ended around a watch: its tap
+   opened when it starts and shut when it ends. It wants an effect at
+   the start and one at the end, which a step hasn't.
 6. Roles read generically.
 7. Expectation kept on the activity, and compared.
 8. Later, and separately: role and field names in `changes` checked as

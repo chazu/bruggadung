@@ -14,7 +14,10 @@
 // - air:      a rest watches the air over it: it wakes when the carbon
 //             dioxide reaches the command's amount, or the temperature
 //             leaves what the breather rests easy in (air/air.tri).
-// - code:     effect_rest (src/act_actions.odin).
+// - code:     the watch on the air is any activity's that is a #Resting
+//             (src/act_actions.odin), and what breathes breathes as at
+//             rest through one (src/domains_atmosphere.odin). That
+//             fatigue is gone is declared.
 
 package rest
 
@@ -35,10 +38,18 @@ lie_down: #Method & {
     steps: [#Do & { op: "while_away" }]
 } @family(methods)
 
-// Rest a while, 8 hours (rested through, fatigue is gone), with a watch on the air: woken when its carbon
-// dioxide reaches the command's amount (mmol; 4,000 if none).
-while_away: #Operation & {
-    effect:   "rest"
+// Resting: rested through, fatigue is gone, however long the rest was.
+// Through it, what breathes breathes as at rest, and there is a watch on
+// the air: woken when its carbon dioxide reaches the command's amount
+// (mmol; 4,000 if none). Whatever is passed at ease is one: a night's
+// sleep (home/), minding a stall (market/), lying in wait (hunting/), an
+// animal grazing or bedded down.
+#Resting: #Operation & {
+    after: { actor: #Agent & { fatigue: 0 } }
+}
+
+// Rest a while, 8 hours.
+while_away: #Resting & {
     duration: 8h
     uses:     ["hands", "legs"]
     roles:    { actor: #Agent & { place: #OnTile } }

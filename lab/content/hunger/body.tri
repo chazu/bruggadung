@@ -11,9 +11,10 @@
 //            detail, frozen included: a frozen agent doesn't decide, so
 //            doesn't eat (open: DETAIL_REGIMES.md). How hunger and food work
 //            below reduced is open.
-// - eating:  eating.tri's food nourishes: satiety rises by the food's
-//            `nourishment` (to 100 at most), applied by the body's code, not
-//            by eating's.
+// - eating:  eating.tri's food nourishes: satiety is more by the food's
+//            `nourishment` (to 100 at most): eating says so (a `changes`,
+//            actions.tri), and how the body keeps it is the body's code:
+//            reserves as they stand, both as of now.
 // - weakness: weakness.tri's curves, from reserves, take attention, the
 //            pace of work, perception and grip.
 // - feeling: interoception feels hunger as 100 less satiety, less twice the
@@ -22,7 +23,10 @@
 //            beat below full. Reserves and weakness aren't felt (open:
 //            VILLAGE.md).
 // - code:    src/domains_bodies.odin: the closed form, the bands' and the
-//            harm's wakes; src/know_knowledge_*.odin: interoception. Only
+//            harm's wakes; an effect is resolved against satiety and
+//            reserves as they are now, not as kept (src/act_view.odin's
+//            truth projection), and one that sets satiety has both kept
+//            as of now (bodies_kept_as_of_now); src/know_knowledge_*.odin: interoception. Only
 //            what carries #Hungry gets hungry: people, here.
 
 package hunger

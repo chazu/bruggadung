@@ -23,7 +23,10 @@ package lab
  * A staged operation's stages each have their own: the roles are the
  * operation's, and its tags reach every stage.
  *
- * Not built: `changes`.
+ * `changes` is the coarse effect (DETAIL_REGIMES.md): a field of a role
+ * (`changedOf`, `changed`), by so much (`changedBy`), to the bounds its
+ * component's type gives it; the role needn't read it, and what fills the
+ * role without the field is unchanged.
  * Arithmetic in `after` (`handfuls: $h - 1`, `math.Clamp`) is worked out by
  * the unification: the pattern brings the operation's own arithmetic.
  */
@@ -121,6 +124,19 @@ declared_set :: proc(world: ^World, entity: Entity_ID, portion: Entity_ID, kind:
 	/* from the value it was read with: if another gets there first, this fails */
 	proposal_group_set_of_to_expecting(g, path, whole(entity), value, was)
 	return ""
+}
+
+
+/* The bounds a component's type gives one of its fields (`int & >=0 &
+ * <=100`): false if it gives none. */
+@(private = "file")
+field_bounds :: proc(tc: ^tri.Content, kind: ^Component_Info, f: ^Field_Info, lo, hi: ^i64) -> bool {
+	arena := tri.arena_new()
+	defer tri.arena_free(arena)
+	type := tri.value(tc, kind.type, arena, nil, 0)
+	if type == nil do return false
+	v := tri.at(tc, type, f.name)
+	return v != nil && tri.node_interval(v, lo, hi) != 0 && lo^ < hi^
 }
 
 
@@ -403,8 +419,20 @@ step_says :: proc(tc: ^tri.Content, pattern: ^tri.Node, step: string) -> bool {
 	for r in Role.Actor ..< Role.Count {
 		if tri.at(tc, pattern, ns_utf8(fmt.tprintf("%safter.%s", step, ROLE_NAMES[r]))) != nil do return true
 	}
-	for list in ([?]string{"moves", "makes", "consumes", "emits", "leaves", "removes"}) {
+	for list in ([?]string{"moves", "makes", "consumes", "emits", "changes", "leaves", "removes"}) {
 		if tri.at(tc, pattern, ns_utf8(fmt.tprintf("%s%s.first", step, list))) != nil do return true
+	}
+	return false
+}
+
+
+/* Whether any component has a field of the name. */
+@(private = "file")
+some_component_has :: proc(tc: ^tri.Content, field: string) -> bool {
+	for i: uint = 0; i < tri.component_count(tc); i += 1 {
+		for j: uint = 0; j < tri.component_field_count(tc, i); j += 1 {
+			if string(tri.component_field(tc, i, j, nil)) == field do return true
+		}
 	}
 	return false
 }
@@ -428,6 +456,21 @@ step_binds :: proc(tc: ^tri.Content, pattern: ^tri.Node, step: string) -> string
 			if !bound do return fmt.tprintf("its %s name no role: tag the role's id (`item: #Thing & {{ id: $i }}`)", named[0])
 		}
 	}
+	/* what it changes is a field of one of its roles, and not one `after`
+	 * states too (EFFECTS.md decisions 5 and 8) */
+	for list := tri.at(tc, pattern, ns_utf8(fmt.tprintf("%schanges", step))); list != nil; list = tri.at(tc, list, "rest") {
+		change := tri.at(tc, list, "first")
+		if change == nil do break
+		role, named   := text_of_node(tc, tri.at(tc, change, "changedOf"))
+		field, which  := text_of_node(tc, tri.at(tc, change, "changed"))
+		if !named || !which do return "its changes say of which role (`changedOf`) and which field (`changed`)"
+		if tri.at(tc, pattern, ns_utf8(fmt.tprintf("roles.%s", role))) == nil do return fmt.tprintf("it changes %s's %s, and has no role %s", role, field, role)
+		if !some_component_has(tc, field) do return fmt.tprintf("it changes %s's %s, which is no component's field", role, field)
+		/* a constant is caught here; what `after` reckons, when it is resolved */
+		if _, stated := int_of(tri.at(tc, pattern, ns_utf8(fmt.tprintf("%safter.%s.%s", step, role, field)))); stated {
+			return fmt.tprintf("its `after` and its `changes` both say %s's %s", role, field)
+		}
+	}
 	return ""
 }
 
@@ -449,14 +492,16 @@ declared_check :: proc(tc: ^tri.Content) -> string {
 				if reason := step_binds(tc, pattern, ""); reason != "" do return fmt.tprintf("the operation %s: %s", operation, reason)
 				continue
 			}
+			/* a stage may be only its time (the gland nut off, before the
+			 * cover): one of them says what the operation does */
+			says := false
 			for k: i64 = 0; tri.at(tc, pattern, ns_utf8(fmt.tprintf("%sduration", step_path(tc, pattern, k)))) != nil; k += 1 {
-				if !step_says(tc, pattern, step_path(tc, pattern, k)) {
-					return fmt.tprintf("stage %d of the operation %s does nothing: it has no effect, named or declared", k, operation)
-				}
+				if step_says(tc, pattern, step_path(tc, pattern, k)) do says = true
 				if reason := step_binds(tc, pattern, step_path(tc, pattern, k)); reason != "" {
 					return fmt.tprintf("stage %d of the operation %s: %s", k, operation, reason)
 				}
 			}
+			if !says do return fmt.tprintf("the operation %s does nothing: no stage of it has an effect, named or declared", operation)
 		}
 	}
 	return ""
@@ -579,6 +624,50 @@ apply_declared_effect :: proc(world: ^World, action: Action, stage: i64, amount:
 				v := tri.at(tc, after, f.name)
 				if v == nil do continue
 				if reason := declared_set(world, entity, portions[r], kind, f, record, v, group); reason != "" do return reason
+			}
+		}
+	}
+
+	/* changes: a field of a role, by so much from what it was read to be,
+	 * and no further than its type lets it go */
+	for list := tri.at(tc, result, ns_utf8(fmt.tprintf("%schanges", step))); list != nil; list = tri.at(tc, list, "rest") {
+		lo, hi: i64
+
+		change := tri.at(tc, list, "first")
+		if change == nil do break
+		role, named  := text_of_node(tc, tri.at(tc, change, "changedOf"))
+		field, which := text_of_node(tc, tri.at(tc, change, "changed"))
+		by, much     := int_of(tri.at(tc, change, "changedBy"))
+		if !named || !which || !much do return fmt.tprintf("%s changes nothing: it says of which role, which field, and by how much", action.operation)
+		r := Role.Count
+		for candidate in Role.Actor ..< Role.Count do if string(ROLE_NAMES[candidate]) == role do r = candidate
+		if r == Role.Count || action.roles[r] == NO_ENTITY do return fmt.tprintf("%s changes its %s's %s, and has no %s", action.operation, role, field, role)
+		entity := action.roles[r]
+		if _, stated := int_of(tri.at(tc, result, ns_utf8(fmt.tprintf("%safter.%s.%s", step, role, field)))); stated {
+			return fmt.tprintf("%s: its `after` and its `changes` both say its %s's %s", action.operation, role, field)
+		}
+		/* the field, in whichever component of the entity has it; one it
+		 * has not is not changed (what doesn't get hungry eats, and is none
+		 * the fuller) */
+		for k: uint = 0; k < world_kind_count(world); k += 1 {
+			if world_record(world, k, entity) == nil do continue
+			kind := world_kind_info(world, k)
+			for i: uint = 0; i < kind.nfields; i += 1 {
+				f := &kind.fields[i]
+				if string(f.name) != field || f.value != VALUE_QUANTITY do continue
+				if !strings.contains(string(f.flags), "proposable") do return fmt.tprintf("%s.%s is not an effect's to set", kind.name, f.name)
+				/* from what it is read to be in truth (a stomach's, as of now) */
+				was: i64
+				path := world_intern(world, ns_utf8(fmt.tprintf("%s.%s", kind.name, f.name)))
+				if !world_get_field(world, path, entity, &was) do continue
+				read, known := int_of(tri.at(tc, result, ns_utf8(fmt.tprintf("roles.%s.%s", role, field))))
+				to := (read if known else was) + by
+				if field_bounds(tc, kind, f, &lo, &hi) do to = clamp(to, lo, hi)
+				/* a stomach's is set as of now, whatever it comes to */
+				if kind.name == "Hungry" do bodies_kept_as_of_now(world, group, entity)
+				if to == was do continue
+				if portions[r] != NO_ENTITY do proposal_group_set_of_to(group, path, whole(portions[r]), to)
+				else do proposal_group_set_of_to_expecting(group, path, whole(entity), to, was)
 			}
 		}
 	}

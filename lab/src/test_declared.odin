@@ -400,3 +400,50 @@ test_marking :: proc(w: ^World, thing: Entity_ID, tries: int) -> ^Proposal_Group
 	}
 	return g
 }
+
+
+/* `changes` (EFFECTS.md decision 1): a field of a role is more by so much,
+ * from what it is in truth, and no further than its type lets it go.
+ * Eating is one: the eater's satiety by the food's nourishment. A stomach
+ * is kept as of the last meal, so it is read as it is now, and set as of
+ * now. */
+test_changes :: proc() {
+	HOUR :: i64(3600000)
+	v: i64
+
+	w := test_world(131)
+	c := test_committer(w)
+	s := autorelease(scheduler_init_with_world(w, c))
+	g := proposal_group_group_with_phase(.System, "setup: an eater, a supper in each hand")
+	eater  := proposal_group_create(g, "worker", "the eater", on_tile(1, 1, 0))
+	first  := proposal_group_create(g, "supper", "a supper", held_by(eater, 0))
+	second := proposal_group_create(g, "supper", "a supper", held_by(eater, 1))
+	proposal_group_set_of_to(g, "Hungry.satiety", whole(eater), 60)
+	committer_submit(c, g)
+	scheduler_run_until(s, time_make(1))
+	eater, first, second = proposal_group_id_for(g, eater), proposal_group_id_for(g, first), proposal_group_id_for(g, second)
+
+	/* four hours on, half of a stomach that empties in eight is gone: 10
+	 * left of 60, though 60 is still what is kept */
+	scheduler_run_until(s, time_make(4 * HOUR))
+	bg_check(world_get_field(w, "Hungry.satiety", eater, &v) && v == 60)
+	bg_check(strings.contains(truth_describe_entity(w, eater), "satiety: 10,"))
+
+	/* a supper gives 50: 60, as of now, and the supper is gone */
+	g = proposal_group_group_with_phase(.Action, "test: a supper eaten")
+	bg_check(apply_declared_effect(w, action_make("eat", eater, first, NO_ENTITY), 0, 0, g) == "")
+	committer_submit(c, g)
+	committer_commit_boundary(c)
+	bg_check(world_get_field(w, "Hungry.satiety", eater, &v) && v == 60)
+	bg_check(world_get_field(w, "Hungry.fedAt", eater, &v) && v == 4 * HOUR)
+	bg_check(strings.contains(truth_describe_entity(w, eater), "satiety: 60,"))
+	bg_check(!world_is_live(w, first))
+
+	/* another, straight after: 110 is more than a stomach holds */
+	g = proposal_group_group_with_phase(.Action, "test: another eaten")
+	bg_check(apply_declared_effect(w, action_make("eat", eater, second, NO_ENTITY), 0, 0, g) == "")
+	committer_submit(c, g)
+	committer_commit_boundary(c)
+	bg_check(world_get_field(w, "Hungry.satiety", eater, &v) && v == 100)
+	bg_check(!world_is_live(w, second))
+}

@@ -366,7 +366,8 @@ view_features_of_all :: proc(self: ^View, entity: Entity_ID, all: bool) -> strin
 
 /* The truth projection of an entity (EFFECTS.md): its description as it
  * is, every field of every component it has, whether or not anyone could
- * perceive it, and its material as it is, not as it appears. What a
+ * perceive it, and its material as it is, not as it appears; a stomach
+ * and its reserves as they are now, not as of the last meal. What a
  * declared effect is resolved against; never an agent's to reason from.
  * "" for no such entity. */
 truth_describe_entity :: proc(world: ^World, entity: Entity_ID) -> string {
@@ -391,7 +392,12 @@ truth_describe_entity :: proc(world: ^World, entity: Entity_ID) -> string {
 			at := rawptr(uintptr(record) + f.offset)
 			switch f.value {
 			case VALUE_QUANTITY:
-				tri.format_quantity(f.kind, (^i64)(at)^, raw_data(buf[:]), len(buf))
+				value := (^i64)(at)^
+				/* a stomach and its reserves are kept as of the last meal:
+				 * the truth is what they have come to since */
+				if kind.name == "Hungry" && f.name == "satiety" do value = satiety((^Hungry)(record), world_time(world).ms)
+				if kind.name == "Hungry" && f.name == "reserves" do value = reserves((^Hungry)(record), world_time(world).ms)
+				tri.format_quantity(f.kind, value, raw_data(buf[:]), len(buf))
 				fmt.sbprintf(&s, ", %s: %s", f.name, cstring(&buf[0]))
 			case VALUE_TYPE:
 				/* an enum not yet set is no value: left open */

@@ -93,8 +93,7 @@ walk_to_work: #Method & {
 } @family(methods)
 
 // Sleep the night through in a bed within reach: rest, eight hours of it.
-sleep: #Operation & {
-    effect:   "rest"
+sleep: #Resting & {
     duration: 8h
     uses:     ["hands", "legs"]
     roles: {

@@ -15,13 +15,13 @@
 // - frozen:  its activities wait; risen, a stage long due ends at once
 //            (REALITY.md step 4; activities.tri).
 // - code:    an `effect` names a function in src/act_actions.odin
-//            (effect_eat, effect_drive, ...). #Effect lists them all: a
+//            (effect_drive, effect_walk, ...). #Effect lists them all: a
 //            topic's new named effect is added there and in the code
 //            together.
 // - code:    a declared effect is applied by one procedure for all
 //            (src/act_declared.odin), which resolves the operation against
-//            the truth; so far `after`, `moves`, `makes`, `consumes` and
-//            `emits`, for an operation or a stage. Taking, giving, putting
+//            the truth: `after`, `moves`, `makes`, `consumes`, `emits`
+//            and `changes`, for an operation or a stage. Taking, giving, putting
 //            down, putting in and looking are declared, and most topics'
 //            own operations; what a command
 //            says reaches an effect as `said` and `written`. A move that
@@ -30,8 +30,12 @@
 //            other's keeping (declared_lend: lending). What is nobody's
 //            is whoever's takes it in hand, and their household's
 //            (src/kinds_body_kind.odin).
-//            An operation, or a stage, with no
-//            effect named or declared and no trace is refused at load.
+//            An operation with no effect named or declared and no
+//            trace, in any stage of it, is refused at load; a stage may
+//            be only its time.
+// - code:    an activity that is a rest (rest/'s #Resting) is given its
+//            watch on the air over its actor when it starts
+//            (src/act_actions.odin).
 // - code:    a walk's stages come from its activity's way, not from the
 //            operation (src/act_activities.odin); its way is found by the
 //            walker, over the ground as it believes it, when it sets out,
@@ -41,7 +45,7 @@
 //            (src/act_activities.odin); they are compacted into digests
 //            after the world's history window (src/core_world.odin).
 
-#Effect: "drive" | "fill" | "walk" | "say" | "tend" | "analyse" | "write" | "read" | "eat" | "investigate" | "rotate" | "strike" | "rest" | "pass" | "copy" | "reveal" | "replace" | "cut" | "shape" | "issue" | "confiscate" | "arrest" | "flee" | "hit" | "hire" | "work" | "service" | "crouch" | "shoot" | "shoulder" | "forage"
+#Effect: "drive" | "fill" | "walk" | "say" | "analyse" | "write" | "read" | "rotate" | "strike" | "copy" | "reveal" | "replace" | "cut" | "shape" | "issue" | "confiscate" | "arrest" | "flee" | "hit" | "hire" | "work" | "service" | "shoot" | "shoulder" | "forage"
 
 // Which roles an operation has is its roles' type: a structure's type is the
 // most general one with all its features.
@@ -110,11 +114,17 @@
 // $k`), its `parameter` the command's (how many), its `said` and `written`
 // what the command says, as a value and as written (market/'s `post`). Into a hand, of an operation
 // that stows (`stow`), is into a pack its actor carries, if it fits. Arithmetic in `after` is Triangle's (CONTENT_LANGUAGE.md §5).
+// `changes` is the coarse effect (DETAIL_REGIMES.md): a field (`changed`)
+// of a role (`changedOf`, by its name) is more by `changedBy`, or less,
+// and no further than its type lets it go (a stomach is full at 100). The
+// role must say the type that has the field, and `after` doesn't state
+// the same one.
 #OfSome:   { portion: int & >=1, exact: bool }
 #Moves:    #OfSome & { moved: ref, into: #Place, passes: bool, lends: bool, until: time }
 #Consumes: #OfSome & { consumed: ref, because: text }
 #Emits:    { event: text, subject: ref, other: ref, detail: text }
 #Makes:    { blueprint: text, at: #Place, called: text, splitFrom: ref, many: int & >=1, gathered: bool }
+#Changes:  { changedOf: text, changed: text, changedBy: int }
 
 // Looking at something within reach changes nothing in the world: it is
 // an event the looker perceives. Its operations say what is looked at.
@@ -140,6 +150,7 @@
     consumes:    [...#Consumes]
     makes:       [...#Makes]
     emits:       [...#Emits]
+    changes:     [...#Changes]
 }
 
 // A stage of an activity: it takes `duration`, and its effect commits when
