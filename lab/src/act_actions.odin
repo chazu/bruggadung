@@ -859,26 +859,6 @@ effect_read :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -
 
 
 
-/* Foraging a patch (content/foraging/): a handful of what it yields into a
- * free hand, the patch one fewer; stripped of the first of a full patch,
- * it begins to grow one back from now. A bare patch gives nothing. */
-@(private = "file")
-effect_forage :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
-	patch := (^Patch)(world_record(world, world_kind_named(world, "Patch"), a.roles[.Item]))
-	if patch == nil do return "it is no patch"
-	if patch.handfuls < 1 do return "there is nothing on it"
-	yields := world_text_field(world, "Patch.yields", a.roles[.Item])
-	if yields == nil || len(yields) == 0 do return "it yields nothing"
-	hand := free_hand(world, a.roles[.Actor])
-	if hand < 0 do return "no hand is free"
-	proposal_group_create(g, yields, "a handful", held_by(a.roles[.Actor], hand))
-	if patch.handfuls >= patch.most do proposal_group_set_of_to(g, "Patch.grewAt", whole(a.roles[.Item]), world_time(world).ms)
-	proposal_group_set_of_to_expecting(g, "Patch.handfuls", whole(a.roles[.Item]), patch.handfuls - 1, patch.handfuls)
-	return ""
-}
-
-
-
 /* A trace of wear made by an effect: tool marks on what was used. */
 @(private = "file")
 wear :: proc(world: ^World, g: ^Proposal_Group, on: Entity_ID, strength: i64) {
@@ -2680,7 +2660,6 @@ effects := [?]Named_Effect{
 	{"shape",     effect_shape},
 	{"issue",     effect_issue},
 	{"strike",    effect_strike},
-	{"forage",    effect_forage},
 	{"shoot",     effect_shoot},
 }
 

@@ -200,10 +200,9 @@ Village :: struct {
 	agency:       ^Agency,
 	bodies:       ^Bodies,
 	air:          ^Atmosphere,       // burns what is in the stoves
-	farming:      ^Farming,          // ripens the crops
+	progressions: ^Progressions,     // ripens the crops, regrows the woods' forage
 	game:         ^Game,             // keeps the herds up
 	perishing:    ^Perishing,        // spoils meat and meals
-	foraging:     ^Foraging,         // regrows the woods' forage
 	people:       [dynamic]Villager,
 	officer:      Entity_ID,         // the watch officer: of the town, not of a household
 	larders:      [4]Entity_ID,      // each household's, by its index
@@ -250,20 +249,18 @@ village_init_with_world :: proc(world: ^World, committer: ^Committer) -> ^Villag
 	self.agency     = agency_init_with_world(world, committer, self.knowledge)
 	self.bodies     = bodies_init_with_world(world)
 	self.air        = atmosphere_init_with_world(world)
-	self.farming    = farming_init_with_world(world)
+	self.progressions = progressions_init_with_world(world)
 	self.game       = game_init_with_world(world)
 	self.perishing  = perishing_init_with_world(world)
-	self.foraging   = foraging_init_with_world(world)
 	self.scheduler  = scheduler_init_with_world(world, committer)
 	/* a diagnostic event is kept a day, then counted (KNOWLEDGE.md decision 21) */
 	world_set_history_window(world, 86400000)
 	agency_set_activities(self.agency, self.activities)
 	scheduler_add_domain(self.scheduler, bodies_as_domain(self.bodies))
 	scheduler_add_domain(self.scheduler, atmosphere_as_domain(self.air))
-	scheduler_add_domain(self.scheduler, farming_as_domain(self.farming))
+	scheduler_add_domain(self.scheduler, progressions_as_domain(self.progressions))
 	scheduler_add_domain(self.scheduler, game_as_domain(self.game))
 	scheduler_add_domain(self.scheduler, perishing_as_domain(self.perishing))
-	scheduler_add_domain(self.scheduler, foraging_as_domain(self.foraging))
 	/* the herds of the eastern woods, kept up from the east edge (VILLAGE.md
 	 * decision 7): six deer at most, four hares, one a quarter-day */
 	edge := [][2]i32{{159, 20}, {159, 45}, {159, 70}, {159, 90}}
@@ -286,10 +283,9 @@ village_dealloc :: proc(self: ^Village) {
 	release(self.agency)
 	release(self.bodies)
 	release(self.air)
-	release(self.farming)
+	release(self.progressions)
 	release(self.game)
 	release(self.perishing)
-	release(self.foraging)
 	delete(self.people)
 	for list in self.plots do delete(list)
 	for r in self.results do delete(r)

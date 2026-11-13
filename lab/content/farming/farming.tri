@@ -21,9 +21,10 @@
 // - frozen:   it doesn't decide; what is under way waits. A plot ripens
 //             frozen or not: its growth is a function of time.
 // - growth:   a plot's crop grows from when its last row was sown
-//             (`sownAt`, `ripensIn`), read when needed, never stepped; it
-//             stands ripe once grown, set then: the plot's one wake. How
-//             far it has grown isn't seen; how it stands is.
+//             (`sownAt`, `ripensIn`), never stepped; it stands ripe once
+//             grown, set then: the plot's one wake (`ripening`, a turn:
+//             reality.tri). How far it has grown isn't seen; how it
+//             stands is.
 // - cooking:  what a harvest yields is food (cooking/cooking.tri's raw
 //             grain, and turnips), raw, cooked as any is; in a larder it
 //             merges with a sack of its kind. One taken from it is the
@@ -36,7 +37,8 @@
 // - code:     how a plot stands when its last row is reaped (bare) or sown
 //             (sown, growing from then, the seed kept for it used): the
 //             plot's own, a reaction to its rows' count
-//             (src/domains_farming.odin), with its growth and its wake.
+//             (src/kinds_plot_kind.odin). Ripening is applied as any
+//             progression is (src/domains_progressions.odin).
 //             Sowing, harvesting and keeping seed back are declared, a row
 //             a time, each counting on the plot's rows as it read them.
 //             Where a plot is seen and reached from is an area's
@@ -61,6 +63,10 @@ package farming
     yields:   text                           @field(content, saved, inspect)
     kept:     *false | true                  @field(content, saved, proposable, inspect, perceive(sight))
 }
+
+// A plot standing sown stands ripe `ripensIn` after its last row was sown.
+ripening: #Turn & { progresses: "Plot", turned: "stands", turnedFrom: "sown", turnedTo: "ripe", asOf: "sownAt", period: "ripensIn" }
+@family(progressions)
 
 plot_seen: #Seen & { kindOf: "#Plot" } @family(seen)
 

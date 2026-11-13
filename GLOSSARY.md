@@ -323,7 +323,7 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
   stall, lying in wait and an animal's grazing are rests. (EFFECTS.md
   step 5)
 - **Named effect**: an effect given as the name of the code that builds
-  it (`effect: "forage"`). (EFFECTS.md)
+  it (`effect: "hire"`). (EFFECTS.md)
 - **Declared effect**: an effect stated in content: the roles as it
   leaves them (`after`), and what it moves, makes, consumes, emits and
   changes. Applied by one generic procedure,
@@ -605,7 +605,7 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
 - **Forage**: food found growing wild in the woods; **foraging**, searching
   a **patch** (a bramble, a hazel: `#Patch`) for a **handful** of it,
   ready to eat. A patch holds a few handfuls and regrows them one at a
-  time. The way the short get by: little nourishment for the work, never
+  time (**regrowth**, a **rate**). The way the short get by: little nourishment for the work, never
   enough to put by. *Avoid:* gathering (a woodcutter's firewood). (VIL d12)
 - **Larder**: a household's container of food (`#Larder`), told from its
   other containers (its coffer, its packs) at a glance, and from its
@@ -823,11 +823,26 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
   progression), **deferred** (doesn't run; caught up on rising),
   **paused** (doesn't run; the time is lost). Deferred and paused are both
   **suspended**. *Avoid:* mode for Tessera's views. (DR d3)
-- **Progression**: what a thing does below full detail, authored in
-  content and applied in bulk, deterministically by seed. Its **forms**:
-  a **rate** on a field; an **approach** to a level (`toward`, `curve`,
-  `@fn`); a **periodic operation** (a pattern, a **period**, a condition,
-  coarse effects); a **change of grain**. (REA d4, d13, DR)
+- **Progression**: what a thing does by itself as time passes, authored
+  in content (an instance in the `progressions` family, naming the
+  component it `progresses`), read in closed form and never stepped; below
+  full detail, also what stands in for what a thing does there, applied
+  in bulk, deterministically by seed. Its **forms**:
+  a **rate** on a field; a **turn**; an **approach** to a level (`toward`,
+  `curve`, `@fn`); a **periodic operation** (a pattern, a **period**, a
+  condition, coarse effects); a **change of grain**. A rate and a turn
+  run at every level of detail, full included (a patch regrowing, a plot
+  ripening); the rest are designed, not built. A **becoming** is not one:
+  it ends a thing and makes another. (REA d4, d13, DR)
+- **Rate**: `#Rate`, a progression's form: a field that `rises` by
+  so much (`risesBy`) each **period** (`period`, a field of the same
+  component) up to a bound (`upTo`, another), reckoned from a time
+  (`asOf`). At its bound it **rests**, its time 0; its time starts when it
+  is next found below. (DR form 1, d4)
+- **Turn**: `#Turn`, a progression's form: a field (`turned`) that stands
+  one way (`turnedFrom`) stands another (`turnedTo`) one period after a
+  time (`asOf`): a threshold as a wake. *Avoid:* turn for an agent's go at
+  something. (DR d5)
 - **Coarse effect**: a declarative change to fields and stocks
   (`{ role, field, by }`), as against an `#Effect`, which names code that
   moves objects. Also a declared effect's `changes`, where the three are
@@ -992,8 +1007,8 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
   sown or reaped is the plot's own (a reaction).
   *Avoid:* field (a component's field). (VIL d5)
 - **Crop**: what a plot grows, kept as the plot's state: sown a row at a
-  time, growing from its last row, ripe after its growth, read lazily. Not
-  an entity of its own. (VIL d5)
+  time, growing from its last row, ripe after its growth (**ripening**, a
+  **turn**). Not an entity of its own. (VIL d5)
 - **Seed to sow**: `#Seed`, a stack of what sows a crop (seed grain,
   turnip seed), a unit to a tile, **kept back** in a larder. See *Words
   with more than one sense*. (VIL d5)

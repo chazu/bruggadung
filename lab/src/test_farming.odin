@@ -27,10 +27,10 @@ test_farming :: proc() {
 	bg_check(world_set_terrain_map(w, "farm_map", &why))
 	c := test_committer(w)
 	activities := activities_with_world(w, c)
-	farming := autorelease(farming_init_with_world(w))
+	farming := autorelease(progressions_init_with_world(w))
 	s := autorelease(scheduler_init_with_world(w, c))
 	scheduler_set_activities(s, activities_as_activity_clock(activities))
-	scheduler_add_domain(s, farming_as_domain(farming))
+	scheduler_add_domain(s, progressions_as_domain(farming))
 
 	g := proposal_group_group_with_phase(.System, "setup: a plot of 8 by 4, a farmhand beside it, seed in hand")
 	plot := proposal_group_create(g, "grain_plot", "the plot", on_tile(4, 3, 0))
@@ -68,7 +68,6 @@ test_farming :: proc() {
 	for k in 1 ..< 14 {
 		at := sown + i64(k) * FARM_DAY + 3 * 3600 * 1000
 		scheduler_run_until(s, time_make(at))
-		bg_check(plot_growth(w, plot_of(w, plot), at) == (at - sown) * 100 / (14 * FARM_DAY))
 		bg_check(stands(w, plot) == plot_stands(w, "sown"))
 	}
 	bg_check(world_boundary(w) - before <= 14)
@@ -186,10 +185,10 @@ test_farming_weeks :: proc() {
 	activities := activities_with_world(w, c)
 	knowledge  := autorelease(knowledge_init_with_world(w))
 	agency     := autorelease(agency_init_with_world(w, c, knowledge))
-	farming    := autorelease(farming_init_with_world(w))
+	farming    := autorelease(progressions_init_with_world(w))
 	s          := autorelease(scheduler_init_with_world(w, c))
 	agency_set_activities(agency, activities)
-	scheduler_add_domain(s, farming_as_domain(farming))
+	scheduler_add_domain(s, progressions_as_domain(farming))
 	scheduler_set_activities(s, activities_as_activity_clock(activities))
 	scheduler_set_perception(s, knowledge_as_perception_phase(knowledge))
 	scheduler_set_decision(s, agency_as_decision_phase(agency))
@@ -230,9 +229,6 @@ test_farming_weeks :: proc() {
 			last = p.stands
 			if p.stands == sown || p.stands == ripe {
 				if (p.stands == ripe) != (now >= p.sownAt + 14 * FARM_DAY) do wrong += 1
-				/* and between this boundary and the next, as the closed form says */
-				between := now + 7919
-				if plot_growth(w, p, between) != min((between - p.sownAt) * 100 / (14 * FARM_DAY), 100) do wrong += 1
 				checked += 1
 			}
 		}
@@ -282,10 +278,10 @@ test_keep_seed :: proc() {
 	activities := activities_with_world(w, c)
 	knowledge  := autorelease(knowledge_init_with_world(w))
 	agency     := autorelease(agency_init_with_world(w, c, knowledge))
-	farming    := autorelease(farming_init_with_world(w))
+	farming    := autorelease(progressions_init_with_world(w))
 	s          := autorelease(scheduler_init_with_world(w, c))
 	agency_set_activities(agency, activities)
-	scheduler_add_domain(s, farming_as_domain(farming))
+	scheduler_add_domain(s, progressions_as_domain(farming))
 	scheduler_set_activities(s, activities_as_activity_clock(activities))
 	scheduler_set_perception(s, knowledge_as_perception_phase(knowledge))
 	scheduler_set_decision(s, agency_as_decision_phase(agency))
@@ -401,10 +397,10 @@ test_harvest_overtaken :: proc() {
 	activities := activities_with_world(w, c)
 	knowledge  := autorelease(knowledge_init_with_world(w))
 	agency     := autorelease(agency_init_with_world(w, c, knowledge))
-	farming    := autorelease(farming_init_with_world(w))
+	farming    := autorelease(progressions_init_with_world(w))
 	s          := autorelease(scheduler_init_with_world(w, c))
 	agency_set_activities(agency, activities)
-	scheduler_add_domain(s, farming_as_domain(farming))
+	scheduler_add_domain(s, progressions_as_domain(farming))
 	scheduler_set_activities(s, activities_as_activity_clock(activities))
 	scheduler_set_perception(s, knowledge_as_perception_phase(knowledge))
 	scheduler_set_decision(s, agency_as_decision_phase(agency))

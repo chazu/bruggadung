@@ -18,8 +18,14 @@
 // - domains:  air, heat, water, light, traces and the body's going without
 //             run over the whole world at every level of detail, frozen
 //             included: they don't yet step by region.
+// - progressions: what a thing does by itself as time passes is a topic's
+//             to declare (#Rate, #Turn, in the `progressions` family), and
+//             runs alike at every level of detail, frozen included. The
+//             other forms (an approach, a periodic operation, a change of
+//             grain) and regimes are not built (DETAIL_REGIMES.md).
 // - code:     src/core_reality.odin (anchors, levels, leases), core_wakes.odin (the
-//             cadence).
+//             cadence); src/domains_progressions.odin applies every
+//             progression: its horizon is the next one due, its wake then.
 
 // The reality bubble (REALITY.md): how exactly each part of the world is
 // simulated, by how far it is from what anchors it. Four levels of detail:
@@ -58,3 +64,20 @@ contact: #Contact & { kinds: ["said", "struck", "arrested", "moved"], lease: 60s
 #Level: { senses: *"all" | "own", every: *0ms | time & >=0ms & <=1d }
 
 reduced: #Level & { senses: "own", every: 10s } @family(levels)
+
+// A progression (DETAIL_REGIMES.md decisions 4 and 5): what a thing does by
+// itself as time passes, read in closed form, never stepped. It `progresses` a
+// component (its name: "Patch"), and reckons from a time the component
+// keeps (`asOf`, a field's name), in periods the component gives (`period`,
+// a field's name too, so that each blueprint has its own).
+#Progression: { progresses: text, asOf: text, period: text }
+
+// A rate: the field that `rises` is `risesBy` more each period, up to the bound
+// the field `upTo` holds. At its bound it rests, its time 0; found below
+// its bound with no time, its time is then (what took it below needn't
+// say so).
+#Rate: #Progression & { rises: text, risesBy: *1 | int & >=1 & <=1000000, upTo: text }
+
+// A turn: the field `turned`, standing `turnedFrom`, stands `turnedTo` one
+// period after its time. What set it to stand so set its time.
+#Turn: #Progression & { turned: text, turnedFrom: text, turnedTo: text }

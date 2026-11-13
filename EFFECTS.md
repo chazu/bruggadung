@@ -7,7 +7,7 @@ work are built: step 2 in Triangle (arithmetic that goes with a pattern;
 `math.Min`, `math.Max`, `math.Clamp`), steps 1 and 3 in
 `lab/src/act_declared.odin`: `after`, `moves`, `makes`, `consumes`,
 `emits` and `changes`, for an operation or a stage. Step 4 is under way
-(23 named effects are left), and of step 5, resting. The rest
+(22 named effects are left), and of step 5, resting. The rest
 is a draft. It takes up
 REVIEW.md §3.1 (and step 7 of its order of work) and turns it into a design
 that could be built an operation at a time.
@@ -59,7 +59,9 @@ Two terms are proposed, and have entries in GLOSSARY.md marked as such: a
    commits, and what hasn't it is unchanged.
 6. **Forage stays a named effect until regrowth is a progression**
    (REVIEW.md §3.2): its effect sets `grewAt`, which is regrowth's
-   business, and it would be converted twice.
+   business, and it would be converted twice. Done since: regrowth is a
+   rate (DETAIL_REGIMES.md, "Built"), which starts its own time when it
+   finds a patch below its most, and foraging is declared.
 7. **`after` as a goal's `done` is out of scope.** Nothing here prevents
    it; it wants its own design once expectation works.
 8. **`after` and `changes` naming the same field of the same role is a
@@ -450,7 +452,7 @@ done after: the first conversions use only the three there are.
    - Sowing and harvesting count rows (`sown: $w + ...`, `reaped: $r +
      $e`), and how the plot stands when the last is sown or reaped is
      the plot's own: a reaction of the Plot kind to its count
-     (src/domains_farming.odin). The alternative by decision 3, a last
+     (src/kinds_plot_kind.odin). The alternative by decision 3, a last
      row as its own operation, needs the farmer to see how many tiles
      are reaped, and a requirement that is an inequality over a product.
      Sowing's row is `math.Min` of the row, the seed in hand and the
@@ -489,6 +491,10 @@ done after: the first conversions use only the three there are.
      belt, for a pouch), and that nothing is there already is the
      committer's to refuse, as for any hand. The numbers are bare in
      content: a place has no name there.
+   - Foraging is declared (22 left), now that regrowth is a progression
+     (decision 6): a handful made in a free hand, the patch one fewer.
+     That it has a handful is required of the role, where the procedure
+     refused.
    Left named, and why: `hit` and `shoot` (an injury that reaches 100 is
    a death, which is code: it wants to be the body's reaction to its
    injury, as a plot's standing is to its count); `hire` (a bond made

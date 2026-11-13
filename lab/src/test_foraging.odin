@@ -53,13 +53,13 @@ test_foraging_run :: proc(grain: cstring, hour: i64 = 8) -> (^World, ^Agency, En
 	activities := activities_with_world(w, c)
 	knowledge  := autorelease(knowledge_init_with_world(w))
 	agency     := autorelease(agency_init_with_world(w, c, knowledge))
-	foraging   := autorelease(foraging_init_with_world(w))
+	foraging   := autorelease(progressions_init_with_world(w))
 	s          := autorelease(scheduler_init_with_world(w, c))
 	agency_set_activities(agency, activities)
 	scheduler_set_activities(s, activities_as_activity_clock(activities))
 	scheduler_set_perception(s, knowledge_as_perception_phase(knowledge))
 	scheduler_set_decision(s, agency_as_decision_phase(agency))
-	scheduler_add_domain(s, foraging_as_domain(foraging))
+	scheduler_add_domain(s, progressions_as_domain(foraging))
 	knowledge_set_omniscient(knowledge, true)      /* it knows what is in its larder */
 
 	g := proposal_group_group_with_phase(.System, "setup: a farmer at the woods' edge")

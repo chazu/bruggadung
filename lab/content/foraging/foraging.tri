@@ -4,7 +4,8 @@
 //
 // Cut points:
 // - full:     a patch holds `handfuls`, at most `most`, and grows one more
-//             every `regrowsIn` while it holds fewer, from `grewAt`.
+//             every `regrowsIn` while it holds fewer, from `grewAt`
+//             (`regrowth`, a rate: reality.tri).
 //             Foraging a patch within reach (ten minutes, the hands)
 //             gives a handful of what it `yields` into a free hand, ready
 //             to eat; a bare patch gives nothing. Hunger's last way of its
@@ -25,15 +26,16 @@
 //             to the edge of woodland never seen.
 // - deals:    asking someone for food (deals/) comes only when this fails
 //             too: it is a way of the goal's own.
-// - code:     effect_forage (src/act_actions.odin); src/domains_foraging.odin
-//             regrows a patch, a wake for each handful; the scenario places
-//             the patches (src/scenario_village.odin).
+// - code:     the scenario places the patches (src/scenario_village.odin).
+//             Regrowth is applied as any progression is
+//             (src/domains_progressions.odin), a wake for each handful.
 
 package foraging
 
 // A patch of forage: how many handfuls it holds (seen), at most; how long
-// one takes to grow back; when it last grew one (or was stripped of its
-// last, and began again); and what a handful is (a blueprint).
+// one takes to grow back; when it last grew one (or, full, was first
+// foraged, and began again; 0 while it is full); and what a handful is (a
+// blueprint).
 #Patch: #Body & {
     @component(Patch)
     handfuls:  *0 | int & >=0 & <=100        @field(content, saved, proposable, inspect, perceive(sight))
@@ -46,6 +48,11 @@ package foraging
 patch_seen: #Seen & { kindOf: "#Patch" } @family(seen)
 patch_look: #Look & { kindOf: "#Patch", look: "patch" } @family(looks)
 
+// A patch holding fewer than its most grows a handful back every
+// `regrowsIn`.
+regrowth: #Rate & { progresses: "Patch", rises: "handfuls", upTo: "most", asOf: "grewAt", period: "regrowsIn" }
+@family(progressions)
+
 // A bramble, three handfuls of berries, one back a day; a hazel, four of
 // hazelnuts, one back every two days.
 bramble: #Patch & { material: "wood", mass: 20kg, handfuls: 3, most: 3, regrowsIn: 1d, yields: "berries" }
@@ -56,15 +63,17 @@ hazel:   #Patch & { material: "wood", mass: 200kg, handfuls: 4, most: 4, regrows
 berries:   #Body & #Food & { material: "food", mass: 150g, raw: false, nourishment: 12, keepsFor: 2d }
 hazelnuts: #Body & #Food & { material: "food", mass: 100g, raw: false, nourishment: 15 }
 
-// Search a patch within reach for a handful: a while, with the hands.
+// Search a patch within reach for a handful: a while, with the hands. It
+// holds one fewer, and the handful is in a free hand.
 forage: #Operation & {
-    effect:   "forage"
     duration: 10min
     uses:     ["hands"]
     roles: {
         actor: #Agent & { id: $a }
-        item:  #Patch
+        item:  #Patch & { handfuls: $h & >=1, yields: $y }
     }
+    makes: [{ blueprint: $y, at: #Held & { by: $a }, called: "a handful" }]
+    after: { item: #Patch & { handfuls: $h - 1 } }
 } @family(operations)
 
 // Foraging: the food found, and the patch it is found in.

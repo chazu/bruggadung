@@ -384,7 +384,8 @@ stocks_wet :: proc(s: ^Tile_Stocks, out: [^][3]i32, max_: uint) -> uint {
 /* --- the world ------------------------------------------------------------ */
 
 /* nil, with the reason, if the content's hash differs from the generated
- * header's, or an operation in it does nothing (act_declared.odin) */
+ * header's, an operation in it does nothing (act_declared.odin), or a
+ * progression names what isn't there (domains_progressions.odin) */
 world_with_content :: proc(content: ^tri.Content, seed: u64, error: ^string) -> ^World {
 	if tri.content_hash(content) != CONTENT_HASH {
 		if error != nil {
@@ -395,6 +396,10 @@ world_with_content :: proc(content: ^tri.Content, seed: u64, error: ^string) -> 
 		return nil
 	}
 	if reason := declared_check(content); reason != "" {
+		if error != nil do error^ = reason
+		return nil
+	}
+	if reason := progressions_check(content); reason != "" {
 		if error != nil do error^ = reason
 		return nil
 	}
@@ -995,7 +1000,6 @@ world_field_holds_type :: proc(self: ^World, path: cstring) -> bool {
 }
 
 
-@(private = "file")
 field_get :: proc(f: ^Field_Info, record: rawptr) -> i64 {
 	p := rawptr(uintptr(record) + f.offset)
 	switch f.value {

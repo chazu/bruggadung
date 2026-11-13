@@ -45,7 +45,7 @@
 //            (src/act_activities.odin); they are compacted into digests
 //            after the world's history window (src/core_world.odin).
 
-#Effect: "drive" | "fill" | "walk" | "say" | "analyse" | "write" | "read" | "rotate" | "strike" | "copy" | "reveal" | "replace" | "cut" | "shape" | "issue" | "confiscate" | "arrest" | "flee" | "hit" | "hire" | "work" | "service" | "shoot" | "forage"
+#Effect: "drive" | "fill" | "walk" | "say" | "analyse" | "write" | "read" | "rotate" | "strike" | "copy" | "reveal" | "replace" | "cut" | "shape" | "issue" | "confiscate" | "arrest" | "flee" | "hit" | "hire" | "work" | "service" | "shoot"
 
 // Which roles an operation has is its roles' type: a structure's type is the
 // most general one with all its features.

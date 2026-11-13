@@ -4,8 +4,10 @@
 
 What each system does at each level of detail (REALITY.md decisions 1, 4,
 11 and 13), how content says so, and how far Triangle can express it. This
-is a draft: nothing here is built. It expands REALITY.md step 5 (abstract
-progression) and is the design that step is to be built from.
+is a draft, and little of it is built: of the forms of progression, a
+rate and a turn, at every level of detail, full included ("Built",
+below). It expands REALITY.md step 5 (abstract progression) and is the
+design that step is to be built from.
 
 In scope:
 - how content declares, per kind of thing and per level, which systems run,
@@ -193,6 +195,51 @@ Triangle fits these best.
 | distort news by generalising | find the shortest delays over large route networks |
 | reach over small route graphs | |
 | settle conditions into things, by seeded construction | |
+
+## Built
+
+REVIEW.md §3.2 proposed building form 1 at full detail first, where
+there were working implementations to check it against. That is done for
+two of them, a patch's regrowth and a plot's ripening: their domains are
+gone, and each is an instance in the `progressions` family, in its
+topic's directory. One domain applies every progression
+(lab/src/domains_progressions.odin), at every level of detail: its
+horizon is the next one due.
+
+```
+regrowth: #Rate & { progresses: "Patch", rises: "handfuls", upTo: "most", asOf: "grewAt", period: "regrowsIn" }
+@family(progressions)
+ripening: #Turn & { progresses: "Plot", turned: "stands", turnedFrom: "sown", turnedTo: "ripe", asOf: "sownAt", period: "ripensIn" }
+@family(progressions)
+```
+
+- **A rate** (`#Rate`) is form 1, with decision 5's wake at each
+  period: the field that `rises` is `risesBy` more each `period`, up to
+  the bound `upTo`. It names fields of one component, so each blueprint
+  has its own period and bound. The stored value is right at every
+  boundary, to the period: nothing reads it lazily (decision 4) yet,
+  since nothing so far moves by less than what is seen of it.
+- **A rate at its bound rests**, its time 0, and one found below its
+  bound with no time left it at the last boundary. So what takes a patch
+  below its most says nothing of regrowth: foraging is a declared effect
+  that says only that the patch has one fewer (EFFECTS.md decision 6).
+- **A turn** (`#Turn`) is decision 5 alone, a threshold as a wake: a
+  field that stands one way stands another, one period after a time.
+  How far along it is isn't kept, and nothing reads it.
+- **What a progression names is checked as a world is made**: a
+  component, its fields, that they hold quantities (or, turned, a choice
+  of texts) and are proposable. The names are `text`, as a declared
+  effect's `changes` are (EFFECTS.md step 8).
+- **Not moved to it**, and why:
+  - A becoming (lab/content/perishing/) ends a thing and makes another,
+    and has courses by where the thing lies. Its domain is general
+    already: tanning added no code to it but the course.
+  - Satiety and reserves (two rates, the second's direction by the
+    first's value, read lazily), lamp oil (falling only while the lamp
+    shines) and a trace's strength want a rate that falls, a condition,
+    and the lazy reader. They are the next uses to build it against.
+  - How a plot stands when its last row is sown or reaped is a reaction
+    to a count, not a matter of time (lab/src/kinds_plot_kind.odin).
 
 ## What this needs that the lab doesn't have
 
