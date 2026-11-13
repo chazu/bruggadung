@@ -13,7 +13,9 @@
 //             harvested; else sows a row of a bare plot, its seed in hand
 //             (fetched from where it is kept first); else puts the seed
 //             back. A plot is tended while it stands sown, its farmer's
-//             hands empty.
+//             hands empty. The hour before work, a farmer that believes
+//             its plot bare takes seed for it along (`seed_along`), so it
+//             comes to the plot with it; one that doesn't finds out there.
 // - reduced:  the same, decided on the cadence's beat; each row's activity
 //             runs its time.
 // - abstract: as reduced. A household's plots as a yield at a place,
@@ -235,6 +237,29 @@ seed_in_hand: #Goal & {
                             plot: #Plot & { grows: $c } }
     }
 } @family(goals)
+
+// Seed along (the morning's commitment, the hour before work): a farmer
+// that believes its plot bare takes seed for it as it sets out, and has it
+// in hand when it comes to the plot. One that believes it sown or ripe, or
+// hasn't seen how it stands, has no way to this and lets it go: it finds
+// out at the plot, and fetches seed from there (`sow_it`).
+seed_along: #Goal & {
+    title: "take seed along"
+    done: {
+        find:  ["plot", "seed"]
+        match: #Farming & { me: #Agent & { id: $me },
+                            seed: #Seed & #Stack & { sows: $c, place: #Held & { by: $me } },
+                            plot: #Plot & { grows: $c } }
+    }
+} @family(goals)
+
+seed_to_sow: #Method & {
+    title: "seed to sow"
+    goal:  "seed_along"
+    rank:  1
+    pre:   { find: ["plot"], match: #Farming & { plot: #Plot & { stands: "bare" } } }
+    steps: [#Achieve & { subgoal: "seed_in_hand" }]
+} @family(methods)
 
 fetch_seed: #Method & {
     title: "fetch seed"

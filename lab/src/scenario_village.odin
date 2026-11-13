@@ -1099,11 +1099,14 @@ village_check_each :: proc(self: ^Village, name: string, where_: Where) {
 	for v in self.people {
 		ok := false
 		switch where_ {
-		/* or, short of food, it foraged this morning and is late packing */
+		/* or, short of food, it foraged this morning and is late packing; or
+		 * it took one and, hungry by then, has eaten it since it set out */
 		case .Packed:
+			day := world_time(self.world).ms / VILLAGE_DAY * VILLAGE_DAY
+			fed: i64
 			ok = village_holds_meal(self.world, v.id) == 1 ||
-			     agency_activity(self.agency, "forage", v.id, "completed",
-			                     world_time(self.world).ms / VILLAGE_DAY * VILLAGE_DAY + 4 * VILLAGE_HOUR) != NO_ENTITY
+			     agency_activity(self.agency, "forage", v.id, "completed", day + 4 * VILLAGE_HOUR) != NO_ENTITY ||
+			     (world_get_field(self.world, "Hungry.fedAt", v.id, &fed) && fed >= day + 7 * VILLAGE_HOUR)
 		case .Work:    ok = village_at_work(self, v)
 		case .Lunched: ok = village_holds_meal(self.world, v.id) == 0      /* at work, it was at 11:00 */
 		/* by its bed, or at its hearth: a late meal cooking at the stove */

@@ -50,9 +50,12 @@ working_day: #Routine & {
 } @family(routines)
 
 // A farmer's: its plot tended (which, the scenario gives), its seed in the
-// household's larder.
+// household's larder; the hour before, seed taken along if it believes the
+// plot bare (farming/'s `seed_along`).
 farmers_day: #Routine & {
     keeps: [{ keep: "plot_tended", opens: 7h, closes: 15h, dutyTo: "work",
+              bindings: [{ binding: "plot" }, { binding: "larder", own: "#Larder" }] },
+            { keep: "seed_along", opens: 6h, closes: 7h, dutyTo: "work",
               bindings: [{ binding: "plot" }, { binding: "larder", own: "#Larder" }] }]
 } @family(routines)
 

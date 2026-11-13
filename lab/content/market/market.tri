@@ -122,9 +122,11 @@ sign_look:  #Look & { kindOf: "price_sign", look: "board" } @family(looks)
 // Nothing left to buy, each holds.
 #Buying: #Condition & #Buys & { buying: "coming" | "priced" | "affords", coinsIn: text }
 
-// The goods a household sells, what its trade makes: food, or firewood.
+// The goods a household sells, what its trade makes and has a price
+// (money/coins.tri): grain, venison, or firewood. Not food of any kind: a
+// hunter come to its stall with a hare's meat in hand has no goods in it.
 // (A hunter's leather is set out beside its goods: `wares`, below.)
-let goods = (#Food & #Stack) | #Stack & { unit: "firewood" }
+let goods = (#Food & #Stack & { unit: "grain" }) | (#Food & #Stack & { unit: "venison" }) | #Stack & { unit: "firewood" }
 
 // The market's frame: the household's stall and its board, the goods, its
 // supply (where it keeps them: a larder, a woodpile), its coffer, a purse
