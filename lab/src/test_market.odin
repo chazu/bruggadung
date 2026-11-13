@@ -9,7 +9,10 @@ package lab
  * until its larder holds enough. Coins and grain are conserved; the
  * farmer's stall holds what it was paid. After the market, the farmer
  * takes its takings home to its coffer, and the woodcutter puts back the
- * coins it didn't spend.
+ * coins it didn't spend. With a pouch in its coffer (content/leatherwork/),
+ * the woodcutter carries its purse in that, at its belt, and pays out of
+ * it: no coins are in its hand, and the pouch goes back into the coffer
+ * with what is left.
  */
 
 import "core:fmt"
@@ -17,9 +20,20 @@ import "core:strings"
 
 
 test_market :: proc() {
+	test_market_run(115, false)
+}
+
+
+test_market_with_a_pouch :: proc() {
+	test_market_run(135, true)
+}
+
+
+@(private = "file")
+test_market_run :: proc(seed: u64, pouched: bool) {
 	HOUR :: i64(3600 * 1000)
 
-	w := test_world(115)
+	w := test_world(seed)
 	why: string
 	bg_check(world_set_terrain_map(w, "woods_map", &why))
 	c := test_committer(w)
@@ -45,12 +59,14 @@ test_market :: proc() {
 	cgrain   := proposal_group_create(g, "grain_sack", "the woodcutter's grain", in_(clarder))
 	coffer   := proposal_group_create(g, "coffer", "the coffer", on_tile(16, 12, 0))
 	purse    := proposal_group_create(g, "coins_400", "the coins", in_(coffer))
+	pouch    := proposal_group_create(g, "pouch", "the pouch", in_(coffer)) if pouched else NO_ENTITY
 	committer_submit(c, g)
 	scheduler_run_until(s, time_make(1))
 	board = proposal_group_id_for(g, board)
 	stall, farmer, flarder, cutter = proposal_group_id_for(g, stall), proposal_group_id_for(g, farmer), proposal_group_id_for(g, flarder), proposal_group_id_for(g, cutter)
 	clarder, coffer, fcoffer = proposal_group_id_for(g, clarder), proposal_group_id_for(g, coffer), proposal_group_id_for(g, fcoffer)
 	fgrain, cgrain, purse = proposal_group_id_for(g, fgrain), proposal_group_id_for(g, cgrain), proposal_group_id_for(g, purse)
+	worn := proposal_group_id_for(g, pouch) if pouched else NO_ENTITY
 
 	fstore := knowledge_store_of(knowledge, farmer)
 	cstore := knowledge_store_of(knowledge, cutter)
@@ -104,6 +120,27 @@ test_market :: proc() {
 	bg_check(stocked >= 20000)
 	bg_check(paid > 0)
 	bg_check(test_market_count(w, "coin") == coins_before && test_market_count(w, "grain") == grain_before)
+	/* with a pouch: at its belt, the purse in it, and no coins in a hand,
+	 * nor left loose in the coffer */
+	if pouched {
+		at := world_location_of(w, worn)
+		bg_check(at.form == .Held_By && at.place == cutter && at.slot == BG_BELT)
+		bg_check(test_market_units_in(w, worn, "coin") == coins_before - paid && test_market_units_in(w, coffer, "coin") == 0)
+		held: [4]Entity_ID
+		for e in held[:min(world_entities_at(w, cutter, .Held_By, raw_data(held[:]), len(held)), len(held))] {
+			u := world_unit_of(w, e)
+			bg_check(u == nil || u != "coin")
+		}
+		/* coins nobody carries pay for nothing: the farmer, by its stall,
+		 * doesn't pay its takings there into its larder */
+		for e in inside[:world_entities_at(w, stall, .In, raw_data(inside[:]), len(inside))] {
+			if u := world_unit_of(w, e); u == nil || u != "coin" do continue
+			refused: string
+			perform(w, c, action_make("pay", farmer, e, flarder), 1, &refused)
+			scheduler_run_until(s, time_make(HOUR + 2000))
+			bg_check(test_market_units_in(w, flarder, "coin") == 0 && test_market_units_in(w, stall, "coin") == paid)
+		}
+	}
 
 	/* after the market: the farmer's takings home to its coffer, the
 	 * woodcutter's coins back in its own */
@@ -114,9 +151,16 @@ test_market :: proc() {
 	scheduler_run_until(s, time_make(3 * HOUR))
 	takings := test_market_units_in(w, fcoffer, "coin")
 	kept    := test_market_units_in(w, coffer, "coin")
+	if pouched {
+		/* the pouch back in the coffer, what is left in it */
+		at := world_location_of(w, worn)
+		bg_check(at.form == .In && at.place == coffer && kept == 0)
+		kept = test_market_units_in(w, worn, "coin")
+	}
 	if takings != paid || kept != coins_before - paid || test_market_units_in(w, stall, "coin") != 0 {
 		fmt.printf("    takings %d of %d paid; the woodcutter's coffer %d\n", takings, paid, kept)
 		for line in agency_log_of(agency, farmer) do fmt.printf("    farmer: %s\n", line)
+		for line in agency_log_of(agency, cutter) do fmt.printf("    cutter: %s\n", line)
 	}
 	bg_check(takings == paid && test_market_units_in(w, stall, "coin") == 0)
 	bg_check(kept == coins_before - paid)

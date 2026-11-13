@@ -927,8 +927,8 @@ village_run :: proc(self: ^Village) {
 	for place in ([2]Entity_ID{self.larders[hunters], self.pit}) {
 		for e in inside[:min(world_entities_at(self.world, place, .In, raw_data(inside[:]), len(inside)), len(inside))] {
 			if world_record(self.world, world_kind_named(self.world, "Body"), e) == nil do continue
-			if village_is_a(self.world, e, "#Hide") do hides += 1
-			if village_is_a(self.world, e, "#Leather") {
+			if world_is_a(self.world, e, "#Hide") do hides += 1
+			if world_is_a(self.world, e, "#Leather") {
 				hides += 1
 				if place != self.pit do leather += world_units_of(self.world, e)
 			}
@@ -939,15 +939,20 @@ village_run :: proc(self: ^Village) {
 		village_check(self, leather > 0, "the hunters tanned hides and put the leather by", "no leather in their larder")
 	}
 	/* and from three weeks, leather sold at their stall, and sewn: a pouch
-	 * in some household's coffer (content/leatherwork/) */
+	 * in some household's coffer (content/leatherwork/), or at its buyer's
+	 * belt; and, a market on (the sixth, on day 23), some pouch with coins
+	 * in it: a purse carried to market in it (content/market/) */
 	if self.days >= 21 {
-		pouches := 0
-		for coffer in self.coffers {
-			for e in inside[:min(world_entities_at(self.world, coffer, .In, raw_data(inside[:]), len(inside)), len(inside))] {
-				if info := world_info(self.world, e); info != nil && info.blueprint == "pouch" do pouches += 1
-			}
+		pouches, pursed := 0, 0
+		bodies := world_store_for_kind(self.world, world_kind_named(self.world, "Body"))
+		for i: uint = 0; i < store_count(bodies); i += 1 {
+			e := store_entity_at_index(bodies, i)
+			if !world_is_live(self.world, e) || !world_is_a(self.world, e, "#Pouch") do continue
+			pouches += 1
+			if village_units_in(self.world, e, "coin") > 0 do pursed += 1
 		}
-		village_check(self, pouches > 0, "a household bought leather and made its pouch of it", "no pouch in any coffer")
+		village_check(self, pouches > 0, "a household bought leather and made its pouch of it", "no pouch anywhere")
+		if self.days >= 23 do village_check(self, pursed > 0, "a buyer carried its purse to market in its pouch", "no pouch with coins in it")
 	}
 	deer, hares := game_count(self.world, "deer"), game_count(self.world, "hare")
 	village_check(self, deer >= 1 && deer <= 6 && hares >= 1 && hares <= 4, "the herds neither vanished nor outgrew the woods",
@@ -1114,17 +1119,6 @@ village_check_market :: proc(self: ^Village, d: i64, before: [4]i64) {
 	              fmt.tprintf("%d coins, %d of them still on the stalls", coins, left))
 	for l, k in self.larders do self.marketed[k] += village_portions_in(self.world, l) - before[k]
 	self.marketing = false
-}
-
-
-/* Whether a thing is of a kind, by its blueprint (a hide, hunting/'s #Hide;
- * leather, tanning/'s #Leather). */
-@(private = "file")
-village_is_a :: proc(world: ^World, e: Entity_ID, kind: cstring) -> bool {
-	info := world_info(world, e)
-	tc   := world_tri(world)
-	return info != nil && tri.pattern(tc, info.blueprint) != nil && tri.type_named(tc, kind) != 0 &&
-	       tri.subtype(tc, tri.node_type(tri.pattern(tc, info.blueprint)), tri.type_named(tc, kind)) != 0
 }
 
 

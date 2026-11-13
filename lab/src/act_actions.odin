@@ -2583,19 +2583,6 @@ injure :: proc(world: ^World, g: ^Proposal_Group, victim: Entity_ID, by: Entity_
 }
 
 
-/* Shouldering a backpack (content/carrying/): onto the back, which is no
- * hand, if nothing is there already. */
-@(private = "file")
-effect_shoulder :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
-	held: [8]Entity_ID
-	for e in held[:min(world_entities_at(world, a.roles[.Actor], .Held_By, raw_data(held[:]), 8), 8)] {
-		if world_location_of(world, e).slot == BG_BACK do return "something is on its back already"
-	}
-	proposal_group_move_to(g, whole(a.roles[.Item]), held_by(a.roles[.Actor], BG_BACK))
-	return ""
-}
-
-
 /* Death (VILLAGE.md decision 7, content/harm/): a body whose injury reaches
  * 100 is its remains (its `remains`, a blueprint: a deer's carcass, a
  * person's corpse), as heavy as it was, where it was; what it held falls
@@ -2695,7 +2682,6 @@ effects := [?]Named_Effect{
 	{"strike",    effect_strike},
 	{"forage",    effect_forage},
 	{"shoot",     effect_shoot},
-	{"shoulder",  effect_shoulder},
 }
 
 
@@ -2746,6 +2732,16 @@ operation_is_a :: proc(world: ^World, operation: cstring, type: cstring) -> bool
 	pattern := tri.pattern(tc, operation) if operation != nil else nil
 	of      := tri.type_named(tc, type)
 	return pattern != nil && of != 0 && tri.subtype(tc, tri.node_type(pattern), of) != 0
+}
+
+
+/* Whether a thing is of a kind, by its blueprint (a hide, hunting/'s #Hide;
+ * what is belted, carrying/'s #Belted). */
+world_is_a :: proc(world: ^World, e: Entity_ID, kind: cstring) -> bool {
+	info := world_info(world, e)
+	tc   := world_tri(world)
+	return info != nil && tri.pattern(tc, info.blueprint) != nil && tri.type_named(tc, kind) != 0 &&
+	       tri.subtype(tc, tri.node_type(tri.pattern(tc, info.blueprint)), tri.type_named(tc, kind)) != 0
 }
 
 

@@ -1037,6 +1037,9 @@ committer_place_obstacle :: proc(self: ^Committer, e: Entity_ID, loc: Location) 
 		if loc.slot == BG_BACK {
 			worn: i64
 			if !world_get_field(self.world, "Pack.worn", e, &worn) || worn == 0 do return fmt.tprintf("%d isn't worn on the back", e)
+		} else if loc.slot == BG_BELT {
+			/* the belt, what is belted (content/carrying/'s #Belted), and only that */
+			if !world_is_a(self.world, e, "#Belted") do return fmt.tprintf("%d isn't worn at the belt", e)
 		} else if loc.slot < 0 || i64(loc.slot) >= agent.hands {
 			return fmt.tprintf("%d has no hand %d", loc.place, loc.slot)
 		}

@@ -1,7 +1,5 @@
 package lab
 
-import tri "../../triangle/odin/triangle"
-
 // BGPerishing — what becomes something else when its time comes, in closed
 // form (VILLAGE.md decision 8; content/perishing/'s #Becoming): a thing
 // that keeps so long (`Becoming.keepsFor` more than 0: meat, a carcass,
@@ -49,11 +47,7 @@ perishing_lies_within :: proc(world: ^World, e: Entity_ID, food: ^Becoming) -> b
 	if food.within == nil || len(food.within) == 0 do return false
 	at := world_location_of(world, e)
 	if at.form != .In do return false
-	tc   := world_tri(world)
-	info := world_info(world, at.place)
-	of   := tri.type_named(tc, food.within)
-	if info == nil || of == 0 || tri.pattern(tc, info.blueprint) == nil do return false
-	return tri.subtype(tc, tri.node_type(tri.pattern(tc, info.blueprint)), of) != 0
+	return world_is_a(world, at.place, food.within)
 }
 
 

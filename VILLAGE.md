@@ -563,7 +563,18 @@ New, and entered in the glossary with this document:
   weeks two households had made a pouch and the third had bought its
   leather. A piece of deer leather is sewn into a backpack, which nobody
   in the village wants: each household has its own, so deer leather
-  still only piles up. Nothing is carried in a pouch yet. With no
+  still only piles up. A buyer whose household has a pouch carries its
+  purse in it (content/market/): the pouch hung at its belt (a hand slot
+  past the hands, as the back is: content/carrying/'s #Belted), the
+  coffer's coins put into it, paid out of it at the stalls with both
+  hands free, and put back in the coffer after with what is left; it is
+  taken as it is the next market, and more put in only when it won't pay
+  for a lot. Coins that came in since (takings) lie loose in the coffer
+  beside it. In 23 days two households' buyers went to the sixth market
+  (day 23) so. A piece of leather bought short of a lot (the stall had
+  one left) came home in the pack and stayed in its buyer's hand, which
+  then cooked nothing: leather is now among what a pack is emptied of
+  into the larder. With no
   venison set out the seller doesn't mind the stall, so sells no leather
   either. Tried first, and dropped: leather set out only when there is
   no venison to spare (in three weeks it never was), and leather on the

@@ -45,7 +45,7 @@
 //            (src/act_activities.odin); they are compacted into digests
 //            after the world's history window (src/core_world.odin).
 
-#Effect: "drive" | "fill" | "walk" | "say" | "analyse" | "write" | "read" | "rotate" | "strike" | "copy" | "reveal" | "replace" | "cut" | "shape" | "issue" | "confiscate" | "arrest" | "flee" | "hit" | "hire" | "work" | "service" | "shoot" | "shoulder" | "forage"
+#Effect: "drive" | "fill" | "walk" | "say" | "analyse" | "write" | "read" | "rotate" | "strike" | "copy" | "reveal" | "replace" | "cut" | "shape" | "issue" | "confiscate" | "arrest" | "flee" | "hit" | "hire" | "work" | "service" | "shoot" | "forage"
 
 // Which roles an operation has is its roles' type: a structure's type is the
 // most general one with all its features.
@@ -73,7 +73,8 @@
 // code. `after` is the roles as the effect leaves them: each field it
 // states is set, if the truth isn't that already. `moves` puts a thing
 // (`moved`, by a tag on its role's id) `into` a place: a tile, a container,
-// a hand (#Held, `by` whom), which is a free one of theirs, or a role in an
+// a hand (#Held, `by` whom), which is a free one of theirs (or the `hand` it
+// says: the back, the belt, carrying/), or a role in an
 // assembly (#Installed). `emits` is events, by `event` (its kind), subject
 // and other, and a `detail` if it gives one (what was written). A step has a declared effect or names one (`effect`), not
 // both. The requirements stay in `roles`: they are matched once from what

@@ -1066,16 +1066,21 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
   and says what is owed (`#Sold`), the buyer pays into the stall. *Avoid:*
   trade (a craft, `Agent.trade`). (VIL d9)
 - **Coins**: money, a stack of the unit `coin` (brass), kept in a
-  household's **coffer**, four hundred to begin with. What a buyer carries to market is its **purse**; what a
-  stall was paid, its **takings**. The tempting purse of AGENCY.md's
+  household's **coffer**, four hundred to begin with. What a buyer carries to market is its **purse**: in its hand, or in a
+  **pouch** at its belt if its household has one, and paid out of either. What a
+  stall was paid is its **takings**. The tempting purse of AGENCY.md's
   scenario is cloth, a purse in the other sense. (VIL d9)
 - **Pack**: a container carried, going where its carrier goes: a
   **backpack** worn on the back (held, but by no hand), or a **basket** in
   a hand. It bears no more than its **load**, in kilograms; what is in a
   pack its carrier carries it knows. A household's are kept by its door,
   taken by whoever needs one, and put back emptied. (VIL d11)
-- **Burden**: what an agent carries, in its hands and on its back, with
-  what is in that. Past the light amount (15 kg) it slows a walk: half
+- **Belted**: a container worn at the belt (`#Belted`: a pouch), held
+  by no hand, as a backpack is on the back; one at a time, hung there
+  with `belt_on`. What is in anything held is **carried** by its holder
+  (a place's `carriedBy`). (lab/content/carrying/)
+- **Burden**: what an agent carries, in its hands, on its back and at its
+  belt, with what is in that. Past the light amount (15 kg) it slows a walk: half
   pace at 55 kg. (VIL d11)
 - **Stow**: what an operation that stows takes, or is handed (gathering,
   picking up, butchering, a purchase), goes into a pack its taker carries
@@ -1094,11 +1099,13 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
 - **Leatherwork**: leather sewn (`sew`) into what its blueprint says
   (`sewnInto`), so many pieces of it used up (`sewnOf`): a piece of deer
   leather a backpack, two of hare leather a **pouch** (`#Pouch`, a small
-  container, for coins). A household buys two pieces of hare leather at
+  **belted** container, for coins). A household buys two pieces of hare leather at
   the hunters' stall, where it is set out beside the venison with its
   price on a second board (`price_sign`; posting on it is `post_beside`,
   a **posting** as `post` is), and makes its pouch of them, kept in its
-  coffer.
+  coffer. Its buyer carries its **purse** to market in it from then:
+  the coffer's coins put into it (`pocket`), and the pouch put back
+  after with what is left.
   (VIL d7, lab/content/leatherwork/)
 - **Pricing**: what a unit of goods is worth to an agent in coins
   (`#Pricing`): its kind's, raised by a need the goods serve. A seller

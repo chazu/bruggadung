@@ -76,9 +76,12 @@ container_look: #Look & { kindOf: "#Container", look: "container" } @family(look
 assembly_look:  #Look & { kindOf: "#Assembly", look: "assembly", prevails: 2 } @family(looks)
 
 // Where a physical thing is: the location relation, as a description.
+// What is in something held is `carriedBy` its holder (derived, not
+// stored: in a pack on a back, a pouch at a belt); in anything else, by
+// nobody (ref(0)).
 #Place:     {}
 #OnTile:    #Place & { x: int, y: int, level: int }
-#Inside:    #Place & { container: ref }
+#Inside:    #Place & { container: ref, carriedBy: ref }
 #Held:      #Place & { by: ref, hand: int }
 #Installed: #Place & { assembly: ref, role: text, index: int }
 

@@ -6,6 +6,9 @@
 // - full:     a pack is a container that goes where its carrier goes: a
 //             backpack on the back (shouldered: held, but by no hand, so
 //             both stay free), a basket in a hand (taken, as anything is).
+//             A belted container (#Belted: a pouch, leatherwork/) hangs at
+//             the belt likewise: held, by no hand, one at a time, put
+//             there from a hand, the ground or a container (`belt_on`).
 //             What is put in it is carried with it, and seen only by whoever
 //             put it there or looks in. It bears no more than its `load`:
 //             what would make it heavier isn't put in. Carried mass (all
@@ -18,8 +21,8 @@
 //             taken out into a free hand (as from any container) and put
 //             where it goes. A household's
 //             packs are its own, kept by its door: whoever needs one takes
-//             it, and puts it back there after, emptied: food, hides and
-//             seed into the larder, firewood onto the woodpile. (Seed kept
+//             it, and puts it back there after, emptied: food, hides,
+//             leather and seed into the larder, firewood onto the woodpile. (Seed kept
 //             back into a pack worn to market was never emptied, and the
 //             pack never put back.) Handling: a thing (`thing`, bound by
 //             the topic's way with #Achieve's `with`) taken in hand,
@@ -36,12 +39,13 @@
 //             hunting/, firewood/) use a pack when the household's is free,
 //             and their hands when it isn't; their unpacking, bringing home
 //             and freeing a hand are the handling's.
-// - code:     the back is a hand slot past the hands (BG_BACK); the load
-//             is the committer's to keep (a placement obstacle); the slowed
-//             walk is work_rate's; stowing is `receiving`; effect_shoulder
-//             (src/act_actions.odin: the back has no name in content, and
-//             that nothing is on it already is no field). Taking into a
-//             pack and putting the pack back are declared (actions.tri).
+// - code:     the back and the belt are hand slots past the hands (8 and
+//             9: BG_BACK, BG_BELT), which take a worn pack and what is
+//             belted, and nothing else, one each: the committer's to keep
+//             (placement obstacles), as the load is; the slowed walk is
+//             work_rate's; stowing is `receiving`. Shouldering, belting,
+//             taking into a pack and putting the pack back are declared
+//             (actions.tri): moves into a hand that say which.
 
 package carrying
 
@@ -68,14 +72,30 @@ basket_look:   #Look & { kindOf: "basket", look: "pack.basket" } @family(looks)
 burden: #Burden & { light: 15kg, slows: 40kg } @family(burden)
 
 // Shoulder a backpack: from the ground or a container in reach, onto the
-// back (no hand is used), if nothing is there already. Two seconds.
+// back (hand 8: no hand is used), if nothing is there already. Two seconds.
 shoulder: #Operation & {
-    effect:   "shoulder"
     duration: 2s
     roles: {
-        actor: #Agent
-        item:  #Pack & { worn: true, place: #OnTile | #Inside }
+        actor: #Agent & { id: $a }
+        item:  #Pack & { id: $i, worn: true, place: #OnTile | #Inside }
     }
+    moves: [#Moves & { moved: $i, into: #Held & { by: $a, hand: 8 } }]
+} @family(operations)
+
+// A container worn at the belt: held, by no hand, as a backpack is on the
+// back; one at a time.
+#Belted: #Container & {}
+
+// Hang something belted at the belt (hand 9: no hand is used): from the
+// actor's hand, the ground or a container in reach, if nothing hangs there
+// already. Two seconds. It is taken off as anything held is put anywhere.
+belt_on: #Operation & {
+    duration: 2s
+    roles: {
+        actor: #Agent & { id: $a }
+        item:  #Belted & { id: $i, place: #OnTile | #Inside | #Held & { by: $a } }
+    }
+    moves: [#Moves & { moved: $i, into: #Held & { by: $a, hand: 9 } }]
 } @family(operations)
 
 // Gathering some of a stack, or picking something up: as taking (some) is,
@@ -265,10 +285,11 @@ return_it: #Method & {
 
 // Emptied: nothing it believes is in the pack (bound), nor anything kept
 // at home in its hands (what it took out of the pack, and goods carried):
-// firewood onto the woodpile; food, seed and hides, and anything else out
-// of the pack, into the larder. Food kept is raw, a stack or a portion
+// firewood onto the woodpile; food, seed, hides and leather (a piece
+// bought, short of a lot: market/), and anything else out of the pack,
+// into the larder. Food kept is raw, a stack or a portion
 // bought on its own; a meal carried to eat isn't.
-let kept   = #Food & { raw: true } | #Food & #Stack | #Seed & #Stack | #Hide
+let kept   = #Food & { raw: true } | #Food & #Stack | #Seed & #Stack | #Hide | #Leather
 let wood   = #Stack & { unit: "firewood" }
 let packed = #Carrying & { pack: #Pack & { id: $p }, thing: #Body & { place: #Inside & { container: $p } } }
 let held   = #Carrying & { me: #Agent & { id: $me }, thing: (kept | wood) & { place: #Held & { by: $me, hand: <8 } } }

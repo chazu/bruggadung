@@ -7,7 +7,7 @@ work are built: step 2 in Triangle (arithmetic that goes with a pattern;
 `math.Min`, `math.Max`, `math.Clamp`), steps 1 and 3 in
 `lab/src/act_declared.odin`: `after`, `moves`, `makes`, `consumes`,
 `emits` and `changes`, for an operation or a stage. Step 4 is under way
-(24 named effects are left), and of step 5, resting. The rest
+(23 named effects are left), and of step 5, resting. The rest
 is a draft. It takes up
 REVIEW.md §3.1 (and step 7 of its order of work) and turns it into a design
 that could be built an operation at a time.
@@ -484,9 +484,12 @@ done after: the first conversions use only the three there are.
      all: it now leaves the wrench's marks on the assembly.
    - Going through a door is a move of the actor onto the door's tile,
      expecting where it was.
-   Left named, and why: `shoulder` (the back
-   is a hand slot with no name in content, and that nothing is on it
-   already is no field); `hit` and `shoot` (an injury that reaches 100 is
+   - Shouldering is declared since (23 left): a move into a hand may
+     say which (`into: #Held & { by: $a, hand: 8 }`, the back; 9, the
+     belt, for a pouch), and that nothing is there already is the
+     committer's to refuse, as for any hand. The numbers are bare in
+     content: a place has no name there.
+   Left named, and why: `hit` and `shoot` (an injury that reaches 100 is
    a death, which is code: it wants to be the body's reaction to its
    injury, as a plot's standing is to its count); `hire` (a bond made
    with its two ends set: `makes` sets no fields); `confiscate` and

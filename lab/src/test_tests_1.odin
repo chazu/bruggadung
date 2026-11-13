@@ -596,7 +596,7 @@ test_menu :: proc() {
 
 	/* a description carries perceivable fields only: the stack's count is hidden */
 	text = view_describe_entity(view_of(4, w), 2)
-	bg_check(ns_has_prefix(text, "#Stack & { id: ref(2), place: #Inside & { container: ref(1) }"))
+	bg_check(ns_has_prefix(text, "#Stack & { id: ref(2), place: #Inside & { container: ref(1), carriedBy: ref(0) }"))
 	bg_check(ns_contains(text, "unit: \"iron_nail\""))
 	bg_check(!ns_contains(text, "count"))
 	/* so a pattern on the count is unknown, never incompatible, and says what to find out */

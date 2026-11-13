@@ -19,10 +19,16 @@
 //             blueprint says there.
 // - market:   leather is bought at a hunter's stall (market/), where it is
 //             set out beside the venison, by the piece: a household
-//             keeps two pieces of hare leather by.
+//             keeps two pieces of hare leather by. A buyer with a pouch in
+//             its coffer carries its purse in it: the pouch hung at its
+//             belt, the coffer's coins put into it, paid out of it at the
+//             stalls, and the pouch put back in the coffer after, what is
+//             left still in it. A pouch at the buyer's belt is the
+//             household's pouch too: none is made while it is away.
+// - carrying: a pouch is belted (carrying/'s #Belted): it hangs at its
+//             wearer's belt, in no hand.
 // - village:  who makes its household's pouch, and when, is the
-//             scenario's (src/scenario_village.odin). Nothing is carried in
-//             a pouch yet: a buyer's coins are in its hand. Nobody wants a
+//             scenario's (src/scenario_village.odin). Nobody wants a
 //             backpack: each household has its own.
 // - code:     none: sewing is declared.
 
@@ -35,8 +41,8 @@ tanning.#Leather: {
     sewnOf:   *1 | int & >=1 & <=20    @field(content, saved, inspect)
 }
 
-// A pouch: a small bag of soft leather, for coins.
-#Pouch: #Container & {}
+// A pouch: a small bag of soft leather, for coins, worn at the belt.
+#Pouch: #Belted & {}
 
 pouch_seen: #Seen & { kindOf: "#Pouch" } @family(seen)
 
@@ -60,12 +66,14 @@ sew: #Operation & {
 #Leatherwork: #Frame & { store: #Body, coffer: #Body, work: #Body, made: #Body }
 
 // The household's pouch (bound when undertaken: its coffer, and where it
-// keeps leather): one in the coffer, as far as the agent knows.
+// keeps leather): one in the coffer, or at the agent's own belt, as far as
+// it knows.
 pouch_made: #Goal & {
     title: "make a pouch"
     done: {
         find:  ["coffer", "made"]
-        match: #Leatherwork & { coffer: #Container & { id: $k }, made: #Pouch & { place: #Inside & { container: $k } } }
+        match: #Leatherwork & { coffer: #Container & { id: $k }, made: #Pouch & { place: #Inside & { container: $k } } } |
+            #Leatherwork & { me: #Agent & { id: $me }, made: #Pouch & { place: #Held & { by: $me, hand: 9 } } }
     }
 } @family(goals)
 

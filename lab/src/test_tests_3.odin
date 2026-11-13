@@ -3281,7 +3281,7 @@ test_habitual_belief :: proc() {
 	/* three times in the bin: six weeks on, it believes the wrench there,
 	 * though it last put it in the crate */
 	habit = test_habitual_belief_run(3, &present)
-	bg_check(present && ns_contains(habit, "place: #Inside & { container: ref(2) }") &&
+	bg_check(present && ns_contains(habit, "place: #Inside & { container: ref(2), carriedBy: ref(0) }") &&
 	         ns_contains(habit, "(bin R2, crate R3)"))
 	/* once: no habit, and it doesn't know where it is, last seen in the crate */
 	none  = test_habitual_belief_run(1, &present)
@@ -3824,6 +3824,7 @@ ALL_TESTS := [?]Test_Case{
 	{"leatherwork",                   test_leatherwork},
 	{"making_a_pouch",                test_making_a_pouch},
 	{"market",                        test_market},
+	{"market_with_a_pouch",           test_market_with_a_pouch},
 	{"carrying",                      test_carrying},
 	{"seed_unpacked",                 test_seed_unpacked},
 	{"look_alikes_unpacked",         test_look_alikes_unpacked},

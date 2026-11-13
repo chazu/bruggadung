@@ -2088,7 +2088,10 @@ knowledge_store_describe_referent :: proc(self: ^Knowledge_Store, referentID: u3
 	fmt.sbprintf(&s, "%s & {{ id: ref(%d)", r.kind, r.id)
 	#partial switch r.form {
 	case .In:
-		fmt.sbprintf(&s, ", place: #Inside & {{ container: ref(%d) }}", r.container)
+		/* in something it believes held: carried by its holder */
+		around := knowledge_store_referent(self, r.container)
+		fmt.sbprintf(&s, ", place: #Inside & {{ container: ref(%d), carriedBy: ref(%d) }}", r.container,
+		             around.container if around != nil && around.present && around.form == .Held_By else 0)
 	case .Held_By:
 		fmt.sbprintf(&s, ", place: #Held & {{ by: ref(%d), hand: %d }}", r.container, r.slot)
 	case .Part_Of:

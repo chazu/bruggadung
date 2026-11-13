@@ -2778,13 +2778,25 @@ agency_cheapest :: proc(self: ^Agency, store: ^Knowledge_Store, me: ^Referent, u
 }
 
 
-/* The coins it holds, as it believes. */
+/* Its purse, as it believes: the coins in its hand, or those in what
+ * hangs at its belt (a pouch, content/leatherwork/), whichever are more;
+ * and how many they are. 0 with none. */
 @(private = "file")
-agency_coins_held :: proc(self: ^Agency, store: ^Knowledge_Store) -> i64 {
+agency_purse :: proc(self: ^Agency, store: ^Knowledge_Store) -> (purse: u32, coins: i64) {
+	tc    := world_tri(self.world)
 	arena := tri.arena_new()
 	defer tri.arena_free(arena)
-	purse := agency_held_like(self, tri.value(world_tri(self.world), "#Stack & { unit: \"coin\" }", arena, nil, 0), store)
-	return agency_units_of(self, purse, store) if purse != 0 else 0
+	coin := tri.value(tc, "#Stack & { unit: \"coin\" }", arena, nil, 0)
+	me   := knowledge_store_self_referent(store)
+	if purse = agency_held_like(self, coin, store); purse != 0 do coins = agency_units_of(self, purse, store)
+	for i: uint = 0; i < knowledge_store_count(store); i += 1 {
+		r := knowledge_store_referent_at(store, i)
+		if !r.present || r.form != .In || !agency_referent_is_of(self, r, coin) do continue
+		around := knowledge_store_referent(store, r.container)
+		if around == nil || !around.present || around.form != .Held_By || around.container != me || around.slot != BG_BELT do continue
+		if n := agency_units_of(self, r.id, store); n > coins do purse, coins = r.id, n
+	}
+	return
 }
 
 
@@ -2818,11 +2830,12 @@ agency_buying :: proc(self: ^Agency, cond: ^tri.Node, which: string, b: [^]Slot_
 		/* knowing no price yet, any coins will do to go and look; knowing
 		 * one, enough for the lot (it is asked again once it does) */
 		best := agency_cheapest(self, store, me, u)
-		held := agency_coins_held(self, store)
+		_, held := agency_purse(self, store)
 		if best >= 0 && units * i64(store.prices[best].coins) <= held do return true
 		if best < 0 && held > 0 do return true
 		/* or no more at home: the coffer looked into on this errand (one
-		 * seen empty before may have been filled since), and no coins in it */
+		 * seen empty before may have been filled since), and no coins in it,
+		 * nor in anything in it (a pouch put by with coins in it) */
 		if !text_at(tc, cond, "coinsIn", slot[:]) do return false
 		k := bound(b, n, str(slot[:]))
 		coffer := knowledge_store_referent(store, k) if k != 0 else nil
@@ -2832,7 +2845,9 @@ agency_buying :: proc(self: ^Agency, cond: ^tri.Node, which: string, b: [^]Slot_
 		coin := tri.value(tc, "#Stack & { unit: \"coin\" }", arena, nil, 0)
 		for i: uint = 0; i < knowledge_store_count(store); i += 1 {
 			r := knowledge_store_referent_at(store, i)
-			if r.present && r.form == .In && r.container == k && agency_referent_is_of(self, r, coin) do return false
+			if !r.present || r.form != .In || !agency_referent_is_of(self, r, coin) do continue
+			if r.container == k do return false
+			if around := knowledge_store_referent(store, r.container); around != nil && around.present && around.form == .In && around.container == k do return false
 		}
 		return true
 	}
@@ -2861,7 +2876,7 @@ agency_purchase :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Store, 
 	price := store.prices[best]
 	mine  := agency_pricing(self, what, store)
 	if price.coins > mine do return fmt.tprintf("%s at %d is dearer than it holds it worth, %d", u, price.coins, mine)
-	have := agency_coins_held(self, store)
+	_, have := agency_purse(self, store)
 	if price.coins > 0 && units * i64(price.coins) > have do units = have / i64(price.coins)
 	if units < 1 do return "it hasn't the coins"
 	/* somewhere to take the lot: a free hand, or room in its pack (its own
@@ -2967,7 +2982,7 @@ agency_settle_purchase :: proc(self: ^Agency, m: ^Motivation, answer: cstring, s
 	stall := agency_stall_by(self, seller, store)
 	if tri.subtype(tc, tri.node_type(said), tri.type_named(tc, "#Sold")) != 0 {
 		owed  := int_at(tc, said, "coins", 0)
-		purse := agency_held_like(self, tri.value(tc, "#Stack & { unit: \"coin\" }", arena, nil, 0), store)
+		purse, _ := agency_purse(self, store)
 		if owed > 0 && purse != 0 && stall != 0 {
 			agency_act(self, m, "paying", store, "pay", purse, stall, owed, nil)
 		} else if owed > 0 {

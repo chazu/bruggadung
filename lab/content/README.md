@@ -106,7 +106,7 @@ cut: the levels of detail first, then other topics, then code.
 | `cooking/` | raw food and meals, the larder, cooking at a lit stove, and the ways from a larder to a meal (`cooking.tri`) |
 | `perishing/` | what becomes something else when its time comes (`#Becoming`), and the other course a place may give it; perishable food: how long it keeps, when it spoils, and spoiled food (`perishing.tri`) |
 | `tanning/` | the tan pit, laying a hide in the tan, leather, and dressing hides (`tanning.tri`) |
-| `leatherwork/` | sewing leather into what it makes, and a household's pouch (`leatherwork.tri`) |
+| `leatherwork/` | sewing leather into what it makes, and a household's pouch, which its buyer carries its purse in (`leatherwork.tri`) |
 | `farming/` | plots (areas) and their crops, seed kept back, sowing and harvesting a row at a time, ripening in closed form (`farming.tri`) |
 | `hunting/` | deer and hares, their instincts and their wariness (`animals.tri`); the hunter, the bow, lying in wait and the shot (`hunting.tri`); carcasses and butchering (`butchering.tri`) |
 | `firewood/` | trees, felling, bucking and splitting with an axe, the woodpile, stoking a stove (`firewood.tri`) |
@@ -115,7 +115,7 @@ cut: the levels of detail first, then other topics, then code.
 | `looks/` | themes: what `lab play`'s map (`text.tri`) and the watcher (`tiles.tri`) draw for each look |
 | `machines/` | latent assembly, wear and servicing (`latent.tri`); the pump and its repair (`pump.tri`) |
 | `money/` | getting money: borrowing, taking; a loan repaid (`money.tri`); coins, the coffer, and what goods are worth in coins (`coins.tri`) |
-| `carrying/` | packs (a backpack worn, a basket held), their loads, the burden that slows a walk, stowing, taking and returning a household's pack; and handling, the goals every topic uses to take a thing in hand where it goes (`carrying.tri`) |
+| `carrying/` | packs (a backpack worn, a basket held), their loads, what is belted (a pouch at the belt), the burden that slows a walk, stowing, taking and returning a household's pack; and handling, the goals every topic uses to take a thing in hand where it goes (`carrying.tri`) |
 | `market/` | stalls and their price boards, keeping a stall, buying to stock a household, the sale (`market.tri`) |
 | `nails/` | nail stacks, wedging a lock, finding nails, putting them away |
 | `promises/` | delivering: what a promise commits to |

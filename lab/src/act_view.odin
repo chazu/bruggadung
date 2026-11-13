@@ -37,13 +37,15 @@ free_hands :: proc(world: ^World, agent: Entity_ID) -> i32 {
 	if a == nil do return 0
 	n = world_entities_at(world, agent, .Held_By, raw_data(held[:]), 8)
 	used: i32
-	for e in held[:min(n, 8)] do if world_location_of(world, e).slot != BG_BACK do used += 1      /* the back is no hand */
+	for e in held[:min(n, 8)] do if world_location_of(world, e).slot < BG_BACK do used += 1      /* the back is no hand, nor the belt */
 	return i32(a.hands) - used
 }
 
 
-/* Where a worn pack is carried (content/carrying/): held, by no hand. */
+/* Where a worn pack is carried (content/carrying/): held, by no hand; and
+ * where what is belted hangs (a pouch, content/leatherwork/), likewise. */
 BG_BACK :: i32(8)
+BG_BELT :: i32(9)
 
 
 /* All an agent carries, in grams: what it holds, in its hands and on its
@@ -172,13 +174,17 @@ append_text :: proc(s: ^strings.Builder, text: cstring) {
 
 
 @(private = "file")
-append_place :: proc(s: ^strings.Builder, loc: Location) {
+append_place :: proc(world: ^World, s: ^strings.Builder, loc: Location) {
 	loc := loc
 	#partial switch loc.form {
 	case .On_Tile:
 		fmt.sbprintf(s, "#OnTile & {{ x: %d, y: %d, level: %d }}", loc.x, loc.y, loc.level)
 	case .In:
-		fmt.sbprintf(s, "#Inside & {{ container: ref(%d) }}", loc.place)
+		/* in something held: carried by its holder; else by nobody
+		 * (things.tri's #Inside) */
+		around := world_location_of(world, loc.place)
+		fmt.sbprintf(s, "#Inside & {{ container: ref(%d), carriedBy: ref(%d) }}", loc.place,
+		             around.place if around.form == .Held_By else NO_ENTITY)
 	case .Held_By:
 		fmt.sbprintf(s, "#Held & {{ by: ref(%d), hand: %d }}", loc.place, loc.slot)
 	case .Part_Of:
@@ -378,7 +384,7 @@ truth_describe_entity :: proc(world: ^World, entity: Entity_ID) -> string {
 	fmt.sbprintf(&s, "%s & {{ id: ref(%d)", kind_of_entity(world, entity), entity)
 	if world_is_physical(world, entity) {
 		strings.write_string(&s, ", place: ")
-		append_place(&s, world_location_of(world, entity))
+		append_place(world, &s, world_location_of(world, entity))
 	}
 	if world_record(world, world_kind_named(world, "Agent"), entity) != nil {
 		fmt.sbprintf(&s, ", freeHands: %d", free_hands(world, entity))
@@ -430,7 +436,7 @@ view_describe_entity :: proc(self: ^View, entity: Entity_ID) -> string {
 	fmt.sbprintf(&s, "%s & {{ id: ref(%d)", view_kind_of(self, entity), entity)
 	if world_is_physical(self.world, entity) {
 		strings.write_string(&s, ", place: ")
-		append_place(&s, world_location_of(self.world, entity))
+		append_place(self.world, &s, world_location_of(self.world, entity))
 	}
 	features = view_features_of(self, entity)
 	if len(features) != 0 do fmt.sbprintf(&s, ", %s", features)
