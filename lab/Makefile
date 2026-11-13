@@ -61,6 +61,8 @@ scenarios: $(LAB)
 	@sh ci/scenario-hashes.sh ./$(LAB)
 
 check: $(CHECKED)
+	$(MAKE) -s --no-print-directory -C $(TRIANGLE) build/triangle
+	$(TRIANGLE)/build/triangle fmt --check content && echo "content: as fmt writes it"
 	./$(CHECKED) test
 	sh ci/scenario-hashes.sh ./$(CHECKED) | diff ci/scenario-hashes.txt - && echo "scenarios: as expected"
 	$(ODIN) check watcher $(FLAGS) && echo "watcher: checked"

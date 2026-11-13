@@ -16,8 +16,10 @@ jobs:
       - name: Triangle
         run: make -C triangle test cli-test lsp-test odin
       - name: Tessera
+        if: ${{ !cancelled() }}
         run: make -C tessera test check
       - name: Lab
+        if: ${{ !cancelled() }}
         run: make -C lab check
 
   linux:
@@ -29,8 +31,10 @@ jobs:
       - name: Triangle
         run: docker run --rm -v "$PWD":/repo -w /repo bruggadung make -C triangle CC=clang test cli-test lsp-test odin
       - name: Tessera
+        if: ${{ !cancelled() }}
         run: docker run --rm -v "$PWD":/repo -w /repo bruggadung make -C tessera test check
       - name: Lab
+        if: ${{ !cancelled() }}
         run: docker run --rm -v "$PWD":/repo -w /repo bruggadung make -C lab check
 
   # Odin links for the MSVC ABI on Windows; the lab and Tessera aren't built

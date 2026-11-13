@@ -17,7 +17,7 @@ platform needs.
 make              # build/<platform>/lab, with -vet -strict-style
 make watcher      # build/<platform>/watcher: a world in a window (raylib)
 make test         # the tests (TEST=name for those whose names contain it)
-make check        # the tests, and every scenario's hashes
+make check        # content as fmt writes it, the tests, every scenario's hashes
 make asan         # the tests under AddressSanitizer (Linux)
 make gen          # src/components.odin, after a content change to components
 ```

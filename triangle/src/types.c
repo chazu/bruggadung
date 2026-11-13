@@ -45,7 +45,10 @@ static uint32_t type_add(Content *c, Sym name, TypeKind kind)
         bool ident = true;
         for (const char *p = name; p < pound && ident; p++) ident = isalnum((unsigned char) *p) || *p == '_';
         if (ident) {
-            char *pkg = strndup(name, (size_t) (pound - name));
+            size_t len = (size_t) (pound - name);      /* strndup is not C11, nor in every libc */
+            char *pkg = malloc(len + 1);
+            memcpy(pkg, name, len);
+            pkg[len] = 0;
             t.home = intern(c, pkg);
             free(pkg);
         }
