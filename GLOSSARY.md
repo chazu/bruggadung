@@ -323,10 +323,12 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
   stall, lying in wait and an animal's grazing are rests. (EFFECTS.md
   step 5)
 - **Named effect**: an effect given as the name of the code that builds
-  it (`effect: "hire"`). (EFFECTS.md)
+  it (`effect: "arrest"`). (EFFECTS.md)
 - **Declared effect**: an effect stated in content: the roles as it
   leaves them (`after`), and what it moves, makes, consumes, emits and
-  changes. Applied by one generic procedure,
+  changes. What it makes is its blueprint's, but for the fields it says
+  (`madeAs`: as heavy as what it was carved from, a bond's two ends).
+  Applied by one generic procedure,
   which resolves the operation against the truth projection. Its `changes`
   are coarse effects: a field of a role, more or less by so much, no
   further than its type lets it go, and read by no role (eating: the

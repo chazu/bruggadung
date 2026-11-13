@@ -6,7 +6,8 @@ package lab
  * operation with no named effect (`effect`) has a declared one: its roles
  * as the effect leaves them (`after`), what it moves (`moves`), constructs
  * (`makes`: one, or so `many` gathered into a stack, with what its holder
- * has of the kind if it says `gathered`) and destroys (`consumes`), whole
+ * has of the kind if it says `gathered`; its fields as `madeAs` says them,
+ * the rest its blueprint's; nowhere, if it says no place) and destroys (`consumes`), whole
  * or a portion of a stack, and the events it emits (`emits`). A thing made
  * `splitFrom` what the step consumes has its mass. The command's parameter is the
  * operation's `parameter`, the time its `now`. A move that `passes` hands
@@ -123,6 +124,58 @@ declared_set :: proc(world: ^World, entity: Entity_ID, portion: Entity_ID, kind:
 	}
 	/* from the value it was read with: if another gets there first, this fails */
 	proposal_group_set_of_to_expecting(g, path, whole(entity), value, was)
+	return ""
+}
+
+
+/* What `madeAs` says of a thing just made (a handle), as proposals: each
+ * field of a component its blueprint has that is given a value there, set
+ * outright, as nobody else can have got to it. What is left open is the
+ * blueprint's. */
+@(private = "file")
+declared_made_as :: proc(world: ^World, shape: ^tri.Node, as: ^tri.Node, thing: Entity_ID, g: ^Proposal_Group) -> string {
+	lo, hi: i64
+
+	if as == nil do return ""
+	tc := world_tri(world)
+	for k: uint = 0; k < world_kind_count(world); k += 1 {
+		kind := world_kind_info(world, k)
+		of   := tri.type_named(tc, kind.type)
+		if of == 0 || tri.subtype(tc, tri.node_type(shape), of) == 0 do continue
+		for i: uint = 0; i < kind.nfields; i += 1 {
+			f := &kind.fields[i]
+			v := tri.at(tc, as, f.name)
+			if v == nil do continue
+			s     := printed(tc, v)
+			path  := world_intern(world, ns_utf8(fmt.tprintf("%s.%s", kind.name, f.name)))
+			value: i64
+			switch f.value {
+			case VALUE_QUANTITY:
+				if tri.node_interval(v, &lo, &hi) == 0 || lo != hi do continue
+				value = lo
+			case VALUE_BOOL:
+				if s != "true" && s != "false" do continue
+				value = 1 if s == "true" else 0
+			case VALUE_REF:
+				e, ok := ref_of(tc, v)
+				if !ok do continue
+				value = i64(e)
+			case VALUE_TYPE:
+				if !strings.has_prefix(s, "\"") do continue
+				value = i64(tri.type_named(tc, ns_utf8(s)))
+			case VALUE_TEXT:
+				text, ok := text_of_node(tc, v)
+				if !ok do continue
+				if !strings.contains(string(f.flags), "proposable") do return fmt.tprintf("%s.%s is not an effect's to set", kind.name, f.name)
+				proposal_group_set_of_to_text(g, path, whole(thing), world_intern(world, ns_utf8(text)))
+				continue
+			case:
+				continue
+			}
+			if !strings.contains(string(f.flags), "proposable") do return fmt.tprintf("%s.%s is not an effect's to set", kind.name, f.name)
+			proposal_group_set_of_to(g, path, whole(thing), value)
+		}
+	}
 	return ""
 }
 
@@ -697,7 +750,11 @@ apply_declared_effect :: proc(world: ^World, action: Action, stage: i64, amount:
 			at = world_location_of(world, into)
 		} else {
 			reason: string
-			at, reason = declared_place(world, place, int_feature(tc, shape, "mass", 0) * many, operation_stows(world, action.operation))
+			/* nowhere, if it says no place: a bond, a claim */
+			at = location_make_none()
+			if place != nil && !strings.has_suffix(string(tri.type_name(tc, tri.node_type(place))), "#Place") {
+				at, reason = declared_place(world, place, int_feature(tc, shape, "mass", 0) * many, operation_stows(world, action.operation))
+			}
 			if reason != "" do return reason
 		}
 		called, named := text_of_node(tc, tri.at(tc, made, "called"))
@@ -707,6 +764,7 @@ apply_declared_effect :: proc(world: ^World, action: Action, stage: i64, amount:
 			thing := proposal_group_create(group, world_intern(world, ns_utf8(blueprint)),
 			                               world_intern(world, ns_utf8(called if named else blueprint)), at)
 			if cut do proposal_group_relate(group, .Split_From, whole(thing), whole(from))
+			if reason := declared_made_as(world, shape, tri.at(tc, made, "madeAs"), thing, group); reason != "" do return reason
 			if into == NO_ENTITY do into = thing
 			else do proposal_group_merge(group, whole(thing), whole(into))
 		}

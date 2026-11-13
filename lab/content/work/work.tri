@@ -16,7 +16,7 @@
 // - money:    needing money, an agent may ask for work (money/money.tri).
 // - promises: a job's task is a goal, such as delivering
 //             (promises/promises.tri).
-// - code:     effect_hire.
+// - code:     none: hiring is declared, a bond made with its two ends.
 
 package work
 
@@ -51,11 +51,11 @@ flyer: #Label & { material: "paper", mass: 5g, legible: 2 }
 // Hire someone in reach: a bond of theirs to the actor, their loyalty to
 // whoever employs them.
 hire: #Operation & {
-    effect: "hire"
     roles: {
-        actor: #Agent
-        item:  #Agent
+        actor: #Agent & { id: $a }
+        item:  #Agent & { id: $i }
     }
+    makes: [{ blueprint: "work_bond", called: "employment", madeAs: #Bond & { bondOf: $i, toward: $a } }]
 } @family(operations)
 
 // Paying a worker: the wage, the worker, and the job's goods and where

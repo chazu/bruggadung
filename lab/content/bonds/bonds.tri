@@ -9,7 +9,7 @@
 // - agency:   #Loyal weighs it, and `order: "loyal"` sorts by it
 //             (agency.tri).
 // - code:     bonds are made from these blueprints (hiring makes a
-//             `work_bond`: effect_hire).
+//             `work_bond`: work/'s `hire`).
 
 package bonds
 

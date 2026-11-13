@@ -2592,23 +2592,6 @@ become :: proc(world: ^World, g: ^Proposal_Group, e: Entity_ID, blueprint: cstri
 }
 
 
-/* Hiring (AGENCY.md decision 15): the one hired is bound to the actor, its
- * loyalty to whoever employs it (decision 12). */
-@(private = "file")
-effect_hire :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -> string {
-	bond: Entity_ID
-
-	if a.roles[.Item] == a.roles[.Actor] {
-		return "one cannot hire oneself"
-	}
-	bond = proposal_group_create(g, "work_bond", "employment", location_make_none())
-	proposal_group_set_of_to(g, "Bond.bondOf", whole(bond), i64(a.roles[.Item]))
-	proposal_group_set_of_to(g, "Bond.toward", whole(bond), i64(a.roles[.Actor]))
-	return ""
-}
-
-
-
 /* The region of air (a GasStore) over the entity's tile, or 0. */
 air_over :: proc(world: ^World, e: Entity_ID) -> Entity_ID {
 	at: Location
@@ -2650,7 +2633,6 @@ effects := [?]Named_Effect{
 	{"arrest",    effect_arrest},
 	{"flee",      effect_flee},
 	{"hit",       effect_hit},
-	{"hire",      effect_hire},
 	{"work",      effect_work},
 	{"copy",      effect_copy},
 	{"reveal",    effect_reveal},

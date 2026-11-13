@@ -30,8 +30,7 @@
 //             vat, as anything in a container is.
 // - village:  nobody in the village brews: no scenario places a vat.
 // - code:     none of its own: mashing is declared (a thing made of what
-//             is consumed, as heavy only because wort's blueprint is a
-//             portion's weight: EFFECTS.md, "Found in brewing"); setting to work is putting in; wort's time in
+//             is consumed, as heavy: `madeAs`); setting to work is putting in; wort's time in
 //             the vat and out of it, and its becoming ale, are the
 //             perishing domain's (src/domains_perishing.odin).
 
@@ -64,8 +63,8 @@ hunger.#Food: {
 
 wort_seen: #Seen & { kindOf: "#Wort" } @family(seen)
 
-// As heavy as the portion of grain it is mashed of.
-wort: #Wort & { material: "food", mass: 250g }
+// Its mass is the grain's it was mashed of.
+wort: #Wort & { material: "food", mass: 1g }
 
 // Wort gone off: rot, as spoiled food is.
 sour_wort: #Spoiled & { material: "rot", mass: 1g }
@@ -75,19 +74,18 @@ sour_wort: #Spoiled & { material: "rot", mass: 1g }
 ale: #Stack & #Food & { material: "food", raw: false, nourishment: 20, keepsFor: 20d, unit: "ale", unitMass: 250g, count: 1 }
 
 // Mash a portion of raw food in hand that mashes, at a lit stove in reach:
-// twenty minutes, with the hands. It is what it mashes into, in a hand of
-// the masher's. A portion, no more: what is made weighs what its blueprint
-// does (a declared `makes` sets no field of what it makes), and the
-// committer holds the two to be as heavy.
+// twenty minutes, with the hands. It is what it mashes into, as heavy, in
+// a hand of the masher's. A portion, no more: a measure of ale is a
+// portion's weight.
 mash: #Operation & {
     duration: 1200s
     uses:     ["hands"]
     roles: {
         actor:       #Agent & { id: $a }
-        item:        #Food & #Body & { id: $i, raw: true, mashesInto: $w, mass: 250g, place: #Held & { by: $a } }
+        item:        #Food & #Body & { id: $i, raw: true, mashesInto: $w, mass: $m & 250g, place: #Held & { by: $a } }
         destination: #Combustor & #Body & { lit: true }
     }
-    makes:    [{ blueprint: $w, at: #Held & { by: $a }, called: "wort", splitFrom: $i }]
+    makes:    [{ blueprint: $w, at: #Held & { by: $a }, called: "wort", splitFrom: $i, madeAs: #Body & { mass: $m } }]
     consumes: [{ consumed: $i, because: "mashed" }]
 } @family(operations)
 

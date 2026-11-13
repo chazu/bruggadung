@@ -45,7 +45,7 @@
 //            (src/act_activities.odin); they are compacted into digests
 //            after the world's history window (src/core_world.odin).
 
-#Effect: "drive" | "fill" | "walk" | "say" | "analyse" | "write" | "read" | "rotate" | "strike" | "copy" | "reveal" | "replace" | "cut" | "shape" | "issue" | "confiscate" | "arrest" | "flee" | "hit" | "hire" | "work" | "service" | "shoot"
+#Effect: "drive" | "fill" | "walk" | "say" | "analyse" | "write" | "read" | "rotate" | "strike" | "copy" | "reveal" | "replace" | "cut" | "shape" | "issue" | "confiscate" | "arrest" | "flee" | "hit" | "work" | "service" | "shoot"
 
 // Which roles an operation has is its roles' type: a structure's type is the
 // most general one with all its features.
@@ -110,6 +110,9 @@
 // the made thing's), or it fails. So `many` of the blueprint are made,
 // gathered into one stack; `gathered`, into a hand, they are with a stack
 // of the kind its holder has already, if any (a harvest, with the armful).
+// `madeAs` says fields of what is made, where its blueprint's won't do: as
+// heavy as what it was carved from (`madeAs: #Body & { mass: $m }`), a
+// bond's two ends. With no `at` it is made nowhere, as a bond is.
 // Into a hand, a made thing goes as a moved one does.
 // An operation's `now` is the time its effect commits (`becomesAt: $now +
 // $k`), its `parameter` the command's (how many), its `said` and `written`
@@ -124,7 +127,7 @@
 #Moves:    #OfSome & { moved: ref, into: #Place, passes: bool, lends: bool, until: time }
 #Consumes: #OfSome & { consumed: ref, because: text }
 #Emits:    { event: text, subject: ref, other: ref, detail: text }
-#Makes:    { blueprint: text, at: #Place, called: text, splitFrom: ref, many: int & >=1, gathered: bool }
+#Makes:    { blueprint: text, at: #Place, called: text, splitFrom: ref, many: int & >=1, gathered: bool, madeAs: #Thing }
 #Changes:  { changedOf: text, changed: text, changedBy: int }
 
 // Looking at something within reach changes nothing in the world: it is

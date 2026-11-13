@@ -7,7 +7,7 @@ work are built: step 2 in Triangle (arithmetic that goes with a pattern;
 `math.Min`, `math.Max`, `math.Clamp`), steps 1 and 3 in
 `lab/src/act_declared.odin`: `after`, `moves`, `makes`, `consumes`,
 `emits` and `changes`, for an operation or a stage. Step 4 is under way
-(22 named effects are left), and of step 5, resting. The rest
+(21 named effects are left), and of step 5, resting. The rest
 is a draft. It takes up
 REVIEW.md §3.1 (and step 7 of its order of work) and turns it into a design
 that could be built an operation at a time.
@@ -498,7 +498,8 @@ done after: the first conversions use only the three there are.
    Left named, and why: `hit` and `shoot` (an injury that reaches 100 is
    a death, which is code: it wants to be the body's reaction to its
    injury, as a plot's standing is to its count); `hire` (a bond made
-   with its two ends set: `makes` sets no fields); `confiscate` and
+   with its two ends set: `makes` sets no fields; declared since, by
+   `madeAs`: "Found in brewing"); `confiscate` and
    `arrest` (custody is a claim made).
 5. Resting is done, `fill` is not. `rest` was three things by its name:
    fatigue gone, a watch on the air hung on the activity by `perform`,
@@ -579,13 +580,19 @@ larder). The lab's code is unchanged but for its tests
 
 Two things it ran into:
 
-- **What `makes` makes weighs what its blueprint does.** `splitFrom`
+- **What `makes` made weighed what its blueprint does.** `splitFrom`
   relates the made thing to what it was carved from, and the committer
-  then holds the two to be as heavy; it doesn't give the made thing the
+  then holds the two to be as heavy; it didn't give the made thing the
   other's mass, as `become` does (lab/src/act_actions.odin). So `mash`
-  takes a portion of 250g and no more, wort's blueprint being 250g. The
-  same limit as `hire`'s (step 4: `makes` sets no fields). A `makes`
-  that says fields of what it makes, mass among them, would lift both.
+  worked only because wort's blueprint was a portion's weight. The same
+  limit as `hire`'s (step 4: `makes` set no fields). Lifted since:
+  **`madeAs` says fields of what is made** (`madeAs: #Body & { mass: $m
+  }`), each a field of a component its blueprint has, set as it is made;
+  and a thing made with no `at` is made nowhere. Wort is as heavy as the
+  grain by what `mash` says, and hiring is declared (a bond, its two
+  ends): 21 named effects are left. `mash` still takes one portion: ale
+  is a stack, a measure a portion's weight, and a becoming makes one
+  unit.
 - **A method matches only what is seen.** `mashesInto` had to be
   `perceive(sight)` for a method to find grain to mash by it, as `raw`
   is; a patch's `yields` isn't, and nothing looks for a patch by it.
