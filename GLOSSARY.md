@@ -1031,8 +1031,8 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
   and ends as its `endingWithin`; its time starts over when it comes to
   lie there, and when it is taken out. Read in closed form, never
   stepped: the perishing
-  domain's, for all of it. Its uses: **perishable** things, and hides
-  **tanning**. Not a **progression**. (VIL d8, lab/content/perishing/)
+  domain's, for all of it. Its uses: **perishable** things, hides
+  **tanning**, and wort **brewing**. Not a **progression**. (VIL d8, lab/content/perishing/)
 - **Perishable**: `#Perishable`, good for so long after it was made,
   then spoiled: food, a carcass, spoiled food itself; a **becoming**. Food
   is perishable when it keeps for some time (`keepsFor`: meat, three
@@ -1119,6 +1119,14 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
   stack, by the piece. **Dressing hides** is the work: a look into the
   pit, the leather there drawn out and put by, each hide kept laid in.
   *Avoid:* curing. (VIL d7, lab/content/tanning/)
+- **Brewing**: a portion of grain **mashed** (`mash`) at a lit stove is
+  **wort** (`#Wort`), as heavy; wort set to work in a **vat** (`#Vat`, a
+  container) is **ale** after five days in it: a **becoming**, on the
+  course wort has within a vat. Left out, wort sours in two days. Ale is
+  food, by the measure, ready as a meal is; there is no thirst. The
+  `brewing` **routine** is the work: a look into the vat, the ale there
+  drawn and put by, a brew kept on. Nobody in the village brews.
+  (lab/content/brewing/)
 - **Leatherwork**: leather sewn (`sew`) into what its blueprint says
   (`sewnInto`), so many pieces of it used up (`sewnOf`): a piece of deer
   leather a backpack, two of hare leather a **pouch** (`#Pouch`, a small

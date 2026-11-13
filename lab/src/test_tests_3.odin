@@ -3800,6 +3800,8 @@ ALL_TESTS := [?]Test_Case{
 	{"foraging",                      test_foraging},
 	{"progressions",                  test_progressions},
 	{"routines",                      test_routines},
+	{"brewing",                       test_brewing},
+	{"brewing_routine",               test_brewing_routine},
 	{"goal_done_beneath",             test_goal_done_beneath},
 	{"eats_what_keeps_least",         test_eats_what_keeps_least},
 	{"errand_window",                 test_errand_window},

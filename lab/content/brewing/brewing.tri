@@ -1,0 +1,213 @@
+// Brewing: grain mashed to wort at a lit stove, wort set to work in a vat,
+// and the ale it becomes (the test REVIEW.md §5 proposes: a topic that
+// adds no code).
+//
+// Cut points:
+// - full:     raw food that mashes (`mashesInto`: grain, to wort) is mashed
+//             a portion at a time, in hand at a lit stove in reach (`mash`):
+//             twenty minutes, and it is wort, as heavy. Wort keeps two days, then sours; put
+//             in a vat, it works, and five days in it (its `keepsWithin`)
+//             it is ale, as heavy, where it lies. Ale is food: ready, and
+//             it keeps twenty days. Whoever brews (the `brewing` routine:
+//             evenings, bound to its vat, its stove, and its larder) looks
+//             into the vat, draws the ale it finds there and puts it by,
+//             and keeps a brew on: with no wort in the vat, a portion of
+//             grain from its larder, mashed, and set to work.
+// - reduced:  the same, decided on the cadence's beat.
+// - abstract: as reduced.
+// - frozen:   nobody brews; wort in a vat becomes ale all the same.
+// - becoming: wort is something that becomes (perishing/'s #Becoming), on
+//             two courses: left out, it sours; in a vat, it works. The vat
+//             does it, as a tan pit does a hide's (tanning/): wort taken
+//             out early is wort again, its working lost. Water, malting
+//             and yeast are left out.
+// - cooking:  grain is cooking/'s, and says what it mashes into there; a
+//             stove to mash at is lit as one to cook at is (its
+//             `stove_lit`).
+// - hunger:   ale is hunger/'s #Food, not raw: drunk as a meal is eaten
+//             (eating.tri's eat). There is no thirst.
+// - perception: that wort has become ale is seen by looking into the
+//             vat, as anything in a container is.
+// - village:  nobody in the village brews: no scenario places a vat.
+// - code:     none of its own: mashing is declared (a thing made of what
+//             is consumed, as heavy only because wort's blueprint is a
+//             portion's weight: EFFECTS.md, "Found in brewing"); setting to work is putting in; wort's time in
+//             the vat and out of it, and its becoming ale, are the
+//             perishing domain's (src/domains_perishing.odin).
+
+package brewing
+
+// A vat: where wort works.
+#Vat: #Container & {}
+
+vat_seen: #Seen & { kindOf: "#Vat" } @family(seen)
+
+vat: #Vat & { material: "wood", mass: 40kg, capacity: 20 }
+
+// What raw food mashes into: a blueprint ("" for what doesn't mash); seen,
+// as that it is raw is.
+hunger.#Food: {
+    mashesInto: *"" | text @field(content, saved, inspect, perceive(sight))
+}
+
+// Wort: ale to be. Something that becomes, on two courses: left out, it
+// sours in two days; in a vat, it is ale in five.
+#Wort: #Body & #Becoming & {
+    keepsFor:      2d
+    becomes:       "sour_wort"
+    ending:        "soured"
+    within:        "#Vat"
+    keepsWithin:   5d
+    becomesWithin: "ale"
+    endingWithin:  "brewed"
+}
+
+wort_seen: #Seen & { kindOf: "#Wort" } @family(seen)
+
+// As heavy as the portion of grain it is mashed of.
+wort: #Wort & { material: "food", mass: 250g }
+
+// Wort gone off: rot, as spoiled food is.
+sour_wort: #Spoiled & { material: "rot", mass: 1g }
+
+// Ale, by the measure: food, ready, a stack, so measures put by are one;
+// it keeps twenty days.
+ale: #Stack & #Food & { material: "food", raw: false, nourishment: 20, keepsFor: 20d, unit: "ale", unitMass: 250g, count: 1 }
+
+// Mash a portion of raw food in hand that mashes, at a lit stove in reach:
+// twenty minutes, with the hands. It is what it mashes into, in a hand of
+// the masher's. A portion, no more: what is made weighs what its blueprint
+// does (a declared `makes` sets no field of what it makes), and the
+// committer holds the two to be as heavy.
+mash: #Operation & {
+    duration: 1200s
+    uses:     ["hands"]
+    roles: {
+        actor:       #Agent & { id: $a }
+        item:        #Food & #Body & { id: $i, raw: true, mashesInto: $w, mass: 250g, place: #Held & { by: $a } }
+        destination: #Combustor & #Body & { lit: true }
+    }
+    makes:    [{ blueprint: $w, at: #Held & { by: $a }, called: "wort", splitFrom: $i }]
+    consumes: [{ consumed: $i, because: "mashed" }]
+} @family(operations)
+
+// Brewing: the vat, the stove the grain is mashed at, where grain and ale
+// are kept (`store`: a household's larder), and the grain, the wort or
+// the ale in hand (`work`).
+#Brewing: #Warming & { vat: #Body, store: #Body, work: #Body }
+
+// A brew on (bound when undertaken: the vat, the stove, and where the
+// grain is kept), kept through the hours for it: wort working in the vat,
+// as far as the brewer knows. The ways: wort in hand is set to work; grain
+// in hand is mashed, the stove lit first; a portion of grain is taken from
+// where it is kept.
+brew_on: #Goal & {
+    title: "keep a brew on"
+    done: {
+        find:  ["vat", "work"]
+        match: #Brewing & { vat: #Vat & { id: $v }, work: #Wort & { place: #Inside & { container: $v } } }
+    }
+    kept: true
+} @family(goals)
+
+set_it_to_work: #Method & {
+    title: "set it to work"
+    goal:  "brew_on"
+    rank:  1
+    pre: {
+        find:  ["work", "vat"]
+        match: #Brewing & { me: #Agent & { id: $me }, work: #Wort & { place: #Held & { by: $me } }, vat: #Vat }
+    }
+    steps: [#Do & { op: "put_in", object: "work", target: "vat" }]
+} @family(methods)
+
+mash_it: #Method & {
+    title: "mash it"
+    goal:  "brew_on"
+    rank:  2
+    pre: {
+        find:  ["work", "stove"]
+        match: #Brewing & {
+            me:    #Agent & { id: $me }
+            work:  #Food & #Body & { raw: true, mashesInto: "wort", mass: 250g, place: #Held & { by: $me } }
+            stove: #Combustor & #Body
+        }
+    }
+    steps: [#Achieve & { subgoal: "stove_lit" }, #Do & { op: "mash", object: "work", target: "stove" }]
+} @family(methods)
+
+take_grain_to_mash: #Method & {
+    title: "take grain to mash"
+    goal:  "brew_on"
+    rank:  3
+    pre: {
+        find:  ["work", "store"]
+        match: #Brewing & {
+            me:    #Agent & { freeHands: >=1 }
+            store: #Container & { id: $s }
+            work:  #Food & #Stack & { raw: true, mashesInto: "wort", place: #Inside & { container: $s } }
+        }
+    }
+    steps: [#Do & { op: "take_some", object: "work", units: 1 }]
+} @family(methods)
+
+// The ale put by (bound: the vat, and where it is kept), kept through the
+// hours for it: none left in the vat, and none in hand, as far as the
+// brewer knows. The ways: ale in hand is put by; ale in the vat is drawn.
+ale_put_by: #Goal & {
+    title: "put the ale by"
+    done:  #None & {
+        find:  ["vat", "work"]
+        match: #Brewing & { me: #Agent & { id: $me }, work: #Food & { unit: "ale", place: #Held & { by: $me } } } |
+            #Brewing & { vat: #Vat & { id: $v }, work: #Food & { unit: "ale", place: #Inside & { container: $v } } }
+    }
+    kept:  true
+} @family(goals)
+
+put_the_ale_by: #Method & {
+    title: "put the ale by"
+    goal:  "ale_put_by"
+    rank:  1
+    pre: {
+        find:  ["work", "store"]
+        match: #Brewing & { me: #Agent & { id: $me }, work: #Food & { unit: "ale", place: #Held & { by: $me } }, store: #Container }
+    }
+    steps: [#Do & { op: "put_in", object: "work", target: "store" }]
+} @family(methods)
+
+draw_the_ale: #Method & {
+    title: "draw the ale"
+    goal:  "ale_put_by"
+    rank:  2
+    pre: {
+        find:  ["work", "vat"]
+        match: #Brewing & { me: #Agent & { freeHands: >=1 }, vat: #Vat & { id: $v },
+                            work: #Food & { unit: "ale", place: #Inside & { container: $v } } }
+    }
+    steps: [#Do & { op: "take", object: "work" }]
+} @family(methods)
+
+// What has become ale is seen by looking: the vat looked into, once for
+// each time the brewer takes this up (bound: the vat).
+vat_seen_to: #Goal & {
+    title: "see to the vat"
+    done:  #Looked & { looked: "vat" }
+} @family(goals)
+
+look_into_the_vat: #Method & {
+    title: "look into the vat"
+    goal:  "vat_seen_to"
+    rank:  1
+    pre:   { find: ["vat"], match: #Brewing & { vat: #Vat } }
+    steps: [#Do & { op: "look_in", object: "vat" }]
+} @family(methods)
+
+// A brewer's evenings: a look into the vat, the ale it shows put by, and
+// a brew kept on; each bound to its own vat, stove and larder.
+brewing: #Routine & {
+    keeps: [{ keep: "vat_seen_to", opens: 16h, closes: 18h, dutyTo: "home", bindings: [{ binding: "vat", own: "#Vat" }] },
+            { keep: "ale_put_by", opens: 16h, closes: 18h, dutyTo: "home",
+              bindings: [{ binding: "vat", own: "#Vat" }, { binding: "store", own: "#Larder" }] },
+            { keep: "brew_on", opens: 16h, closes: 19h, dutyTo: "home",
+              bindings: [{ binding: "vat", own: "#Vat" }, { binding: "stove", own: "#Stove" }, { binding: "store", own: "#Larder" }] }]
+} @family(routines)

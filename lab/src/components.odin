@@ -1,10 +1,10 @@
-// Generated from Triangle content a3443d4f6e5144a3: do not edit. Type IDs are valid
+// Generated from Triangle content 6e667ad28b020571: do not edit. Type IDs are valid
 // only for this content; regenerate when it changes.
 package lab
 
 import tri "../../triangle/odin/triangle"
 
-CONTENT_HASH :: 0xa3443d4f6e5144a3
+CONTENT_HASH :: 0x6e667ad28b020571
 
 // Becoming, from #Becoming
 Becoming :: struct {
@@ -72,6 +72,7 @@ Food :: struct {
 	cooking: i64,    // int, in quanta of 1; content, saved, inspect
 	keptAs: cstring,    // text; content, saved, inspect
 	keptOf: i64,    // int, in quanta of 1; content, saved, inspect
+	mashesInto: cstring,    // text; content, saved, inspect, perceive(sight)
 	mealKeepsFor: i64,    // time, in quanta of 1ms; content, saved, inspect
 	nourishment: i64,    // int, in quanta of 1; content, saved, proposable, inspect
 	raw: bool,    // bool; content, saved, proposable, inspect, perceive(sight)
@@ -433,81 +434,81 @@ Fastener :: struct {
 }
 
 // #ActivityStatus
-ACTIVITYSTATUS_ABORTED :: 1101
-ACTIVITYSTATUS_COMPLETED :: 1102
-ACTIVITYSTATUS_EXHAUSTED :: 1103
-ACTIVITYSTATUS_FAILED :: 1104
-ACTIVITYSTATUS_RUNNING :: 1105
-ACTIVITYSTATUS_SUSPENDED :: 1106
+ACTIVITYSTATUS_ABORTED :: 1124
+ACTIVITYSTATUS_COMPLETED :: 1125
+ACTIVITYSTATUS_EXHAUSTED :: 1126
+ACTIVITYSTATUS_FAILED :: 1127
+ACTIVITYSTATUS_RUNNING :: 1128
+ACTIVITYSTATUS_SUSPENDED :: 1129
 
 // #Tie
-TIE_EMPLOY :: 1186
-TIE_FRIEND :: 1187
-TIE_KIN :: 1188
-TIE_SWORN :: 1189
+TIE_EMPLOY :: 1209
+TIE_FRIEND :: 1210
+TIE_KIN :: 1211
+TIE_SWORN :: 1212
 
 // #ClaimKind
-CLAIMKIND_CUSTODY :: 1108
-CLAIMKIND_KEEPING :: 1109
-CLAIMKIND_OWNERSHIP :: 1110
-CLAIMKIND_RESERVATION :: 1111
+CLAIMKIND_CUSTODY :: 1131
+CLAIMKIND_KEEPING :: 1132
+CLAIMKIND_OWNERSHIP :: 1133
+CLAIMKIND_RESERVATION :: 1134
 
 // #Penalty
-PENALTY_FINE :: 1172
-PENALTY_ARREST :: 1205
-PENALTY_CONFISCATE :: 1206
+PENALTY_FINE :: 1195
+PENALTY_ARREST :: 1228
+PENALTY_CONFISCATE :: 1229
 
 // #Wrong
-WRONG_ANOTHERS :: 1197
-WRONG_UNAUTHORIZED :: 1198
+WRONG_ANOTHERS :: 1220
+WRONG_UNAUTHORIZED :: 1221
 
 // #Material
-MATERIAL_CLOTH :: 1151
-MATERIAL_EARTH :: 1152
-MATERIAL_FOOD :: 1153
-MATERIAL_LEATHER :: 1154
-MATERIAL_GRAIN :: 1156
-MATERIAL_ROT :: 1157
-MATERIAL_RUBBER :: 1158
-MATERIAL_STONE :: 1159
-MATERIAL_TURNIP :: 1160
-MATERIAL_WICKER :: 1161
-MATERIAL_FLESH :: 1208
-MATERIAL_BRASS :: 1210
-MATERIAL_IRON :: 1211
-MATERIAL_PAPER :: 1212
-MATERIAL_STEEL :: 1213
-MATERIAL_BIRCH :: 1215
-MATERIAL_OAK :: 1216
+MATERIAL_CLOTH :: 1174
+MATERIAL_EARTH :: 1175
+MATERIAL_FOOD :: 1176
+MATERIAL_LEATHER :: 1177
+MATERIAL_GRAIN :: 1179
+MATERIAL_ROT :: 1180
+MATERIAL_RUBBER :: 1181
+MATERIAL_STONE :: 1182
+MATERIAL_TURNIP :: 1183
+MATERIAL_WICKER :: 1184
+MATERIAL_FLESH :: 1231
+MATERIAL_BRASS :: 1233
+MATERIAL_IRON :: 1234
+MATERIAL_PAPER :: 1235
+MATERIAL_STEEL :: 1236
+MATERIAL_BIRCH :: 1238
+MATERIAL_OAK :: 1239
 
 // "flesh" | "metal" | "natural" | "paper" | "wood"
-BODY_SURFACE_NATURAL :: 799
-BODY_SURFACE_FLESH :: 1208
-BODY_SURFACE_BRASS :: 1210
-BODY_SURFACE_IRON :: 1211
-BODY_SURFACE_PAPER :: 1212
-BODY_SURFACE_STEEL :: 1213
-BODY_SURFACE_BIRCH :: 1215
-BODY_SURFACE_OAK :: 1216
+BODY_SURFACE_NATURAL :: 813
+BODY_SURFACE_FLESH :: 1231
+BODY_SURFACE_BRASS :: 1233
+BODY_SURFACE_IRON :: 1234
+BODY_SURFACE_PAPER :: 1235
+BODY_SURFACE_STEEL :: 1236
+BODY_SURFACE_BIRCH :: 1238
+BODY_SURFACE_OAK :: 1239
 
 // #Colour
-COLOUR_BLUE :: 1114
-COLOUR_BLACK :: 1116
-COLOUR_BROWN :: 1117
-COLOUR_GREEN :: 1118
-COLOUR_GREY :: 1119
-COLOUR_BEIGE :: 1121
-COLOUR_NAVY :: 1122
-COLOUR_ORANGE :: 1123
-COLOUR_PURPLE :: 1124
-COLOUR_RED :: 1125
-COLOUR_WHITE :: 1126
-COLOUR_YELLOW :: 1127
+COLOUR_BLUE :: 1137
+COLOUR_BLACK :: 1139
+COLOUR_BROWN :: 1140
+COLOUR_GREEN :: 1141
+COLOUR_GREY :: 1142
+COLOUR_BEIGE :: 1144
+COLOUR_NAVY :: 1145
+COLOUR_ORANGE :: 1146
+COLOUR_PURPLE :: 1147
+COLOUR_RED :: 1148
+COLOUR_WHITE :: 1149
+COLOUR_YELLOW :: 1150
 
 // "bare" | "ripe" | "sown"
-PLOT_STANDS_BARE :: 471
-PLOT_STANDS_RIPE :: 894
-PLOT_STANDS_SOWN :: 945
+PLOT_STANDS_BARE :: 477
+PLOT_STANDS_RIPE :: 909
+PLOT_STANDS_SOWN :: 964
 
 // The field registry: what code needs to read and write any component
 // generically.
@@ -588,6 +589,7 @@ COMPONENT_COUNT :: 51
 	{"cooking", offset_of(Food, cooking), VALUE_QUANTITY, "int", "content, saved, inspect"},
 	{"keptAs", offset_of(Food, keptAs), VALUE_TEXT, "text", "content, saved, inspect"},
 	{"keptOf", offset_of(Food, keptOf), VALUE_QUANTITY, "int", "content, saved, inspect"},
+	{"mashesInto", offset_of(Food, mashesInto), VALUE_TEXT, "text", "content, saved, inspect, perceive(sight)"},
 	{"mealKeepsFor", offset_of(Food, mealKeepsFor), VALUE_QUANTITY, "time", "content, saved, inspect"},
 	{"nourishment", offset_of(Food, nourishment), VALUE_QUANTITY, "int", "content, saved, proposable, inspect"},
 	{"raw", offset_of(Food, raw), VALUE_BOOL, "bool", "content, saved, proposable, inspect, perceive(sight)"},
@@ -870,7 +872,7 @@ COMPONENTS := [COMPONENT_COUNT + 1]Component_Info{
 	{"Hungry", "#Hungry", size_of(Hungry), 7, &Hungry_fields[0]},
 	{"Lever", "#Lever", size_of(Lever), 3, &Lever_fields[0]},
 	{"OfficeHolder", "#OfficeHolder", size_of(Office_Holder), 2, &Office_Holder_fields[0]},
-	{"Food", "#Food", size_of(Food), 6, &Food_fields[0]},
+	{"Food", "#Food", size_of(Food), 7, &Food_fields[0]},
 	{"Respirator", "#Respirator", size_of(Respirator), 4, &Respirator_fields[0]},
 	{"Scribe", "#Scribe", size_of(Scribe), 1, &Scribe_fields[0]},
 	{"Seed", "#Seed", size_of(Seed), 1, &Seed_fields[0]},

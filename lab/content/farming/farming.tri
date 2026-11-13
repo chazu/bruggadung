@@ -25,6 +25,8 @@
 //             grown, set then: the plot's one wake (`ripening`, a turn:
 //             reality.tri). How far it has grown isn't seen; how it
 //             stands is.
+// - brewing:  harvested grain mashes into wort, as cooking/'s does
+//             (brewing/'s `mashesInto`).
 // - cooking:  what a harvest yields is food (cooking/cooking.tri's raw
 //             grain, and turnips), raw, cooked as any is; in a larder it
 //             merges with a sack of its kind. One taken from it is the
@@ -87,7 +89,7 @@ grain_plot:  #Plot & { material: "earth", mass: 1kg, grows: "grain", ripensIn: 1
 turnip_plot: #Plot & { material: "earth", mass: 1kg, grows: "turnip", ripensIn: 12d, yields: "turnip_harvest" }
 
 // What a tile's harvest is: raw food, a stack, as grain is kept.
-let raw_grain  = { material: "food", raw: true, nourishment: 15, cooking: 35 }
+let raw_grain  = { material: "food", raw: true, nourishment: 15, cooking: 35, mashesInto: "wort" }
 let raw_turnip = { material: "food", raw: true, nourishment: 10, cooking: 30 }
 // It can be kept back as seed (`keptAs`, a #Seed's blueprint), a sack at
 // a time.

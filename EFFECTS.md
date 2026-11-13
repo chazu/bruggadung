@@ -567,6 +567,32 @@ its tests.
   now an hour at most (NEGOTIATION.md decision 3), and the three weeks
   fail 7 checks again, all of them the two households short of food.
 
+## Found in brewing
+
+REVIEW.md's test, and this document's: the next topic adds no Odin outside
+its tests. Brewing (lab/content/brewing/) is that topic, and it holds:
+grain mashed to wort at a lit stove (a declared effect: a thing made of
+what is consumed), wort become ale in a vat (a becoming, on a course),
+and a brewer's evenings (a routine, bound to its own vat, stove and
+larder). The lab's code is unchanged but for its tests
+(lab/src/test_brewing.odin) and the generated components.
+
+Two things it ran into:
+
+- **What `makes` makes weighs what its blueprint does.** `splitFrom`
+  relates the made thing to what it was carved from, and the committer
+  then holds the two to be as heavy; it doesn't give the made thing the
+  other's mass, as `become` does (lab/src/act_actions.odin). So `mash`
+  takes a portion of 250g and no more, wort's blueprint being 250g. The
+  same limit as `hire`'s (step 4: `makes` sets no fields). A `makes`
+  that says fields of what it makes, mass among them, would lift both.
+- **A method matches only what is seen.** `mashesInto` had to be
+  `perceive(sight)` for a method to find grain to mash by it, as `raw`
+  is; a patch's `yields` isn't, and nothing looks for a patch by it.
+  That a kind of thing mashes is knowledge of the kind, not something
+  seen of each sack: what an agent knows of kinds has no place yet
+  (KNOWLEDGE.md).
+
 ## Found in building step 1
 
 - **A feature has one introducing type across all content**, so the

@@ -106,6 +106,7 @@ cut: the levels of detail first, then other topics, then code.
 | `cooking/` | raw food and meals, the larder, cooking at a lit stove, and the ways from a larder to a meal (`cooking.tri`) |
 | `perishing/` | what becomes something else when its time comes (`#Becoming`), and the other course a place may give it; perishable food: how long it keeps, when it spoils, and spoiled food (`perishing.tri`) |
 | `tanning/` | the tan pit, laying a hide in the tan, leather, and dressing hides (`tanning.tri`) |
+| `brewing/` | grain mashed to wort, the vat, the ale wort becomes in it, and a brewer's routine (`brewing.tri`): a topic with no code of its own |
 | `leatherwork/` | sewing leather into what it makes, and a household's pouch, which its buyer carries its purse in (`leatherwork.tri`) |
 | `farming/` | plots (areas) and their crops, seed kept back, sowing and harvesting a row at a time, ripening in closed form (`farming.tri`) |
 | `hunting/` | deer and hares, their instincts and their wariness (`animals.tri`); the hunter, the bow, lying in wait and the shot (`hunting.tri`); carcasses and butchering (`butchering.tri`) |

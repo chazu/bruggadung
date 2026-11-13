@@ -37,6 +37,8 @@
 //             (habit, AGENCY.md §8), then the nearest.
 // - perishing: a meal keeps two days from when it is cooked, whatever it
 //             was made of, then spoils (perishing/); raw grain keeps.
+// - brewing:  grain says what it mashes into (`mashesInto`, brewing/'s
+//             field: wort); a stove to mash at is lit by `stove_lit`.
 // - carrying: a larder is a kind of its own (#Larder), so looking for food
 //             doesn't look into the coffer or the packs beside it first
 //             (carrying/, money/coins.tri).
@@ -62,7 +64,7 @@ food_look: #Look & { kindOf: "#Food", look: "food", prevails: 1 } @family(looks)
 
 // Grain, by the portion: raw, a little nourishment; cooked, a meal. A
 // household's larder holds a sack of it, a stack of portions.
-let raw_grain = { material: "food", raw: true, nourishment: 15, cooking: 35 }
+let raw_grain = { material: "food", raw: true, nourishment: 15, cooking: 35, mashesInto: "wort" }
 grain:      #Body & #Food & raw_grain & { mass: 250g }
 grain_sack: #Stack & #Food & raw_grain & { unit: "grain", unitMass: 250g, count: 60 }
 
