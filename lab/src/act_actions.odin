@@ -3335,6 +3335,7 @@ perform :: proc(world: ^World, committer: ^Committer, action: Action, amount: i6
 		fmt.sbprintf(&source, " (%d)", amount)
 	}
 	group = proposal_group_group_with_phase(.Action, strings.to_string(source))
+	group.declared, group.acts = action.operation, action
 	proposal_group_set_actor(group, action.roles[.Actor])
 	proposal_group_set_weight(group, contest_weight(world, action.roles[.Actor], action.operation))
 	if effect == "fill" {
@@ -3419,6 +3420,7 @@ perform :: proc(world: ^World, committer: ^Committer, action: Action, amount: i6
 @(private = "file")
 perform_again :: proc(world: ^World, was: ^Proposal_Group) -> ^Proposal_Group {
 	group := proposal_group_group_with_phase(.Action, proposal_group_source(was))
+	group.declared, group.acts = was.declared, was.acts
 	proposal_group_set_actor(group, was.actor)
 	proposal_group_set_weight(group, was.weight)
 	if apply_effect(world, was.action, was.amount, group) != "" do return nil

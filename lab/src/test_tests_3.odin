@@ -3784,6 +3784,7 @@ ALL_TESTS := [?]Test_Case{
 	{"restore_errors",                test_restore_errors},
 	{"formatting",                    test_formatting},
 	{"watcher",                       test_watcher},
+	{"watcher_panes",                 test_watcher_panes},
 	{"village",                       test_village},
 	{"looks",                         test_looks},
 	{"declared",                      test_declared},

@@ -201,8 +201,11 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
   transfer a stock, relate, create, destroy, split, merge, emit an event,
   contribute to a domain. It has a **source** (what proposed it) and a
   **cause** (the event that led to it). (ACT §8)
-- **Proposal group**: proposals applied all or none. *Avoid:* bare
-  "group" in docs. (ACT §8)
+- **Proposal group**: proposals applied all or none. Where content
+  declares what its source is (an operation, a progression), it names that
+  **declaration**, with the action that filled an operation's roles; a
+  group whose source is code names none. *Avoid:* bare "group" in docs;
+  "provenance" for this (that is an entity's ancestry). (ACT §8)
 - **Commit round**: one pass validating and applying proposal groups;
   reactions seed the next, up to **R** rounds a boundary; what is left is
   **deferred** to the next boundary. (ACT §9)
@@ -1006,6 +1009,10 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
 - **Watcher**: what runs a lab world and publishes its scenes to a viewer:
   `lab/watcher/`, in one process with its window. Not an activity's
   **watch**. (TES)
+- **Pane**: what the watcher's panel shows, one at a time: **inspect**
+  (what is selected), the **log** (proposal groups committed, each leading
+  to its events, their causes and its declaration as written), the
+  **content** (its files and declarations). (lab/watcher/panes.odin)
 
 ## The village (proposed)
 

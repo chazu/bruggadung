@@ -252,7 +252,13 @@ isometric later.
   shows the world as the agent selected knows it (VILLAGE.md slice 11):
   its inspector then says what the agent recalls of the referent selected,
   where it believes it, and how long since it saw it; of itself, its
-  concerns and what it lately thought.
+  concerns and what it lately thought. Its panel has three **panes**
+  (`lab/watcher/panes.odin`): inspect; the log, a line to each proposal
+  group committed, leading to its events, the chain of their causes, and
+  the declaration the group came from with its text as written; and the
+  content, its files and declarations, where a click on a declared name
+  opens it. They read the world, the committer and the content's files,
+  and change nothing but what is selected.
 
 ## The plan, in slices
 

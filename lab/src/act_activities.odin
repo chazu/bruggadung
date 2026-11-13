@@ -500,6 +500,9 @@ activities_complete_due_at :: proc(self: ^Activities, t: Time) {
 		                                                        fmt.tprintf("stage %d done", record.stage) if more else "completes"))
 		proposal_group_set_cause(group, activities_start_of(self, a))
 		proposal_group_set_actor(group, Entity_ID(record.actorRef))
+		group.declared = operation
+		group.acts     = action_make(operation, Entity_ID(record.actorRef), Entity_ID(record.itemRef),
+		                             Entity_ID(record.destinationRef))
 		proposal_group_set_weight(group, contest_weight(self.world, Entity_ID(record.actorRef), operation))
 		/* a step along the way, of an operation whose stages are diagnostic:
 		 * the last, and how it ends, are history (KNOWLEDGE.md decision 21) */

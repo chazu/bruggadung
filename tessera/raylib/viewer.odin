@@ -32,12 +32,13 @@ Viewer :: struct {
 	levels:   [2]i32,          // the levels there are, inclusive: the focus stays in them
 	selected: u64,             // a mark's id, or 0
 	shade:    bool,            // darken by light
-	panel:    i32,             // px wide at most, the panel on the right (two fifths of a narrow window)
+	panel:    i32,             // px wide at most, the panel on the right
+	share:    f32,             // of the window's width, at most, the panel takes
 	fonts:    Fonts,           // viewer_free lets them go
 }
 
 viewer_make :: proc(centre: [2]f32, focus: i32, levels: [2]i32) -> Viewer {
-	return Viewer{centre = centre, tile = 22, focus = focus, levels = levels, shade = true, panel = 380}
+	return Viewer{centre = centre, tile = 22, focus = focus, levels = levels, shade = true, panel = 380, share = 0.4}
 }
 
 viewer_free :: proc(v: ^Viewer) {
@@ -49,9 +50,9 @@ map_pane :: proc(v: ^Viewer) -> rl.Rectangle {
 	return {0, 0, f32(rl.GetScreenWidth() - panel_width(v)), f32(rl.GetScreenHeight())}
 }
 
-@(private)
+// How wide the panel is drawn: `panel`, or its `share` of a narrow window.
 panel_width :: proc(v: ^Viewer) -> i32 {
-	return min(v.panel, rl.GetScreenWidth() * 2 / 5)
+	return min(v.panel, i32(f32(rl.GetScreenWidth()) * v.share))
 }
 
 // The tiles in view, a tile round them, and the focus level with the one
@@ -83,7 +84,8 @@ tile_origin :: proc(v: ^Viewer, x, y: i32) -> [2]f32 {
 }
 
 // The viewer's own input, against the scene on screen: arrows or WASD (or a
-// right-button drag) pan, the wheel zooms, Page Up and Page Down (or < and
+// right-button drag) pan, the wheel zooms (over the map: over the panel it
+// is the caller's), Page Up and Page Down (or < and
 // >) change level, a click selects the top mark on a tile (again: the next
 // one down), Escape lets go of it. Returns whether the selection changed.
 viewer_input :: proc(v: ^Viewer, s: ^tessera.Scene) -> bool {
@@ -93,7 +95,7 @@ viewer_input :: proc(v: ^Viewer, s: ^tessera.Scene) -> bool {
 	if rl.IsKeyDown(.UP) || rl.IsKeyDown(.W) do v.centre.y -= step
 	if rl.IsKeyDown(.DOWN) || rl.IsKeyDown(.S) do v.centre.y += step
 	if rl.IsMouseButtonDown(.RIGHT) do v.centre -= rl.GetMouseDelta() / v.tile
-	if wheel := rl.GetMouseWheelMove(); wheel != 0 {
+	if wheel := rl.GetMouseWheelMove(); wheel != 0 && rl.GetMousePosition().x < map_pane(v).width {
 		v.tile = clamp(v.tile * (1.15 if wheel > 0 else 1 / 1.15), 6, 64)
 	}
 	shift := rl.IsKeyDown(.LEFT_SHIFT) || rl.IsKeyDown(.RIGHT_SHIFT)
@@ -261,8 +263,7 @@ cstr :: proc(s: string) -> cstring {
 }
 
 // A line broken at spaces into parts at most `width` px wide (a word wider
-// than that stands alone).
-@(private)
+// than that stands alone). Temporary.
 wrap :: proc(f: ^Fonts, line: string, width: f32, px: i32) -> []string {
 	parts := make([dynamic]string, context.temp_allocator)
 	rest := line

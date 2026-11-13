@@ -36,10 +36,22 @@ Committer :: struct {
 	reactors:  [dynamic]Reactor_Pair,     // pairs: kind index, reactor (its data retained)
 	listeners: [dynamic]Round_Listener,   // each one's data retained
 	sources:   map[u64]string,            // commit position → the group's source
+	committed: map[u64]Committed,         // commit position → what else is kept of the group
 	trace:     [dynamic]string,
 	rounds:    uint,
 	position:  u64,
 	round:     u32,
+}
+
+
+// What is kept of a group committed, beside its source: when, and the
+// declaration it came from with the action that filled its roles (nil and
+// empty for a group no declaration is the source of).
+Committed :: struct {
+	time:     i64,
+	declared: cstring,
+	acts:     Action,
+	applied:  bool,
 }
 
 
@@ -110,6 +122,7 @@ committer_init_with_world :: proc(world: ^World) -> ^Committer {
 	self.reactors  = make([dynamic]Reactor_Pair)
 	self.listeners = make([dynamic]Round_Listener)
 	self.sources   = make(map[u64]string)
+	self.committed = make(map[u64]Committed)
 	self.trace     = make([dynamic]string)
 	self.rounds    = 4
 	return self
@@ -128,6 +141,7 @@ committer_dealloc :: proc(self: ^Committer) {
 	delete(self.listeners)
 	for _, source in self.sources do delete(source)        // freeing: the order can't matter
 	delete(self.sources)
+	delete(self.committed)
 	for i := 0; i < len(self.trace); i += 1 do delete(self.trace[i])
 	delete(self.trace)
 }
@@ -176,6 +190,12 @@ committer_has_pending :: proc(self: ^Committer) -> bool {
 // returned nil.
 committer_source_of_position :: proc(self: ^Committer, position: u64) -> (string, bool) #optional_ok {
 	return self.sources[position]
+}
+
+
+// What is kept of the group committed at a position, if this committer did it.
+committer_committed_at :: proc(self: ^Committer, position: u64) -> (Committed, bool) #optional_ok {
+	return self.committed[position]
 }
 
 
@@ -1196,6 +1216,7 @@ committer_commit_group :: proc(self: ^Committer, group: ^Proposal_Group) {
 	self.position += 1
 	if old, ok := self.sources[self.position]; ok do delete(old)
 	self.sources[self.position] = strings.clone(proposal_group_source(group))
+	self.committed[self.position] = Committed{time = world_time(self.world).ms, declared = group.declared, acts = group.acts}
 	committer_note(self, fmt.tprintf("b%d r%d #%d %s %s", world_boundary(self.world), self.round,
 	                                 self.position, PHASE_NAMES[proposal_group_phase(group)], proposal_group_source(group)))
 	tally = {}
@@ -1221,6 +1242,7 @@ committer_commit_group :: proc(self: ^Committer, group: ^Proposal_Group) {
 	}
 	world_commit_group(self.world)
 	proposal_group_set_applied(group, true, "", self.position)
+	(&self.committed[self.position]).applied = true
 	for i := first; !self.untraced && i < world_event_count(self.world); i += 1 {
 		committer_note(self, committer_describe_event(self, world_event_at(self.world, i)))
 	}

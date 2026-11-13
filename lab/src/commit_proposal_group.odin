@@ -96,6 +96,11 @@ Proposal_Group :: struct {
 	action:    Action,
 	amount:    i64,
 	tries:     int,
+	// the declaration its source is, where content declares it (an
+	// operation, a progression): interned, or nil. `acts` is the action, for
+	// an operation's: who and what filled its roles.
+	declared:  cstring,
+	acts:      Action,
 
 	// results, set by commitment
 	applied:   bool,

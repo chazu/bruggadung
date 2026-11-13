@@ -7,6 +7,8 @@ package lab
  * the same crowd run in one go does (watcher.odin).
  */
 
+import "core:strings"
+
 import "../../tessera"
 
 
@@ -69,4 +71,57 @@ test_watcher :: proc() {
 	}
 	delete(w.ids)
 	delete(w.title)
+}
+
+
+/*
+ * What the watcher's panes read (watcher_inspect.odin): the marked nail's
+ * proposal groups are in the log, the latest first, a line to each; the taking of a nail names the
+ * operation that declares it and who and what filled its roles; the
+ * operation's text is found in the content as it is written; and a
+ * component's type is found wherever it is declared, a topic's additions
+ * among them.
+ */
+test_watcher_panes :: proc() {
+	w, why := watcher_open("marked-nail", 0)
+	bg_check(why == "")
+	if why != "" do return
+	defer delete(w.title)
+	bg_check(watcher_step_until(&w, 3_600_000, max(u64)))
+
+	log := watcher_log(&w, NO_ENTITY, 1000)
+	bg_check(len(log) > 5)
+	for i in 1 ..< len(log) do bg_check(log[i].event < log[i - 1].event)
+	bg_check(strings.contains(log[len(log) - 1].text, "setup: the workshop: created x"))   /* a line to a group */
+	about := watcher_log(&w, 4, 1000)                  /* the worker's: fewer */
+	bg_check(len(about) > 0 && len(about) < len(log))
+
+	taken: u64
+	for line in log do if watcher_declared_by(&w, line.event) == "take" do taken = line.event
+	bg_check(strings.contains(watcher_event(&w, taken)[0].text, "event"))
+	bg_check(taken != 0)
+	if taken != 0 {
+		named, actor := false, false
+		for line in watcher_event(&w, taken) {
+			if line.declared == "take" do named = true
+			if line.entity == 4 && strings.has_prefix(line.text, "  actor:") do actor = true
+		}
+		bg_check(named && actor)
+	}
+	bg_check(watcher_declared_by(&w, log[len(log) - 1].event) == "")   /* the setup: code */
+
+	decls := watcher_declared(&w, "take")
+	bg_check(len(decls) == 1)
+	if len(decls) == 1 {
+		first, text := watcher_source(decls[0].file, decls[0].line)
+		bg_check(first >= 1 && first <= decls[0].line && len(text) >= 2)
+		bg_check(strings.contains(strings.join(text, "\n", context.temp_allocator), "take: #Taking"))
+		bg_check(strings.trim_space(text[len(text) - 1]) != "")
+	}
+	bg_check(len(watcher_declared(&w, "#Agent")) > 1)   /* the root's, and topics' fields */
+	bg_check(len(watcher_declared(&w, "no_such_thing")) == 0)
+	bg_check(len(watcher_files(&w)) > 20)
+
+	of := watcher_declarations_of(&w, 4)
+	bg_check(len(of) >= 2 && len(watcher_declared(&w, of[0])) >= 1 && strings.has_prefix(of[1], "#"))
 }

@@ -27,6 +27,7 @@ make gen                                 # regenerate src/components.odin from c
 ./build/<platform>/lab play workshop     # play: the map, the menu, commands, the inspector (also cistern)
 make watcher && ./build/<platform>/watcher crowd 40   # a world in a window: 40 workers on the yard (also cistern, marked-nail, ...)
 ./build/<platform>/watcher village --knows             # the village as a villager knows it (k: the truth, or back)
+./build/<platform>/watcher village --pane log          # the panel's panes: 1 inspect, 2 the log, 3 the content (--open forage: a declaration)
 ```
 
 `make check` compares each scenario's hashes with
@@ -51,7 +52,7 @@ make watcher && ./build/<platform>/watcher crowd 40   # a world in a window: 40 
 | `src/save_save.odin` | Saves as text, and restoring them |
 | `src/scenario_*.odin` | The worlds' setups, and *The marked nail*, the cistern and the village: the scenarios, their input logs, and their checks |
 | `src/play_play.odin` | The interactive session behind `lab play` |
-| `src/scene_truth.odin`, `src/scene_knowledge.odin`, `src/looks.odin`, `src/watcher.odin` | Tessera's truth scenes of a world, and knowledge scenes of what one agent knows of it; what things look like, and themes, from content; what the watcher can watch, and its running of it |
+| `src/scene_truth.odin`, `src/scene_knowledge.odin`, `src/looks.odin`, `src/watcher.odin` | Tessera's truth scenes of a world, and knowledge scenes of what one agent knows of it; what things look like, and themes, from content; what the watcher can watch, and its running of it; `src/watcher_inspect.odin`: what its panes read (the log, an event's causes and declaration, the content as written) |
 | `watcher/` | The watcher: a lab world in a window, its own executable (raylib), built by `make watcher` |
 | `src/test_*.odin`, `main.odin` | The test runner and the tests; the command line |
 

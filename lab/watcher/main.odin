@@ -4,7 +4,8 @@
  * boundary, and each frame draws a scene of what is in view: the truth, or
  * the world as one agent knows it (VILLAGE.md slice 11).
  *
- *   watcher [-C contentdir] <what> [agents] [--from hours] [--knows] [--shot file.png]
+ *   watcher [-C contentdir] <what> [agents] [--from hours] [--knows] [--pane log|content]
+ *           [--open declaration] [--shot file.png]
  *
  * <what> is one of lab.WATCHABLE. In the window:
  *
@@ -15,13 +16,17 @@
  *   click        select what is on a tile (again: the one under it)
  *   arrows/WASD, right-drag: pan; wheel: zoom; PgUp/PgDn or < >: level;
  *   L: light; Esc: select nothing
+ *   1 2 3        the panel's pane: inspect, the log, the content (panes.odin)
+ *   backspace    back, in the log and the content
+ *   \            the panel wide, or narrow again
  *
  * In an agent's knowledge, what is selected is one of its referents, and
  * tab goes on to the next agent's knowledge. --from runs the world that many
  * hours before the window opens (as it would run watched: no boundary put
  * in). --knows opens it as the first agent knows it, following it. --shot draws three
  * seconds of frames, saves the last as a PNG, and quits: a look at the
- * window without anyone at it.
+ * window without anyone at it. --pane opens the panel on that pane, and
+ * --open the content pane on a declaration (`forage`, `#Patch`).
  *
  * The lab itself never links raylib: this is its own executable, built by
  * `make watcher`.
@@ -49,6 +54,8 @@ HELP :: [?]string {
 	"arrows, WASD, right-drag: pan   wheel: zoom   PgUp PgDn, < >: level",
 	"k: as the agent selected knows it, or the truth",
 	"L: light   Esc: select nothing   q: quit",
+	"1 2 3: inspect, the log, the content   backspace: back   \\: wide panel",
+	"over the panel, the wheel scrolls; a blue line leads somewhere",
 }
 
 main :: proc() {
@@ -60,9 +67,19 @@ main :: proc() {
 	}
 	shot: string
 	from: f64                          // hours of world time run before the window opens
-	for len(args) >= 2 && (args[len(args) - 2] == "--shot" || args[len(args) - 2] == "--from") {
+	pane: Pane                         // --pane: the pane the panel opens on
+	open: string                       // --open: a declaration the content pane opens on
+	for len(args) >= 2 && (args[len(args) - 2] == "--shot" || args[len(args) - 2] == "--from" ||
+	                       args[len(args) - 2] == "--pane" || args[len(args) - 2] == "--open") {
 		if args[len(args) - 2] == "--shot" {
 			shot = args[len(args) - 1]
+		} else if args[len(args) - 2] == "--pane" {
+			switch args[len(args) - 1] {
+			case "log":     pane = .Log
+			case "content": pane = .Content
+			}
+		} else if args[len(args) - 2] == "--open" {
+			open = args[len(args) - 1]
 		} else if h, ok := strconv.parse_f64(args[len(args) - 1]); ok && h >= 0 {
 			from = h
 		}
@@ -96,7 +113,7 @@ main :: proc() {
 	lab.release_shared_content_after_use()
 
 	rl.SetConfigFlags({.WINDOW_RESIZABLE, .VSYNC_HINT})
-	rl.InitWindow(1400, 860, strings.clone_to_cstring(fmt.tprintf("watcher: %s", w.title)))
+	rl.InitWindow(1600, 940, strings.clone_to_cstring(fmt.tprintf("watcher: %s", w.title)))
 	rl.SetExitKey(.KEY_NULL)           // Escape lets go of the selection; q quits
 	rl.SetTargetFPS(60)
 
@@ -111,6 +128,8 @@ main :: proc() {
 	v := view.viewer_make({f32(lab.world_tiles_wide(world)) / 2, f32(lab.world_tiles_high(world)) / 2}, 0,
 	                      {0, levels - 1})
 	v.selected = u64(w.follow)
+	panes := Panes{pane = pane}
+	if open != "" do panes_open(&panes, open, "", 0)
 	follow := false                    // f follows the one selected
 	knower: lab.Entity_ID              // whose knowledge is shown; none: the truth
 
@@ -210,7 +229,8 @@ main :: proc() {
 		}
 
 		rl.BeginDrawing()
-		view.viewer_draw(&v, scene, &theme, header[:], panel[:])
+		view.viewer_draw(&v, scene, &theme, header[:], nil)
+		if picked := panes_frame(&panes, &v, &w, knower, panel[:]); picked != 0 do v.selected = picked
 		rl.EndDrawing()
 		frames += 1
 		if shot != "" && frames == 180 {
@@ -223,6 +243,7 @@ main :: proc() {
 		lab.pool_drain()
 	}
 
+	panes_free(&panes)
 	view.viewer_free(&v)
 	rl.CloseWindow()
 	view.theme_free(&theme)

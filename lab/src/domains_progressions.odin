@@ -254,7 +254,10 @@ progressions_advance_from :: proc(self: ^Progressions, t0: Time, t1: Time, world
 				proposal_group_set_of_to(group, p.asOfPath, e, time)
 			}
 		}
-		if group != nil do committer_submit(committer, group)
+		if group != nil {
+			group.declared = world_intern(world, strings.clone_to_cstring(p.name, context.temp_allocator))
+			committer_submit(committer, group)
+		}
 	}
 }
 
