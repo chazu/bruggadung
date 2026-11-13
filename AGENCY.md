@@ -468,6 +468,11 @@ a disturbance generates no goal to investigate it.
 - **A routine** is the set of default goals active in a time window. It is
   built from commitments (a shift from 8 to 16, an employment obligation from
   §6) and habits (eat at noon).
+  - Built: a routine is authored in content (`#Routine`, the `routines`
+    family): the goals it keeps, each over its hours, every period, and
+    what each commitment's slots are bound to: the agent's own of a
+    kind, or what is given. An agent takes on as many as it is given
+    (VILLAGE.md decision 4); an animal's instinct is one.
 - **A habit** is a context, a choice, and a strength.
   - Strength rises with repetition and decays analytically.
   - Habits supply method defaults: where to put things, which route to

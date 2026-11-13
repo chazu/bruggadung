@@ -4304,29 +4304,94 @@ mind_due_now :: proc(context_: rawptr, agent: Entity_ID) -> i64 {
 }
 
 
+/* What an agent owns of a kind, as it knows it: its referent for the
+ * thing, of the least ID, that an ownership claim of its is on and that is
+ * of the kind (a type's name, "#Bed"; or a blueprint's, "coffer"). 0 with
+ * none it knows of. A household's things are each member's own. */
+@(private = "file")
+agency_own_of_kind :: proc(self: ^Agency, agent: Entity_ID, kind: cstring) -> u32 {
+	who, thing: Entity_ID
+
+	found     := NO_ENTITY
+	ownership := u32(tri.type_named(world_tri(self.world), "\"ownership\""))
+	claims    := world_store_for_kind(self.world, world_kind_named(self.world, "Claim"))
+	for i: uint = 0; i < store_count(claims); i += 1 {
+		claim := (^Claim)(store_record_at_index(claims, i))
+		c     := store_entity_at_index(claims, i)
+		if u32(claim.kind) != ownership || claim_lapsed(self.world, c) do continue
+		if world_edges_from(self.world, .Claimant, c, &who, 1) == 0 || who != agent do continue
+		if world_edges_from(self.world, .Claim_Subject, c, &thing, 1) == 0 || !world_is_live(self.world, thing) do continue
+		if found != NO_ENTITY && thing >= found do continue
+		info := world_info(self.world, thing)
+		if info == nil do continue
+		if (string(kind)[0] == '#' && world_is_a(self.world, thing, kind)) || info.blueprint == kind do found = thing
+	}
+	if found == NO_ENTITY do return 0
+	store := knowledge_store_of(self.knowledge, agent)
+	for i: uint = 0; i < knowledge_store_count(store); i += 1 {
+		if r := knowledge_store_referent_at(store, i); r.truth == found do return r.id
+	}
+	return 0
+}
+
+
+/* A routine taken on (content/agency.tri's #Routine): each goal it keeps
+ * undertaken over its window, every period, its slots bound as the routine
+ * says: to what is `given` for the slot, else to the agent's own of the
+ * kind, else left to the goal's methods. "" if it is; else why not, and
+ * the commitments before the one that failed stand. `early` opens each
+ * window so much sooner (an instinct's: a day, so that the one under way
+ * now is kept). */
+agency_take_on_routine :: proc(self: ^Agency, agent: Entity_ID, routine: cstring, given: []Slot_Binding = {}, early: i64 = 0) -> string {
+	goal, duty, slot, kind: [64]u8
+
+	tc   := world_tri(self.world)
+	node := node_of(tc, routine)
+	if node == nil || tri.at(tc, node, "keeps") == nil do return fmt.tprintf("%s is no routine", routine)
+	recurs := int_at(tc, node, "recurs", 86400000)
+	starts := int_at(tc, node, "starts", 0)
+	for keeps := tri.at(tc, node, "keeps"); keeps != nil; keeps = tri.at(tc, keeps, "rest") {
+		kept := tri.at(tc, keeps, "first")
+		if kept == nil || !text_at(tc, kept, "keep", goal[:]) do break
+		if !text_at(tc, kept, "dutyTo", duty[:]) do put(duty[:], "routine")
+		bound := make([dynamic]Slot_Binding, context.temp_allocator)
+		for list := tri.at(tc, kept, "bindings"); list != nil; list = tri.at(tc, list, "rest") {
+			binding := tri.at(tc, list, "first")
+			if binding == nil || !text_at(tc, binding, "binding", slot[:]) do break
+			referent: u32
+			for g in given do if string(g.slot) == str(slot[:]) do referent = g.referent
+			if referent == 0 && text_at(tc, binding, "own", kind[:]) && len(str(kind[:])) > 0 {
+				referent = agency_own_of_kind(self, agent, cstr(kind[:]))
+				if referent == 0 {
+					return fmt.tprintf("%d knows of no %s of its own, for the %s of %s (%s)", agent, str(kind[:]), str(slot[:]),
+					                   str(goal[:]), routine)
+				}
+			}
+			if referent != 0 do append(&bound, Slot_Binding{world_intern(self.world, cstr(slot[:])), referent})
+		}
+		from  := starts + int_at(tc, kept, "opens", 0) - early
+		until := starts + int_at(tc, kept, "closes", recurs) - early
+		if !agency_undertake_every_with(self, agent, cstr(goal[:]), from, until, cstr(duty[:]), recurs, bound[:]) {
+			return fmt.tprintf("%d couldn't take on %s (%s)", agent, str(goal[:]), routine)
+		}
+	}
+	return ""
+}
+
+
 /* An animal's mind (content/hunting/): made as it first perceives, its
- * instinct (`Agent.instinct`, an #Instinct) undertaken: each goal it keeps
- * over its hours, every day. Each window is undertaken a day early, so the
- * one under way now (a night begun yesterday) is kept, and the rest open
- * as their hours come. nil for an agent with none: a person's days are its
- * commitments. */
+ * instinct (`Agent.instinct`, an #Instinct: a routine) taken on: each goal
+ * it keeps over its hours, every day. Each window is undertaken a day
+ * early, so the one under way now (a night begun yesterday) is kept, and
+ * the rest open as their hours come. nil for an agent with none: a
+ * person's routines are the scenario's to have it take on. */
 @(private = "file")
 agency_take_on_instinct :: proc(self: ^Agency, agent: Entity_ID) -> ^Motivation {
 	DAY :: i64(86400000)
-	goal: [64]u8
 	name := world_text_field(self.world, "Agent.instinct", agent)
 	if name == nil || len(name) == 0 || !world_is_live(self.world, agent) do return nil
-	tc := world_tri(self.world)
-	took := false
-	for keeps := tri.at(tc, tri.pattern(tc, name), "keeps"); keeps != nil; keeps = tri.at(tc, keeps, "rest") {
-		kept := tri.at(tc, keeps, "first")
-		if kept == nil || !text_at(tc, kept, "goal", goal[:]) do break
-		from  := int_at(tc, kept, "from", 0)
-		until := int_at(tc, kept, "until", DAY)
-		if !agency_undertake_every_with(self, agent, cstr(goal[:]), from - DAY, until - DAY, "instinct", DAY, {}) do return nil
-		took = true
-	}
-	return agency_existing_mind_of(self, agent) if took else nil
+	if agency_take_on_routine(self, agent, name, {}, DAY) != "" do return nil
+	return agency_existing_mind_of(self, agent)
 }
 
 

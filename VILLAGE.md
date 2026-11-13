@@ -98,6 +98,15 @@ things the lab put off:
      chopping block, a hunting blind). Sight reaches four tiles, so each
      villager is shown its worksite and its home before the first morning;
      the rest of the way it finds as it walks.
+   - Built since (content/village/routines.tri): the commitments, their
+     hours and what each is bound to are **routines** in content
+     (agency.tri's `#Routine`), by the day and by the market day. A slot
+     is bound to the agent's own of a kind (its bed, its household's
+     stove, larder, woodpile, coffer, stall, tan pit), found by its
+     ownership claims, as it knows it. The scenario says who takes on
+     which routine, and gives what ownership doesn't settle: the
+     worksite, which plot, the stall's board, where its goods are kept.
+     An animal's instinct is a routine too.
    - Built (slice 4): work and home are **kept** goals (agency.tri): a
      villager who goes home to eat in its working hours, or to the stove
      in the evening, goes back. A kept goal has no deadline to rise

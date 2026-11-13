@@ -3799,6 +3799,7 @@ ALL_TESTS := [?]Test_Case{
 	{"never_came_home",              test_never_came_home},
 	{"foraging",                      test_foraging},
 	{"progressions",                  test_progressions},
+	{"routines",                      test_routines},
 	{"goal_done_beneath",             test_goal_done_beneath},
 	{"eats_what_keeps_least",         test_eats_what_keeps_least},
 	{"errand_window",                 test_errand_window},

@@ -7,6 +7,8 @@
 // - reduced, abstract, frozen: nobody is, yet.
 // - home:     beds and worksites are home/home.tri's kinds, and the
 //             day's commitments its goals.
+// - routines: what each villager keeps to, and when, is routines.tri's;
+//             who keeps which routine is the scenario's.
 // - hunger:   the villagers get hungry (hunger/body.tri) and eat from
 //             their larders (cooking/cooking.tri): a sack of grain each, a
 //             farming household's what is left of its last harvest (enough
@@ -30,12 +32,12 @@
 //             game there at the start, the herds' bounds and where they
 //             come in, and a bow each, are the scenario's.
 // - carrying: each household has a backpack and a basket, kept by its
-//             coffer (carrying/); who takes which, and when, the
-//             scenario's.
+//             coffer (carrying/); who takes which is the scenario's, and
+//             when, routines.tri's.
 // - market:   each household has a coffer of coins by its larder, and a
 //             stall with its board on the green (market/, money/coins.tri);
-//             market days, who keeps the stall and who buys what, are the
-//             scenario's. The watch officer, of no household, buys its
+//             market days are routines.tri's; who keeps the stall and who
+//             buys what, the scenario's. The watch officer, of no household, buys its
 //             grain and firewood there with its wage, a coffer of coins
 //             at its post, paid ahead; who pays the town is open.
 // - terrain:  the map's kinds are terrain/terrain.tri's.
@@ -44,8 +46,8 @@
 //             (knowledge.tri's #Common), so a hungry villager knows whose
 //             door to ask at (deals/).
 // - code:     src/scenario_village.odin: where everyone and everything
-//             stands, the households' bonds and claims, the commitments,
-//             and the checks.
+//             stands, the households' bonds and claims, who takes on
+//             which routine, and the checks.
 
 package village
 

@@ -83,10 +83,11 @@ VILLAGE_FARM_GRAIN :: i64(480)         // what is left of a farming household's 
 VILLAGE_COINS :: i64(400)              // coins in each household's coffer (money/coins.tri's coins_400)
 VILLAGE_WAGE :: i64(1200)              // the watch officer's wage, paid ahead (village.tri's watch_wage)
 VILLAGE_STOCKED :: i64(3000)          // pieces on a stocked woodpile (firewood.tri's woodpile_stocked, three tonnes)
-VILLAGE_MARKET :: i64(2)               // the first market day's index (day 3); then every fourth
+VILLAGE_MARKET :: i64(2)               // the first market day's index (day 3); then every fourth: as village/routines.tri's #MarketDay says
 
-/* What each household buys at the market (content/market/): the goals,
- * each stocking its larder (or woodpile) with what it doesn't make. */
+/* What each household buys at the market (content/market/): the routines
+ * (content/village/routines.tri), each stocking its larder (or woodpile)
+ * with what it doesn't make. */
 /* The watch's post, south of the green: where its officer stands, its
  * bed, its larder, its stove, its woodpile and its coffer. */
 @(private = "file", rodata)
@@ -94,10 +95,10 @@ village_post := [6][2]i32{{60, 56}, {60, 57}, {61, 57}, {59, 57}, {61, 56}, {59,
 
 @(private = "file", rodata)
 village_buys := [4][2]cstring {
-	{"meat_stocked", "firewood_stocked"},
-	{"meat_stocked", "firewood_stocked"},
-	{"grain_stocked", "meat_stocked"},
-	{"grain_stocked", "firewood_stocked"},
+	{"buying_meat", "buying_firewood"},
+	{"buying_meat", "buying_firewood"},
+	{"buying_grain", "buying_meat"},
+	{"buying_grain", "buying_firewood"},
 }
 
 Village_Household :: struct {
@@ -541,160 +542,78 @@ village_setup :: proc(self: ^Village) {
 	committer_submit(c, hearth)
 	scheduler_run_until(self.scheduler, time_make(8))
 
-	/* the watch officer's nights: a supper, its stove stoked, and its bed;
-	 * and on market day it buys its grain and its firewood with its wage,
-	 * as a household's buyer does */
-	{
-		store  := knowledge_store_of(self.knowledge, self.officer)
-		bed    := village_referent_of(store, proposal_group_id_for(g, post_bed))
-		stove  := village_referent_of(store, proposal_group_id_for(hearth, post_fire))
-		larder := village_referent_of(store, proposal_group_id_for(g, post_food))
-		pile   := village_referent_of(store, proposal_group_id_for(hearth, post_pile))
-		coffer := village_referent_of(store, proposal_group_id_for(g, post_coffer))
-		day    := VILLAGE_MARKET * VILLAGE_DAY
-		if larder == 0 || pile == 0 || coffer == 0 ||
-		   !agency_undertake_every_with(self.agency, self.officer, "grain_stocked", day + 9 * VILLAGE_HOUR + VILLAGE_HOUR / 2,
-		                                day + 12 * VILLAGE_HOUR, "market", 4 * VILLAGE_DAY, {{"supply", larder}, {"coffer", coffer}}) ||
-		   !agency_undertake_every_with(self.agency, self.officer, "firewood_stocked", day + 9 * VILLAGE_HOUR + VILLAGE_HOUR / 2,
-		                                day + 12 * VILLAGE_HOUR, "market", 4 * VILLAGE_DAY, {{"supply", pile}, {"coffer", coffer}}) ||
-		   !agency_undertake_every_with(self.agency, self.officer, "coins_home", day + 12 * VILLAGE_HOUR, day + 15 * VILLAGE_HOUR,
-		                                "market", 4 * VILLAGE_DAY, {{"coffer", coffer}}) {
-			self.error = fmt.aprintf("the watch officer couldn't take on its marketing")
-			return
-		}
-		if bed == 0 || stove == 0 ||
-		   !agency_undertake_every_with(self.agency, self.officer, "stove_stoked", 19 * VILLAGE_HOUR, 21 * VILLAGE_HOUR, "home",
-		                                VILLAGE_DAY, {{"stove", stove}}) ||
-		   !agency_undertake_every_with(self.agency, self.officer, "sleep_in_bed", 22 * VILLAGE_HOUR, 30 * VILLAGE_HOUR, "home",
-		                                VILLAGE_DAY, {{"bed", bed}}) ||
-		   !agency_undertake_every_with(self.agency, self.officer, "eat_supper", 18 * VILLAGE_HOUR, 21 * VILLAGE_HOUR, "home",
-		                                VILLAGE_DAY, {}) {
-			self.error = fmt.aprintf("the watch officer couldn't take on its nights")
+	/* the watch officer's routines (content/village/routines.tri): on
+	 * market day it buys its grain and its firewood with its wage, as a
+	 * household's buyer does; and its nights: its stove stoked, its bed, a
+	 * supper. Each bound to its own */
+	for routine in ([]cstring{"buying_grain", "buying_firewood", "coins_taken_home", "nights"}) {
+		if why := agency_take_on_routine(self.agency, self.officer, routine); why != "" {
+			self.error = fmt.aprintf("the watch officer: %s", why)
 			return
 		}
 	}
 
-	/* the day's commitments, every day, bound to its own bed and its work */
+	/* each villager's routines: its nights and its working day, its
+	 * trade's, and its part on market days: the household's first keeps
+	 * the stall, its second buys what the household doesn't make. What is
+	 * the agent's own a routine binds itself; given here: its worksite,
+	 * a farmer's plot, the stall's board, and where its goods are kept */
 	farmer_index: [4]int
 	for v in self.people {
-		store := knowledge_store_of(self.knowledge, v.id)
-		bed   := village_referent_of(store, v.bed)
-		work  := village_referent_of(store, v.worksite)
-		stove := village_referent_of(store, self.stoves[v.household])
-		pile  := village_referent_of(store, self.woodpiles[v.household])
-		larder := village_referent_of(store, self.larders[v.household])
-		if bed == 0 || work == 0 || stove == 0 || pile == 0 {
-			self.error = fmt.aprintf("%d hasn't seen its %s", v.id,
-			                         "bed" if bed == 0 else ("worksite" if work == 0 else ("stove" if stove == 0 else "woodpile")))
-			return
+		store  := knowledge_store_of(self.knowledge, v.id)
+		h      := households[v.household]
+		given  := make([dynamic]Slot_Binding, context.temp_allocator)
+		taken  := make([dynamic]cstring, context.temp_allocator)
+		append(&given, Slot_Binding{"worksite", village_referent_of(store, v.worksite)})
+		append(&taken, "working_day", "nights")
+		switch h.worksite {
+		case "chopping_block":
+			append(&taken, "woodcutters_day")
+		case "hunting_blind":
+			append(&taken, "hunters_day")
 		}
-		if households[v.household].worksite == "hunting_blind" && village_referent_of(store, self.pit) == 0 {
-			self.error = fmt.aprintf("%d hasn't seen its household's tan pit", v.id)
-			return
-		}
-		ok := agency_undertake_every_with(self.agency, v.id, "be_at_work", 7 * VILLAGE_HOUR, 15 * VILLAGE_HOUR, "work",
-		                                  VILLAGE_DAY, {{"worksite", work}}) &&
-		      agency_undertake_every_with(self.agency, v.id, "be_home", 15 * VILLAGE_HOUR, 22 * VILLAGE_HOUR, "home",
-		                                  VILLAGE_DAY, {{"bed", bed}}) &&
-		      agency_undertake_every_with(self.agency, v.id, "sleep_in_bed", 22 * VILLAGE_HOUR, 30 * VILLAGE_HOUR, "home",
-		                                  VILLAGE_DAY, {{"bed", bed}}) &&
-		      agency_undertake_every_with(self.agency, v.id, "food_along", 6 * VILLAGE_HOUR, 7 * VILLAGE_HOUR, "work",
-		                                  VILLAGE_DAY, {}) &&
-		      agency_undertake_every_with(self.agency, v.id, "eat_supper", 18 * VILLAGE_HOUR, 21 * VILLAGE_HOUR, "home",
-		                                  VILLAGE_DAY, {}) &&
-		      agency_undertake_every_with(self.agency, v.id, "stove_stoked", 19 * VILLAGE_HOUR, 21 * VILLAGE_HOUR, "home",
-		                                  VILLAGE_DAY, {{"stove", stove}}) &&
-		      (households[v.household].worksite != "chopping_block" ||
-		       agency_undertake_every_with(self.agency, v.id, "woodpile_stocked", 7 * VILLAGE_HOUR, 15 * VILLAGE_HOUR, "work",
-		                                   VILLAGE_DAY, {{"woodpile", pile}, {"coffer", village_referent_of(store, self.coffers[v.household])}})) &&
-		      (households[v.household].worksite != "hunting_blind" ||
-		       agency_undertake_every_with(self.agency, v.id, "game_hunted", 7 * VILLAGE_HOUR, 15 * VILLAGE_HOUR, "work",
-		                                   VILLAGE_DAY, {{"larder", larder}})) &&
-		      /* the hunters dress their hides, home from the hunt: a look into
-		       * the pit, and the work it shows (content/tanning/) */
-		      (households[v.household].worksite != "hunting_blind" ||
-		       (agency_undertake_every_with(self.agency, v.id, "pit_seen_to", 16 * VILLAGE_HOUR, 18 * VILLAGE_HOUR, "home",
-		                                    VILLAGE_DAY, {{"pit", village_referent_of(store, self.pit)}}) &&
-		        agency_undertake_every_with(self.agency, v.id, "hides_dressed", 16 * VILLAGE_HOUR, 18 * VILLAGE_HOUR, "home",
-		                                    VILLAGE_DAY, {{"pit", village_referent_of(store, self.pit)}, {"store", larder}}))) &&
-		      /* the backpack, for a woodcutter's or a hunter's day; put back by
-		       * the larder after (content/carrying/) */
-		      (households[v.household].worksite == "scarecrow" ||
-		       agency_undertake_every_with(self.agency, v.id, "pack_worn", 6 * VILLAGE_HOUR, 7 * VILLAGE_HOUR,
-		                                   "work", VILLAGE_DAY, {})) &&
-		      agency_undertake_every_with(self.agency, v.id, "pack_returned", 15 * VILLAGE_HOUR, 16 * VILLAGE_HOUR, "home",
-		                                  VILLAGE_DAY, {{"home", larder}, {"woodpile", pile}})
 		/* a farmer's plot: one of its household's, by turns (the Ashes' three
 		 * over their two, two Brooks to each of theirs), so it carries one
-		 * kind of seed; bound to the plot as it knows it, and the household's
-		 * larder, where its seed is kept */
+		 * kind of seed */
 		if plots := self.plots[v.household][:]; len(plots) > 0 {
-			known := village_referent_of(store, plots[farmer_index[v.household] % len(plots)])
+			append(&given, Slot_Binding{"plot", village_referent_of(store, plots[farmer_index[v.household] % len(plots)])})
 			farmer_index[v.household] += 1
-			ok = ok && known != 0 &&
-			     agency_undertake_every_with(self.agency, v.id, "plot_tended", 7 * VILLAGE_HOUR, 15 * VILLAGE_HOUR, "work",
-			                                 VILLAGE_DAY, {{"plot", known}, {"larder", larder}})
+			append(&taken, "farmers_day")
 		}
-		/* market days (content/market/): the household's first keeps its
-		 * stall, from where its goods are kept; its second buys what it
-		 * doesn't make; each takes the coins home after */
-		stall  := village_referent_of(store, self.stalls[v.household])
-		coffer := village_referent_of(store, self.coffers[v.household])
-		board  := village_referent_of(store, self.boards[v.household])
-		first  := 0
+		first := 0
 		for w, i in self.people do if w.household == v.household {
 			first = i
 			break
 		}
-		which  := 0
+		which := 0
 		for w, i in self.people do if w.id == v.id do which = i - first
-		day    := VILLAGE_MARKET * VILLAGE_DAY
-		if ok && (stall == 0 || coffer == 0 || board == 0) {
-			self.error = fmt.aprintf("%d hasn't seen its household's %s", v.id, "stall" if stall == 0 else ("coffer" if coffer == 0 else "board"))
-			return
-		}
-		if ok && which == 0 {
-			supply := pile if households[v.household].worksite == "chopping_block" else larder
-			/* the hunters' stall has a second board, for their leather */
-			keeping := []Slot_Binding{{"stall", stall}, {"board", board}, {"supply", supply}}
-			if households[v.household].worksite == "hunting_blind" {
-				keeping = []Slot_Binding{{"stall", stall}, {"board", board}, {"supply", supply}, {"sign", village_referent_of(store, self.sign)}}
-			}
-			ok = agency_undertake_every_with(self.agency, v.id, "pack_carried", day + 9 * VILLAGE_HOUR, day + 9 * VILLAGE_HOUR + VILLAGE_HOUR / 2,
-			                                 "market", 4 * VILLAGE_DAY, {}) &&
-			     agency_undertake_every_with(self.agency, v.id, "stall_kept", day + 9 * VILLAGE_HOUR, day + 12 * VILLAGE_HOUR, "market",
-			                                 4 * VILLAGE_DAY, keeping) &&
-			     agency_undertake_every_with(self.agency, v.id, "unsold_home", day + 12 * VILLAGE_HOUR, day + 13 * VILLAGE_HOUR,
-			                                 "market", 4 * VILLAGE_DAY, {{"stall", stall}, {"supply", supply}}) &&
-			     agency_undertake_every_with(self.agency, v.id, "takings_home", day + 12 * VILLAGE_HOUR, day + 13 * VILLAGE_HOUR,
-			                                 "market", 4 * VILLAGE_DAY, {{"stall", stall}, {"coffer", coffer}})
-		} else if ok && which == 1 {
-			ok = agency_undertake_every_with(self.agency, v.id, "pack_carried", day + 9 * VILLAGE_HOUR + VILLAGE_HOUR / 2,
-			                                 day + 10 * VILLAGE_HOUR, "market", 4 * VILLAGE_DAY, {})
-			for goal in village_buys[v.household] {
-				supply := pile if goal == "firewood_stocked" else larder
-				ok = ok && agency_undertake_every_with(self.agency, v.id, goal, day + 9 * VILLAGE_HOUR + VILLAGE_HOUR / 2,
-				                                       day + 12 * VILLAGE_HOUR, "market", 4 * VILLAGE_DAY,
-				                                       {{"supply", supply}, {"coffer", coffer}})
-			}
+		switch which {
+		case 0:
+			/* from its woodpile, a woodcutter's; the hunters' stall has a
+			 * second board, for their leather */
+			append(&given, Slot_Binding{"board", village_referent_of(store, self.boards[v.household])},
+			       Slot_Binding{"supply", village_referent_of(store, self.woodpiles[v.household] if h.worksite == "chopping_block" else
+			                                                         self.larders[v.household])})
+			if h.worksite == "hunting_blind" do append(&given, Slot_Binding{"sign", village_referent_of(store, self.sign)})
+			append(&taken, "stall_keeping")
+		case 1:
+			append(&taken, "going_to_market")
+			for routine in village_buys[v.household] do append(&taken, routine)
 			/* but a hunter's, leather too: two pieces of hare leather, of
 			 * which, evenings, it makes its household's pouch
 			 * (content/leatherwork/) */
-			if households[v.household].worksite != "hunting_blind" {
-				ok = ok && agency_undertake_every_with(self.agency, v.id, "leather_stocked", day + 9 * VILLAGE_HOUR + VILLAGE_HOUR / 2,
-				                                       day + 12 * VILLAGE_HOUR, "market", 4 * VILLAGE_DAY,
-				                                       {{"supply", larder}, {"coffer", coffer}}) &&
-				     agency_undertake_every_with(self.agency, v.id, "pouch_made", 16 * VILLAGE_HOUR, 18 * VILLAGE_HOUR, "home",
-				                                 VILLAGE_DAY, {{"store", larder}, {"coffer", coffer}})
-			}
-			/* till none are left in its hands: through the afternoon, if
-			 * something keeps it from it at noon */
-			ok = ok && agency_undertake_every_with(self.agency, v.id, "coins_home", day + 12 * VILLAGE_HOUR, day + 15 * VILLAGE_HOUR,
-			                                       "market", 4 * VILLAGE_DAY, {{"coffer", coffer}})
+			if h.worksite != "hunting_blind" do append(&taken, "buying_leather", "pouch_making")
+			append(&taken, "coins_taken_home")
 		}
-		if !ok {
-			self.error = fmt.aprintf("%d couldn't take on its day", v.id)
+		for g in given do if g.referent == 0 {
+			self.error = fmt.aprintf("%d hasn't seen its %s", v.id, g.slot)
 			return
+		}
+		for routine in taken {
+			if why := agency_take_on_routine(self.agency, v.id, routine, given[:]); why != "" {
+				self.error = strings.clone(why)
+				return
+			}
 		}
 	}
 }

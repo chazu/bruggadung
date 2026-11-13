@@ -652,7 +652,14 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
 - **Loyalty**: the weight of a bond. *Avoid:* treating it as a
   disposition. (AGE d12)
 - **Routine**: the goals in force at a time, from commitments and habits.
-  (AGE §8)
+  Authored, a `#Routine` (the `routines` family): the goals it **keeps**,
+  each over its hours (`from`, `until`), every so often (`recurs`, a day
+  unless it says; the first from `starts`), and what each one's slots are
+  bound to (`binds`): the thing of a kind that is the agent's **own** (by
+  an ownership claim of its, as a household's things are each member's),
+  or what whoever has it take the routine on gives for the slot. Taken
+  on, each is a recurring commitment. An agent may keep several. An
+  animal's is its **instinct**. (AGE §8, VIL d4, lab/content/agency.tri)
 - **Worksite**: what a household's day's work is done at (`#Worksite`: a
   scarecrow in a plot, a chopping block): its people's work commitment is
   bound to it. *Avoid:* workplace, place of work (a **place** is
@@ -1050,7 +1057,8 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
 - **Remains**: what any body is once its injury reaches 100 and it dies,
   as heavy as it was: its blueprint's `remains`, a carcass for an animal,
   a **corpse** for a person. (VIL d7)
-- **Instinct**: the goals an animal keeps every day, each over its hours,
+- **Instinct**: an animal's **routine** (`#Instinct`): the goals it keeps
+  every day, each over its hours,
   taken on as it first perceives (a grazer's: to roam from dawn to dusk,
   bedded down the night). A person has none. (AG d21)
 - **Bolt**: an animal's flight from a person in sight: a dozen tiles in

@@ -23,7 +23,7 @@
 // - knowledge: the #Danger is drawn only by an agent with the skill `wary`
 //             (an animal's; a person's is 0), from a #Sighted premise
 //             (knowledge.tri), weighed at every perception.
-// - code:     an instinct taken on, and the #Wander step
+// - code:     an instinct taken on, as any routine is, and the #Wander step
 //             (src/agency_agency.odin); the #Sighted premise
 //             (src/know_knowledge_1.odin); a bolt is effect_flee, carried
 //             as far as its `run` (src/act_actions.odin); the herd kept up
@@ -41,15 +41,14 @@ package hunting
     instinct: *"" | text             @field(content, saved, inspect)
 }
 
-// An instinct: the goals an animal keeps, each from `from` until `until`
-// (past midnight, more than a day), every day.
-#Keeps:    { goal: text, from: time & >=0ms & <=1d, until: time & >=0ms & <=2d }
-#Instinct: { keeps: [...#Keeps] }
+// An instinct: an animal's routine (agency.tri): the goals it keeps, each
+// over its hours, every day.
+#Instinct: #Routine & {}
 
 // A grazer's day: roaming from dawn to dusk, bedded down the night.
 grazing: #Instinct & {
-    keeps: [{ goal: "roam", from: 5h, until: 21h },
-            { goal: "bedded_down", from: 21h, until: 29h }]
+    keeps: [{ keep: "roam", opens: 5h, closes: 21h, dutyTo: "instinct" },
+            { keep: "bedded_down", opens: 21h, closes: 29h, dutyTo: "instinct" }]
 } @family(instincts)
 
 // An animal: wary, grazing, and no hands.

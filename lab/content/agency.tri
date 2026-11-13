@@ -15,7 +15,8 @@
 // - frozen:   it doesn't decide; risen, it looks, and so decides, at once.
 // - code:     src/agency_agency.odin: considerations by their kind (#Flat,
 //             #Scaled, #Need, #Trait, #AtHome, #ByLight, ...), conditions,
-//             `order`, commitments, goals arising from findings or from
+//             `order`, commitments, a routine taken on
+//             (agency_take_on_routine), goals arising from findings or from
 //             what is held; #Did of an instant operation, from the mind's
 //             memory of its own acts; #None, a condition negated; a method
 //             step's act done again to no end fails it
@@ -254,3 +255,20 @@
 // point a point. With none, 10. Lending a thing costs its worth, less by
 // the trust that it comes back.
 #Valuing: #Flat & #Need & { valued: #Body }
+
+// A routine (AGENCY.md §8, VILLAGE.md decision 4): the goals an agent
+// keeps, each (`keep`, a goal's name) over a window that `opens` and
+// `closes` (past midnight, more than a day) in a period that `recurs` (a
+// day, unless it says), the first starting at `starts`. Taken on, each is
+// a commitment, a duty to what it says (`dutyTo`: "work", "home"),
+// recurring.
+//
+// A commitment's slots are bound as it is taken on (`bindings`): to the
+// thing of a kind (`own`, its type's name) that is the agent's own, by an
+// ownership claim of its; or, saying no kind, to what whoever has the
+// agent take the routine on gives for the slot (its plot, of the
+// household's two), and with nothing given, left to the goal's methods to
+// find.
+#Binding: { binding: text, own: *"" | text }
+#Keeps:   { keep: text, opens: time & >=0ms & <=1d, closes: time & >=0ms & <=2d, dutyTo: *"routine" | text, bindings: [...#Binding] }
+#Routine: { keeps: [...#Keeps], recurs: *1d | time & >=1s & <=1000d, starts: *0ms | time & >=0ms & <=1000d }

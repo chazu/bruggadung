@@ -1,0 +1,129 @@
+// The village's routines: what each villager keeps to, by the day and by
+// the market day, and what each commitment is bound to (VILLAGE.md
+// decision 4, AGENCY.md §8).
+//
+// Cut points:
+// - full:     a villager keeps the routines the scenario has it take on:
+//             everyone its nights; a household's people their working
+//             day, and their trade's; on market days (every fourth, from
+//             the third) its first keeps the stall and its second buys
+//             what the household doesn't make. Each goal kept is a
+//             commitment over its hours, weighed against the agent's
+//             needs as any goal is.
+// - reduced:  the same, decided on the cadence's beat.
+// - abstract: as reduced. A routine is what a schedule would be read
+//             from (DETAIL_REGIMES.md): not built.
+// - frozen:   it doesn't decide; its commitments' windows open and close
+//             all the same.
+// - home, cooking, hunger, firewood, hunting, tanning, carrying, farming,
+//             market, leatherwork: the goals kept are theirs, with their
+//             methods; here is only when, and bound to what.
+// - binding:  a slot bound to the agent's own (`own`) is bound to what it
+//             owns of the kind, as it knows it: its bed, its household's
+//             stove, larder, woodpile, coffer, stall and tan pit. One
+//             that says no kind is the scenario's to give: the worksite,
+//             which of the household's plots, the stall's board, where
+//             the goods it sells are kept, the hunters' sign.
+// - code:     who keeps which routine, and what is given
+//             (src/scenario_village.odin); taking one on
+//             (src/agency_agency.odin's agency_take_on_routine).
+
+package village
+
+// Everyone's nights: the stove stoked of an evening, a night's sleep in
+// one's own bed, and supper.
+nights: #Routine & {
+    keeps: [{ keep: "stove_stoked", opens: 19h, closes: 21h, dutyTo: "home", bindings: [{ binding: "stove", own: "#Stove" }] },
+            { keep: "sleep_in_bed", opens: 22h, closes: 30h, dutyTo: "home", bindings: [{ binding: "bed", own: "#Bed" }] },
+            { keep: "eat_supper", opens: 18h, closes: 21h, dutyTo: "home" }]
+} @family(routines)
+
+// A working day: at the worksite from seven till three, with food packed
+// the hour before; home by one's bed after, and the pack put back by the
+// larder.
+working_day: #Routine & {
+    keeps: [{ keep: "be_at_work", opens: 7h, closes: 15h, dutyTo: "work", bindings: [{ binding: "worksite" }] },
+            { keep: "be_home", opens: 15h, closes: 22h, dutyTo: "home", bindings: [{ binding: "bed", own: "#Bed" }] },
+            { keep: "food_along", opens: 6h, closes: 7h, dutyTo: "work" },
+            { keep: "pack_returned", opens: 15h, closes: 16h, dutyTo: "home",
+              bindings: [{ binding: "home", own: "#Larder" }, { binding: "woodpile", own: "#Woodpile" }] }]
+} @family(routines)
+
+// A farmer's: its plot tended (which, the scenario gives), its seed in the
+// household's larder.
+farmers_day: #Routine & {
+    keeps: [{ keep: "plot_tended", opens: 7h, closes: 15h, dutyTo: "work",
+              bindings: [{ binding: "plot" }, { binding: "larder", own: "#Larder" }] }]
+} @family(routines)
+
+// A woodcutter's: the household's woodpile stocked, a backpack on for the
+// day.
+woodcutters_day: #Routine & {
+    keeps: [{ keep: "woodpile_stocked", opens: 7h, closes: 15h, dutyTo: "work",
+              bindings: [{ binding: "woodpile", own: "#Woodpile" }, { binding: "coffer", own: "coffer" }] },
+            { keep: "pack_worn", opens: 6h, closes: 7h, dutyTo: "work" }]
+} @family(routines)
+
+// A hunter's: game for the household's larder, a backpack on for the day;
+// home from the hunt, a look into the tan pit and the work it shows.
+hunters_day: #Routine & {
+    keeps: [{ keep: "game_hunted", opens: 7h, closes: 15h, dutyTo: "work", bindings: [{ binding: "larder", own: "#Larder" }] },
+            { keep: "pit_seen_to", opens: 16h, closes: 18h, dutyTo: "home", bindings: [{ binding: "pit", own: "#TanPit" }] },
+            { keep: "hides_dressed", opens: 16h, closes: 18h, dutyTo: "home",
+              bindings: [{ binding: "pit", own: "#TanPit" }, { binding: "store", own: "#Larder" }] },
+            { keep: "pack_worn", opens: 6h, closes: 7h, dutyTo: "work" }]
+} @family(routines)
+
+// Evenings, a pouch made of leather bought, for the household's coins.
+pouch_making: #Routine & {
+    keeps: [{ keep: "pouch_made", opens: 16h, closes: 18h, dutyTo: "home",
+              bindings: [{ binding: "store", own: "#Larder" }, { binding: "coffer", own: "coffer" }] }]
+} @family(routines)
+
+// A market day: every fourth, from the third.
+#MarketDay: #Routine & { recurs: 4d, starts: 2d }
+
+// The household's first keeps its stall from nine till noon, what it sells
+// carried there from where it is kept (the scenario gives where, the
+// stall's board, and the hunters' sign for their leather); then takes home
+// what is unsold, and the takings.
+stall_keeping: #MarketDay & {
+    keeps: [{ keep: "pack_carried", opens: 9h, closes: 9h + 30min, dutyTo: "market" },
+            { keep: "stall_kept", opens: 9h, closes: 12h, dutyTo: "market",
+              bindings: [{ binding: "stall", own: "#Stall" }, { binding: "board" }, { binding: "supply" }, { binding: "sign" }] },
+            { keep: "unsold_home", opens: 12h, closes: 13h, dutyTo: "market", bindings: [{ binding: "stall", own: "#Stall" }, { binding: "supply" }] },
+            { keep: "takings_home", opens: 12h, closes: 13h, dutyTo: "market",
+              bindings: [{ binding: "stall", own: "#Stall" }, { binding: "coffer", own: "coffer" }] }]
+} @family(routines)
+
+// Its second goes to market at half past nine, a pack with it.
+going_to_market: #MarketDay & {
+    keeps: [{ keep: "pack_carried", opens: 9h + 30min, closes: 10h, dutyTo: "market" }]
+} @family(routines)
+
+// What a household doesn't make, bought till noon with coins from its
+// coffer, for its larder or its woodpile.
+let larder_stocked = [{ binding: "supply", own: "#Larder" }, { binding: "coffer", own: "coffer" }]
+
+buying_grain: #MarketDay & {
+    keeps: [{ keep: "grain_stocked", opens: 9h + 30min, closes: 12h, dutyTo: "market", bindings: larder_stocked }]
+} @family(routines)
+
+buying_meat: #MarketDay & {
+    keeps: [{ keep: "meat_stocked", opens: 9h + 30min, closes: 12h, dutyTo: "market", bindings: larder_stocked }]
+} @family(routines)
+
+buying_leather: #MarketDay & {
+    keeps: [{ keep: "leather_stocked", opens: 9h + 30min, closes: 12h, dutyTo: "market", bindings: larder_stocked }]
+} @family(routines)
+
+buying_firewood: #MarketDay & {
+    keeps: [{ keep: "firewood_stocked", opens: 9h + 30min, closes: 12h, dutyTo: "market",
+              bindings: [{ binding: "supply", own: "#Woodpile" }, { binding: "coffer", own: "coffer" }] }]
+} @family(routines)
+
+// The coins left in hand taken home to the coffer: through the afternoon,
+// if something keeps it from it at noon.
+coins_taken_home: #MarketDay & {
+    keeps: [{ keep: "coins_home", opens: 12h, closes: 15h, dutyTo: "market", bindings: [{ binding: "coffer", own: "coffer" }] }]
+} @family(routines)
