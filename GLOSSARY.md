@@ -24,7 +24,8 @@ ARCHITECTURE.md, CL = CONTENT_LANGUAGE.md, COM = COMPONENTS.md, DES =
 DESIGN.md, DOM = DOMAIN_SIMULATION.md, DR = DETAIL_REGIMES.md, INS =
 INSTITUTIONS.md, KNO = KNOWLEDGE.md, LAT = LATENT_ASSEMBLY.md, MET =
 METHODS.md, NEG =
-NEGOTIATION.md, REA = REALITY.md, PRF = PERFORMANCE.md, TER = TERRAIN.md,
+NEGOTIATION.md, ORO = OROGEN.md, REA = REALITY.md, PRF = PERFORMANCE.md, TER =
+TERRAIN.md,
 TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
 3; "§3" its numbered section.
 
@@ -760,7 +761,8 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
   room labels, the spatial index, tile stocks, and detail. (TER d5)
 - **Terrain source**: what tells the world a tile's kind: an **authored
   map** (text drawn with a **legend**), a plain fill, later a
-  **generator**. Only **changed chunks** are stored. (TER d4, d5)
+  **generator** (Orogen's, through a **generated map**). Only **changed
+  chunks** are stored. (TER d4, d5; ORO)
 - **Terrain change**: the `setTerrain` proposal. (TER d6)
 - **Doorway**: a tile whose kind `divides`: it joins two rooms and belongs
   to neither. A **door** is an entity standing in one, passing its `wide`
@@ -1014,6 +1016,39 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
   to its events, their causes and its declaration as written), the
   **content** (its files and declarations). (lab/watcher/panes.odin)
 
+## Orogen (proposed)
+
+- **Orogen**: the terrain generator in `orogen/`: from a seed and a
+  tile's position, the ground's elevation and ground class; knows nothing
+  of terrain kinds, the lab or Tessera. Places terrain only. (ORO)
+- **Elevation**: how high the ground stands at a tile, counted in levels:
+  the level of the tile one stands in there. **Relief**: how elevation
+  varies over ground. **Sea level**: the elevation below which ground is
+  water. *Avoid:* height (a thing's own), altitude. (ORO d2, d6)
+- **Ground class**: what Orogen says a cell is (`air`, `earth`, `rock`,
+  `grass`, `sand`, `water`, `ice`), turned into a terrain kind by a
+  generated map's legend. *Avoid:* biome (not designed), terrain kind
+  (content's). (ORO d3)
+- **Generated map**: a map in content that names a generator, its width,
+  height, levels, parameters, whether it **wraps**, and its legend from
+  ground class to terrain kind. (ORO d3)
+- **Wrapping**: a world's x taken modulo its width, so east meets west:
+  the world is a cylinder. **The seam**: where x returns to 0. **The
+  poles**: its north and south ends, which nothing crosses. (ORO d4)
+- **Step up, step down**: a walk between tiles side by side whose ground
+  differs by one level, read from terrain as it is. **Cliff**: a
+  difference of two or more, which nothing walks. *Avoid:* ramp, slope
+  (for the step). (ORO d6)
+- **Planet model**: a planet's large shape, computed whole from the seed
+  and never saved: a grid of **planet cells**, each kilometres across,
+  with plates, elevation, climate and rivers. (ORO d5)
+- **Refiner**: what answers for one tile's column, from the seed, the
+  position and the planet cells around it (seeded noise alone on a small
+  map). (ORO d5)
+- **Climate**: how warm and wet a place is over a year, the planet
+  model's. **Weather**, what the sky does on a day, would be a domain's.
+  (ORO d5)
+
 ## The village (proposed)
 
 - **Plot**: tilled ground a household farms (`#Plot`): an **area**, known
@@ -1200,6 +1235,7 @@ Each row says which term to use for which sense.
 | hypothesis | competing beliefs | **identity hypothesis**; design hypotheses are not domain terms |
 | generalise | memory decay and news, along primary parents | **anti-unify** (`tri_generalize`, structures) |
 | spec | a resolved blueprint | **design doc** |
+| cell | what is stored for a tile | **planet cell** (Orogen's coarse grid) |
 | seed | an entity's seed | **world seed**; a unit's seed (latent); **seed to sow** (`#Seed`), named by what it sows: seed grain, turnip seed |
 | fidelity | how faithfully a route carries news | **detail** (AGENCY.md's "fidelity levels" are levels of detail) |
 | loyalty | a bond's weight | (not a disposition) |

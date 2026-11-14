@@ -197,6 +197,7 @@ floor.
   reach is walked toward by the nearest point found, which a long wall can
   mislead; long journeys want a coarser graph (rooms and doorways, or
   chunks) to plan over first.
-- **Generators.** What a generator is in content (rules, rooms and
-  corridors, noise), and how determinism by seed and chunk meets content
-  that changes.
+- **Generators.** OROGEN.md proposes the generator for open country
+  (elevation and ground class by seed and position) and how a generated
+  map is declared. Still open: what a generator is in content (rules,
+  rooms and corridors), and how a generator meets content that changes.
