@@ -1,4 +1,4 @@
-# Triangle (C), Tessera and the lab (Odin), on macOS and Linux; Triangle on
+# Triangle (C), Tessera, Orogen and the lab (Odin), on macOS and Linux; Triangle on
 # Windows too. What each platform needs is in ci/README.md.
 name: build
 
@@ -18,6 +18,9 @@ jobs:
       - name: Tessera
         if: ${{ !cancelled() }}
         run: make -C tessera test check
+      - name: Orogen
+        if: ${{ !cancelled() }}
+        run: make -C orogen test check
       - name: Lab
         if: ${{ !cancelled() }}
         run: make -C lab check
@@ -33,6 +36,9 @@ jobs:
       - name: Tessera
         if: ${{ !cancelled() }}
         run: docker run --rm -v "$PWD":/repo -w /repo bruggadung make -C tessera test check
+      - name: Orogen
+        if: ${{ !cancelled() }}
+        run: docker run --rm -v "$PWD":/repo -w /repo bruggadung make -C orogen test check
       - name: Lab
         if: ${{ !cancelled() }}
         run: docker run --rm -v "$PWD":/repo -w /repo bruggadung make -C lab check

@@ -9,7 +9,10 @@ what is asked of it, so a planet costs what is explored of it. It places
 terrain only. Biomes, plants, animals and settlements come later, and are
 not designed here.
 
-This document is a proposal. Nothing is built. The name is provisional.
+This document is a proposal. Slice 1, the library, is built in
+[orogen/](orogen/README.md): the Odin package `orogen` and a tool that
+prints a map as text. Nothing in the lab uses it yet. The name is
+provisional.
 
 Three things in the repository shape it:
 
@@ -44,8 +47,9 @@ Three things in the repository shape it:
      stays no goal. It is that unexplored ground is nowhere stored, so the
      generator is its only record.
 3. **Ground classes are Orogen's; terrain kinds are content's.** Orogen
-   names a small set of classes (`air`, `earth`, `rock`, `grass`, `sand`,
-   `water`, `ice`, more as it grows). A generated map in content has a
+   names a small set of classes (`air`, `earth`, `rock`, `water`, `grass`,
+   `sand`, `stone`, more as it grows). Earth, rock and water fill a cell;
+   grass, sand and stone are ground to stand on. A generated map in content has a
    legend from class to terrain kind, as a drawn map has one from
    character to kind (TERRAIN.md decision 4). Orogen never names a
    terrain kind, and content never reaches into Orogen's arithmetic.
@@ -107,8 +111,9 @@ Three things in the repository shape it:
      air with no ground a level below.
    - **Hills hide what is behind them.** Earth and rock are opaque, and
      sight is a straight line through cells in three dimensions.
-   - **Water is a ground class** in the first version: a tile below **sea
-     level** is water, which nothing walks into. Seas and lakes are
+   - **Water is a ground class** in the first version: ground below **sea
+     level** is a seabed, with water in every cell from it up to sea
+     level, which nothing walks into. Seas and lakes are
      terrain, not the fluid domain's tile stocks, which would be a stock
      for every tile of an ocean. Where the two meet is open (below).
    - **The view needs nothing new.** Tessera draws the focus level, and
@@ -131,11 +136,12 @@ Three things in the repository shape it:
 The first three are the first version: a small generated map with relief
 that villagers walk and see across.
 
-1. **The library.** `orogen/`: seeded integer noise, elevation from it,
-   ground classes from elevation (water below sea level, sand beside it,
-   grass, rock high up), width, height and wrapping. Tests: the same
-   answer in any order of asking; a wrapped map's east edge meets its
-   west. A small tool prints a map's classes and elevations as text.
+1. **The library** (built). `orogen/`: seeded integer noise, elevation
+   from it, ground classes from elevation (water below sea level, sand at
+   it, grass, bare stone high up and beside a cliff), width, height and
+   wrapping. Tests: the same answer in any order of asking; a wrapped
+   map's east edge meets its west; a map kept as text that every platform
+   must make again. A small tool prints a map's classes and elevations.
 2. **A generated terrain source in the lab.** The generated map in
    content with its legend; the source and its cache; the world's extent
    and levels from it; saving and the state hash. The watcher shows it.

@@ -1,5 +1,5 @@
 # The whole project from its root: each part has its own Makefile
-# (triangle/, tessera/, lab/), and this one only sends targets to them.
+# (triangle/, tessera/, orogen/, lab/), and this one only sends targets to them.
 #
 #   make              the lab (and Triangle's library, which it links)
 #   make watcher      the watcher: a lab world in a window
@@ -29,13 +29,16 @@ watch: watcher
 test:
 	@$(MAKE) --no-print-directory -C triangle test
 	@$(MAKE) --no-print-directory -C tessera test
+	@$(MAKE) --no-print-directory -C orogen test
 	@$(MAKE) --no-print-directory -C lab test
 
 check:
 	@$(MAKE) --no-print-directory -C triangle test cli-test lsp-test odin
 	@$(MAKE) --no-print-directory -C tessera test check
+	@$(MAKE) --no-print-directory -C orogen test check
 	@$(MAKE) --no-print-directory -C lab check
 
 clean:
 	@$(MAKE) --no-print-directory -C triangle clean
+	@$(MAKE) --no-print-directory -C orogen clean
 	@$(MAKE) --no-print-directory -C lab clean

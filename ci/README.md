@@ -1,6 +1,6 @@
 # Building on each platform
 
-Triangle is C11. Tessera and the lab are Odin, the release pinned here
+Triangle is C11. Tessera, Orogen and the lab are Odin, the release pinned here
 (`install-odin.sh` and `Dockerfile`: change both together). The lab links
 Triangle's C library, which `make -C triangle odin-lib` builds for the
 platform. Every scenario ends in the same state on each platform: `make -C
@@ -8,8 +8,8 @@ lab check` compares them against `lab/ci/scenario-hashes.txt`.
 
 | Platform | What to install | Then |
 | --- | --- | --- |
-| macOS | Xcode's command line tools, and Odin: `sh ci/install-odin.sh` (prints where; put it on PATH) | `make -C triangle test cli-test lsp-test odin`, `make -C tessera test check`, `make -C lab check` |
-| Linux | clang, make, Python 3 and Odin: `Dockerfile` does it, or is the image to build in | `docker build -t bruggadung ci`, then `docker run --rm -v "$PWD":/repo -w /repo bruggadung make -C lab check` (and the same for Triangle with `CC=clang`, and Tessera) |
+| macOS | Xcode's command line tools, and Odin: `sh ci/install-odin.sh` (prints where; put it on PATH) | `make -C triangle test cli-test lsp-test odin`, `make -C tessera test check`, `make -C orogen test check`, `make -C lab check` |
+| Linux | clang, make, Python 3 and Odin: `Dockerfile` does it, or is the image to build in | `docker build -t bruggadung ci`, then `docker run --rm -v "$PWD":/repo -w /repo bruggadung make -C lab check` (and the same for Triangle with `CC=clang`, Tessera and Orogen) |
 | Windows | MSYS2, then `sh ci/windows/setup-msys2.sh` in an MSYS2 shell | Triangle only, in a CLANG64 shell: `make -C triangle CC=clang test cli-test lsp-test` |
 
 `.github/workflows/build.yml` runs all of this on each push.

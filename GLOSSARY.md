@@ -1024,9 +1024,10 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
 - **Elevation**: how high the ground stands at a tile, counted in levels:
   the level of the tile one stands in there. **Relief**: how elevation
   varies over ground. **Sea level**: the elevation below which ground is
-  water. *Avoid:* height (a thing's own), altitude. (ORO d2, d6)
+  a seabed under water. A column's **surface**: its topmost cell that
+  isn't air. *Avoid:* height (a thing's own), altitude. (ORO d2, d6)
 - **Ground class**: what Orogen says a cell is (`air`, `earth`, `rock`,
-  `grass`, `sand`, `water`, `ice`), turned into a terrain kind by a
+  `water`, `grass`, `sand`, `stone`), turned into a terrain kind by a
   generated map's legend. *Avoid:* biome (not designed), terrain kind
   (content's). (ORO d3)
 - **Generated map**: a map in content that names a generator, its width,
