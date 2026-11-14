@@ -18,6 +18,7 @@ import "core:c"
 import "core:fmt"
 import "core:mem"
 import "core:slice"
+import "../../orogen"
 import tri "../../triangle/odin/triangle"
 
 BG_CHUNK :: 32               /* a chunk is BG_CHUNK x BG_CHUNK tiles of one level */
@@ -80,7 +81,28 @@ Flood_Cell :: struct {
 	was: u32,                       /* its label before */
 }
 
+/* A generated map's source (OROGEN.md): Orogen's map, the terrain kind of
+ * each ground class, and the columns of the chunks last asked for. The
+ * columns are kept for speed alone: no part of a save or the state hash. */
+@(private = "file")
+BG_GENERATED_SLOTS :: 256       /* a power of two */
+
+@(private = "file")
+Generated_Chunk :: struct {
+	cx:      i32,
+	cy:      i32,
+	columns: ^[BG_CHUNK * BG_CHUNK]orogen.Column,       /* nil: an empty slot */
+}
+
+@(private = "file")
+Generated :: struct {
+	plan:  orogen.Map,
+	kinds: [orogen.Class]Terrain_Kind,
+	slots: [BG_GENERATED_SLOTS]Generated_Chunk,
+}
+
 Terrain :: struct {
+	generated: ^Generated,          /* or nil: drawn, or the fill */
 	kinds:    [^]Terrain_Info,      /* kinds[ 0] is none */
 	nkinds:   uint,
 	map_:     cstring,
@@ -251,9 +273,115 @@ Drawn_Level :: struct {
 	rows: cstring,
 }
 
+/* A whole number a map gives, or `otherwise`. */
+@(private = "file")
+number_of :: proc(content: ^tri.Content, node: ^tri.Node, path: cstring, otherwise: i64) -> i64 {
+	lo: i64
+	hi: i64
+
+	if tri.node_interval(tri.at(content, node, path), &lo, &hi) == 0 || lo != hi do return otherwise
+	return lo
+}
+
+/* Terrain made by a generated map in content (a #Generated instance,
+ * OROGEN.md): its extent and what shapes its ground are the map's, its seed
+ * the map's or else `seed`, and each ground class the kind its legend
+ * gives. NULL, with the reason, if the map is malformed. */
+@(private = "file")
+terrain_generated :: proc(content: ^tri.Content, node: ^tri.Node, map_: cstring, seed: u64, error: ^string) -> ^Terrain {
+	t: ^Terrain
+	g: ^Generated
+	list: ^tri.Node
+	item: ^tri.Node
+	class: cstring
+	kind: cstring
+	own: i64
+	ok: bool
+
+	t = new_terrain(content, error)
+	if t == nil do return nil
+	t.map_ = dup_string(map_)
+	g = new(Generated)
+	t.generated = g
+	own = number_of(content, node, "seed", 0)
+	g.plan = orogen.Map {
+		seed      = u64(own) if own != 0 else seed,
+		wide      = i32(number_of(content, node, "width", 0)),
+		high      = i32(number_of(content, node, "height", 0)),
+		levels    = i32(number_of(content, node, "tall", 0)),
+		wraps     = is_true(content, node, "wraps"),
+		lowest    = i32(number_of(content, node, "lowest", -1)),
+		sea       = i32(number_of(content, node, "sea", -1)),
+		highest   = i32(number_of(content, node, "highest", -1)),
+		span      = i32(number_of(content, node, "span", 0)),
+		octaves   = i32(number_of(content, node, "octaves", 0)),
+		roughness = i32(number_of(content, node, "roughness", -1)),
+		soil      = i32(number_of(content, node, "soil", -1)),
+		bare      = i32(number_of(content, node, "bare", 0)),
+	}
+	ok = true
+	if fault := orogen.map_fault(g.plan); fault != "" {
+		set_error(error, "%s: %s", map_, fault)
+		ok = false
+	}
+	for list = tri.at(content, node, "legend"); ok && list != nil; list = tri.at(content, list, "rest") {
+		item = tri.at(content, list, "first")
+		if item == nil do break
+		class = text_of(content, item, "class")
+		kind = text_of(content, item, "terrain")
+		c, known := orogen.class_named(string(class))
+		if !known || c == .None {
+			set_error(error, "%s: no ground class named %s", map_, class if class != nil else "")
+			ok = false
+		} else {
+			g.kinds[c] = terrain_kind_named(t, kind)
+			if g.kinds[c] == 0 {
+				set_error(error, "%s: no terrain kind named %s, for %s", map_, kind if kind != nil else "", class)
+				ok = false
+			}
+		}
+		delete(class)
+		delete(kind)
+	}
+	for c in orogen.Class {
+		if ok && c != .None && g.kinds[c] == 0 {
+			set_error(error, "%s: its legend has no terrain kind for %s", map_, orogen.class_name(c))
+			ok = false
+		}
+	}
+	if !ok {
+		terrain_free(t)
+		return nil
+	}
+	t.wide = g.plan.wide
+	t.high = g.plan.high
+	t.levels = g.plan.levels
+	t.fill = g.kinds[.Air]
+	return t
+}
+
+/* The generator of a generated map's terrain: its seed, and the version of
+ * Orogen that makes it; false if the terrain isn't generated. */
+terrain_generator :: proc(t: ^Terrain) -> (seed: u64, version: int, ok: bool) {
+	if t == nil || t.generated == nil do return 0, 0, false
+	return t.generated.plan.seed, orogen.VERSION, true
+}
+
+/* The level one stands at on a tile: of its highest cell that has a floor
+ * and isn't solid; false if it has none, or is outside the extent. */
+terrain_ground_level :: proc(t: ^Terrain, x: i32, y: i32) -> (z: i32, ok: bool) {
+	k: Terrain_Kind
+
+	for z = t.levels - 1; z >= 0; z -= 1 {
+		k = terrain_at(t, x, y, z)
+		if k != 0 && t.kinds[k].floored && !t.kinds[k].solid do return z, true
+	}
+	return 0, false
+}
+
 /* Terrain drawn by a map in content (a #Map instance): its extent is the
  * drawing's. NULL, with the reason, if the map is malformed. */
-terrain_from_map :: proc(content: ^tri.Content, map_: cstring, error: ^string) -> ^Terrain {
+terrain_from_map :: proc(content: ^tri.Content, map_: cstring, seed: u64, error: ^string) -> ^Terrain {
 	node: ^tri.Node
 	list: ^tri.Node
 	item: ^tri.Node
@@ -279,6 +407,7 @@ terrain_from_map :: proc(content: ^tri.Content, map_: cstring, error: ^string) -
 
 	node = tri.spec(content, map_)
 	if node == nil do node = tri.pattern(content, map_)
+	if node != nil && tri.at(content, node, "generator") != nil do return terrain_generated(content, node, map_, seed, error)
 	if node == nil || tri.at(content, node, "levels") == nil {
 		set_error(error, "no map named %s", map_)
 		return nil
@@ -432,6 +561,10 @@ terrain_free :: proc(t: ^Terrain) {
 	free(t.rooms)
 	free(t.free_)
 	free(t.flood)
+	if t.generated != nil {
+		for &slot in t.generated.slots do free(slot.columns)
+		free(t.generated)
+	}
 	delete(t.map_)
 	free(t)
 }
@@ -465,6 +598,17 @@ inside :: #force_inline proc(t: ^Terrain, x: i32, y: i32, z: i32) -> bool {
 /* What the source gives a cell, whatever has changed. */
 terrain_source :: proc(t: ^Terrain, x: i32, y: i32, z: i32) -> Terrain_Kind {
 	if !inside(t, x, y, z) do return 0
+	if t.generated != nil {
+		g := t.generated
+		cx, cy := x / BG_CHUNK, y / BG_CHUNK
+		slot := &g.slots[uint(mix((u64(u32(cx)) << 32) ~ u64(u32(cy)))) & (BG_GENERATED_SLOTS - 1)]
+		if slot.columns == nil || slot.cx != cx || slot.cy != cy {
+			if slot.columns == nil do slot.columns = new([BG_CHUNK * BG_CHUNK]orogen.Column)
+			slot.cx, slot.cy = cx, cy
+			orogen.columns(g.plan, cx * BG_CHUNK, cy * BG_CHUNK, BG_CHUNK, BG_CHUNK, slot.columns[:])
+		}
+		return g.kinds[orogen.cell_of(g.plan, slot.columns[(y % BG_CHUNK) * BG_CHUNK + x % BG_CHUNK], z)]
+	}
 	if t.drawn == nil do return t.fill
 	return t.drawn[(uint(z) * uint(t.high) + uint(y)) * uint(t.wide) + uint(x)]
 }
@@ -655,6 +799,15 @@ terrain_hash :: proc(t: ^Terrain) -> u64 {
 	/* kinds by name: content renumbers them */
 	h = mix(h ~ u64(t.wide) ~ (u64(t.high) << 20) ~ (u64(t.levels) << 40))
 	h = mix_string(h, terrain_kind_name(t, t.fill))
+	if t.generated != nil {      /* what makes the ground: the generator, and all that shapes it */
+		p := t.generated.plan
+		h = mix(h ~ u64(orogen.VERSION))
+		h = mix(h ~ p.seed)
+		for v in ([]i32{i32(p.wraps), p.lowest, p.sea, p.highest, p.span, p.octaves, p.roughness, p.soil, p.bare}) {
+			h = mix(h ~ u64(u32(v)))
+		}
+		for c in orogen.Class do if c != .None do h = mix_string(h, terrain_kind_name(t, t.generated.kinds[c]))
+	}
 	n = terrain_changed(t, nil, 0)
 	if n == 0 do return h
 	corners = make([^][3]i32, n)

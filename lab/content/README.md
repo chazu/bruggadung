@@ -124,7 +124,7 @@ cut: the levels of detail first, then other topics, then code.
 | `rest/` | tiredness, and resting it off |
 | `sawing/` | a log sawn through, its partial cut, its grading |
 | `talk/` | utterances, accounts, a lie; records written and read |
-| `terrain/` | terrain kinds, and the maps (`maps/`, brought in by `@embed`) |
+| `terrain/` | terrain kinds, the drawn maps (`maps/`, brought in by `@embed`), and generated maps |
 | `traces/` | trace kinds, what is read from them, a disturbance investigated |
 | `village/` | the village: its map, its villagers, their beds, larders, woodpiles and worksites |
 | `valves/` | levers, wrenches and pipes; turning a seized valve |

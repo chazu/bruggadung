@@ -9,10 +9,12 @@ what is asked of it, so a planet costs what is explored of it. It places
 terrain only. Biomes, plants, animals and settlements come later, and are
 not designed here.
 
-This document is a proposal. Slice 1, the library, is built in
-[orogen/](orogen/README.md): the Odin package `orogen` and a tool that
-prints a map as text. Nothing in the lab uses it yet. The name is
-provisional.
+This document is a proposal. Slices 1 and 2 are built: the library in
+[orogen/](orogen/README.md) (the Odin package `orogen` and a tool that
+prints a map as text), and the lab's generated terrain source
+(`lab/src/core_terrain.odin`, `hills_map` in
+`lab/content/terrain/terrain.tri`), which the watcher shows (`watcher
+hills`). Nothing walks it yet. The name is provisional.
 
 Three things in the repository shape it:
 
@@ -54,9 +56,10 @@ Three things in the repository shape it:
    character to kind (TERRAIN.md decision 4). Orogen never names a
    terrain kind, and content never reaches into Orogen's arithmetic.
    - A generated map is declared beside the drawn ones
-     (`lab/content/terrain/terrain.tri`): which generator, its width and
-     height in tiles, whether it wraps, its levels, its parameters and its
-     legend. Its seed is the world seed unless it gives one.
+     (`lab/content/terrain/terrain.tri`, `#Generated`): its width and
+     height in tiles, how many levels tall it is, whether it wraps, what
+     shapes its ground, and its legend. Its seed is the world seed unless
+     it gives one. A legend that leaves a ground class out is refused.
 4. **The world is a cylinder.** Tiles are one square grid. With wrapping
    on, x is taken modulo the world's width: walking east returns from the
    west. North and south end at the poles, in ice or sea nothing crosses.
@@ -116,20 +119,23 @@ Three things in the repository shape it:
      level, which nothing walks into. Seas and lakes are
      terrain, not the fluid domain's tile stocks, which would be a stock
      for every tile of an ocean. Where the two meet is open (below).
-   - **The view needs nothing new.** Tessera draws the focus level, and
-     lower levels dimmed through cells with no floor (TESSERA.md,
-     "Levels"). Ground at the focus level is drawn, lower ground shows
-     dimmed, and higher ground is the earth it is made of.
+   - **The view shows what lies below.** Tessera draws the focus level,
+     and through cells with no floor the first level below that has one,
+     dimmer the deeper (TESSERA.md, "Levels"; it was one level below
+     only). Ground at the focus level is drawn, lower ground shows dimmer,
+     and higher ground is the earth it is made of. A truth scene tells
+     light only for the cell of each column that shows.
 7. **Generated chunks are cached, not stored.** Sight and pathfinding ask
    for cells far more often than chunks change. The lab's generated
-   source keeps the columns of the chunks last asked for, up to a bound,
-   and drops the oldest. The cache is no part of a save or the state
+   source keeps the columns of the chunks last asked for, 256 of them,
+   and drops one when another takes its place. The cache is no part of a save or the state
    hash. A chunk is stored, as now, only once something changes in it.
 8. **A save names what made its terrain.** The generator, its version, the
-   seed and the parameters go in the save with the changed chunks. A
-   changed generator would move every unchanged chunk of an old save, so
-   a save whose generator version isn't the build's is refused, until
-   there is a reason to do better.
+   seed and the map's name go in the save with the changed chunks; what
+   shapes the ground is the map's, in content, whose hash a save already
+   names. A changed generator would move every unchanged chunk of an old
+   save, so a save whose generator version isn't the build's is refused,
+   until there is a reason to do better.
 
 ## Slices
 
@@ -142,9 +148,11 @@ that villagers walk and see across.
    wrapping. Tests: the same answer in any order of asking; a wrapped
    map's east edge meets its west; a map kept as text that every platform
    must make again. A small tool prints a map's classes and elevations.
-2. **A generated terrain source in the lab.** The generated map in
-   content with its legend; the source and its cache; the world's extent
-   and levels from it; saving and the state hash. The watcher shows it.
+2. **A generated terrain source in the lab** (built). The generated map
+   in content with its legend (`hills_map`); the source and its cache; the
+   world's extent and levels from it; saving and the state hash; the level
+   one stands at on a tile. The watcher shows it (`watcher hills [seed]`),
+   opening at the level of the ground at its middle.
 3. **Walking and seeing relief.** Steps up and down in pathfinding and in
    the walk; sight through cells in three dimensions; an agent's terrain
    memory across levels. A scenario: a walk over a hill, and something
@@ -167,10 +175,11 @@ that villagers walk and see across.
   sight, the reality bubble's `up` and `down`, and a scene's range of
   levels were sized for buildings. The first version keeps relief within
   64 levels.
-- **A surface view.** On a steep slope the focus level shows a thin band
-  of ground. A view that follows the ground (each tile drawn at its own
-  elevation, shaded by height) may read better outdoors, and is a
-  backend's choice (TESSERA.md, "Levels").
+- **A view that follows the ground.** From one focus level, relief reads
+  only as lower ground being dimmer, and higher ground is cut through as
+  earth. A view with each tile drawn at its own elevation, shaded by
+  height or with contours, would read better outdoors, and is a backend's
+  choice (TESSERA.md, "Levels").
 - **Water as terrain and water as stock.** Where a sea meets a bucket, a
   ditch dug to the shore, or rain. Rivers that flow.
 - **Long journeys.** Pathfinding is bounded (TERRAIN.md, "what lets

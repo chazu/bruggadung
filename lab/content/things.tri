@@ -28,7 +28,7 @@
 // What things are made of, and the colours they come in: hierarchies, so a
 // memory loses detail along them (KNOWLEDGE.md §12): an oak chest is
 // remembered as wooden, then as made of something.
-#Material: "metal" | "wood" | "flesh" | "paper" | "food" | "cloth" | "rubber" | "stone" | "leather" | "earth" | "plant" | "rot"
+#Material: "metal" | "wood" | "flesh" | "paper" | "food" | "cloth" | "rubber" | "stone" | "leather" | "earth" | "plant" | "rot" | "water"
 "metal":   "iron" | "brass" | "steel"
 "wood":    "oak" | "birch"
 "plant":   "grain" | "turnip" | "wicker"

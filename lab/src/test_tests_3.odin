@@ -3744,6 +3744,7 @@ ALL_TESTS := [?]Test_Case{
 	{"servicing",                     test_servicing},
 	{"diligence",                     test_diligence},
 	{"terrain",                       test_terrain},
+	{"generated",                     test_generated},
 	{"sight_and_memory",              test_sight_and_memory},
 	{"rooms",                         test_rooms},
 	{"air_follows_terrain",           test_air_follows_terrain},

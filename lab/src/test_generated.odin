@@ -1,0 +1,154 @@
+package lab
+
+/*
+ * A generated map (OROGEN.md slice 2, content/terrain/terrain.tri's
+ * hills_map): the world's terrain is what Orogen makes from the world seed,
+ * each ground class the kind the map's legend gives; a column is earth and
+ * rock, its ground, and air over it; a change is stored and saved as on a
+ * drawn map, and nothing else of the ground is; a save says what generated
+ * it, and one that another seed or another Orogen made is refused; a truth
+ * scene shows it.
+ */
+
+import "core:fmt"
+import "core:strings"
+
+import "../../orogen"
+import "../../tessera"
+
+
+test_generated :: proc() {
+	st:    Stage
+	g:     ^Proposal_Group
+	error: string
+
+	st.w = test_world(7)
+	bg_check(world_set_terrain_map(st.w, "hills_map", &error))
+	if error != "" do return
+	t := world_terrain(st.w)
+	bg_check(world_tiles_wide(st.w) == 256 && world_tiles_high(st.w) == 256 && world_levels(st.w) == 32)
+	seed, version, generated := terrain_generator(t)
+	bg_check(generated && seed == 7 && version == orogen.VERSION)
+
+	/* every cell is the kind its ground class has in the legend; over the
+	 * map there is sea, shore, grass and stone */
+	plan := orogen.map_make(7, 256, 256)
+	kind_of := [orogen.Class]string {
+		.None  = "",
+		.Air   = "open_air",
+		.Earth = "soil",
+		.Rock  = "bedrock",
+		.Water = "sea",
+		.Grass = "grass",
+		.Sand  = "sand",
+		.Stone = "bare_stone",
+	}
+	seen: [orogen.Class]int
+	wrong := 0
+	for y: i32 = 0; y < 256; y += 5 {
+		for x: i32 = 0; x < 256; x += 3 {
+			c, _ := orogen.column(plan, x, y)
+			seen[c.class] += 1
+			for z: i32 = 0; z < 32; z += 1 {
+				if test_terrain_kind(st.w, x, y, z) != kind_of[orogen.cell(plan, x, y, z)] do wrong += 1
+			}
+			/* one stands on the ground; on the sea, nowhere */
+			level, stands := terrain_ground_level(t, x, y)
+			if stands != (c.class != .Water) || (stands && level != c.elevation) do wrong += 1
+		}
+	}
+	bg_check(wrong == 0)
+	bg_check(seen[.Water] > 0 && seen[.Sand] > 0 && seen[.Grass] > 0 && seen[.Stone] > 0)
+	/* past its edges, and over its levels, nothing */
+	bg_check(terrain_at(t, 256, 0, 0) == 0 && terrain_at(t, 0, -1, 0) == 0 && terrain_at(t, 0, 0, 32) == 0)
+	/* asked again after many other chunks have been (more than are kept),
+	 * the first is as it was */
+	first := terrain_at(t, 1, 1, 10)
+	for cy: i32 = 0; cy < 8; cy += 1 do for cx: i32 = 0; cx < 8; cx += 1 do terrain_at(t, cx * 32, cy * 32, 0)
+	bg_check(terrain_at(t, 1, 1, 10) == first)
+	/* nothing has changed, so nothing is stored */
+	bg_check(terrain_changed(t, nil, 0) == 0)
+	hash := world_state_hash(st.w)
+
+	/* another seed is other ground, and another hash; the same seed, the same */
+	other := test_world(8)
+	bg_check(world_set_terrain_map(other, "hills_map", &error))
+	differs := 0
+	for x: i32 = 0; x < 256; x += 1 {
+		if world_ground_level(other, x, 100) != world_ground_level(st.w, x, 100) do differs += 1
+	}
+	bg_check(differs > 50 && world_state_hash(other) != hash)
+	again := test_world(7)
+	bg_check(world_set_terrain_map(again, "hills_map", &error) && world_state_hash(again) == hash)
+
+	/* a change by commitment: a wall built on the ground; its chunk is the
+	 * one stored */
+	x, y: i32
+	z: i32
+	found := false
+	for y = 40; y < 200 && !found; y += 1 {
+		for x = 40; x < 200 && !found; x += 1 {
+			level, stands := terrain_ground_level(t, x, y)
+			if stands do z, found = level, true
+		}
+	}
+	x, y = x - 1, y - 1
+	bg_check(found)
+	st.c = test_committer(st.w)
+	st.s = autorelease(scheduler_init_with_world(st.w, st.c))
+	g = proposal_group_group_with_phase(.System, "setup: a wall on the hill")
+	proposal_group_set_terrain(g, "stone_wall", on_tile(x, y, z))
+	committer_submit(st.c, g)
+	scheduler_run_until(st.s, time_make(1))
+	bg_check(proposal_group_applied(g) && test_terrain_kind(st.w, x, y, z) == "stone_wall")
+	bg_check(terrain_changed(t, nil, 0) == 1 && world_state_hash(st.w) != hash)
+	level, _ := terrain_ground_level(t, x, y)
+	bg_check(level != z)                      /* the wall fills where one stood */
+
+	/* saved: the map, what generated it, and the one chunk; restored, the same */
+	hash = world_state_hash(st.w)
+	text := save(st.w, st.c, nil)
+	bg_check(ns_contains(text, "terrain hills_map\n"))
+	bg_check(ns_contains(text, fmt.tprintf("terrain-generator orogen %d 7\n", orogen.VERSION)))
+	bg_check(len(ns_components_separated(text, "terrain-chunk ")) == 2)
+	error = ""
+	c: ^Committer
+	w := test_restore(text, world_content_build(st.w), &c, &error)
+	bg_check(w != nil && world_state_hash(w) == hash && test_terrain_kind(w, x, y, z) == "stone_wall" &&
+	         world_tiles_wide(w) == 256 && world_levels(w) == 32)
+	/* a save another Orogen made, or another seed: not this ground */
+	older, _ := strings.replace(text, fmt.tprintf("terrain-generator orogen %d 7", orogen.VERSION),
+	                            "terrain-generator orogen 0 7", 1, context.temp_allocator)
+	error = ""
+	bg_check(test_restore(older, world_content_build(st.w), &c, &error) == nil && ns_contains(error, "generated by orogen 0"))
+	elsewhere, _ := strings.replace(text, fmt.tprintf("terrain-generator orogen %d 7", orogen.VERSION),
+	                                fmt.tprintf("terrain-generator orogen %d 9", orogen.VERSION), 1,
+	                                context.temp_allocator)
+	error = ""
+	bg_check(test_restore(elsewhere, world_content_build(st.w), &c, &error) == nil && ns_contains(error, "another seed"))
+
+	/* a truth scene of it: each cell looks as its kind, and air is open */
+	focus := world_ground_level(again, 128, 128)
+	s := scene_truth(again, {x0 = 120, y0 = 120, w = 16, h = 16, z0 = 0, z1 = focus, focus = focus}, 1,
+	                 context.temp_allocator)
+	bg_check(s != nil && s.extent.z0 == 0 && s.extent.z1 == focus)
+	if s != nil {
+		wrong = 0
+		for sy: i32 = 120; sy < 136; sy += 1 {
+			for sx: i32 = 120; sx < 136; sx += 1 {
+				for sz: i32 = 0; sz <= focus; sz += 1 {
+					cell := tessera.cell_at(s, sx, sy, sz)
+					info := terrain_kind_info(world_terrain(again), terrain_at(world_terrain(again), sx, sy, sz))
+					if cell == nil || tessera.look_name(s, cell.terrain) != string(info.look) do wrong += 1
+					if cell != nil && (.Open in cell.flags) != (string(info.name) == "open_air") do wrong += 1
+				}
+			}
+		}
+		bg_check(wrong == 0)
+	}
+
+	/* a map whose legend leaves a class out, or that can't be made, is refused */
+	bad := test_world(7)
+	error = ""
+	bg_check(!world_set_terrain_map(bad, "no_such_map", &error) && ns_contains(error, "no map named"))
+}

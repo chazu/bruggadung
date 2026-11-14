@@ -123,7 +123,7 @@ cells_of_a_column :: proc(t: ^testing.T) {
 				testing.expect_value(t, k, orogen.Class.Air)
 			}
 		}
-		testing.expect_value(t, orogen.cell(m, x, y, orogen.surface(m, c) + 1), orogen.Class.Air)
+		testing.expect_value(t, orogen.cell(m, x, y, orogen.top(m, c) + 1), orogen.Class.Air)
 		if east, ok := orogen.elevation(m, x + 1, y); ok {
 			d := abs(east - c.elevation)
 			if d == 1 do steps += 1

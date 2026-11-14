@@ -760,7 +760,7 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
 - **Chunk**: 32 by 32 tiles on one level: the unit of terrain storage,
   room labels, the spatial index, tile stocks, and detail. (TER d5)
 - **Terrain source**: what tells the world a tile's kind: an **authored
-  map** (text drawn with a **legend**), a plain fill, later a
+  map** (text drawn with a **legend**), a plain fill, or a
   **generator** (Orogen's, through a **generated map**). Only **changed
   chunks** are stored. (TER d4, d5; ORO)
 - **Terrain change**: the `setTerrain` proposal. (TER d6)
@@ -1024,15 +1024,16 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
 - **Elevation**: how high the ground stands at a tile, counted in levels:
   the level of the tile one stands in there. **Relief**: how elevation
   varies over ground. **Sea level**: the elevation below which ground is
-  a seabed under water. A column's **surface**: its topmost cell that
-  isn't air. *Avoid:* height (a thing's own), altitude. (ORO d2, d6)
+  a seabed under water. A column's **top**: its topmost cell that isn't
+  air (not **surface**, a body's field). *Avoid:* height (a thing's own), altitude. (ORO d2, d6)
 - **Ground class**: what Orogen says a cell is (`air`, `earth`, `rock`,
   `water`, `grass`, `sand`, `stone`), turned into a terrain kind by a
   generated map's legend. *Avoid:* biome (not designed), terrain kind
   (content's). (ORO d3)
-- **Generated map**: a map in content that names a generator, its width,
-  height, levels, parameters, whether it **wraps**, and its legend from
-  ground class to terrain kind. (ORO d3)
+- **Generated map**: a map in content (`#Generated`) that names a
+  generator, its width and height, how many levels **tall** it is, what
+  shapes its ground, whether it **wraps**, and its legend from ground
+  class to terrain kind. (ORO d3)
 - **Wrapping**: a world's x taken modulo its width, so east meets west:
   the world is a cylinder. **The seam**: where x returns to 0. **The
   poles**: its north and south ends, which nothing crosses. (ORO d4)

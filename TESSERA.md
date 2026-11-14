@@ -201,9 +201,10 @@ A backend draws in this order:
 6. Annotations.
 7. The backend's own interface.
 
-**Levels.** The focus level is drawn in full. A level below shows, dimmed,
-through cells of the focus level that have no floor (open air, a stairwell,
-a hole). Levels above are hidden. Moving the focus up or down is the
+**Levels.** The focus level is drawn in full. Through cells with no floor
+(open air, a stairwell, a hole) the first level below that has one shows,
+dimmer the deeper, as far down as the backend looks (the raylib viewer:
+16 levels). Levels above are hidden. Moving the focus up or down is the
 viewer's own business and changes nothing in the simulation. The model
 assumes no projection: a backend may draw top-down (the first one) or
 isometric later.

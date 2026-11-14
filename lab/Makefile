@@ -40,17 +40,17 @@ all: $(LAB)
 triangle:
 	@$(MAKE) -s --no-print-directory -C $(TRIANGLE) odin-lib
 
-$(LAB): $(wildcard src/*.odin) $(wildcard ../tessera/*.odin) | triangle
+$(LAB): $(wildcard src/*.odin) $(wildcard ../tessera/*.odin ../orogen/*.odin) | triangle
 	@mkdir -p $(BUILD)
 	$(ODIN) build src $(FLAGS) -out:$@
 
-$(CHECKED): $(wildcard src/*.odin) $(wildcard ../tessera/*.odin) | triangle
+$(CHECKED): $(wildcard src/*.odin) $(wildcard ../tessera/*.odin ../orogen/*.odin) | triangle
 	@mkdir -p $(BUILD)/speed
 	$(ODIN) build src $(FLAGS) -o:speed -out:$@
 
 watcher: $(WATCHER)
 
-$(WATCHER): $(wildcard watcher/*.odin src/*.odin ../tessera/*.odin ../tessera/raylib/*.odin) | triangle
+$(WATCHER): $(wildcard watcher/*.odin src/*.odin ../tessera/*.odin ../tessera/raylib/*.odin ../orogen/*.odin) | triangle
 	@mkdir -p $(BUILD)
 	$(ODIN) build watcher $(FLAGS) -out:$@
 

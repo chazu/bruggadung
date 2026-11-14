@@ -4,7 +4,7 @@
 //          [--at X,Y] [--size W,H]
 //
 // Prints the whole map, or the `--size` tiles from `--at`; with
-// `--elevations`, each tile's surface level in place of its ground class.
+// `--elevations`, each tile's top level in place of its ground class.
 package main
 
 import "core:fmt"

@@ -603,7 +603,7 @@ test_terrain :: proc() {
 	/* a world with no map: open floor, 32 x 32, one level; nothing past it */
 	st.w = test_world(7)
 	t    = world_terrain(st.w)
-	bg_check(t != nil && terrain_kind_count(t) == 9 && test_terrain_kind(st.w, 0, 0, 0) == "open_floor")
+	bg_check(t != nil && terrain_kind_count(t) == 14 && test_terrain_kind(st.w, 0, 0, 0) == "open_floor")
 	bg_check(world_tiles_wide(st.w) == 32 && world_tiles_high(st.w) == 32 && world_levels(st.w) == 1)
 	bg_check(terrain_at(t, 32, 0, 0) == 0 && terrain_solid(t, -1, 0, 0) && !terrain_solid(t, 5, 5, 0))
 	bg_check(terrain_changed(t, nil, 0) == 0)

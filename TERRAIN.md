@@ -52,7 +52,8 @@ and costs nothing per tile that serves no purpose.
    world asks its terrain source what a cell is:
    - an authored map (step 1);
    - a plain fill, for a world with no map;
-   - later, a generator, seeded from the world's seed and the chunk.
+   - a generator, seeded from the world's seed (OROGEN.md; built for
+     open country).
 
    Terrain is chunked, 32 x 32 tiles of one level per chunk. A chunk is
    stored only once something changes in it, as a copy of what the source

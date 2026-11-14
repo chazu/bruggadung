@@ -28,6 +28,7 @@ make gen                                 # regenerate src/components.odin from c
 make watcher && ./build/<platform>/watcher crowd 40   # a world in a window: 40 workers on the yard (also cistern, marked-nail, ...)
 ./build/<platform>/watcher village --knows             # the village as a villager knows it (k: the truth, or back)
 ./build/<platform>/watcher village --pane log          # the panel's panes: 1 inspect, 2 the log, 3 the content (--open forage: a declaration)
+./build/<platform>/watcher hills 7                     # generated country (OROGEN.md), from seed 7; PgUp PgDn change the level looked at
 ```
 
 `make check` compares each scenario's hashes with

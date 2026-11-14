@@ -31,7 +31,7 @@ Watcher :: struct {
 	ids:       []Entity_ID,      // the watcher deletes it
 }
 
-WATCHABLE :: "village, crowd [agents], spread [agents], cistern, cistern-b, cistern-d, cistern-e, " +
+WATCHABLE :: "village, crowd [agents], spread [agents], hills [seed], cistern, cistern-b, cistern-d, cistern-e, " +
              "marked-nail, marked-nail-a, marked-nail-b"
 
 
@@ -68,6 +68,14 @@ watcher_open :: proc(name: string, agents: i32) -> (w: Watcher, why: string) {
 			follow    = ids[0],
 			ids       = ids,
 		}, ""
+	case name == "hills":
+		/* generated country (OROGEN.md), with nobody in it yet: `agents` is its seed */
+		world := test_world(u64(agents))
+		if world == nil do return {}, "no world"
+		if !world_set_terrain_map(world, "hills_map", &why) do return {}, why
+		world_set_time(world, time_make(12 * 3_600_000))      /* noon: nothing there passes the time */
+		scheduler := autorelease(scheduler_init_with_world(world, test_committer(world)))
+		return Watcher{title = fmt.aprintf("hills, seed %d", agents), world = world, scheduler = scheduler}, ""
 	case strings.has_prefix(name, "cistern"):
 		variant: Cistern_Variant
 		switch name {

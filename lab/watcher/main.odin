@@ -7,7 +7,7 @@
  *   watcher [-C contentdir] <what> [agents] [--from hours] [--knows] [--pane log|content]
  *           [--open declaration] [--shot file.png]
  *
- * <what> is one of lab.WATCHABLE. In the window:
+ * <what> is one of lab.WATCHABLE (for `hills`, the number is its seed). In the window:
  *
  *   space        pause, or go on          .  one boundary
  *   [  ]         slower, faster           f  follow the one selected, or stop
@@ -125,7 +125,8 @@ main :: proc() {
 	}
 	world := w.world
 	levels := lab.world_levels(world)
-	v := view.viewer_make({f32(lab.world_tiles_wide(world)) / 2, f32(lab.world_tiles_high(world)) / 2}, 0,
+	centre := [2]i32{lab.world_tiles_wide(world), lab.world_tiles_high(world)} / 2
+	v := view.viewer_make({f32(centre.x), f32(centre.y)}, lab.world_ground_level(world, centre.x, centre.y),
 	                      {0, levels - 1})
 	v.selected = u64(w.follow)
 	panes := Panes{pane = pane}

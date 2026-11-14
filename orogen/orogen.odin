@@ -134,7 +134,8 @@ columns :: proc(m: Map, x0, y0, w, h: i32, out: []Column) {
 	assert(w >= 0 && h >= 0 && len(out) >= int(w) * int(h))
 	if w == 0 || h == 0 do return
 	W, H := int(w) + 2, int(h) + 2
-	rises := make([]i32, W * H, context.temp_allocator)
+	few: [34 * 34]i32 // a chunk and the tiles round it: no allocation
+	rises := few[:W * H] if W * H <= len(few) else make([]i32, W * H, context.temp_allocator)
 	OUT :: min(i32)
 	for j in 0 ..< H do for i in 0 ..< W {
 		x, ok := place(m, x0 + i32(i) - 1, y0 + i32(j) - 1)
@@ -175,9 +176,9 @@ cell :: proc(m: Map, x, y, z: i32) -> Class {
 	return cell_of(m, c, z) if ok else .None
 }
 
-// The level of a column's topmost cell that isn't air: the ground, or the
-// water's surface.
-surface :: proc(m: Map, c: Column) -> i32 {
+// A column's top: the level of its topmost cell that isn't air: the ground,
+// or the water over a seabed.
+top :: proc(m: Map, c: Column) -> i32 {
 	return m.sea - 1 if c.class == .Water else c.elevation
 }
 

@@ -8,7 +8,8 @@ the focus level, and selecting a mark. It knows nothing of what a scene came
 from. Running a simulation, and what a selected mark is, are the caller's.
 
 The draw order is TESSERA.md's: terrain, fluid, marks by stack order, then
-light and memory; levels below show, dimmed, through cells with no floor. In
+light and memory; levels below show, dimmer the deeper, through cells with no
+floor. In
 a knowledge scene a tile never seen is black, one remembered (not in sight)
 is dimmed by its age, and a mark believed gone isn't drawn. Overlays and
 annotations aren't drawn yet (slice 5).
@@ -30,6 +31,7 @@ Viewer :: struct {
 	tile:     f32,             // px a tile is drawn
 	focus:    i32,             // the level looked at
 	levels:   [2]i32,          // the levels there are, inclusive: the focus stays in them
+	depth:    i32,             // how many levels below the focus show through open cells
 	selected: u64,             // a mark's id, or 0
 	shade:    bool,            // darken by light
 	panel:    i32,             // px wide at most, the panel on the right
@@ -38,7 +40,8 @@ Viewer :: struct {
 }
 
 viewer_make :: proc(centre: [2]f32, focus: i32, levels: [2]i32) -> Viewer {
-	return Viewer{centre = centre, tile = 22, focus = focus, levels = levels, shade = true, panel = 380, share = 0.4}
+	return Viewer{centre = centre, tile = 22, focus = focus, levels = levels, depth = 16, shade = true, panel = 380,
+	              share = 0.4}
 }
 
 viewer_free :: proc(v: ^Viewer) {
@@ -55,8 +58,8 @@ panel_width :: proc(v: ^Viewer) -> i32 {
 	return min(v.panel, i32(f32(rl.GetScreenWidth()) * v.share))
 }
 
-// The tiles in view, a tile round them, and the focus level with the one
-// below it: the extent to ask a producer for.
+// The tiles in view, a tile round them, and the focus level with the
+// `depth` levels below it: the extent to ask a producer for.
 viewer_extent :: proc(v: ^Viewer) -> tessera.Extent {
 	pane := map_pane(v)
 	half := [2]f32{pane.width, pane.height} / (2 * v.tile)
@@ -65,7 +68,7 @@ viewer_extent :: proc(v: ^Viewer) -> tessera.Extent {
 	return tessera.Extent {
 		x0 = x0, y0 = y0,
 		w = i32(2 * half.x) + 3, h = i32(2 * half.y) + 3,
-		z0 = max(v.focus - 1, v.levels[0]), z1 = v.focus,
+		z0 = max(v.focus - v.depth, v.levels[0]), z1 = v.focus,
 		focus = v.focus,
 	}
 }
@@ -108,7 +111,8 @@ viewer_input :: proc(v: ^Viewer, s: ^tessera.Scene) -> bool {
 	mouse := rl.GetMousePosition()
 	if s == nil || !rl.IsMouseButtonPressed(.LEFT) || mouse.x >= map_pane(v).width do return false
 	t := tile_at(v, mouse)
-	on := marks_on(s, t.x, t.y, v.focus, context.temp_allocator)
+	_, shown, _ := shown_at(s, t.x, t.y, v.focus)
+	on := marks_on(s, t.x, t.y, shown, context.temp_allocator)
 	before := v.selected
 	if len(on) == 0 {
 		v.selected = 0
@@ -142,14 +146,16 @@ viewer_draw :: proc(v: ^Viewer, s: ^tessera.Scene, theme: ^Theme, header, panel:
 	pane := map_pane(v)
 	if s != nil do draw_map(v, s, theme)
 	if v.selected != 0 && s != nil {
-		if m := tessera.mark_find(s, v.selected); m != nil && m.z == v.focus {
+		if m := tessera.mark_find(s, v.selected); m != nil {
 			for m.holder != 0 {             // held: its holder's tile shows it
 				h := tessera.mark_find(s, m.holder)
 				if h == nil do break
 				m = h
 			}
-			o := tile_origin(v, m.x, m.y)
-			rl.DrawRectangleLinesEx({o.x - 1, o.y - 1, v.tile + 2, v.tile + 2}, 2, {255, 220, 80, 255})
+			if _, shown, _ := shown_at(s, m.x, m.y, v.focus); m.z == shown {
+				o := tile_origin(v, m.x, m.y)
+				rl.DrawRectangleLinesEx({o.x - 1, o.y - 1, v.tile + 2, v.tile + 2}, 2, {255, 220, 80, 255})
+			}
 		}
 	}
 	y: f32 = 6
@@ -179,18 +185,11 @@ draw_map :: proc(v: ^Viewer, s: ^tessera.Scene, theme: ^Theme) {
 	for y in e.y0 ..< e.y0 + e.h {
 		for x in e.x0 ..< e.x0 + e.w {
 			o := tile_origin(v, x, y)
-			c := tessera.cell_at(s, x, y, v.focus)
+			c, z, dim := shown_at(s, x, y, v.focus)
 			if c == nil do continue
 			if knowing && c.seen < 0 {   // never seen: nothing known of it
 				rl.DrawRectangleV(o, {v.tile, v.tile}, {0, 0, 0, 255})
 				continue
-			}
-			z := v.focus
-			dim: f32 = 1
-			if .Open in c.flags {        // no floor: the level below, dimmed
-				if below := tessera.cell_at(s, x, y, v.focus - 1); below != nil && (!knowing || below.seen >= 0) {
-					c, z, dim = below, v.focus - 1, 0.45
-				}
 			}
 			g := theme_glyph(theme, tessera.look_name(s, c.terrain))
 			if c.fluid > 0 {
@@ -219,6 +218,24 @@ draw_map :: proc(v: ^Viewer, s: ^tessera.Scene, theme: ^Theme) {
 			if shown > 1 do rl.DrawRectangleV(o + {v.tile - 4, 1}, {3, 3}, scale({255, 255, 255, 255}, dim))
 		}
 	}
+}
+
+// The cell a tile shows from the focus level, its level, and how dim: the
+// focus level's, or through cells with no floor the first below that has
+// one (in a knowledge scene, that is known of), dimmer the deeper. nil if
+// the tile isn't in the scene.
+@(private)
+shown_at :: proc(s: ^tessera.Scene, x, y, focus: i32) -> (c: ^tessera.Cell, z: i32, dim: f32) {
+	c, z, dim = tessera.cell_at(s, x, y, focus), focus, 1
+	if c == nil do return
+	knowing := s.meta.view == .Knowledge
+	for (.Open in c.flags) && (!knowing || c.seen >= 0) {
+		below := tessera.cell_at(s, x, y, z - 1)
+		if below == nil || (knowing && below.seen < 0) do break
+		c, z = below, z - 1
+		dim = 0.7 if z == focus - 1 else max(dim * 0.95, 0.3)
+	}
+	return
 }
 
 // How bright a tile remembered is, seen `age` ms ago: half, fading to a

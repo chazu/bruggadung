@@ -12,6 +12,11 @@ tiles_grass:    #Glyph & { theme: "tiles", look: "ground.grass", char: ",", ink:
 tiles_tilled:   #Glyph & { theme: "tiles", look: "ground.tilled", char: "≈", ink: [150, 108, 62], ground: [44, 30, 18] } @family(glyphs)
 tiles_woodland: #Glyph & { theme: "tiles", look: "ground.woodland", char: "\"", ink: [58, 112, 52], ground: [12, 26, 12] } @family(glyphs)
 tiles_path:     #Glyph & { theme: "tiles", look: "ground.path", char: ".", ink: [156, 136, 102], ground: [42, 36, 26] } @family(glyphs)
+tiles_sand:     #Glyph & { theme: "tiles", look: "ground.sand", char: ".", ink: [200, 178, 120], ground: [70, 60, 38] } @family(glyphs)
+tiles_stone:    #Glyph & { theme: "tiles", look: "ground.stone", char: "^", ink: [150, 150, 146], ground: [50, 50, 50] } @family(glyphs)
+tiles_earth:    #Glyph & { theme: "tiles", look: "mass.earth", char: "%", ink: [96, 72, 48], ground: [52, 38, 24] } @family(glyphs)
+tiles_rock:     #Glyph & { theme: "tiles", look: "mass.rock", char: "%", ink: [104, 104, 104], ground: [60, 60, 62] } @family(glyphs)
+tiles_water:    #Glyph & { theme: "tiles", look: "water", char: "~", ink: [96, 150, 230], ground: [18, 44, 96] } @family(glyphs)
 
 tiles_thing:     #Glyph & { theme: "tiles", look: "thing", char: "?", ink: [200, 200, 200] } @family(glyphs)
 tiles_body:      #Glyph & { theme: "tiles", look: "body", char: "o", ink: [200, 190, 170] } @family(glyphs)

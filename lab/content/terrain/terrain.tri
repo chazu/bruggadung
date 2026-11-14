@@ -9,7 +9,11 @@
 //            (hunting/): at the market on the green, crouched still, it is
 //            seen.
 // - code:    src/core_terrain.odin; a map's levels are files in maps/,
-//            brought in by @embed (a path from this directory).
+//            brought in by @embed (a path from this directory). A
+//            generated map's ground is Orogen's (orogen/, OROGEN.md): this
+//            file says how large the map is, what shapes its ground and
+//            which terrain kind each ground class is; the arithmetic from a
+//            seed and a tile to an elevation and a ground class is code.
 
 package terrain
 
@@ -51,16 +55,29 @@ grass:       #Terrain & { exposed: true, madeOf: "earth", look: "ground.grass" }
 tilled_soil: #Terrain & { exposed: true, madeOf: "earth", look: "ground.tilled" } @family(terrain)
 woodland:    #Terrain & { madeOf: "earth", look: "ground.woodland" } @family(terrain)
 dirt_path:   #Terrain & { exposed: true, madeOf: "earth", look: "ground.path" } @family(terrain)
+// generated country (OROGEN.md): sand at the water's edge, and bare stone
+// high up and at a cliff, to stand on; the earth and the rock beneath the
+// ground, which fill their cells; the sea, which nothing walks into
+sand:        #Terrain & { exposed: true, madeOf: "earth", look: "ground.sand" } @family(terrain)
+bare_stone:  #Terrain & { exposed: true, madeOf: "stone", look: "ground.stone" } @family(terrain)
+soil:        #Terrain & { solid: true, opaque: true, madeOf: "earth", look: "mass.earth" } @family(terrain)
+bedrock:     #Terrain & { solid: true, opaque: true, madeOf: "stone", look: "mass.rock" } @family(terrain)
+sea:         #Terrain & { solid: true, madeOf: "water", look: "water" } @family(terrain)
 
 // A map: its levels drawn in characters, a level to a file brought in by
 // @embed; its legend, a terrain kind for each character; and the kind of
 // the cells a drawing leaves out (past a short row's end, a level not
 // drawn). The world is as wide as the longest row, or `width` if more; as
 // long as the most rows, or `height`; and as deep as the highest level.
-#MapKey:   { glyph: text, terrain: text }
+//
+// A map of either sort, drawn or generated (below), has a legend, each key
+// of it naming a terrain kind, and a width and height in tiles.
+#Key:      { terrain: text }
+#AnyMap:   { legend: _, width: int & >=0, height: int & >=0 }
+#MapKey:   #Key & { glyph: text }
 #MapLevel: { z: int & >=0 & <=63, rows: text }
-#Map:      { legend: [...#MapKey], levels: [...#MapLevel], fill: text, width: *0 | int & >=0 & <=4096,
-             height: *0 | int & >=0 & <=4096 }
+#Map:      #AnyMap & { legend: [...#MapKey], levels: [...#MapLevel], fill: text, width: *0 | int & >=0 & <=4096,
+                       height: *0 | int & >=0 & <=4096 }
 
 // A shed of stone with a plank floor, a doorway in its east wall, and a
 // path of open ground beyond; past the drawing's short rows, open ground too.
@@ -106,4 +123,46 @@ plain_map: #Map & {
     fill:   "open_floor"
     width:  1024
     height: 1024
+}
+
+// A generated map (OROGEN.md): no drawing, but what Orogen makes from a
+// seed. Its `width` and `height` are in tiles, and it is `tall` so many
+// levels; with `wraps`, its ground runs unbroken from its east edge to its
+// west. Its `seed` is the world seed unless it gives one. Its ground stands
+// from `lowest` to `highest`, under water below `sea`, and bare stone from
+// `bare` up; its largest rises are `span` tiles across (a power of two),
+// with `octaves` sizes of rise summed, each half the last across and
+// `roughness` (of 256) of its height; `soil` levels of earth lie over the
+// rock. Its legend says the terrain kind of each ground class.
+#GroundKey: #Key & { class: text }
+#Generated: #AnyMap & {
+    generator: "relief"
+    legend:    [...#GroundKey]
+    width:     int & >=1 & <=1073741824
+    height:    int & >=1 & <=1073741824
+    tall:      *32 | int & >=2 & <=256
+    wraps:     *false | true
+    seed:      *0 | int & >=0
+    lowest:    *2 | int & >=0 & <=255
+    sea:       *8 | int & >=0 & <=255
+    highest:   *26 | int & >=0 & <=255
+    bare:      *21 | int & >=0 & <=255
+    span:      *32 | int & >=2 & <=65536
+    octaves:   *4 | int & >=1 & <=16
+    roughness: *128 | int & >=0 & <=256
+    soil:      *3 | int & >=0 & <=255
+}
+
+// Rolling country with a little sea, 256 by 256: grass, sand at the shore,
+// bare stone on the heights and the cliffs.
+hills_map: #Generated & {
+    width:  256
+    height: 256
+    legend: [{ class: "air", terrain: "open_air" },
+             { class: "earth", terrain: "soil" },
+             { class: "rock", terrain: "bedrock" },
+             { class: "water", terrain: "sea" },
+             { class: "grass", terrain: "grass" },
+             { class: "sand", terrain: "sand" },
+             { class: "stone", terrain: "bare_stone" }]
 }

@@ -2070,7 +2070,7 @@ world_set_terrain_map :: proc(self: ^World, map_: cstring, error: ^string) -> bo
 		}
 		return false
 	}
-	t := terrain_from_map(self.content, map_, &why)
+	t := terrain_from_map(self.content, map_, self.seed, &why)
 	if t == nil {
 		if error != nil {
 			error^ = why
@@ -2084,6 +2084,15 @@ world_set_terrain_map :: proc(self: ^World, map_: cstring, error: ^string) -> bo
 	self.tilesHigh = terrain_high(t)
 	self.levels = terrain_levels(t)
 	return true
+}
+
+
+/* The level one stands at on a tile (its highest cell with a floor that
+ * isn't solid), or 0 if there is nowhere to stand on it. */
+world_ground_level :: proc(self: ^World, x: i32, y: i32) -> i32 {
+	if self.terrain == nil do return 0
+	z, _ := terrain_ground_level(self.terrain, x, y)
+	return z
 }
 
 

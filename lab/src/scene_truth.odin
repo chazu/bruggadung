@@ -8,7 +8,9 @@ package lab
  * Cut points: a mark's appearance key is its entity's look (looks.odin: its
  * blueprint's, its kind's, content/things.tri's #Look); a terrain kind's is
  * its own `look` (content/terrain/terrain.tri). One with none is keyed by its
- * blueprint's name. Light is light_at's 0, 1 or 2, as 0, 128 or 255.
+ * blueprint's name. Light is light_at's 0, 1 or 2, as 0, 128 or 255, told
+ * for the cell of each column that shows from the focus level (and any over
+ * it); the others are told dark.
  */
 
 import "../../tessera"
@@ -30,21 +32,31 @@ scene_truth :: proc(world: ^World, extent: tessera.Extent, seq: u64,
 	if s == nil do return nil
 
 	terrain := world_terrain(world)
-	for z := e.z0; z <= e.z1; z += 1 {
-		for y := e.y0; y < e.y0 + e.h; y += 1 {
-			for x := e.x0; x < e.x0 + e.w; x += 1 {
+	/* a column at a time, from the top: light is asked of every lamp and
+	 * fire, so only for the cell of a column that shows from the focus (the
+	 * first at or under it with a floor, or the lowest), and for those over
+	 * the focus */
+	for y := e.y0; y < e.y0 + e.h; y += 1 {
+		for x := e.x0; x < e.x0 + e.w; x += 1 {
+			shows := true
+			for z := e.z1; z >= e.z0; z -= 1 {
 				c := tessera.cell_at(s, x, y, z)
 				c.seen = now
 				c.flags = {.In_Sight}
+				floored := true
 				if terrain != nil {
 					info := terrain_kind_info(terrain, terrain_at(terrain, x, y, z))
 					if info != nil {
 						c.terrain = tessera.look(s, string(info.look))
-						if !info.floored do c.flags += {.Open}
+						floored = info.floored
+						if !floored do c.flags += {.Open}
 					}
 				}
 				c.fluid = u32(clamp(world_water_at_x(world, x, y, z), 0, i64(max(u32))))
-				c.light = u8(min(light_at(world, on_tile(x, y, z), now) * 128, 255))
+				if z > e.focus || (shows && (floored || z == e.z0)) {
+					c.light = u8(min(light_at(world, on_tile(x, y, z), now) * 128, 255))
+				}
+				if z <= e.focus && floored do shows = false
 			}
 		}
 	}

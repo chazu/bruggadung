@@ -5,7 +5,8 @@ how high the ground stands there and what it is. The design is
 [OROGEN.md](../OROGEN.md).
 
 This is slice 1, the library: the Odin package `orogen` (this directory).
-It needs only Odin's core library. Nothing in the lab uses it yet.
+It needs only Odin's core library. The lab's generated terrain source
+reads it (`../lab/src/core_terrain.odin`).
 
 - **A map** (`orogen.odin`: `Map`, `map_make`, `map_fault`): a seed, a
   width and height in tiles, its levels, whether it wraps, and what shapes
@@ -16,7 +17,7 @@ It needs only Odin's core library. Nothing in the lab uses it yet.
   level of the cell one stands in there, or of the seabed) and its ground
   class. The same map and position give the same column whenever asked,
   in any order. `columns` fills a block at once.
-- **Cells** (`cell`, `cell_of`, `surface`): rock and earth beneath the
+- **Cells** (`cell`, `cell_of`, `top`): rock and earth beneath the
   ground, the ground at its elevation, air over it; over a seabed, water
   up to sea level.
 - **Ground classes** (`Class`): `air`, `earth`, `rock`, `water`, `grass`,
@@ -27,7 +28,7 @@ It needs only Odin's core library. Nothing in the lab uses it yet.
   ground runs unbroken across the seam. Such a map is a whole number of
   spans wide. North and south never wrap.
 - **Text** (`text.odin`: `map_text`): a character to a tile, its ground
-  class or the level of its surface.
+  class or the level of its top.
 
 Everything is computed in integers, so a map is the same on every
 platform: `tests/golden/` holds one, and the tests compare. A change that
@@ -53,7 +54,7 @@ build/orogen --wide 1024 --high 512 --wraps --at 1000,0 --size 80,24
 ```
 
 `~` water, `:` sand, `.` grass, `^` stone. With `--elevations`, each
-tile's surface level: 0 to 9, then a to z.
+tile's top level: 0 to 9, then a to z.
 
 ## Building
 

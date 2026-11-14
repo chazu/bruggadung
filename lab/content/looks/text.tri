@@ -9,6 +9,7 @@ text_doorway:     #Glyph & { theme: "text", look: "doorway", char: "." } @family
 text_air:         #Glyph & { theme: "text", look: "air", char: "." } @family(glyphs)
 text_ground:      #Glyph & { theme: "text", look: "ground", char: "." } @family(glyphs)
 text_water:       #Glyph & { theme: "text", look: "water", char: "~" } @family(glyphs)
+text_mass:        #Glyph & { theme: "text", look: "mass", char: "%" } @family(glyphs)
 text_thing:       #Glyph & { theme: "text", look: "thing", char: "o" } @family(glyphs)
 text_body:        #Glyph & { theme: "text", look: "body", char: "o" } @family(glyphs)
 text_agent:       #Glyph & { theme: "text", look: "agent", char: "A" } @family(glyphs)

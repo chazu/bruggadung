@@ -35,7 +35,7 @@ elevation_glyph :: proc(e: i32) -> byte {
 }
 
 // The tiles of `w` by `h` from (x0, y0), a row to a line: each tile's
-// ground class, or with `elevations` the level of its surface (the ground,
+// ground class, or with `elevations` the level of its top (the ground,
 // or the water over it).
 map_text :: proc(m: Map, x0, y0, w, h: i32, elevations := false, allocator := context.allocator) -> string {
 	b := strings.builder_make(allocator)
@@ -47,7 +47,7 @@ map_text :: proc(m: Map, x0, y0, w, h: i32, elevations := false, allocator := co
 			case c.class == .None:
 				strings.write_byte(&b, ' ')
 			case elevations:
-				strings.write_byte(&b, elevation_glyph(surface(m, c)))
+				strings.write_byte(&b, elevation_glyph(top(m, c)))
 			case:
 				strings.write_byte(&b, class_glyph(c.class))
 			}
