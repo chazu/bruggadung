@@ -337,7 +337,9 @@ lend: #Operation & {
 look_in: #Looking & { roles: { item: #Container } } @family(operations)
 
 // Walking, a second a tile. A walk of one tile names its direction in the
-// operation's name; the walker arrives when it is done. What the actor
+// operation's name; the walker arrives when it is done, at the level the
+// ground is at there: a step up or down (OROGEN.md decision 6), and never
+// off a drop. What the actor
 // holds goes along: it is held by the actor, wherever the actor is.
 #Walk: #Operation & {
     effect:   "walk"

@@ -69,13 +69,48 @@ watcher_open :: proc(name: string, agents: i32) -> (w: Watcher, why: string) {
 			ids       = ids,
 		}, ""
 	case name == "hills":
-		/* generated country (OROGEN.md), with nobody in it yet: `agents` is its seed */
+		/* generated country (OROGEN.md), from noon, with a few explorers on
+		 * it: `agents` is its seed */
 		world := test_world(u64(agents))
 		if world == nil do return {}, "no world"
 		if !world_set_terrain_map(world, "hills_map", &why) do return {}, why
-		world_set_time(world, time_make(12 * 3_600_000))      /* noon: nothing there passes the time */
-		scheduler := autorelease(scheduler_init_with_world(world, test_committer(world)))
-		return Watcher{title = fmt.aprintf("hills, seed %d", agents), world = world, scheduler = scheduler}, ""
+		noon: i64 = 12 * 3_600_000
+		world_set_time(world, time_make(noon))
+		c          := test_committer(world)
+		committer_set_tracing(c, false)
+		activities := activities_with_world(world, c)
+		knowledge  := autorelease(knowledge_init_with_world(world))
+		agency     := autorelease(agency_init_with_world(world, c, knowledge))
+		scheduler  := autorelease(scheduler_init_with_world(world, c))
+		agency_set_activities(agency, activities)
+		scheduler_set_activities(scheduler, activities_as_activity_clock(activities))
+		scheduler_set_perception(scheduler, knowledge_as_perception_phase(knowledge))
+		scheduler_set_decision(scheduler, agency_as_decision_phase(agency))
+		g   := proposal_group_group_with_phase(.System, "watcher: explorers in the hills")
+		ids := make([dynamic]Entity_ID)
+		mid := [2]i32{world_tiles_wide(world), world_tiles_high(world)} / 2
+		for i: i32 = 0; i < 40 && len(ids) < 8; i += 1 {     /* about the middle, where there is ground */
+			x, y := mid.x + (i * 37) % 31 - 15, mid.y + (i * 23) % 31 - 15
+			level, stands := terrain_ground_level(world_terrain(world), x, y)
+			if !stands do continue
+			append(&ids, proposal_group_create(g, "worker", ns_utf8(fmt.tprintf("explorer %d", len(ids))),
+			                                   on_tile(x, y, level)))
+		}
+		committer_submit(c, g)
+		scheduler_run_until(scheduler, time_make(noon + 1))
+		for &id in ids {
+			id = proposal_group_id_for(g, id)
+			agency_autopilot_explore(agency, id, 50)
+		}
+		return Watcher {
+			title     = fmt.aprintf("hills, seed %d", agents),
+			world     = world,
+			scheduler = scheduler,
+			agency    = agency,
+			knowledge = knowledge,
+			follow    = ids[0] if len(ids) > 0 else 0,
+			ids       = ids[:],
+		}, ""
 	case strings.has_prefix(name, "cistern"):
 		variant: Cistern_Variant
 		switch name {

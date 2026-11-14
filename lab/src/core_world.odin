@@ -1700,11 +1700,11 @@ world_entities_at :: proc(self: ^World, place: Entity_ID, form: Location_Form, o
 /* What is within `radius` of a tile, all of it: on the ground there, and
  * what is in, on, held by or part of that, all the way down. Malloc'd into
  * out^, in no set order; returns how many. The caller frees it. */
-world_things_near :: proc(self: ^World, tile: Location, radius: i32, out: ^[^]Entity_ID) -> uint {
-	n := world_entities_near(self, tile, radius, nil, 0)
+world_things_near :: proc(self: ^World, tile: Location, radius: i32, out: ^[^]Entity_ID, span: i32 = 0) -> uint {
+	n := world_entities_near(self, tile, radius, nil, 0, span)
 	cap := n + 16
 	list := make([^]Entity_ID, cap)
-	n = world_entities_near(self, tile, radius, list, cap)
+	n = world_entities_near(self, tile, radius, list, cap, span)
 	for i: uint = 0; i < n; i += 1 {
 		m := world_entities_in(self, list[i], nil, 0)
 		if n + m > cap {
@@ -1841,9 +1841,10 @@ world_entities_on_tile :: proc(self: ^World, tile: Location, out: [^]Entity_ID, 
 
 
 /* What stands on the ground within `radius` tiles of a tile (corners too),
- * on its level, in entity order. A spatial query: it reads the chunks the
+ * on its level and up to `span` levels over and under it, in entity order. A spatial query: it reads the chunks the
  * square touches, nothing else. */
-world_entities_near :: proc(self: ^World, tile: Location, radius: i32, out: [^]Entity_ID, max_: uint) -> uint {
+world_entities_near :: proc(self: ^World, tile: Location, radius: i32, out: [^]Entity_ID, max_: uint,
+                            span: i32 = 0) -> uint {
 	count: uint
 
 	if tile.form != .On_Tile || radius < 0 {
@@ -1851,22 +1852,24 @@ world_entities_near :: proc(self: ^World, tile: Location, radius: i32, out: [^]E
 	}
 	n: uint = 0
 	sorted := true
-	for cy := (tile.y - radius) >> 5; cy <= (tile.y + radius) >> 5; cy += 1 {
-		for cx := (tile.x - radius) >> 5; cx <= (tile.x + radius) >> 5; cx += 1 {
-			ids := index_get(self.onGround, ground_key(cx * BG_CHUNK, cy * BG_CHUNK, tile.level), &count)
-			for i: uint = 0; i < count; i += 1 {
-				loc := (^Location)(store_record_for(self.locations, ids[i]))
-				if loc == nil || loc.form != .On_Tile || loc.level != tile.level ||
-				   abs(loc.x - tile.x) > radius || abs(loc.y - tile.y) > radius {
-					continue
-				}
-				if n < max_ {
-					if n != 0 && out[n - 1] > ids[i] {
-						sorted = false
+	for level := max(tile.level - span, 0); level <= min(tile.level + span, self.levels - 1); level += 1 {
+		for cy := (tile.y - radius) >> 5; cy <= (tile.y + radius) >> 5; cy += 1 {
+			for cx := (tile.x - radius) >> 5; cx <= (tile.x + radius) >> 5; cx += 1 {
+				ids := index_get(self.onGround, ground_key(cx * BG_CHUNK, cy * BG_CHUNK, level), &count)
+				for i: uint = 0; i < count; i += 1 {
+					loc := (^Location)(store_record_for(self.locations, ids[i]))
+					if loc == nil || loc.form != .On_Tile || loc.level != level ||
+					   abs(loc.x - tile.x) > radius || abs(loc.y - tile.y) > radius {
+						continue
 					}
-					out[n] = ids[i]
+					if n < max_ {
+						if n != 0 && out[n - 1] > ids[i] {
+							sorted = false
+						}
+						out[n] = ids[i]
+					}
+					n += 1
 				}
-				n += 1
 			}
 		}
 	}
@@ -1877,7 +1880,7 @@ world_entities_near :: proc(self: ^World, tile: Location, radius: i32, out: [^]E
 		e   := store_entity_at_index(areas, i)
 		a   := (^Area)(store_record_at_index(areas, i))
 		loc := (^Location)(store_record_for(self.locations, e))
-		if loc == nil || loc.form != .On_Tile || loc.level != tile.level ||
+		if loc == nil || loc.form != .On_Tile || abs(loc.level - tile.level) > span ||
 		   (abs(loc.x - tile.x) <= radius && abs(loc.y - tile.y) <= radius) {
 			continue       /* not on the ground, or counted already */
 		}

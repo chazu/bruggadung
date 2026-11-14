@@ -9,21 +9,24 @@ what is asked of it, so a planet costs what is explored of it. It places
 terrain only. Biomes, plants, animals and settlements come later, and are
 not designed here.
 
-This document is a proposal. Slices 1 and 2 are built: the library in
+This document is a proposal. Slices 1 to 3 are built: the library in
 [orogen/](orogen/README.md) (the Odin package `orogen` and a tool that
-prints a map as text), and the lab's generated terrain source
+prints a map as text); the lab's generated terrain source
 (`lab/src/core_terrain.odin`, `hills_map` in
-`lab/content/terrain/terrain.tri`), which the watcher shows (`watcher
-hills`). Nothing walks it yet. The name is provisional.
+`lab/content/terrain/terrain.tri`); and walking and seeing relief. The
+watcher shows explorers finding their way about generated hills (`watcher
+hills`). The name is provisional.
 
 Three things in the repository shape it:
 
 - **TERRAIN.md decision 5.** The world asks a terrain source what a cell
   is, and stores only the chunks something has changed. A generator is the
   third source it names. Orogen is what that source calls.
-- **TERRAIN.md step 4 (levels) is not built.** A world has levels, but
-  nothing walks between them and sight stays on one. Relief in the first
-  version (decision 6) needs part of that step built in the lab.
+- **TERRAIN.md step 4 (levels) was not built.** A world had levels, but
+  nothing walked between them and sight stayed on one. Relief in the first
+  version (decision 6) built the part of that step it needs: steps on a
+  slope, and sight across levels. Stairs, ladders and falling are still
+  that step's.
 - **Tessera draws scenes, never worlds** (TESSERA.md decision 1). Orogen
   gives Tessera nothing. The lab's terrain reads Orogen, and the lab's
   scenes show the terrain, as they do an authored map.
@@ -105,15 +108,27 @@ Three things in the repository shape it:
    generated ground as they would a drawn map's.
    - **A step up or down** is between tiles side by side whose ground
      differs by one level. It is read from terrain as it is: the cell
-     beside the walker is solid and the cell above that is ground (up),
-     or the cell beside is open air and the cell below that is ground
-     (down). There is no ramp or stair kind for a hillside. Stairs and
-     ladders indoors stay TERRAIN.md step 4's.
-   - **A cliff** is a difference of two levels or more. Nothing walks it.
-     Nothing falls from it yet either: a walker doesn't step into open
-     air with no ground a level below.
-   - **Hills hide what is behind them.** Earth and rock are opaque, and
-     sight is a straight line through cells in three dimensions.
+     beside the walker is solid and one can stand in the cell over that
+     (up), or the cell beside has no floor and one can stand in the cell
+     under it (down). A step up also needs the cell over the walker open:
+     not solid, and with no floor, which would be a ceiling. There is no
+     ramp or stair kind for a hillside. Stairs and ladders indoors stay
+     TERRAIN.md step 4's.
+   - **A cliff** is a difference of two levels or more. Nothing walks up
+     it, and stepping off it is a **drop**, which a walk refuses: nothing
+     falls yet.
+   - **A walk follows the ground.** A walk's way is still its directions;
+     each tile's walk comes to the level the ground is at. An agent plans
+     over the ground as it believes it, a level to each tile of the way,
+     and guesses a cell it has never seen open. Where it guessed wrong,
+     the walk is blocked there, as at a wall it hadn't seen.
+   - **Hills hide what is behind them.** Earth and rock are opaque. Sight
+     reaches as far up and down as across, along a straight line through
+     cells in three dimensions, either way. An agent sees, and remembers,
+     the cells of the levels over and under it as it does its own.
+   - **Reach is a step.** One reaches a thing on a tile beside one's own a
+     level up or down when the cell over the lower of the two is open, as
+     on a hillside, and not through a floor.
    - **Water is a ground class** in the first version: ground below **sea
      level** is a seabed, with water in every cell from it up to sea
      level, which nothing walks into. Seas and lakes are
@@ -153,10 +168,14 @@ that villagers walk and see across.
    world's extent and levels from it; saving and the state hash; the level
    one stands at on a tile. The watcher shows it (`watcher hills [seed]`),
    opening at the level of the ground at its middle.
-3. **Walking and seeing relief.** Steps up and down in pathfinding and in
-   the walk; sight through cells in three dimensions; an agent's terrain
-   memory across levels. A scenario: a walk over a hill, and something
-   behind the hill not seen until its crest.
+3. **Walking and seeing relief** (built). Steps up and down in
+   pathfinding (a level to each tile of a way) and in the walk; sight
+   through cells in three dimensions; an agent's terrain memory and what
+   it sees of things across levels; reach up and down a slope. A ridge
+   drawn a level to a file (`ridge_map`) and its test: a walk over the
+   ridge, a bucket behind it not seen until the crest, a cliff nothing
+   climbs or steps off, an explorer finding its way over; and an explorer
+   keeping to the ground on generated hills.
 4. **Wrapping in the lab.** Positions brought into range; differences
    taken the short way; the spatial index, sight, sound and pathfinding
    across the seam. A scenario on a world a few chunks round.
@@ -168,6 +187,17 @@ that villagers walk and see across.
 
 ## Open questions
 
+- **What still keeps to one level.** Sound and what is heard, a lamp's
+  and a fire's light, traces and what is read from them, a label read at
+  a glance, where a wanderer picks to go, and the agents' own tests of
+  who is beside whom (a stall and its keeper, a buyer and a seller) all
+  compare levels as equal. On a slope they miss what is a step up or
+  down. An agent's belief that a thing is in reach allows a level's
+  difference without asking what is between; the world's own test does
+  ask.
+- **What seeing across levels costs.** An agent on relief looks at nine
+  levels of cells where it looked at one. Worlds of one level are as
+  they were; a crowd on hills hasn't been measured.
 - **How much the lab subtracts coordinates directly.** Slice 4's size
   isn't known until that is surveyed.
 - **How tall a world is.** A level is a storey, so a mountain is hundreds

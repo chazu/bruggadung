@@ -157,7 +157,9 @@ floor.
      the corridor a row lower, walled at its ends. They give the results
      they gave, the corridor's listener a tile further from the clatter.
 4. **Levels.** Floors, open air, stairs or ladders; water falling through
-   what has no floor.
+   what has no floor. Built of it, for relief (OROGEN.md decision 6): a
+   step up or down a slope, in the walk and in pathfinding; sight, terrain
+   memory and reach across levels.
 
 ### Built besides: what lets terrain scale
 

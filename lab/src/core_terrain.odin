@@ -666,6 +666,60 @@ terrain_floored :: proc(t: ^Terrain, x: i32, y: i32, z: i32) -> bool {
 	return k != 0 && t.kinds[k].floored
 }
 
+/* Whether one can stand in a cell: it has a floor and isn't solid. */
+terrain_standable :: proc(t: ^Terrain, x: i32, y: i32, z: i32) -> bool {
+	k: Terrain_Kind
+
+	k = terrain_at(t, x, y, z)
+	return k != 0 && t.kinds[k].floored && !t.kinds[k].solid
+}
+
+/* How a walk of one tile goes (OROGEN.md decision 6). */
+Step_Kind :: enum {
+	Level,      /* onto ground at the same level */
+	Up,         /* a step up: the cell beside is solid, and one stands on it */
+	Down,       /* a step down: the cell beside has no floor, and there is ground a level below */
+	Blocked,    /* the cell beside is solid, with no standing on it, or off the map */
+	Drop,       /* the cell beside has no floor, and no ground a level below: a cliff, or open air */
+}
+
+/* A walk from a tile at level z to the tile (u, v) beside it: how it goes,
+ * and the level it comes to (z if it can't be walked). A step up needs the
+ * cell over the walker to be open: not solid, and with no floor (which
+ * would be the walker's ceiling). */
+terrain_step :: proc(t: ^Terrain, x: i32, y: i32, z: i32, u: i32, v: i32) -> (kind: Step_Kind, level: i32) {
+	k: Terrain_Kind
+	over: Terrain_Kind
+
+	k = terrain_at(t, u, v, z)
+	if k == 0 do return .Blocked, z
+	if t.kinds[k].solid {
+		over = terrain_at(t, x, y, z + 1)
+		if over == 0 || t.kinds[over].solid || t.kinds[over].floored || !terrain_standable(t, u, v, z + 1) do return .Blocked, z
+		return .Up, z + 1
+	}
+	if t.kinds[k].floored do return .Level, z
+	if !terrain_standable(t, u, v, z - 1) do return .Drop, z
+	return .Down, z - 1
+}
+
+/* Whether two tiles side by side (corners too), or one tile, are beside
+ * each other across their levels, for reaching from one to the other: on
+ * one level; or a level apart with the cell over the lower one open (not
+ * solid, and with no floor), as on a hillside and not through a ceiling. */
+terrain_beside :: proc(t: ^Terrain, x0: i32, y0: i32, z0: i32, x1: i32, y1: i32, z1: i32) -> bool {
+	over: Terrain_Kind
+
+	if z0 == z1 do return true
+	if abs(z0 - z1) != 1 do return false
+	if z0 < z1 {
+		over = terrain_at(t, x0, y0, z0 + 1)
+	} else {
+		over = terrain_at(t, x1, y1, z1 + 1)
+	}
+	return over != 0 && !t.kinds[over].solid && !t.kinds[over].floored
+}
+
 /* A chunk's cells (BG_CHUNK * BG_CHUNK, row by row; cells past the extent 0). */
 terrain_chunk_cells :: proc(t: ^Terrain, x0: i32, y0: i32, z: i32, cells: [^]Terrain_Kind) {
 	x: i32

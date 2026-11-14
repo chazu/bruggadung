@@ -726,12 +726,21 @@ effect_walk :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) -
 		return "one can walk only on the ground"
 	}
 	if direction < 0 do return "walk where?"
+	from := at
 	switch op[direction + 1] if direction + 1 < len(op) else 0 {
 	case 'n': at.y -= 1
 	case 's': at.y += 1
 	case 'e': at.x += 1
 	case 'w': at.x -= 1
 	case:     return "walk where?"
+	}
+	/* over relief (OROGEN.md decision 6): a step up or down comes to
+	 * another level; nothing steps off a cliff. Into what is solid, or off
+	 * the map, the move is refused as any is. */
+	if t := world_terrain(world); t != nil {
+		how, level := terrain_step(t, from.x, from.y, from.level, at.x, at.y)
+		if how == .Drop do return fmt.tprintf("(%d, %d) is a drop", at.x, at.y)
+		at.level = level
 	}
 	proposal_group_move_to(g, whole(a.roles[.Actor]), at)
 	tread(world, at, g)

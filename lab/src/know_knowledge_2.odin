@@ -209,13 +209,19 @@ knowledge_perceive :: proc(self: ^Knowledge, store: ^Knowledge_Store, first: uin
 			knowledge_store_miss_change_from(store, Terrain_Kind(ev.amount), ev.location.x, ev.location.y, ev.location.level)
 		}
 	}
-	for y = here.y - BG_SIGHT; y <= here.y + BG_SIGHT; y += 1 {
-		for x = here.x - BG_SIGHT; x <= here.x + BG_SIGHT; x += 1 {
-			tile   = here
-			tile.x = x
-			tile.y = y
-			if world_is_tile_x(self.world, x, y, here.level) && knowledge_sees(self, tile, here) {
-				knowledge_store_see(store, now, x, y, here.level)
+	/* its own level first, as ever; then those over and under it that there are */
+	for dz: i32 = 0; dz <= 2 * BG_SIGHT; dz += 1 {
+		level := here.level + ((dz + 1) / 2 if dz % 2 == 1 else -dz / 2)
+		if level < 0 || level >= world_levels(self.world) do continue
+		for y = here.y - BG_SIGHT; y <= here.y + BG_SIGHT; y += 1 {
+			for x = here.x - BG_SIGHT; x <= here.x + BG_SIGHT; x += 1 {
+				tile       = here
+				tile.x     = x
+				tile.y     = y
+				tile.level = level
+				if world_is_tile_x(self.world, x, y, level) && knowledge_sees(self, tile, here) {
+					knowledge_store_see(store, now, x, y, level)
+				}
 			}
 		}
 	}
@@ -1121,7 +1127,7 @@ know_mark_near :: proc(world: ^World, tile: Location, radius: i32, kagent: uint,
 	count: uint
 	i:     uint
 
-	count = world_things_near(world, tile, radius, &near)
+	count = world_things_near(world, tile, radius, &near, BG_SIGHT)
 	for i = 0; i < count; i += 1 {
 		if world_record(world, kagent, near[i]) != nil {
 			if n^ == cap_^ {

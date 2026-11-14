@@ -1039,8 +1039,9 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
   poles**: its north and south ends, which nothing crosses. (ORO d4)
 - **Step up, step down**: a walk between tiles side by side whose ground
   differs by one level, read from terrain as it is. **Cliff**: a
-  difference of two or more, which nothing walks. *Avoid:* ramp, slope
-  (for the step). (ORO d6)
+  difference of two or more, which nothing walks up; stepping off one is
+  a **drop**, which a walk refuses. Tiles a step apart are **beside**
+  each other, for reach. *Avoid:* ramp, slope (for the step). (ORO d6)
 - **Planet model**: a planet's large shape, computed whole from the seed
   and never saved: a grid of **planet cells**, each kilometres across,
   with plates, elevation, climate and rivers. (ORO d5)

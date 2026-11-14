@@ -467,12 +467,17 @@ test_grid_open :: proc(context_: rawptr, x: i32, y: i32) -> bool {
 }
 
 
-test_everywhere :: proc(context_: rawptr, x: i32, y: i32) -> bool {
-	return true
+test_everywhere :: proc(context_: rawptr, x: i32, y: i32, z: i32, u: i32, v: i32) -> (i32, bool) {
+	return z, true
 }
 
 
-test_at_star :: proc(context_: rawptr, x: i32, y: i32) -> bool {
+test_grid_step :: proc(context_: rawptr, x: i32, y: i32, z: i32, u: i32, v: i32) -> (i32, bool) {
+	return z, test_grid_open(context_, u, v)
+}
+
+
+test_at_star :: proc(context_: rawptr, x: i32, y: i32, z: i32) -> bool {
 	g: ^Test_Grid
 
 	g = (^Test_Grid)(context_)
@@ -514,7 +519,7 @@ test_paths :: proc() {
 	q.tx       = 7
 	q.ty       = 1
 	q.context_ = &grid
-	q.passable = test_grid_open
+	q.step     = test_grid_step
 	first      = path_find(&q)
 	bg_check(first.found && first.step == .East && first.steps == 9)
 	for walked, clear = 0, true; walked < 20; walked += 1 {
@@ -555,7 +560,7 @@ test_paths :: proc() {
 	q.targeted = true
 	q.tx       = 1000000
 	q.ty       = 7
-	q.passable = test_everywhere
+	q.step     = test_everywhere
 	r          = path_find(&q)
 	bg_check(!r.found && r.expanded <= BG_PATH_BUDGET && (r.step == .East || r.step == .South) &&
 	         r.x > 4000)
@@ -3745,6 +3750,7 @@ ALL_TESTS := [?]Test_Case{
 	{"diligence",                     test_diligence},
 	{"terrain",                       test_terrain},
 	{"generated",                     test_generated},
+	{"relief",                        test_relief},
 	{"sight_and_memory",              test_sight_and_memory},
 	{"rooms",                         test_rooms},
 	{"air_follows_terrain",           test_air_follows_terrain},

@@ -2,8 +2,9 @@ package lab
 
 /*
  * BGPath — finding a way over tiles (TERRAIN.md, pathfinding): a search
- * from a tile, by steps north, south, east and west, over the tiles a
- * caller lets through, for a tile it is looking for. Bounded: it expands at
+ * from a tile, by steps north, south, east and west, each to the level the
+ * caller says it comes to (the same, or a step up or down: OROGEN.md
+ * decision 6), for a tile it is looking for. Bounded: it expands at
  * most a budget of tiles, so its cost is the same in any size of world.
  * With a target, it is A*, the steps still to go reckoned to the target's
  * reach (a tile beside it, corners too); without, it is breadth-first,
@@ -36,13 +37,16 @@ Step :: enum i32 {
 Path_Query :: struct {
 	x:        i32,                      /* where it starts */
 	y:        i32,
-	targeted: bool,                     /* toward (tx, ty): done within a step of it */
+	z:        i32,
+	targeted: bool,                     /* toward (tx, ty, tz): done within a step of it, and a level */
 	tx:       i32,
 	ty:       i32,
+	tz:       i32,
 	budget:   uint,                     /* 0: BG_PATH_BUDGET */
 	context_: rawptr,                   // `context` is Odin's keyword
-	passable: proc(context_: rawptr, x: i32, y: i32) -> bool,
-	goal:     proc(context_: rawptr, x: i32, y: i32) -> bool,    /* untargeted: what it looks for */
+	/* a walk from (x, y, z) to the tile (u, v) beside it: the level it comes to, or false */
+	step:     proc(context_: rawptr, x: i32, y: i32, z: i32, u: i32, v: i32) -> (level: i32, ok: bool),
+	goal:     proc(context_: rawptr, x: i32, y: i32, z: i32) -> bool,    /* untargeted: what it looks for */
 	way:      ^[dynamic]Step,           /* if set, filled with every step of the way, first to last */
 }
 
@@ -51,6 +55,7 @@ Path_Result :: struct {
 	found:    bool,                     /* a way all the way */
 	x:        i32,                      /* where the way it took ends */
 	y:        i32,
+	z:        i32,
 	steps:    i64,                      /* how many to there */
 	expanded: uint,
 }
@@ -59,6 +64,7 @@ Path_Result :: struct {
 Path_Node :: struct {
 	x:      i32,
 	y:      i32,
+	z:      i32,
 	g:      i64,            /* steps from the start */
 	h:      i64,            /* steps to go, at least */
 	parent: i32,            /* -1 for the start */
@@ -110,17 +116,17 @@ to_go :: proc(q: ^Path_Query, x: i32, y: i32) -> i64 {
 }
 
 @(private = "file")
-slot :: proc(x: i32, y: i32) -> uint {
-	return uint(mix((u64(u32(x)) << 32) | u64(u32(y)))) & (tablecap - 1)
+slot :: proc(x: i32, y: i32, z: i32) -> uint {
+	return uint(mix(mix((u64(u32(x)) << 32) | u64(u32(y))) ~ u64(u32(z)))) & (tablecap - 1)
 }
 
 /* The node at a tile, or -1. */
 @(private = "file")
-node_at :: proc(x: i32, y: i32) -> i32 {
+node_at :: proc(x: i32, y: i32, z: i32) -> i32 {
 	i: uint
 
-	for i = slot(x, y); stamps[i] == search; i = (i + 1) & (tablecap - 1) {
-		if nodes[table[i] - 1].x == x && nodes[table[i] - 1].y == y do return table[i] - 1
+	for i = slot(x, y, z); stamps[i] == search; i = (i + 1) & (tablecap - 1) {
+		if nodes[table[i] - 1].x == x && nodes[table[i] - 1].y == y && nodes[table[i] - 1].z == z do return table[i] - 1
 	}
 	return -1
 }
@@ -129,7 +135,7 @@ node_at :: proc(x: i32, y: i32) -> i32 {
 table_put :: proc(n: i32) {
 	i: uint
 
-	for i = slot(nodes[n].x, nodes[n].y); stamps[i] == search; i = (i + 1) & (tablecap - 1) {
+	for i = slot(nodes[n].x, nodes[n].y, nodes[n].z); stamps[i] == search; i = (i + 1) & (tablecap - 1) {
 	}
 	table[i] = n + 1
 	stamps[i] = search
@@ -183,9 +189,9 @@ heap_pop :: proc(n: ^uint) -> i32 {
 }
 
 @(private = "file")
-done :: proc(q: ^Path_Query, x: i32, y: i32) -> bool {
-	if q.targeted do return abs(i64(x) - i64(q.tx)) <= 1 && abs(i64(y) - i64(q.ty)) <= 1
-	return q.goal != nil && q.goal(q.context_, x, y)
+done :: proc(q: ^Path_Query, x: i32, y: i32, z: i32) -> bool {
+	if q.targeted do return abs(i64(x) - i64(q.tx)) <= 1 && abs(i64(y) - i64(q.ty)) <= 1 && abs(z - q.tz) <= 1
+	return q.goal != nil && q.goal(q.context_, x, y, z)
 }
 
 /* The first step on the way from the start to node n. */
@@ -209,7 +215,7 @@ first_step :: proc(n: i32) -> Step {
 
 /* Searches. Targeted and not found within the budget, the first step is
  * toward the tile it reached nearest the target; untargeted, none. The
- * start need not be passable. Ties go to the order north, south, east,
+ * start need not be anywhere one could walk to. Ties go to the order north, south, east,
  * west, after the steps nearer the target. */
 path_find :: proc(q: ^Path_Query) -> Path_Result {
 	r: Path_Result
@@ -256,6 +262,7 @@ path_find :: proc(q: ^Path_Query) -> Path_Result {
 	seq = 0
 	nodes[0].x = q.x
 	nodes[0].y = q.y
+	nodes[0].z = q.z
 	nodes[0].g = 0
 	nodes[0].h = to_go(q, q.x, q.y)
 	nodes[0].parent = -1
@@ -269,7 +276,7 @@ path_find :: proc(q: ^Path_Query) -> Path_Result {
 		if nodes[n].closed do continue
 		nodes[n].closed = true
 		r.expanded += 1
-		if done(q, nodes[n].x, nodes[n].y) {
+		if done(q, nodes[n].x, nodes[n].y, nodes[n].z) {
 			r.found = true
 			best = n
 			break
@@ -278,8 +285,9 @@ path_find :: proc(q: ^Path_Query) -> Path_Result {
 		for d = 0; d < 4; d += 1 {
 			u = nodes[n].x + dx[d]
 			v = nodes[n].y + dy[d]
-			if !q.passable(q.context_, u, v) do continue
-			m = node_at(u, v)
+			w, ok := q.step(q.context_, nodes[n].x, nodes[n].y, nodes[n].z, u, v)
+			if !ok do continue
+			m = node_at(u, v, w)
 			if m >= 0 {
 				if nodes[m].closed || nodes[m].g <= nodes[n].g + 1 do continue
 				nodes[m].g = nodes[n].g + 1
@@ -290,6 +298,7 @@ path_find :: proc(q: ^Path_Query) -> Path_Result {
 				nnodes += 1
 				nodes[m].x = u
 				nodes[m].y = v
+				nodes[m].z = w
 				nodes[m].g = nodes[n].g + 1
 				nodes[m].h = to_go(q, u, v)
 				nodes[m].parent = n
@@ -302,6 +311,7 @@ path_find :: proc(q: ^Path_Query) -> Path_Result {
 	if !r.found && !q.targeted do return r
 	r.x = nodes[best].x
 	r.y = nodes[best].y
+	r.z = nodes[best].z
 	r.steps = nodes[best].g
 	r.step = first_step(best)
 	if q.way != nil do way_to(best, q.way)

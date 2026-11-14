@@ -14,6 +14,9 @@
 //            file says how large the map is, what shapes its ground and
 //            which terrain kind each ground class is; the arithmetic from a
 //            seed and a tile to an elevation and a ground class is code.
+//            A step up or down between levels, a cliff, and who is beside
+//            whom across a level are read from the kinds' `solid` and
+//            `floored` by code (terrain_step, terrain_beside).
 
 package terrain
 
@@ -123,6 +126,21 @@ plain_map: #Map & {
     fill:   "open_floor"
     width:  1024
     height: 1024
+}
+
+// A ridge, drawn a level to a file (OROGEN.md decision 6, relief in
+// levels), 11 by 5 and the same in every row. From the west: flat ground,
+// a ridge two levels high with a step to each level, flat ground again, a
+// cliff of two levels with a plateau on it, and the cliff down again.
+ridge_map: #Map & {
+    legend: [{ glyph: ",", terrain: "grass" },
+             { glyph: "%", terrain: "soil" },
+             { glyph: "_", terrain: "open_air" }]
+    levels: [{ z: 0, rows: _ @embed(file="maps/ridge.0.map", type=text) },
+             { z: 1, rows: _ @embed(file="maps/ridge.1.map", type=text) },
+             { z: 2, rows: _ @embed(file="maps/ridge.2.map", type=text) },
+             { z: 3, rows: "_" }]
+    fill:   "open_air"
 }
 
 // A generated map (OROGEN.md): no drawing, but what Orogen makes from a

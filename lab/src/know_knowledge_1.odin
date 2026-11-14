@@ -193,15 +193,52 @@ know_line_clear :: proc(t: ^Terrain, x0: i32, y0: i32, x1: i32, y1: i32, z: i32)
 }
 
 
-/* Whether a tile is in the agent's line of sight: on its level, within
- * BG_SIGHT, and nothing opaque between (light aside). */
+/* The same between two cells on different levels (OROGEN.md decision 6: a
+ * hill hides what is behind it): a straight line through cells in three
+ * dimensions, a cell to each step along its longest side. */
+@(private)
+know_line_clear_across :: proc(t: ^Terrain, from: [3]i32, to: [3]i32) -> bool {
+	d := [3]i32{abs(to.x - from.x), abs(to.y - from.y), abs(to.z - from.z)}
+	s := [3]i32{1 if to.x > from.x else -1, 1 if to.y > from.y else -1, 1 if to.z > from.z else -1}
+	long := 0
+	if d[1] > d[long] do long = 1
+	if d[2] > d[long] do long = 2
+	at := from
+	err: [3]i32
+	for k in 0 ..< 3 do err[k] = 2 * d[k] - d[long]
+	for _ in 1 ..< d[long] {
+		for k in 0 ..< 3 {
+			if k == long {
+				at[k] += s[k]
+			} else {
+				if err[k] > 0 {
+					at[k] += s[k]
+					err[k] -= 2 * d[long]
+				}
+				err[k] += 2 * d[k]
+			}
+		}
+		if terrain_opaque(t, at.x, at.y, at.z) do return false
+	}
+	return true
+}
+
+
+/* Whether a tile is in the agent's line of sight: within BG_SIGHT, across
+ * and up or down, and nothing opaque between (light aside). */
 knowledge_in_sight :: proc(self: ^Knowledge, tile: Location, here: Location) -> bool {
 	t: ^Terrain
 
 	if self.omniscient do return true
-	if tile.level != here.level || abs(tile.x - here.x) > BG_SIGHT || abs(tile.y - here.y) > BG_SIGHT do return false
-	if abs(tile.x - here.x) <= 1 && abs(tile.y - here.y) <= 1 do return true
+	if abs(tile.level - here.level) > BG_SIGHT || abs(tile.x - here.x) > BG_SIGHT || abs(tile.y - here.y) > BG_SIGHT {
+		return false
+	}
 	t = world_terrain(self.world)
+	if tile.level != here.level {
+		a, b := [3]i32{here.x, here.y, here.level}, [3]i32{tile.x, tile.y, tile.level}
+		return t == nil || know_line_clear_across(t, a, b) || know_line_clear_across(t, b, a)
+	}
+	if abs(tile.x - here.x) <= 1 && abs(tile.y - here.y) <= 1 do return true
 	return t == nil || know_line_clear(t, here.x, here.y, tile.x, tile.y, here.level) ||
 	       know_line_clear(t, tile.x, tile.y, here.x, here.y, here.level)
 }
@@ -227,14 +264,14 @@ knowledge_candidates_from :: proc(self: ^Knowledge, here: Location, out: ^[^]Ent
 		out^ = list
 		return n
 	}
-	return world_things_near(self.world, here, BG_SIGHT, out)
+	return world_things_near(self.world, here, BG_SIGHT, out, BG_SIGHT)
 }
 
 
 knowledge_sees :: proc(self: ^Knowledge, tile: Location, here: Location) -> bool {
 	if self.omniscient do return true
 	if !knowledge_in_sight(self, tile, here) do return false
-	if abs(tile.x - here.x) <= 1 && abs(tile.y - here.y) <= 1 do return true
+	if abs(tile.x - here.x) <= 1 && abs(tile.y - here.y) <= 1 && abs(tile.level - here.level) <= 1 do return true
 	return knowledge_light_at(self, tile) > 0
 }
 

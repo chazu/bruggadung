@@ -462,16 +462,48 @@ walkable :: proc(context_: rawptr, x: i32, y: i32) -> bool {
 }
 
 
+/* A walk of one tile over the ground as the agent believes it (OROGEN.md
+ * decision 6): the level it comes to. A cell never seen it guesses open:
+ * ground at its level, a way up, or ground below a step down. */
 @(private = "file")
-unseen :: proc(context_: rawptr, x: i32, y: i32) -> bool {
+walk_step :: proc(context_: rawptr, x: i32, y: i32, z: i32, u: i32, v: i32) -> (level: i32, ok: bool) {
 	c := (^Walk_Context)(context_)
-	if knowledge_store_has_seen_x(c.store, x, y, c.level) do return false
+	if !world_is_tile_x(c.world, u, v, z) do return z, false
+	t := world_terrain(c.world)
+	if t == nil do return z, true
+	believed :: proc(c: ^Walk_Context, t: ^Terrain, x: i32, y: i32, z: i32) -> ^Terrain_Info {
+		return terrain_kind_info(t, knowledge_store_believed_terrain_at_x(c.store, x, y, z))
+	}
+	beside := believed(c, t, u, v, z)
+	switch {
+	case beside == nil:
+		return z, true
+	case beside.solid:              /* a step up, if one stands on it and nothing is over one's head */
+		if !world_is_tile_x(c.world, u, v, z + 1) do return z, false
+		up, over := believed(c, t, u, v, z + 1), believed(c, t, x, y, z + 1)
+		if up != nil && (up.solid || !up.floored) do return z, false
+		if over != nil && (over.solid || over.floored) do return z, false
+		return z + 1, true
+	case !beside.floored:           /* a step down, if there is ground a level below */
+		if !world_is_tile_x(c.world, u, v, z - 1) do return z, false
+		down := believed(c, t, u, v, z - 1)
+		if down != nil && (down.solid || !down.floored) do return z, false
+		return z - 1, true
+	}
+	return z, true
+}
+
+
+@(private = "file")
+unseen :: proc(context_: rawptr, x: i32, y: i32, z: i32) -> bool {
+	c := (^Walk_Context)(context_)
+	if knowledge_store_has_seen_x(c.store, x, y, z) do return false
 	if c.over == 0 do return true
 	/* beside ground of the kind, as it saw it */
 	for dy: i32 = -1; dy <= 1; dy += 1 {
 		for dx: i32 = -1; dx <= 1; dx += 1 {
-			if (dx != 0 || dy != 0) && knowledge_store_has_seen_x(c.store, x + dx, y + dy, c.level) &&
-			   knowledge_store_believed_terrain_at_x(c.store, x + dx, y + dy, c.level) == c.over {
+			if (dx != 0 || dy != 0) && knowledge_store_has_seen_x(c.store, x + dx, y + dy, z) &&
+			   knowledge_store_believed_terrain_at_x(c.store, x + dx, y + dy, z) == c.over {
 				return true
 			}
 		}
@@ -1046,15 +1078,16 @@ agency_explore :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Store, o
 	c.over     = over
 	q.x        = me.x
 	q.y        = me.y
+	q.z        = me.level
 	q.context_ = &c
-	q.passable = walkable
+	q.step     = walk_step
 	q.goal     = unseen
 	way       := make([dynamic]Step, context.temp_allocator)
 	q.way      = &way
 	self.pathSearches += 1
 	r := path_find(&q)
 	if !r.found || r.step == .None do return false
-	agency_set_out(self, m, way[:], 0, r.x, r.y, me.level, "exploring", fmt.tprintf("toward (%d, %d)", r.x, r.y))
+	agency_set_out(self, m, way[:], 0, r.x, r.y, r.z, "exploring", fmt.tprintf("toward (%d, %d)", r.x, r.y))
 	return true
 }
 
@@ -1085,11 +1118,13 @@ agency_wander :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Store, wi
 		q          = {}
 		q.x        = me.x
 		q.y        = me.y
+		q.z        = me.level
 		q.targeted = true
 		q.tx       = x
 		q.ty       = y
+		q.tz       = me.level
 		q.context_ = &c
-		q.passable = walkable
+		q.step     = walk_step
 		q.way      = &way
 		self.pathSearches += 1
 		r := path_find(&q)
@@ -1116,11 +1151,13 @@ agency_wander :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Store, wi
 				q          = {}
 				q.x        = me.x
 				q.y        = me.y
+				q.z        = me.level
 				q.targeted = true
 				q.tx       = x
 				q.ty       = y
+				q.tz       = me.level
 				q.context_ = &c
-				q.passable = walkable
+				q.step     = walk_step
 				q.way      = &way
 				self.pathSearches += 1
 				r := path_find(&q)
@@ -1753,16 +1790,19 @@ agency_walk_stale :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Store
 	c.world = self.world
 	c.store = store
 	c.level = me.level
-	x, y   := me.x, me.y
-	way    := string(record.way)
+	x, y, z := me.x, me.y, me.level
+	way     := string(record.way)
 	for i := int(record.stage); i < len(way); i += 1 {
+		u, v := x, y
 		switch way[i] {
-		case 'n': y -= 1
-		case 's': y += 1
-		case 'e': x += 1
-		case 'w': x -= 1
+		case 'n': v -= 1
+		case 's': v += 1
+		case 'e': u += 1
+		case 'w': u -= 1
 		}
-		if !walkable(&c, x, y) do return fmt.tprintf("the way is blocked at (%d, %d)", x, y)
+		level, ok := walk_step(&c, x, y, z, u, v)
+		if !ok do return fmt.tprintf("the way is blocked at (%d, %d)", u, v)
+		x, y, z = u, v, level
 	}
 	return ""
 }
@@ -1801,11 +1841,13 @@ agency_walk :: proc(self: ^Agency, m: ^Motivation, why: string, me: ^Referent, t
 	east, south := referent_extent(target)
 	near       := area_nearest(Location{form = .On_Tile, x = target.x, y = target.y, level = target.level}, east, south,
 	                           Location{form = .On_Tile, x = me.x, y = me.y, level = me.level})
+	q.z        = me.level
 	q.targeted = true
 	q.tx       = near.x
 	q.ty       = near.y
+	q.tz       = near.level
 	q.context_ = &c
-	q.passable = walkable
+	q.step     = walk_step
 	q.way      = &way
 	self.pathSearches += 1
 	r := path_find(&q)

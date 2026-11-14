@@ -137,7 +137,11 @@ view_can_reach :: proc(self: ^View, entity: Entity_ID, range: i32 = 1) -> bool {
 		east, south := world_area_extent(self.world, entity)
 		there = area_nearest(there, east, south, here)
 	}
-	return here.level == there.level && abs(here.x - there.x) <= range && abs(here.y - there.y) <= range
+	if abs(here.x - there.x) > range || abs(here.y - there.y) > range do return false
+	/* a level apart, from beside it on a hillside (OROGEN.md decision 6) */
+	t := world_terrain(self.world)
+	return here.level == there.level ||
+	       (t != nil && terrain_beside(t, here.x, here.y, here.level, there.x, there.y, there.level))
 }
 
 

@@ -128,6 +128,7 @@ main :: proc() {
 	centre := [2]i32{lab.world_tiles_wide(world), lab.world_tiles_high(world)} / 2
 	v := view.viewer_make({f32(centre.x), f32(centre.y)}, lab.world_ground_level(world, centre.x, centre.y),
 	                      {0, levels - 1})
+	if x, y, z, ok := lab.watcher_tile_of(&w, w.follow); ok do v.centre, v.focus = {f32(x), f32(y)}, z
 	v.selected = u64(w.follow)
 	panes := Panes{pane = pane}
 	if open != "" do panes_open(&panes, open, "", 0)
