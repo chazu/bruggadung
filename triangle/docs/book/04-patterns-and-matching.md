@@ -6,7 +6,11 @@ This chapter explains how to write a pattern and what a match gives.
 
 ## A pattern
 
-An instance whose type has no component kind is a pattern.
+You write a pattern as an instance, the same as a blueprint. The
+difference is in the types. A blueprint has a type that gives data to an
+entity, such as `#Wrench` ([chapter 3](03-blueprints.md)). A pattern has
+no such type, so the program cannot make an entity from it. The program
+can only match it.
 
 ```cue
 #Roles: { instrument: #Tool, target: #Fastener }
@@ -22,6 +26,13 @@ tighten: #Roles & {
     target:     #Nut & { size: $s, state: "loose" }
 } @family(operations)
 ```
+
+`loosen` and `tighten` are patterns. Their type is `#Roles`, and `#Roles`
+has no `@component` attribute, and no type above it has one. The fields
+`instrument` and `target` do contain `#Wrench` and `#Nut`, but only the
+types of the instance itself count, not the types of its fields. A
+`loosen` is not a thing in the world. It is a description of a situation:
+a wrench and a nut that go together.
 
 `loosen` has two **roles**: an instrument and a target. It says what each
 role needs. The instrument is a wrench. The target is a tight nut. The nut

@@ -43,8 +43,12 @@ The comment directly above `#Physical` is its **docstring**. Tools show it.
 The words that start with `@` are **attributes**. They give information to
 the program that uses the content.
 
-- `@component(Physical)` makes the type a **component kind**. The features
-  that the type introduces are the fields of the component.
+- `@component(Physical)` tells the program to keep data for this type. The
+  program keeps the state of each entity in records, and such a record is
+  a **component**. Here, each entity that is `#Physical` gets one
+  `Physical` component, a record with the fields `mass` and `material`. A
+  type with this attribute is a **component kind**. A type without it
+  gives no data to an entity. It is only a description.
 - `@field(content, saved)` sets the flags of a field. The flag `content`
   permits content to set the field. The engine keeps the other flags for
   the program.

@@ -11,11 +11,19 @@ is not a type, and it is not in the hierarchy.
 
 Instances are in two groups.
 
-- A **blueprint** is an instance whose type has a component kind. The
-  program constructs entities from it.
+- A **blueprint** describes a thing that the program can make. The engine
+  knows a blueprint by its types: one or more of them, or of the types
+  above them, has the attribute `@component`
+  ([chapter 2](02-types.md)). Thus an entity made from the instance has
+  data to keep.
 - All other instances are **patterns**: an operation, a method, an
-  interpretation rule. The program matches a pattern against descriptions.
-  [Chapter 4](04-patterns-and-matching.md) is about patterns.
+  interpretation rule. None of the types of a pattern has `@component`, so
+  the program cannot make an entity from it. The program matches a pattern
+  against descriptions. [Chapter 4](04-patterns-and-matching.md) is about
+  patterns.
+
+You do not mark an instance as a blueprint or as a pattern. Its types
+decide.
 
 ```cue
 wrench_19: #Wrench & {
@@ -25,8 +33,10 @@ wrench_19: #Wrench & {
 }
 ```
 
-`wrench_19` is a blueprint, because `#Wrench` is below `#Physical`, which
-is a component kind.
+`wrench_19` is a blueprint. Its type is `#Wrench`. `#Wrench` is below
+`#Physical`, and `#Physical` has `@component(Physical)`. An entity made
+from `wrench_19` thus has a `Physical` component, with a mass of 0.85 kg
+and steel as its material.
 
 ## The spec
 
