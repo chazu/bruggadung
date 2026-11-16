@@ -2,7 +2,7 @@
 
 This chapter explains how the engine does its work. You do not need it to
 write content. It helps you to understand the cost of each operation and
-the reasons for some rules of the language.
+the reasons for some language rules.
 
 ## The main fact: most unifications fail
 
@@ -113,6 +113,8 @@ A lazy node prints as its type.
 All nodes are in arenas. An arena allocates by a move of a pointer, and it
 frees all its nodes together.
 
+The design doc lists four sorts of arena:
+
 | Arena | Lifetime |
 | --- | --- |
 | Load | One content build |
@@ -121,7 +123,7 @@ frees all its nodes together.
 | Knowledge | One for each agent. Made smaller by a copy of the live descriptions |
 
 A program measures an arena with `tri_arena_bytes` and a feature structure
-with `tri_node_count`. To make a store of knowledge smaller, it copies the
+with `tri_node_count`. To make a knowledge store smaller, it copies the
 live descriptions into a new arena with `tri_copy`, and frees the old one.
 
 ## The quick check and the index
@@ -130,9 +132,9 @@ The index of a family holds the patterns by the type at the root of each
 role. For a description, it returns the patterns whose types are
 compatible.
 
-The **quick check** makes the index reject more patterns. For each family, the engine
-keeps the types at a small set of paths: those where matches fail most
-often. For a description, it compares the types at those paths by a meet
+The **quick check** makes the index reject more patterns. For each family,
+the engine keeps the types at a small set of paths: those where matches
+fail most often. For a description, it compares the types at those paths by a meet
 lookup. That rejects most patterns that would fail, before the full match.
 
 On the English Resource Grammar, 13 paths reject 97.6% of the failures, and
@@ -156,8 +158,9 @@ grammars. `tri_content_load_tdl` reads a grammar into the same syntax tree.
 This front end is not for content. It has two purposes:
 
 - **A large test.** The English Resource Grammar (ERG) is a large grammar
-  of English, made over many years. If the engine loads it and gives the
-  correct results, the engine is probably correct.
+  of English. If the engine loads it and gives the same results as a
+  second system, that is good evidence that the hierarchy and unification
+  are correct.
 - **A reference.** ACE is a fast parser for those grammars, written in C.
   The benchmark compares Triangle with ACE on the same work.
 

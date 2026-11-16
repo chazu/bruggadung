@@ -12,9 +12,10 @@ make game                 # build/libtriangle-game.a: no TDL front end
 cc -std=c11 -Iinclude app.c build/libtriangle.a -o app
 ```
 
-The lab links `libtriangle-game.a`. That library does not contain the TDL
-front end, which is only for tests and benchmarks
-([chapter 8](08-engine.md)).
+`libtriangle-game.a` does not contain the TDL front end, which is only for
+tests and benchmarks ([chapter 8](08-engine.md)). The lab links a library
+of the same sort through the Odin package: `make odin-lib` builds it into
+`build/<platform>/libtriangle.a`.
 
 ## The four objects
 
@@ -114,8 +115,10 @@ tri_arena_release(a, m);          /* x is gone */
 ```
 
 **Sharing.** The result of `tri_unify` can share nodes with its inputs. Do
-not free the arenas of the inputs while you use the result. Use `tri_copy`
-to get a feature structure that shares nothing.
+not free the arenas of the inputs while you use the result. The two inputs
+must not share a node at two different positions: do not unify a feature
+structure with one of its own parts. Use `tri_copy` to get a feature
+structure that shares nothing.
 
 **Read only.** Patterns and specs belong to the content build. Do not
 change them.
@@ -190,7 +193,7 @@ A number is exact when `lo == hi`. An open end is `INT64_MIN` or
 `INT64_MAX`.
 
 `tri_value` is stricter than content. A default (`*`) is an error. A
-disjunction of feature structures is an error.
+disjunction of feature structures, or of separate numbers, is an error.
 
 ## Blueprints
 
@@ -247,7 +250,7 @@ arithmetic cannot state, such as a value from a table.
 | `tri_match_hypotheses(...)` | Match against hypotheses with credences |
 | `tri_explain_instance(...)` | The match as text for a person |
 
-The result structure is:
+The result struct is:
 
 ```c
 typedef struct {
@@ -269,16 +272,16 @@ can be more.
 | `tri_conflicts(c, a, b, paths, max)` | Each path where the two conflict |
 | `tri_subsumes(c, a, b, &forward, &backward)` | Which one is more general. Both directions in one call |
 | `tri_lgg(c, a, b, out)` | The most specific feature structure that is more general than both |
-| `tri_generalize(c, node, path, steps, out)` | Memory decay: the node at the path goes up `steps` primary parents |
+| `tri_generalize(c, node, path, steps, out)` | Memory decay: the node at the path goes up `steps` primary parents at most. A number becomes wider by its `@widen` step for each step |
 
 ### Apply a pattern
 
 When one argument of `tri_unify` is the result of `tri_pattern`, the result
 has what the arithmetic of the instance gives. Step 3 of the program above
-does this. It is how a program builds the result of a rule from what
-matched its premises.
+does this. It is how a program builds the result of a Triangle rule from
+what matched its premises.
 
-Three rules apply:
+Three conditions apply:
 
 - Pass the pattern node itself. The engine finds the arithmetic by that
   node. A copy of the node does not have it.
@@ -358,7 +361,7 @@ kind, and a table of the fields.
 ```c
 /* Physical, from #Physical */
 typedef struct {
-    int64_t         mass;        /* mass, in quanta of 1g; content, saved */
+    int64_t         mass;    /* mass, in quanta of 1g; content, saved */
     uint32_t        material;    /* #Material: a type ID; content, saved */
 } BGPhysical;
 ```
@@ -367,7 +370,7 @@ typedef struct {
 - An enum is a `uint32_t` type ID.
 - A referent is a `uint64_t`.
 
-The table of fields gives the offset, the value type, and the `@field`
+The table of fields gives the offset, the value kind, and the `@field`
 flags of each field. With it, code can read and write a component that it
 does not know.
 

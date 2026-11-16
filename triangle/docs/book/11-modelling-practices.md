@@ -7,7 +7,8 @@ because a pattern is a term of Triangle.
 The authors of the content of the lab found each practice while they wrote
 that content. Each practice has the same parts: the problem, the practice,
 an example from the lab, why it works, and its limit. Where an example is
-shortened, `...` shows what is omitted.
+shortened, `...` shows what is omitted. Some shortened declarations are on
+one line where the file has many lines.
 
 The practices have one common aim. A new topic uses the mechanisms that
 exist. It does not need a mechanism of its own.
@@ -35,13 +36,14 @@ implements the ability asks only for the component.
 ```cue
 #Becoming: {
     @component(Becoming)
-    keepsFor:  *0ms | time & >=0ms & <=100d    @field(content, saved, inspect)
-    becomesAt: *0ms | time & >=0ms & <=10000d  @field(saved, proposable, inspect)
-    becomes:   *"spoiled_food" | text          @field(content, saved, inspect)
-    ending:    *"spoiled" | text               @field(content, saved, inspect)
+    keepsFor:      *0ms | time & >=0ms & <=100d     @field(content, saved, inspect)
+    becomesAt:     *0ms | time & >=0ms & <=10000d   @field(saved, proposable, inspect)
+    becomes:       *"spoiled_food" | text           @field(content, saved, inspect)
+    ending:        *"spoiled" | text                @field(content, saved, inspect)
     ...
 }
 
+...
 #Spoiled: #Body & #Perishable & { keepsFor: 10d, becomes: "" }
 ```
 
@@ -64,10 +66,13 @@ that introduces it.
 has only that one field.
 
 ```cue
-#Looks:  { look: text }
+#Looks: { look: text }
+...
 #OfKind: { kindOf: text }
-#Look:   #Looks & #OfKind & { prevails: *0 | int }
-#Seen:   #OfKind & {}
+...
+#Look: #Looks & #OfKind & { prevails: *0 | int }
+...
+#Seen: #OfKind & {}
 ```
 
 `#Look` and `#Seen` both say which kind of entity they are about. `kindOf`
@@ -115,7 +120,7 @@ entities.
 `""` for text, `false` for a flag.
 
 ```cue
-keepsWithin: *0ms | time & >=0ms & <=100d    @field(content, saved, inspect)
+    keepsWithin:   *0ms | time & >=0ms & <=100d     @field(content, saved, inspect)
 ```
 
 **Why it works.** A blueprint says only what is special about it. The spec
@@ -171,7 +176,9 @@ An operation that writes `actor` and `item` has roles of the type
 item?" by the type of its roles.
 
 **Limit.** A new role needs a new type in this hierarchy. Add the type at
-the root, because the roles are vocabulary for all topics.
+the root, because the roles are vocabulary for all topics. In November
+2026 the code of the lab knows three roles only: `actor`, `item` and
+`destination`. A fourth role needs a change to that code too.
 
 ### 7. Before and after in one pattern
 
@@ -213,8 +220,8 @@ operation repeats the same code.
 of entries of those types. One procedure applies each sort.
 
 ```cue
-#Moves: #OfSome & { moved: ref, into: #Place, passes: bool, lends: bool, until: time }
-
+#Moves:    #OfSome & { moved: ref, into: #Place, passes: bool, lends: bool, until: time }
+...
 give: #Operation & {
     roles: {
         actor:       #Agent & { id: $a }
@@ -248,10 +255,10 @@ the type.
 
 ```cue
 #Taking: #Operation & { roles: { actor: #Agent, item: #Body } }
-
+...
 take:    #Taking & { contest: "quickness", ... }
 take_up: #Taking & { contest: "quickness", duration: 1s, uses: ["hands"], hard: "fail", ... }
-
+...
 theft_law: #Law & { forbids: "#Taking", wrong: "anothers", brings: "arrest", weighs: 40, common: true }
 ```
 
@@ -259,9 +266,9 @@ The law forbids the type. Each operation below `#Taking` is a taking,
 including one that a new topic adds later. In the same way, each operation
 below `#Resting` is a rest, and the lab gives it a watch on the air.
 
-The design doc for effects decided the same for two cases that change
-different amounts: to cook a portion of a stack and to cook all of it are
-two operations.
+The design doc for effects ([EFFECTS.md](../../../EFFECTS.md), decision 3)
+decided the same for one operation with two cases that differ. To cook a
+portion of a stack and to cook all of it are two operations.
 
 **Why it works.** Each operation stays a simple pattern. The agent sees two
 entries on the menu and can choose. The type is the place where the common
@@ -284,9 +291,10 @@ the instances in a family. The code reads the family.
 
 ```cue
 vat_seen: #Seen & { kindOf: "#Vat" } @family(seen)
-
-body_look:  #Look & { kindOf: "#Body", look: "body", prevails: -1 } @family(looks)
-agent_look: #Look & { kindOf: "#Agent", look: "agent", prevails: 3 } @family(looks)
+...
+body_look:      #Look & { kindOf: "#Body", look: "body", prevails: -1 } @family(looks)
+agent_look:     #Look & { kindOf: "#Agent", look: "agent", prevails: 3 } @family(looks)
+...
 
 coat_persists: #Persistence & { feature: "coat", persists: 1d } @family(persistence)
 ```
@@ -312,9 +320,9 @@ the author needs.
 it needs it.
 
 ```cue
-#Wort: #Body & #Becoming & { ..., becomes: "sour_wort", within: "#Vat", becomesWithin: "ale", ... }
-
-steps: [#Do & { op: "put_in", object: "work", target: "vat" }]
+#Wort: #Body & #Becoming & { ..., becomes: "sour_wort", ..., within: "#Vat", ..., becomesWithin: "ale", ... }
+...
+    steps: [#Do & { op: "put_in", object: "work", target: "vat" }]
 ```
 
 **Why it works.** The link is loose. A method can name an operation of a
@@ -335,11 +343,12 @@ much attention a body loses as its reserves fall.
 curves: straight between the points, constant beyond the ends.
 
 ```cue
-#Point:    { input: int, output: int }
+#Point:         { input: int, output: int }
+...
 #Weakness: { weakens: "attention" | "pace" | "perception" | "grip", lost: [...#Point] }
 
-weak_attention: #Weakness & { weakens: "attention",
-                              lost: [{ input: 0, output: 50 }, { input: 40, output: 25 }, { input: 80, output: 0 }] } @family(weakness)
+weak_attention:  #Weakness & { weakens: "attention",
+                               lost: [{ input: 0, output: 50 }, { input: 40, output: 25 }, { input: 80, output: 0 }] } @family(weakness)
 ```
 
 **Why it works.** An author changes the behaviour with numbers. The numbers
@@ -406,10 +415,12 @@ A goal and a method both match against the goal frame. Declare a slot that
 two goal frames share on a type above both.
 
 ```cue
-#Frame:   { me: #Agent }
+#Frame: { me: #Agent }
+...
 #Warming: #Frame & { stove: #Body }
+...
 #Brewing: #Warming & { vat: #Body, store: #Body, work: #Body }
-
+...
 set_it_to_work: #Method & {
     title: "set it to work"
     goal:  "brew_on"
@@ -444,12 +455,18 @@ chooses the sort by the type of its `done`.
 
 ```cue
 #Condition: { find: [...text], match: #Frame }
-#Looked:    #Condition & { looked: text }
-#Did:       #Condition & { did: text, lately: time }
-#None:      #Condition & { none: true }
-
+...
+#Looked:  #Condition & { looked: text }
+#Did:     #Condition & { did: text, lately: time }
+...
+#None:    #Condition & { none: true }
+...
 eat_when_hungry: #Goal & { ..., done: #Did & { did: "eat" }, ... }
-vat_seen_to:     #Goal & { title: "see to the vat", done: #Looked & { looked: "vat" } } @family(goals)
+...
+vat_seen_to: #Goal & {
+    title: "see to the vat"
+    done:  #Looked & { looked: "vat" }
+} @family(goals)
 ```
 
 `#None` holds when no referent that the agent believes in matches. The goal
@@ -481,7 +498,7 @@ lab/content/hunger/eating.tri    package hunger: food, and the operation eat
 can use the same field name. A topic refers to the root and to other
 topics. The root never refers to a topic.
 
-**Limit.** There is one level of directories. A topic that becomes large
+**Limit.** Topic directories do not nest. A topic that becomes large
 divides into files, not into directories below it.
 
 ### 17. A header that states the limits
@@ -507,8 +524,8 @@ each place where the content stops and something different continues.
 ```
 
 **Why it works.** The header states what the content does not do. "code:
-none" is a claim that a reader can check. A change that moves a cut point
-changes the header in the same commit.
+none" is a statement that a reader can check. A change that moves a cut
+point updates the header in the same change.
 
 **Limit.** A header can become wrong. A reviewer must read it with each
 change.

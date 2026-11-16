@@ -38,7 +38,8 @@ short. A technical term has one meaning. The terms are those of
 ## The other documents
 
 The book does not replace the other documents. It gives the ideas and the
-reasons. The other documents give the full rules.
+reasons. The other documents give each language rule and each function in
+full.
 
 | Document | Contents |
 | --- | --- |
@@ -59,7 +60,7 @@ reference and the code disagree, the code is correct.
   (`test_docs_guide`) loads the guide and checks its results. The test
   does not read this book.
 - Some examples of chapters 2 to 6 are not in the workshop: `maker`,
-  `long_spanner`, `#Person` and `#Larder`. They are small illustrations.
+  `ada_wrench`, `#Person` and `#Larder`. They are small illustrations.
   Some are from the content of the lab, and the text says so.
 - The examples of chapters 10 to 12 are from the content of the lab, in
   [lab/content](../../../lab/content). They were correct in November 2026.
@@ -73,15 +74,22 @@ reference and the code disagree, the code is correct.
 | Word | Meaning |
 | --- | --- |
 | Content | The Triangle source that authors write: types, blueprints, operations, goals |
+| Topic | One part of the content that crosses systems, such as hunger. Each topic has its own directory |
 | Engine | The C library that loads content and operates on it |
 | Bruggadung | The project: a roguelike with many simulated systems. The framework comes first, then the game |
 | Lab | The simulation laboratory of the project, in Odin, in `lab/`. It implements the systems and proves them by scenarios |
 | Program | The code that uses the engine. In this project, the lab |
 | Entity | Anything with identity in the simulation: a person, a tool, a claim |
+| Blueprint | Content that says how to make entities of one kind ([chapter 3](03-blueprints.md)) |
+| Operation | Content that says what an agent can do: to take, to eat ([chapter 10](10-substrate.md)) |
 | Feature, field | A feature is a named attribute of a type. In content, an author writes it as a field |
 | Open, concrete | A value is concrete when it is one exact value. It is open when it is not concrete: a range, or a type |
 | Percept | What an agent perceives of an entity at one time, as a description |
+| Referent | What an agent takes to be one entity, from what it perceived ([chapter 10](10-substrate.md)) |
 | Seed | A 64-bit number from which construction makes its choices. The program gives one to each entity |
 | Load | To read all content files and resolve them. The result is one **content build** |
 | Feature structure | A graph of typed nodes. All content is made of feature structures |
+| Atom | A value that is a name, written as a string: `"steel"` ([chapter 2](02-types.md)) |
+| Pattern | A feature structure that a program matches against descriptions ([chapter 4](04-patterns-and-matching.md)) |
+| Description | A feature structure that describes something: what an agent knows, or what is true |
 | Level of detail | How exactly the simulation simulates something: full, reduced, abstract or frozen |

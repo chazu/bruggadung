@@ -64,13 +64,14 @@ time, on a type above both:
 #Way:  #Link & { length: length }
 ```
 
-This language rule is strict. It lets the engine know the type of a
-feature structure from its features: `{ from: "hall" }` is a `#Link`. It
-also finds mistakes. Two authors cannot use one field name for two
-different meanings.
+This language rule is strict. Because of it, the engine knows the type of
+a feature structure from its features: `{ from: "hall" }` is a `#Link`.
+The language rule also prevents a mistake: two authors cannot use one
+field name for two different meanings.
 
-Packages relax this language rule between topics. Two packages can each have a
-feature of the same name. See [chapter 6](06-clauses-packages-tools.md).
+Packages relax this language rule between topics. Two packages can each
+have a feature of the same name. See
+[chapter 6](06-clauses-packages-tools.md).
 
 ## Types are closed
 
@@ -82,7 +83,7 @@ unknown feature 'colour'
 ```
 
 In addition, each feature structure is **totally well-typed**. Each node
-has each feature of its type, although the content does not write it. A
+has each feature of its type, also when the content does not write it. A
 feature that the content does not write has the most general value that its
 type permits. That value means "nothing is known".
 
@@ -106,8 +107,8 @@ between mild steel and forged steel.
 This small hierarchy is useful in two ways:
 
 - A blueprint can say `"steel"`, and each wrench gets one of the two kinds.
-- An agent that forgets goes up the hierarchy. `"forged"` becomes `"steel"`,
-  and then `#Material`.
+- When an agent forgets, a value goes up the hierarchy. `"forged"` becomes
+  `"steel"`, and then `#Material`.
 
 A string that some enum lists is the atom of that enum, in all content. A
 string that no enum lists is free text, of the built-in type `text`.
@@ -143,8 +144,8 @@ A type can have many parents. A type that an author conjoins with others to
 add features and defaults is a **mixin**:
 
 ```cue
-#Metal:  #Physical & { material: *"steel" }
-#Wooden: #Physical & { material: *"oak" }
+#Metal:   #Physical & { material: *"steel" }
+#Wooden:  #Physical & { material: *"oak" }
 ```
 
 ## The meet of two types
@@ -166,24 +167,26 @@ Authors do not write these types. The build log lists them.
 ## A type is a constraint
 
 The body of a type is a constraint. Each feature structure of the type
-satisfies it. This is how content states a rule that is always true:
+satisfies it. This is how content states a constraint that is always true:
 
 ```cue
 #Stack: #Body & {
     ...
     count:    $n & int & >=1 & <=100000 ...
     unitMass: $u & mass                 ...
+    ...
     mass:     $u * $n
 }
 ```
 
-This is a type from the lab, shortened. It says that the mass of each stack
-is the mass of one unit times the count. No code computes the mass. The
-type does. ([Chapter 4](04-patterns-and-matching.md) explains the tags `$n`
+This is a type from the lab, shortened: `...` shows what is omitted. It
+says that the mass of each stack is the mass of one unit times the count.
+No code of the lab computes the mass. The engine computes it from the
+type. ([Chapter 4](04-patterns-and-matching.md) explains the tags `$n`
 and `$u`. [Chapter 5](05-computed-values.md) explains the arithmetic.)
 
 Triangle has no separate syntax for "if an entity is X, then Y". To state
-such a rule, declare the type X and put Y in its body.
+such a constraint, declare the type X and put Y in its body.
 
 ## Disjunction in a type
 
@@ -254,7 +257,7 @@ Additions let one topic add its fields to a type of a different topic.
 | `int` | Whole numbers |
 | `fixed` | Numbers with three decimal places |
 | `text` | Free text |
-| `ref` | A handle to an entity at runtime: `ref(12)` |
+| `ref` | A handle to a referent or an entity at runtime: `ref(12)` |
 | `mass`, `length`, `time`, `force`, `torque`, `heat`, `temperature`, `volume`, `amount` | Quantities, with units |
 
 Previous: [1. What Triangle is](01-introduction.md).

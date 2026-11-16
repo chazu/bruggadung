@@ -80,6 +80,8 @@ package cooking
 #Larder: #Container & { larder: bool }
 ```
 
+This `#Larder` is an illustration. It is not the `#Larder` of the lab.
+
 ### What a package owns
 
 Types, instances, component kinds and features belong to their package. Two
@@ -162,10 +164,11 @@ that has only warnings is correct to use.
 
 ### The formatter
 
-`triangle fmt` changes only spaces. It never joins or divides a line. It
-aligns fields that are on consecutive lines. It writes nothing if the
-result would change the meaning of the content. The lab keeps all content
-in this layout, and its checks fail if a file is not.
+`triangle fmt` changes only the white space in a line. It never joins or
+divides a line. It aligns fields that are on consecutive lines. It writes
+nothing if the result would change the meaning of the content. The lab
+keeps all content in this layout: `make check` in the lab fails if `fmt`
+would change a file.
 
 ### The language server
 
@@ -178,10 +181,11 @@ There is a mode for Emacs in `triangle/emacs`.
 
 ### Export
 
-`triangle export` writes what `cue export` writes. The command writes a
-blueprint as its spec. It writes a value that the spec leaves open as its
-constraint, such as `">=10mm & <=24mm"`. Open values are the purpose of a
-blueprint, so they are not an error.
+`triangle export` writes instances as JSON or YAML, as `cue export` does.
+The command writes a blueprint as its spec, and a pattern as the content
+writes it. It writes a value that the spec leaves open as its constraint,
+such as `">=10mm & <=24mm"`. Open values are the purpose of a blueprint,
+so they are not an error. The option `--concrete` makes them an error.
 
 ## The content hash
 

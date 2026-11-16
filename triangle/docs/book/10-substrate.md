@@ -2,8 +2,9 @@
 
 Bruggadung is a project to make a roguelike with many simulated systems.
 The **lab**, in `lab/`, is the simulation laboratory of the project. It
-implements the systems in Odin and proves them by scenarios. Its largest
-scenario is a village: agents, tools, food, air, heat, knowledge and law.
+implements the systems in Odin and proves them by scenarios. One scenario
+is a village: twelve people and a watch officer, with work, a market and
+homes.
 
 This chapter explains how the lab uses Triangle. The aim of the design is
 that an author adds a new topic to the simulation with content only, and
@@ -30,7 +31,7 @@ For each new feature of the simulation, ask these questions in order:
 1. Can content say this with the mechanisms that exist?
 2. If not, which general mechanism is missing?
 
-A special case in code is the last answer.
+Write a special case in code only when no general mechanism is possible.
 
 ## The life of content in the lab
 
@@ -41,13 +42,15 @@ A special case in code is the last answer.
 | 3. Check | The lab refuses content that does not agree with its code | `world_with_content` |
 | 4. Run | The systems read specs and patterns, and make descriptions | The rest of this chapter |
 
-Step 3 has three checks:
+Step 3 has four checks:
 
 - The content hash must be the hash that `components.odin` was generated
   from. If not, the message tells you to run `make gen`.
 - Each operation must do something. An operation with no effect and no
   trace is an error. (A **trace** is physical evidence that an event
   leaves.)
+- A declared effect must name roles and fields that exist. The parts of a
+  declared effect are in a later section of this chapter.
 - Each progression must name a component and fields that exist.
 
 These checks find, at the start, mistakes that would give no message
@@ -63,6 +66,8 @@ of a record in the lab.
     @component(Body)
     mass:      mass                    @field(content, saved, proposable, inspect, perceive(touch))
     material:  #Material               @field(content, saved, inspect, perceive(sight))
+    // what its material looks like, if not itself (KNOWLEDGE.md §4): the
+    // senses report it instead; an analysis reaches beneath it
     surface:   *"natural" | "metal" | "wood" | "flesh" | "paper" @field(content, saved, inspect, appears(material))
     bent:      *false | true           @field(saved, proposable, inspect, perceive(sight))
     toolMarks: *0 | int & >=0 & <=100  @field(saved, proposable, inspect, perceive(sight))
@@ -73,18 +78,21 @@ The generator writes one Odin struct for each component kind, and a table
 that describes each field. The lab never writes the list of fields a second
 time.
 
-The flags of `@field` control the general mechanisms of the lab:
+The flags of `@field` control general mechanisms. The engine enforces the
+flag `content`. The lab reads the other flags from the table of fields.
 
-| Flag | Effect |
+| Flag | Effect in November 2026 |
 | --- | --- |
-| `content` | Content can set the field. The loader enforces this |
-| `saved` | The lab writes the field to a save |
-| `proposable` | An effect can propose a change to the field |
-| `inspect` | Tools for developers show the field |
-| `perceive(sight)` | An agent that sees the entity learns the field |
+| `content` | Content can set the field. The engine enforces this at load |
+| `proposable` | An effect can propose a change to the field. The lab refuses a proposal to a field that does not have the flag |
+| `perceive(sight)` | The field is in the description of what an agent perceives. The lab tests only that the flag is there. It does not test which sense the flag names |
+| `appears(material)` | The field says what a different field looks like. The senses report it in place of that field |
+| `saved` | The intent is that the lab saves the field. The lab does not test this flag: a save contains each field of each component |
+| `inspect` | The intent is that tools for developers show the field. The lab tests it in one place: a description for developers and tests that includes fields which an agent cannot perceive |
 
-Because of the flags, a new field needs no code to be saved, shown or
-perceived. The author writes the flags, and the mechanisms apply.
+Because of the flags and the table of fields, a new field needs no code to
+be saved, proposed or perceived. The author writes the field and its
+flags, and the general mechanisms apply.
 
 An entity type conjoins component types. The blueprint `ale` has the type
 `#Stack & #Food`. Thus ale has the components Body, Stack, Food and
@@ -105,7 +113,7 @@ two.
 ## Two sources of descriptions
 
 The engine matches patterns against descriptions. The lab has two sources
-of descriptions, and the difference is fundamental.
+of descriptions, and the difference is important.
 
 | Source | What it contains | Who uses it |
 | --- | --- | --- |
@@ -196,7 +204,7 @@ To resolve a declared effect is one unification.
    `moves`, and the other parts. The lab reads each concrete value there
    and makes a **proposal** from it.
 
-A proposal is a change that an effect asks for. The lab applies the
+A proposal is a change that an effect asks for. The lab commits the
 proposals of one effect together, or none of them.
 
 For `eat`, the tag `$n` is the nourishment of the real food. After the
@@ -207,13 +215,20 @@ Arithmetic works in the same step. The operation that takes one handful
 from a patch says, in part:
 
 ```cue
-roles: { item: #Patch & { handfuls: $h & >=1, yields: $y } }
-after: { item: #Patch & { handfuls: $h - 1 } }
+forage: #Operation & {
+    ...
+    roles: {
+        ...
+        item:  #Patch & { handfuls: $h & >=1, yields: $y }
+    }
+    ...
+    after: { item: #Patch & { handfuls: $h - 1 } }
+} @family(operations)
 ```
 
 The pattern brings its arithmetic into the unification
 ([chapter 5](05-computed-values.md)). The lab reads the new number from the
-result. No code subtracts.
+result. The lab has no code that subtracts a handful.
 
 ### The lab uses the requirements two times
 
@@ -300,7 +315,7 @@ pattern. Some families of the lab:
 | `seen` | Which kinds of entity an agent can tell by sight | Perception |
 | `looks`, `glyphs` | What to draw for each kind of entity | The viewers |
 | `progressions` | What an entity does by itself as time passes | The progressions domain |
-| `values`, `prices` | What entities are worth | Agency, the market |
+| `values`, `prices` | The value of entities to an agent, and their prices in coins | Agency, the market |
 | `terrain` | The terrain kinds | The terrain system |
 
 To add a member, an author writes one declaration. No list in the code
@@ -340,10 +355,11 @@ The lab simulates what is near the player at full detail, and what is far
 at less detail. There are four levels of detail: full, reduced, abstract
 and frozen.
 
-Each content file starts with a header that lists its **cut points**: what
-changes at each level of detail, what goes to other topics, and what the
-code does that the content does not say. The header is the place where an
-author states the limits of the file.
+Each content file starts with a header that lists its **cut points**. A
+cut point is a place where the content of the file stops and something
+different continues: a different level of detail, a different topic, or
+code. The header is the place where an author states the limits of the
+file.
 
 ## Saves
 
@@ -378,9 +394,9 @@ Content cannot say everything, and should not. These parts stay in the lab:
 - perception: who perceives which event
 - the named effects: `#Effect` in `actions.tri` lists 22 names, such as
   `walk`, `strike` and `shoot`
-- how proposals become changes, and who wins a conflict
+- how the lab commits proposals, and which proposal wins a conflict
 
-The direction of the work is to make this list shorter.
+The aim of the work is to make this list shorter.
 [EFFECTS.md](../../../EFFECTS.md) gives the progress.
 
 Previous: [9. What Triangle borrows](09-heritage.md).

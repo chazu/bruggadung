@@ -8,9 +8,9 @@ There are two groups, and the difference is important:
 - **Constraints** hold wherever the feature structure goes: at load, at
   construction, at runtime. Arithmetic and string interpolation are
   constraints.
-- **Load-time tools** run one time when content loads. Then they are gone.
-  `let`, comprehensions, most built-in functions, and comparisons are
-  load-time tools.
+- **Load-time tools** run one time when content loads. The engine replaces
+  each of them with its result. `let`, comprehensions, most built-in
+  functions, and comparisons are load-time tools.
 
 ## Arithmetic
 
@@ -145,8 +145,8 @@ comprehension cannot make declarations.
 ## Built-in functions
 
 Triangle has a part of the built-in functions of CUE: `len`, `div`, `mod`,
-and parts of the packages `strings`, `list` and `math`. No `import` is
-necessary.
+`quo`, `rem`, and parts of the packages `strings`, `list` and `math`. No
+`import` is necessary.
 
 ```cue
 let sizes = [10mm, 13mm, 17mm, 19mm, 24mm]
@@ -171,7 +171,7 @@ The slots of `rack` are `[13mm, 17mm, 19mm, 24mm]`. Its stock of steel is
 
 These functions run at load, on data that is known then. The engine
 replaces each call with its result. Comparisons (`==`, `<`) and logic
-(`&&`, `||`, `!`) follow the same rule.
+(`&&`, `||`, `!`) follow the same language rule.
 
 A comparison between two open fields is not a constraint in Triangle.
 Arithmetic and tags relate fields. A third mechanism would make matching
@@ -180,8 +180,8 @@ more complex.
 ## Text
 
 A string that no enum lists has the type `text`. Strings have the escapes
-of CUE. A **raw string**, `#"…"#`, has no escapes. Use it for regular
-expressions.
+of CUE. In a **raw string**, `#"…"#`, a backslash is an ordinary
+character. Use a raw string for regular expressions.
 
 ```cue
 #Labelled: {

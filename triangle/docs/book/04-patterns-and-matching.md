@@ -1,8 +1,8 @@
 # 4. Patterns and matching
 
 A **pattern** is a feature structure that the program matches against
-descriptions. Operations, methods and interpretation rules are patterns. This chapter
-explains how to write a pattern and what a match gives.
+descriptions. Operations, methods and interpretation rules are patterns.
+This chapter explains how to write a pattern and what a match gives.
 
 ## A pattern
 
@@ -50,7 +50,8 @@ a `$s` in a different declaration have no relation.
 
 ### A name copies, a reference shares
 
-This difference is important, and it is different from CUE.
+This difference is important. In CUE, a reference passes constraints in
+one direction only.
 
 | Syntax | Meaning |
 | --- | --- |
@@ -83,7 +84,7 @@ Here is `loosen` against four descriptions. In each, the wrench is 19 mm.
 | 13 mm | Incompatible: `target.size: 19mm vs 13mm` | |
 | Nothing | Unknown | `target.size`, `target.state` |
 
-For numbers, the rule is about intervals:
+For numbers, the result depends on the intervals:
 
 - If the interval of the description is inside the interval of the pattern,
   the pattern is entailed there.
@@ -102,8 +103,9 @@ Residual paths make partial knowledge useful:
 - An agent can take a residual path as a goal. If the residual path is
   `target.size`, the agent goes to measure the nut.
 - An **interpretation rule** is content that says what an agent concludes
-  from what it perceives. It concludes only if its premises are entailed.
-  An agent never concludes from what it does not know.
+  from what it perceives. The agent concludes only if the premises of the
+  interpretation rule are entailed. An agent never concludes from what it
+  does not know.
 
 ## Bindings
 
@@ -125,7 +127,7 @@ residuals: target.size
 A pattern can have a disjunction of feature structures, as a blueprint can.
 The engine expands it into variants at load.
 
-A match against a pattern with variants has this rule:
+A match against a pattern with variants has this result:
 
 - entailed, if one variant or more is entailed
 - incompatible, if all variants are incompatible
@@ -146,9 +148,10 @@ take: #Taking & {
 ```
 
 `take` has three variants: one for an item in a container, one for an item
-on the ground, and one for an item that is installed in an assembly. A
-description of an item in a container entails the first variant, so it
-entails `take`.
+on the ground, and one for an item that is installed in an assembly.
+Suppose that a description says that the item is in a container, and that
+the actor has a free hand. The description entails the first variant, so
+it entails `take`.
 
 ## Competing hypotheses
 
@@ -172,8 +175,9 @@ gives the patterns that can match. It never omits a pattern that matches.
 It can include some that do not.
 
 `@quickcheck(target.state)` names a path where matches often fail. The
-index compares the types at those paths first. That comparison is one
-lookup in a table. It rejects most patterns before the full match starts.
+index compares the types at those paths first. Each comparison is one
+lookup in a table. The comparisons reject most patterns before the full
+match starts.
 
 Do not guess the paths. The engine can record the paths where matches
 fail while tests run. Then it writes the `@quickcheck` attribute for you.
@@ -189,9 +193,9 @@ program unifies a pattern with a description, the result has all that both
 say. The tags of the pattern carry values from one part of the result to a
 different part.
 
-This is how a Triangle rule makes its conclusion. The premises and the conclusion
-are parts of one pattern. Tags connect them. When the premises unify with a
-description, the conclusion is complete.
+This is how a Triangle rule makes its conclusion. The premises and the
+conclusion are parts of one pattern. Tags connect them. When the premises
+unify with a description, the conclusion is complete.
 [Chapter 5](05-computed-values.md) gives an example with arithmetic.
 
 ## Memory and recognition

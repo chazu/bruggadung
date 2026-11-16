@@ -34,14 +34,14 @@ takes from each.
 | System | What it is | What Triangle takes |
 | --- | --- | --- |
 | TDL | The type description language of Krieger and Schäfer. A variant of it is the language of the DELPH-IN grammars | The meaning of the language |
-| LKB | The Linguistic Knowledge Builder of Copestake: a grammar development system that reads TDL | With TDL: the type discipline. Its defaults are the origin of YADU |
+| LKB | The Linguistic Knowledge Builder of Copestake: a grammar development system that reads TDL | With TDL: the type discipline. The LKB has defeasible constraints, which PET removed |
 | PET, ACE | Fast parsers for DELPH-IN grammars, in C++ and C | The engine techniques. ACE is also the reference for tests |
 | LOGIN, LIFE | Logic programming languages of Aït-Kaci and others, with typed terms in place of Prolog terms | The encoding of meets. Matching by entailment |
-| Troll, ConTroll | Systems from Tübingen with strict typing and constraints on types | Constraints attached to types. No syntax for implication |
+| Troll, ConTroll | Systems from Tübingen with strict typing and constraints on types | Closed types, and constraints attached to types. No syntax for implication |
 | ALE, TRALE | The Attribute Logic Engine of Carpenter and Penn, and its successor | Nothing directly. ALE is evidence against an abstract machine (not verified) |
 | ProFIT | Erbach's Prolog with features, inheritance and templates | The idea of features at fixed positions |
-| LiLFeS | A logic programming language with feature structures, from Tokyo. The Enju parser uses it | With CUF: definite clauses over feature structures |
-| CUF | A constraint formalism from Stuttgart | Delayed goals: arithmetic in a clause waits |
+| LiLFeS | A logic programming language with feature structures, from Tokyo. The Enju parser uses it | With CUF: definite clauses over feature structures, and delayed goals |
+| CUF | A constraint formalism from Stuttgart | With LiLFeS: the clause layer |
 | The TFS system of Emele and Zajac | An early typed feature structure system | Nothing directly. The study covered it |
 | CUE | A configuration language. It is not a grammar system, but its implementation notes ground it in typed feature structures and the LKB (not verified) | The syntax |
 
@@ -101,9 +101,11 @@ The first difference has a strong reason. A pattern must let information go
 in both directions. If the simulation learns the size of the nut, the
 pattern must constrain the wrench. A one-way reference cannot do that.
 
-Triangle writes a reference with a dot at the start: `.instrument.size`. In
-CUE it is a plain name, found by scope. The dot makes a reference easy to
-see. A field that moves into a nested feature structure keeps its meaning.
+Triangle writes a reference with a dot at the start: `.instrument.size`.
+The path starts at the root of the declaration. In CUE a reference is a
+plain name, found by scope. With the dot, a tool can tell a reference from
+a name. A reference also keeps its meaning when an author moves its field
+into a nested feature structure.
 
 ## PET and ACE: the engine
 
@@ -130,35 +132,37 @@ Resource Grammar. Then its results can be compared with those of ACE. See
 Two ideas come from the work of Aït-Kaci and his colleagues.
 
 **Meets by bit vectors.** Aït-Kaci, Boyer, Lincoln and Nasr (1989) showed
-how to give each type a code, so that the meet of two types is the bitwise
+how to give each type a code. The meet of two types is then the bitwise
 AND of their codes. Triangle uses this encoding.
 
-**Matching by entailment.** In LIFE, a function does not unify its
-arguments with the call. It checks if the call *entails* the pattern of the
-function. If the call is too general to decide, the function waits. LIFE
-calls this residuation (not verified).
+**Matching by entailment.** The study reports this of LIFE (not verified).
+LIFE matches the arguments of a function by entailment: it checks if the
+call *entails* the pattern of the function. If the call is too general to
+decide, the function suspends: it waits for more information.
 
-Triangle takes this idea and changes one part. A simulation cannot wait for
-more information. So the engine does not suspend. It returns the third
-result, *unknown*, with the **residual paths**. The program decides what to
-do: permit the action, or find out.
+Triangle takes this idea and changes one part. A match in a simulation
+cannot wait for more information. So a match does not suspend. It returns
+the third result, *unknown*, with the **residual paths**. The program
+decides what to do: permit the action, or find out. Arithmetic keeps the
+suspension: a result stays open until its operands are known.
 
 ## YADU: defaults
 
-Defaults are dangerous in a unification system. In many designs, the result
-depends on the order in which the defaults apply.
+Defaults are difficult in a unification system. The result can depend on
+the order in which the defaults apply.
 
-YADU, by Lascarides and Copestake (1999), is a default unification that
-does not depend on order. A more specific default wins over a more general
-one. Defaults are cheap to combine and costly only to resolve, one time for
-each object (not verified).
+The study reports this of YADU, by Lascarides and Copestake (1999) (not
+verified). YADU is a default unification that does not depend on order. A
+more specific default wins over a more general one. Defaults are cheap to
+combine and costly only to resolve, one time for each object.
 
-Triangle takes the rule of specificity from YADU. It resolves defaults one
-time, when it makes a spec.
+Triangle takes the language rule of specificity from YADU. It resolves
+defaults one time, when it makes a spec.
 
 Triangle departs from YADU in one case. Where two defaults from unrelated
-types conflict, YADU keeps their generalisation. Triangle drops both, gives
-a warning, and leaves the field open. An author then sees the conflict.
+types conflict, YADU keeps their generalisation: a value that no author
+wrote. Triangle drops both, gives a warning, and leaves the field open. An
+author then sees the conflict.
 
 ## Kiefer and others: no disjunction in the unifier
 
@@ -189,15 +193,14 @@ attached to a type. It does not take a general syntax for implication. To
 state "each X is Y", an author declares the type X and writes Y in its
 body.
 
-That a feature structure can have only the features of its type is a
-different idea. It is the appropriateness of Carpenter, and Triangle has it
-from TDL.
+The design doc names two sources for closed types: TDL, and the
+closed-world typing of Troll.
 
 ## ProFIT, and Wintner and Francez: features at fixed positions
 
 Erbach's ProFIT compiles typed terms to Prolog terms with a fixed number of
 arguments. Then plain unification of terms does typed unification. Wintner
-and Francez used fixed positions in an abstract machine.
+and Francez also put features at fixed positions.
 
 The plan of Triangle was to give each feature a fixed position in its node.
 The engine as built sorts the arcs by feature. The effect is similar: two
@@ -211,12 +214,13 @@ report. Triangle has no abstract machine. It has C structs.
 ## LiLFeS and CUF: definite clauses
 
 LiLFeS and CUF are logic programming languages over feature structures.
-Triangle takes its clause layer from them:
+Triangle takes two ideas for its clause layer from them:
 
-- From LiLFeS: definite clauses whose terms are feature structures, solved
-  by resolution.
-- From CUF: delayed goals. Arithmetic in a clause waits until its arguments
-  are known.
+- definite clauses whose terms are feature structures, solved by
+  resolution, as in LiLFeS
+- delayed goals: arithmetic in a clause waits until its arguments are known
+
+The design doc names the two systems together as the source of both ideas.
 
 The layer is small. It has no negation and no cut. Clauses are for short
 inferences about relations, not for search.
@@ -240,13 +244,14 @@ inferences about relations, not for search.
 | An abstract machine | One report (not verified) says that an encoding as terms ran faster than a special machine |
 | Structural types | A wrench and a nut with the same fields must stay different |
 | Negation and cut in clauses | Clauses are for short inferences only |
-| Comprehensions that make declarations | Each declaration must be visible in the source |
+| Comprehensions that make declarations | The design doc lists them as not adopted. It gives no reason |
 | Comparisons as constraints between open fields | Arithmetic and tags already relate fields |
 
 ## What Triangle adds or changes
 
 The sources are about grammars and configuration. A simulation needs more.
-Some of these parts are new. Some change an idea from a source.
+Some of these parts are new: they do not come from one of the sources
+above. Some change an idea from a source.
 
 | Part | New, or changed from | Purpose |
 | --- | --- | --- |
@@ -254,7 +259,7 @@ Some of these parts are new. Some change an idea from a source.
 | Intervals as partial knowledge, and arithmetic as a constraint on intervals | Changed from the bounds of CUE | "About 19 mm" is a value that the engine can match |
 | Variation from a seed, with a seed for each path | New | Different entities from one blueprint. The same seed gives the same entity |
 | The spec: a blueprint resolved at load | New | Construction is fast and has no defaults |
-| A third result of a match, with residual paths | Changed from the residuation of LIFE | Agents act and plan with partial knowledge |
+| A third result of a match, with residual paths | Changed from the suspension of LIFE | Agents act and plan with partial knowledge |
 | Matching against hypotheses with credences | New | Uncertain identity with no disjunction |
 | Generalisation along the primary parent, and `@widen` | New | Memory decay |
 | `@component` and `@field` | New | The records of the program are generated from content |

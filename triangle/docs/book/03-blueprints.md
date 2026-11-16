@@ -62,7 +62,7 @@ quantity.
 | `volume` | 1 mL | `mL`, `L`, `m3` |
 | `amount` | 1 mmol | `mmol`, `mol` |
 
-The rules are:
+The language rules are:
 
 - A literal converts exactly. `0.85kg` is 850 quanta of mass.
 - A literal that is not a whole number of quanta is an error. `0.05mm` is
@@ -102,13 +102,13 @@ nothing more specific decides the field.
 }
 ```
 
-The value of `wear` is in the range 0 to 1000, and it is 0 if no one says
-more. The operator `&` binds more tightly than `|`, so the expression is
-`*0 | (>=0 & <=1000)`.
+The value of `wear` is in the range 0 to 1000, and it is 0 if no
+declaration says more. The operator `&` binds more tightly than `|`, so
+the expression is `*0 | (>=0 & <=1000)`.
 
 ### Which default wins
 
-Types can give different defaults for one field. The rule is
+Types can give different defaults for one field. The language rule is
 **specificity**:
 
 1. A default of a more specific type wins over a default of a more general
@@ -139,7 +139,7 @@ warning: hammer: conflicting defaults for material from #Wooden, #Metal; both dr
 `mallet` gives its own default, so its material is `"ash"`.
 
 The order of the types in the conjunction does not change the result. This
-is important. In many languages, the last one wins, and a small edit
+is important. In a language where the last declaration wins, a small edit
 changes the meaning. In Triangle, only specificity decides.
 
 ### Defaults exist only at load
@@ -194,7 +194,7 @@ Four seeds give four nuts:
 #Nut & { mass: 5g, material: "steel", size: 16mm, state: "loose" }
 ```
 
-### The rules of construction
+### The language rules of construction
 
 - The same seed always gives the same entity.
 - Each open field is a **variation point**. Each variation point has its
@@ -254,20 +254,27 @@ The meaning of `|` depends on its position. This table is a summary.
 | An instance | Feature structures, or separate numbers | Variants |
 | A runtime value | Feature structures, or separate numbers | An error |
 
-In each position, the engine resolves the disjunction before runtime: into
-types, into a choice at construction, or into variants. No disjunction of
-feature structures stays in a feature structure at runtime.
+The engine resolves each disjunction at load or at construction. At load,
+a disjunction becomes types or variants. At construction, the engine
+chooses one alternative. No disjunction of feature structures stays in a
+feature structure at runtime.
 
 ## A copy of an instance
 
 An instance can name another instance. That makes a copy:
 
 ```cue
-long_spanner: spanner & { maker: "Ada" }
+ada_wrench: wrench_19 & { maker: "Ada" }
 ```
 
-The copy has all that `spanner` says, and what it adds. A name always
-copies. If you change the copy, the original does not change.
+The copy has all that `wrench_19` says, and what it adds. (`maker` is the
+field that an addition gave to `#Tool` in [chapter 2](02-types.md).) A name
+always copies. If you change the copy, the original does not change.
+
+**Caution.** A copy of an instance that has variants does not get the
+variants. It gets their generalisation: what all the variants say. A copy
+of `spanner` has a size from 13 mm to 19 mm and a mass from 200 g to
+350 g. Construction chooses the two values separately.
 
 Previous: [2. Types and feature structures](02-types.md).
 Next: [4. Patterns and matching](04-patterns-and-matching.md)

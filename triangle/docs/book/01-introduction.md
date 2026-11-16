@@ -9,7 +9,7 @@ that an author writes to describe that world:
 - the specific entities: a 19 mm wrench of forged steel
 - the operations: to take, to eat, to tighten a nut
 - the goals of an agent, and the methods that achieve them
-- the rules by which an agent interprets what it sees
+- the interpretation rules: what an agent concludes from what it perceives
 
 Triangle is one language for all of these. A file of Triangle has the
 extension `.tri`.
@@ -56,8 +56,8 @@ about the state. It is *more general* than the first one. Each entity that
 the first one describes, the second one describes too.
 
 This order, from general to specific, is the most important idea of
-Triangle. Less
-information is not an error. It is a more general description.
+Triangle. Less information is not an error. It is a more general
+description.
 
 ## Three operations
 
@@ -71,8 +71,9 @@ The engine has three main operations on feature structures.
 
 Each purpose of the simulation uses these operations:
 
-- To make an entity, the engine unifies the types of a blueprint with what
-  the blueprint says. Then it chooses a value for each field that is open.
+- A **blueprint** says how to make entities of one kind. To make an
+  entity, the engine unifies the types of a blueprint with what the
+  blueprint says. Then it chooses a value for each field that is open.
 - To decide what is possible, the engine matches the pattern of an
   operation against a description.
 - When an agent sees something, the simulation makes a **percept**: a
@@ -82,7 +83,7 @@ Each purpose of the simulation uses these operations:
 
 ## The third result
 
-A match has three results, not two.
+A match has one of three results, not one of two.
 
 | Result | Meaning |
 | --- | --- |
