@@ -13,6 +13,10 @@ Documentation:
 - [docs/REFERENCE.md](docs/REFERENCE.md): the grammar, built-in types, units,
   every attribute, the rules for defaults and variation, and every diagnostic
 - [docs/API.md](docs/API.md): embedding the engine from C and Odin
+- [docs/book](docs/book/README.md): a book, in simplified technical English:
+  the language, the C API, the engine, what Triangle borrows from typed
+  feature structure grammars and from CUE, how bruggadung's lab uses it as a
+  substrate for simulation, and patterns for modelling phenomena reusably
 - [The command-line tool and the editor](#the-command-line-tool-and-the-editor):
   `triangle check`, `triangle inspect`, the language server, and Emacs
 
@@ -56,7 +60,7 @@ TRI_PROPS_SCALE=10 ./build/test properties     # ten times the randomised cases
 | `src/xtree.c` | Syntax tree printing and construction |
 | `src/util.c` | Arenas, symbols, maps, diagnostics |
 | `odin/` | The Odin package, `triangle`, with its tests |
-| `docs/` | The guide, the language reference, and the embedding API |
+| `docs/` | The guide, the language reference, the embedding API, and the book (`docs/book/`) |
 | `tests/` | Core tests; the three scenarios and the example file from CONTENT_LANGUAGE.md; every feature; randomised property tests and source fuzzing; a small TDL grammar; a leak check against a counting allocator |
 | `bench/erg.c` | Benchmark against a TDL grammar such as the English Resource Grammar |
 | `bench/content.c` | Benchmark of a synthetic content build shaped like bruggadung's |

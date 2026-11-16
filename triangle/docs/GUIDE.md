@@ -342,6 +342,36 @@ ratchet: #Ratchet & { material: "steel", size: 30cm, mass: 1kg, arm: 0.25m, forc
 each use is its value afresh. Its name may not be an instance's or a built-in
 type's, so it never hides one.
 
+`math.Min`, `math.Max` and `math.Clamp` are arithmetic too. Unlike the other
+built-in functions (§10), they take tags and wait for them, as `+ - * /` do.
+With them a pattern can say what a field is *after* something happens, and
+keep the result inside the field's bounds:
+
+```cue
+// Using a tool wears it: by 10, and never past worn out.
+#Use: { tool: #Tool, after: #Tool }
+
+use: #Use & {
+    tool:  { wear: $w }
+    after: { wear: math.Clamp($w + 10, 0, 1000) }
+}
+
+worn_use: use & { tool: { wear: 995 } }
+```
+
+`use` is a pattern (§8): `#Use` has no component. Its arithmetic is part of
+it, and goes where the pattern goes:
+
+- **Into a copy by name.** `worn_use` copies `use` and adds a wear of 995, so
+  its `after.wear` is `1000`: 1005, clamped.
+- **Into a unification at runtime.** The game unifies `use`'s pattern with a
+  description of a real tool (`tri_unify` with `tri_pattern`'s result; §13).
+  If the tool's wear is 400, the result's `after.wear` is `410`. If it is
+  only known to be between 100 and 200, the result is between 110 and 210.
+
+This is how bruggadung's content states what an operation does: the pattern
+names the roles before, and the same pattern computes the roles after.
+
 ## 10. Data: comprehensions and functions
 
 `for` and `if` make a list's items, or a struct's fields, from data written
@@ -395,7 +425,8 @@ rack: #Rack & {
 All of this is expanded when content loads, so nothing else ever sees a
 comprehension or a call. Their sources and arguments must be known by then:
 `for s in .slots` reads the slots as written in this declaration, not values
-that unification computes later. That is the one place they differ from CUE.
+that unification computes later. That is one place they differ from CUE;
+the other is that a comprehension can't make declarations.
 
 ## 11. Text
 
@@ -517,7 +548,7 @@ standing for the `.tri` files in it and in its subdirectories:
 ```text
 $ triangle check examples/workshop
 examples/workshop/blueprints.tri:21:1: warning: hammer: conflicting defaults for material from #Wooden, #Metal; both dropped
-ok: 72 types, 18 instances, 6 components, 1 warning; hash …
+ok: 73 types, 20 instances, 6 components, 1 warning; hash …
 $ triangle inspect rack examples/workshop        # the spec, and where each value came from
 $ triangle fmt examples/workshop                 # spacing, indentation and alignment, in place
 $ triangle export -e wrench_19 examples/workshop
@@ -567,3 +598,6 @@ change what the content means.
   and Odin.
 - [CONTENT_LANGUAGE.md](../../CONTENT_LANGUAGE.md): the specification, with the
   reasoning, scenarios, and research behind each decision.
+- [The Triangle book](book/README.md): the ideas behind the language, the
+  engine, what Triangle borrows and from where, and how bruggadung's content
+  uses it, with patterns for modelling.

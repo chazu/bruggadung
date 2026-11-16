@@ -178,6 +178,10 @@ const TriNode *entity = tri_construct(c, "nut", seed, a); /* every variation poi
   Matching uses it. With variants, `tri_pattern_variant_count` and
   `tri_pattern_variant` give each one, and `tri_pattern` is their
   generalisation.
+  The pattern carries the instance's own arithmetic: `tri_unify` with a
+  pattern as one argument works that arithmetic out in the result (below).
+  With several variants, each variant's pattern carries its own, and the
+  generalised `tri_pattern` carries none.
 - `tri_spec` is the blueprint with its defaults resolved. Its open fields
   are its variation points (`tri_spec_variation_path`).
 - `tri_spec_note` gives notes on how the spec was made: where each default
@@ -242,6 +246,24 @@ case TRI_INCOMPATIBLE: /* ruled out at r.failure.path */ break;
 - `tri_unify(c, a, b, out, &failure)` gives the most general structure that
   both describe, or `NULL` with the first failing path. Mind the sharing rule
   above.
+- **Applying a pattern.** When `a` or `b` is the result of `tri_pattern`
+  (of an instance with one variant) or of `tri_pattern_variant`, the result
+  also holds what the instance's
+  arithmetic gives (`+ - * /`, `math.Min`, `math.Max`, `math.Clamp`). This
+  is how a rule's result is built from what matched its premises:
+
+  ```c
+  /* use: #Use & { tool: { wear: $w }, after: { wear: math.Clamp($w + 10, 0, 1000) } } */
+  const TriNode *d = tri_value(c, "#Use & { tool: #Wrench & { wear: 400 } }", a, NULL, 0);
+  const TriNode *r = tri_unify(c, tri_pattern(c, "use"), d, a, &failure);
+  /* tri_at(c, r, "after.wear") is 410; NULL r means a requirement of `use` does not hold,
+     and failure.path says which */
+  ```
+
+  The arithmetic is found by the pattern's own node, so pass the pattern
+  itself, not a copy of it. It does not go with `r` into a further
+  `tri_unify`: put everything the pattern needs into one description.
+  REFERENCE.md (Arithmetic) gives the rules.
 - `tri_conflicts(c, a, b, paths, max)` gives every path where `a` and `b`
   conflict. Recognition weighs these against the paths that agree.
 - `tri_subsumes(c, a, b, &forward, &backward)` tests both directions at once:

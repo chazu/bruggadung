@@ -800,6 +800,17 @@ void test_docs_guide(void)
     /* §9–10: arithmetic and clauses */
     CHECK_STR(printed(c, tri_at(c, tri_spec(c, "breaker"), "torque")), "40Nm");
     CHECK_STR(printed(c, tri_at(c, tri_spec(c, "ratchet"), "reach")), "280mm");
+    /* §9: arithmetic goes with its pattern, into a copy by name and a unification at runtime */
+    {
+        TriFailure uf;
+        CHECK_STR(printed(c, tri_at(c, tri_pattern(c, "worn_use"), "after.wear")), "1000");
+        const TriNode *used = tri_unify(c, tri_pattern(c, "use"), tri_value(c, "#Use & { tool: #Wrench & { wear: 400 } }", a, NULL, 0), a, &uf);
+        CHECK(used != NULL);
+        if (used) CHECK_STR(printed(c, tri_at(c, used, "after.wear")), "410");
+        used = tri_unify(c, tri_pattern(c, "use"), tri_value(c, "#Use & { tool: #Wrench & { wear: >=100 & <=200 } }", a, NULL, 0), a, &uf);
+        CHECK(used != NULL);
+        if (used) CHECK_STR(printed(c, tri_at(c, used, "after.wear")), ">=110 & <=210");
+    }
     CHECK_STR(printed(c, tri_at(c, tri_spec(c, "gearbox"), "teeth.rest.first")), "48");
     /* §10–11: data and text */
     const TriNode *rack = tri_spec(c, "rack");

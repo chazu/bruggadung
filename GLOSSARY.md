@@ -538,6 +538,12 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
 - **Goal**: a desired state or ongoing condition ("not hungry", "promise
   kept"), done when its `done` pattern holds. Not a recipe's stopping
   condition. (AGE d1)
+- **Goal frame**: what a goal and its methods are about (`#Frame` in
+  content): the agent itself, as `me`, and a slot for each entity
+  involved, each bound to a referent. A goal's frame is the type of its
+  `done` pattern; a slot a goal and its subgoal share is declared once, on
+  a type both frames inherit, and its binding passes between them. Not
+  Tessera's **frame**. (lab/content/agency.tri)
 - **Goal generator**: a source of candidate goals: needs, routine,
   commitments, reactive, instrumental, social. (AGE §4)
 - **Consideration**: one scored input to a goal's worth: a fixed-point
@@ -1232,11 +1238,12 @@ Each row says which term to use for which sense.
 | stage | a stage of an activity | **modifier stage** |
 | mode | a regime's setting for a system | **view** (Tessera) |
 | view | Tessera's truth or knowledge | **knowledge view** (the query interface) |
+| frame | Tessera's complete scene | **goal frame** (agency's `#Frame`: a goal's slots) |
 | merge / split | always qualified | referents merging; stacks splitting; air joining and parting |
 | history | the log of committed events | **use record** (an assembly's) |
 | reveal | a latent part made an entity | **analysis** (reading beneath appearance) |
 | hypothesis | competing beliefs | **identity hypothesis**; design hypotheses are not domain terms |
-| generalise | memory decay and news, along primary parents | **anti-unify** (`tri_generalize`, structures) |
+| generalise | memory decay and news, along primary parents (`tri_generalize`) | **anti-unify** (`tri_lgg`: two feature structures) |
 | spec | a resolved blueprint | **design doc** |
 | cell | what is stored for a tile | **planet cell** (Orogen's coarse grid) |
 | seed | an entity's seed | **world seed**; a unit's seed (latent); **seed to sow** (`#Seed`), named by what it sows: seed grain, turnip seed |

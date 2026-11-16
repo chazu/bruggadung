@@ -595,7 +595,10 @@ is an error rather than unified.
 ## Arithmetic
 
 - Operands are numbers, tags, references, and parenthesised arithmetic.
-  Operators are `+ - * /`.
+  Operators are `+ - * /`. `math.Min(a, b)`, `math.Max(a, b)` and
+  `math.Clamp(x, lowest, highest)` are arithmetic too
+  ([Built-in functions](#built-in-functions)): they take the same operands
+  and wait for them in the same way, but never narrow backwards.
 - Every tag in an arithmetic expression must also be bound to a field of the
   same declaration. A reference always is.
 - Values carry exponents over m, kg, s, K and mol. Sums and differences need
@@ -613,6 +616,28 @@ is an error rather than unified.
 - Arithmetic of constants folds at load: `size: 2 * 9.5mm` is `19mm`.
 - It applies everywhere structures are made: type expansions, patterns,
   specs, construction, runtime values, unification, and clause resolution.
+- **An instance's arithmetic goes with its pattern.** A type's arithmetic is
+  part of the type, so it holds wherever the type is. An instance's own
+  arithmetic is kept with the instance's pattern, and goes to two places:
+  - **A copy by name.** With `base: #Box & { w: $w, h: $h, girth: ($w + $h) * 2 }`,
+    the copy `derived: base & { w: 10mm, h: 20mm }` has a `girth` of `60mm`.
+    The copy may be at the root of a declaration or inside a structure.
+  - **A unification with the pattern at runtime.** `tri_unify` with the
+    result of `tri_pattern` as either argument finds the instance's
+    arithmetic and works it out in the result. For an instance with several
+    variants, each variant's pattern (`tri_pattern_variant`) has that
+    variant's arithmetic, and the generalised `tri_pattern` has none. So an
+    operation that says `roles: { item: { handfuls: $h & >=1 } }` and
+    `after: { item: { handfuls: $h - 1 } }`, unified with a description
+    whose `handfuls` is 3, gives an `after.item.handfuls` of 2. An open
+    argument gives an open result: `>=2 & <=4` gives `>=1 & <=3`.
+
+  Two limits:
+  - It does not go with the *result* of such a unification into a further
+    one. Arithmetic still open in the result is dropped there, so unify the
+    pattern with everything it needs in one description.
+  - A copy by name of an instance that has several variants drops the
+    instance's arithmetic.
 
 ## Interpolation
 

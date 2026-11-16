@@ -19,3 +19,13 @@ let socket = 30mm
 #Ratchet: #Lever & { reach: .arm + socket }
 
 ratchet: #Ratchet & { material: "steel", size: 30cm, mass: 1kg, arm: 0.25m, force: 60N }
+
+// Using a tool wears it: by 10, and never past worn out.
+#Use: { tool: #Tool, after: #Tool }
+
+use: #Use & {
+    tool:  { wear: $w }
+    after: { wear: math.Clamp($w + 10, 0, 1000) }
+}
+
+worn_use: use & { tool: { wear: 995 } }
