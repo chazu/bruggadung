@@ -615,6 +615,22 @@ apply_declared_effect :: proc(world: ^World, action: Action, stage: i64, amount:
 	if result == nil {
 		return fmt.tprintf("%s fails at %s", action.operation, cstring(&failure.path[0]))
 	}
+	/* an operation with alternatives (`place: #Inside | #OnTile`) has a
+	 * pattern for each variant, and `pattern` is only what they all say: it
+	 * holds none of the alternatives, and none of the operation's
+	 * arithmetic. The truth must fit one of them, and the effect is that
+	 * one's: the first that fits. */
+	if variants := uint(tri.pattern_variant_count(tc, action.operation)); variants > 1 {
+		first: tri.Failure
+		result = nil
+		for v: uint = 0; v < variants && result == nil; v += 1 {
+			result = tri.unify(tc, tri.pattern_variant(tc, action.operation, v), truth, arena, &failure)
+			if v == 0 do first = failure
+		}
+		if result == nil {
+			return fmt.tprintf("%s fails at %s", action.operation, cstring(&first.path[0]))
+		}
+	}
 
 	/* moves: first, since units moved off a stack are that role from then
 	 * on, and `after` speaks of them */

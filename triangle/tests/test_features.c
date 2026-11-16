@@ -833,6 +833,17 @@ void test_docs_guide(void)
     tri_content_free(c);
 }
 
+/* A path that is a directory is an error, not an empty source: fopen opens
+ * one on macOS and Linux. (On Windows it doesn't open at all.) */
+void test_load_directory(void)
+{
+    const char *paths[] = { "docs" };
+    TriContent *c = tri_content_load(paths, 1);
+    CHECK(!tri_content_ok(c));
+    CHECK(has_diag(c, "docs", 1));
+    tri_content_free(c);
+}
+
 /* --- from an independent audit of the spec against the code ---------------------------------- */
 
 void test_tag_residuals_and_bindings(void)

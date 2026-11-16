@@ -56,6 +56,20 @@ test_declared :: proc() {
 	at = world_location_of(w, other)
 	bg_check(at.form == .On_Tile && at.x == 1 && at.y == 1 && at.level == 0)
 
+	/* an operation with alternatives (take: from a container, the ground
+	 * or an assembly) is resolved against each: what is in another's hand
+	 * fits none, though what they all say (a place) it does; what lies on
+	 * the ground fits one, and is taken */
+	theirs := test_commit_create(c, "iron_nail", held_by(taker, 0))
+	g = proposal_group_group_with_phase(.Action, "test: taken from a hand")
+	reason = apply_declared_effect(w, action_make("take", giver, theirs, NO_ENTITY), 0, 0, g)
+	bg_check(strings.contains(reason, "take fails at roles.item.place"))
+	bg_check(proposal_group_count(g) == 0)
+	g = proposal_group_group_with_phase(.Action, "test: taken from the ground")
+	reason = apply_declared_effect(w, action_make("take", giver, other, NO_ENTITY), 0, 0, g)
+	bg_check(reason == "")
+	bg_check(proposal_group_count(g) > 0)
+
 	/* every operation in the content says what it does */
 	bg_check(declared_check(world_tri(w)) == "")
 

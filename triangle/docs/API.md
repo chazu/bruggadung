@@ -90,7 +90,9 @@ if (!tri_content_ok(c)) { tri_content_free(c); return 1; }
 tri_content_free(c);
 ```
 
-- `tri_content_load(paths, n)` reads files. `tri_content_load_strings(names, sources, n)` reads
+- `tri_content_load(paths, n)` reads files. Each path is a file: a
+  directory is an error (`cannot read …: it is not a file`), since the
+  library doesn't walk directories as the `triangle` command does. `tri_content_load_strings(names, sources, n)` reads
   sources from memory, using `names` in diagnostics. Both always return a
   content object, even on errors.
 - `tri_content_ok` is true when there are no errors. Warnings are allowed.

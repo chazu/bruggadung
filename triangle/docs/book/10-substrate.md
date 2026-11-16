@@ -197,7 +197,8 @@ To resolve a declared effect is one unification.
 
 1. The lab writes the truth projection of the entities that fill the roles.
 2. It unifies the pattern of the operation with that description
-   (`tri.unify`).
+   (`tri.unify`). For an operation with variants, it uses the first variant
+   that unifies.
 3. If unification fails, a requirement does not hold. The path of the
    failure is the reason, and the action fails.
 4. If unification succeeds, the tags carried the real values into `after`,

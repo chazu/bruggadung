@@ -1,6 +1,7 @@
 #include "internal.h"
 
 #include <ctype.h>
+#include <limits.h>
 #include <time.h>
 
 /* Loading: building feature structures from the syntax tree, type expansions,
@@ -4371,13 +4372,26 @@ static TriContent *load_common(const char *const *names, const char *const *sour
         if (from_files) {
             FILE *f = fopen(names[i], "rb");
             if (!f) { diag(c, true, noloc, "cannot open %s", names[i]); ok = false; continue; }
-            fseek(f, 0, SEEK_END);
-            long len = ftell(f);
-            fseek(f, 0, SEEK_SET);
+            /* a directory opens, on some systems, and then doesn't read:
+             * without this it would load as an empty source, and pass */
+            long len = fseek(f, 0, SEEK_END) == 0 ? ftell(f) : -1;
+            if (len < 0 || len == LONG_MAX || fseek(f, 0, SEEK_SET) != 0) {
+                fclose(f);
+                diag(c, true, noloc, "cannot read %s: it is not a file (a directory's files are named one by one)", names[i]);
+                ok = false;
+                continue;
+            }
             owned = malloc((size_t) len + 1);
             size_t got = fread(owned, 1, (size_t) len, f);
+            bool bad = ferror(f) || got != (size_t) len;
             owned[got] = 0;
             fclose(f);
+            if (bad) {
+                free(owned);
+                diag(c, true, noloc, "cannot read %s: it is not a file (a directory's files are named one by one)", names[i]);
+                ok = false;
+                continue;
+            }
             src = owned;
         }
         ok &= parse_source(c, intern(c, names[i]), src, &c->decls);

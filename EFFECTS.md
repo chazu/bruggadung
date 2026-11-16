@@ -7,7 +7,7 @@ work are built: step 2 in Triangle (arithmetic that goes with a pattern;
 `math.Min`, `math.Max`, `math.Clamp`), steps 1 and 3 in
 `lab/src/act_declared.odin`: `after`, `moves`, `makes`, `consumes`,
 `emits` and `changes`, for an operation or a stage. Step 4 is under way
-(21 named effects are left), and of step 5, resting. The rest
+(22 named effects are left), and of step 5, resting. The rest
 is a draft. It takes up
 REVIEW.md §3.1 (and step 7 of its order of work) and turns it into a design
 that could be built an operation at a time.
@@ -590,7 +590,7 @@ Two things it ran into:
   }`), each a field of a component its blueprint has, set as it is made;
   and a thing made with no `at` is made nowhere. Wort is as heavy as the
   grain by what `mash` says, and hiring is declared (a bond, its two
-  ends): 21 named effects are left. `mash` still takes one portion: ale
+  ends): 22 named effects are left. `mash` still takes one portion: ale
   is a stack, a measure a portion's weight, and a becoming makes one
   unit.
 - **A method matches only what is seen.** `mashesInto` had to be

@@ -16,7 +16,7 @@ Documentation:
 - [docs/book](docs/book/README.md): a book, in simplified technical English:
   the language, the C API, the engine, what Triangle borrows from typed
   feature structure grammars and from CUE, how bruggadung's lab uses it as a
-  substrate for simulation, and patterns for modelling phenomena reusably
+  substrate for simulation, and practices for modelling phenomena reusably
 - [The command-line tool and the editor](#the-command-line-tool-and-the-editor):
   `triangle check`, `triangle inspect`, the language server, and Emacs
 

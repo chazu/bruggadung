@@ -152,7 +152,12 @@ parents.
 - Any other instance is a **pattern**: an operation, a rule, a clause. Its
   spec is made only on request.
 - An instance may name another instance in its definition, which copies it:
-  `long_spanner: spanner & { … }`. An instance may not refer to itself.
+  `worn_wrench: wrench_19 & { … }`. An instance may not refer to itself.
+  A copy of an instance with several variants is a copy of their
+  generalisation (what `tri_pattern` gives), not of the variants: what
+  each variant held together (a 13 mm spanner's mass) is open in the copy,
+  each field over all the variants' values, and drawn by itself; the
+  instance's arithmetic is dropped too ([Arithmetic](#arithmetic)).
 - An instance's name may not be a built-in type's name.
 
 **Features.** A feature belongs to the type that introduces it: the most
@@ -891,6 +896,7 @@ location of the other declaration where there is one.
 | Message | Cause |
 | --- | --- |
 | `cannot open file` | |
+| `cannot read path: it is not a file (a directory's files are named one by one)` | A path given to `tri_content_load` is a directory, or doesn't read. The `triangle` command takes directories and finds their files; the library takes files. |
 | `includes nested too deeply at file` | TDL `:include` deeper than 32. |
 | `this library was built without the TDL front end (TRI_NO_TDL); cannot read file` | `tri_content_load_tdl` in the game build. |
 

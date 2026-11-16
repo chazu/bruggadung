@@ -1,18 +1,19 @@
 package lab
 
 /*
- * BGView — what an actor can bind and what it can tell about each entity:
- * the stub of the knowledge view (ACTIONS.md §3, KNOWLEDGE.md §13) until
- * perception exists. It is the truth projection, limited the way the menu
- * contract requires:
+ * View: what an actor can bind and what it can tell about each entity, as
+ * its senses give it now (ACTIONS.md §3, KNOWLEDGE.md §13): the truth
+ * projection, limited the way the menu contract requires. The menu and a
+ * commanded action are matched against it (act_actions.odin), and
+ * perception reads what an agent perceives through it
+ * (know_knowledge_2.odin); what an agent decides from is its knowledge
+ * (agency_agency.odin), which remembers, fades and can be wrong.
  *
  *   - formulate: only entities in reach can be bound (the actor's tile and
  *     the eight around it, and anything inside, held, or installed there)
  *   - appearsBeginnable: a description carries only fields whose @field
  *     flags say they can be perceived; hidden fields stay open, so they make
  *     a match unknown, and unknown never excludes
- *
- * (ported from the Objective-C lab's act/BGView.m)
  */
 
 import "core:fmt"

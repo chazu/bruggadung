@@ -372,8 +372,10 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
 ## Domains
 
 - **Domain**: owns one family of stock kinds and the algorithm that
-  advances them: atmosphere, thermal, fluid, light. *Avoid:* system (for
-  these specifically). (DOM d1)
+  advances them: atmosphere, thermal, fluid, light. The lab has domains
+  too for what isn't a stock but changes by itself: bodies (hunger),
+  perishing (what becomes), progressions, traces, hunting. *Avoid:* system
+  (for these specifically). (DOM d1; lab/src/domains_*.odin)
 - **Stock**: a conserved, integer quantity with a home: 400 L in a
   cistern, heat in a stove. A **stock kind** is owned by one domain and
   declares its quantum and split rule. Below full detail, also a count
@@ -960,9 +962,10 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
   hypotheses, a **credence mass** for each. (CL d10, §9)
 - **Family**: instances grouped by `@family(name)`, with a pattern index
   and a **quick check**. (CL §8, §12)
-- **Rule** (Triangle): a feature structure an engine applies in its own
+- **Rule** (Triangle): a feature structure a system applies in its own
   fixed way: an operation, recipe, method, interpretation rule, curve,
-  norm. "No rule engine searches." Not an institution's rule. (CL d9, §10)
+  norm. No system searches for rules to apply ("No rule engine searches",
+  CL §10). Not an institution's rule. (CL d9, §10)
 - **Definite clause**: `#Clause` / `#Fact`, solved by resolution with a
   depth limit, for short recursive inferences. (CL §10)
 - **Attribute**: `@name(...)`: `@component`, `@field`, `@family`,

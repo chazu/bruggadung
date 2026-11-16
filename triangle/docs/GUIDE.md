@@ -596,8 +596,8 @@ change what the content means.
   types, units, and diagnostics.
 - [API.md](API.md): loading content, matching, construction, and saves from C
   and Odin.
-- [CONTENT_LANGUAGE.md](../../CONTENT_LANGUAGE.md): the specification, with the
+- [CONTENT_LANGUAGE.md](../../CONTENT_LANGUAGE.md): the design doc, with the
   reasoning, scenarios, and research behind each decision.
 - [The Triangle book](book/README.md): the ideas behind the language, the
   engine, what Triangle borrows and from where, and how bruggadung's content
-  uses it, with patterns for modelling.
+  uses it, with practices for modelling.

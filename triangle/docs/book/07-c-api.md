@@ -157,9 +157,8 @@ build for other work unless `tri_content_ok` is true.
 The load functions take file paths, not directories. The `triangle` command
 finds the files of a directory itself.
 
-**Caution.** If you pass a directory to `tri_content_load`, the result has
-no error and no diagnostic. It contains only the built-in types. Make sure
-that each path is a file.
+If you pass a directory to `tri_content_load`, the result has an error:
+`cannot read …: it is not a file`.
 
 ## Types
 
