@@ -258,7 +258,7 @@ held_alike :: proc(world: ^World, holder: Entity_ID, blueprint: string) -> Entit
 	name := world_intern(world, ns_utf8(blueprint))
 	unit := world_unit_of_blueprint(world, name)
 	raw  := printed(tc, tri.at(tc, tri.pattern(tc, name), "raw"))
-	for e in held[:min(world_entities_at(world, holder, .Held_By, raw_data(held[:]), 8), 8)] {
+	for e in world_entities_at_in(world, holder, .Held_By, held[:], "things an agent holds") {
 		was: i64
 		u := world_unit_of(world, e)
 		if !world_is_stack(world, e) || u == nil || unit == nil || string(u) != string(unit) do continue
@@ -288,13 +288,12 @@ owners_among :: proc(world: ^World, claims: []Entity_ID) -> []Entity_ID {
 /* The claims of a kind (`"ownership"`, quoted as content writes it) on an
  * entity itself. */
 claims_on :: proc(world: ^World, entity: Entity_ID, kind: cstring) -> []Entity_ID {
-	claims: [64]Entity_ID
-
 	found  := make([dynamic]Entity_ID, context.temp_allocator)
 	of     := u32(tri.type_named(world_tri(world), kind))
 	kclaim := world_kind_named(world, "Claim")
-	n := world_edges_to(world, .Claim_Subject, entity, &claims[0], 64)
-	for c in claims[:min(n, 64)] {
+	claims := world_edges_to_all(world, .Claim_Subject, entity)
+	defer delete(claims)
+	for c in claims {
 		claim := (^Claim)(world_record(world, kclaim, c))
 		if claim != nil && u32(claim.kind) == of do append(&found, c)
 	}

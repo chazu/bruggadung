@@ -310,14 +310,21 @@ knowledge_conflicts_of :: proc(self: ^Knowledge, r: ^Referent, store: ^Knowledge
                                paths: [^]u8, length: uint, agree: ^i32) -> i32 {
 	x: ^tri.Node
 	y: ^tri.Node
-	found: [8][256]u8
 	n: uint
 	i: uint
 
 	/* both from the store's knowledge arena */
 	x      = knowledge_store_parsed(store, fmt.tprintf("%s & {{ %s }}", kind, know_lasting(knowledge_store_recall(store, r))))
 	y      = knowledge_store_parsed(store, fmt.tprintf("%s & {{ %s }}", kind, know_lasting(features)))
-	n      = tri.conflicts(world_tri(self.world), x, y, &found[0], 8) if x != nil && y != nil else 0
+	/* tri.conflicts stops at the room it has: given more, until there is
+	   room to spare, every conflict is counted */
+	room: [8][256]u8
+	found := room[:]
+	for x != nil && y != nil {
+		n = tri.conflicts(world_tri(self.world), x, y, raw_data(found), uint(len(found)))
+		if n < uint(len(found)) do break
+		found = make([][256]u8, 2 * len(found), context.temp_allocator)
+	}
 	paths[0] = 0
 	for i = 0; i < n; i += 1 {
 		k1_cat(paths, length, fmt.tprintf("%s%s", ", " if i != 0 else "", k1_buf(found[i][:])))

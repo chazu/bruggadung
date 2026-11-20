@@ -176,11 +176,18 @@ run_tests :: proc(tests: []Test_Case, only: string) -> i32 {
 			clear(&interpretation_missed)
 			failures += 1
 		}
+		if len(cap_faults) != 0 {
+			for line in cap_faults do fmt.printf("    cap fault: %s\n", line)
+			take_cap_faults()
+			failures += 1
+		}
 		fmt.printf("%s %s\n", "ok  " if failures == before else "FAIL", tests[i].name)
 		run += 1
 	}
 	fmt.printf("%d tests, %d checks, %d failed\n", run, checks, failures)
 	delete(interpretation_missed)
+	delete(cap_faults)
+	cap_faults = nil
 	if shared_content != nil do tri.content_free(shared_content)
 	shared_content = nil
 	free_released_content()

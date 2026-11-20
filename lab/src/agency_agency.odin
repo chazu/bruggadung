@@ -98,9 +98,11 @@ import "core:strings"
 import tri "../../triangle/odin/triangle"
 
 
-BG_MAX_INTENTIONS  :: 16
-BG_MAX_SLOTS       :: 8
-BG_MAX_QUESTIONS   :: 8
+/* Fixed caps (core_faults.odin): past one is a fault. A mind's other lists
+ * (its commitments, questions, what it settled and weighed, its talks and
+ * debts) grow as they need. */
+BG_MAX_INTENTIONS  :: 16     /* goals deep: past it, a way that wants another subgoal fails */
+BG_MAX_SLOTS       :: 8      /* a goal's or a method's slots */
 
 BG_BUSY_COST       :: 3      /* per point of attention the running activity demands */
 BG_COMMITTED       :: 5      /* for holding a goal of its own */
@@ -108,15 +110,14 @@ BG_WORTH           :: 10     /* what a thing is worth, with no value authored fo
 BG_VETO            :: 1000   /* what a veto counts: more than anything else can weigh */
 BG_MARGIN          :: 5      /* what another goal must beat the current one by */
 BG_INTERRUPT       :: 5      /* and more, to interrupt an activity under way */
-BG_MAX_SETTLED     :: 16
-BG_MAX_COMMITMENTS :: 16
-BG_MAX_ACTED       :: 16      /* the instant operations whose last doing a mind remembers */
+BG_MAX_ACTED       :: 16      /* the instant operations whose last doing a mind remembers: past it,
+                                 the one done longest ago is forgotten (no fault) */
 BG_KEPT_RETRY :: i64(600000)     /* ms: a kept goal found impossible is tried again ten minutes later */
 BG_NEED_RETRY :: i64(7200000)    /* ms: a need's goal found impossible is weighed again two hours later (rationing:
                                     the meal packed at dawn is eaten at work, not at once) */
 @(private = "file") BG_AGAIN_WITHIN :: i64(1000)     /* ms: an act done again so soon is done again to no end... */
 @(private = "file") BG_AGAIN_TIMES  :: 10            /* ...once it has been, so many times running */
-BG_MAX_HABITS      :: 16
+BG_MAX_HABITS      :: 16     /* past it, the weakest is forgotten (AGENCY.md §8; no fault) */
 BG_HABIT_GAIN      :: 10     /* each repetition */
 BG_HABIT_FADE      :: 1      /* a day */
 BG_DUTY            :: 20     /* what a commitment is worth */
@@ -239,13 +240,15 @@ Motivation :: struct {
 	awaitSince:   i64,                 /* ms */
 	awaitUntil:   i64,                 /* ms: then it stops waiting */
 	heard:        u64,                 /* the serial of the first observation it has not yet considered for questions */
-	questions:    [BG_MAX_QUESTIONS]Question,
+	/* each [dynamic] list here is counted apart, by its n-field, and grown
+	   with grown_to: past the count it may hold stale elements */
+	questions:    [dynamic]Question,
 	nquestions:   i32,
-	settled:      [BG_MAX_SETTLED]Arisen,
+	settled:      [dynamic]Arisen,
 	nsettled:     i32,
-	weighed:      [BG_MAX_SETTLED]Arisen,  /* the last verdict, so it is logged when it changes */
+	weighed:      [dynamic]Arisen,     /* the last verdict, so it is logged when it changes */
 	nweighed:     i32,
-	commitments:  [BG_MAX_COMMITMENTS]Commitment,
+	commitments:  [dynamic]Commitment,
 	acted:        [BG_MAX_ACTED]Acted,
 	nacted:       i32,
 	ncommitments: i32,
@@ -262,9 +265,9 @@ Motivation :: struct {
 	again:        Repeated_Act,        /* its last method step's act, and how often in a row */
 	postedUnit:   cstring,             /* interned: the goods it last posted a price for (content/market/) */
 	postedCoins:  i32,                 /* and that price: a sale at it is struck, its stock since as it may */
-	talks:        [BG_MAX_TALKS]Talk,  /* its negotiations (NEGOTIATION.md) */
+	talks:        [dynamic]Talk,       /* its negotiations (NEGOTIATION.md) */
 	ntalks:       i32,
-	owed:         [BG_MAX_OWED]Owed,   /* what it owes, is owed, and has agreed to hand over */
+	owed:         [dynamic]Owed,       /* what it owes, is owed, and has agreed to hand over */
 	nowed:        i32,
 	log:          [dynamic]string,     /* each line in context.allocator */
 }
@@ -324,6 +327,12 @@ motivation_new :: proc() -> ^Motivation {
 motivation_dealloc :: proc(self: ^Motivation) {
 	for s in self.log do delete(s)
 	delete(self.log)
+	delete(self.questions)
+	delete(self.settled)
+	delete(self.weighed)
+	delete(self.commitments)
+	delete(self.talks)
+	delete(self.owed)
 }
 
 
@@ -379,12 +388,18 @@ text_at :: proc(tc: ^tri.Content, node: ^tri.Node, path: cstring, buf: []u8) -> 
 }
 
 
-/* The texts of the list at `path`, in order. */
-@(private = "file")
-texts_at :: proc(tc: ^tri.Content, node: ^tri.Node, path: cstring, out: [^][32]u8, max_: uint) -> uint {
+/* The texts of the list at `path`, in order, as many as `max_`. More is a
+ * fault, named by `cap`, unless `cap` is "": the caller wants the first
+ * ones only. */
+@(private)
+texts_at :: proc(tc: ^tri.Content, node: ^tri.Node, path: cstring, out: [^][32]u8, max_: uint, cap: string = "") -> uint {
 	n: uint = 0
-	for list := tri.at(tc, node, path) if node != nil else nil; list != nil && n < max_; list = tri.at(tc, list, "rest") {
+	for list := tri.at(tc, node, path) if node != nil else nil; list != nil; list = tri.at(tc, list, "rest") {
 		if tri.at(tc, list, "first") == nil do break
+		if n == max_ {
+			if cap != "" do cap_fault("%s: more than %s (%d) in its %s; the rest passed over", tri.type_name(tc, tri.node_type(node)), cap, max_, path)
+			break
+		}
 		if text_at(tc, tri.at(tc, list, "first"), nil, out[n][:]) do n += 1
 	}
 	return n
@@ -409,13 +424,14 @@ int_at :: proc(tc: ^tri.Content, node: ^tri.Node, path: cstring, otherwise: i64)
 
 
 /* An instance's patterns, one per variant. */
-@(private = "file")
+@(private)
 variants_of :: proc(tc: ^tri.Content, instance: cstring, out: [^]^tri.Node, max_: uint) -> uint {
 	n := uint(tri.pattern_variant_count(tc, instance))
 	if n == 0 {
 		out[0] = tri.pattern(tc, instance)
 		return 1 if out[0] != nil else 0
 	}
+	if n > max_ do cap_fault("%s: %d variants, more than BG_MAX_VARIANTS (%d); the rest passed over", instance, n, max_)
 	i: uint
 	for i = 0; i < n && i < max_; i += 1 do out[i] = tri.pattern_variant(tc, instance, i)
 	return i
@@ -885,6 +901,10 @@ agency_adopt :: proc(self: ^Agency, goal: cstring, m: ^Motivation, params: [^]Sl
 	for ; intention.nparams < n && intention.nparams < BG_MAX_SLOTS; intention.nparams += 1 {
 		intention.params[intention.nparams] = params[intention.nparams]
 	}
+	if n > BG_MAX_SLOTS {
+		cap_fault("agent %d adopting %s: %d slots bound, more than BG_MAX_SLOTS (%d); the rest dropped", m.agent, goal, n,
+		          BG_MAX_SLOTS)
+	}
 }
 
 
@@ -919,8 +939,7 @@ agency_undertake_goal_from_until_source :: proc(self: ^Agency, agent: Entity_ID,
 	if tri.at(tc, tri.pattern(tc, goal), "done") == nil do return false
 	agency_control(self, agent)
 	m := agency_mind_of(self, agent)
-	if m.ncommitments == BG_MAX_COMMITMENTS do return false
-	c := &m.commitments[m.ncommitments]
+	c := grown_to(&m.commitments, m.ncommitments)
 	m.ncommitments += 1
 	c^       = {}
 	c.goal   = world_intern(self.world, goal)
@@ -948,9 +967,12 @@ agency_undertake_goal_from_until_source_every :: proc(self: ^Agency, agent: Enti
  * agent's. */
 agency_undertake_every_with :: proc(self: ^Agency, agent: Entity_ID, goal: cstring, from: i64, until: i64,
                                     source: cstring, every: i64, slots: []Slot_Binding) -> bool {
-	if len(slots) > BG_MAX_SLOTS || !agency_undertake_goal_from_until_source_every(self, agent, goal, from, until, source, every) {
+	if len(slots) > BG_MAX_SLOTS {
+		cap_fault("agent %d undertaking %s: %d slots bound, more than BG_MAX_SLOTS (%d); not undertaken", agent, goal,
+		          len(slots), BG_MAX_SLOTS)
 		return false
 	}
+	if !agency_undertake_goal_from_until_source_every(self, agent, goal, from, until, source, every) do return false
 	m := agency_mind_of(self, agent)
 	c := &m.commitments[m.ncommitments - 1]
 	for b, i in slots do c.params[i] = {world_intern(self.world, b.slot), b.referent}
@@ -981,7 +1003,7 @@ agency_promise :: proc(self: ^Agency, agent: Entity_ID, hearer: u32, goods: u32,
 	m       := agency_mind_of(self, agent)
 	store   := knowledge_store_of(self.knowledge, agent)
 	content := knowledge_store_promise_that_is_in(store, goods, container, deadline)
-	if content == "" || m.ncommitments == BG_MAX_COMMITMENTS ||
+	if content == "" ||
 	   !agency_act(self, m, "promising", store, "say", hearer, 0, 0, ns_utf8(content)) {
 		return false
 	}
@@ -1262,8 +1284,8 @@ agency_load :: proc(self: ^Agency, c: ^Condition, instance: cstring, path: cstri
 	if c.nvariants == 0 || c.me == nil do return false
 	c.frame  = tri.type_name(tc, tri.node_type(c.match[0]))
 	put(sub[:], fmt.tprintf("%s.find", path))
-	c.nfind  = texts_at(tc, variants[0], cstr(sub[:]), raw_data(c.find[:]), BG_MAX_SLOTS)
-	c.norder = texts_at(tc, variants[0], "order", raw_data(c.order[:]), 4)
+	c.nfind  = texts_at(tc, variants[0], cstr(sub[:]), raw_data(c.find[:]), BG_MAX_SLOTS, "BG_MAX_SLOTS")
+	c.norder = texts_at(tc, variants[0], "order", raw_data(c.order[:]), len(c.order), "the orders a condition holds")
 	c.seeks  = tri.at(tc, variants[0], "seeks")
 	c.tri    = tc
 	if !text_at(tc, variants[0], "search", c.search[:]) do c.search[0] = 0
@@ -1444,7 +1466,10 @@ agency_bind :: proc(self: ^Agency, c: ^Condition, k: uint, b: [^]Slot_Binding, n
 		}
 		return agency_bind(self, c, k + 1, b, n)
 	}
-	if n^ >= BG_MAX_SLOTS do return false
+	if n^ >= BG_MAX_SLOTS {
+		cap_fault("%s: slot %s past BG_MAX_SLOTS (%d) bound; the condition fails", c.instance, slot, BG_MAX_SLOTS)
+		return false
+	}
 
 	ncandidates: uint = 0
 	c.slot = slot
@@ -1489,7 +1514,13 @@ agency_bind :: proc(self: ^Agency, c: ^Condition, k: uint, b: [^]Slot_Binding, n
 	held := false
 	for i: uint = 0; i < ncandidates && !held; i += 1 {
 		c.tries += 1
-		if c.tries > BG_MAX_TRIES do break
+		if c.tries > BG_MAX_TRIES {
+			/* a bound on the search, kept: met, the condition is taken not to hold */
+			if c.tries == BG_MAX_TRIES + 1 {
+				cap_fault("%s: more than BG_MAX_TRIES (%d) matches tried; taken not to hold", c.instance, BG_MAX_TRIES)
+			}
+			break
+		}
 		t             := candidates[i].referent
 		before        := n^
 		b[n^].slot     = world_intern(self.world, slot)
@@ -1647,7 +1678,7 @@ agency_methods_for_mind :: proc(self: ^Agency, goal: cstring, m: ^Motivation, ou
 
 
 /* A goal's methods: by rank, then by name. */
-@(private = "file")
+@(private)
 agency_methods_for :: proc(self: ^Agency, goal: cstring, out: [^]cstring, max_: uint) -> uint {
 	buf: [64]u8
 	j:   uint
@@ -1655,11 +1686,15 @@ agency_methods_for :: proc(self: ^Agency, goal: cstring, out: [^]cstring, max_: 
 	tc     := world_tri(self.world)
 	family := tri.family_index(tc, "methods")
 	n: uint = 0
-	for i: uint = 0; family != nil && i < uint(tri.index_count(family)) && n < max_; i += 1 {
+	for i: uint = 0; family != nil && i < uint(tri.index_count(family)); i += 1 {
 		name := cstring(tri.index_tag(family, i))
 		if !text_at(tc, tri.pattern(tc, name), "goal", buf[:]) || str(buf[:]) != string(goal) do continue
 		for j = 0; j < n && string(out[j]) != string(name); j += 1 {}
 		if j < n do continue      /* an entry per variant */
+		if n == max_ {
+			cap_fault("goal %s: more than %d methods (BG_MAX_METHODS); %s and the rest passed over", goal, max_, name)
+			break
+		}
 		name = world_intern(self.world, name)
 		for j = n; j > 0; j -= 1 {
 			t := out[j - 1]
@@ -2087,7 +2122,7 @@ agency_suspended_step_of :: proc(self: ^Agency, method: cstring, m: ^Motivation)
 agency_pass :: proc(self: ^Agency, step: ^tri.Node, b: [^]Slot_Binding, n: i32, out: []Slot_Binding) -> i32 {
 	slot, is: [32]u8
 	tc := world_tri(self.world)
-	pn := min(n, i32(len(out)))
+	pn := i32(fitting(uint(n), len(out), "the slots passed to a subgoal (BG_MAX_SLOTS)"))
 	copy(out[:pn], b[:pn])
 	for with := tri.at(tc, step, "with"); with != nil; with = tri.at(tc, with, "rest") {
 		w := tri.at(tc, with, "first")
@@ -2099,7 +2134,10 @@ agency_pass :: proc(self: ^Agency, step: ^tri.Node, b: [^]Slot_Binding, n: i32, 
 		k: i32
 		for k = 0; k < pn && out[k].slot != name; k += 1 {}
 		if k == pn {
-			if pn == i32(len(out)) do continue
+			if pn == i32(len(out)) {
+				cap_fault("passing %s to a subgoal: more than BG_MAX_SLOTS (%d) bound; not passed", name, len(out))
+				continue
+			}
 			pn += 1
 		}
 		out[k] = {name, r}
@@ -2163,6 +2201,10 @@ agency_follow :: proc(self: ^Agency, m: ^Motivation, method: cstring, index: i32
 	for steps := tri.at(tc, pattern, "steps"); steps != nil; steps, k = tri.at(tc, steps, "rest"), k + 1 {
 		step := tri.at(tc, steps, "first")
 		if step == nil do break
+		if sequence && k == 32 {
+			cap_fault("%s: a sequence of more than 32 steps (stepsDone's bits); those past it are not kept as done",
+			          str(title[:]))
+		}
 		/* a recipe's operation done already: an instant one performed, a timed
 		 * one completed since the goal was adopted */
 		if sequence && text_at(tc, step, "op", op[:]) {
@@ -2188,16 +2230,22 @@ agency_follow :: proc(self: ^Agency, m: ^Motivation, method: cstring, index: i32
 			pn := agency_pass(self, step, b, n, pb[:])
 			before := pn
 			if agency_holds(self, cstr(goal[:]), "done", 0, raw_data(pb[:]), &pn, store) {
-				for q := before; q < pn && n < BG_MAX_SLOTS; q += 1 {
+				for q := before; q < pn; q += 1 {
 					name := agency_passed_back(self, step, pb[q].slot)
-					if bound(b, n, string(name)) == 0 {
-						b[n] = {name, pb[q].referent}
-						n += 1
+					if bound(b, n, string(name)) != 0 do continue
+					if n == BG_MAX_SLOTS {
+						cap_fault("%s: %s, bound by subgoal %s, past BG_MAX_SLOTS (%d); not bound", str(title[:]), name,
+						          str(goal[:]), BG_MAX_SLOTS)
+						continue
 					}
+					b[n] = {name, pb[q].referent}
+					n += 1
 				}
 				continue
 			}
 			if m.nintentions == BG_MAX_INTENTIONS {
+				cap_fault("agent %d, %s: subgoal %s past BG_MAX_INTENTIONS (%d) goals deep; the way fails", m.agent,
+				          str(title[:]), str(goal[:]), BG_MAX_INTENTIONS)
 				agency_fail(self, m, index, fmt.tprintf("%s: too many goals deep", str(title[:])))
 				return false
 			}
@@ -2305,7 +2353,7 @@ agency_follow :: proc(self: ^Agency, m: ^Motivation, method: cstring, index: i32
 		 * the way holds, it waits to resume. */
 		if resume_failed != "" {
 			pb: [BG_MAX_SLOTS]Slot_Binding
-			pn := min(n, BG_MAX_SLOTS)
+			pn := i32(fitting(uint(n), BG_MAX_SLOTS, "a way's bindings, checked again (BG_MAX_SLOTS)"))
 			copy(pb[:pn], b[:pn])
 			if !agency_holds(self, method, "pre", m.intentions[m.nintentions - 1].adopted, raw_data(pb[:]), &pn, store) {
 				agency_note(self, m, fmt.tprintf("%s no longer holds: giving up the %s put down: %s", str(title[:]), str(op[:]),
@@ -2471,7 +2519,7 @@ agency_hear_questions :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_S
 	for i: uint = 0; i < knowledge_store_observation_count(store); i += 1 {
 		o := knowledge_store_observation_at(store, i)
 		if o.serial < m.heard || string(o.kind) != "said" || o.other != me || o.actor == 0 || o.actor == me ||
-		   o.content == nil || m.nquestions == BG_MAX_QUESTIONS {
+		   o.content == nil {
 			continue
 		}
 		arena    := tri.arena_new()
@@ -2486,10 +2534,7 @@ agency_hear_questions :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_S
 		                         tri.subtype(tc, tri.node_type(question), tri.type_named(tc, "#Refuse")) != 0 ||
 		                         tri.subtype(tc, tri.node_type(question), tri.type_named(tc, "#Repaid")) != 0)) ||
 		                       (tri.type_named(tc, "#Buy") != 0 && tri.subtype(tc, tri.node_type(question), tri.type_named(tc, "#Buy")) != 0)) {
-			m.questions[m.nquestions]         = {}
-			m.questions[m.nquestions].asker   = o.actor
-			m.questions[m.nquestions].content = world_intern(self.world, o.content)
-			m.questions[m.nquestions].heard   = o.time
+			grown_to(&m.questions, m.nquestions)^ = {asker = o.actor, content = world_intern(self.world, o.content), heard = o.time}
 			m.nquestions += 1
 		}
 		tri.arena_free(arena)
@@ -3734,17 +3779,16 @@ agency_settle :: proc(self: ^Agency, m: ^Motivation, intention: ^Intention, done
 
 		if !text_at(world_tri(self.world), tri.pattern(world_tri(self.world), intention.goal), "pressed.need", need[:]) do return
 		for k = 0; k < m.nsettled && !(m.settled[k].goal == intention.goal && m.settled[k].about == 0); k += 1 {}
-		if k == m.nsettled && m.nsettled < BG_MAX_SETTLED do m.nsettled += 1
-		if k < m.nsettled {
-			m.settled[k].goal    = intention.goal
-			m.settled[k].about   = 0
-			m.settled[k].verdict = knowledge_store_feels(knowledge_store_of(self.knowledge, m.agent), cstr(need[:]))
-			/* impossible for now: tried again a while later, as a kept goal is
-			 * (what was in the way may not be: a meal in hand since), when it
-			 * next decides */
-			m.settled[k].retry   = 0 if done else world_time(self.world).ms + BG_NEED_RETRY
-			m.settled[k].held    = agency_held_signature(self, knowledge_store_of(self.knowledge, m.agent))
-		}
+		a := grown_to(&m.settled, k)
+		if k == m.nsettled do m.nsettled += 1
+		a.goal    = intention.goal
+		a.about   = 0
+		a.verdict = knowledge_store_feels(knowledge_store_of(self.knowledge, m.agent), cstr(need[:]))
+		/* impossible for now: tried again a while later, as a kept goal is
+		 * (what was in the way may not be: a meal in hand since), when it
+		 * next decides */
+		a.retry   = 0 if done else world_time(self.world).ms + BG_NEED_RETRY
+		a.held    = agency_held_signature(self, knowledge_store_of(self.knowledge, m.agent))
 		return
 	}
 	if intention.arose == 0 do return
@@ -3755,10 +3799,8 @@ agency_settle :: proc(self: ^Agency, m: ^Motivation, intention: ^Intention, done
 			return
 		}
 	}
-	if m.nsettled == BG_MAX_SETTLED do return
-	m.settled[m.nsettled].goal    = intention.goal
-	m.settled[m.nsettled].about   = intention.arose
-	m.settled[m.nsettled].verdict = i32(world_time(self.world).ms / 1000)
+	grown_to(&m.settled, m.nsettled)^ = {goal = intention.goal, about = intention.arose,
+	                                     verdict = i32(world_time(self.world).ms / 1000)}
 	m.nsettled += 1
 }
 
@@ -3978,9 +4020,8 @@ agency_weigh :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Store, bus
 
 	/* logged when the verdict changes */
 	last = -1
-	if !agency_has(self, raw_data(m.weighed[:]), m.nweighed, best, bestAbout, &last) && m.nweighed < BG_MAX_SETTLED {
-		m.weighed[m.nweighed].goal  = best
-		m.weighed[m.nweighed].about = bestAbout
+	if !agency_has(self, raw_data(m.weighed[:]), m.nweighed, best, bestAbout, &last) {
+		grown_to(&m.weighed, m.nweighed)^ = {goal = best, about = bestAbout}
 		m.nweighed += 1
 	}
 	for k = 0; k < m.nweighed; k += 1 {
@@ -4003,7 +4044,11 @@ agency_weigh :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Store, bus
 		                                 fmt.tprintf(" + interruption %d", BG_INTERRUPT) if busy else "",
 		                                 "switching" if verdict != 0 else "staying"))
 	}
-	if verdict == 0 || m.nintentions == BG_MAX_INTENTIONS do return false
+	if verdict == 0 do return false
+	if m.nintentions == BG_MAX_INTENTIONS {
+		cap_fault("agent %d: %s past BG_MAX_INTENTIONS (%d) goals deep; not taken up", m.agent, best, BG_MAX_INTENTIONS)
+		return false
+	}
 
 	/* what it was doing, suspended */
 	mine := world_copy_activities_of(self.world, m.agent, &nmine)
@@ -4251,6 +4296,10 @@ agency_decide :: proc(self: ^Agency, m: ^Motivation) -> bool {
 		}
 		top.following = chosen
 		return agency_follow(self, m, methods[chosen], chosen, raw_data(chosenB[:]), chosenN, store)
+	}
+	if unknownMethod >= 0 && m.nintentions == BG_MAX_INTENTIONS {
+		cap_fault("agent %d: %s, to find out what %s needs, past BG_MAX_INTENTIONS (%d) goals deep; not taken up", m.agent,
+		          str(subgoal[:]), methods[unknownMethod], BG_MAX_INTENTIONS)
 	}
 	if unknownMethod >= 0 && m.nintentions < BG_MAX_INTENTIONS {
 		agency_note(self, m, fmt.tprintf("%s: unknown at %s: %s first",
@@ -4508,7 +4557,14 @@ agency_decide_boundary :: proc(self: ^Agency, boundary: u64) {
 		if m == nil do m = agency_take_on_instinct(self, due[i])
 		if m == nil do continue
 		if agency_is_due(self, m) {
-			for k := 0; k < 2 * BG_MAX_INTENTIONS && !agency_decide(self, m); k += 1 {}
+			/* each decision that doesn't settle it changes the stack: one per
+			   goal deep, taken up and put down, is the most it may need */
+			k := 0
+			for ; k < 2 * BG_MAX_INTENTIONS && !agency_decide(self, m); k += 1 {}
+			if k == 2 * BG_MAX_INTENTIONS {
+				cap_fault("agent %d: %d decisions in one turn (2 * BG_MAX_INTENTIONS) left it undecided; the rest put off",
+				          m.agent, k)
+			}
 			m.decidedAt = world_time(self.world).ms
 		}
 		wakes_push(self.wakes, m.agent, due_of(self, m))
@@ -4630,16 +4686,21 @@ agency_restore_saved_state :: proc(self: ^Agency, lines: []string) {
 		words := ns_components_separated(lines[i], " ")
 		if len(words) >= 8 && words[0] == "commitment" {
 			m = agency_mind_of(self, Entity_ID(ns_long_long_value(words[1])))
-			if m.ncommitments == BG_MAX_COMMITMENTS do continue
-			c := &m.commitments[m.ncommitments]
+			c := grown_to(&m.commitments, m.ncommitments)
 			m.ncommitments += 1
+			c^        = {}
 			c.goal    = world_intern(self.world, ns_utf8(words[2]))
 			c.from    = ns_long_long_value(words[3])
 			c.until   = ns_long_long_value(words[4])
 			c.source  = world_intern(self.world, ns_utf8(words[5]))
 			c.settled = ns_int_value(words[6]) != 0
 			c.nparams = 0
-			for q := 8; q + 1 < len(words) && c.nparams < BG_MAX_SLOTS; q += 2 {
+			for q := 8; q + 1 < len(words); q += 2 {
+				if c.nparams == BG_MAX_SLOTS {
+					cap_fault("a saved commitment of agent %s to %s: more than BG_MAX_SLOTS (%d) slots; the rest dropped",
+					          words[1], words[2], BG_MAX_SLOTS)
+					break
+				}
 				c.params[c.nparams].slot     = world_intern(self.world, ns_utf8(words[q]))
 				c.params[c.nparams].referent = u32(ns_long_long_value(words[q + 1]))
 				c.nparams += 1
@@ -4648,7 +4709,10 @@ agency_restore_saved_state :: proc(self: ^Agency, lines: []string) {
 		}
 		if len(words) == 6 && words[0] == "habit" {
 			m = agency_mind_of(self, Entity_ID(ns_long_long_value(words[1])))
-			if m.nhabits == BG_MAX_HABITS do continue
+			if m.nhabits == BG_MAX_HABITS {
+				cap_fault("agent %s's saved habits: more than BG_MAX_HABITS (%d); %s dropped", words[1], BG_MAX_HABITS, words[2])
+				continue
+			}
 			h := &m.habits[m.nhabits]
 			m.nhabits += 1
 			h.context_ = world_intern(self.world, ns_utf8(words[2]))
@@ -4706,14 +4770,12 @@ agency_restore_saved_state :: proc(self: ^Agency, lines: []string) {
 		}
 		if ((len(words) == 4 || len(words) == 7) && words[0] == "settled") || (len(words) == 5 && words[0] == "weighed") {
 			m = agency_mind_of(self, Entity_ID(ns_long_long_value(words[1])))
-			full := (m.nsettled == BG_MAX_SETTLED) if words[0] == "settled" else (m.nweighed == BG_MAX_SETTLED)
-			if full do continue
 			a: ^Arisen
 			if words[0] == "settled" {
-				a = &m.settled[m.nsettled]
+				a = grown_to(&m.settled, m.nsettled)
 				m.nsettled += 1
 			} else {
-				a = &m.weighed[m.nweighed]
+				a = grown_to(&m.weighed, m.nweighed)
 				m.nweighed += 1
 			}
 			a.goal    = world_intern(self.world, ns_utf8(words[2]))
@@ -4726,21 +4788,21 @@ agency_restore_saved_state :: proc(self: ^Agency, lines: []string) {
 		if agency_deals_restore(self, words) do continue
 		if len(words) == 4 && words[0] == "acted" {
 			m = agency_mind_of(self, Entity_ID(ns_long_long_value(words[1])))
-			if m.nacted < BG_MAX_ACTED {
-				m.acted[m.nacted] = {world_intern(self.world, ns_utf8(words[2])), ns_long_long_value(words[3])}
-				m.nacted += 1
+			if m.nacted == BG_MAX_ACTED {
+				cap_fault("agent %s's saved acts: more than BG_MAX_ACTED (%d); %s dropped", words[1], BG_MAX_ACTED, words[2])
+				continue
 			}
+			m.acted[m.nacted] = {world_intern(self.world, ns_utf8(words[2])), ns_long_long_value(words[3])}
+			m.nacted += 1
 			continue
 		}
 		if len(words) == 6 && words[0] == "question" {
 			m = agency_mind_of(self, Entity_ID(ns_long_long_value(words[1])))
-			if m.nquestions == BG_MAX_QUESTIONS do continue
 			// decode_word's text is the caller's to free.
 			text := decode_word(ns_utf8(words[5]))
-			m.questions[m.nquestions].asker    = u32(ns_long_long_value(words[2]))
-			m.questions[m.nquestions].heard    = ns_long_long_value(words[3])
-			m.questions[m.nquestions].deferred = ns_int_value(words[4]) != 0
-			m.questions[m.nquestions].content  = world_intern(self.world, text)
+			grown_to(&m.questions, m.nquestions)^ = {asker = u32(ns_long_long_value(words[2])), heard = ns_long_long_value(words[3]),
+			                                         deferred = ns_int_value(words[4]) != 0,
+			                                         content = world_intern(self.world, text)}
 			m.nquestions += 1
 			free(rawptr(text))
 			continue
@@ -4759,6 +4821,10 @@ agency_restore_saved_state :: proc(self: ^Agency, lines: []string) {
 		m.awaitUntil = ns_long_long_value(words[7])
 		n            = ns_int_value(words[8])
 		w            = 9
+		if n > BG_MAX_INTENTIONS {
+			cap_fault("agent %s's saved mind: %d goals deep, more than BG_MAX_INTENTIONS (%d); the rest dropped", words[1], n,
+			          BG_MAX_INTENTIONS)
+		}
 		for k = 0; k < n && k < BG_MAX_INTENTIONS && w + 10 <= len(words); k += 1 {
 			t = &m.intentions[m.nintentions]
 			m.nintentions += 1
@@ -4783,6 +4849,10 @@ agency_restore_saved_state :: proc(self: ^Agency, lines: []string) {
 			w += 1
 			t.nparams    = ns_int_value(words[w])
 			w += 1
+			if t.nparams > BG_MAX_SLOTS {
+				cap_fault("agent %s's saved intention %s: %d slots, more than BG_MAX_SLOTS (%d); the rest dropped", words[1],
+				          t.goal, t.nparams, BG_MAX_SLOTS)
+			}
 			for p = 0; p < t.nparams && p < BG_MAX_SLOTS && w + 2 <= len(words); p += 1 {
 				t.params[p].slot     = world_intern(self.world, ns_utf8(words[w]))
 				w += 1

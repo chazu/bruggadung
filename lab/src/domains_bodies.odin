@@ -138,9 +138,13 @@ weakness_load :: proc(content: ^tri.Content) -> Weakness_Table {
 		}
 		c := &table[which]
 		c.n = 0
-		for list := tri.at(content, node, "lost"); list != nil && c.n < len(c.input); list = tri.at(content, list, "rest") {
+		for list := tri.at(content, node, "lost"); list != nil; list = tri.at(content, list, "rest") {
 			p = tri.at(content, list, "first")
 			if p == nil do break
+			if c.n == len(c.input) {
+				cap_fault("weakness %s: more than %d points; the rest passed over", cstring(tri.index_tag(family, i)), len(c.input))
+				break
+			}
 			if tri.node_interval(tri.at(content, p, "input"), &lo, &hi) == 0 || lo != hi do continue
 			x := lo
 			if tri.node_interval(tri.at(content, p, "output"), &lo, &hi) == 0 || lo != hi do continue

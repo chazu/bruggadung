@@ -1697,6 +1697,22 @@ world_entities_at :: proc(self: ^World, place: Entity_ID, form: Location_Form, o
 }
 
 
+/* world_entities_at, all of them, in a list the caller deletes. */
+world_entities_at_all :: proc(self: ^World, place: Entity_ID, form: Location_Form, allocator := context.allocator) -> []Entity_ID {
+	list := make([]Entity_ID, world_entities_at(self, place, form, nil, 0), allocator)
+	world_entities_at(self, place, form, raw_data(list), uint(len(list)))
+	return list
+}
+
+
+/* world_entities_at into a buffer: those that fit. More than fit is a
+ * fault (core_faults.odin), named by `what`. */
+world_entities_at_in :: proc(self: ^World, place: Entity_ID, form: Location_Form, buf: []Entity_ID, what: string) -> []Entity_ID {
+	n := world_entities_at(self, place, form, raw_data(buf), uint(len(buf)))
+	return buf[:fitting(n, len(buf), what)]
+}
+
+
 /* What is within `radius` of a tile, all of it: on the ground there, and
  * what is in, on, held by or part of that, all the way down. Malloc'd into
  * out^, in no set order; returns how many. The caller frees it. */
@@ -2045,6 +2061,28 @@ world_edges_to :: proc(self: ^World, kind: Edge_Kind, to: Entity_ID, out: [^]Ent
 }
 
 
+/* world_edges_to, all of them, in a list the caller deletes. */
+world_edges_to_all :: proc(self: ^World, kind: Edge_Kind, to: Entity_ID, allocator := context.allocator) -> []Entity_ID {
+	list := make([]Entity_ID, world_edges_to(self, kind, to, nil, 0), allocator)
+	world_edges_to(self, kind, to, raw_data(list), uint(len(list)))
+	return list
+}
+
+
+/* world_edges_to and world_edges_from into a buffer: those that fit. More
+ * than fit is a fault (core_faults.odin), named by `what`. */
+world_edges_to_in :: proc(self: ^World, kind: Edge_Kind, to: Entity_ID, buf: []Entity_ID, what: string) -> []Entity_ID {
+	n := world_edges_to(self, kind, to, raw_data(buf), uint(len(buf)))
+	return buf[:fitting(n, len(buf), what)]
+}
+
+
+world_edges_from_in :: proc(self: ^World, kind: Edge_Kind, from: Entity_ID, buf: []Entity_ID, what: string) -> []Entity_ID {
+	n := world_edges_from(self, kind, from, raw_data(buf), uint(len(buf)))
+	return buf[:fitting(n, len(buf), what)]
+}
+
+
 /* --- tiles ----------------------------------------------------------------- */
 
 /* --- terrain --------------------------------------------------------------- */
@@ -2377,12 +2415,11 @@ world_set_checked_out :: proc(self: ^World, flag: bool, entity: Entity_ID) {
 
 /* The sum of the quantities of the claims on an entity. */
 world_claimed_units_of :: proc(self: ^World, entity: Entity_ID) -> i64 {
-	claims: [64]Entity_ID
-
-	n := world_edges_to(self, .Claim_Subject, entity, &claims[0], 64)
+	claims := world_edges_to_all(self, .Claim_Subject, entity)
+	defer delete(claims)
 	sum: i64 = 0
-	for i: uint = 0; i < n && i < 64; i += 1 {
-		claim := (^Claim)(world_record(self, world_kind_named(self, "Claim"), claims[i]))
+	for c in claims {
+		claim := (^Claim)(world_record(self, world_kind_named(self, "Claim"), c))
 		if claim != nil {
 			sum += claim.quantity
 		}
@@ -2396,26 +2433,27 @@ world_claimed_units_of :: proc(self: ^World, entity: Entity_ID) -> i64 {
  * units. After a split of mixed goods it is not, and that stays explicit
  * until an institution decides (§6). */
 world_claim_allocation_resolved :: proc(self: ^World, claim: Entity_ID) -> bool {
-	others: [64]Entity_ID
-	subjects: [64]Entity_ID
-
 	record := (^Claim)(world_record(self, world_kind_named(self, "Claim"), claim))
 	if record == nil {
 		return false
 	}
-	n := world_edges_from(self, .Claim_Subject, claim, &subjects[0], 64)
+	n := world_edges_from(self, .Claim_Subject, claim, nil, 0)
 	if n <= 1 {
 		return true
 	}
+	subjects := make([]Entity_ID, n)
+	defer delete(subjects)
+	world_edges_from(self, .Claim_Subject, claim, raw_data(subjects), n)
 	units: i64 = 0
-	for i: uint = 0; i < n && i < 64; i += 1 {
-		m := world_edges_to(self, .Claim_Subject, subjects[i], &others[0], 64)
-		for j: uint = 0; j < m && j < 64; j += 1 {
-			if others[j] != claim {
+	for subject in subjects {
+		others := world_edges_to_all(self, .Claim_Subject, subject)
+		defer delete(others)
+		for other in others {
+			if other != claim {
 				return false
 			}
 		}
-		units += world_units_of(self, subjects[i])
+		units += world_units_of(self, subject)
 	}
 	return units == record.quantity
 }

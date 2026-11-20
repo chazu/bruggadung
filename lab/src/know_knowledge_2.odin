@@ -2348,13 +2348,13 @@ know_is_of :: proc(world: ^World, e: Entity_ID, of: tri.Type) -> bool {
 /* Whose an entity is: the claimants of its ownership claims. */
 @(private)
 know_owners_of :: proc(world: ^World, e: Entity_ID) -> []Entity_ID {
-	claims: [64]Entity_ID
 	claimant: [1]Entity_ID
 	owners := make([dynamic]Entity_ID, context.temp_allocator)
 	ownership := u32(tri.type_named(world_tri(world), "\"ownership\""))
 	kclaim := world_kind_named(world, "Claim")
-	n := world_edges_to(world, .Claim_Subject, e, &claims[0], 64)
-	for i: uint = 0; i < n && i < 64; i += 1 {
+	claims := world_edges_to_all(world, .Claim_Subject, e)
+	defer delete(claims)
+	for i := 0; i < len(claims); i += 1 {
 		claim := (^Claim)(world_record(world, kclaim, claims[i]))
 		if claim == nil || u32(claim.kind) != ownership do continue
 		if world_edges_from(world, .Claimant, claims[i], &claimant[0], 1) != 0 do append(&owners, claimant[0])
@@ -2366,13 +2366,13 @@ know_owners_of :: proc(world: ^World, e: Entity_ID) -> []Entity_ID {
 /* What an agent owns: the subjects of its ownership claims. */
 @(private)
 know_owned_by :: proc(world: ^World, agent: Entity_ID) -> []Entity_ID {
-	claims: [256]Entity_ID
 	subject: [1]Entity_ID
 	owned := make([dynamic]Entity_ID, context.temp_allocator)
 	ownership := u32(tri.type_named(world_tri(world), "\"ownership\""))
 	kclaim := world_kind_named(world, "Claim")
-	n := world_edges_to(world, .Claimant, agent, &claims[0], 256)
-	for i: uint = 0; i < n && i < 256; i += 1 {
+	claims := world_edges_to_all(world, .Claimant, agent)
+	defer delete(claims)
+	for i := 0; i < len(claims); i += 1 {
 		claim := (^Claim)(world_record(world, kclaim, claims[i]))
 		if claim == nil || u32(claim.kind) != ownership do continue
 		if world_edges_from(world, .Claim_Subject, claims[i], &subject[0], 1) != 0 do append(&owned, subject[0])
@@ -2387,7 +2387,6 @@ know_owned_by :: proc(world: ^World, agent: Entity_ID) -> []Entity_ID {
  * What is lent to it, it knows too: a #Lent finding. */
 @(private)
 know_own :: proc(self: ^Knowledge, store: ^Knowledge_Store, agent: Entity_ID, e: Entity_ID, referent: u32, now: i64) {
-	claims: [64]Entity_ID
 	claimant: [1]Entity_ID
 	me := knowledge_store_self_referent(store)
 	if me == 0 do return
@@ -2416,8 +2415,9 @@ know_own :: proc(self: ^Knowledge, store: ^Knowledge_Store, agent: Entity_ID, e:
 	}
 	ownership := u32(tri.type_named(world_tri(self.world), "\"ownership\""))
 	kclaim := world_kind_named(self.world, "Claim")
-	n := world_edges_to(self.world, .Claim_Subject, e, &claims[0], 64)
-	for i: uint = 0; i < n && i < 64; i += 1 {
+	claims := world_edges_to_all(self.world, .Claim_Subject, e)
+	defer delete(claims)
+	for i := 0; i < len(claims); i += 1 {
 		claim := (^Claim)(world_record(self.world, kclaim, claims[i]))
 		if claim == nil || u32(claim.kind) != ownership do continue
 		if world_edges_from(self.world, .Claimant, claims[i], &claimant[0], 1) == 0 || claimant[0] != agent do continue
