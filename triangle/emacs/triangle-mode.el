@@ -26,6 +26,13 @@
 ;; you are editing, as one content build: its directory, or, while the
 ;; directory above holds .tri files of its own, that one (a topic directory
 ;; loads with the content around it).
+;;
+;; In a tree with Triangle's sources (a bruggadung checkout), the mode runs
+;; `triangle-program' only if it was built from those sources: `triangle
+;; version' names the revision it was built from, and tools/revision.sh the
+;; tree's.  An installed tool left behind by the sources reads the content
+;; wrongly and still says it is fine.  `make -C triangle install' brings it
+;; up to date; `triangle-check-revision' turns the check off.
 
 ;;; Code:
 
@@ -41,6 +48,14 @@
 (defcustom triangle-program "triangle"
   "The triangle command-line tool, used for checks and the language server."
   :type 'string
+  :group 'triangle)
+
+(defcustom triangle-check-revision t
+  "Whether to refuse a `triangle-program' built from other sources.
+When the file is in a tree with Triangle's sources, the mode compares the
+revision `triangle version' names with the tree's (tools/revision.sh), and
+refuses to run a program whose revision differs."
+  :type 'boolean
   :group 'triangle)
 
 (defcustom triangle-indent-offset 4
@@ -260,12 +275,49 @@ of its own, that one: a topic directory loads with the content around it."
               (setq dir up)
             (throw 'root dir)))))))
 
+(defun triangle--source-tree ()
+  "Return the directory of Triangle's sources above the current file, or nil."
+  (when-let* ((root (locate-dominating-file
+                    (if buffer-file-name (file-name-directory buffer-file-name) default-directory)
+                    "triangle/tools/revision.sh")))
+    (file-name-as-directory (expand-file-name "triangle" root))))
+
+(defun triangle--output (program &rest args)
+  "Return what PROGRAM prints when run with ARGS, trimmed, or nil if it fails."
+  (with-temp-buffer
+    (when (eql 0 (ignore-errors (apply #'call-process program nil '(t nil) nil args)))
+      (string-trim (buffer-string)))))
+
+(defun triangle--revision-mismatch ()
+  "Return why `triangle-program' is not built from the sources here, or nil.
+Nil too when the check is off, the file is in no tree with Triangle's
+sources, or git can't name the tree's revision."
+  (when-let* ((triangle-check-revision)
+              (tree (triangle--source-tree))
+              (want (let ((default-directory tree))
+                      (triangle--output "sh" "tools/revision.sh")))
+              ((not (equal want "unknown"))))
+    (let* ((version (triangle--output triangle-program "version"))
+           (have (and version (car (last (split-string version))))))
+      (unless (equal have want)
+        (format "%s is %s, but the sources at %s are revision %s: run make -C %s install, or set `triangle-program'"
+                triangle-program
+                (if version (format "\"%s\"" version) "not a program that runs")
+                (abbreviate-file-name tree) want (abbreviate-file-name tree))))))
+
+(defun triangle--program ()
+  "Return `triangle-program', or signal why it is not built from these sources."
+  (when-let* ((why (triangle--revision-mismatch)))
+    (user-error "Triangle: %s" why))
+  triangle-program)
+
 (defun triangle-check ()
   "Load the current content directory with `triangle check'.
 Diagnostics appear in a compilation buffer, where \\[next-error] visits them."
   (interactive)
-  (let ((default-directory (triangle--content-dir)))
-    (compile (concat (shell-quote-argument triangle-program) " check ."))))
+  (let ((program (triangle--program))
+        (default-directory (triangle--content-dir)))
+    (compile (concat (shell-quote-argument program) " check ."))))
 
 (defun triangle--name-at-point ()
   "Return the Triangle name at point, a type, instance, or atom, or nil."
@@ -279,13 +331,14 @@ Diagnostics appear in a compilation buffer, where \\[next-error] visits them."
   (interactive
    (let ((default (triangle--name-at-point)))
      (list (read-string (format-prompt "Inspect" default) nil nil default))))
-  (let ((dir (triangle--content-dir))
+  (let ((program (triangle--program))
+        (dir (triangle--content-dir))
         (buf (get-buffer-create "*triangle-inspect*")))
     (with-current-buffer buf
       (let ((inhibit-read-only t))
         (erase-buffer)
         (setq default-directory dir)
-        (call-process triangle-program nil t nil "inspect" name ".")
+        (call-process program nil t nil "inspect" name ".")
         (goto-char (point-min)))
       (special-mode))
     (display-buffer buf)))
@@ -330,7 +383,7 @@ Diagnostics appear in a compilation buffer, where \\[next-error] visits them."
   (add-to-list 'lsp-language-id-configuration '(triangle-mode . "triangle"))
   (lsp-register-client
    (make-lsp-client
-    :new-connection (lsp-stdio-connection (lambda () (list triangle-program "lsp")))
+    :new-connection (lsp-stdio-connection (lambda () (list (triangle--program) "lsp")))
     :activation-fn (lsp-activate-on "triangle")
     :major-modes '(triangle-mode)
     :server-id 'triangle-lsp)))
@@ -338,7 +391,7 @@ Diagnostics appear in a compilation buffer, where \\[next-error] visits them."
 (with-eval-after-load 'eglot
   (defvar eglot-server-programs)
   (add-to-list 'eglot-server-programs
-               `(triangle-mode . ,(lambda (&rest _) (list triangle-program "lsp")))))
+               `(triangle-mode . ,(lambda (&rest _) (list (triangle--program) "lsp")))))
 
 (provide 'triangle-mode)
 ;;; triangle-mode.el ends here

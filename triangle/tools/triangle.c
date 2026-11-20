@@ -6,6 +6,7 @@
  *   triangle export [OPTIONS] [PATH...]   instances as JSON or YAML
  *   triangle fmt [--check] [PATH...]      lay sources out canonically
  *   triangle lsp                          the language server, over stdio
+ *   triangle version                      the version, and the sources' revision
  *
  * A PATH is a .tri file or a directory, which stands for the .tri files in it
  * and beneath it (its topic directories); with none, the current directory. */
@@ -339,7 +340,8 @@ static void usage(FILE *f)
           "  fmt [--check] [PATH...]      lay sources out canonically, in place (--check: list\n"
           "                               the files it would change; -: stdin to stdout)\n"
           "  lsp                          run the language server over stdio\n"
-          "  version                      print the version\n\n"
+          "  version                      print the version, and the revision of the sources\n"
+          "                               it was built from (tools/revision.sh)\n\n"
           "A PATH is a .tri file or a directory of them, its subdirectories included; the default\n"
           "is the current directory.\n",
           f);
@@ -357,7 +359,10 @@ int main(int argc, char **argv)
     if (!strcmp(cmd, "export")) return cmd_export(rest, n);
     if (!strcmp(cmd, "fmt")) return cmd_fmt(rest, n);
     if (!strcmp(cmd, "lsp") || !strcmp(cmd, "--lsp")) return lsp_main();
-    if (!strcmp(cmd, "version") || !strcmp(cmd, "--version")) { printf("triangle %s\n", TRIANGLE_VERSION); return 0; }
+    if (!strcmp(cmd, "version") || !strcmp(cmd, "--version")) {
+        printf("triangle %s, revision %s\n", TRIANGLE_VERSION, tri_revision());
+        return 0;
+    }
     if (!strcmp(cmd, "help") || !strcmp(cmd, "--help") || !strcmp(cmd, "-h")) { usage(stdout); return 0; }
     fprintf(stderr, "triangle: unknown command %s\n", cmd);
     usage(stderr);

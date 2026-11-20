@@ -188,9 +188,48 @@
 
 (ert-deftest triangle-test-eglot-registration ()
   (require 'eglot)
-  (let ((entry (assoc 'triangle-mode eglot-server-programs)))
+  (let ((entry (assoc 'triangle-mode eglot-server-programs))
+        (triangle-check-revision nil))
     (should entry)
     (should (equal (funcall (cdr entry) nil) (list triangle-program "lsp")))))
+
+(defun triangle-test-script (file text)
+  "Write TEXT to FILE as a shell script that can run, and return FILE."
+  (make-directory (file-name-directory file) t)
+  (with-temp-file file (insert "#!/bin/sh\n" text "\n"))
+  (set-file-modes file #o755)
+  file)
+
+(ert-deftest triangle-test-revision ()
+  ;; In a tree with Triangle's sources, the mode runs only a program built
+  ;; from them: one whose `triangle version' names the tree's revision.
+  (let* ((top (file-name-as-directory (make-temp-file "triangle-test" t)))
+         (content (file-name-as-directory (expand-file-name "lab/content" top)))
+         (current (triangle-test-script (expand-file-name "bin/current" top)
+                                        "echo 'triangle 0.1.0, revision 0123456789ab'"))
+         (stale (triangle-test-script (expand-file-name "bin/stale" top)
+                                      "echo 'triangle 0.1.0'"))
+         (triangle-check-revision t))
+    (unwind-protect
+        (progn
+          (make-directory content t)
+          (let ((default-directory content))
+            ;; no tree with Triangle's sources above: no check
+            (let ((triangle-program stale))
+              (should-not (triangle--revision-mismatch)))
+            (triangle-test-script (expand-file-name "triangle/tools/revision.sh" top)
+                                  "echo 0123456789ab")
+            (let ((triangle-program current))
+              (should-not (triangle--revision-mismatch))
+              (should (equal (triangle--program) current)))
+            (let ((triangle-program stale))
+              (should (string-match-p "0123456789ab" (triangle--revision-mismatch)))
+              (should-error (triangle--program) :type 'user-error)
+              (let ((triangle-check-revision nil))
+                (should (equal (triangle--program) stale))))
+            (let ((triangle-program (expand-file-name "bin/none" top)))
+              (should (string-match-p "not a program that runs" (triangle--revision-mismatch))))))
+      (delete-directory top t))))
 
 (provide 'triangle-mode-test)
 ;;; triangle-mode-test.el ends here

@@ -46,3 +46,11 @@ wrapper :: proc(t: ^testing.T) {
 	defer delete(bad_err)
 	testing.expect(t, bad == nil && strings.contains(bad_err, "#Nope"), bad_err)
 }
+
+// The library linked is the one built from the sources the wrapper was
+// compiled with, and it names their revision.
+@(test)
+revision :: proc(t: ^testing.T) {
+	testing.expect(t, len(string(tri.revision())) > 0)
+	testing.expect_value(t, tri.revision_mismatch(), "")
+}

@@ -1,5 +1,9 @@
 # Triangle (C), Tessera, Orogen and the lab (Odin), on macOS and Linux; Triangle on
 # Windows too. What each platform needs is in ci/README.md.
+#
+# Each part is a job of its own, the root Makefile's check-<part> (make check
+# runs them all), so that one part's failure doesn't hide another's. Linux runs
+# make asan as a job too.
 name: build
 
 on:
@@ -8,40 +12,32 @@ on:
 
 jobs:
   macos:
+    name: macos (${{ matrix.target }})
     runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [check-triangle, check-tessera, check-orogen, check-lab]
     steps:
       - uses: actions/checkout@v4
       - name: Odin
         run: sh ci/install-odin.sh "$RUNNER_TEMP/odin" >> "$GITHUB_PATH"
-      - name: Triangle
-        run: make -C triangle test cli-test lsp-test odin
-      - name: Tessera
-        if: ${{ !cancelled() }}
-        run: make -C tessera test check
-      - name: Orogen
-        if: ${{ !cancelled() }}
-        run: make -C orogen test check
-      - name: Lab
-        if: ${{ !cancelled() }}
-        run: make -C lab check
+      - name: make ${{ matrix.target }}
+        run: make ${{ matrix.target }}
 
   linux:
+    name: linux (${{ matrix.target }})
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [check-triangle, check-tessera, check-orogen, check-lab, asan]
     steps:
       - uses: actions/checkout@v4
       - name: Toolchain image
         run: docker build -t bruggadung ci
-      - name: Triangle
-        run: docker run --rm -v "$PWD":/repo -w /repo bruggadung make -C triangle CC=clang test cli-test lsp-test odin
-      - name: Tessera
-        if: ${{ !cancelled() }}
-        run: docker run --rm -v "$PWD":/repo -w /repo bruggadung make -C tessera test check
-      - name: Orogen
-        if: ${{ !cancelled() }}
-        run: docker run --rm -v "$PWD":/repo -w /repo bruggadung make -C orogen test check
-      - name: Lab
-        if: ${{ !cancelled() }}
-        run: docker run --rm -v "$PWD":/repo -w /repo bruggadung make -C lab check
+      - name: make ${{ matrix.target }}
+        run: docker run --rm -v "$PWD":/repo -w /repo bruggadung make CC=clang ${{ matrix.target }}
 
   # Odin links for the MSVC ABI on Windows; the lab and Tessera aren't built
   # there yet (triangle/Makefile's odin-lib has the untried MSVC build).
