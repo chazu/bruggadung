@@ -3326,10 +3326,12 @@ const TriNode *tri_generalize(TriContent *c, const TriNode *node, const char *pa
 
 /* --- the content hash ---------------------------------------------------------------------------- */
 
-/* The hash covers the hierarchy, every type's expansion, and every instance's
- * patterns and spec. Structures are hashed by walking them: a node seen before
- * in the same structure is hashed as a reference to its first position (the
+/* The hash covers the hierarchy, every type's expansion, every instance's
+ * patterns and spec, and the attributes written in every declaration.
+ * Structures are hashed by walking them: a node seen before in the same
+ * structure is hashed as a reference to its first position (the
  * copy-generation fields mark the visit), so sharing counts but addresses don't.
+ * Features are hashed by name, not by ID, so renaming one changes the hash.
  * TRI_DUMP=file also writes the same content as text, for diffing. */
 
 static void hmix(uint64_t *h, uint64_t x)
@@ -3342,7 +3344,7 @@ static void hstr(uint64_t *h, const char *s)
     *h = fnv1a(*h, s, strlen(s) + 1);
 }
 
-static void hash_node(Content *c, uint64_t *h, TriNode *n, uint64_t cg, uint64_t *next)
+static void hash_node(Content *c, uint64_t *h, TriNode *n, uint64_t cg, uint64_t *next, const uint64_t *fh)
 {
     if (n->cpygen == cg) { hmix(h, 0xA11CE ^ ((uint64_t) (uintptr_t) n->cpy << 8)); return; }
     n->cpygen = cg;
@@ -3357,15 +3359,126 @@ static void hash_node(Content *c, uint64_t *h, TriNode *n, uint64_t cg, uint64_t
     }
     hmix(h, n->narcs);
     for (uint32_t i = 0; i < n->narcs; i++) {
-        hmix(h, n->arcs[i].feat);
-        hash_node(c, h, n->arcs[i].val, cg, next);
+        hmix(h, fh[n->arcs[i].feat]);
+        hash_node(c, h, n->arcs[i].val, cg, next, fh);
     }
 }
 
-static void hash_root(Content *c, uint64_t *h, TriNode *n)
+static void hash_root(Content *c, uint64_t *h, TriNode *n, const uint64_t *fh)
 {
     uint64_t next = 1;
-    hash_node(c, h, n, ++c->cgenctr, &next);
+    hash_node(c, h, n, ++c->cgenctr, &next, fh);
+}
+
+/* Attributes are hashed as written, since the engine reads their text (the
+ * generated headers copy @field's flags). Each is a record: where it is (a path
+ * of labels, `|i` for a disjunction's i-th alternative, `[i]` for a list item),
+ * its name, its rank among the attributes of that name at that place (the
+ * first is the one read), and its text. A type's or instance's records are
+ * sorted, so the order of declarations, files, and conjuncts doesn't count.
+ * Every attribute is hashed, including names Triangle ignores: a tool may read
+ * them. */
+typedef VEC(char *) StrVec;
+
+static void attr_records(const Attr *attrs, int n, const char *where, StrVec *out)
+{
+    for (int i = 0; i < n; i++) {
+        int rank = 0;
+        for (int j = 0; j < i; j++) rank += attrs[j].name == attrs[i].name;
+        Buf r = { 0 };
+        buf_printf(&r, "%s\x1f@%s\x1f%d\x1f%s", where, attrs[i].name, rank, attrs[i].args ? attrs[i].args : "");
+        VEC_PUSH(*out, r.s);
+    }
+}
+
+static void attrs_walk(const X *x, Buf *path, StrVec *out)
+{
+    if (!x) return;
+    size_t len = path->len;
+    switch (x->k) {
+    case X_STRUCT:
+        attr_records(x->u.st.attrs, x->u.st.nattrs, path->s ? path->s : "", out);
+        for (int i = 0; i < x->u.st.n; i++) {
+            const XField *f = &x->u.st.fields[i];
+            if (f->label) buf_printf(path, ".%s", f->label);
+            else if (f->dlabel) {
+                char *t = x_text(f->dlabel);
+                buf_printf(path, ".(%s)", t);
+                free(t);
+            } else buf_puts(path, ".(for)");
+            attr_records(f->attrs, f->nattrs, path->s, out);
+            attrs_walk(f->value, path, out);
+            path->len = len;
+            if (path->s) path->s[len] = 0;
+        }
+        break;
+    case X_AND:
+        attrs_walk(x->u.bin.a, path, out);
+        attrs_walk(x->u.bin.b, path, out);
+        break;
+    case X_OR: {
+        XPtrVec alts = { 0 };
+        x_flatten((X *) x, X_OR, &alts);
+        for (size_t i = 0; i < alts.n; i++) {
+            buf_printf(path, "|%zu", i);
+            attrs_walk(alts.v[i], path, out);
+            path->len = len;
+            path->s[len] = 0;
+        }
+        VEC_FREE(alts);
+        break;
+    }
+    case X_DEFAULT:
+        attrs_walk(x->u.sub, path, out);
+        break;
+    case X_LIST:
+        for (int i = 0; i < x->u.list.n; i++) {
+            buf_printf(path, "[%d]", i);
+            attrs_walk(x->u.list.items[i], path, out);
+            path->len = len;
+            path->s[len] = 0;
+        }
+        buf_puts(path, "[...]");
+        attrs_walk(x->u.list.elem, path, out);
+        attrs_walk(x->u.list.tail, path, out);
+        path->len = len;
+        path->s[len] = 0;
+        break;
+    case X_COMP:
+        attrs_walk(x->u.comp.body, path, out);
+        break;
+    default:
+        break;
+    }
+}
+
+static int cmp_strp(const void *a, const void *b)
+{
+    return strcmp(*(char *const *) a, *(char *const *) b);
+}
+
+/* Hash the attributes of a type's or an instance's declarations. */
+static void hash_attrs(uint64_t *h, Decl *const *decls, size_t n, Buf *dump)
+{
+    StrVec recs = { 0 };
+    Buf path = { 0 };
+    for (size_t k = 0; k < n; k++) {
+        attr_records(decls[k]->attrs, decls[k]->nattrs, "", &recs);
+        attrs_walk(decls[k]->value, &path, &recs);
+        buf_free(&path);
+    }
+    if (recs.n) qsort(recs.v, recs.n, sizeof *recs.v, cmp_strp);
+    hmix(h, recs.n);
+    for (size_t i = 0; i < recs.n; i++) {
+        hstr(h, recs.v[i]);
+        if (dump) {
+            buf_puts(dump, "  ");
+            for (const char *p = recs.v[i]; *p; p++) buf_putc(dump, *p == '\x1f' ? ' ' : *p);
+            buf_putc(dump, '\n');
+        }
+        free(recs.v[i]);
+    }
+    VEC_FREE(recs);
 }
 
 static int cmp_symp(const void *a, const void *b)
@@ -3378,11 +3491,17 @@ static void compute_hash(Content *c)
     uint64_t h = 0xcbf29ce484222325ULL;
     const char *dump = getenv("TRI_DUMP");
     Buf b = { 0 };
+    /* each feature by its full name */
+    uint64_t *fh = malloc(sizeof *fh * (c->feats.n ? c->feats.n : 1));
+    for (size_t f = 0; f < c->feats.n; f++) {
+        fh[f] = 0xcbf29ce484222325ULL;
+        hstr(&fh[f], c->feats.v[f].full);
+    }
     for (uint32_t t = 0; t < c->types.n; t++) {
         TypeInfo *ti = &c->types.v[t];
         hstr(&h, ti->name);
         for (size_t k = 0; k < ti->parents.n; k++) hmix(&h, ti->parents.v[k]);
-        if (ti->expansion) hash_root(c, &h, ti->expansion);
+        if (ti->expansion) hash_root(c, &h, ti->expansion, fh);
         if (dump) {
             buf_printf(&b, "%s<", ti->name);
             for (size_t k = 0; k < ti->parents.n; k++) buf_printf(&b, "%s,", c->types.v[ti->parents.v[k]].name);
@@ -3390,6 +3509,7 @@ static void compute_hash(Content *c)
             if (ti->expansion) fs_print(c, &b, ti->expansion);
             buf_putc(&b, '\n');
         }
+        hash_attrs(&h, ti->decls.v, ti->decls.n, dump ? &b : NULL);
     }
     /* instances in name order */
     Sym *names = malloc(sizeof(Sym) * (c->insts.n ? c->insts.n : 1));
@@ -3398,8 +3518,8 @@ static void compute_hash(Content *c)
     for (size_t i = 0; i < c->insts.n; i++) {
         InstInfo *in = &c->insts.v[inst_index(c, names[i])];
         hstr(&h, names[i]);
-        for (size_t v = 0; v < in->vars.n; v++) hash_root(c, &h, in->vars.v[v].pattern);
-        if (in->sstate == 2) hash_root(c, &h, in->spec);
+        for (size_t v = 0; v < in->vars.n; v++) hash_root(c, &h, in->vars.v[v].pattern, fh);
+        if (in->sstate == 2) hash_root(c, &h, in->spec, fh);
         if (dump) {
             buf_printf(&b, "%s=", names[i]);
             for (size_t v = 0; v < in->vars.n; v++) {
@@ -3412,8 +3532,10 @@ static void compute_hash(Content *c)
             }
             buf_putc(&b, '\n');
         }
+        hash_attrs(&h, in->decls.v, in->decls.n, dump ? &b : NULL);
     }
     free(names);
+    free(fh);
     if (dump) {
         FILE *f = fopen(dump, "w");
         if (f) { fwrite(b.s ? b.s : "", 1, b.len, f); fclose(f); }

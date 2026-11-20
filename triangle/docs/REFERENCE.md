@@ -359,6 +359,11 @@ and an argument of the wrong form is an error. Checks that need the content
 exist, whether an `@embed` file can be read) come later, from the attribute's
 reader. `tri_attribute_count` and `tri_attribute` list the attributes.
 
+The content hash covers every attribute's text, including the unknown ones,
+because the engine and tools read it: `@field`'s flags go into generated
+headers as written. A change to the text changes the hash. The order of
+attributes after one field, and of declarations, doesn't.
+
 | Attribute | Where | Arguments | Meaning |
 | --- | --- | --- | --- |
 | `@component(Name)` | Inside a type's structure | A name | The type is component kind `Name`. The features it introduces are the component's fields. A type is at most one component. |

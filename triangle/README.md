@@ -211,7 +211,7 @@ wall-clock times on a quiet machine are within a few per cent of it.
 | With the quick check (13 paths) | 97.6% of failures filtered, 2.2× faster, none wrongly rejected |
 | Pattern index of 597 rule daughters | about 52 candidates per entry, 7 µs per query |
 | Subsumption | about 17 million tests per second |
-| Content hash | `3ea4a70b06b06265`, identical across runs, and with sharing on or off |
+| Content hash | `3ea4a70b06b06265`, identical across runs, and with sharing on or off. Measured before the hash covered feature names, so a run today prints another value |
 | Sanitizers | Clean under ASan and UBSan |
 
 **Speed**, before and after profiling. Instruction counts are from

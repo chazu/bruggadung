@@ -1,10 +1,10 @@
-// Generated from Triangle content b6175b7da2b0f95c: do not edit. Type IDs are valid
+// Generated from Triangle content 5f57a5173e4ecb46: do not edit. Type IDs are valid
 // only for this content; regenerate when it changes.
 package lab
 
 import tri "../../triangle/odin/triangle"
 
-CONTENT_HASH :: 0xb6175b7da2b0f95c
+CONTENT_HASH :: 0x5f57a5173e4ecb46
 
 // Becoming, from #Becoming
 Becoming :: struct {

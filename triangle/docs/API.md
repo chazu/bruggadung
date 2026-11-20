@@ -109,8 +109,11 @@ tri_content_free(c);
   before the error, so an editor can still navigate it.
 - `tri_log_count`, `tri_log_message`: the build log. It lists every type the
   loader generated and every pair of conflicting defaults it dropped.
-- `tri_content_hash`: a hash of the content's meaning. It doesn't depend on
-  file or declaration order. Saves and generated headers record it.
+- `tri_content_hash`: a hash of the content's meaning: the hierarchy, every
+  type's expansion, every instance's patterns and spec, the names of
+  features, and every attribute as written. It doesn't depend on file or
+  declaration order, or on the order of attributes at one place. Saves and
+  generated headers record it.
 - `tri_content_stats`: counts and load timings (`TriStats`).
 - `tri_instance_count`, `tri_instance_name`: the instances, in declaration order.
   `tri_instance_status` is the TDL `:status` of an instance, or empty.
