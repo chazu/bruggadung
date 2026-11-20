@@ -997,6 +997,11 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
   content file lists its cut points in its header. (lab/content/README.md)
 - **Content build / content hash**: one load of all content / its hash,
   stored in saves. (CL §8)
+- **Revision** (Triangle's): the commit that Triangle's library and tool
+  are built from, as `triangle/tools/revision.sh` names it (12 hex digits,
+  `+` for changes not committed). `triangle version` prints it. The lab and
+  the Emacs mode refuse a build of another revision. It is the code's, not
+  the content's: that is the content hash. (triangle/README.md)
 - **Arena**: a region allocator for nodes; compacted by copying. (CL §12)
 
 ## Tessera

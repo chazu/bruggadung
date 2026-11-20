@@ -21,13 +21,15 @@ Documentation:
   `triangle check`, `triangle inspect`, the language server, and Emacs
 
 ```sh
-make            # library and tests
-make test       # the leak check, then the tests
+make            # library, tests and tools
+make test       # all of that, the leak check, then the tests
 make asan       # rebuild and test with AddressSanitizer and UBSan
 make odin       # the Odin package (odin/triangle) and its tests
 make odin-lib   # build/<platform>/: the game's library, for Odin to link
 make game       # build/libtriangle-game.a, without the TDL front end
 make install    # build/triangle into ~/.local/bin (PREFIX=... to change)
+make installed-test   # make install into build/prefix, and cli_test.py on that
+make installed-check  # warns if the triangle on PATH is not this tree's revision
 make lsp-test   # drive the language server over stdio
 make emacs-test # the Emacs mode's tests
 make examples   # regenerate examples/workshop from docs/GUIDE.md
@@ -153,6 +155,17 @@ name at point.
   :custom (triangle-program (expand-file-name "~/.local/bin/triangle"))
   :hook (triangle-mode . lsp-deferred))     ; or eglot-ensure
 ```
+
+**The revision.** The build stamps the library and the tool with the
+revision of Triangle's sources (`tools/revision.sh`: the last commit that
+changed `src`, `include`, `tools` or the Makefile, with `+` for changes not
+committed). `triangle version` prints it, and `tri_revision()` returns it.
+An installed tool that the sources have left behind reads the content
+wrongly and still says it is fine. So, for a file in a tree with Triangle's
+sources, the Emacs mode refuses to run a `triangle-program` of another
+revision, and says to `make install`. `triangle-check-revision` turns that
+off. The lab refuses a library of another revision than the one it was
+compiled with, and `make installed-check` warns about the one on PATH.
 
 ## A taste
 

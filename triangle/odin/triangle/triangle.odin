@@ -86,6 +86,9 @@ Fn :: #type proc "c" (ctx: rawptr, content: ^Content, owner: ^Node, lo, hi: ^i64
 
 @(default_calling_convention = "c", link_prefix = "tri_")
 foreign lib {
+	// the revision of the sources the library was built from (tools/revision.sh)
+	revision :: proc() -> cstring ---
+
 	// arenas
 	arena_new     :: proc() -> ^Arena ---
 	arena_free    :: proc(arena: ^Arena) ---

@@ -22,6 +22,10 @@ typedef uint32_t          TriType;
 
 #define TRI_BOTTOM ((TriType) 0xFFFFFFFFu)
 
+/* The revision of the sources the library was built from (tools/revision.sh):
+ * a commit's first 12 hex digits, "+" if the tree had changes, or "unknown". */
+const char *tri_revision(void);
+
 /* --- arenas ---------------------------------------------------------------- */
 
 typedef struct { void *chunk; size_t used; } TriMark;

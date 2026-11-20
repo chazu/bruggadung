@@ -383,10 +383,15 @@ stocks_wet :: proc(s: ^Tile_Stocks, out: [^][3]i32, max_: uint) -> uint {
 
 /* --- the world ------------------------------------------------------------ */
 
-/* nil, with the reason, if the content's hash differs from the generated
+/* nil, with the reason, if Triangle's library is not built from the sources
+ * the lab was compiled with, the content's hash differs from the generated
  * header's, an operation in it does nothing (act_declared.odin), or a
  * progression names what isn't there (domains_progressions.odin) */
 world_with_content :: proc(content: ^tri.Content, seed: u64, error: ^string) -> ^World {
+	if reason := tri.revision_mismatch(); reason != "" {
+		if error != nil do error^ = reason
+		return nil
+	}
 	if tri.content_hash(content) != CONTENT_HASH {
 		if error != nil {
 			error^ = fmt.tprintf("the content (%016x) is not what src/components.odin " +

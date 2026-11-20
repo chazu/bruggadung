@@ -115,6 +115,11 @@ tri_content_free(c);
   declaration order, or on the order of attributes at one place. Saves and
   generated headers record it.
 - `tri_content_stats`: counts and load timings (`TriStats`).
+- `tri_revision()`: the revision of the sources the library was built from,
+  as `tools/revision.sh` prints it: the last commit that changed `src`,
+  `include`, `tools` or the Makefile (12 hex digits), with `+` if they had
+  changes not committed, or `unknown`. `triangle version` prints it, and the
+  lab refuses a library whose revision isn't the one it was compiled with.
 - `tri_instance_count`, `tri_instance_name`: the instances, in declaration order.
   `tri_instance_status` is the TDL `:status` of an instance, or empty.
 - `tri_doc(c, name)`: the docstring of a type or instance, or `NULL`.

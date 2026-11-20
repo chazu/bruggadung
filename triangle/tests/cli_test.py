@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The triangle command: export, inspect on an instance without a spec, and fmt.
+"""The triangle command: export, inspect on an instance without a spec, fmt, and version.
 
     python3 tests/cli_test.py build/triangle      (make cli-test)
 """
@@ -139,6 +139,17 @@ def test_topics(exe):
         shutil.rmtree(tmp)
 
 
+def test_version(exe):
+    # The tool names the revision of the sources it was built from, so that
+    # an installed one left behind by them can be told from a current one.
+    here = os.path.dirname(os.path.abspath(__file__))
+    rev = subprocess.run(["sh", os.path.join(here, "..", "tools", "revision.sh")],
+                         capture_output=True, text=True).stdout.strip()
+    rc, out, _ = run(exe, "version")
+    check(rc == 0 and out.startswith("triangle ") and out.split()[-1] == rev,
+          "version names this tree's revision, %s (%s)" % (rev, out.strip()))
+
+
 def main(exe):
     ws = "examples/workshop"
     rc, out, err = run(exe, "export", "-e", "wrench_19", "-e", "nut", "-e", "gearbox", ws)
@@ -166,6 +177,7 @@ def main(exe):
           "inspect says why an instance has no spec")
     test_fmt(exe)
     test_topics(exe)
+    test_version(exe)
     print("%d failed" % failures)
     return 1 if failures else 0
 

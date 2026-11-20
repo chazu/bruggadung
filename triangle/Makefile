@@ -1,6 +1,6 @@
 CC      ?= cc
 CFLAGS  ?= -std=c11 -O2 -g -Wall -Wextra -Wno-unused-parameter
-CPPFLAGS = -Iinclude -D_DEFAULT_SOURCE
+CPPFLAGS = -Iinclude -Ibuild -D_DEFAULT_SOURCE
 SRC      = $(wildcard src/*.c)
 OBJ      = $(SRC:src/%.c=build/%.o)
 TESTS    = $(wildcard tests/*.c)
@@ -50,6 +50,35 @@ install: build/triangle
 	install -d $(PREFIX)/bin
 	install build/triangle $(PREFIX)/bin/triangle
 
+# What `make install` installs, tested: it installs into build/prefix, and
+# the command-line tests run on that tool. They include that its `triangle
+# version` names this tree's revision.
+installed-test:
+	$(MAKE) --no-print-directory install PREFIX=$(CURDIR)/build/prefix
+	python3 tests/cli_test.py build/prefix/bin/triangle
+
+# The triangle on PATH, which the Emacs mode runs, against this tree. It
+# only warns: what a developer has installed is theirs.
+installed-check:
+	@t=$$(command -v triangle) || { echo "triangle: none on PATH"; exit 0; }; \
+	v=$$("$$t" version 2>/dev/null); \
+	case "$$v" in \
+	*" $(REVISION)") echo "$$t: $$v, as this tree" ;; \
+	*) echo "warning: $$t is \"$$v\", but this tree's revision is $(REVISION):" \
+	        "make -C triangle install" ;; \
+	esac
+
+# The sources' revision (tools/revision.sh), for tri_revision and `triangle
+# version`. The file is written only when the revision changes, so that only
+# then does the library rebuild.
+REVISION := $(shell sh tools/revision.sh)
+
+build/revision.h: FORCE | build
+	@echo '#define TRI_REVISION "$(REVISION)"' > $@.new
+	@if cmp -s $@.new $@; then rm -f $@.new; else mv $@.new $@; fi
+
+FORCE:
+
 # The library for the game: without the TDL front end, which stays a test oracle.
 GAMEOBJ = $(filter-out build/game/tdl.o,$(SRC:src/%.c=build/game/%.o))
 
@@ -65,7 +94,8 @@ game: build/libtriangle-game.a
 build:
 	mkdir -p build
 
-test: build/test leakcheck
+# (all, so that build/triangle is never older than the library it links)
+test: all leakcheck
 	./build/test
 
 # The library built against a counting allocator: everything must be freed.
@@ -122,4 +152,8 @@ odin: $(ODIN_LIB)
 clean:
 	rm -rf build
 
-.PHONY: cli-test all test asan odin odin-lib leakcheck game clean lsp-test emacs-test install examples
+# Each build of revision.c, in every variant of the library, reads the stamp.
+$(filter %/revision.o,$(OBJ) $(GAMEOBJ) $(LEAKOBJ) $(ODINOBJ)): build/revision.h
+
+.PHONY: cli-test all test asan odin odin-lib leakcheck game clean lsp-test emacs-test install \
+        installed-test installed-check examples FORCE

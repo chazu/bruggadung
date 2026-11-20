@@ -8,8 +8,35 @@ package triangle
 
 import "core:c"
 import "core:c/libc"
+import "core:fmt"
 import "core:slice"
 import "core:strings"
+
+// The revision of Triangle's sources that this package was compiled with:
+// the one build/revision.h names, which the library's build writes. "" if
+// there is no such file.
+when #exists("../../build/revision.h") {
+	@(private)
+	REVISION_H :: #load("../../build/revision.h", string)
+} else {
+	@(private)
+	REVISION_H :: ""
+}
+
+// "" if the library linked is built from the sources this package was
+// compiled with; if not, why. A program compiled against one build of
+// Triangle and linked with another (a library older than the tree) reads
+// content as neither would.
+revision_mismatch :: proc() -> string {
+	h := REVISION_H
+	i := strings.index_byte(h, '"')
+	j := strings.last_index_byte(h, '"')
+	if i < 0 || j <= i do return ""
+	want, have := h[i + 1:j], string(revision())
+	if want == have do return ""
+	return fmt.tprintf("Triangle's library is revision %s, but its sources are %s: " +
+	                   "run make -C triangle odin-lib, then rebuild", have, want)
+}
 
 // A content build from files, in the order given. On failure, nil and every
 // diagnostic, a line each; the caller frees either.
