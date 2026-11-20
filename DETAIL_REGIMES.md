@@ -1,5 +1,11 @@
 # Systems at each level of detail
 
+> **Status: proposed, built in part.** Checked on 2026-11-19 against
+> `5750de8`. The doc calls itself a draft. Two forms of progression, a
+> rate and a turn, are built at every level of detail
+> (lab/src/domains_progressions.odin, `a95de4f`), as its section "Built"
+> says. None of its five steps is built whole.
+
 ## Status and scope
 
 What each system does at each level of detail (REALITY.md decisions 1, 4,

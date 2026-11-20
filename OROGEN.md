@@ -1,5 +1,11 @@
 # Orogen
 
+> **Status: accepted, built in part.** Checked on 2026-11-19 against
+> `5750de8`. Slices 1 to 3 of 6 are built: the library and its tool in
+> orogen/, the generated terrain source (lab/src/core_terrain.odin) and
+> walking and seeing relief (`9bcd8b1`, `1dfc879`, `c829b86`). Slices 4 to
+> 6 (wrapping in the lab, the planet model, the refiner) are not built.
+
 ## Status and scope
 
 Orogen is bruggadung's terrain generator: a library that says, from a seed

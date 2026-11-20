@@ -1,5 +1,12 @@
 # Maximalist Roguelike: Design Proposal
 
+> **Status: accepted.** Checked on 2026-11-19 against `5750de8`. The six
+> systems are now each a design doc (ARCHITECTURE.md lists them). Steps 1
+> to 4 of the development sequence are done: the scenarios and contracts
+> are in the system docs, and the lab runs them. Step 5, the game, has not
+> started: the village is a lab scenario. This line replaces the older
+> status in the section below.
+
 ## Status and scope
 
 This is an initial design proposal, not an implemented architecture. The next

@@ -1,5 +1,14 @@
 # Domain Simulation
 
+> **Status: built.** Checked on 2026-11-19 against `5750de8`. The domains
+> are in lab/src/domains_*.odin and the scheduler in
+> lab/src/sched_scheduler.odin. The lab runs all three scenarios: the
+> unattended stove (lab/src/test_tests_3.odin), the interrupted pump
+> repair (lab/src/test_tests_1.odin, test_tests_2.odin) and two draws on a
+> dwindling stock (lab/src/scenario_cistern.odin, `lab run cistern`). The
+> class names (`BG…`) are from the Objective-C lab. This line replaces the
+> older status in the section below.
+
 ## Status and scope
 
 Proposal. This document names and specifies the system sketched in

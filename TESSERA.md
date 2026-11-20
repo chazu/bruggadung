@@ -1,5 +1,12 @@
 # Tessera
 
+> **Status: accepted, built in part.** Checked on 2026-11-19 against
+> `5750de8`. Slices 1 and 3 are built, slices 2 and 4 in part, and slices
+> 5 and 6 are not (tessera/, lab/src/scene_truth.odin,
+> lab/src/scene_knowledge.odin, lab/watcher/). The lab calls none of the
+> frame and diff codec (REVIEW.md §4.9). The class names (`BG…`) are from
+> the Objective-C lab.
+
 ## Status and scope
 
 Tessera is bruggadung's visual engine: everything that shows a tile-based

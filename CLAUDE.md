@@ -1,5 +1,9 @@
 # Bruggadung: instructions for agents
 
+> **Status: accepted.** Checked on 2026-11-19 against `5750de8`. The
+> instructions for agents, in force. Last changed in `9c120b8`
+> (2026-11-19).
+
 ## Terminology
 
 GLOSSARY.md is the project's ubiquitous language. Always use its terms, in

@@ -1,3 +1,8 @@
+> **Status: superseded.** Checked on 2026-11-19 against `5750de8`. A raw
+> chat log from 2026-10-29, from before the design docs. DESIGN.md
+> discards the name and setting it proposes. KNOWLEDGE.md records what it
+> took from it. Nothing in it is decided.
+
 i want to make a maximalist roguelike. give me some ideas for what that might entail
 
 Oh, I love this idea. Especially because roguelikes are one of the few genres where you can pursue absolute, unreasonable complexity without necessarily requiring a massive art budget.

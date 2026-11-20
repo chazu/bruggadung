@@ -1,5 +1,12 @@
 # Effects as data
 
+> **Status: accepted, built in part.** Checked on 2026-11-19 against
+> `5750de8`. The decisions date from 2026-11-11. Steps 1 to 3 of the order
+> of work are built (lab/src/act_declared.odin,
+> lab/src/test_declared.odin). Step 4 is under way:
+> lab/src/act_actions.odin still has 22 named effects, as the section
+> below says. Of step 5, resting is built. Steps 6 to 8 are not built.
+
 ## Status and scope
 
 The decisions below were taken on 2026-11-11. Steps 1 to 3 of the order of

@@ -1,5 +1,12 @@
 # The reality bubble
 
+> **Status: accepted, built in part.** Checked on 2026-11-19 against
+> `5750de8`. Steps 1 to 4 of 7 are built, step 4 for agents only
+> (lab/src/core_reality.odin, lab/src/core_wakes.odin,
+> lab/content/reality.tri; `4cbd197` to `741294e`). Steps 5 to 7 are not
+> built. DETAIL_REGIMES.md expands step 5. The class names (`BG…`) are
+> from the Objective-C lab.
+
 ## Status and scope
 
 How much of the world is simulated how exactly, and where. Today everything

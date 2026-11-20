@@ -1,5 +1,13 @@
 # Architecture
 
+> **Status: accepted, out of date.** Checked on 2026-11-19 against
+> `5750de8`. The overview of how the systems connect still holds. The
+> table "Documents" and "What comes next" do not: REALITY.md, TERRAIN.md,
+> TESSERA.md and METHODS.md are built further than they say, and
+> VILLAGE.md, PERFORMANCE.md and EFFECTS.md are not listed. The status
+> line of each doc is current. This line replaces the older status in the
+> section below.
+
 ## Status and scope
 
 Overview of the whole framework as currently proposed. [DESIGN.md](DESIGN.md)

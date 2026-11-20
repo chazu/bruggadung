@@ -1,5 +1,12 @@
 # Terrain
 
+> **Status: accepted, built in part.** Checked on 2026-11-19 against
+> `5750de8`. Steps 1 to 3 are built, and of step 4, steps up and down a
+> slope for relief (OROGEN.md slice 3). The code is in
+> lab/src/core_terrain.odin and lab/src/core_path.odin, the content in
+> lab/content/terrain/. The class names (`BGTerrain`, `BGWorld`) are from
+> the Objective-C lab.
+
 ## Status and scope
 
 The world's physical layout: what each tile at each level is (floor, wall,
