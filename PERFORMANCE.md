@@ -1,5 +1,10 @@
 # Performance
 
+> **Status: accepted, built in part.** Checked on 2026-11-19 against
+> `5750de8`. Decisions 1, 2 and 5 to 8 are built (`39e36f3`, `7037b89`,
+> `79adce5`, `64195c0`, `fe0af2e`). Decisions 3 and 4 are still proposals:
+> no later commit builds them. REVIEW.md §5 item 9 takes up decision 3.
+
 ## Status and scope
 
 Measurements and proposals. Decisions 1 (a walk as one activity, see

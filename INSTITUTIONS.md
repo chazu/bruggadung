@@ -1,5 +1,11 @@
 # Institutions
 
+> **Status: accepted, built in part.** Checked on 2026-11-19 against
+> `5750de8`. Decisions 1 to 9 are taken, and the doc has no contract yet.
+> The lab has a law against theft, the watch, arrest, confiscation and
+> permits (lab/content/institutions/, `authorize` in
+> lab/src/act_actions.odin). Fines and revoking a permit are not built.
+
 ## Status and scope
 
 This document is ARCHITECTURE.md §6. It holds decisions as they are made;

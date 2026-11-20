@@ -1,5 +1,11 @@
 # Latent assembly
 
+> **Status: built.** Checked on 2026-11-19 against `5750de8`. Decisions 1
+> to 8 run in the lab (lab/src/kinds_latent_kind.odin,
+> lab/content/machines/). Servicing, decision 8, came in `fb10787` and
+> `14e9092`. The numbers under "Provisional" are the lab's, not derived.
+> `BGLatentKind` is now lab/src/kinds_latent_kind.odin.
+
 ## Status and scope
 
 The document COMPONENTS.md §7 points to: how a latent assembly's parts

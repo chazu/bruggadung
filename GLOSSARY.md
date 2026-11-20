@@ -1,5 +1,9 @@
 # Glossary
 
+> **Status: accepted.** Checked on 2026-11-19 against `5750de8`. Kept
+> current: the last change is `f405c3a` (2026-11-19). CLAUDE.md makes its
+> terms the rule for docs, content, code and commits.
+
 ## Status and scope
 
 The ubiquitous language of bruggadung: the words the design docs, the
@@ -66,6 +70,16 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
   (lab/src/core_faults.odin; REVIEW.md §4.4)
 - **Design doc**: one of the top-level `.md` documents. *Avoid:* spec
   (reserved for Triangle's resolved blueprint).
+- **Status line**: the quoted line under a design doc's title that says
+  where it stands, and the commit and date it was checked against:
+  **proposed** (not decided), **accepted** (decided, not all built),
+  **built** (its scenarios or its plan run in the code), **superseded**
+  (another doc or decision replaces it), or **unclear**. "Built in part"
+  names what is built. Where a doc's "Status and scope" section says
+  otherwise, the status line wins. (REVIEW.md §4.8)
+- **Changelog**: CHANGELOG.md, what changed, by topic, from the git
+  history. lab/PLAN.md is the lab's log of each step, in order. (REVIEW.md
+  §4.8)
 - **Developer view / player view**: the two views. The developer view
   shows the truth and its causes; the player view shows only what the
   character perceives or infers. Nothing in the player view may leak the

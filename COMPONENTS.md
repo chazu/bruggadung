@@ -1,5 +1,13 @@
 # Components
 
+> **Status: built.** Checked on 2026-11-19 against `5750de8`. The lab runs
+> all three scenarios: the marked nail (lab/src/scenario_marked_nail.odin,
+> `lab run marked-nail`), the forged permit (lab/src/test_tests_1.odin)
+> and the pump (lab/src/test_tests_2.odin). LATENT_ASSEMBLY.md holds §7's
+> detail. The interface sketch (§13) and the class names (`BG…`) are from
+> the Objective-C lab. This line replaces the older status in the section
+> below.
+
 ## Status and scope
 
 Proposal. This document specifies the system sketched in

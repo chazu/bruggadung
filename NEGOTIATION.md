@@ -1,5 +1,11 @@
 # Negotiation
 
+> **Status: built.** Checked on 2026-11-19 against `5750de8`. The lab runs
+> all four scenarios: a neighbour asked, a sale and debts in `test_deals`,
+> and the village in `test_asking_in_the_village` and `lab run village`
+> (lab/src/test_deals.odin, lab/src/agency_deals.odin). Lending came later
+> (`5a02aa1`, `45facda`).
+
 ## Status and scope
 
 Decisions; built in the lab (lab/PLAN.md, `test_deals`). This document extends

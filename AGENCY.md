@@ -1,5 +1,13 @@
 # Agency
 
+> **Status: accepted, built in part.** Checked on 2026-11-19 against
+> `5750de8`. The lab runs all three scenarios (lab/src/test_tests_1.odin,
+> test_tests_2.odin), Scenario 1 adapted. Decisions go on to 36, and
+> METHODS.md and NEGOTIATION.md extend §5. §13 (fidelity levels) is
+> reserved and not built: REALITY.md's levels of detail, built for
+> agents, now cover it. The interface sketch (§17) is Objective-C. This
+> line replaces the older status in the section below.
+
 ## Status and scope
 
 Proposal. This document specifies the system sketched in

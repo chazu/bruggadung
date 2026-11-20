@@ -1,5 +1,13 @@
 # Actions
 
+> **Status: built.** Checked on 2026-11-19 against `5750de8`. The lab runs
+> all three scenarios: the seized valve and the interrupted repair
+> (lab/src/test_tests_3.odin), and two hands, one seal
+> (lab/src/test_tests_2.odin). EFFECTS.md takes §4 further: effects
+> declared in content. The interface sketch (§14) and the class names
+> (`BG…`) are from the Objective-C lab. This line replaces the older
+> status in the section below.
+
 ## Status and scope
 
 Proposal. This document specifies the system sketched in

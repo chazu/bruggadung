@@ -1,5 +1,11 @@
 # The village
 
+> **Status: built.** Checked on 2026-11-19 against `5750de8`. All 13
+> slices are built (`18bbcdc` to `58f78ea`). `lab run village` runs a week
+> in the village, and `make check` compares its hashes
+> (lab/src/scenario_village.odin, lab/ci/scenario-hashes.sh). This line
+> replaces the older status in the section below.
+
 ## Status and scope
 
 A design for the lab's first scenario of daily life: a dozen people in four

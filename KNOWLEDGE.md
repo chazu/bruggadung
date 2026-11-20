@@ -1,5 +1,13 @@
 # Knowledge
 
+> **Status: built.** Checked on 2026-11-19 against `5750de8`. The lab runs
+> all three scenarios: the witness and the rumour, the cleaned workshop,
+> and the player's map and notebook (lab/src/test_tests_1.odin). Decisions
+> 17 to 20 are built (`e0d0f0a`, `01d72b2`, `a9858de`, `7037b89`). The
+> interface sketch (§19) and the class names (`BG…`) are from the
+> Objective-C lab. This line replaces the older status in the section
+> below.
+
 ## Status and scope
 
 Proposal. This document specifies the system sketched in

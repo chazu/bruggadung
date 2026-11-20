@@ -1,5 +1,13 @@
 # Review: technical debt, and how Triangle is used
 
+> **Status: proposed.** Checked on 2026-11-19 against `5750de8`. A review,
+> not a design: nothing in it is decided until a change takes it up. Of
+> §5's order of work, item 5 is merged (`5750de8`). Of item 2, §4.2
+> defects 1, 2, 6, 9 and 10 are merged. Of item 1, `316e51b` removed
+> strndup and checks the content's format, and CI has no `make asan` job.
+> Items 3, 4 and 6 to 17 are not merged. This line and CHANGELOG.md are
+> item 18.
+
 ## Status and scope
 
 A review of the whole repository as of `fa2e056` (2026-11-09): the design

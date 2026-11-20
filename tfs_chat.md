@@ -1,3 +1,8 @@
+> **Status: unclear.** Checked on 2026-11-19 against `5750de8`. A raw chat
+> log about typed feature structure systems, from 2026-10-29. No design
+> doc cites it, and it records no decision. CONTENT_LANGUAGE.md holds
+> Triangle's design.
+
 What other typed feature structure based systems have been implemented other than cue and what are their functions
 
 Yes. CUE is actually a fairly late and unusual application of an older family of ideas. Most earlier typed-feature-structure systems were built for logic programming, knowledge representation, and computational linguistics, rather than configuration.

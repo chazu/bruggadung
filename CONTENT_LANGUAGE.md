@@ -1,5 +1,13 @@
 # Triangle: the content language
 
+> **Status: built.** Checked on 2026-11-19 against `5750de8`. The engine
+> is in triangle/. Scenario 1 runs in triangle/tests/test_scenarios.c, and
+> Scenarios 2 and 3 in lab/src/test_tests_2.odin. Decision 12 (topics as
+> packages) came in `e22f407`. REVIEW.md §4.2 lists defects: 1, 2, 6, 9
+> and 10 are fixed (merges `dc1590a`, `f7987ff`, `4f15898`), and the
+> others are open. This line replaces the older status in the section
+> below.
+
 ## Status and scope
 
 Proposal. This document specifies bruggadung's **content language**, named

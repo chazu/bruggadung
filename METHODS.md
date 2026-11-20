@@ -1,5 +1,12 @@
 # Methods: whole ways and subgoals
 
+> **Status: accepted, built in part.** Checked on 2026-11-19 against
+> `5750de8`. Decisions 1 to 6 are built, as "Built so far" says
+> (lab/src/agency_agency.odin, lab/src/test_methods.odin,
+> content/market/). A later commit made firewood and the hunt whole ways
+> (`27bef94`). Whether every topic in "Content, in order" is rewritten
+> was not checked.
+
 ## Status and scope
 
 Being built (lab/PLAN.md). Built: decisions 5 and 6, the market's buying
