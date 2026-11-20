@@ -347,6 +347,7 @@ listed by area below.
 | Randomised properties: unification is commutative, associative, and idempotent; subsumption, matching, and generalisation agree with it; the quick check never rejects a success; saves round-trip; declaration order never changes the content; construction is concrete and a function of the seed | `test_props.c` |
 | Interval arithmetic is sound and exact; every clause solution is an instance of its query | `test_properties_arithmetic`, `test_properties_clauses` |
 | Fuzzed sources never crash the loader | `test_fuzz_sources` |
+| A conflict deep in a long list, and the generation counters past 2^32 | `test_limits.c` |
 | Every allocation is freed, error paths included | `tests/leakcheck` |
 | The Odin package | `odin/test` |
 
@@ -380,8 +381,17 @@ errors gave one location. Several behaviours had no test.
 
 Known shortcuts:
 
-- The generation counters are 32-bit and never reset. That gives about 4
-  billion operations per content object.
+- The generation counters are 64-bit and never reset. They do not wrap: at
+  1.6 million operations a second, 2^64 operations take about 365,000 years.
+  (They were 32-bit, and wrapped after about 4 billion operations into a
+  crash.) The wider marks make a node 56 bytes, not the 48 of the table
+  above. Resetting the marks at a wrap was not an option: nodes live in the
+  caller's arenas, which the engine cannot visit.
+- A path has no fixed depth. A list is a chain of `rest` arcs, so a conflict
+  at item 2000 is 2002 features deep, and the unifier's path stack grows to
+  hold it. (It was 128 entries, unchecked.) A failure's path as text is at
+  most 255 characters: a longer one keeps its first and last features and
+  counts those it leaves out, as in `items.rest.<1958 more>.rest.first`.
 - Each default applied while resolving a spec copies the whole structure. This
   only happens at load, but it is wasteful.
 - **Structure sharing has a contract.** A unification result may share

@@ -3,6 +3,7 @@
 
 #include "triangle.h"
 
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -33,6 +34,10 @@ extern const char *test_current;
         test_failures++; \
     } \
 } while (0)
+
+/* A hook for tests only, in the library but in no public header: the next
+ * operation's generations are `next` (src/fs.c). */
+void tri_test_set_generations(TriContent *content, uint64_t next);
 
 /* helpers */
 TriContent *load(const char *const *names, const char *const *sources, size_t n);
