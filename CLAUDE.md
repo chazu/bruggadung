@@ -36,3 +36,25 @@ the simulation. The lab's scenario hashes only show that a change moved an
 outcome. That a change would move them is never a cost to weigh against
 it and never a reason to shape a design: make the better change,
 regenerate the hashes, and say so in the commit.
+
+## Running tests
+
+Run only the narrowest tests for your change. Don't run the full suite
+(`make test` at the root, every scenario, or `make asan`) unless the task
+asks for it: the merge check runs `make test` for you. For agents, this
+replaces lab/AGENTS.md's "run `make check` before committing".
+
+- triangle/: `make -C triangle build/test`, then `./build/test <substring>`
+  in triangle/ runs the tests whose names contain it. `make -C triangle
+  cli-test` or `lsp-test` tests the command line or the language server.
+- lab/: `make -C lab test TEST=<substring>`. One scenario: `make -C lab`,
+  then `./build/<platform>/lab run <name>` in lab/ (the names are in
+  lab/ci/scenario-hashes.sh).
+- tessera/, orogen/: no narrow target. In the directory, `odin test tests
+  -vet -strict-style -define:ODIN_TEST_NAMES=tessera_test.<proc>` (or
+  `orogen_test.<proc>`) runs one test.
+- Content: `make -C triangle build/triangle`, then `triangle/build/triangle
+  check lab/content` and `triangle/build/triangle fmt --check <file>`.
+  After a change to components, `make -C lab gen`.
+
+Say in your report which tests you ran.
