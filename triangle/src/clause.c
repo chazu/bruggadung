@@ -100,7 +100,7 @@ static bool propagate_pending(Solver *s, State *st)
     Content *c = s->c;
     for (int round = 0; round < 16; round++) {
         TriMark sm = tri_arena_mark(c->scratch);
-        uint32_t saved = op_begin(c);
+        uint64_t saved = op_begin(c);
         c->failed = false;
         c->depth = 0;
         bool ok = true, changed = false;
@@ -165,7 +165,7 @@ static void solve(Solver *s, State *st, size_t depth)
         if (!head || meet(c, head->type, goal->type) == TRI_BOTTOM) continue;
         TriMark wm = tri_arena_mark(s->work);
         TriMark sm = tri_arena_mark(c->scratch);
-        uint32_t saved = op_begin(c);
+        uint64_t saved = op_begin(c);
         c->failed = false;
         c->depth = 0;
         TriNode *fresh = copy_raw(c, c->scratch, pattern);          /* fresh variables */

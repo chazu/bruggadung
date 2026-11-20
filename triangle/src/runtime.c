@@ -813,7 +813,7 @@ const TriNode *tri_restore(TriContent *c, const char *text, TriArena *out, char 
         if (n && *r.s) rerr(&r, "%s", "unexpected text after the saved structure");
         else if (n && same) result = n;
         else if (n) {
-            uint32_t saved = op_begin(c);
+            uint64_t saved = op_begin(c);
             c->failed = false;
             c->depth = 0;
             bool ok = true;

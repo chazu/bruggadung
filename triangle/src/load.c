@@ -150,8 +150,7 @@ static bool type_field_loc(Content *c, uint32_t t, const uint32_t *path, size_t 
 static bool unify_at_other(Build *b, TriNode *x, TriNode *y, Loc loc, const char *what, uint32_t other)
 {
     Content *c = b->c;
-    if (b->path.n) memcpy(c->pathstack, b->path.v, b->path.n * sizeof(uint32_t));
-    c->depth = (int) b->path.n;
+    path_set(c, b->path.v, b->path.n);
     c->failed = false;
     if (unify1(c, x, y)) return true;
     if (b->ok) {
@@ -737,17 +736,19 @@ TriNode *type_expansion(Content *c, uint32_t t)
     }
     ti->xstate = 1;
 
-    /* Save the failure state of any operation in progress. */
-    uint32_t savedpath[128];
+    /* Save the failure state of any operation in progress. The paths have no
+     * bound (a list's length is a path's depth), so their copies are on the
+     * heap; a type is expanded once, so this is rare. */
     int saveddepth = c->depth;
     bool savedfailed = c->failed;
     TriFailure savedfail = *fail_info(c);
-    uint32_t savedfailpath[128];
     int savedfaildepth = c->faildepth;
-    memcpy(savedfailpath, c->failpath, sizeof savedfailpath);
-    memcpy(savedpath, c->pathstack, sizeof savedpath);
+    uint32_t *savedpath = malloc(sizeof(uint32_t) * ((size_t) saveddepth + 1));
+    uint32_t *savedfailpath = malloc(sizeof(uint32_t) * ((size_t) savedfaildepth + 1));
+    if (saveddepth) memcpy(savedpath, c->pathstack, sizeof(uint32_t) * (size_t) saveddepth);
+    if (savedfaildepth) memcpy(savedfailpath, c->failpath, sizeof(uint32_t) * (size_t) savedfaildepth);
     TriMark m = tri_arena_mark(c->scratch);
-    uint32_t saved = op_begin(c);
+    uint64_t saved = op_begin(c);
 
     Build b = { 0 };
     b.c = c;
@@ -832,13 +833,16 @@ TriNode *type_expansion(Content *c, uint32_t t)
 
     op_end(c, saved);
     tri_arena_release(c->scratch, m);
-    memcpy(c->pathstack, savedpath, sizeof savedpath);
+    /* (each array only grows, so each still has room for what it held) */
+    if (saveddepth) memcpy(c->pathstack, savedpath, sizeof(uint32_t) * (size_t) saveddepth);
     c->depth = saveddepth;
     c->failed = savedfailed;
     c->fail_ = savedfail;
     c->failfmt = true;
-    memcpy(c->failpath, savedfailpath, sizeof savedfailpath);
+    if (savedfaildepth) memcpy(c->failpath, savedfailpath, sizeof(uint32_t) * (size_t) savedfaildepth);
     c->faildepth = savedfaildepth;
+    free(savedpath);
+    free(savedfailpath);
 
     ti = &c->types.v[t];
     if (out && c->types.v[t].ariths.n) {
@@ -1196,7 +1200,7 @@ static void copy_arith(ArithVec *dst, const ArithRec *src)
 typedef struct { const ArithRec *rec; U32Vec prefix; } ArithUse;
 typedef VEC(ArithUse) ArithUses;
 
-static void collect_ariths(Content *c, TriNode *n, U32Vec *path, ArithUses *out, uint32_t cg)
+static void collect_ariths(Content *c, TriNode *n, U32Vec *path, ArithUses *out, uint64_t cg)
 {
     if (n->cpygen == cg) return;
     n->cpygen = cg;
@@ -1444,7 +1448,7 @@ static TriNode *settle_arith(Content *c, TriNode *root, const ArithVec *extra, T
         }
         bool changed = false;
         if (ok && where.n) {
-            uint32_t saved = op_begin(c);
+            uint64_t saved = op_begin(c);
             reset_failure(c);
             for (size_t k = 0; k < where.n && ok; k++) ok = unify1(c, root, wrap_path(c, &where.v[k], vals.v[k]));
             if (ok) { root = copy_out(c, arena, root, NULL); changed = true; }
@@ -1476,7 +1480,7 @@ static bool arith_target(Content *c, uint32_t t, uint32_t f)
 static bool pair_conflicts(Content *c, X *x1, X *x2)
 {
     TriMark m = tri_arena_mark(c->scratch);
-    uint32_t saved = op_begin(c);
+    uint64_t saved = op_begin(c);
     Build b = { 0 };
     b.c = c; b.ok = true; b.contributor = CONTRIB_INSTANCE; b.owner = TRI_BOTTOM;
     int nerr = c->nerrors;
@@ -1510,7 +1514,7 @@ static bool build_variant(Content *c, uint32_t i, X **xs, InstVariant *out, bool
     int nerr = c->nerrors;
     size_t ndiag = c->diags.n;
     TriMark m = tri_arena_mark(c->scratch);
-    uint32_t saved = op_begin(c);
+    uint64_t saved = op_begin(c);
     Build b = { 0 };
     b.c = c; b.ok = true; b.contributor = CONTRIB_INSTANCE; b.owner = TRI_BOTTOM; b.record = true;
     b.direct = true;
@@ -1724,7 +1728,7 @@ static int cmp_path(const U32Vec *a, const U32Vec *b)
 
 /* Gathers the default (or @vary) records of the types of every node, with
  * their paths made absolute. */
-static void collect_recs(Content *c, TriNode *n, U32Vec *path, DefVec *out, uint32_t cg, bool vary)
+static void collect_recs(Content *c, TriNode *n, U32Vec *path, DefVec *out, uint64_t cg, bool vary)
 {
     if (n->cpygen == cg) return;          /* visited (a shared node) */
     n->cpygen = cg;
@@ -1760,7 +1764,7 @@ static TriNode *wrap_path(Content *c, const U32Vec *path, TriNode *value)
 static TriNode *try_defaults(Content *c, TriNode *root, DefaultRec **ds, size_t n, TriArena *arena)
 {
     TriMark m = tri_arena_mark(c->scratch);
-    uint32_t saved = op_begin(c);
+    uint64_t saved = op_begin(c);
     Build b = { 0 };
     b.c = c; b.ok = true;
     int nerr = c->nerrors;
@@ -1965,7 +1969,7 @@ static int variation_kind(Content *c, TriNode *n)
 /* Records variation points in path order. Returns false (with a diagnostic
  * when `in` is given) if a number is open without bounds. */
 static bool collect_variation(Content *c, TriNode *n, U32Vec *path, PathVec *out, InstInfo *in,
-                              const char *prefix, uint32_t cg)
+                              const char *prefix, uint64_t cg)
 {
     if (n->cpygen == cg) return true;     /* visited (a shared node) */
     n->cpygen = cg;
@@ -2054,7 +2058,7 @@ static TriNode *force_alternatives(Content *c, TriNode *root, Notes *ns, bool *c
     }
     buf_free(&nb);
     if (ok && forced.n) {
-        uint32_t saved = op_begin(c);
+        uint64_t saved = op_begin(c);
         reset_failure(c);
         for (size_t k = 0; k < forced.n && ok; k++) ok = unify1(c, root, wrap_path(c, &forced.v[k], vals.v[k]));
         if (ok) root = copy_out(c, arena, root, NULL);
@@ -2166,7 +2170,7 @@ bool inst_spec(Content *c, uint32_t i)
         VEC_FREE(path);
         /* freeze into the spec arena */
         TriMark fm = tri_arena_mark(c->scratch);
-        uint32_t saved = op_begin(c);
+        uint64_t saved = op_begin(c);
         v->spec = copy_out(c, c->spec, roots[k], NULL);
         op_end(c, saved);
         tri_arena_release(c->scratch, fm);
@@ -2275,7 +2279,7 @@ const U32Vec *enum_leaves(Content *c, uint32_t t)
 /* Whether unifying `value` into `root` at `path` would succeed. */
 static bool fits(Content *c, TriNode *root, const U32Vec *path, TriNode *value)
 {
-    uint32_t saved = op_begin(c);
+    uint64_t saved = op_begin(c);
     reset_failure(c);
     bool ok = unify1(c, root, wrap_path(c, path, value));
     op_end(c, saved);
@@ -2468,7 +2472,7 @@ static TriNode *derive(Content *c, TriNode *root, TriArena *out, bool *ok)
     VEC_FREE(path);
     if (!ds.n) { VEC_FREE(ds); return root; }
     TriMark m = tri_arena_mark(c->scratch);
-    uint32_t saved = op_begin(c);
+    uint64_t saved = op_begin(c);
     reset_failure(c);
     for (size_t k = 0; k < ds.n && *ok; k++) {
         TriNode *v = leaf_new(c, c->scratch, ds.v[k].dimtype, ds.v[k].lo, ds.v[k].hi);
@@ -2546,7 +2550,7 @@ const TriNode *tri_construct(TriContent *c, const char *instance, uint64_t seed,
             vals[k] = draw_point(c, root, &points.v[k], vp, seed, &structural);
             ok = vals[k] != NULL;
         }
-        uint32_t saved = op_begin(c);
+        uint64_t saved = op_begin(c);
         reset_failure(c);
         for (size_t k = 0; k < points.n && ok; k++) ok = unify1(c, root, wrap_path(c, &points.v[k], vals[k]));
         if (ok) root = copy_out(c, c->scratch, root, NULL);
@@ -2568,7 +2572,7 @@ const TriNode *tri_construct(TriContent *c, const char *instance, uint64_t seed,
     if (ok) root = derive(c, root, c->scratch, &ok);
     TriNode *r = NULL;
     if (ok) {
-        uint32_t saved = op_begin(c);
+        uint64_t saved = op_begin(c);
         r = copy_out(c, out, root, NULL);
         op_end(c, saved);
     }
@@ -2904,7 +2908,7 @@ const TriNode *tri_value(TriContent *c, const char *expr, TriArena *out, char *e
     const TriNode *r = NULL;
     if (x) {
         TriMark m = tri_arena_mark(c->scratch);
-        uint32_t saved = op_begin(c);
+        uint64_t saved = op_begin(c);
         Build b = { 0 };
         b.c = c; b.ok = true; b.runtime = true;
         TriNode *n = build_raw(&b, x);
@@ -3041,7 +3045,7 @@ TriMatch tri_match(TriContent *c, const TriNode *pattern, const TriNode *descrip
     if (fwd) { r->result = TRI_ENTAILED; return r->result; }
 
     TriMark m = tri_arena_mark(c->scratch);
-    uint32_t saved = op_begin(c);
+    uint64_t saved = op_begin(c);
     reset_failure(c);
     bool compatible = unify1(c, (TriNode *) pattern, (TriNode *) description);
     if (!compatible) r->failure = *fail_info(c);
@@ -3205,7 +3209,7 @@ size_t tri_explain_instance(TriContent *c, const char *instance, const TriNode *
 
 typedef struct { TriNode *target; uint32_t type; int64_t lo, hi; } GenTarget;
 
-static TriNode *gen_copy(Content *c, TriArena *a, TriNode *n, const GenTarget *g, uint32_t cg)
+static TriNode *gen_copy(Content *c, TriArena *a, TriNode *n, const GenTarget *g, uint64_t cg)
 {
     if (n->cpygen == cg) return n->cpy;
     uint32_t t = n == g->target ? g->type : n->type;
@@ -3344,7 +3348,7 @@ static void hstr(uint64_t *h, const char *s)
     *h = fnv1a(*h, s, strlen(s) + 1);
 }
 
-static void hash_node(Content *c, uint64_t *h, TriNode *n, uint32_t cg, uint64_t *next, const uint64_t *fh)
+static void hash_node(Content *c, uint64_t *h, TriNode *n, uint64_t cg, uint64_t *next, const uint64_t *fh)
 {
     if (n->cpygen == cg) { hmix(h, 0xA11CE ^ ((uint64_t) (uintptr_t) n->cpy << 8)); return; }
     n->cpygen = cg;
@@ -4538,6 +4542,8 @@ TriContent *tri_content_load_strings(const char *const *names, const char *const
 void tri_content_free(TriContent *c)
 {
     if (!c) return;
+    free(c->pathstack);
+    free(c->failpath);
     for (size_t i = 0; i < c->diags.n; i++) free(c->diags.v[i].msg);
     VEC_FREE(c->diags);
     for (size_t i = 0; i < c->types.n; i++) {
