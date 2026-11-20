@@ -502,10 +502,7 @@ menu_for_world :: proc(actor: Entity_ID, world: ^World) -> ^Menu {
 	nops = j
 
 	view   = view_of(actor, world)
-	nreach = view_reachable(view, &reach[0], 256)
-	if nreach > 256 {
-		nreach = 256
-	}
+	nreach = fitting(view_reachable(view, &reach[0], len(reach)), len(reach), "things in an actor's reach")
 	for o = 0; o < nops; o += 1 {
 		pattern     = tri.pattern(content, ops[o])
 		item        = has_role(content, pattern, .Item)
@@ -583,9 +580,13 @@ menu_for_world_believed :: proc(store: ^Knowledge_Store, world: ^World, believed
 	nops = j
 	/* what the actor believes is here, in reach, by referent */
 	nreach = 0
-	for i = 0; i < knowledge_store_count(store) && nreach < 256; i += 1 {
+	for i = 0; i < knowledge_store_count(store); i += 1 {
 		ref = knowledge_store_referent_at(store, i)
 		if ref.present && ref.id != me.id && referent_in_reach(me, ref) {
+			if nreach == len(reach) {
+				cap_fault("things %d believes in reach: more than the %d its menu holds; the rest passed over", actor, len(reach))
+				break
+			}
 			reach[nreach] = Entity_ID(ref.id)
 			nreach += 1
 		}
@@ -698,9 +699,9 @@ effect_drive :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group) 
 	index: i32
 
 	nail  = unit(a.roles[.Item], 1) if world_is_stack(world, a.roles[.Item]) else whole(a.roles[.Item])
-	n     = world_entities_at(world, a.roles[.Destination], .Part_Of, &parts[0], 64)
+	n     = fitting(world_entities_at(world, a.roles[.Destination], .Part_Of, &parts[0], len(parts)), len(parts), "parts of an assembly")
 	index = 0
-	for i = 0; i < n && i < 64; i += 1 {
+	for i = 0; i < n; i += 1 {
 		at := world_location_of(world, parts[i])
 		if location_role(&at) == "wedge" {
 			index += 1
@@ -939,18 +940,19 @@ turning_chain :: proc(world: ^World, actor: Entity_ID, chain: ^[2]Entity_ID, cos
 	best: i64
 
 	lk     = world_kind_named(world, "Lever")
-	nreach = view_reachable(view_of(actor, world), &reach[0], 256)
-	if nreach > 256 {
-		nreach = 256
-	}
+	nreach = fitting(view_reachable(view_of(actor, world), &reach[0], len(reach)), len(reach), "things in an actor's reach")
 	nc = 0
-	for i = 0; i < nreach && nc < 64; i += 1 {
+	for i = 0; i < nreach; i += 1 {
 		if world_record(world, lk, reach[i]) == nil {
 			continue
 		}
 		c = access_cost(world, actor, reach[i])
 		if c < 0 {
 			continue
+		}
+		if nc == len(cand) {
+			cap_fault("levers in reach of %d: more than the %d a turn weighs; the rest passed over", actor, len(cand))
+			break
 		}
 		cand[nc]  = reach[i]
 		ccost[nc] = c
@@ -1054,16 +1056,16 @@ receiving :: proc(world: ^World, agent: Entity_ID, mass: i64, stows: bool) -> (L
 	held:   [8]Entity_ID
 	inside: [16]Entity_ID
 	if stows {
-		n := min(world_entities_at(world, agent, .Held_By, raw_data(held[:]), 8), 8)
+		holds := world_entities_at_in(world, agent, .Held_By, held[:], "things an agent holds")
 		for pass in 0 ..< 2 {
-			for e in held[:n] {
+			for e in holds {
 				load, capacity: i64
 				if (world_location_of(world, e).slot == BG_BACK) != (pass == 0) do continue
 				if !world_get_field(world, "Pack.load", e, &load) || !world_get_field(world, "Container.capacity", e, &capacity) do continue
-				m := min(world_entities_at(world, e, .In, raw_data(inside[:]), 16), 16)
+				in_pack := world_entities_at_in(world, e, .In, inside[:], "things in a pack")
 				bears := mass
-				for c in inside[:m] do bears += world_mass_of(world, c)
-				if bears <= load && i64(m) < capacity do return in_(e), true
+				for c in in_pack do bears += world_mass_of(world, c)
+				if bears <= load && i64(len(in_pack)) < capacity do return in_(e), true
 			}
 		}
 	}
@@ -1097,7 +1099,11 @@ curve_at :: proc(content: ^tri.Content, curve: ^tri.Node, x: i64, out: ^i32) -> 
 	k: int
 	curve := curve
 
-	for n = 0; curve != nil && n < 16 && got(&p, tri.at(content, curve, "first")); curve = tri.at(content, curve, "rest") {
+	for n = 0; curve != nil && got(&p, tri.at(content, curve, "first")); curve = tri.at(content, curve, "rest") {
+		if n == len(at) {
+			cap_fault("a curve: more than %d points; the rest passed over", len(at))
+			break
+		}
 		if tri.node_interval(tri.at(content, p, "input"), &lo, &hi) == 0 || lo != hi {
 			continue
 		}
@@ -1348,7 +1354,7 @@ effect_rotate :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group)
 	             "turn" if applied >= valve.rating else "hold", valve.rating / 1000)
 
 	/* what isn't held is taken up, into the free hands in order */
-	n    = world_entities_at(world, actor, .Held_By, &held[0], 8)
+	n    = fitting(world_entities_at(world, actor, .Held_By, &held[0], len(held)), len(held), "things an agent holds")
 	hand = 0
 	for k = 0; k < 2; k += 1 {
 		if chain[k] == 0 || cost[k] == 0 {
@@ -1356,7 +1362,7 @@ effect_rotate :: proc(world: ^World, a: Action, amount: i64, g: ^Proposal_Group)
 		}
 		for ; i64(hand) < agent.hands; hand += 1 {
 			taken = false
-			for i = 0; i < n && i < 8 && !taken; i += 1 {
+			for i = 0; i < n && !taken; i += 1 {
 				taken = world_location_of(world, held[i]).slot == hand
 			}
 			if !taken {
@@ -1592,9 +1598,8 @@ latent_part :: proc(world: ^World, assembly: Entity_ID, role: cstring) -> Entity
 	n: uint
 	i: uint
 
-	n = world_entities_at(world, assembly, .Part_Of, &in_[0], 64)
-	// The C read past in[64] when more than 64 were part of it; here only within it
-	for i = 0; i < n && i < 64; i += 1 {
+	n = fitting(world_entities_at(world, assembly, .Part_Of, &in_[0], len(in_)), len(in_), "parts of an assembly")
+	for i = 0; i < n; i += 1 {
 		at := world_location_of(world, in_[i])
 		if location_role(&at) == string(role) {
 			return in_[i]
@@ -1714,9 +1719,8 @@ latent_use :: proc(world: ^World, g: ^Proposal_Group, assembly: Entity_ID, d: i6
 	if schema == nil || depth > 8 {
 		return
 	}
-	n = world_entities_at(world, assembly, .Part_Of, &in_[0], 64)
-	// The C read past in[64] when more than 64 were part of it; here only within it
-	for i = 0; i < n && i < 64; i += 1 {
+	n = fitting(world_entities_at(world, assembly, .Part_Of, &in_[0], len(in_)), len(in_), "parts of an assembly")
+	for i = 0; i < n; i += 1 {
 		p = (^Part)(world_record(world, world_kind_named(world, "Part"), in_[i]))
 		if p == nil {
 			continue
@@ -2230,9 +2234,8 @@ add_claims :: proc(world: ^World, on: Entity_ID, partsOnly: bool, found: ^[dynam
 	m: uint
 	j: uint
 
-	m = world_edges_to(world, .Claim_Subject, on, &claims[0], 16)
-	// The C read past claims[16] when more than 16 claimed it; here only within it
-	for j = 0; j < m && j < 16; j += 1 {
+	m = fitting(world_edges_to(world, .Claim_Subject, on, &claims[0], len(claims)), len(claims), "claims on a thing")
+	for j = 0; j < m; j += 1 {
 		if (!partsOnly || covers_parts(world, (^Claim)(world_record(world, world_kind_named(world, "Claim"), claims[j])))) &&
 		   !slice.contains(found[:], claims[j]) {
 			append(found, claims[j])
@@ -2580,7 +2583,7 @@ injure :: proc(world: ^World, g: ^Proposal_Group, victim: Entity_ID, by: Entity_
 die :: proc(world: ^World, g: ^Proposal_Group, body: Entity_ID) {
 	held: [8]Entity_ID
 	at := world_location_of(world, body)
-	for e in held[:world_entities_at(world, body, .Held_By, raw_data(held[:]), len(held))] {
+	for e in world_entities_at_in(world, body, .Held_By, held[:], "things an agent holds") {
 		proposal_group_move_to(g, whole(e), at)
 	}
 	blueprint := world_text_field(world, "Agent.remains", body)

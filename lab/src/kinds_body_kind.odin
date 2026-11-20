@@ -71,8 +71,8 @@ body_kind_react_to_event :: proc(self: ^Body_Kind, committer: ^Committer, event:
 	unit = world_unit_of(world, event.subject)
 	if unit == nil do return
 	/* the lowest-numbered stack of the same unit already there */
-	n = world_entities_at(world, event.location.place, .In, raw_data(here[:]), 256)
-	for i = 0; i < n && i < 256; i += 1 {
+	n = fitting(world_entities_at(world, event.location.place, .In, raw_data(here[:]), len(here)), len(here), "things in a container")
+	for i = 0; i < n; i += 1 {
 		if here[i] == event.subject || !world_is_stack(world, here[i]) || world_unit_of(world, here[i]) != unit do continue
 		if !food_alike(world, event.subject, here[i]) do continue
 		group = proposal_group_group_with_phase(.System,

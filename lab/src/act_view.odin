@@ -32,13 +32,11 @@ View :: struct {
 free_hands :: proc(world: ^World, agent: Entity_ID) -> i32 {
 	a:    ^Agent
 	held: [8]Entity_ID
-	n:    uint
 
 	a = (^Agent)(world_record(world, world_kind_named(world, "Agent"), agent))
 	if a == nil do return 0
-	n = world_entities_at(world, agent, .Held_By, raw_data(held[:]), 8)
 	used: i32
-	for e in held[:min(n, 8)] do if world_location_of(world, e).slot < BG_BACK do used += 1      /* the back is no hand, nor the belt */
+	for e in world_entities_at_in(world, agent, .Held_By, held[:], "things an agent holds") do if world_location_of(world, e).slot < BG_BACK do used += 1      /* the back is no hand, nor the belt */
 	return i32(a.hands) - used
 }
 
@@ -55,9 +53,9 @@ carried_mass :: proc(world: ^World, agent: Entity_ID) -> i64 {
 	held:   [8]Entity_ID
 	inside: [16]Entity_ID
 	total:  i64
-	for e in held[:min(world_entities_at(world, agent, .Held_By, raw_data(held[:]), 8), 8)] {
+	for e in world_entities_at_in(world, agent, .Held_By, held[:], "things an agent holds") {
 		total += world_mass_of(world, e)
-		for c in inside[:min(world_entities_at(world, e, .In, raw_data(inside[:]), 16), 16)] do total += world_mass_of(world, c)
+		for c in world_entities_at_in(world, e, .In, inside[:], "things in what an agent holds") do total += world_mass_of(world, c)
 	}
 	return total
 }
@@ -67,18 +65,16 @@ carried_mass :: proc(world: ^World, agent: Entity_ID) -> i64 {
 free_hand :: proc(world: ^World, agent: Entity_ID) -> i32 {
 	a:     ^Agent
 	held:  [8]Entity_ID
-	i:     uint
-	n:     uint
 	hand:  i32
 	taken: bool
 
 	a = (^Agent)(world_record(world, world_kind_named(world, "Agent"), agent))
 	if a == nil do return -1
-	n = world_entities_at(world, agent, .Held_By, raw_data(held[:]), 8)
+	holds := world_entities_at_in(world, agent, .Held_By, held[:], "things an agent holds")
 	for hand = 0; i64(hand) < a.hands; hand += 1 {
 		taken = false
-		for i = 0; i < n && i < 8 && !taken; i += 1 {
-			taken = world_location_of(world, held[i]).slot == hand
+		for i := 0; i < len(holds) && !taken; i += 1 {
+			taken = world_location_of(world, holds[i]).slot == hand
 		}
 		if !taken do return hand
 	}

@@ -57,6 +57,13 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
   **scenario harness**. Every scenario keeps its results as the lab
   grows. (COM, ARC)
 - **Acceptance check**: a verifiable criterion a scenario must meet. (COM)
+- **Cap fault**: a fixed cap in the lab's code met (a mind more than 16
+  goals deep, more open taps than the fluid domain holds): the work past
+  it is not done, and the test or run that met it fails. A cap whose
+  overflow is the model (a habit forgotten, the weakest first) is no cap
+  fault. Not a failed action, nor a group the committer rejects, which
+  are the simulation's own outcomes. Not Orogen's map fault.
+  (lab/src/core_faults.odin; REVIEW.md §4.4)
 - **Design doc**: one of the top-level `.md` documents. *Avoid:* spec
   (reserved for Triangle's resolved blueprint).
 - **Developer view / player view**: the two views. The developer view

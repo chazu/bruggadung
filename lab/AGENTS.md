@@ -68,6 +68,13 @@ release that changes them shows up there.
 - A `@(private = "file")` name doesn't clash with the same name in another
   file of the Odin package.
 - C's `context` is Odin's keyword: such a field or parameter is `context_`.
+- **No cap skips work silently** (`src/core_faults.odin`). A list that may
+  grow is a `[dynamic]` (a mind's lists use `grown_to`), or one the world
+  fills whole (`world_entities_at_all`, `world_edges_to_all`). A fixed
+  buffer that stays is read with `fitting`, `world_entities_at_in` or
+  `world_edges_to_in`, and any other cap met calls `cap_fault`: the test
+  or run that meets it fails. A test that means to meet a cap takes the
+  cap fault with `take_cap_faults`.
 
 ## Scenario hashes notice a change
 

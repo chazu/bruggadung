@@ -3845,4 +3845,10 @@ ALL_TESTS := [?]Test_Case{
 	{"keep_seed",                     test_keep_seed},
 	{"harvest_overtaken",             test_harvest_overtaken},
 	{"units_name_instances",          test_units_name_instances},
+	{"caps_faults",                   test_caps_faults},
+	{"caps_mind",                     test_caps_mind},
+	{"caps_undertake",                test_caps_undertake},
+	{"caps_content",                  test_caps_content},
+	{"caps_world",                    test_caps_world},
+	{"caps_fluid",                    test_caps_fluid},
 }

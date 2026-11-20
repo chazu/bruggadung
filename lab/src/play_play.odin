@@ -407,12 +407,12 @@ play_inspect :: proc(self: ^Play, e: Entity_ID) {
 
 	fmt.sbprintf(&self.out, "%s\n", world_describe_entity(self.world, e))
 	for k := 0; k < int(Edge_Kind.Kind_Count); k += 1 {
-		n = world_edges_from(self.world, Edge_Kind(k), e, raw_data(other[:]), 64)
-		for i: uint = 0; i < n && i < 64; i += 1 {
+		n = fitting(world_edges_from(self.world, Edge_Kind(k), e, raw_data(other[:]), len(other)), len(other), "edges shown")
+		for i: uint = 0; i < n; i += 1 {
 			fmt.sbprintf(&self.out, "  %s -> %d\n", EDGE_KIND_NAMES[Edge_Kind(k)], other[i])
 		}
-		n = world_edges_to(self.world, Edge_Kind(k), e, raw_data(other[:]), 64)
-		for i: uint = 0; i < n && i < 64; i += 1 {
+		n = fitting(world_edges_to(self.world, Edge_Kind(k), e, raw_data(other[:]), len(other)), len(other), "edges shown")
+		for i: uint = 0; i < n; i += 1 {
 			fmt.sbprintf(&self.out, "  %s <- %d\n", EDGE_KIND_NAMES[Edge_Kind(k)], other[i])
 		}
 	}

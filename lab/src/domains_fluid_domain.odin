@@ -34,7 +34,7 @@ import "core:slice"
 import tri "../../triangle/odin/triangle"
 
 
-BG_FLUID_MAX :: 64
+BG_FLUID_MAX :: 64      /* open taps, and watches, in one structure: past it, a fault */
 
 // Water on the floor spreads between adjacent tiles: across each pair, in a
 // step of dt, (difference × dt) / (8 τ) whole millilitres, from step-start
@@ -192,36 +192,42 @@ fluid_domain_scan :: proc(self: ^Fluid_Domain, views: [^]Tap_View) -> i32 {
 	taps   = world_store_for_kind(self.world, world_kind_named(self.world, "Tap"))
 	kstore = world_kind_named(self.world, "WaterStore")
 	n      = 0
-	for i = 0; i < store_count(taps) && n < BG_FLUID_MAX; i += 1 {
+	for i = 0; i < store_count(taps); i += 1 {
 		tap = (^Tap)(store_record_at_index(taps, i))
 		if !tap.open {
 			continue
 		}
-		views[n].tap = store_entity_at_index(taps, i)
-		at           = world_location_of(self.world, views[n].tap)
+		v: Tap_View
+		v.tap = store_entity_at_index(taps, i)
+		at    = world_location_of(self.world, v.tap)
 		// a tap draws from the store it is installed in
 		if at.form != .Part_Of || world_record(self.world, kstore, at.place) == nil {
 			continue
 		}
-		views[n].source      = at.place
-		views[n].rate        = tap.rate
-		views[n].destination = NO_ENTITY
+		v.source      = at.place
+		v.rate        = tap.rate
+		v.destination = NO_ENTITY
 		// into what sits in it, or onto the tile below
-		m = world_entities_at(self.world, views[n].tap, .In, &inside[0], 4)
-		for j = 0; j < m && j < 4; j += 1 {
+		m = fitting(world_entities_at(self.world, v.tap, .In, &inside[0], len(inside)), len(inside), "things in a tap")
+		for j = 0; j < m; j += 1 {
 			if world_record(self.world, kstore, inside[j]) != nil {
-				views[n].destination = inside[j]
+				v.destination = inside[j]
 				break
 			}
 		}
-		if views[n].destination == 0 {
-			if !ground_tile(self.world, views[n].tap, &tile) {
+		if v.destination == 0 {
+			if !ground_tile(self.world, v.tap, &tile) {
 				continue
 			}
-			views[n].x     = tile.x
-			views[n].y     = tile.y
-			views[n].level = tile.level
+			v.x     = tile.x
+			v.y     = tile.y
+			v.level = tile.level
 		}
+		if n == BG_FLUID_MAX {
+			cap_fault("more than BG_FLUID_MAX (%d) open taps in one structure; tap %d and the rest do not flow", BG_FLUID_MAX, v.tap)
+			break
+		}
+		views[n] = v
 		n += 1
 	}
 	return n
@@ -596,8 +602,12 @@ fluid_domain_restore_saved_state :: proc(self: ^Fluid_Domain, lines: []string) {
 	i:     int
 
 	self.ncarries = 0
-	for i = 0; i < len(lines) && self.ncarries < BG_FLUID_MAX; i += 1 {
+	for i = 0; i < len(lines); i += 1 {
 		if sscanf(lines[i], "carry %llu %lld", &tap, &carry) == 2 {
+			if self.ncarries == BG_FLUID_MAX {
+				cap_fault("a save: more than BG_FLUID_MAX (%d) taps' carries; the rest dropped", BG_FLUID_MAX)
+				break
+			}
 			self.carryTaps[self.ncarries] = Entity_ID(u64(tap))
 			self.carries[self.ncarries]   = carry
 			self.ncarries += 1
@@ -687,7 +697,7 @@ fluid_domain_watches :: proc(self: ^Fluid_Domain, out: [^]Fluid_Watch) -> i32 {
 	watching = world_copy_watching_activities(self.world, &count)      // the world's index of watches
 	running  = tri.type_named(world_tri(self.world), "\"running\"")
 	n        = 0
-	for i = 0; i < count && n < BG_FLUID_MAX; i += 1 {
+	for i = 0; i < count; i += 1 {
 		record = (^Activity)(world_record(self.world, world_kind_named(self.world, "Activity"), watching[i]))
 		if record == nil || (record.watchHolder == 0 && record.watchFloor == 0) || record.status != u32(running) {
 			continue
@@ -700,6 +710,11 @@ fluid_domain_watches :: proc(self: ^Fluid_Domain, out: [^]Fluid_Watch) -> i32 {
 				     i64(self.holders[h].y) == record.watchY && i64(self.holders[h].level) == record.watchLevel
 			} else {
 				on = self.holders[h].entity == Entity_ID(record.watchHolder)
+			}
+			if on && n == BG_FLUID_MAX {
+				cap_fault("more than BG_FLUID_MAX (%d) watches on water; activity %d and the rest are not told", BG_FLUID_MAX,
+				          watching[i])
+				break
 			}
 			if on {
 				out[n].activity = watching[i]
@@ -1074,10 +1089,13 @@ fluid_domain_report_watches_to :: proc(self: ^Fluid_Domain, committer: ^Committe
 			group = proposal_group_group_with_phase(.Process, "fluid: watches reached")
 		}
 		proposal_group_emit_subject_other(group, "watched", whole(watches[i].activity), whole(self.holders[watches[i].holder].entity))
-		if self.nfired < BG_FLUID_MAX {
-			self.fired[self.nfired] = watches[i].activity
-			self.nfired += 1
+		if self.nfired == BG_FLUID_MAX {
+			cap_fault("more than BG_FLUID_MAX (%d) watches fired and still watching; activity %d will be told again",
+			          BG_FLUID_MAX, watches[i].activity)
+			continue
 		}
+		self.fired[self.nfired] = watches[i].activity
+		self.nfired += 1
 	}
 	if group != nil {
 		committer_submit(committer, group)

@@ -116,9 +116,10 @@ test_eats_what_keeps_least :: proc() {
  */
 test_errand_window :: proc() {
 	m: Motivation
+	defer delete(m.commitments)
+	grown_to(&m.commitments, 0).from = 7 * 3600 * 1000      /* the work, from seven */
+	grown_to(&m.commitments, 1).from = 12 * 3600 * 1000     /* the takings, from noon */
 	m.ncommitments = 2
-	m.commitments[0].from = 7 * 3600 * 1000      /* the work, from seven */
-	m.commitments[1].from = 12 * 3600 * 1000     /* the takings, from noon */
 	m.nintentions = 2
 	m.intentions[0].commitment = 1
 	m.intentions[0].pending    = -1              /* suspended beneath: not what the takings are for */

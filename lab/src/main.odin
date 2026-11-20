@@ -186,9 +186,9 @@ run_scenario :: proc(name: string, save_: bool, menuAt: i64) -> i32 {
 
 		marked_nail_run_until(scenario, time_make(menuAt))
 		view = view_of(4, world)
-		n    = view_reachable(view, raw_data(reach[:]), 64)
+		n    = fitting(view_reachable(view, raw_data(reach[:]), len(reach)), len(reach), "things the worker can see")
 		fmt.printf("== what the worker (4) can see at t=%dms\n", menuAt)
-		for i: uint = 0; i < n && i < 64; i += 1 do fmt.printf("%s\n", view_describe_entity(view, reach[i]))
+		for i: uint = 0; i < n; i += 1 do fmt.printf("%s\n", view_describe_entity(view, reach[i]))
 		menu = menu_for_world(4, world)
 		fmt.printf("\n== the worker's menu\n")
 		for i: uint = 0; i < menu_count(menu); i += 1 do fmt.printf("%s\n", menu_describe_at(menu, i))
@@ -286,5 +286,6 @@ main :: proc() {
 	}
 	pool_drain()
 	free_released_content()          // the worlds on it went with the pool
+	if report_cap_faults() && status == 0 do status = 1      /* a cap met (core_faults.odin) */
 	os.exit(int(status))
 }

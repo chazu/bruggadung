@@ -783,8 +783,7 @@ village_run :: proc(self: ^Village) {
 			lines := agency_log_of(self.agency, l.agent)
 			for line in lines[min(l.printed, len(lines)):] do fmt.eprintf("%d %s\n", l.agent, line)
 			l.printed = len(lines)
-			held: [8]Entity_ID
-			for e in held[:min(world_entities_at(self.world, l.agent, .Held_By, raw_data(held[:]), len(held)), len(held))] {
+			for e in world_entities_at_all(self.world, l.agent, .Held_By, context.temp_allocator) {
 				fmt.eprintf("%d night %d, holds %s\n", l.agent, d + 1, world_describe_entity(self.world, e))
 			}
 		}
@@ -807,8 +806,7 @@ village_run :: proc(self: ^Village) {
 		}
 		village_check(self, len(astray) == 0, fmt.tprintf("night %d, 02:00: every pack back by its larder, empty", d + 1),
 		              fmt.tprintf("not: %s", strings.join(astray[:], ", ", context.temp_allocator)))
-		kept: [64]Entity_ID
-		for e in kept[:min(world_entities_at(self.world, self.larders[hunters], .In, raw_data(kept[:]), len(kept)), len(kept))] {
+		for e in world_entities_at_all(self.world, self.larders[hunters], .In, context.temp_allocator) {
 			if u := world_unit_of(self.world, e); u != nil && (u == "venison" || u == "hare meat") {
 				meatNights += 1
 				break
@@ -833,14 +831,13 @@ village_run :: proc(self: ^Village) {
 	/* the hunters' work: meat brought home, in their larder some night (a
 	 * stack spoils whole, content/perishing/: on any one night it may just
 	 * have); the game kept up (VILLAGE.md decision 7) */
-	inside: [64]Entity_ID
 	village_check(self, meatNights > 0, "the hunters brought meat home", "none in their larder, any night")
 	/* and a hide, carried home in the pack (content/carrying/), not left
 	 * lying: in their larder, laid in the tan, or leather by now
 	 * (content/tanning/); from a fortnight on, some of it leather, put by */
 	hides, leather := 0, i64(0)
 	for place in ([2]Entity_ID{self.larders[hunters], self.pit}) {
-		for e in inside[:min(world_entities_at(self.world, place, .In, raw_data(inside[:]), len(inside)), len(inside))] {
+		for e in world_entities_at_all(self.world, place, .In, context.temp_allocator) {
 			if world_record(self.world, world_kind_named(self.world, "Body"), e) == nil do continue
 			if world_is_a(self.world, e, "#Hide") do hides += 1
 			if world_is_a(self.world, e, "#Leather") {
@@ -1000,8 +997,7 @@ village_check_market :: proc(self: ^Village, d: i64, before: [4]i64) {
 	 * nearer) may sell all that is wanted (content/money/'s #Pricing) */
 	set_out, paid: [4]bool      /* by household */
 	for st, k in self.stalls {
-		inside: [16]Entity_ID
-		for e in inside[:min(world_entities_at(self.world, st, .In, raw_data(inside[:]), len(inside)), len(inside))] do if u := world_unit_of(self.world, e); u != nil && u != "coin" do set_out[k] = true
+		for e in world_entities_at_all(self.world, st, .In, context.temp_allocator) do if u := world_unit_of(self.world, e); u != nil && u != "coin" do set_out[k] = true
 		paid[k] = village_units_in(self.world, st, "coin") > 0
 		set_out[k] = set_out[k] || paid[k]
 	}
@@ -1039,20 +1035,16 @@ village_check_market :: proc(self: ^Village, d: i64, before: [4]i64) {
 
 /* The units of a unit in a container. */
 village_units_in :: proc(world: ^World, container: Entity_ID, unit: cstring) -> i64 {
-	inside: [64]Entity_ID
 	total: i64
-	n := min(world_entities_at(world, container, .In, raw_data(inside[:]), len(inside)), len(inside))
-	for e in inside[:n] do if u := world_unit_of(world, e); u != nil && u == unit do total += world_units_of(world, e)
+	for e in world_entities_at_all(world, container, .In, context.temp_allocator) do if u := world_unit_of(world, e); u != nil && u == unit do total += world_units_of(world, e)
 	return total
 }
 
 
 /* The pieces of firewood in a container. */
 village_firewood_in :: proc(world: ^World, container: Entity_ID) -> i64 {
-	inside: [64]Entity_ID
 	total: i64
-	n := min(world_entities_at(world, container, .In, raw_data(inside[:]), len(inside)), len(inside))
-	for e in inside[:n] do if world_unit_of(world, e) == "firewood" do total += world_units_of(world, e)
+	for e in world_entities_at_all(world, container, .In, context.temp_allocator) do if world_unit_of(world, e) == "firewood" do total += world_units_of(world, e)
 	return total
 }
 
@@ -1060,9 +1052,7 @@ village_firewood_in :: proc(world: ^World, container: Entity_ID) -> i64 {
 /* The grams of meat in the container, and of spoiled food. */
 @(private = "file")
 village_meat_in :: proc(world: ^World, container: Entity_ID) -> (meat: i64, rot: i64) {
-	inside: [64]Entity_ID
-	n := min(world_entities_at(world, container, .In, raw_data(inside[:]), len(inside)), len(inside))
-	for e in inside[:n] {
+	for e in world_entities_at_all(world, container, .In, context.temp_allocator) {
 		if u := world_unit_of(world, e); u == "venison" || u == "hare meat" {
 			meat += world_mass_of(world, e)
 		} else if info := world_info(world, e); info != nil && info.blueprint == "spoiled_food" {
@@ -1076,10 +1066,8 @@ village_meat_in :: proc(world: ^World, container: Entity_ID) -> (meat: i64, rot:
 /* The portions of food kept by the portion in a container, grain and
  * turnips (not the seed kept there). */
 village_portions_in :: proc(world: ^World, container: Entity_ID) -> i64 {
-	inside: [64]Entity_ID
 	total: i64
-	n := min(world_entities_at(world, container, .In, raw_data(inside[:]), len(inside)), len(inside))
-	for e in inside[:n] do if u := world_unit_of(world, e); u == "grain" || u == "turnip" do total += world_units_of(world, e)
+	for e in world_entities_at_all(world, container, .In, context.temp_allocator) do if u := world_unit_of(world, e); u == "grain" || u == "turnip" do total += world_units_of(world, e)
 	return total
 }
 
@@ -1166,11 +1154,9 @@ village_at_work :: proc(self: ^Village, v: Villager) -> bool {
 // How many meals (food, not raw) an agent holds.
 @(private = "file")
 village_holds_meal :: proc(world: ^World, agent: Entity_ID) -> int {
-	held: [8]Entity_ID
 	raw: i64
 	meals := 0
-	n := min(world_entities_at(world, agent, .Held_By, raw_data(held[:]), len(held)), len(held))
-	for e in held[:n] {
+	for e in world_entities_at_all(world, agent, .Held_By, context.temp_allocator) {
 		if world_get_field(world, "Food.raw", e, &raw) && raw == 0 do meals += 1
 	}
 	return meals

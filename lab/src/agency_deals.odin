@@ -35,8 +35,8 @@ import "core:fmt"
 import "core:strings"
 import tri "../../triangle/odin/triangle"
 
-BG_MAX_TALKS   :: 8
-BG_MAX_OWED    :: 16
+BG_MAX_TALKS   :: 8                       /* talks kept: past it, the oldest that is over is forgotten; one under
+                                             way never is, and the list grows */
 BG_ASK_COST    :: 30                      /* what asking costs anyone, before its pride (dB) */
 BG_ASK_PEOPLE  :: 3                       /* whom it asks, each time it takes the goal up */
 BG_DEAL_WAIT   :: i64(5000)               /* ms it waits for the other's answer */
@@ -613,25 +613,24 @@ agency_doing_worth :: proc(self: ^Agency, m: ^Motivation, store: ^Knowledge_Stor
 
 @(private = "file")
 agency_add_talk :: proc(m: ^Motivation, t: Talk) {
-	if m.ntalks == BG_MAX_TALKS {
-		/* the oldest that is over makes room, else the oldest */
-		k: i32 = 0
-		for i: i32 = 0; i < m.ntalks; i += 1 do if m.talks[i].state != .Open && m.talks[i].state != .Agreed && m.talks[i].state != .Waiting { k = i; break }
-		copy(m.talks[k:m.ntalks - 1], m.talks[k + 1:m.ntalks])
-		m.ntalks -= 1
+	if m.ntalks >= BG_MAX_TALKS {
+		/* the oldest that is over makes room */
+		for i: i32 = 0; i < m.ntalks; i += 1 {
+			if m.talks[i].state == .Open || m.talks[i].state == .Agreed || m.talks[i].state == .Waiting do continue
+			copy(m.talks[i:m.ntalks - 1], m.talks[i + 1:m.ntalks])
+			m.ntalks -= 1
+			break
+		}
 	}
-	m.talks[m.ntalks] = t
+	grown_to(&m.talks, m.ntalks)^ = t
 	m.ntalks += 1
 }
 
 
+/* A debt is never forgotten: repaid, or given up, it is dropped. */
 @(private = "file")
 agency_add_owed :: proc(m: ^Motivation, o: Owed) {
-	if m.nowed == BG_MAX_OWED {
-		copy(m.owed[0:m.nowed - 1], m.owed[1:m.nowed])
-		m.nowed -= 1
-	}
-	m.owed[m.nowed] = o
+	grown_to(&m.owed, m.nowed)^ = o
 	m.nowed += 1
 }
 
@@ -1201,10 +1200,9 @@ agency_deals_saved :: proc(m: ^Motivation, lines: ^[dynamic]string) {
 agency_deals_restore :: proc(self: ^Agency, words: []string) -> bool {
 	if len(words) == 17 && words[0] == "talk" {
 		m := agency_mind_of(self, Entity_ID(ns_long_long_value(words[1])))
-		if m.ntalks == BG_MAX_TALKS do return true
 		goal := decode_word(ns_utf8(words[5]))
 		what := decode_word(ns_utf8(words[16]))
-		m.talks[m.ntalks] = Talk{with = u32(ns_long_long_value(words[2])), asking = ns_int_value(words[3]) != 0,
+		grown_to(&m.talks, m.ntalks)^ = Talk{with = u32(ns_long_long_value(words[2])), asking = ns_int_value(words[3]) != 0,
 		                         state = Talk_State(ns_int_value(words[4])),
 		                         goal = world_intern(self.world, goal) if len(string(goal)) > 0 else nil,
 		                         units = ns_int_value(words[6]), wanting = ns_int_value(words[7]), rounds = ns_int_value(words[8]),
@@ -1220,9 +1218,8 @@ agency_deals_restore :: proc(self: ^Agency, words: []string) -> bool {
 	}
 	if len(words) == 9 && words[0] == "owed" {
 		m := agency_mind_of(self, Entity_ID(ns_long_long_value(words[1])))
-		if m.nowed == BG_MAX_OWED do return true
 		what := decode_word(ns_utf8(words[8]))
-		m.owed[m.nowed] = Owed{kind = Owed_Kind(ns_int_value(words[2])), other = u32(ns_long_long_value(words[3])),
+		grown_to(&m.owed, m.nowed)^ = Owed{kind = Owed_Kind(ns_int_value(words[2])), other = u32(ns_long_long_value(words[3])),
 		                       units = ns_int_value(words[4]), explicit = ns_int_value(words[5]) != 0,
 		                       due = ns_long_long_value(words[6]), since = ns_long_long_value(words[7]),
 		                       what = world_intern(self.world, what)}

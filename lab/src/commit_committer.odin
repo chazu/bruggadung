@@ -58,9 +58,6 @@ Committed :: struct {
 // What a group declares it creates or destroys: the only changes to total
 // mass and to each unit's count that conservation allows.
 @(private = "file")
-BG_MAX_UNITS :: 64
-
-@(private = "file")
 Unit_Tally :: struct {
 	unit:     cstring,
 	before:   i64,
@@ -71,20 +68,16 @@ Unit_Tally :: struct {
 @(private = "file")
 Tally :: struct {
 	mass:   i64,
-	units:  [BG_MAX_UNITS]Unit_Tally,
-	nunits: uint,
+	units:  [dynamic]Unit_Tally,      /* as many as the group touches; its committer deletes it */
 }
 
 @(private = "file")
 tally_unit :: proc(t: ^Tally, unit: cstring) -> ^Unit_Tally {
-	for i: uint = 0; i < t.nunits; i += 1 {
-		if string(t.units[i].unit) == string(unit) do return &t.units[i]
+	for &u in t.units {
+		if string(u.unit) == string(unit) do return &u
 	}
-	if t.nunits == BG_MAX_UNITS do return nil
-	t.units[t.nunits] = {}
-	t.units[t.nunits].unit = unit
-	t.nunits += 1
-	return &t.units[t.nunits - 1]
+	append(&t.units, Unit_Tally{unit = unit})
+	return &t.units[len(t.units) - 1]
 }
 
 
@@ -527,7 +520,6 @@ food_alike :: proc(world: ^World, a: Entity_ID, b: Entity_ID) -> bool {
  * claimant has a claim of its kind on the stack already. */
 @(private = "file")
 claim_doubles :: proc(world: ^World, claim: Entity_ID, stack: Entity_ID) -> bool {
-	there: [64]Entity_ID
 	who, other: Entity_ID
 
 	kclaim := world_kind_named(world, "Claim")
@@ -535,8 +527,9 @@ claim_doubles :: proc(world: ^World, claim: Entity_ID, stack: Entity_ID) -> bool
 	if mine == nil || world_edges_from(world, .Claimant, claim, &who, 1) == 0 do return false
 	tc := world_tri(world)
 	if mine.kind != u32(tri.type_named(tc, "\"ownership\"")) && mine.kind != u32(tri.type_named(tc, "\"keeping\"")) do return false
-	n := world_edges_to(world, .Claim_Subject, stack, &there[0], 64)
-	for c in there[:min(n, 64)] {
+	there := world_edges_to_all(world, .Claim_Subject, stack)
+	defer delete(there)
+	for c in there {
 		theirs := (^Claim)(world_record(world, kclaim, c))
 		if c == claim || theirs == nil || theirs.kind != mine.kind do continue
 		if world_edges_from(world, .Claimant, c, &other, 1) != 0 && other == who do return true
@@ -578,8 +571,8 @@ committer_merge_obstacle :: proc(self: ^Committer, a: Entity_ID, b: Entity_ID) -
 	// whose the stack is as much (claim_doubles): one portion of a
 	// household's, put with the household's sack
 	if !world_is_stack(self.world, a) {
-		n = world_edges_to(self.world, .Claim_Subject, a, &claims[0], 8)
-		for i: uint = 0; i < n && i < 8; i += 1 {
+		n = fitting(world_edges_to(self.world, .Claim_Subject, a, &claims[0], len(claims)), len(claims), "claims on a unit merging")
+		for i: uint = 0; i < n; i += 1 {
 			if world_edges_from(self.world, .Claim_Subject, claims[i], &subjects[0], 2) == 1 &&
 			   !claim_doubles(self.world, claims[i], b) {
 				return "a claim is on this unit alone"
@@ -767,13 +760,11 @@ committer_apply :: proc(self: ^Committer, p: ^Proposal, g: ^Proposal_Group, tall
 	loc:    Location
 	a:      Entity_ID
 	b:      Entity_ID
-	claims: [64]Entity_ID
 	e:      Entity_ID
 	reason: string
 	error:  string
 	kbody:  uint
 	kstack: uint
-	n:      uint
 	ev:     u64
 	seed:   u64
 	f:      ^Field_Info
@@ -817,9 +808,10 @@ committer_apply :: proc(self: ^Committer, p: ^Proposal, g: ^Proposal_Group, tall
 		/* where it was: a witness knows the thing that ended there (KNOWLEDGE.md decision 19) */
 		ev = committer_emit(self, "destroyed", e, NO_ENTITY, 0, p.name, world_location_of(self.world, e), g)
 		// the claims on it are on it no more; one on nothing else is over
-		n = world_edges_to(self.world, .Claim_Subject, e, &claims[0], 64)
+		claims := world_edges_to_all(self.world, .Claim_Subject, e)
+		defer delete(claims)
 		world_destroy(self.world, e, NO_ENTITY, ev, p.name if p.name != nil else "destroyed")
-		for i: uint = 0; i < n && i < 64; i += 1 {
+		for i := 0; i < len(claims); i += 1 {
 			world_remove_edge(self.world, .Claim_Subject, claims[i], e)
 			if !world_is_live(self.world, claims[i]) || world_edges_from(self.world, .Claim_Subject, claims[i], &a, 1) != 0 do continue
 			over := committer_emit(self, "destroyed", claims[i], NO_ENTITY, 0, "its subject gone", location_make_none(), g)
@@ -931,8 +923,9 @@ committer_apply :: proc(self: ^Committer, p: ^Proposal, g: ^Proposal_Group, tall
 		world_set_location(self.world, loc, e)
 		world_add_edge(self.world, .Split_From, e, a)
 		// every claim on the stack extends to what was split off; which units it covers is not assigned
-		n = world_edges_to(self.world, .Claim_Subject, a, &claims[0], 64)
-		for i: uint = 0; i < n && i < 64; i += 1 do world_add_edge(self.world, .Claim_Subject, claims[i], e)
+		claims := world_edges_to_all(self.world, .Claim_Subject, a)
+		defer delete(claims)
+		for c in claims do world_add_edge(self.world, .Claim_Subject, c, e)
 		committer_emit(self, "split", e, a, p.value, nil, loc, g)
 		return ""
 
@@ -953,8 +946,9 @@ committer_apply :: proc(self: ^Committer, p: ^Proposal, g: ^Proposal_Group, tall
 		// quantity claims follow the units; each keeps its quantity. A claim
 		// of ownership or keeping the stack's claimant has on it already
 		// isn't doubled: left on nothing, it is over
-		n = world_edges_to(self.world, .Claim_Subject, a, &claims[0], 64)
-		for i: uint = 0; i < n && i < 64; i += 1 {
+		claims := world_edges_to_all(self.world, .Claim_Subject, a)
+		defer delete(claims)
+		for i := 0; i < len(claims); i += 1 {
 			one: Entity_ID
 			world_remove_edge(self.world, .Claim_Subject, claims[i], a)
 			if !claim_doubles(self.world, claims[i], b) {
@@ -983,7 +977,7 @@ committer_apply :: proc(self: ^Committer, p: ^Proposal, g: ^Proposal_Group, tall
 			return ""
 		}
 		// splitFrom and claimant are many-to-one
-		if p.edge != .Claim_Subject && world_edges_from(self.world, p.edge, a, &claims[0], 1) != 0 {
+		if p.edge != .Claim_Subject && world_edges_from(self.world, p.edge, a, nil, 0) != 0 {
 			return fmt.tprintf("%d already has a %s", a, EDGE_KIND_NAMES[p.edge])
 		}
 		world_add_edge(self.world, p.edge, a, b)
@@ -1025,7 +1019,6 @@ committer_place_obstacle :: proc(self: ^Committer, e: Entity_ID, loc: Location) 
 	agent:     ^Agent
 	container: ^Container
 	assembly:  ^Assembly
-	others:    [256]Entity_ID
 	up:        Entity_ID
 	other:     Location
 	guard:     uint
@@ -1048,7 +1041,12 @@ committer_place_obstacle :: proc(self: ^Committer, e: Entity_ID, loc: Location) 
 		if up == e do return fmt.tprintf("%d would be inside itself", e)
 		up = world_location_of(self.world, up).place
 	}
-	n = world_entities_at(self.world, loc.place, loc.form, &others[0], 256)
+	if up != NO_ENTITY {
+		cap_fault("%d placed more than 64 deep; not checked for being inside itself past that", e)
+	}
+	others := world_entities_at_all(self.world, loc.place, loc.form)
+	defer delete(others)
+	n = uint(len(others))
 	#partial switch loc.form {
 	case .Held_By:
 		agent = (^Agent)(world_record(self.world, world_kind_named(self.world, "Agent"), loc.place))
@@ -1063,7 +1061,7 @@ committer_place_obstacle :: proc(self: ^Committer, e: Entity_ID, loc: Location) 
 		} else if loc.slot < 0 || i64(loc.slot) >= agent.hands {
 			return fmt.tprintf("%d has no hand %d", loc.place, loc.slot)
 		}
-		for i: uint = 0; i < n && i < 256; i += 1 {
+		for i: uint = 0; i < n; i += 1 {
 			other = world_location_of(self.world, others[i])
 			if others[i] != e && other.slot == loc.slot {
 				return fmt.tprintf("hand %d of %d already holds %d", loc.slot, loc.place, others[i])
@@ -1078,7 +1076,7 @@ committer_place_obstacle :: proc(self: ^Committer, e: Entity_ID, loc: Location) 
 		/* a pack bears no more than its load (content/carrying/) */
 		if load: i64; world_get_field(self.world, "Pack.load", loc.place, &load) {
 			bears: i64
-			for i: uint = 0; i < n && i < 256; i += 1 do bears += world_mass_of(self.world, others[i])      /* it among them */
+			for i: uint = 0; i < n; i += 1 do bears += world_mass_of(self.world, others[i])      /* it among them */
 			if bears > load do return fmt.tprintf("%d would bear %dg, more than its %dg", loc.place, bears, load)
 		}
 		return ""
@@ -1087,7 +1085,7 @@ committer_place_obstacle :: proc(self: ^Committer, e: Entity_ID, loc: Location) 
 		assembly = (^Assembly)(world_record(self.world, world_kind_named(self.world, "Assembly"), loc.place))
 		if assembly == nil do return fmt.tprintf("%d is not an assembly", loc.place)
 		if loc.slot < 0 || i64(loc.slot) >= assembly.slots do return fmt.tprintf("%d has no slot %d", loc.place, loc.slot)
-		for i: uint = 0; i < n && i < 256; i += 1 {
+		for i: uint = 0; i < n; i += 1 {
 			other = world_location_of(self.world, others[i])
 			if others[i] != e && other.slot == loc.slot && location_role(&other) == location_role(&loc) {
 				return fmt.tprintf("%s %d of %d is taken", location_role(&loc), loc.slot, loc.place)
@@ -1170,7 +1168,7 @@ committer_validate :: proc(self: ^Committer, tally: ^Tally) -> string {
 	if after - before != tally.mass {
 		return fmt.tprintf("mass is not conserved: %dg before, %dg after, %dg declared", before, after, tally.mass)
 	}
-	for i: uint = 0; i < tally.nunits; i += 1 {
+	for i := 0; i < len(tally.units); i += 1 {
 		u = &tally.units[i]
 		if u.after - u.before != u.declared {
 			return fmt.tprintf("the count of %s is not conserved: %d before, %d after, %d declared",
@@ -1220,6 +1218,7 @@ committer_commit_group :: proc(self: ^Committer, group: ^Proposal_Group) {
 	committer_note(self, fmt.tprintf("b%d r%d #%d %s %s", world_boundary(self.world), self.round,
 	                                 self.position, PHASE_NAMES[proposal_group_phase(group)], proposal_group_source(group)))
 	tally = {}
+	defer delete(tally.units)
 	world_begin_group(self.world)
 	first     = world_event_count(self.world)
 	proposals = committer_individuate(self, group, &n)
