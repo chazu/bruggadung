@@ -1362,6 +1362,64 @@ void test_component_header(void)
     tri_content_free(c);
 }
 
+/* The content hash covers attributes and feature names (REVIEW.md §4.2 (6)):
+ * the hash guards generated components and saves by ID, which both read them. */
+static uint64_t hash_of(const char *const *srcs, size_t n)
+{
+    const char *names[] = { "a.tri", "b.tri" };
+    TriContent *c = load(names, srcs, n);
+    CHECK(tri_content_ok(c));
+    if (!tri_content_ok(c)) dump_diags(c);
+    uint64_t h = tri_content_hash(c);
+    tri_content_free(c);
+    return h;
+}
+
+static uint64_t hash_of1(const char *src)
+{
+    return hash_of(&src, 1);
+}
+
+void test_content_hash_attributes(void)
+{
+    const char *base =
+        "#B: { @component(B)\n  size: length @field(content, saved) @widen(1mm)\n}\n"
+        "b: #B & { size: >=1mm & <=9mm @vary(mode: 2mm) } @family(things)\n";
+    uint64_t h = hash_of1(base);
+    /* the same content hashes the same on every load */
+    CHECK(hash_of1(base) == h);
+    /* one @field flag fewer */
+    CHECK(hash_of1("#B: { @component(B)\n  size: length @field(content) @widen(1mm)\n}\n"
+                   "b: #B & { size: >=1mm & <=9mm @vary(mode: 2mm) } @family(things)\n") != h);
+    /* @vary's mode */
+    CHECK(hash_of1("#B: { @component(B)\n  size: length @field(content, saved) @widen(1mm)\n}\n"
+                   "b: #B & { size: >=1mm & <=9mm @vary(mode: 8mm) } @family(things)\n") != h);
+    /* @widen's step */
+    CHECK(hash_of1("#B: { @component(B)\n  size: length @field(content, saved) @widen(2mm)\n}\n"
+                   "b: #B & { size: >=1mm & <=9mm @vary(mode: 2mm) } @family(things)\n") != h);
+    /* @family's name */
+    CHECK(hash_of1("#B: { @component(B)\n  size: length @field(content, saved) @widen(1mm)\n}\n"
+                   "b: #B & { size: >=1mm & <=9mm @vary(mode: 2mm) } @family(others)\n") != h);
+    /* the component's name */
+    CHECK(hash_of1("#B: { @component(C)\n  size: length @field(content, saved) @widen(1mm)\n}\n"
+                   "b: #B & { size: >=1mm & <=9mm @vary(mode: 2mm) } @family(things)\n") != h);
+    /* a feature's name, though its ID stays the same */
+    CHECK(hash_of1("#B: { @component(B)\n  sizes: length @field(content, saved) @widen(1mm)\n}\n"
+                   "b: #B & { sizes: >=1mm & <=9mm @vary(mode: 2mm) } @family(things)\n") != h);
+    /* the order of a field's attributes doesn't count */
+    CHECK(hash_of1("#B: { @component(B)\n  size: length @widen(1mm) @field(content, saved)\n}\n"
+                   "b: #B & { size: >=1mm & <=9mm @vary(mode: 2mm) } @family(things)\n") == h);
+    /* nor the order of declarations and files */
+    const char *split[] = {
+        "#B: { @component(B)\n  size: length @field(content, saved)\n}\n"
+        "b: #B & { size: >=1mm & <=9mm @vary(mode: 2mm) } @family(things)\n",
+        "#B: { size: length @widen(1mm) }\n",
+    };
+    uint64_t hs = hash_of(split, 2);
+    const char *swapped[] = { split[1], split[0] };
+    CHECK(hash_of(swapped, 2) == hs);
+}
+
 void test_failure_recording_and_sizes(void)
 {
     TriContent *c = load1_ok(

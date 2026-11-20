@@ -193,6 +193,11 @@ Each content build has a **content hash**. It is a hash of the meaning of
 the content. It does not change with the order of files or declarations. It
 does not change with layout or comments.
 
+The hash covers the names of features and the text of every attribute,
+such as `@field(content, saved)` or `@vary(mode: 2mm)`. If you change a flag
+or a mode, the hash changes. The order of the attributes after one field
+does not change it.
+
 Programs use the hash to make sure that data agrees with the content. A
 save contains it. A generated file of component structs contains it.
 

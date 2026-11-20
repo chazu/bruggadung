@@ -353,6 +353,11 @@ or on its own inside a structure. The parser keeps the text between the
 parentheses as it is, and the attribute that reads it parses it. Unknown
 attribute names are ignored, so tools can add their own.
 
+The content hash covers every attribute's text, including the unknown ones,
+because the engine and tools read it: `@field`'s flags go into generated
+headers as written. A change to the text changes the hash. The order of
+attributes after one field, and of declarations, doesn't.
+
 | Attribute | Where | Arguments | Meaning |
 | --- | --- | --- | --- |
 | `@component(Name)` | Inside a type's structure | A name | The type is component kind `Name`. The features it introduces are the component's fields. A type is at most one component. |

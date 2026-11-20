@@ -500,7 +500,9 @@ The loader runs these steps, in this order, once per content build:
 6. Freeze the specs into an immutable arena, laid out by position (§12).
 7. Compile the pattern indexes and quick-check vectors (§12), one per
    family of instances marked `@family(name)`, from their `@quickcheck` paths.
-8. Record the content hash. Saves store it (§15).
+8. Record the content hash. Saves store it (§15). It covers the attributes
+   as written and the names of features, since generated components and
+   saves by ID read them.
 
 Every error carries the source locations of both conflicting sides.
 
