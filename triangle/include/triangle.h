@@ -106,6 +106,11 @@ const char *tri_type_feature(const TriContent *content, TriType t, size_t i);
  * count, and the name of the i-th, with its signature. */
 size_t      tri_function_count(void);
 const char *tri_function(size_t i, const char **signature);
+/* The attributes content may write (@field, @vary, ...): the count, and the
+ * name of the i-th (without the @), with a line saying what it is. Any other
+ * attribute is a load error. */
+size_t      tri_attribute_count(void);
+const char *tri_attribute(size_t i, const char **doc);
 
 /* Component kinds declared with @component, and their fields' @field flags. */
 size_t      tri_component_count(const TriContent *content);

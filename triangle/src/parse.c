@@ -165,6 +165,191 @@ static size_t path_segments(const char *s)
     return (size_t) (t - s);
 }
 
+/* --- attributes ---------------------------------------------------------------- */
+
+/* An attribute's argument text, its spaces at either end skipped: [*s, *e). */
+static void attr_trim(const char *args, const char **s, const char **e)
+{
+    const char *a = args, *b = args + strlen(args);
+    while (a < b && isspace((unsigned char) *a)) a++;
+    while (b > a && isspace((unsigned char) b[-1])) b--;
+    *s = a;
+    *e = b;
+}
+
+/* [s, e) is a name: a letter or '_', then letters, digits and '_'. */
+static bool attr_name_at(const char *s, const char *e)
+{
+    if (s == e || !name_start(*s)) return false;
+    for (s++; s < e; s++) if (!isalnum((unsigned char) *s) && *s != '_') return false;
+    return true;
+}
+
+/* The checks below return NULL if the arguments are good, or what they need. */
+
+static const char *attr_need_name(const char *args)
+{
+    const char *s, *e;
+    attr_trim(args, &s, &e);
+    return attr_name_at(s, e) ? NULL : "a name";
+}
+
+/* Comma-separated items, each passing ok; none may be empty. */
+static bool attr_list(const char *args, bool (*ok)(const char *, const char *))
+{
+    const char *s, *e;
+    attr_trim(args, &s, &e);
+    if (s == e) return false;
+    for (;;) {
+        const char *c = s;
+        int depth = 0;
+        while (c < e && (depth || *c != ',')) {
+            if (*c == '(') depth++;
+            if (*c == ')') depth--;
+            c++;
+        }
+        const char *a = s, *b = c;
+        while (a < b && isspace((unsigned char) *a)) a++;
+        while (b > a && isspace((unsigned char) b[-1])) b--;
+        if (!ok(a, b)) return false;
+        if (c == e) return true;
+        s = c + 1;
+    }
+}
+
+/* a flag: a name, or a name and its arguments, perceive(sight) */
+static bool attr_flag(const char *s, const char *e)
+{
+    const char *p = memchr(s, '(', (size_t) (e - s));
+    if (!p) return attr_name_at(s, e);
+    return attr_name_at(s, p) && e[-1] == ')';
+}
+
+static bool attr_weight(const char *s, const char *e)
+{
+    if (s == e) return false;
+    for (; s < e; s++) if (!isdigit((unsigned char) *s)) return false;
+    return true;
+}
+
+/* a dotted path of names: actor.freeHands */
+static bool attr_path(const char *s, const char *e)
+{
+    for (;;) {
+        const char *d = memchr(s, '.', (size_t) (e - s));
+        if (!attr_name_at(s, d ? d : e)) return false;
+        if (!d) return true;
+        s = d + 1;
+    }
+}
+
+/* a quantity, with or without a unit and a sign: 2mm, 3, -5C */
+static bool attr_quantity(const char *s, const char *e)
+{
+    int dim;
+    int64_t q;
+    bool neg = s < e && *s == '-';
+    if (neg) s++;
+    return s < e && units_parse(s, (size_t) (e - s), neg, &dim, &q) == NULL;
+}
+
+static const char *attr_need_flags(const char *args)
+{
+    return attr_list(args, attr_flag) ? NULL : "comma-separated flags, each a name or a name(args)";
+}
+
+static const char *attr_need_weights(const char *args)
+{
+    const char *s, *e;
+    attr_trim(args, &s, &e);
+    if (e - s >= 4 && !memcmp(s, "mode", 4) && (e - s == 4 || s[4] == ':' || isspace((unsigned char) s[4]))) {
+        const char *v = s + 4;
+        while (v < e && isspace((unsigned char) *v)) v++;
+        if (v == e || *v != ':') return "a value: @vary(mode: 19mm)";
+        for (v++; v < e && isspace((unsigned char) *v); v++) {}
+        return attr_quantity(v, e) ? NULL : "a quantity as its mode: @vary(mode: 19mm)";
+    }
+    return attr_list(args, attr_weight) ? NULL : "whole-number weights, one per alternative, or mode: v";
+}
+
+static const char *attr_need_count(const char *args)
+{
+    const char *s, *e;
+    attr_trim(args, &s, &e);
+    if (!attr_weight(s, e)) return "a positive whole number";
+    while (s < e && *s == '0') s++;
+    return s == e ? "a positive whole number" : NULL;
+}
+
+static const char *attr_need_paths(const char *args)
+{
+    return attr_list(args, attr_path) ? NULL : "comma-separated dotted feature paths";
+}
+
+static const char *attr_need_step(const char *args)
+{
+    const char *s, *e;
+    int dim;
+    int64_t q;
+    attr_trim(args, &s, &e);
+    if (s == e || units_parse(s, (size_t) (e - s), false, &dim, &q) || q <= 0) return "a positive quantity: @widen(1mm)";
+    return NULL;
+}
+
+static int attr_option(const char *args, const char *key, char *out, size_t size);
+
+static const char *attr_need_file(const char *args)
+{
+    char file[8];
+    return attr_option(args, "file", file, sizeof file) && *file ? NULL : "a file: @embed(file=name.txt)";
+}
+
+/* Every attribute Triangle knows: its name, what it is, and a check of its
+ * arguments. An attribute not here is an error. The attribute's reader
+ * checks what needs the content: @vary's count of weights, @quickcheck's
+ * features, @embed's file. */
+static const struct {
+    const char *name;
+    const char *doc;
+    const char *(*check)(const char *args);
+} attributes[] = {
+    { "component", "@component(Name): the type is a component kind", attr_need_name },
+    { "field", "@field(flags): flags of a component's field", attr_need_flags },
+    { "vary", "@vary(weights) or @vary(mode: v): how construction chooses among alternatives, or in a range",
+      attr_need_weights },
+    { "variants", "@variants(n): the limit on an instance's variants", attr_need_count },
+    { "family", "@family(name): the instance is in a pattern family", attr_need_name },
+    { "quickcheck", "@quickcheck(paths): quick-check paths for the instance's family", attr_need_paths },
+    { "widen", "@widen(step): in memory decay, the field's interval widens by step", attr_need_step },
+    { "embed", "@embed(file=path, type=text): the field is the file's text", attr_need_file },
+    { "fn", "@fn(name): a field derived by registered code", attr_need_name },
+};
+
+size_t tri_attribute_count(void) { return sizeof attributes / sizeof *attributes; }
+
+const char *tri_attribute(size_t i, const char **doc)
+{
+    if (i >= tri_attribute_count()) return NULL;
+    if (doc) *doc = attributes[i].doc;
+    return attributes[i].name;
+}
+
+/* An unknown attribute, or a known one with bad arguments, is an error at
+ * the attribute; parsing goes on, so each one is reported. */
+static void attr_check(Parser *p, const Tok *t)
+{
+    for (size_t i = 0; i < tri_attribute_count(); i++) {
+        if (strcmp(t->attr_name, attributes[i].name)) continue;
+        const char *need = attributes[i].check(t->attr_args);
+        if (need) diag(p->c, true, t->loc, "@%s(%s): @%s needs %s", t->attr_name, t->attr_args, t->attr_name, need);
+        return;
+    }
+    Buf b = { 0 };
+    for (size_t i = 0; i < tri_attribute_count(); i++) buf_printf(&b, "%s@%s", i ? ", " : "", attributes[i].name);
+    diag(p->c, true, t->loc, "unknown attribute @%s; the attributes are %s", t->attr_name, b.s);
+    buf_free(&b);
+}
+
 static bool lex(Parser *p, const char *src)
 {
     return lex_at(p, src, 1, 1);
@@ -203,6 +388,13 @@ static bool lex_at(Parser *p, const char *src, int line, int col)
                     return false;
                 }
                 while (isalnum((unsigned char) *s) || *s == '_') ADV();
+            }
+            /* a use of the clause types brings in their prelude (load.c): the
+             * name itself, not a comment, a string, or a longer name */
+            if (ch == '#') {
+                size_t n = (size_t) (s - t.s);
+                if ((n == 7 && !memcmp(t.s, "#Clause", 7)) || (n == 5 && !memcmp(t.s, "#Fact", 5)))
+                    p->c->clause_refs = true;
             }
             /* then a path into it: wrench_19.size, tools.wrench_250.head.size, steps[0] */
             for (size_t n = path_segments(s); n; n--) ADV();
@@ -326,6 +518,7 @@ static bool lex_at(Parser *p, const char *src, int line, int col)
             } else {
                 t.attr_args = arena_alloc(p->c->load, 1);
             }
+            attr_check(p, &t);
         } else {
             ADV();
             switch (ch) {
@@ -867,7 +1060,7 @@ static X *embed(Parser *p, X *v, const Attr *a, Loc loc)
 {
     char file[1024], type[32], msg[1200];
     if (!attr_option(a->args, "file", file, sizeof file) || !*file) {
-        perr(p, loc, "@embed needs a file: @embed(file=name.txt)");
+        p->error = true;                       /* attr_check has said so, at the attribute */
         return NULL;
     }
     int escapes = file[0] == '/' || !strcmp(file, "..") || !strncmp(file, "../", 3) || strstr(file, "/../") ||

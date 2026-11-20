@@ -1616,11 +1616,7 @@ bool inst_pattern(Content *c, uint32_t i)
     Expand e = { c, DEFAULT_MAX_VARIANTS, 0, false, false, false };
     for (size_t k = 0; k < nd; k++) {
         const char *lim = attr_args(in->decls.v[k]->attrs, in->decls.v[k]->nattrs, "variants");
-        if (lim) {
-            long n = strtol(lim, NULL, 10);
-            if (n < 1) diag(c, true, in->decls.v[k]->loc, "%s: @variants needs a positive count", in->name);
-            else e.cap = (size_t) n;
-        }
+        if (lim) e.cap = (size_t) strtol(lim, NULL, 10);   /* positive: the parser checked it */
     }
     /* each declaration's variants, then their product */
     XVarVec *parts = calloc(nd ? nd : 1, sizeof(XVarVec));
@@ -4365,7 +4361,6 @@ static TriContent *load_common(const char *const *names, const char *const *sour
     c->genctr = 1;
     c->gen = 1;
     bool ok = parse_source(c, intern(c, "<prelude>"), prelude, &c->decls);
-    bool uses_clauses = false;
     for (size_t i = 0; i < n; i++) {
         const char *src = sources ? sources[i] : NULL;
         char *owned = NULL;
@@ -4395,10 +4390,10 @@ static TriContent *load_common(const char *const *names, const char *const *sour
             src = owned;
         }
         ok &= parse_source(c, intern(c, names[i]), src, &c->decls);
-        if (src && (strstr(src, "#Clause") || strstr(src, "#Fact"))) uses_clauses = true;
         free(owned);
     }
-    if (uses_clauses) ok &= parse_source(c, intern(c, "<clauses>"), clause_prelude, &c->decls);
+    /* the lexer sets clause_refs when a source names #Clause or #Fact */
+    if (c->clause_refs) ok &= parse_source(c, intern(c, "<clauses>"), clause_prelude, &c->decls);
     finish_load(c, ok, t0);
     return c;
 }

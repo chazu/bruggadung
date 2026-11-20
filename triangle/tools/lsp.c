@@ -1363,17 +1363,6 @@ static void workspace_symbols(const J *id, const J *params)
     str_free(&r);
 }
 
-static const char *const attributes[][2] = {
-    { "component", "@component(Name): the type is a component kind" },
-    { "field", "@field(flags): flags of a component's field" },
-    { "vary", "@vary(weights): weights of the alternatives a blueprint varies over" },
-    { "fn", "@fn(name): a field derived by registered code" },
-    { "family", "@family(name): the instance is in a pattern family" },
-    { "quickcheck", "@quickcheck(paths): quick-check paths for the instance's family" },
-    { "variants", "@variants(n): raise the limit on an instance's variants" },
-    { "widen", "@widen: see REFERENCE.md, Attributes" },
-};
-
 static const char *const builtins[] = {
     "_", "atom", "bool", "int", "fixed", "text", "ref", "mass", "length", "time", "force", "torque",
     "heat", "temperature", "volume", "amount", "true", "false", "package", "#List", "#Cons", "#Null",
@@ -1471,8 +1460,11 @@ static void completion(const J *id, const J *params)
     if (ref) {
         complete_reference(&at, &it, rs);
     } else if (attr) {
-        for (size_t i = 0; i < sizeof attributes / sizeof *attributes; i++)
-            item(&it, attributes[i][0], 14, NULL, attributes[i][1]);
+        for (size_t i = 0; i < tri_attribute_count(); i++) {
+            const char *doc;
+            const char *name = tri_attribute(i, &doc);
+            item(&it, name, 14, NULL, doc);
+        }
     } else {
         char *pkg = source_package(text);
         size_t pl = pkg ? strlen(pkg) : 0;
