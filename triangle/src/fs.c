@@ -8,18 +8,51 @@
 /* Each operation gets a fresh generation; scratch from other operations becomes
  * invalid without being cleared. Nested operations (lazy expansion during a
  * unification) save and restore the outer generation. */
-uint32_t op_begin(Content *c)
+uint64_t op_begin(Content *c)
 {
-    uint32_t saved = c->gen;
+    uint64_t saved = c->gen;
     c->gen = ++c->genctr;
     c->opdepth++;
     return saved;
 }
 
-void op_end(Content *c, uint32_t saved)
+void op_end(Content *c, uint64_t saved)
 {
     c->gen = saved;
     c->opdepth--;
+}
+
+/* --- the path stack ------------------------------------------------------------- */
+
+/* The path stack has no bound: a conflict at item 2000 of a list is 2002
+ * features deep. Growth doubles, so a push is constant time on average. */
+static uint32_t *grow_path(uint32_t *v, size_t *cap, size_t n)
+{
+    if (n <= *cap) return v;
+    size_t cap2 = *cap ? *cap : 64;
+    while (cap2 < n) cap2 *= 2;
+    v = realloc(v, cap2 * sizeof *v);
+    if (!v) abort();
+    *cap = cap2;
+    return v;
+}
+
+void path_reserve(Content *c, size_t n)
+{
+    c->pathstack = grow_path(c->pathstack, &c->pathcap, n);
+}
+
+void path_push(Content *c, uint32_t f)
+{
+    if ((size_t) c->depth == c->pathcap) path_reserve(c, (size_t) c->depth + 1);
+    c->pathstack[c->depth++] = f;
+}
+
+void path_set(Content *c, const uint32_t *path, size_t n)
+{
+    path_reserve(c, n);
+    if (n) memcpy(c->pathstack, path, n * sizeof(uint32_t));
+    c->depth = (int) n;
 }
 
 /* --- nodes ------------------------------------------------------------------------ */
@@ -168,6 +201,34 @@ void path_format(Content *c, Buf *b, const uint32_t *path, size_t n)
     if (!n) buf_puts(b, "(root)");
 }
 
+/* A path as text in fewer than `len` bytes. A path too long for that keeps its
+ * first and last features and counts those it leaves out between them:
+ * items.rest.rest.<140 more>.rest.first. Cut at the end, it would lose the
+ * part that says where the conflict is. */
+static void path_format_fit(Content *c, Buf *b, size_t len, const uint32_t *path, size_t n)
+{
+    path_format(c, b, path, n);
+    if (b->len < len) return;
+    b->len = 0;
+    b->s[0] = 0;
+    size_t head = 0, hl = 0, tail = 0, tl = 0;
+    while (head < n && hl + strlen(c->feats.v[path[head]].name) + 1 <= len / 3)
+        hl += strlen(c->feats.v[path[head++]].name) + 1;
+    /* ".<N more>." with N up to 20 digits */
+    size_t room = len - 1 - hl - 32;
+    while (tail < n - head && tl + strlen(c->feats.v[path[n - 1 - tail]].name) + 1 <= room)
+        tl += strlen(c->feats.v[path[n - 1 - tail++]].name) + 1;
+    for (size_t i = 0; i < head; i++) {
+        buf_puts(b, c->feats.v[path[i]].name);
+        buf_putc(b, '.');
+    }
+    buf_printf(b, "<%zu more>", n - head - tail);
+    for (size_t i = n - tail; i < n; i++) {
+        buf_putc(b, '.');
+        buf_puts(b, c->feats.v[path[i]].name);
+    }
+}
+
 /* Records a failure cheaply; most failures are never looked at, so the text
  * is made only when failure() is asked for it. */
 static void fail_at(Content *c, TriNode *a, TriNode *b, const char *why)
@@ -176,7 +237,8 @@ static void fail_at(Content *c, TriNode *a, TriNode *b, const char *why)
     c->failed = true;
     c->failfmt = false;
     c->faildepth = c->depth;
-    memcpy(c->failpath, c->pathstack, sizeof(uint32_t) * (size_t) c->depth);
+    c->failpath = grow_path(c->failpath, &c->failcap, (size_t) c->depth);
+    if (c->depth) memcpy(c->failpath, c->pathstack, sizeof(uint32_t) * (size_t) c->depth);
     c->failraw.why = why;
     c->failraw.ltype = a->type;
     node_iv(c, a, &c->failraw.llo, &c->failraw.lhi);
@@ -194,7 +256,7 @@ TriFailure *fail_info(Content *c)
     memset(&c->fail_, 0, sizeof c->fail_);
     if (!c->failed) return &c->fail_;
     Buf p = { 0 }, l = { 0 }, r = { 0 };
-    path_format(c, &p, c->failpath, (size_t) c->faildepth);
+    path_format_fit(c, &p, sizeof c->fail_.path, c->failpath, (size_t) c->faildepth);
     if (c->failraw.why) buf_puts(&l, c->failraw.why);
     else describe_value(c, &l, c->failraw.ltype, c->failraw.llo, c->failraw.lhi);
     if (c->failraw.hasr) describe_value(c, &r, c->failraw.rtype, c->failraw.rlo, c->failraw.rhi);
@@ -457,7 +519,7 @@ bool unify1(Content *c, TriNode *a, TriNode *b)
                 for (uint32_t k = 0; k < ts->ncarcs; k++)
                     if (ts->carcs[k].feat == f) { tv = ts->carcs[k].val; break; }
         }
-        c->pathstack[c->depth++] = f;
+        path_push(c, f);
         if (tv) {
             if (!unify1(c, tv, arc->val)) return false;
         } else if (!approp(c, t, f)) {
@@ -493,7 +555,7 @@ TriNode *materialize(Content *c, TriNode *n)
     if (!is_lazy(c, n) || c->types.v[n->type].xstate != 2) return n;
     TriNode *e = type_expansion(c, n->type);
     if (!e) return n;
-    uint32_t saved = op_begin(c);
+    uint64_t saved = op_begin(c);
     bool savedfailed = c->failed;
     int saveddepth = c->depth;
     TriNode *m = copy_raw(c, c->scratch, e);
@@ -505,7 +567,7 @@ TriNode *materialize(Content *c, TriNode *n)
     return r;
 }
 
-static TriNode *copy_raw_rec(Content *c, TriArena *a, TriNode *n, uint32_t cg)
+static TriNode *copy_raw_rec(Content *c, TriArena *a, TriNode *n, uint64_t cg)
 {
     if (n->cpygen == cg) return n->cpy;
     TriNode *m = node_new(c, a, n->type);
@@ -536,7 +598,7 @@ TriNode *copy_raw(Content *c, TriArena *a, TriNode *n)
  * narrowed intervals, and comp-arcs. With `share`, a node from a long-lived
  * arena that is unchanged, with unchanged descendants, is reused rather than
  * copied (structure sharing). */
-static TriNode *copy_out_rec(Content *c, TriArena *a, TriNode *n, uint32_t cg, bool *ok, bool share)
+static TriNode *copy_out_rec(Content *c, TriArena *a, TriNode *n, uint64_t cg, bool *ok, bool share)
 {
     n = deref(c, n);
     if (n->cpygen == cg) {
@@ -589,7 +651,7 @@ void copy_out_many(Content *c, TriArena *a, TriNode **roots, size_t n)
     if (noshare < 0) noshare = getenv("TRI_NOSHARE") != NULL;
     bool ok = true;
     c->cyclic = false;
-    uint32_t cg = ++c->cgenctr;
+    uint64_t cg = ++c->cgenctr;
     TriNode **in = malloc(sizeof(TriNode *) * (n ? n : 1));
     memcpy(in, roots, sizeof(TriNode *) * n);
     for (size_t i = 0; i < n; i++) roots[i] = copy_out_rec(c, a, in[i], cg, &ok, !noshare);
@@ -681,7 +743,7 @@ static void subsume_rec(Content *c, TriNode *a, TriNode *b, SubState *s)
 void tri_subsumes(TriContent *c, const TriNode *a, const TriNode *b, int *forward, int *backward)
 {
     TriMark m = tri_arena_mark(c->scratch);
-    uint32_t saved = op_begin(c);
+    uint64_t saved = op_begin(c);
     SubState s = { true, true };
     subsume_rec(c, (TriNode *) a, (TriNode *) b, &s);
     op_end(c, saved);
@@ -844,7 +906,7 @@ const TriNode *tri_unify(TriContent *c, const TriNode *a, const TriNode *b, TriA
                          TriFailure *failure)
 {
     TriMark m = tri_arena_mark(c->scratch);
-    uint32_t saved = op_begin(c);
+    uint64_t saved = op_begin(c);
     c->failed = false;
     c->depth = 0;
     TriNode *r = NULL;
@@ -1040,4 +1102,13 @@ size_t tri_conflicts(TriContent *c, const TriNode *a, const TriNode *b, char (*p
 const TriNode *tri_copy(TriContent *c, const TriNode *node, TriArena *out)
 {
     return copy_raw(c, out, (TriNode *) node);
+}
+
+/* For tests only (tests/test.h declares it): the next operation and the next
+ * copy get generation `next`, so a test can run past 2^32 without running
+ * 2^32 operations first. */
+void tri_test_set_generations(TriContent *c, uint64_t next)
+{
+    c->genctr = next - 1;
+    c->cgenctr = next - 1;
 }

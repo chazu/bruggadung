@@ -346,8 +346,8 @@ struct TriNode {
         struct { int64_t lo, hi; };   /* dimension nodes */
     };
     Scratch *sx;
-    uint32_t sxgen;
-    uint32_t cpygen;
+    uint64_t sxgen;              /* the generation sx belongs to */
+    uint64_t cpygen;             /* the copy generation cpy belongs to */
     TriNode *cpy;
 };
 
@@ -445,17 +445,28 @@ struct TriContent {
     uint32_t top, atomroot, stringroot, dimtype[NDIMS], tlist, tcons, tnull, tbool;
     uint32_t ffirst, frest;
 
-    /* generations */
-    uint32_t gen, genctr, cgenctr;
+    /* generations: a node's scratch (sx) and copy (cpy) count only while its
+     * mark equals the current generation, so no mark is ever cleared. A
+     * counter that wrapped would make a mark from long ago current again, and
+     * the engine would trust a stale pointer. Resetting every mark at the wrap
+     * cannot be done: nodes live in callers' arenas, which the engine does not
+     * know. So the counters are 64-bit and do not wrap: at 1.6 million
+     * operations a second, 2^64 is about 365,000 years. The cost is 8 bytes a
+     * node (56, not 48). */
+    uint64_t gen, genctr, cgenctr;
     int opdepth;                 /* nesting of operations; 1 = top level */
 
-    /* failure recording */
-    uint32_t pathstack[128];
+    /* failure recording. A list is a chain of rest arcs, so a path is as
+     * long as the list it goes into: the path stack has no fixed size, and
+     * grows (path_push) as unification goes deeper. */
+    uint32_t *pathstack;
+    size_t pathcap;
     int depth;
     bool failed;
     TriFailure fail_;            /* formatted on demand: read it through fail_info() */
     bool failfmt;                /* fail_ is up to date */
-    uint32_t failpath[128];      /* the failing path, as feature IDs */
+    uint32_t *failpath;          /* the failing path, as feature IDs */
+    size_t failcap;
     int faildepth;
     struct { const char *why; uint32_t ltype, rtype; int64_t llo, lhi, rlo, rhi; bool hasr; } failraw;
     char failwhy[256];           /* a failure's reason, when it is made up on the spot */
@@ -513,8 +524,11 @@ Sym      anon_name(Content *c, X *orx);
 Sym      list_type_name(Content *c, const X *elem, bool cons);
 
 /* fs.c */
-uint32_t op_begin(Content *c);
-void     op_end(Content *c, uint32_t saved);
+uint64_t op_begin(Content *c);
+void     op_end(Content *c, uint64_t saved);
+void     path_reserve(Content *c, size_t n);              /* room for n entries in the path stack */
+void     path_push(Content *c, uint32_t f);
+void     path_set(Content *c, const uint32_t *path, size_t n);
 TriNode *node_new(Content *c, TriArena *a, uint32_t type);
 Scratch *sx_get(Content *c, TriNode *n);
 Scratch *sx_make(Content *c, TriNode *n);

@@ -59,7 +59,7 @@ the order of files.
 
 ## Nodes
 
-A node is a C struct of 48 bytes. It has a type ID, its arcs, and the
+A node is a C struct of 56 bytes. It has a type ID, its arcs, and the
 scratch fields that unification uses. A quantity or an atom is a leaf node,
 with its value in the node.
 
@@ -212,8 +212,11 @@ The random tests found five defects, which are corrected. The
 
 ## Known limits
 
-- The generation counters have 32 bits and never reset. One content build
-  can do about 4 billion operations.
+- The generation counters have 64 bits and never reset. They do not wrap
+  in practice: 2^64 operations take about 365,000 years.
+- A failure's path as text has at most 255 characters. A longer path keeps
+  its first and last features, and gives the number of features between
+  them.
 - The two inputs of a unification must not share a node at two different
   positions.
 - The units are a table in `src/units.c`. Content cannot add a unit.
