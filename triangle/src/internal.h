@@ -472,6 +472,7 @@ struct TriContent {
     char failwhy[256];           /* a failure's reason, when it is made up on the spot */
     VEC(LetName) lets;           /* the names lets and comprehensions bind, checked against declarations */
     bool parsed_comp;            /* the last parse_expr_string had comprehensions */
+    bool clause_refs;            /* a source names #Clause or #Fact: load their prelude */
     U64Map declidx;              /* declaration label → first index + 1, for comprehensions' sources */
     bool declidx_built;
 

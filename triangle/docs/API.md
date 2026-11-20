@@ -130,6 +130,9 @@ TriType m = tri_meet(c, wrench, tool);             /* the most general common su
   has, its own and inherited.
 - `tri_function_count` and `tri_function` list the built-in functions content
   may call, with their signatures (REFERENCE.md, Built-in functions).
+- `tri_attribute_count` and `tri_attribute` list the attributes content may
+  write, each with a line saying what it is (REFERENCE.md, Attributes). Any
+  other attribute is a load error.
 - Type IDs are dense and deterministic for a given content hash. They change
   when content changes.
 - Components: `tri_component_count`, `tri_component_name`, and

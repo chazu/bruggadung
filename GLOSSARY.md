@@ -969,7 +969,8 @@ TES = TESSERA.md, VIL = VILLAGE.md. "d3" is a doc's decision
 - **Definite clause**: `#Clause` / `#Fact`, solved by resolution with a
   depth limit, for short recursive inferences. (CL §10)
 - **Attribute**: `@name(...)`: `@component`, `@field`, `@family`,
-  `@vary`, `@widen`, `@fn`, `@embed`, `@quickcheck`, `@variants`. (CL §1)
+  `@vary`, `@widen`, `@fn`, `@embed`, `@quickcheck`, `@variants`. Any
+  other name is a load error. (CL §1)
 - **Derived field**: a value computed by code named by `@fn`. (CL §5)
 - **Package**: a file or directory of content scoping its names and
   features; a name is qualified (`cooking.#Food`) only where two packages

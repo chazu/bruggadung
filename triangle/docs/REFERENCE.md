@@ -350,15 +350,21 @@ classes such as `\pL`, and case folding beyond ASCII.
 
 An attribute is written after a field's value, after a top-level declaration,
 or on its own inside a structure. The parser keeps the text between the
-parentheses as it is, and the attribute that reads it parses it. Unknown
-attribute names are ignored, so tools can add their own.
+parentheses as it is, and the attribute that reads it parses it. The
+attributes are those in the table below, and no others: an unknown name,
+such as a misspelt `@feild`, is an error at the attribute. The parser also
+checks each attribute's arguments against the table's Arguments column,
+and an argument of the wrong form is an error. Checks that need the content
+(how many weights `@vary` needs, whether a `@quickcheck` path's features
+exist, whether an `@embed` file can be read) come later, from the attribute's
+reader. `tri_attribute_count` and `tri_attribute` list the attributes.
 
 | Attribute | Where | Arguments | Meaning |
 | --- | --- | --- | --- |
 | `@component(Name)` | Inside a type's structure | A name | The type is component kind `Name`. The features it introduces are the component's fields. A type is at most one component. |
 | `@field(flags)` | After a field | Comma-separated flags | Field registry flags. `content` lets content set the field; setting any other field from content is an error. Other flags (`saved`, `inspect`, `proposable`, `perceive(sight)`, …) are kept for the engine (`tri_component_field`, generated headers) and not checked. A field with no `@field` is unrestricted. |
 | `@vary(w1, w2, …)` | After a field, or after an instance declaration | Whole-number weights | Weights for choosing among alternatives in construction, one per alternative. After a field, they count the field's top-level alternatives, or, when its value is a named enum, the enum's declared members in order. After a declaration, they weight its top-level structural alternatives (its variants). A weight of 0 means never. |
-| `@vary(mode: v)` | After a field holding a range | A quantity of the field's kind | Draw from a triangular distribution over the range, peaked at `v`. The range needs both bounds. If `v` doesn't parse as that kind, the draw is uniform. |
+| `@vary(mode: v)` | After a field holding a range | A quantity of the field's kind | Draw from a triangular distribution over the range, peaked at `v`. The range needs both bounds. A `v` that isn't a quantity is an error; if it is a quantity of another kind, the draw is uniform. |
 | `@variants(n)` | After an instance declaration | A positive whole number | The cap on the instance's variants. Default 64. |
 | `@family(name)` | After an instance declaration | A name | Put the instance in a pattern family, whose index is compiled at load (`tri_family_index`). |
 | `@quickcheck(p, …)` | After an instance declaration | Dotted feature paths | Quick-check paths for the instance's family. The family pools the paths of all its instances. |
@@ -861,7 +867,6 @@ location of the other declaration where there is one.
 | `X: [variant n: ]path is not concrete and has no bounds to vary within` | A blueprint field construction can't draw. |
 | `X: [variant n: ]no alternative of T fits at path` | No alternative of a disjunction type is compatible with the rest of the blueprint. |
 | `X expands to more than n variants; raise the limit with @variants(n)` | Too many combinations of alternatives. |
-| `X: @variants needs a positive count` | |
 | `warning: X: conflicting defaults for path from #A, #B; both dropped` | Defaults from unrelated types disagree. The field becomes variation. |
 
 **Attributes**
@@ -870,7 +875,8 @@ location of the other declaration where there is one.
 | --- | --- |
 | `@vary(…) needs one whole-number weight per alternative (n)` | The weights don't match the alternatives. |
 | `@vary(…) needs a field with alternatives` | Weights on a field with fewer than two alternatives. |
-| `@vary(mode) needs a value: @vary(mode: 19mm)` | |
+| `unknown attribute @x; the attributes are …` | An attribute not in the table of attributes, often a misspelling. |
+| `@x(…): @x needs …` | A known attribute's arguments are not of the form it takes: `@widen(banana)`, `@variants(0)`, `@family()`. |
 | `X: @vary(…) after a declaration weights its top-level alternatives, and this declaration has none (put it after the field)` | Weights after a declaration whose value is a single structure. |
 | `X: @quickcheck path 'p' has an unknown feature` | |
 

@@ -1147,6 +1147,84 @@ void test_clauses(void)
     tri_content_free(c);
 }
 
+/* A comment, a string or a longer name doesn't bring in the clause prelude
+ * (REVIEW.md §4.2 (9)): only a use of #Clause or #Fact does. */
+void test_clause_prelude_from_tokens(void)
+{
+    static const char *srcs[] = {
+        "// see #Fact in the docs\n#Animal: { head: text }\na: #Animal & { head: \"x\" }\n",
+        "#Animal: { body: text } // a #Clause has a body too\n#Plant: { head: text, note: text }\na: #Plant & { note: \"#Fact\" }\n",
+        "#Factory: { head: text }\n#Clauses: { body: text }\n",
+    };
+    for (size_t i = 0; i < sizeof srcs / sizeof *srcs; i++) {
+        TriContent *c = load1_ok(srcs[i]);
+        CHECK(tri_type_named(c, "#Fact") == TRI_BOTTOM);
+        tri_content_free(c);
+    }
+    /* a use, and a use with a path, still do */
+    TriContent *c = load1_ok("#Edge: { from: text }\ne1: #Fact & { head: #Edge & { from: \"a\" } }\n");
+    CHECK(tri_type_named(c, "#Fact") != TRI_BOTTOM);
+    tri_content_free(c);
+}
+
+/* An unknown attribute, or a known one with bad arguments, is an error at
+ * its file and line (REVIEW.md §4.2 (10)). */
+void test_attribute_checks(void)
+{
+    static const struct { const char *src; const char *diag; int line; } cases[] = {
+        { "#A: {\n  x: text @feild(content)\n}\n", "unknown attribute @feild", 2 },
+        { "#A: {\n  x: length @widen(banana)\n}\n", "@widen(banana): @widen needs a positive quantity", 2 },
+        { "#A: { x: text }\na: #A @famly(x)\n", "unknown attribute @famly", 2 },
+        { "#A: { x: text }\na: #A @family\n", "@family(): @family needs a name", 2 },
+        { "#A: { x: text }\na: #A @family(two words)\n", "@family needs a name", 2 },
+        { "#A: { @component(1B)\n x: text }\n", "@component needs a name", 1 },
+        { "#A: { x: text @field(content,, saved) }\n", "@field needs comma-separated flags", 1 },
+        { "#A: { x: text @field() }\n", "@field needs comma-separated flags", 1 },
+        { "#A: { x: \"a\" | \"b\" @vary(1, x) }\n", "@vary needs whole-number weights", 1 },
+        { "#A: { x: >=1mm & <=9mm @vary(mode: banana) }\n", "@vary needs a quantity as its mode", 1 },
+        { "#A: { x: >=1mm & <=9mm @vary(mode) }\n", "@vary needs a value", 1 },
+        { "#A: { x: text }\na: #A @variants(0)\n", "@variants needs a positive whole number", 2 },
+        { "#A: { x: text }\na: #A @variants(5x)\n", "@variants needs a positive whole number", 2 },
+        { "#A: { x: text }\na: #A @quickcheck(x..y)\n", "@quickcheck needs comma-separated dotted feature paths", 2 },
+        { "#A: { x: text @embed(type=text) }\n", "@embed needs a file", 1 },
+        { "#A: { x: mass @fn() }\n", "@fn needs a name", 1 },
+    };
+    for (size_t i = 0; i < sizeof cases / sizeof *cases; i++) {
+        TriContent *c = load1(cases[i].src);
+        CHECK(!tri_content_ok(c));
+        int found = 0;
+        for (size_t d = 0; d < tri_diag_count(c); d++) {
+            const char *file;
+            int line, col;
+            if (!strstr(tri_diag_message(c, d), cases[i].diag)) continue;
+            found = tri_diag_is_error(c, d) && tri_diag_location(c, d, &file, &line, &col) &&
+                    !strcmp(file, "f.tri") && line == cases[i].line;
+        }
+        if (!found) { fprintf(stderr, "    case %zu:\n", i); dump_diags(c); }
+        CHECK(found);
+        tri_content_free(c);
+    }
+    /* each of several is reported */
+    TriContent *c = load1("#A: { x: text @feild(content), y: text @widen(banana) }\na: #A @famly(x)\n");
+    CHECK(has_diag(c, "@feild", 1) && has_diag(c, "@widen(banana)", 1) && has_diag(c, "@famly", 1));
+    tri_content_free(c);
+    /* the good forms load */
+    c = load1_ok("#Colour: \"red\" | \"green\"\n"
+                 "#A: { @component(A)\n"
+                 "  size: >=1mm & <=9mm @field(content, saved, perceive(sight)) @widen(1mm) @vary(mode: 2mm)\n"
+                 "  colour: #Colour @field(content) @vary(1, 3)\n"
+                 "  heat: >=-20C & <=20C @field(content) @vary(mode: -5C)\n"
+                 "}\n"
+                 "a: #A @family(things) @quickcheck(size, colour) @variants(8)\n");
+    tri_content_free(c);
+    /* the list is the one the API gives */
+    CHECK(tri_attribute_count() == 9);
+    const char *doc = NULL;
+    CHECK_STR(tri_attribute(0, &doc), "component");
+    CHECK(doc && strstr(doc, "@component"));
+    CHECK(tri_attribute(tri_attribute_count(), NULL) == NULL);
+}
+
 /* --- the decided open questions ------------------------------------------------------------ */
 
 void test_path_keyed_variation(void)
